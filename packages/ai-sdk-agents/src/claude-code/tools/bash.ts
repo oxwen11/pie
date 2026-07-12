@@ -1,5 +1,5 @@
 import { tool, type Tool, type UIToolInvocation } from "ai";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const inputSchema = z.object({
   /**
