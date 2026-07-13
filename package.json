@@ -26,16 +26,16 @@
     "doctor:staged": "for d in apps/desktop apps/web packages/ui; do (cd \"$d\" && npx --no-install react-doctor --staged --blocking error) || exit 1; done"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.6",
-    "@types/node": "^24.10.13",
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^24.13.3",
     "lint-staged": "^17.0.8",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.73.0",
-    "publint": "^0.3.12",
+    "publint": "^0.3.21",
     "react-doctor": "^0.7.6",
     "simple-git-hooks": "^2.13.1",
-    "taze": "^19.5.0",
-    "turbo": "^2.5.8",
+    "taze": "^19.14.1",
+    "turbo": "^2.10.4",
     "typescript": "^7.0.2",
     "vitest": "catalog:"
   },
