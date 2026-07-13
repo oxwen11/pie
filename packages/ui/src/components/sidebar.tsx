@@ -91,10 +91,10 @@ export function SidebarProvider({
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
+  const open = openProp ?? _open;
   const setOpen = React.useCallback(
     async (value: boolean | ((value: boolean) => boolean)) => {
-      const currentOpen = openProp ?? _open;
-      const openState = typeof value === "function" ? value(currentOpen) : value;
+      const openState = typeof value === "function" ? value(open) : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
@@ -109,12 +109,12 @@ export function SidebarProvider({
         value: String(openState),
       });
     },
-    [setOpenProp, openProp, _open],
+    [setOpenProp, open],
   );
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((prev) => !prev) : setOpen((prev) => !prev);
+    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen]);
 
   // Adds a keyboard shortcut to toggle the sidebar.
@@ -130,21 +130,22 @@ export function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
-  const contextValue = React.useMemo<SidebarContextProps>(() => {
-    const open = openProp ?? _open;
+  // We add a state so that we can do data-state="expanded" or "collapsed".
+  // This makes it easier to style the sidebar with Tailwind classes.
+  const state = open ? "expanded" : "collapsed";
 
-    return {
+  const contextValue = React.useMemo<SidebarContextProps>(
+    () => ({
       isMobile,
       open,
       openMobile,
       setOpen,
       setOpenMobile,
-      // We add a state so that we can do data-state="expanded" or "collapsed".
-      // This makes it easier to style the sidebar with Tailwind classes.
-      state: open ? "expanded" : "collapsed",
+      state,
       toggleSidebar,
-    };
-  }, [openProp, _open, setOpen, isMobile, openMobile, toggleSidebar]);
+    }),
+    [state, open, setOpen, isMobile, openMobile, toggleSidebar],
+  );
 
   return (
     <SidebarContext.Provider value={contextValue}>

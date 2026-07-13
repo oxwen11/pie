@@ -473,6 +473,9 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource-variable/inter':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@tiptap/pm':
         specifier: ^3.27.3
         version: 3.27.3
@@ -1374,6 +1377,9 @@ packages:
 
   '@fontsource-variable/geist@5.2.9':
     resolution: {integrity: sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ==}
+
+  '@fontsource-variable/inter@5.2.8':
+    resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
 
   '@henrygd/queue@1.2.0':
     resolution: {integrity: sha512-jW/BLSTpcvExDhqJGxtIPgGr2O0IFF8XUNDwEbfCfhrXT8a4xztQ9Lv6U/vbYzYC0xVWn+3zv6YnLUh3bEFUKA==}
@@ -8460,6 +8466,8 @@ snapshots:
   '@fontsource-variable/geist-mono@5.2.8': {}
 
   '@fontsource-variable/geist@5.2.9': {}
+
+  '@fontsource-variable/inter@5.2.8': {}
 
   '@henrygd/queue@1.2.0': {}
 
