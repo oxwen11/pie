@@ -20,7 +20,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
-    "prepublish": "turbo build --filter=./packages/*",
+    "prepublish": "pnpm run build:packages",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks",
     "doctor": "react-doctor --yes"
   },
