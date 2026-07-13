@@ -22,8 +22,7 @@
     "changeset:publish": "changeset publish",
     "prepublish": "turbo build --filter=./packages/*",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks",
-    "doctor": "react-doctor --yes",
-    "doctor:ci": "react-doctor --yes --scope changed --blocking error"
+    "doctor": "react-doctor --yes"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
