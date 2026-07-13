@@ -39,7 +39,7 @@
     "@orpc/publisher": "^2.0.0-beta.16",
     "@orpc/server": "^2.0.0-beta.16",
     "@orpc/tanstack-query": "^2.0.0-beta.16",
-    "@pierre/diffs": "1.2.8",
+    "@pierre/diffs": "^1.2.12",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-query": "^5.101.2",
