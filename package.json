@@ -23,7 +23,7 @@
     "prepublish": "turbo build --filter=./packages/*",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks",
     "doctor": "react-doctor --yes",
-    "doctor:staged": "for d in apps/desktop apps/web packages/ui; do (cd \"$d\" && npx --no-install react-doctor --staged --blocking error) || exit 1; done"
+    "doctor:ci": "react-doctor --yes --scope changed --blocking error"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
@@ -40,7 +40,7 @@
     "vitest": "catalog:"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx --no-install lint-staged && pnpm run doctor:staged"
+    "pre-commit": "npx --no-install lint-staged"
   },
   "lint-staged": {
     "*": [
