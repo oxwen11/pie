@@ -28,11 +28,11 @@
     "@vibest/harness": "workspace:*",
     "effect": "4.0.0-beta.97",
     "simple-git": "^3.36.0",
-    "uuid": "^13.0.0",
-    "ws": "^8.18.3"
+    "uuid": "^14.0.1",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@types/node": "^24.10.13",
+    "@types/node": "^24.13.3",
     "@types/ws": "^8.18.1",
     "@vibest/typescript": "workspace:*",
     "ai": "^7.0.22",
