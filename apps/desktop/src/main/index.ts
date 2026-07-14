@@ -2,16 +2,28 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 
 import icon from "../../resources/icon.png?asset";
-import { App } from "./app";
-import { setupIPC } from "./ipc";
+import { type Backend, startBackend } from "./backend";
+import { APP_ORIGIN, registerAppProtocol, registerAppScheme } from "./protocol";
 
-let mainApp: App | null = null;
+let backend: Backend | undefined;
 
-function createWindow(appInstance: App): void {
-  // Create the browser window.
+// Two launches would spawn two backends, each on its own port, each with its
+// own agent — so the second launch focuses the first window instead.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
+// Must precede app.whenReady().
+registerAppScheme();
+
+function rendererRoot(): string {
+  return path.join(path.dirname(fileURLToPath(import.meta.url)), "../renderer");
+}
+
+function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -23,9 +35,11 @@ function createWindow(appInstance: App): void {
     trafficLightPosition: { x: 16, y: 16 },
     ...(process.platform === "linux" ? { icon } : {}),
     webPreferences: {
-      preload: path.join(path.dirname(fileURLToPath(import.meta.url)), "../preload/index.mjs"),
-      sandbox: false,
+      // .js, not .mjs: a sandboxed preload must be CommonJS.
+      preload: path.join(path.dirname(fileURLToPath(import.meta.url)), "../preload/index.js"),
+      sandbox: true,
       contextIsolation: true,
+      nodeIntegration: false,
     },
   });
 
@@ -33,71 +47,75 @@ function createWindow(appInstance: App): void {
     mainWindow.show();
   });
 
-  // Refresh git watchers when window gains focus
-  mainWindow.on("focus", () => {
-    appInstance.gitWatcher.refreshByGroup("git");
-  });
-
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);
     return { action: "deny" };
   });
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  if (is.dev && devUrl) {
+    void mainWindow.loadURL(devUrl);
   } else {
-    mainWindow.loadFile(
-      path.join(path.dirname(fileURLToPath(import.meta.url)), "../renderer/index.html"),
-    );
+    // Load the origin root, not /index.html: the router matches on pathname, and
+    // "/index.html" matches no route (it renders Not Found). The protocol
+    // handler's SPA fallback serves index.html for "/" anyway.
+    void mainWindow.loadURL(`${APP_ORIGIN}/`);
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+app.on("second-instance", () => {
+  const [existing] = BrowserWindow.getAllWindows();
+  if (!existing) return;
+  if (existing.isMinimized()) existing.restore();
+  existing.focus();
+});
+
 app.whenReady().then(async () => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId("com.vibest.desktop");
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // Initialize the App instance
-  mainApp = new App();
-  await mainApp.start();
+  // In dev the renderer is served by Vite over http, so that origin must be
+  // allowed too; in production it is only ever the app protocol.
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  const corsOrigins = [APP_ORIGIN, ...(is.dev && devUrl ? [new URL(devUrl).origin] : [])];
 
-  // Setup IPC handlers with App instance
-  setupIPC(mainApp);
+  try {
+    backend = await startBackend({ corsOrigins });
+  } catch (error) {
+    dialog.showErrorBox(
+      "Vibest could not start",
+      `The local server failed to start.\n\n${(error as Error).message}`,
+    );
+    app.quit();
+    return;
+  }
 
-  createWindow(mainApp);
+  // The preload asks for this before the renderer's first module runs.
+  ipcMain.on("vibest:bootstrap", (event) => {
+    event.returnValue = backend
+      ? { httpBaseUrl: backend.httpBaseUrl, wsBaseUrl: backend.wsBaseUrl, token: backend.token }
+      : null;
+  });
+
+  registerAppProtocol(rendererRoot());
+
+  createWindow();
 
   app.on("activate", () => {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0 && mainApp) createWindow(mainApp);
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on("before-quit", async () => {
-  if (mainApp) {
-    await mainApp.stop();
-  }
+app.on("before-quit", () => {
+  backend?.stop();
+  backend = undefined;
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

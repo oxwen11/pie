@@ -1,17 +1,15 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
-  "include": [
-    "src/renderer/src/env.d.ts",
-    "src/renderer/src/**/*",
-    "src/renderer/src/**/*.tsx",
-    "src/preload/*.d.ts",
-    "src/shared/**/*"
-  ],
+  "include": ["src/renderer/**/*", "src/preload/*.d.ts", "src/shared/**/*"],
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
+    // The renderer compiles @vibest/app from source, so this project sees that
+    // source too: it needs the app's own `@` alias, and `vite/client` for the
+    // side-effect CSS import.
+    "types": ["vite/client"],
     "paths": {
-      "@renderer/*": ["./src/renderer/src/*"]
+      "@/*": ["../app/src/*"]
     }
   }
 }

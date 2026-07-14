@@ -9,9 +9,23 @@ import sirv from "sirv";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { bearerToken, createTicketStore, tokensMatch } from "./auth";
+import { corsHeaders } from "./cors";
+
 const isDev = process.env.NODE_ENV === "development";
 
 type UIHandler = (req: IncomingMessage, res: ServerResponse) => void;
+
+export type CreateServerOptions = {
+  /**
+   * When set, every `/api/*` request except `/api/health` must present
+   * `Authorization: Bearer <token>`, and every WebSocket upgrade must carry a
+   * valid single-use `?ticket=`. Unset (browser mode) disables both.
+   */
+  authToken?: string | undefined;
+  /** Origins permitted to make cross-origin requests. Empty = same-origin only. */
+  corsOrigins?: readonly string[] | undefined;
+};
 
 function notFound(res: ServerResponse) {
   res.statusCode = 404;
@@ -19,15 +33,15 @@ function notFound(res: ServerResponse) {
 }
 
 /**
- * Locate the built web UI (t3code-style): the packaged layout ships it next
- * to the server bundle as `client/`, while running from monorepo source falls
- * back to `apps/web/dist`.
+ * Locate the built web UI: the packaged layout ships it next to the server
+ * bundle as `client/`, while running from monorepo source falls back to
+ * `apps/app/dist`.
  */
 function resolveStaticDir(): string | undefined {
   const candidates = [
     new URL("./client/", import.meta.url), // packaged: dist/client next to dist/cli.js
-    new URL("../../../../apps/web/dist/", import.meta.url), // monorepo, from src/node
-    new URL("../../../apps/web/dist/", import.meta.url), // monorepo, from packages/vibest/dist
+    new URL("../../../../apps/app/dist/", import.meta.url), // monorepo, from src/node
+    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/vibest/dist
   ];
   for (const candidate of candidates) {
     const dir = path.resolve(fileURLToPath(candidate));
@@ -38,9 +52,12 @@ function resolveStaticDir(): string | undefined {
   return undefined;
 }
 
-export async function createServer(): Promise<Server> {
+export async function createServer(options: CreateServerOptions = {}): Promise<Server> {
+  const { authToken, corsOrigins = [] } = options;
+
   const rpcHandler = createNodeRPCHandler();
   const wsHandler = createWsRPCHandler();
+  const tickets = createTicketStore();
 
   let serveUI: UIHandler;
 
@@ -50,11 +67,42 @@ export async function createServer(): Promise<Server> {
 
   async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     try {
+      const headers = corsHeaders(req.headers.origin, corsOrigins);
+      if (headers) {
+        for (const [name, value] of Object.entries(headers)) {
+          res.setHeader(name, value);
+        }
+      }
+
+      if (req.method === "OPTIONS") {
+        // A preflight from an origin we don't allow gets no headers, so the
+        // browser blocks the real request that would have followed.
+        res.statusCode = headers ? 204 : 403;
+        res.end();
+        return;
+      }
+
       const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
 
+      // Unauthenticated on purpose: the desktop supervisor polls this before
+      // it holds a token, and it discloses nothing.
       if (req.method === "GET" && pathname === "/api/health") {
         res.setHeader("content-type", "text/plain");
         res.end("ok");
+        return;
+      }
+
+      if (authToken !== undefined && pathname.startsWith("/api/")) {
+        if (!tokensMatch(authToken, bearerToken(req.headers.authorization))) {
+          res.statusCode = 401;
+          res.end("Unauthorized");
+          return;
+        }
+      }
+
+      if (req.method === "POST" && pathname === "/api/ws-ticket") {
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ ticket: tickets.issue() }));
         return;
       }
 
@@ -82,8 +130,8 @@ export async function createServer(): Promise<Server> {
     // (vite is a devDependency and marked external in tsdown.config.ts).
     const { createServer: createViteDevServer } = await import("vite");
     const vite = await createViteDevServer({
-      // Serve the standalone web app package (apps/web) through this server.
-      root: path.resolve(fileURLToPath(new URL("../../../../apps/web/", import.meta.url))),
+      // Serve the standalone web app package (apps/app) through this server.
+      root: path.resolve(fileURLToPath(new URL("../../../../apps/app/", import.meta.url))),
       server: {
         middlewareMode: true,
         hmr: {
@@ -97,7 +145,7 @@ export async function createServer(): Promise<Server> {
     if (!staticDir) {
       serveUI = (_req, res) => {
         res.statusCode = 503;
-        res.end("Web UI not built. Run the @vibest/web build first.");
+        res.end("Web UI not built. Run the @vibest/app build first.");
       };
     } else {
       const assets = sirv(staticDir, {
@@ -122,6 +170,18 @@ export async function createServer(): Promise<Server> {
       const protocol = req.headers["sec-websocket-protocol"];
       if (protocol && ["vite-ping", "vite-hmr"].includes(protocol)) return;
     }
+
+    if (authToken !== undefined) {
+      // A WS handshake carries no Authorization header, so the renderer proves
+      // itself with a single-use ticket minted over the authenticated HTTP link.
+      const requestUrl = new URL(req.url ?? "/", "http://localhost");
+      if (!tickets.consume(requestUrl.searchParams.get("ticket"))) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+    }
+
     wss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
       wss.emit("connection", ws, req);
     });
