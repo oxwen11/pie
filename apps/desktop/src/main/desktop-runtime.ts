@@ -36,6 +36,9 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
+  const isE2E = process.env["VIBEST_E2E"] === "1";
+  if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
+
   let runtime: ReturnType<typeof makeRuntime> | undefined;
   let disposing = false;
   let allowQuit = false;
