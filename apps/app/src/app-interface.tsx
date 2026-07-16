@@ -12,6 +12,14 @@ import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
 
+// Dev only: hover any element and press Cmd/Ctrl+C to copy it with its React
+// component stack and source locations, for pasting into a coding agent. The
+// guard is statically false in production, so react-grab is dead-code-eliminated
+// from both the Vite and electron-vite builds. See https://react-grab.com.
+if (import.meta.env.DEV) {
+  void import("react-grab");
+}
+
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
