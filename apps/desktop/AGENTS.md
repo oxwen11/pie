@@ -121,13 +121,6 @@ The preload must not expose Node or Electron objects to the page. The renderer m
 
 ## Verification
 
-For transport or lifecycle changes, run:
-
-- `pnpm --filter desktop test`
-- `pnpm --filter desktop typecheck`
-- `pnpm --filter desktop build`
-- `pnpm --filter desktop e2e`
-- `pnpm check`
-- `pnpm test`
+For transport or lifecycle changes, run the relevant workspace tasks via `turbo` (see the command conventions in the repo-root `AGENTS.md`).
 
 Tests must cover MessagePort unary RPC, stream delivery, client cancellation running the server finalizer, renderer reload receiving a new port, server recovery, Retry, Quit, and child-process cleanup. Package the unpacked app and smoke-test it after changes to preload, Electron platform imports, or runtime paths.

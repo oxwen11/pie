@@ -11,7 +11,7 @@ Key architectural patterns include:
 - **Monorepo:** Facilitates code sharing, consistent tooling, and streamlined development across related projects.
 - **Client-Server Communication:** Utilizes a custom RPC (Remote Procedure Call) layer (`@orpc`) for type-safe communication between frontend clients and the local backend server.
 - **Modular Design:** Functionality is broken down into distinct packages (e.g., `agents`, `ui`, `server-rpc`), promoting reusability and maintainability.
-- **AI-first Approach:** Deep integration with AI models (specifically Anthropic's Claude Code) is central, with dedicated packages defining AI tools and message handling.
+- **AI-first Approach:** Deep integration with AI models (specifically Anthropic's Codex) is central, with dedicated packages defining AI tools and message handling.
 
 ## Components and Modules
 
@@ -19,28 +19,28 @@ The repository is structured into several key applications (`apps`) and shared p
 
 ### Applications (`apps/`)
 
-- **`apps/app`**: The main web application, built with React and TanStack Router. It serves as a standalone interface for interacting with the Claude Code AI. It consumes shared UI components from `@vibest/ui` and communicates with the local server via `@orpc/client`.
+- **`apps/app`**: The main web application, built with React and TanStack Router. It serves as a standalone interface for interacting with the Codex AI. It consumes shared UI components from `@vibest/ui` and communicates with the local server via `@orpc/client`.
 
 ### Packages (`packages/`)
 
 - **`packages/agents`**: Contains the core logic for AI agents.
-  - **`claude-code`**: Implements the specific logic for interacting with the Anthropic Claude Code AI, handling session management and prompt processing.
+  - **`Codex`**: Implements the specific logic for interacting with the Anthropic Codex AI, handling session management and prompt processing.
 - **`packages/ai-sdk-agents`**: Defines the tools and types for AI agent SDKs. This package is crucial as it enumerates the capabilities of AI agents, such as `Bash`, `Read`, `Edit`, `Grep`, `Task`, `Web-Fetch`, and `Web-Search`, allowing the AI to interact with the development environment.
 - **`packages/cli`**: The local Node.js server that acts as the backend for the entire system.
   - It uses Express.js to serve static files (the built `apps/app` application) and handles RPC requests from clients via `@orpc/server`.
   - It instantiates and manages the `ClaudeCodeAgent` to process AI prompts.
-- **`packages/server-rpc`**: Defines the RPC routes and types for the backend server. This ensures type-safe communication between clients and the server, particularly for Claude Code-related operations.
+- **`packages/server-rpc`**: Defines the RPC routes and types for the backend server. This ensures type-safe communication between clients and the server, particularly for Codex-related operations.
 - **`packages/shared`**: A utility package for common types and constants shared across the monorepo.
 - **`packages/ui`**: A comprehensive UI component library, built with React, Radix UI, and Tailwind CSS. It includes:
   - **`ai-elements`**: Specialized components for building AI chat interfaces (e.g., `Conversation`, `Message`, `PromptInput`).
-  - **`claude-code`**: Components for rendering Claude Code-specific outputs, such as detailed visualizations of AI tool invocations (`ClaudeCodeBashTool`, `ClaudeCodeReadTool`, etc.).
+  - **`Codex`**: Components for rendering Codex-specific outputs, such as detailed visualizations of AI tool invocations (`ClaudeCodeBashTool`, `ClaudeCodeReadTool`, etc.).
   - **`components`**: General-purpose UI components (e.g., `Avatar`, `Button`, `Collapsible`, `DropdownMenu`) that are reused across all frontend applications.
 
 ## High-Level Functionality
 
 The repository provides a suite of tools that collectively offer:
 
-1.  **AI-Powered Coding Assistance:** Enables developers to interact with AI agents (specifically Claude Code) to get help with coding tasks, code reviews, debugging, and general development queries.
+1.  **AI-Powered Coding Assistance:** Enables developers to interact with AI agents (specifically Codex) to get help with coding tasks, code reviews, debugging, and general development queries.
 2.  **Contextual AI Interaction:** The AI receives accurate context of the code being worked on, leading to more relevant and useful responses.
 3.  **Streaming AI Responses:** Supports real-time streaming of AI chat responses, including intermediate steps and tool invocations, providing a dynamic and transparent interaction experience.
 4.  **Visualization of AI Tool Activity:** Displays the actions taken by the AI agent (e.g., running bash commands, reading files, performing edits, or executing tasks) in a structured and understandable format within the chat interface.
@@ -60,16 +60,16 @@ Data flow in the `vibest` system is orchestrated across several layers:
 
 3.  **Server-side Processing (Backend):**
     - The server, built with Express.js, receives RPC requests via `@orpc/server`.
-    - It uses `packages/agents/claude-code` to interact with the Claude Code AI.
+    - It uses `packages/agents/Codex` to interact with the Codex AI.
     - The AI processes the prompt, potentially utilizing tools defined in `packages/ai-sdk-agents` (e.g., `bash`, `read`, `edit`, `grep`, `task`) based on the context provided.
 
 4.  **AI Response and Streaming:**
-    - The Claude Code AI generates a response, which can include text, code blocks, or instructions for tool invocations.
+    - The Codex AI generates a response, which can include text, code blocks, or instructions for tool invocations.
     - The server streams these responses back to the client using `eventIteratorToStream`, allowing for real-time updates in the UI.
 
 5.  **UI Rendering:**
     - The web app receives the streamed AI response.
-    - Components from `@vibest/ui` (specifically `ai-elements` and `claude-code/message-parts`) parse and render the AI's output, including markdown text, code blocks, and visual representations of executed tools (e.g., `ClaudeCodeBashTool`, `ClaudeCodeReadTool`).
+    - Components from `@vibest/ui` (specifically `ai-elements` and `Codex/message-parts`) parse and render the AI's output, including markdown text, code blocks, and visual representations of executed tools (e.g., `ClaudeCodeBashTool`, `ClaudeCodeReadTool`).
 
 ## State Management Best Practices
 
@@ -98,7 +98,7 @@ The `vibest` project adheres to several modern engineering practices to ensure c
 The project integrates with several critical technologies and third-party tools:
 
 - **AI/LLM:**
-  - `@anthropic-ai/claude-agent-sdk`: The primary AI SDK for building agents and coding assistance.
+  - `@anthropic-ai/Codex-agent-sdk`: The primary AI SDK for building agents and coding assistance.
   - `ai` (Vercel AI SDK): Provides a robust framework for building AI-powered applications, handling chat message formats and streaming.
 - **Frontend Development:**
   - **React.js:** The core library for building the web application's user interface.
