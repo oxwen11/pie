@@ -57,7 +57,8 @@ export function makeMainWindow(
         show: false,
         autoHideMenuBar: true,
         titleBarStyle: "hiddenInset",
-        trafficLightPosition: { x: 16, y: 16 },
+        // y=20 centers the ~14px traffic lights on the header row (see __root.tsx).
+        trafficLightPosition: { x: 22, y: 20 },
         ...(process.platform === "linux" ? { icon } : {}),
         webPreferences: {
           preload: path.join(path.dirname(fileURLToPath(import.meta.url)), "../preload/index.js"),

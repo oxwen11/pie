@@ -11,6 +11,7 @@ import { makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
+import { vibestTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
 
@@ -38,6 +39,14 @@ function makeRuntime(devUrl: string | undefined) {
 export function startDesktopRuntime(): void {
   const isE2E = process.env["VIBEST_E2E"] === "1";
   if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
+
+  // Opt-in CDP remote debugging (agent-browser); isolated userData avoids the
+  // single-instance lock.
+  const remoteDebugPort = process.env["VIBEST_REMOTE_DEBUG_PORT"];
+  if (remoteDebugPort) {
+    app.commandLine.appendSwitch("remote-debugging-port", remoteDebugPort);
+    app.setPath("userData", vibestTempPath(`remote-debugging-${remoteDebugPort}`));
+  }
 
   let runtime: ReturnType<typeof makeRuntime> | undefined;
   let disposing = false;
