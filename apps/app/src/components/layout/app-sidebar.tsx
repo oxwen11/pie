@@ -25,9 +25,9 @@ export function AppSidebar({ onNewChat }: { onNewChat: () => void }) {
   return (
     <Sidebar variant="inset" collapsible="offcanvas" className="md:p-1.5">
       {/* Reserves the traffic-light / pinned-toggle row (see __root.tsx). */}
-      <SidebarHeader className="h-10" />
+      <SidebarHeader className="h-10 [-webkit-app-region:drag]" />
 
-      <SidebarContent>
+      <SidebarContent className="[-webkit-app-region:no-drag]">
         {/* Only New chat is wired; the rest are placeholders. */}
         <SidebarGroup>
           <SidebarGroupContent>
