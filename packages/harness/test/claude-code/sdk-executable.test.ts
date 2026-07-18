@@ -11,9 +11,11 @@ const fakeClaude = path.resolve(import.meta.dirname, "../../../../tools/testing/
 it.effect("communicates with Claude Agent SDK through a fake Claude executable", () =>
   Effect.gen(function* () {
     const agent = yield* makeClaudeCodeAgent({
-      ...process.env,
-      VIBEST_E2E: "1",
-      VIBEST_E2E_CLAUDE_EXECUTABLE: fakeClaude,
+      env: {
+        ...process.env,
+        VIBEST_E2E: "1",
+        VIBEST_E2E_CLAUDE_EXECUTABLE: fakeClaude,
+      },
     });
     const { sessionId } = yield* agent.session.create;
 

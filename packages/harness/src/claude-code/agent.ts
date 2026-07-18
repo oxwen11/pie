@@ -117,9 +117,23 @@ export interface ClaudeCodeAgent {
 
 const sdkError = (operation: string, cause: unknown) => new ClaudeSdkError({ operation, cause });
 
-export const makeClaudeCodeAgent = (
-  env: NodeJS.ProcessEnv = process.env,
-): Effect.Effect<ClaudeCodeAgent, never, Scope.Scope> =>
+/**
+ * Configuration for {@link makeClaudeCodeAgent}. All fields optional.
+ *
+ * `permissionMode` is forwarded to every Claude Agent SDK session. Leave it
+ * unset to let the SDK use its own default; set it to `"bypassPermissions"`
+ * to skip permission prompts — the SDK's required
+ * `allowDangerouslySkipPermissions: true` is added automatically in that case.
+ */
+export interface ClaudeCodeAgentOptions {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly permissionMode?: sdk.PermissionMode;
+}
+
+export const makeClaudeCodeAgent = ({
+  env = process.env,
+  permissionMode,
+}: ClaudeCodeAgentOptions = {}): Effect.Effect<ClaudeCodeAgent, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const sessions = yield* Ref.make(new Map<string, SessionState>());
@@ -239,10 +253,13 @@ export const makeClaudeCodeAgent = (
             return runCallbackPromise(waitForPermission);
           };
 
-          const options: sdk.Options = {
+          const queryOptions: sdk.Options = {
             mcpServers: {},
             strictMcpConfig: true,
-            permissionMode: "default",
+            permissionMode,
+            ...(permissionMode === "bypassPermissions"
+              ? { allowDangerouslySkipPermissions: true }
+              : {}),
             stderr: (error) => console.error(error),
             executable: process.execPath as "node",
             pathToClaudeCodeExecutable: resolveClaudeExecutable({ env }),
@@ -253,7 +270,11 @@ export const makeClaudeCodeAgent = (
             ...identity,
           };
           const queryInstance = yield* Effect.try({
-            try: () => query({ prompt: Stream.toAsyncIterable(Stream.fromQueue(input)), options }),
+            try: () =>
+              query({
+                prompt: Stream.toAsyncIterable(Stream.fromQueue(input)),
+                options: queryOptions,
+              }),
             catch: (cause) => sdkError("query", cause),
           });
           const state: SessionState = {

@@ -1,4 +1,9 @@
-export { makeClaudeCodeAgent, type ClaudeCodeAgent, type ToolPermissionRequest } from "./agent";
+export {
+  makeClaudeCodeAgent,
+  type ClaudeCodeAgent,
+  type ClaudeCodeAgentOptions,
+  type ToolPermissionRequest,
+} from "./agent";
 export { makeClaudeCodeAdapter } from "./runtime";
 
 export * from "./tools";

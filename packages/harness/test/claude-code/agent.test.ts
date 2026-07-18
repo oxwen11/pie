@@ -94,12 +94,36 @@ describe("ClaudeCodeAgent", () => {
   it.effect("passes the server environment to the Claude Code process", () =>
     Effect.gen(function* () {
       const agent = yield* makeClaudeCodeAgent({
-        ...process.env,
-        HTTPS_PROXY: "http://desktop-proxy.test:8443",
+        env: {
+          ...process.env,
+          HTTPS_PROXY: "http://desktop-proxy.test:8443",
+        },
       });
       const { sessionId } = yield* agent.session.create;
 
       NodeAssert.equal(lastOptions().env?.["HTTPS_PROXY"], "http://desktop-proxy.test:8443");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("leaves the permission mode to the SDK default when none is provided", () =>
+    Effect.gen(function* () {
+      const agent = yield* makeClaudeCodeAgent();
+      const { sessionId } = yield* agent.session.create;
+
+      NodeAssert.equal(lastOptions().permissionMode, undefined);
+      NodeAssert.equal(lastOptions().allowDangerouslySkipPermissions, undefined);
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("forwards bypass permission mode and the required safety flag", () =>
+    Effect.gen(function* () {
+      const agent = yield* makeClaudeCodeAgent({ permissionMode: "bypassPermissions" });
+      const { sessionId } = yield* agent.session.create;
+
+      NodeAssert.equal(lastOptions().permissionMode, "bypassPermissions");
+      NodeAssert.equal(lastOptions().allowDangerouslySkipPermissions, true);
       yield* agent.session.abort(sessionId);
     }),
   );
