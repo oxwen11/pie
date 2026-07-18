@@ -11,7 +11,7 @@ import { makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
-import { vibestTempPath } from "./lib/utils";
+import { devUserDataPath, devWorktreeSlug, vibestTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
 
@@ -46,6 +46,13 @@ export function startDesktopRuntime(): void {
   if (remoteDebugPort) {
     app.commandLine.appendSwitch("remote-debugging-port", remoteDebugPort);
     app.setPath("userData", vibestTempPath(`remote-debugging-${remoteDebugPort}`));
+  } else if (is.dev && !isE2E) {
+    // Give dev its own userData so its single-instance lock is independent of an
+    // installed build (which on macOS keeps holding the lock after its window
+    // closes). Key it on the git worktree so parallel dev instances from
+    // different worktrees don't collide. E2E is excluded — it passes its own
+    // --user-data-dir.
+    app.setPath("userData", devUserDataPath(Effect.runSync(devWorktreeSlug)));
   }
 
   let runtime: ReturnType<typeof makeRuntime> | undefined;
