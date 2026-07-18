@@ -29,19 +29,9 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
   const isFetching = useRouterState({ select: (s) => s.isLoading });
-  const { orpcQueryUtils } = Route.useRouteContext();
   const navigate = useNavigate();
 
-  const handleNewChat = async () => {
-    try {
-      const { sessionId } = await orpcQueryUtils.session.create.call({
-        harnessAgentId: "claude-code",
-      });
-      navigate({ to: "/session/$sessionId", params: { sessionId } });
-    } catch (error) {
-      console.error("Failed to create session", error);
-    }
-  };
+  const handleNewChat = () => navigate({ to: "/draft" });
 
   return (
     // -webkit-app-region drags the desktop window (no-op in the browser).
