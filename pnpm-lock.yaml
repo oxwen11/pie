@@ -157,7 +157,7 @@ importers:
         version: 6.0.3(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
       code-inspector-plugin:
         specifier: latest
-        version: 2.0.1
+        version: 2.0.1(@opencode-ai/sdk@1.18.3)
       react-grab:
         specifier: ^0.1.48
         version: 0.1.48(react@19.2.7)
@@ -245,7 +245,7 @@ importers:
         version: 2.1.1
       code-inspector-plugin:
         specifier: latest
-        version: 2.0.1
+        version: 2.0.1(@opencode-ai/sdk@1.18.3)
       dmg-builder:
         specifier: 26.4.0
         version: 26.4.0
@@ -350,6 +350,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 0.80.7
         version: 0.80.7(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@opencode-ai/sdk':
+        specifier: 1.18.3
+        version: 1.18.3
       '@vibest/contract':
         specifier: workspace:*
         version: link:../contract
@@ -1824,6 +1827,9 @@ packages:
   '@npmcli/fs@4.0.0':
     resolution: {integrity: sha512-/xGlezI6xfGO9NwuJlnwz/K14qD1kCSAGtacBHnGzeAIuJGazcp45KP5NuyARXoKb7cwulAGWVsbeSxdG/cb0Q==}
     engines: {node: ^18.17.0 || >=20.5.0}
+
+  '@opencode-ai/sdk@1.18.3':
+    resolution: {integrity: sha512-Mevo4e6kQwbvto9E+42KSIVMhp+JBu+SwQhC5AomAvrV6Xkio3U249T+xDILDCXhl5Z/Hi/DlAuVLzpGnuh0gg==}
 
   '@opentelemetry/api-logs@0.220.0':
     resolution: {integrity: sha512-CmVa4ImJ+ynfrPMNaAXHET6Bhb44SwzmfyVJFq9ni2jgXJR/l7C6gfVFddNmHP+ZOkP9cf4f9DBe68qVLTHc9w==}
@@ -9158,7 +9164,7 @@ snapshots:
 
   '@chevrotain/types@11.1.2': {}
 
-  '@code-inspector/core@2.0.1':
+  '@code-inspector/core@2.0.1(@opencode-ai/sdk@1.18.3)':
     dependencies:
       '@vue/compiler-dom': 3.5.27
       '@xterm/addon-fit': 0.11.0
@@ -9170,25 +9176,16 @@ snapshots:
       node-pty: 1.1.0
       portfinder: 1.0.38
       ws: 8.21.0
+    optionalDependencies:
+      '@opencode-ai/sdk': 1.18.3
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  '@code-inspector/esbuild@2.0.1':
+  '@code-inspector/esbuild@2.0.1(@opencode-ai/sdk@1.18.3)':
     dependencies:
-      '@code-inspector/core': 2.0.1
-    transitivePeerDependencies:
-      - '@anthropic-ai/claude-agent-sdk'
-      - '@openai/codex-sdk'
-      - '@opencode-ai/sdk'
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-
-  '@code-inspector/mako@2.0.1':
-    dependencies:
-      '@code-inspector/core': 2.0.1
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
       - '@openai/codex-sdk'
@@ -9197,10 +9194,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@code-inspector/turbopack@2.0.1':
+  '@code-inspector/mako@2.0.1(@opencode-ai/sdk@1.18.3)':
     dependencies:
-      '@code-inspector/core': 2.0.1
-      '@code-inspector/webpack': 2.0.1
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
       - '@openai/codex-sdk'
@@ -9209,9 +9205,21 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@code-inspector/vite@2.0.1':
+  '@code-inspector/turbopack@2.0.1(@opencode-ai/sdk@1.18.3)':
     dependencies:
-      '@code-inspector/core': 2.0.1
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/webpack': 2.0.1(@opencode-ai/sdk@1.18.3)
+    transitivePeerDependencies:
+      - '@anthropic-ai/claude-agent-sdk'
+      - '@openai/codex-sdk'
+      - '@opencode-ai/sdk'
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
+  '@code-inspector/vite@2.0.1(@opencode-ai/sdk@1.18.3)':
+    dependencies:
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
       chalk: 4.1.1
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
@@ -9221,9 +9229,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@code-inspector/webpack@2.0.1':
+  '@code-inspector/webpack@2.0.1(@opencode-ai/sdk@1.18.3)':
     dependencies:
-      '@code-inspector/core': 2.0.1
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
       - '@openai/codex-sdk'
@@ -9975,6 +9983,10 @@ snapshots:
   '@npmcli/fs@4.0.0':
     dependencies:
       semver: 7.8.5
+
+  '@opencode-ai/sdk@1.18.3':
+    dependencies:
+      cross-spawn: 7.0.6
 
   '@opentelemetry/api-logs@0.220.0':
     dependencies:
@@ -12879,14 +12891,14 @@ snapshots:
 
   cluster-key-slot@1.1.1: {}
 
-  code-inspector-plugin@2.0.1:
+  code-inspector-plugin@2.0.1(@opencode-ai/sdk@1.18.3):
     dependencies:
-      '@code-inspector/core': 2.0.1
-      '@code-inspector/esbuild': 2.0.1
-      '@code-inspector/mako': 2.0.1
-      '@code-inspector/turbopack': 2.0.1
-      '@code-inspector/vite': 2.0.1
-      '@code-inspector/webpack': 2.0.1
+      '@code-inspector/core': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/esbuild': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/mako': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/turbopack': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/vite': 2.0.1(@opencode-ai/sdk@1.18.3)
+      '@code-inspector/webpack': 2.0.1(@opencode-ai/sdk@1.18.3)
       chalk: 4.1.1
     transitivePeerDependencies:
       - '@anthropic-ai/claude-agent-sdk'
