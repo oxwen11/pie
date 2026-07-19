@@ -1,3 +1,4 @@
+import { fsContract } from "./fs";
 import { projectContract } from "./project";
 import { sessionContract } from "./session";
 
@@ -7,8 +8,9 @@ export * from "./session-events";
 export const contract = {
   project: projectContract,
   session: sessionContract,
+  fs: fsContract,
 };
 export type Contract = typeof contract;
 
-export { projectContract, sessionContract };
+export { fsContract, projectContract, sessionContract };
 export type { SessionEventStreamItem } from "./session";
