@@ -13,7 +13,12 @@ import {
 import { ProjectModuleLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { SessionRepositoryLayer } from "../src/session";
+import {
+  HarnessAgentSessionPortLayer,
+  SessionManagerLayer,
+  SessionRepositoryLayer,
+  SessionServiceLayer,
+} from "../src/session";
 
 /**
  * A router client backed by the full `RpcContext`, with an adapterless session
@@ -21,17 +26,24 @@ import { SessionRepositoryLayer } from "../src/session";
  * (rpc-session) build their own layers instead.
  */
 export function makeRpcTestHarness(home: string) {
-  const sessionLayer = HarnessAgentSessionServiceLayer.pipe(
+  const paths = layerPaths(home);
+  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
     Layer.provide(Layer.sync(HarnessAgentRegistry, () => makeHarnessAgentRegistry([]))),
+  );
+  const projectLayer = ProjectModuleLayer.pipe(Layer.provide(paths));
+  const sessionServiceLayer = SessionServiceLayer.pipe(
+    Layer.provide(projectLayer),
+    Layer.provide(SessionRepositoryLayer.pipe(Layer.provide(paths))),
+    Layer.provide(HarnessAgentSessionPortLayer.pipe(Layer.provide(harnessSessionLayer))),
+    Layer.provide(SessionManagerLayer.pipe(Layer.provide(EventBusLayer))),
     Layer.provide(EventBusLayer),
   );
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
       EventBusLayer,
-      sessionLayer,
+      sessionServiceLayer,
+      projectLayer,
       FileSystemServiceLayer,
-      ProjectModuleLayer.pipe(Layer.provide(layerPaths(home))),
-      SessionRepositoryLayer.pipe(Layer.provide(layerPaths(home))),
       NodeFileSystem.layer,
     ),
   );

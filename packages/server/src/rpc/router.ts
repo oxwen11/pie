@@ -8,8 +8,8 @@ import { sessionRouter } from "./session";
 const orpc = os.$context<RpcContext>();
 
 export const router = orpc.router({
-  project: projectRouter,
   session: sessionRouter,
+  project: projectRouter,
   fs: fsRouter,
 });
 export type Router = typeof router;
