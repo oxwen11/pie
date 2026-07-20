@@ -295,6 +295,48 @@ export type ActiveTurnSnapshot = {
   readonly complete: boolean;
 };
 
+// A permission preset the user can pick for a session. `id` is the harness's
+// own outward vocabulary (mapped to its native system inside the adapter, e.g.
+// Claude's `permissionMode` or Codex's approval + sandbox); `label` is the
+// display string the UI renders verbatim.
+export const HarnessAgentPermissionModeSchema = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+});
+export type HarnessAgentPermissionMode = typeof HarnessAgentPermissionModeSchema.Type;
+
+// Capabilities negotiated once per harness, not per session — identical for
+// every session of a given harness (they depend on the agent's type + CLI/SDK
+// version, not on any one session). Absent `permissionModes` means the harness
+// has no permission protocol at all (e.g. Pi).
+export const HarnessAgentCapabilitiesSchema = Schema.Struct({
+  permissionModes: Schema.optionalKey(Schema.Array(HarnessAgentPermissionModeSchema)),
+});
+export type HarnessAgentCapabilities = typeof HarnessAgentCapabilitiesSchema.Type;
+
+// One entry of the negotiation result: a harness the server hosts, whether it's
+// usable right now (`available` + optional `reason`), and its capabilities. The
+// UI reads `available` to decide which harnesses to offer and `capabilities` to
+// drive per-harness controls (e.g. the permission-mode picker).
+export const HarnessAgentInfoSchema = Schema.Struct({
+  id: HarnessAgentIdSchema,
+  name: Schema.String,
+  available: Schema.Boolean,
+  reason: Schema.optionalKey(Schema.String),
+  capabilities: HarnessAgentCapabilitiesSchema,
+});
+export type HarnessAgentInfo = typeof HarnessAgentInfoSchema.Type;
+
+// The whole negotiation, exchanged once after the client connects (MCP
+// `initialize`-style): the server declares every harness it hosts with its
+// availability and capabilities in one shot. The client holds this and reads
+// per-harness data by id — it never re-negotiates to switch the selected
+// harness.
+export const HarnessNegotiationSchema = Schema.Struct({
+  harnessAgents: Schema.Array(HarnessAgentInfoSchema),
+});
+export type HarnessNegotiation = typeof HarnessNegotiationSchema.Type;
+
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;
@@ -344,7 +386,7 @@ export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
   // Per-prompt model selection is a vibest addition not in the original design;
-  // it stays until a setModel/config effort replaces it.
+  // it stays until session-scoped setModel fully replaces it.
   model: Schema.optionalKey(Schema.String),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
@@ -410,9 +452,15 @@ export const BrowseResultSchema = Schema.Struct({
 // Lifecycle method inputs / outputs
 // ---------------------------------------------------------------------------
 
+// `model` / `permissionMode` are session-scoped config the user picks at create
+// time and changes mid-session via the dedicated setModel / setPermissionMode
+// calls — never carried on a prompt turn.
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   harnessAgentId: HarnessAgentIdSchema,
+  model: Schema.optionalKey(Schema.String),
+  // Outward permission-mode id from the session's harness capabilities.
+  permissionMode: Schema.optionalKey(Schema.String),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 
@@ -455,6 +503,20 @@ export const ResolveRefInputSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isUUID()),
 });
 export type ResolveRefInput = typeof ResolveRefInputSchema.Type;
+
+// Session-scoped config setters; `model` / `permissionMode` use the harness's
+// outward vocabulary (see HarnessAgentCapabilities).
+export const SetSessionModelInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  model: Schema.String,
+});
+export type SetSessionModelInput = typeof SetSessionModelInputSchema.Type;
+
+export const SetSessionPermissionModeInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  permissionMode: Schema.String,
+});
+export type SetSessionPermissionModeInput = typeof SetSessionPermissionModeInputSchema.Type;
 
 export const RespondToAgentRequestInputSchema = Schema.Struct({
   ref: SessionRefSchema,

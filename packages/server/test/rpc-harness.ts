@@ -9,6 +9,7 @@ import {
   HarnessAgentRegistry,
   HarnessAgentSessionServiceLayer,
   makeHarnessAgentRegistry,
+  type HarnessAgentAdapter,
 } from "../src/harness";
 import { ProjectModuleLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
@@ -25,11 +26,13 @@ import {
  * service and project storage under `home`. Tests that need live adapters
  * (rpc-session) build their own layers instead.
  */
-export function makeRpcTestHarness(home: string) {
+export function makeRpcTestHarness(
+  home: string,
+  adapters: ReadonlyArray<HarnessAgentAdapter> = [],
+) {
   const paths = layerPaths(home);
-  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
-    Layer.provide(Layer.sync(HarnessAgentRegistry, () => makeHarnessAgentRegistry([]))),
-  );
+  const registryLayer = Layer.sync(HarnessAgentRegistry, () => makeHarnessAgentRegistry(adapters));
+  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(Layer.provide(registryLayer));
   const projectLayer = ProjectModuleLayer.pipe(Layer.provide(paths));
   const sessionServiceLayer = SessionServiceLayer.pipe(
     Layer.provide(projectLayer),
@@ -38,11 +41,14 @@ export function makeRpcTestHarness(home: string) {
     Layer.provide(SessionManagerLayer.pipe(Layer.provide(EventBusLayer))),
     Layer.provide(EventBusLayer),
   );
+  // registryLayer is merged in as well as provided into the session service;
+  // Layer memoization (same reference) keeps it one registry instance.
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
       EventBusLayer,
       sessionServiceLayer,
       projectLayer,
+      registryLayer,
       FileSystemServiceLayer,
       NodeFileSystem.layer,
     ),

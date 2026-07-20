@@ -11,6 +11,11 @@ import { Schema } from "effect";
 export const CreateSessionInputSchema = Schema.Struct({
   workspacePath: Schema.String,
   sessionId: Schema.optionalKey(Schema.String),
+  // Session config chosen at create time, applied via the session's own
+  // setModel / setPermissionMode before the first prompt (applyInitialSessionConfig).
+  model: Schema.optionalKey(Schema.String),
+  // Outward permission-mode id from the harness's capabilities.
+  permissionMode: Schema.optionalKey(Schema.String),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

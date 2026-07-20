@@ -109,6 +109,10 @@ export interface ClaudeCodeAgent {
       sessionId: string,
       model: string,
     ) => Effect.Effect<void, ClaudeAgentFailure>;
+    readonly setPermissionMode: (
+      sessionId: string,
+      mode: sdk.PermissionMode,
+    ) => Effect.Effect<void, ClaudeAgentFailure>;
     readonly getSupportedCommands: (
       sessionId: string,
     ) => Effect.Effect<sdk.SlashCommand[], ClaudeAgentFailure>;
@@ -267,9 +271,10 @@ export const makeClaudeCodeAgent = ({
             mcpServers: {},
             strictMcpConfig: true,
             permissionMode,
-            ...(permissionMode === "bypassPermissions"
-              ? { allowDangerouslySkipPermissions: true }
-              : {}),
+            // Permit bypass so a session can be switched to "bypassPermissions"
+            // at runtime (setPermissionMode). This only enables the capability;
+            // the active mode stays whatever `permissionMode` currently is.
+            allowDangerouslySkipPermissions: true,
             stderr: (error) => console.error(error),
             executable: process.execPath as "node",
             pathToClaudeCodeExecutable: resolveClaudeExecutable({ env }),
@@ -556,6 +561,10 @@ export const makeClaudeCodeAgent = ({
           }),
         setModel: (sessionId, model) =>
           callQuery(sessionId, "set-model", (sdkQuery) => sdkQuery.setModel(model)),
+        setPermissionMode: (sessionId, mode) =>
+          callQuery(sessionId, "set-permission-mode", (sdkQuery) =>
+            sdkQuery.setPermissionMode(mode),
+          ),
         getSupportedCommands: (sessionId) =>
           callQuery(sessionId, "supported-commands", (sdkQuery) => sdkQuery.supportedCommands()),
         getSupportedModels: (sessionId) =>

@@ -13,12 +13,12 @@ import type { ChatTransport as AiChatTransport, UIMessage, UIMessageChunk } from
 import type { AgentRequest, AgentResponse } from "./agent-requests";
 import type { ChatSessionTransport } from "./chat-transport-port";
 
-export type ChatModel = "opus" | "sonnet";
-
 const isAbortError = (error: unknown) =>
   error instanceof DOMException && error.name === "AbortError";
 
-const toPromptInput = (ref: SessionRef, message: UIMessage, model: ChatModel): PromptInput => {
+// Model / permission mode are session config applied via their own calls
+// (setModel / setPermissionMode) — a prompt turn never carries them.
+const toPromptInput = (ref: SessionRef, message: UIMessage): PromptInput => {
   const parts: PromptPart[] = [];
   for (const part of message.parts) {
     if (part.type === "text") {
@@ -42,7 +42,7 @@ const toPromptInput = (ref: SessionRef, message: UIMessage, model: ChatModel): P
       });
     }
   }
-  return { ref, parts, model };
+  return { ref, parts };
 };
 
 type EventSubscription = {
@@ -54,7 +54,12 @@ type VibestSessionClient = VibestClient["session"];
 
 type SessionClient = Pick<
   VibestSessionClient,
-  "interrupt" | "prompt" | "respondToAgentRequest" | "getSnapshot"
+  | "interrupt"
+  | "prompt"
+  | "respondToAgentRequest"
+  | "setModel"
+  | "setPermissionMode"
+  | "getSnapshot"
 > & {
   subscribe: (
     ...args: Parameters<VibestSessionClient["subscribe"]>
@@ -184,12 +189,11 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
   ): Promise<ReadableStream<UIMessageChunk>> {
     const message = options.messages.at(-1);
     if (!message) throw new Error("message is required");
-    const model = (options.body as { model?: ChatModel } | undefined)?.model ?? "sonnet";
     // Subscribe before prompting: the live stream has no replay, so the turn's
     // first events must not race ahead of the subscription.
     const initial = await this.#subscribe(options.abortSignal);
     try {
-      const receipt = await this.client.session.prompt(toPromptInput(this.#ref, message, model), {
+      const receipt = await this.client.session.prompt(toPromptInput(this.#ref, message), {
         signal: options.abortSignal,
       });
       const interrupt = () => {
@@ -327,5 +331,13 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
       requestId,
       response,
     });
+  }
+
+  async setModel(model: string): Promise<void> {
+    await this.client.session.setModel({ ref: this.#ref, model });
+  }
+
+  async setPermissionMode(permissionMode: string): Promise<void> {
+    await this.client.session.setPermissionMode({ ref: this.#ref, permissionMode });
   }
 }

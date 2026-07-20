@@ -21,15 +21,20 @@ export const sessionRouter = orpc.router({
   // lifecycle -----------------------------------------------------------------
   create: orpc.create.effect(function* ({ input, errors }) {
     const sessions = yield* SessionService;
-    return yield* sessions.create(input.projectId, input.harnessAgentId).pipe(
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        AgentUnavailable: (e) =>
-          Effect.fail(errors.UNSUPPORTED({ message: `${e.harnessAgentId}: ${e.reason}` })),
-        SessionOpenFailed: (e) => Effect.fail(errors.INTERNAL({ message: e.reason })),
-      }),
-    );
+    return yield* sessions
+      .create(input.projectId, input.harnessAgentId, {
+        ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(input.permissionMode !== undefined ? { permissionMode: input.permissionMode } : {}),
+      })
+      .pipe(
+        Effect.catchTags({
+          ProjectNotFound: (e) =>
+            Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+          AgentUnavailable: (e) =>
+            Effect.fail(errors.UNSUPPORTED({ message: `${e.harnessAgentId}: ${e.reason}` })),
+          SessionOpenFailed: (e) => Effect.fail(errors.INTERNAL({ message: e.reason })),
+        }),
+      );
   }),
   resume: orpc.resume.effect(function* ({ input, errors }) {
     const sessions = yield* SessionService;
@@ -152,6 +157,46 @@ export const sessionRouter = orpc.router({
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {
     const sessions = yield* SessionService;
     yield* sessions.interrupt(input.ref).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(
+            "projectId" in e
+              ? errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })
+              : errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
+          ),
+        SessionRefMismatch: (e) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
+          ),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  setModel: orpc.setModel.effect(function* ({ input, errors }) {
+    const sessions = yield* SessionService;
+    yield* sessions.setModel(input.ref, input.model).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(
+            "projectId" in e
+              ? errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })
+              : errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
+          ),
+        SessionRefMismatch: (e) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
+          ),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  setPermissionMode: orpc.setPermissionMode.effect(function* ({ input, errors }) {
+    const sessions = yield* SessionService;
+    yield* sessions.setPermissionMode(input.ref, input.permissionMode).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(

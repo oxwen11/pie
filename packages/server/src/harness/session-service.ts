@@ -88,6 +88,14 @@ export type HarnessAgentSessionServiceShape = {
   readonly interrupt: (
     sessionId: string,
   ) => Effect.Effect<void, SessionNotFound | SessionClosed | AgentOperationError>;
+  readonly setModel: (
+    sessionId: string,
+    model: string,
+  ) => Effect.Effect<void, SessionNotFound | SessionClosed | AgentOperationError>;
+  readonly setPermissionMode: (
+    sessionId: string,
+    mode: string,
+  ) => Effect.Effect<void, SessionNotFound | SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     sessionId: string,
     requestId: string,
@@ -339,6 +347,12 @@ export const makeHarnessAgentSessionService = (
         getManaged(sessionId).pipe(Effect.flatMap((managed) => managed.session.prompt(input))),
       interrupt: (sessionId) =>
         getManaged(sessionId).pipe(Effect.flatMap((managed) => managed.session.interrupt)),
+      setModel: (sessionId, model) =>
+        getManaged(sessionId).pipe(Effect.flatMap((managed) => managed.session.setModel(model))),
+      setPermissionMode: (sessionId, mode) =>
+        getManaged(sessionId).pipe(
+          Effect.flatMap((managed) => managed.session.setPermissionMode(mode)),
+        ),
       respondToAgentRequest: (sessionId, requestId, response) =>
         getManaged(sessionId).pipe(
           Effect.flatMap((managed) => managed.session.respondToAgentRequest(requestId, response)),

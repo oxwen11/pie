@@ -14,6 +14,8 @@ import { createCodexTransform } from "@vibest/harness/codex";
 import type { CodexUIMessageChunk } from "@vibest/harness/codex";
 import type { ServerNotification, ServerRequest } from "@vibest/harness/codex/protocol";
 import type {
+  AskForApproval,
+  SandboxPolicy,
   ThreadReadResponse,
   ThreadResumeResponse,
   ThreadStartResponse,
@@ -131,6 +133,8 @@ export interface CodexAgent {
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
+      readonly approvalPolicy?: AskForApproval;
+      readonly sandboxPolicy?: SandboxPolicy;
     }) => Effect.Effect<
       {
         readonly turnId: string;
@@ -667,6 +671,10 @@ export const makeCodexAgentWithDependencies = <R>(
                     .request<TurnStartResponse>("turn/start", {
                       threadId: session.threadId,
                       input: turnInput,
+                      // Per-turn permission override (applies to this and
+                      // subsequent turns); omitted keys keep the thread default.
+                      ...(input.approvalPolicy ? { approvalPolicy: input.approvalPolicy } : {}),
+                      ...(input.sandboxPolicy ? { sandboxPolicy: input.sandboxPolicy } : {}),
                     })
                     .pipe(
                       Effect.tapError(() =>

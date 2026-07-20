@@ -91,10 +91,14 @@ const SessionServiceProvided = SessionServiceLayer.pipe(
   Layer.provide(EventBusLayer),
 );
 
+// RegistryLayer is merged in as well as provided into SessionServiceLayer;
+// Effect memoizes it by reference, so both see the one registry instance while
+// the harness route can resolve capabilities directly off it.
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   SessionServiceProvided,
   ProjectServiceProvided,
+  RegistryLayer,
   FileSystemServiceLayer,
   NodeFileSystem.layer,
 );

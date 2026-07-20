@@ -47,6 +47,8 @@ const makeFakePort = (opts: { failCreate?: HarnessCreateError } = {}) => {
     events: () => Effect.succeed(Stream.empty),
     prompt: () => Effect.die("prompt not exercised"),
     interrupt: () => Effect.die("interrupt not exercised"),
+    setModel: () => Effect.die("setModel not exercised"),
+    setPermissionMode: () => Effect.die("setPermissionMode not exercised"),
     respondToAgentRequest: () => Effect.die("respond not exercised"),
   });
   return { layer, spy };

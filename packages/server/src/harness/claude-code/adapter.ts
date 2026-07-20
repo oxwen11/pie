@@ -7,12 +7,13 @@ import { createTransform } from "@vibest/harness/claude-code";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
-import type {
-  HarnessAgentAdapter,
-  HarnessAgentSession,
-  SessionCapabilities,
-  SessionInfoResult,
-  UserInput,
+import {
+  applyInitialSessionConfig,
+  type HarnessAgentAdapter,
+  type HarnessAgentSession,
+  type SessionCapabilities,
+  type SessionInfoResult,
+  type UserInput,
 } from "../adapter";
 import {
   AgentOpenError,
@@ -30,6 +31,17 @@ const EVENT_QUEUE_CAPACITY = 1024;
 
 const operationError = (sessionId: string, operation: string, cause: unknown) =>
   new AgentOperationError({ sessionId, operation, cause });
+
+// Map claude-code's outward permission-mode ids onto the SDK's native enum.
+// Unknown ids yield undefined so setPermissionMode can reject them.
+const CLAUDE_PERMISSION_MODES: Record<string, sdk.PermissionMode> = {
+  plan: "plan",
+  ask: "default",
+  acceptEdits: "acceptEdits",
+  full: "bypassPermissions",
+};
+const toClaudePermissionMode = (id: string): sdk.PermissionMode | undefined =>
+  CLAUDE_PERMISSION_MODES[id];
 
 const toClaudeMessage = (input: UserInput): sdk.SDKUserMessage["message"] => ({
   role: "user",
@@ -252,6 +264,33 @@ const makeSession = (
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
     });
 
+    const setModel: HarnessAgentSession["setModel"] = (model) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        yield* agent.session
+          .setModel(sessionId, model)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
+      });
+
+    const setPermissionMode: HarnessAgentSession["setPermissionMode"] = (mode) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        const native = toClaudePermissionMode(mode);
+        if (!native)
+          return yield* Effect.fail(
+            operationError(
+              sessionId,
+              "set-permission-mode",
+              new Error(`unknown permission mode: ${mode}`),
+            ),
+          );
+        yield* agent.session
+          .setPermissionMode(sessionId, native)
+          .pipe(
+            Effect.mapError((cause) => operationError(sessionId, "set-permission-mode", cause)),
+          );
+      });
+
     const getCapabilities: HarnessAgentSession["getCapabilities"] = Effect.gen(function* () {
       const [commands, models, mcpServers] = yield* Effect.all(
         [
@@ -282,11 +321,6 @@ const makeSession = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-          if (input.model) {
-            yield* agent.session
-              .setModel(sessionId, input.model)
-              .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
-          }
           const prompt = yield* agent.session
             .prompt({ sessionId, message: toClaudeMessage(input) })
             .pipe(
@@ -327,6 +361,8 @@ const makeSession = (
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
+      setModel,
+      setPermissionMode,
       interrupt,
       respondToAgentRequest: (requestId, response) =>
         Ref.get(pendingPermissions).pipe(
@@ -365,6 +401,14 @@ const makeSession = (
 export const makeClaudeCodeAdapter = (agent: ClaudeCodeAgent): HarnessAgentAdapter => ({
   id: "claude-code",
   descriptor: { id: "claude-code", name: "Claude Code" },
+  capabilities: Effect.succeed({
+    permissionModes: [
+      { id: "plan", label: "Plan" },
+      { id: "ask", label: "Ask" },
+      { id: "acceptEdits", label: "Accept edits" },
+      { id: "full", label: "Full access" },
+    ],
+  }),
   checkAvailability: Effect.try({
     try: () => {
       resolveClaudeExecutable();
@@ -379,10 +423,11 @@ export const makeClaudeCodeAdapter = (agent: ClaudeCodeAgent): HarnessAgentAdapt
       }),
     ),
   ),
-  open: (_input) =>
+  open: (input) =>
     agent.session.create.pipe(
       Effect.mapError((cause) => new AgentOpenError({ harnessAgentId: "claude-code", cause })),
       Effect.flatMap(({ sessionId }) => makeSession(agent, sessionId)),
+      Effect.tap((session) => applyInitialSessionConfig(session, input)),
     ),
   resume: (input) =>
     agent.session.resume(input.sessionId).pipe(

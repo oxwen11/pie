@@ -91,6 +91,7 @@ function setup() {
     EventBusLayer,
     sessionServiceLayer,
     projectServiceLayer,
+    registryLayer,
     FileSystemServiceLayer,
     NodeServices.layer,
   );

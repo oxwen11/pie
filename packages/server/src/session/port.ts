@@ -26,6 +26,7 @@ export type HarnessPromptError =
   | TurnAlreadyRunning
   | AgentOperationError;
 export type HarnessInterruptError = HarnessSessionNotFound | SessionClosed | AgentOperationError;
+export type HarnessSetConfigError = HarnessSessionNotFound | SessionClosed | AgentOperationError;
 export type HarnessRespondError =
   | HarnessSessionNotFound
   | AgentRequestUnavailable
@@ -47,6 +48,7 @@ export class HarnessAgentSessionPort extends Context.Service<
     readonly create: (
       harnessAgentId: HarnessAgentId,
       workspacePath: string,
+      config?: { readonly model?: string; readonly permissionMode?: string },
     ) => Effect.Effect<string, HarnessCreateError>;
     /** Ensure a native session is active again from its stored native id. */
     readonly resume: (
@@ -65,6 +67,15 @@ export class HarnessAgentSessionPort extends Context.Service<
       input: UserInput,
     ) => Effect.Effect<PromptReceipt, HarnessPromptError>;
     readonly interrupt: (harnessSessionId: string) => Effect.Effect<void, HarnessInterruptError>;
+    // Session-scoped config setters; values use the harness's outward vocabulary.
+    readonly setModel: (
+      harnessSessionId: string,
+      model: string,
+    ) => Effect.Effect<void, HarnessSetConfigError>;
+    readonly setPermissionMode: (
+      harnessSessionId: string,
+      permissionMode: string,
+    ) => Effect.Effect<void, HarnessSetConfigError>;
     readonly respondToAgentRequest: (
       harnessSessionId: string,
       requestId: string,
@@ -97,11 +108,19 @@ export const HarnessAgentSessionPortLayer: Layer.Layer<
   Effect.gen(function* () {
     const harness = yield* HarnessAgentSessionService;
     return {
-      create: (harnessAgentId, workspacePath) =>
-        harness.create(harnessAgentId, { workspacePath }).pipe(
-          Effect.map((result) => result.sessionId),
-          Effect.mapError(mapCreateError(harnessAgentId)),
-        ),
+      create: (harnessAgentId, workspacePath, config) =>
+        harness
+          .create(harnessAgentId, {
+            workspacePath,
+            ...(config?.model !== undefined ? { model: config.model } : {}),
+            ...(config?.permissionMode !== undefined
+              ? { permissionMode: config.permissionMode }
+              : {}),
+          })
+          .pipe(
+            Effect.map((result) => result.sessionId),
+            Effect.mapError(mapCreateError(harnessAgentId)),
+          ),
       resume: (harnessAgentId, harnessSessionId, workspacePath) =>
         harness
           .resume({ sessionId: harnessSessionId, harnessAgentId, workspacePath })
@@ -113,6 +132,9 @@ export const HarnessAgentSessionPortLayer: Layer.Layer<
           .pipe(Effect.map((stream) => stream.pipe(Stream.map((draft) => draft.body)))),
       prompt: (harnessSessionId, input) => harness.prompt(harnessSessionId, input),
       interrupt: (harnessSessionId) => harness.interrupt(harnessSessionId),
+      setModel: (harnessSessionId, model) => harness.setModel(harnessSessionId, model),
+      setPermissionMode: (harnessSessionId, permissionMode) =>
+        harness.setPermissionMode(harnessSessionId, permissionMode),
       respondToAgentRequest: (harnessSessionId, requestId, response) =>
         harness.respondToAgentRequest(harnessSessionId, requestId, response),
     };

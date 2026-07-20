@@ -30,6 +30,7 @@ import {
   type HarnessPromptError,
   type HarnessRespondError,
   type HarnessResumeError,
+  type HarnessSetConfigError,
 } from "./port";
 import { SessionRepository } from "./repository";
 import { SessionManager, type SessionNotActive } from "./runtime";
@@ -66,6 +67,7 @@ export class SessionService extends Context.Service<
     readonly create: (
       projectId: string,
       harnessAgentId: HarnessAgentId,
+      config?: { readonly model?: string; readonly permissionMode?: string },
     ) => Effect.Effect<
       SessionRef,
       ProjectNotFound | HarnessCreateError | StoreReadError | StoreWriteError
@@ -108,6 +110,21 @@ export class SessionService extends Context.Service<
     ) => Effect.Effect<
       void,
       SessionNotFound | SessionRefMismatch | StoreReadError | HarnessInterruptError
+    >;
+    /** Session-scoped config setters; values use the harness's outward vocabulary. */
+    readonly setModel: (
+      ref: SessionRef,
+      model: string,
+    ) => Effect.Effect<
+      void,
+      SessionNotFound | SessionRefMismatch | StoreReadError | HarnessSetConfigError
+    >;
+    readonly setPermissionMode: (
+      ref: SessionRef,
+      permissionMode: string,
+    ) => Effect.Effect<
+      void,
+      SessionNotFound | SessionRefMismatch | StoreReadError | HarnessSetConfigError
     >;
     readonly respondToAgentRequest: (
       ref: SessionRef,
@@ -177,10 +194,10 @@ export const SessionServiceLayer: Layer.Layer<
       );
 
     return {
-      create: (projectId, harnessAgentId) =>
+      create: (projectId, harnessAgentId, config) =>
         projects.findById(projectId).pipe(
           Effect.flatMap((project) =>
-            port.create(harnessAgentId, project.path).pipe(
+            port.create(harnessAgentId, project.path, config).pipe(
               Effect.flatMap((harnessSessionId) => {
                 const sessionId = randomUUID();
                 const metadata: Session = {
@@ -288,6 +305,14 @@ export const SessionServiceLayer: Layer.Layer<
 
       interrupt: (ref) =>
         resolveHarnessSessionId(ref).pipe(Effect.flatMap((id) => port.interrupt(id))),
+
+      setModel: (ref, model) =>
+        resolveHarnessSessionId(ref).pipe(Effect.flatMap((id) => port.setModel(id, model))),
+
+      setPermissionMode: (ref, permissionMode) =>
+        resolveHarnessSessionId(ref).pipe(
+          Effect.flatMap((id) => port.setPermissionMode(id, permissionMode)),
+        ),
 
       respondToAgentRequest: (ref, requestId, response) =>
         resolveHarnessSessionId(ref).pipe(

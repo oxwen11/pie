@@ -19,8 +19,9 @@ import { createChatBaseExtensions } from "@/components/chat/input/extensions/cha
 import { createSubmitKeymap } from "@/components/chat/input/extensions/keymaps";
 import { hasChatContent } from "@/components/chat/input/serialize";
 import { ModelSelect } from "@/components/chat/model-select";
+import { PermissionModeSelect } from "@/components/chat/permission-mode-select";
+import type { ChatModel, ChatPermissionMode } from "@/core/chat/chat-config";
 import { useChatManager } from "@/core/chat/chat-context";
-import type { ChatModel } from "@/core/chat/chat-transport";
 
 // "/draft" is the new-session surface: type a first message, which creates a
 // session, sends it as the opening turn, and navigates into the live session.
@@ -35,6 +36,9 @@ function DraftRoute() {
   const manager = useChatManager();
   const navigate = useNavigate();
   const [model, setModel] = useState<ChatModel>("sonnet");
+  // Default to the most permissive mode (claude-code's "full" → bypassPermissions)
+  // so first-run turns aren't gated on approvals; the user can dial it down.
+  const [permissionMode, setPermissionMode] = useState<ChatPermissionMode>("full");
 
   // Create the session and start its first turn against the manager's persisted
   // store, then navigate — the session route re-attaches the same Chat with the
@@ -47,8 +51,10 @@ function DraftRoute() {
       const ref = await orpcQueryUtils.session.create.call({
         projectId: project.id,
         harnessAgentId: "claude-code",
+        model,
+        permissionMode,
       });
-      void manager.attach(ref).prompt(text, { model });
+      void manager.attach(ref).prompt(text);
       return ref.sessionId;
     },
     onSuccess: (sessionId) => {
@@ -96,6 +102,11 @@ function DraftRoute() {
           <PromptInputToolbar>
             <PromptInputTools>
               <ModelSelect value={model} onChange={setModel} />
+              <PermissionModeSelect
+                harnessAgentId="claude-code"
+                value={permissionMode}
+                onChange={setPermissionMode}
+              />
             </PromptInputTools>
             <PromptInputSubmit disabled={!hasContent || startSession.isPending} />
           </PromptInputToolbar>

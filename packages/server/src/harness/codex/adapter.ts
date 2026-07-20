@@ -1,13 +1,15 @@
 import type { SessionEvent } from "@vibest/harness";
 import type { CodexUIMessageChunk, SessionEnvelopeDraft } from "@vibest/harness";
+import type { AskForApproval, SandboxPolicy } from "@vibest/harness/codex/protocol/v2";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
-import type {
-  HarnessAgentAdapter,
-  HarnessAgentSession,
-  SessionInfoResult,
-  UserInput,
+import {
+  applyInitialSessionConfig,
+  type HarnessAgentAdapter,
+  type HarnessAgentSession,
+  type SessionInfoResult,
+  type UserInput,
 } from "../adapter";
 import {
   AgentOpenError,
@@ -37,6 +39,28 @@ const toPromptText = (input: UserInput): string =>
     )
     .join("\n");
 
+type CodexPermission = { approvalPolicy: AskForApproval; sandboxPolicy: SandboxPolicy };
+
+const workspaceWrite: SandboxPolicy = {
+  type: "workspaceWrite",
+  writableRoots: [],
+  networkAccess: false,
+  excludeTmpdirEnvVar: false,
+  excludeSlashTmp: false,
+};
+
+// Map codex's outward permission-mode ids onto its approval policy + sandbox.
+// Unknown ids yield undefined so setPermissionMode can reject them.
+const CODEX_PERMISSIONS: Record<string, CodexPermission> = {
+  "read-only": {
+    approvalPolicy: "on-request",
+    sandboxPolicy: { type: "readOnly", networkAccess: false },
+  },
+  ask: { approvalPolicy: "on-request", sandboxPolicy: workspaceWrite },
+  full: { approvalPolicy: "never", sandboxPolicy: { type: "dangerFullAccess" } },
+};
+const toCodexPermission = (id: string): CodexPermission | undefined => CODEX_PERMISSIONS[id];
+
 const makeSession = (
   agent: CodexAgent,
   sessionId: string,
@@ -49,6 +73,9 @@ const makeSession = (
     const cursor = yield* Ref.make(0);
     const closed = yield* Ref.make(false);
     const activeTurn = yield* Ref.make<string | undefined>(undefined);
+    // Codex has no session-wide permission call; it takes an approval policy +
+    // sandbox per turn. We hold the current mode here and apply it on each turn.
+    const permissionMode = yield* Ref.make<CodexPermission | undefined>(undefined);
 
     const emit = (body: CodexUIMessageChunk | SessionEvent) =>
       Queue.offer(events, { harnessAgentId: "codex", sessionId, body }).pipe(
@@ -138,8 +165,9 @@ const makeSession = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          const permission = yield* Ref.get(permissionMode);
           const prompt = yield* agent.session
-            .prompt({ sessionId, text: toPromptText(input) })
+            .prompt({ sessionId, text: toPromptText(input), ...permission })
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning
@@ -193,6 +221,22 @@ const makeSession = (
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
+      // Codex fixes its model at thread start; there's no runtime switch, so we
+      // accept the call and no-op rather than fail the caller.
+      setModel: () => Effect.void,
+      setPermissionMode: (mode) =>
+        Effect.gen(function* () {
+          const native = toCodexPermission(mode);
+          if (!native)
+            return yield* Effect.fail(
+              operationError(
+                sessionId,
+                "set-permission-mode",
+                new Error(`unknown permission mode: ${mode}`),
+              ),
+            );
+          yield* Ref.set(permissionMode, native);
+        }),
       interrupt,
       respondToAgentRequest: (requestId, response) =>
         agent.session.respondPermission(sessionId, requestId, response).pipe(
@@ -215,11 +259,21 @@ const makeSession = (
 export const makeCodexAdapter = (agent: CodexAgent): HarnessAgentAdapter => ({
   id: "codex",
   descriptor: { id: "codex", name: "Codex" },
+  capabilities: Effect.succeed({
+    permissionModes: [
+      // Codex has no "plan" (it never produces a plan) — its read-only preset
+      // is a pure read-only sandbox, declared under its own id.
+      { id: "read-only", label: "Read only" },
+      { id: "ask", label: "Ask" },
+      { id: "full", label: "Full access" },
+    ],
+  }),
   checkAvailability: Effect.succeed({ available: true }),
   open: (input) =>
     agent.session.create({ workspacePath: input.workspacePath }).pipe(
       Effect.mapError((cause) => new AgentOpenError({ harnessAgentId: "codex", cause })),
       Effect.flatMap(({ sessionId }) => makeSession(agent, sessionId)),
+      Effect.tap((session) => applyInitialSessionConfig(session, input)),
     ),
   resume: (input) =>
     agent.session.resume({ sessionId: input.sessionId, workspacePath: input.workspacePath }).pipe(
