@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ServerExitedBeforeReady,
+  type ServerEndpoint,
   type ServerProcessConfig,
   type LocalServerConfig,
   type RunningServerProcess,
@@ -14,7 +15,7 @@ import {
 type FakeProcess = {
   readonly port: number;
   readonly config: ServerProcessConfig;
-  readonly becomeReady: (port?: number) => void;
+  readonly becomeReady: (port?: number, token?: string) => void;
   readonly failBeforeReady: () => void;
   readonly exit: () => void;
   killed: boolean;
@@ -26,14 +27,14 @@ function makeHarness(overrides: Partial<LocalServerConfig> = {}) {
 
   const spawnServer: SpawnServer = (config, port) =>
     Effect.gen(function* () {
-      const ready = yield* Deferred.make<number, ServerExitedBeforeReady>();
+      const ready = yield* Deferred.make<ServerEndpoint, ServerExitedBeforeReady>();
       const exited = yield* Deferred.make<{ exitCode: number | null }>();
       const process: FakeProcess = {
         port,
         config,
         killed: false,
-        becomeReady: (boundPort = port || 40_000) => {
-          Effect.runSync(Deferred.succeed(ready, boundPort));
+        becomeReady: (boundPort = port || 40_000, token = "daemon-token") => {
+          Effect.runSync(Deferred.succeed(ready, { port: boundPort, token }));
         },
         failBeforeReady: () => {
           Effect.runSync(
@@ -64,12 +65,10 @@ function makeHarness(overrides: Partial<LocalServerConfig> = {}) {
 
   const config: LocalServerConfig = {
     entry: "/fake/cli.mjs",
-    token: "fixed-token",
     environment: Effect.succeed({
       PATH: "/login/bin:/usr/bin",
       HTTPS_PROXY: "http://proxy.test:8443",
     }),
-    corsOrigins: ["vibest://app"],
     initialRestartDelayMs: 0,
     maxRestartDelayMs: 0,
     maxFastFailures: 5,
@@ -112,7 +111,7 @@ describe("LocalServer", () => {
     await expect(Effect.runPromise(server.connection)).resolves.toEqual({
       httpBaseUrl: "http://127.0.0.1:56789",
       wsBaseUrl: "ws://127.0.0.1:56789",
-      token: "fixed-token",
+      token: "daemon-token",
     });
     await expect(Effect.runPromise(server.snapshot)).resolves.toMatchObject({ status: "ready" });
     expect(h.processes[0]!.config.environment).toMatchObject({
@@ -161,7 +160,31 @@ describe("LocalServer", () => {
     await h.dispose();
   });
 
-  it("restarts on the same pinned port and keeps the token", async () => {
+  it("serves the latest endpoint after a restart hands back a new token", async () => {
+    const h = makeHarness();
+    await eventually(() => expect(h.processes).toHaveLength(1));
+    h.processes[0]!.becomeReady(50_000);
+    const server = await h.server;
+    await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
+      token: "daemon-token",
+    });
+
+    // A daemon respawn mints a fresh token — the connection must not be stale.
+    h.processes[0]!.exit();
+    await eventually(() => expect(h.processes).toHaveLength(2));
+    h.processes[1]!.becomeReady(50_001, "rotated-token");
+    await eventually(async () => {
+      await expect(Effect.runPromise(server.connection)).resolves.toEqual({
+        httpBaseUrl: "http://127.0.0.1:50001",
+        wsBaseUrl: "ws://127.0.0.1:50001",
+        token: "rotated-token",
+      });
+    });
+
+    await h.dispose();
+  });
+
+  it("restarts on the same pinned port", async () => {
     const h = makeHarness();
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
@@ -171,7 +194,6 @@ describe("LocalServer", () => {
     h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
     expect(h.processes[1]!.port).toBe(50_000);
-    expect(h.processes[1]!.config.token).toBe("fixed-token");
     h.processes[1]!.becomeReady();
     await eventually(async () => {
       expect((await Effect.runPromise(server.snapshot)).status).toBe("ready");

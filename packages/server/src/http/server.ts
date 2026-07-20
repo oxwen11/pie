@@ -1,20 +1,15 @@
-import fs from "node:fs";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { createServer as createHttpServer } from "node:http";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-import { createRpcRuntime, createWsRPCHandler } from "@vibest/server/rpc";
-import sirv from "sirv";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { createRpcRuntime, createWsRPCHandler } from "../rpc";
 import { bearerToken, createTicketStore, tokensMatch } from "./auth";
-import { corsHeaders } from "./cors";
+import { corsHeaders, isAllowedOrigin, isLoopbackHost } from "./cors";
+import { createUIHandler, type UIHandler } from "./ui";
 
 const isDev = process.env.NODE_ENV === "development";
-
-type UIHandler = (req: IncomingMessage, res: ServerResponse) => void;
 
 export type ManagedServer = Server & {
   readonly dispose: () => Promise<void>;
@@ -27,33 +22,17 @@ export type CreateServerOptions = {
    * valid single-use `?ticket=`. Unset (browser mode) disables both.
    */
   authToken?: string | undefined;
-  /** Origins permitted to make cross-origin requests. Empty = same-origin only. */
+  /**
+   * Extra cross-origin allowlist entries on top of the built-in trusted set
+   * (the desktop scheme + loopback). For a future hosted web app; unset in the
+   * common case, where the static policy already covers every real client.
+   */
   corsOrigins?: readonly string[] | undefined;
 };
 
 function notFound(res: ServerResponse) {
   res.statusCode = 404;
   res.end("Not Found");
-}
-
-/**
- * Locate the built web UI: the packaged layout ships it next to the server
- * bundle as `client/`, while running from monorepo source falls back to
- * `apps/app/dist`.
- */
-function resolveStaticDir(): string | undefined {
-  const candidates = [
-    new URL("./client/", import.meta.url), // packaged: dist/client next to dist/cli.js
-    new URL("../../../../apps/app/dist/", import.meta.url), // monorepo, from src/node
-    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/vibest/dist
-  ];
-  for (const candidate of candidates) {
-    const dir = path.resolve(fileURLToPath(candidate));
-    if (fs.existsSync(path.join(dir, "index.html"))) {
-      return dir;
-    }
-  }
-  return undefined;
 }
 
 export async function createServer(options: CreateServerOptions = {}): Promise<ManagedServer> {
@@ -72,6 +51,15 @@ export async function createServer(options: CreateServerOptions = {}): Promise<M
 
   async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     try {
+      // Anti DNS-rebinding: the server binds loopback, so a request whose Host
+      // is not loopback comes from an attacker page whose domain rebound to
+      // 127.0.0.1 — CORS would not stop it, this does.
+      if (!isLoopbackHost(req.headers.host)) {
+        res.statusCode = 403;
+        res.end("Forbidden");
+        return;
+      }
+
       const headers = corsHeaders(req.headers.origin, corsOrigins);
       if (headers) {
         for (const [name, value] of Object.entries(headers)) {
@@ -126,36 +114,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<M
     }
   }
 
-  if (isDev) {
-    // Import vite lazily so the production bundle never depends on it
-    // (vite is a devDependency and marked external in tsdown.config.ts).
-    const { createServer: createViteDevServer } = await import("vite");
-    const vite = await createViteDevServer({
-      // Serve the standalone web app package (apps/app) through this server.
-      root: path.resolve(fileURLToPath(new URL("../../../../apps/app/", import.meta.url))),
-      server: {
-        middlewareMode: true,
-        hmr: {
-          server,
-        },
-      },
-    });
-    serveUI = (req, res) => vite.middlewares(req, res, () => notFound(res));
-    closeUI = () => vite.close();
-  } else {
-    const staticDir = resolveStaticDir();
-    if (!staticDir) {
-      serveUI = (_req, res) => {
-        res.statusCode = 503;
-        res.end("Web UI not built. Run the @vibest/app build first.");
-      };
-    } else {
-      const assets = sirv(staticDir, {
-        single: true,
-      });
-      serveUI = (req, res) => assets(req, res, () => notFound(res));
-    }
-  }
+  ({ serveUI, closeUI } = await createUIHandler(server, isDev));
 
   const wss = new WebSocketServer({ noServer: true });
 
@@ -176,6 +135,19 @@ export async function createServer(options: CreateServerOptions = {}): Promise<M
     const requestUrl = new URL(req.url ?? "/", "http://localhost");
     if (requestUrl.pathname !== "/ws/rpc") {
       socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
+    // CORS never guards WebSockets, so the upgrade repeats the HTTP checks:
+    // reject a rebinding Host and any browser Origin outside the allowlist.
+    // A native client (no Origin) still passes, gated only by the ticket below.
+    const origin = req.headers.origin;
+    if (
+      !isLoopbackHost(req.headers.host) ||
+      (origin !== undefined && !isAllowedOrigin(origin, corsOrigins))
+    ) {
+      socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
       socket.destroy();
       return;
     }

@@ -1,0 +1,316 @@
+import childProcess from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+
+import { Clock, Effect } from "effect";
+
+import { DaemonLaunchError, DaemonStoppedError } from "./errors";
+import { daemonAlive, healthy, pidAlive } from "./liveness";
+import { lockExists, readLockPid, releaseLock, tryAcquireLock } from "./lock";
+import { reservePort } from "./port";
+import { type DaemonRecord, readRecord, removeRecord, writeRecord } from "./record";
+import { clearTombstone, hasTombstone, writeTombstone } from "./tombstone";
+
+const DEFAULT_PORT = 4000;
+const READY_TIMEOUT_MS = 30_000;
+const HEALTH_POLL_INTERVAL_MS = 150;
+const STOP_GRACE_MS = 5_000;
+const LOCK_ATTEMPTS = 10;
+
+export type DaemonHandle = {
+  readonly address: string;
+  readonly port: number;
+  readonly token: string;
+  readonly pid: number;
+  /** True when an already-running daemon was attached to instead of spawned. */
+  readonly reused: boolean;
+};
+
+export type ResolveDaemonOptions = {
+  /** `$VIBEST_HOME` — owns `daemon.pid`, `daemon.log`, and the launch lock. */
+  readonly home: string;
+  /**
+   * argv that launches the plain foreground server, e.g.
+   * `[process.execPath, ...process.execArgv, cliEntry, "serve"]`. The daemon is
+   * just this command spawned detached — the server stays daemon-unaware.
+   */
+  readonly serverArgv: readonly string[];
+  /** Preferred port; falls back to an ephemeral one if taken. Default `4000`. */
+  readonly port?: number;
+  /**
+   * Base environment for the spawned daemon (default `process.env`). The
+   * desktop passes its resolved login-shell environment plus
+   * `ELECTRON_RUN_AS_NODE`; the launcher's own `VIBEST_*` entries win.
+   */
+  readonly environment?: NodeJS.ProcessEnv;
+  /**
+   * Set by automatic supervision loops (the desktop's exit-triggered respawn).
+   * While the `daemon.stopped` tombstone is present, an autoRespawn caller
+   * fails with `DaemonStoppedError` instead of resurrecting a daemon the user
+   * explicitly stopped. Explicit front-doors leave this unset.
+   */
+  readonly autoRespawn?: boolean;
+  readonly readyTimeoutMs?: number;
+};
+
+export type DaemonLauncherError = DaemonLaunchError | DaemonStoppedError;
+
+/**
+ * The shared launcher (the local twin of the SSH launch script): read
+ * `daemon.pid`; if a healthy daemon is there, attach; otherwise spawn the
+ * foreground server detached, wait for it to answer health, and record it. Both
+ * the CLI and the desktop go through here so there is exactly one daemon per
+ * `$VIBEST_HOME` — concurrent launchers are serialized by an exclusive-create
+ * launch lock, and the loser attaches to the winner's daemon.
+ *
+ * Effect-based orchestration around one deliberately-raw seam: the detached
+ * spawn itself (see `spawnDetached`) — everything that sleeps, times out, or
+ * can fail lives in Effect so callers get interruption and typed errors.
+ *
+ * There is no origin negotiation here: the daemon's CORS policy is static (the
+ * desktop scheme + loopback are always trusted), so any client attaches to the
+ * one daemon regardless of who started it — no restart-to-widen-CORS.
+ */
+export const resolveOrSpawnDaemon = (
+  options: ResolveDaemonOptions,
+): Effect.Effect<DaemonHandle, DaemonLauncherError> =>
+  Effect.gen(function* () {
+    const existing = readRecord(options.home);
+
+    if (existing && (yield* daemonAlive(existing))) {
+      // A live daemon makes any tombstone stale (someone started it again).
+      clearTombstone(options.home);
+      return attach(existing, true);
+    }
+
+    if (options.autoRespawn === true && hasTombstone(options.home)) {
+      return yield* Effect.fail(
+        new DaemonStoppedError({
+          message:
+            "vibest daemon was stopped explicitly; not auto-respawning (run `vibest daemon start` to start it again)",
+        }),
+      );
+    }
+    clearTombstone(options.home);
+
+    if (existing) {
+      // Wedged (pid alive but unhealthy) daemons must die before we replace
+      // them, or they leak as orphans still holding their port. A dead pid is
+      // a no-op here.
+      yield* killPid(existing.pid);
+      removeRecord(options.home);
+    }
+    return yield* spawnLocked(options);
+  });
+
+/** Read the current daemon's status without starting one. */
+export const statusDaemon = (
+  home: string,
+): Effect.Effect<{ readonly running: boolean; readonly record?: DaemonRecord }> =>
+  Effect.gen(function* () {
+    const record = readRecord(home);
+    if (record && (yield* daemonAlive(record))) return { running: true, record };
+    return { running: false };
+  });
+
+/**
+ * Stop the daemon and leave a `daemon.stopped` tombstone so automatic
+ * supervision (the desktop's respawn loop) does not resurrect it. The
+ * tombstone is written before the kill so a respawn racing the stop still
+ * sees it. Returns whether anything was running.
+ */
+export const stopDaemon = (home: string): Effect.Effect<"stopped" | "not-running"> =>
+  Effect.gen(function* () {
+    const record = readRecord(home);
+    if (!record || !pidAlive(record.pid)) {
+      removeRecord(home);
+      return "not-running";
+    }
+
+    writeTombstone(home);
+    yield* killPid(record.pid);
+    removeRecord(home);
+    return "stopped";
+  });
+
+/** SIGTERM, wait up to the grace period, escalate to SIGKILL. */
+const killPid = (pid: number): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    if (!pidAlive(pid)) return;
+    signal(pid, "SIGTERM");
+    const deadline = (yield* Clock.currentTimeMillis) + STOP_GRACE_MS;
+    while ((yield* Clock.currentTimeMillis) < deadline && pidAlive(pid)) {
+      yield* Effect.sleep(100);
+    }
+    if (pidAlive(pid)) signal(pid, "SIGKILL");
+  });
+
+/**
+ * Serialize spawns with the launch lock (see `lock.ts`) so two launchers racing
+ * an empty `$VIBEST_HOME` (or a respawn window) cannot both spawn a daemon —
+ * the loser waits for the winner's record and attaches. A lock whose holder pid
+ * died is reclaimed. `ensuring` releases the lock even when the spawn is
+ * interrupted.
+ */
+const spawnLocked = (
+  options: ResolveDaemonOptions,
+): Effect.Effect<DaemonHandle, DaemonLauncherError> =>
+  Effect.gen(function* () {
+    const { home } = options;
+    fs.mkdirSync(home, { recursive: true });
+    const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
+
+    for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+      const acquired = yield* Effect.try({
+        try: () => tryAcquireLock(home),
+        catch: (cause) =>
+          new DaemonLaunchError({
+            message: `Unable to acquire the vibest daemon launch lock: ${String(cause)}`,
+            cause,
+          }),
+      });
+
+      if (!acquired) {
+        const holder = readLockPid(home);
+        if (holder !== undefined && !pidAlive(holder)) {
+          // The locking launcher died mid-spawn; reclaim and try again.
+          releaseLock(home);
+          continue;
+        }
+        // Another launcher is spawning right now: wait for its daemon, then
+        // re-enter the full resolve so this caller attaches to the winner's
+        // daemon (which by then is recorded and healthy).
+        const winner = yield* waitForRecord(home, timeoutMs);
+        if (winner) return yield* resolveOrSpawnDaemon(options);
+        continue;
+      }
+
+      return yield* spawnDaemon(options).pipe(
+        Effect.ensuring(Effect.sync(() => releaseLock(home))),
+      );
+    }
+    return yield* Effect.fail(
+      new DaemonLaunchError({ message: "Could not acquire the vibest daemon launch lock" }),
+    );
+  });
+
+/** Poll for a healthy record to appear (a concurrent launcher is spawning). */
+const waitForRecord = (home: string, timeoutMs: number): Effect.Effect<DaemonRecord | undefined> =>
+  Effect.gen(function* () {
+    const deadline = (yield* Clock.currentTimeMillis) + timeoutMs;
+    while ((yield* Clock.currentTimeMillis) < deadline) {
+      const record = readRecord(home);
+      if (record && (yield* daemonAlive(record))) return record;
+      if (!lockExists(home)) return undefined;
+      yield* Effect.sleep(HEALTH_POLL_INTERVAL_MS);
+    }
+    return undefined;
+  });
+
+const spawnDaemon = (
+  options: ResolveDaemonOptions,
+): Effect.Effect<DaemonHandle, DaemonLaunchError> =>
+  Effect.gen(function* () {
+    const { home } = options;
+    const port = yield* reservePort(options.port ?? DEFAULT_PORT);
+    const token = crypto.randomBytes(32).toString("hex");
+    const address = `http://127.0.0.1:${port}`;
+
+    const pid = yield* Effect.try({
+      try: () => spawnDetached(options, port, token),
+      catch: (cause) =>
+        new DaemonLaunchError({
+          message: `Unable to spawn the vibest daemon: ${String(cause)}`,
+          cause,
+        }),
+    });
+
+    const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
+    if (!(yield* waitHealthy(address, pid, timeoutMs))) {
+      signal(pid, "SIGTERM");
+      return yield* Effect.fail(
+        new DaemonLaunchError({
+          message: `vibest daemon did not become healthy within ${timeoutMs}ms; see ${path.join(home, "daemon.log")}`,
+        }),
+      );
+    }
+
+    const record: DaemonRecord = {
+      pid,
+      address,
+      token,
+      startedAt: yield* Clock.currentTimeMillis,
+    };
+    writeRecord(home, record);
+    return attach(record, false);
+  });
+
+/**
+ * The one seam Effect cannot model: a detached, unref'd child with stdio
+ * redirected to a log fd — the exact opposite of a supervised
+ * `ChildProcessSpawner` child (piped stdio, killed when its scope closes).
+ * The daemon must outlive this launcher, so this stays raw `node:child_process`
+ * — the local `nohup vibest serve > log`.
+ */
+function spawnDetached(options: ResolveDaemonOptions, port: number, token: string): number {
+  const { home } = options;
+  const logFd = fs.openSync(path.join(home, "daemon.log"), "a", 0o600);
+  try {
+    const [command, ...args] = options.serverArgv;
+    if (command === undefined) throw new Error("serverArgv must not be empty");
+
+    const child = childProcess.spawn(command, args, {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: {
+        // Extra CORS origins (if any) ride the inherited environment's
+        // VIBEST_CORS_ORIGINS — the launcher no longer computes a per-launch
+        // set, since the daemon's policy is otherwise static.
+        ...(options.environment ?? process.env),
+        VIBEST_HOME: home,
+        VIBEST_PORT: String(port),
+        VIBEST_AUTH_TOKEN: token,
+      },
+    });
+    child.unref();
+
+    if (child.pid === undefined) throw new Error("Failed to spawn vibest daemon (no pid)");
+    return child.pid;
+  } finally {
+    fs.closeSync(logFd);
+  }
+}
+
+/**
+ * Two-signal readiness: the process must still be alive (a crash during boot
+ * short-circuits the wait) and answer `/api/health`.
+ */
+const waitHealthy = (address: string, pid: number, timeoutMs: number): Effect.Effect<boolean> =>
+  Effect.gen(function* () {
+    const deadline = (yield* Clock.currentTimeMillis) + timeoutMs;
+    while ((yield* Clock.currentTimeMillis) < deadline) {
+      if (!pidAlive(pid)) return false;
+      if (yield* healthy(address)) return true;
+      yield* Effect.sleep(HEALTH_POLL_INTERVAL_MS);
+    }
+    return false;
+  });
+
+function attach(record: DaemonRecord, reused: boolean): DaemonHandle {
+  return {
+    address: record.address,
+    port: Number(new URL(record.address).port),
+    token: record.token,
+    pid: record.pid,
+    reused,
+  };
+}
+
+function signal(pid: number, sig: NodeJS.Signals): void {
+  try {
+    process.kill(pid, sig);
+  } catch {
+    // already gone
+  }
+}

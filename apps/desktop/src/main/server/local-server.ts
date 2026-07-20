@@ -43,17 +43,25 @@ export type ServerStartError = ServerSpawnError | ServerReadyTimeout | ServerExi
 
 export type ServerProcessConfig = {
   readonly entry: string;
-  readonly token: string;
   readonly environment: NodeJS.ProcessEnv;
-  readonly corsOrigins: readonly string[];
 };
 
 export type ServerProcessExit = {
   readonly exitCode: number | null;
 };
 
+/**
+ * What a ready backend hands the supervisor. The token is per-process: a
+ * managed child echoes the token it was given, while the shared daemon mints
+ * its own — so it must come from the ready signal, not the static config.
+ */
+export type ServerEndpoint = {
+  readonly port: number;
+  readonly token: string;
+};
+
 export type RunningServerProcess = {
-  readonly ready: Effect.Effect<number, ServerStartError>;
+  readonly ready: Effect.Effect<ServerEndpoint, ServerStartError>;
   readonly awaitExit: Effect.Effect<ServerProcessExit, ServerSpawnError>;
 };
 
@@ -115,6 +123,10 @@ export function makeLocalServer(
     });
     const retryQueue = yield* Queue.dropping<void>(1);
     const initial = yield* Deferred.make<ServerConnection>();
+    // The daemon can come back with a fresh token (and, rarely, port) after a
+    // restart, so `connection` must serve the latest endpoint — the Deferred
+    // only gates "at least one ready happened".
+    const latest = yield* SubscriptionRef.make<ServerConnection | undefined>(undefined);
 
     const initialDelay = config.initialRestartDelayMs ?? DEFAULTS.initialRestartDelayMs;
     const maxDelay = config.maxRestartDelayMs ?? DEFAULTS.maxRestartDelayMs;
@@ -124,9 +136,7 @@ export function makeLocalServer(
     const supervise = Effect.gen(function* () {
       const processConfig: ServerProcessConfig = {
         entry: config.entry,
-        token: config.token,
         environment: yield* config.environment,
-        corsOrigins: config.corsOrigins,
       };
       let first = true;
       let pinnedPort = 0;
@@ -138,22 +148,24 @@ export function makeLocalServer(
         const attempt = yield* Effect.scoped(
           Effect.gen(function* () {
             const running = yield* spawnServer(processConfig, first ? 0 : pinnedPort);
-            const boundPort = yield* running.ready;
+            const endpoint = yield* running.ready;
             readyAt = yield* Clock.currentTimeMillis;
 
             const wasFirst = first;
             if (wasFirst) {
-              pinnedPort = boundPort;
+              pinnedPort = endpoint.port;
               first = false;
             }
 
+            const connection: ServerConnection = {
+              httpBaseUrl: `http://127.0.0.1:${endpoint.port}`,
+              wsBaseUrl: `ws://127.0.0.1:${endpoint.port}`,
+              token: endpoint.token,
+            };
+            yield* SubscriptionRef.set(latest, connection);
             yield* setStatus(statusRef, "ready");
             if (wasFirst) {
-              yield* Deferred.succeed(initial, {
-                httpBaseUrl: `http://127.0.0.1:${boundPort}`,
-                wsBaseUrl: `ws://127.0.0.1:${boundPort}`,
-                token: config.token,
-              });
+              yield* Deferred.succeed(initial, connection);
             }
             return yield* running.awaitExit;
           }),
@@ -194,7 +206,10 @@ export function makeLocalServer(
     const snapshot = SubscriptionRef.get(statusRef);
 
     return {
-      connection: Deferred.await(initial),
+      connection: Effect.gen(function* () {
+        const firstConnection = yield* Deferred.await(initial);
+        return (yield* SubscriptionRef.get(latest)) ?? firstConnection;
+      }),
       snapshot,
       changes: SubscriptionRef.changes(statusRef),
       retry: Effect.gen(function* () {
