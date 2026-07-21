@@ -6,6 +6,7 @@ import type {
   HarnessAgentSession,
   PromptReceipt,
   SessionCapabilities,
+  SessionInfoResult,
   UserInput,
 } from "./adapter";
 import {
@@ -15,6 +16,7 @@ import {
   AgentUnavailable,
   CapabilityUnsupported,
   type CreateSessionError,
+  type HarnessAgentNotFound,
   type ResumeSessionError,
   SessionClosed,
   SessionNotFound,
@@ -107,6 +109,16 @@ export type HarnessAgentSessionServiceShape = {
     SessionCapabilities,
     SessionNotFound | CapabilityUnsupported | AgentOperationError
   >;
+  /**
+   * Look up display info (title, recency) for a persisted session by its native
+   * id, without opening it — used at list time. Never requires an active
+   * session; goes straight to the adapter via the registry.
+   */
+  readonly getSessionInfo: (
+    harnessAgentId: HarnessAgentId,
+    harnessSessionId: string,
+    cwd?: string,
+  ) => Effect.Effect<SessionInfoResult, HarnessAgentNotFound | AgentOperationError>;
   /**
    * The raw per-session event stream, drained by the server SessionRuntime. The
    * harness never numbers or projects it; drafts are native-`sessionId`-keyed.
@@ -359,6 +371,10 @@ export const makeHarnessAgentSessionService = (
         ),
       getCapabilities: (sessionId) =>
         getManaged(sessionId).pipe(Effect.flatMap((managed) => managed.session.getCapabilities)),
+      getSessionInfo: (harnessAgentId, harnessSessionId, cwd) =>
+        registry
+          .get(harnessAgentId)
+          .pipe(Effect.flatMap((adapter) => adapter.getSessionInfo(harnessSessionId, cwd))),
       events: (sessionId) =>
         getManaged(sessionId).pipe(Effect.map((managed) => managed.session.events)),
       close,
