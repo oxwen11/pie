@@ -2,12 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 
+import { isSessionScopedEvent } from "@vibest/contract";
 import { Effect, Layer, Stream } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { layerPaths } from "../src/config/paths";
 import { AgentUnavailable } from "../src/errors";
-import { EventBusLayer } from "../src/events";
+import { EventBus, EventBusLayer } from "../src/events";
 import type { SessionInfoResult } from "../src/harness";
 import { ProjectRepositoryLayer } from "../src/project/repository";
 import { ProjectService, ProjectServiceLayer } from "../src/project/service";
@@ -50,7 +51,7 @@ const makeFakePort = (
     events: () => Effect.succeed(Stream.empty),
     getSessionInfo: () =>
       Effect.succeed<SessionInfoResult>(opts.sessionInfo ?? { _tag: "unsupported" }),
-    prompt: () => Effect.die("prompt not exercised"),
+    prompt: () => Effect.succeed({ turnId: "turn-1" }),
     interrupt: () => Effect.die("interrupt not exercised"),
     setModel: () => Effect.die("setModel not exercised"),
     setPermissionMode: () => Effect.die("setPermissionMode not exercised"),
@@ -86,7 +87,7 @@ describe("SessionService", () => {
 
   const run = <A, E>(
     port: Layer.Layer<HarnessAgentSessionPort>,
-    program: Effect.Effect<A, E, SessionService | ProjectService | SessionRepository>,
+    program: Effect.Effect<A, E, SessionService | ProjectService | SessionRepository | EventBus>,
   ) => Effect.runPromise(Effect.provide(program, layers(port)));
 
   it("create resolves projectId to cwd, generates a uuid sessionId, persists metadata", async () => {
@@ -257,14 +258,80 @@ describe("SessionService", () => {
     expect(result.listed.map((s) => s.sessionId).toSorted()).toEqual(
       [result.a.sessionId, result.b.sessionId].toSorted(),
     );
-    // The default fake reports `unsupported`, so history is not advertised.
-    expect(result.listed.every((s) => !s.historyAvailable)).toBe(true);
+    // We own the record, so a session we created reads as history-available.
+    expect(result.listed.every((s) => s.historyAvailable)).toBe(true);
   });
 
-  it("list reflects the harness's title, recency, and history availability", async () => {
-    const { layer } = makeFakePort({
-      sessionInfo: { _tag: "found", info: { title: "My chat", updatedAt: 1_700_000_000_000 } },
-    });
+  it("titles a session from its first prompt, collapsing whitespace", async () => {
+    const { layer } = makeFakePort();
+    const listed = await run(
+      layer,
+      Effect.gen(function* () {
+        const projects = yield* ProjectService;
+        const sessions = yield* SessionService;
+        const project = yield* projects.create({ name: "app", path: "/tmp/vibest-app" });
+        const ref = yield* sessions.create(project.id, "claude-code");
+        yield* sessions.prompt({ ref, parts: [{ type: "text", text: "  Fix the  login  bug " }] });
+        return yield* sessions.list(project.id);
+      }),
+    );
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.title).toBe("Fix the login bug");
+  });
+
+  it("publishes session.updated with the collapsed title on the first prompt", async () => {
+    const { layer } = makeFakePort();
+    const result = await run(
+      layer,
+      Effect.gen(function* () {
+        const projects = yield* ProjectService;
+        const sessions = yield* SessionService;
+        const bus = yield* EventBus;
+        const project = yield* projects.create({ name: "app", path: "/tmp/vibest-app" });
+        const ref = yield* sessions.create(project.id, "claude-code");
+        // Subscribe after create so only the prompt's event is in flight; the
+        // queue buffers it until take(1) pulls it — no forked drain, no race.
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const stream = yield* bus.subscribe({ kind: "global" });
+            yield* sessions.prompt({
+              ref,
+              parts: [{ type: "text", text: "  Fix the  login  bug " }],
+            });
+            const items = yield* Stream.runCollect(Stream.take(stream, 1));
+            return Array.from(items);
+          }),
+        );
+      }),
+    );
+    expect(result).toHaveLength(1);
+    const item = result[0];
+    expect(item?.type).toBe("event");
+    const event = item?.type === "event" ? item.event : undefined;
+    expect(event && !isSessionScopedEvent(event)).toBe(true);
+    expect(event?.type).toBe("session.updated");
+    expect(event?.type === "session.updated" ? event.title : undefined).toBe("Fix the login bug");
+  });
+
+  it("keeps the first prompt's title; later prompts don't rename", async () => {
+    const { layer } = makeFakePort();
+    const listed = await run(
+      layer,
+      Effect.gen(function* () {
+        const projects = yield* ProjectService;
+        const sessions = yield* SessionService;
+        const project = yield* projects.create({ name: "app", path: "/tmp/vibest-app" });
+        const ref = yield* sessions.create(project.id, "claude-code");
+        yield* sessions.prompt({ ref, parts: [{ type: "text", text: "first" }] });
+        yield* sessions.prompt({ ref, parts: [{ type: "text", text: "second" }] });
+        return yield* sessions.list(project.id);
+      }),
+    );
+    expect(listed[0]?.title).toBe("first");
+  });
+
+  it("lists a session with no title until its first prompt", async () => {
+    const { layer } = makeFakePort();
     const listed = await run(
       layer,
       Effect.gen(function* () {
@@ -276,26 +343,6 @@ describe("SessionService", () => {
       }),
     );
     expect(listed).toHaveLength(1);
-    // A session the harness still knows carries history + its display fields.
-    expect(listed[0]?.historyAvailable).toBe(true);
-    expect(listed[0]?.title).toBe("My chat");
-    expect(listed[0]?.updatedAt).toBe(new Date(1_700_000_000_000).toISOString());
-  });
-
-  it("list marks a session the harness no longer knows as history-unavailable", async () => {
-    const { layer } = makeFakePort({ sessionInfo: { _tag: "missing" } });
-    const listed = await run(
-      layer,
-      Effect.gen(function* () {
-        const projects = yield* ProjectService;
-        const sessions = yield* SessionService;
-        const project = yield* projects.create({ name: "app", path: "/tmp/vibest-app" });
-        yield* sessions.create(project.id, "claude-code");
-        return yield* sessions.list(project.id);
-      }),
-    );
-    expect(listed).toHaveLength(1);
-    expect(listed[0]?.historyAvailable).toBe(false);
     expect(listed[0]?.title).toBeUndefined();
   });
 
