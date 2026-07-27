@@ -1,4 +1,4 @@
-import type { AgentResponse } from "@vibest/contract";
+import type { AgentResponse, PermissionMode, ReasoningEffort } from "@vibest/contract";
 import { Context, Effect, Layer, Stream } from "effect";
 
 import { AgentUnavailable, SessionOpenFailed, SessionResumeFailed } from "../errors";
@@ -7,6 +7,7 @@ import {
   type AgentRequestUnavailable,
   type CreateSessionError,
   HarnessAgentSessionService,
+  type PermissionModeUnsupported,
   type PromptReceipt,
   type ResumeSessionError,
   type SessionClosed,
@@ -18,7 +19,7 @@ import {
 } from "../harness";
 import type { HarnessAgentId } from "../types";
 
-export type HarnessCreateError = AgentUnavailable | SessionOpenFailed;
+export type HarnessCreateError = AgentUnavailable | SessionOpenFailed | PermissionModeUnsupported;
 export type HarnessResumeError = AgentUnavailable | SessionResumeFailed;
 export type HarnessEventsError = HarnessSessionNotFound;
 export type HarnessPromptError =
@@ -49,7 +50,11 @@ export class HarnessAgentSessionPort extends Context.Service<
     readonly create: (
       harnessAgentId: HarnessAgentId,
       cwd: string,
-      config?: { readonly model?: string; readonly permissionMode?: string },
+      config?: {
+        readonly model?: string;
+        readonly reasoningEffort?: ReasoningEffort;
+        readonly permissionMode?: PermissionMode;
+      },
     ) => Effect.Effect<string, HarnessCreateError>;
     /** Ensure a native session is active again from its stored native id. */
     readonly resume: (
@@ -78,15 +83,20 @@ export class HarnessAgentSessionPort extends Context.Service<
       harnessSessionId: string,
       cwd: string,
     ) => Effect.Effect<SessionInfoResult>;
-    // Session-scoped config setters; values use the harness's outward vocabulary.
+    // Session-scoped config setters. `model` is the provider-local model id —
+    // the RPC boundary unpacked and validated the providerId/modelId pair already.
     readonly setModel: (
       harnessSessionId: string,
       model: string,
     ) => Effect.Effect<void, HarnessSetConfigError>;
+    readonly setReasoningEffort: (
+      harnessSessionId: string,
+      reasoningEffort: ReasoningEffort,
+    ) => Effect.Effect<void, HarnessSetConfigError>;
     readonly setPermissionMode: (
       harnessSessionId: string,
-      permissionMode: string,
-    ) => Effect.Effect<void, HarnessSetConfigError>;
+      permissionMode: PermissionMode,
+    ) => Effect.Effect<void, HarnessSetConfigError | PermissionModeUnsupported>;
     readonly respondToAgentRequest: (
       harnessSessionId: string,
       requestId: string,
@@ -97,10 +107,14 @@ export class HarnessAgentSessionPort extends Context.Service<
 
 const mapCreateError =
   (harnessAgentId: HarnessAgentId) =>
-  (error: CreateSessionError): HarnessCreateError =>
-    error._tag === "AgentUnavailable"
-      ? new AgentUnavailable({ harnessAgentId, reason: error.reason })
-      : new SessionOpenFailed({ harnessAgentId, reason: error.message });
+  (error: CreateSessionError): HarnessCreateError => {
+    if (error._tag === "AgentUnavailable")
+      return new AgentUnavailable({ harnessAgentId, reason: error.reason });
+    // Passed through untouched: the RPC layer maps it to INVALID_ARGUMENT,
+    // which folding it into SessionOpenFailed (INTERNAL) would erase.
+    if (error._tag === "PermissionModeUnsupported") return error;
+    return new SessionOpenFailed({ harnessAgentId, reason: error.message });
+  };
 
 const mapResumeError =
   (harnessAgentId: HarnessAgentId, harnessSessionId: string) =>
@@ -124,6 +138,9 @@ export const HarnessAgentSessionPortLayer: Layer.Layer<
           .create(harnessAgentId, {
             cwd,
             ...(config?.model !== undefined ? { model: config.model } : {}),
+            ...(config?.reasoningEffort !== undefined
+              ? { reasoningEffort: config.reasoningEffort }
+              : {}),
             ...(config?.permissionMode !== undefined
               ? { permissionMode: config.permissionMode }
               : {}),
@@ -148,6 +165,8 @@ export const HarnessAgentSessionPortLayer: Layer.Layer<
           .getSessionInfo(harnessAgentId, harnessSessionId, cwd)
           .pipe(Effect.catch(() => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }))),
       setModel: (harnessSessionId, model) => harness.setModel(harnessSessionId, model),
+      setReasoningEffort: (harnessSessionId, reasoningEffort) =>
+        harness.setReasoningEffort(harnessSessionId, reasoningEffort),
       setPermissionMode: (harnessSessionId, permissionMode) =>
         harness.setPermissionMode(harnessSessionId, permissionMode),
       respondToAgentRequest: (harnessSessionId, requestId, response) =>

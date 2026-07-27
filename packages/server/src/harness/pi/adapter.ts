@@ -18,6 +18,7 @@ import {
   SessionNotResumable,
   TurnAlreadyRunning,
 } from "../errors";
+import { findExecutable } from "../executable";
 import { streamFromQueueOne } from "../queue-stream";
 import type { PiAgent } from "./agent";
 
@@ -193,9 +194,10 @@ const makeSession = (
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
-      // Pi has neither a model switch nor a permission protocol; accept the
-      // config calls and no-op rather than fail the caller.
+      // Pi has neither a model switch, an reasoningEffort switch, nor a permission
+      // protocol; accept the config calls and no-op rather than fail the caller.
       setModel: () => Effect.void,
+      setReasoningEffort: () => Effect.void,
       setPermissionMode: () => Effect.void,
       interrupt,
       respondToAgentRequest: (requestId, response) =>
@@ -218,12 +220,21 @@ const makeSession = (
     } satisfies HarnessAgentSession;
   });
 
-export const makePiAdapter = (agent: PiAgent): HarnessAgentAdapter => ({
+export const makePiAdapter = (
+  agent: PiAgent,
+  options: { readonly executablePath?: string } = {},
+): HarnessAgentAdapter => ({
   id: "pi",
   descriptor: { id: "pi", name: "Pi" },
-  // Pi has no permission protocol — declare no modes at all.
-  capabilities: Effect.succeed({}),
-  checkAvailability: Effect.succeed({ available: true }),
+  // Pi has neither a permission protocol nor a model catalogue — declaring
+  // nothing (empty subset, no probe) is what makes the UI render no config
+  // controls for it.
+  permissionModes: [],
+  checkAvailability: Effect.sync(() =>
+    findExecutable(options.executablePath ?? "pi")
+      ? { available: true }
+      : { available: false, reason: "Pi was not found on PATH." },
+  ),
   open: (input) =>
     agent.session.create({ cwd: input.cwd }).pipe(
       Effect.mapError((cause) => new AgentOpenError({ harnessAgentId: "pi", cause })),

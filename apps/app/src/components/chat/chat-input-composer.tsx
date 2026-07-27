@@ -32,7 +32,7 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
     // otherwise bare Enter is consumed by the default newline behavior before
     // the keymap ever sees it.
     extensions: (self) => [
-      ...createChatBaseExtensions({ placeholder: () => "Ask Claude Code anything..." }),
+      ...createChatBaseExtensions(),
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {

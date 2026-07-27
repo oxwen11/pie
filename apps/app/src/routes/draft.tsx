@@ -3,6 +3,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEditorState } from "@tiptap/react";
 import type { ListSessionsOutput, SessionSummary } from "@vibest/contract";
 import {
+  HARNESS_AGENT_IDS,
+  PermissionModeSchema,
+  type HarnessAgentId,
+  type PermissionMode,
+} from "@vibest/contract";
+import {
   PromptInput,
   PromptInputSubmit,
   PromptInputToolbar,
@@ -12,6 +18,7 @@ import { Button } from "@vibest/ui/components/button";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { HarnessSelect } from "@/components/chat/harness-select";
 import { ChatInput } from "@/components/chat/input/chat-input";
 import {
   ChatInputProvider,
@@ -25,8 +32,55 @@ import { PermissionModeSelect } from "@/components/chat/permission-mode-select";
 import Loader from "@/components/loader";
 import { ImportProjectDialog } from "@/components/projects/import-project-dialog";
 import { ProjectSelect } from "@/components/projects/project-select";
-import type { ChatModel, ChatPermissionMode } from "@/core/chat/chat-config";
 import { useChatManager } from "@/core/chat/chat-context";
+import { orderPermissionModes } from "@/core/harness/permission-modes";
+import {
+  pickDefaultHarnessAgentId,
+  resolveModel,
+  resolvePermissionMode,
+} from "@/core/harness/session-config";
+import { useHarnessAgent, useHarnessAgents, useHarnessProbe } from "@/core/harness/use-harness";
+
+// Until the user picks one. Every other config default is declared by the
+// harness itself; which harness to start from is the one thing no harness can
+// answer, so it is a product decision and lives here. It is a preference, not a
+// guarantee — see pickDefaultHarnessAgentId for what happens when it isn't
+// installed.
+const PREFERRED_HARNESS_AGENT_ID: HarnessAgentId = "claude-code";
+
+/**
+ * The draft config lives in the URL, and only what the user explicitly picked
+ * is written there. Everything absent follows the selected harness's declared
+ * default, which is the same thing "omit the field" means to `session.create`.
+ *
+ * That is what makes switching harness free of reset logic: navigating with a
+ * new `harness` simply drops the other params, so everything falls back to the
+ * new harness's defaults. No effect, no state to synchronise, no frame where a
+ * dropdown holds a value the new harness doesn't offer. `projectId` survives
+ * the switch — it names what the session is about, not how it runs.
+ *
+ * A model is two params (`provider` + `model`) that only mean anything
+ * together — modelId alone is only unique within its provider.
+ */
+type DraftSearch = {
+  readonly projectId?: string;
+  readonly harness?: HarnessAgentId;
+  readonly provider?: string;
+  readonly model?: string;
+  readonly permission?: PermissionMode;
+};
+
+const asHarnessAgentId = (value: unknown): HarnessAgentId | undefined =>
+  HARNESS_AGENT_IDS.find((id) => id === value);
+
+const asPermissionMode = (value: unknown): PermissionMode | undefined =>
+  PermissionModeSchema.literals.find((mode) => mode === value);
+
+const asText = (value: unknown): string | undefined =>
+  typeof value === "string" && value.length > 0 ? value : undefined;
+
+const optional = <K extends string, V extends string>(key: K, value: V | undefined) =>
+  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 
 // "/draft" is the new-session surface: pick a project, type a first message,
 // which creates a session, sends it as the opening turn, and navigates into the
@@ -34,23 +88,22 @@ import { useChatManager } from "@/core/chat/chat-context";
 // Keep the "/draft" path literal — the router plugin requires a string literal
 // (autoCodeSplitting breaks otherwise).
 export const Route = createFileRoute("/draft")({
-  // The only search state: which project a sidebar `+` preselected. Absent means
-  // nothing is selected yet — there is no default project.
-  validateSearch: (search: Record<string, unknown>): { projectId?: string } =>
-    typeof search.projectId === "string" ? { projectId: search.projectId } : {},
+  validateSearch: (search: Record<string, unknown>): DraftSearch => ({
+    ...optional("projectId", asText(search.projectId)),
+    ...optional("harness", asHarnessAgentId(search.harness)),
+    ...optional("provider", asText(search.provider)),
+    ...optional("model", asText(search.model)),
+    ...optional("permission", asPermissionMode(search.permission)),
+  }),
   component: DraftRoute,
 });
 
 function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
-  const { projectId } = Route.useSearch();
+  const search = Route.useSearch();
   const manager = useChatManager();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [model, setModel] = useState<ChatModel>("sonnet");
-  // Default to the most permissive mode (claude-code's "full" → bypassPermissions)
-  // so first-run turns aren't gated on approvals; the user can dial it down.
-  const [permissionMode, setPermissionMode] = useState<ChatPermissionMode>("full");
   const [importOpen, setImportOpen] = useState(false);
 
   const projects = useQuery({
@@ -60,7 +113,25 @@ function DraftRoute() {
 
   // Derived, never synced: a projectId the URL still carries but the server no
   // longer knows reads as "nothing selected", not as a stale selection.
-  const selected = projects.data?.find((project) => project.id === projectId) ?? null;
+  const selected = projects.data?.find((project) => project.id === search.projectId) ?? null;
+
+  const harnessAgents = useHarnessAgents();
+  const harnessAgentId =
+    search.harness ?? pickDefaultHarnessAgentId(harnessAgents, PREFERRED_HARNESS_AGENT_ID);
+  const harnessAgent = useHarnessAgent(harnessAgentId);
+  // The selected project's directory decides what its harness can offer — a
+  // project's own settings can remap what a model id resolves to. No project
+  // picked means no cwd to probe, so the model picker has nothing to offer;
+  // the composer blocks on project selection anyway. Undefined until the probe
+  // lands is not a wait either: submitting meanwhile omits `model` — which is
+  // exactly what "the user didn't pick one" already means.
+  const probe = useHarnessProbe(harnessAgentId, selected?.path);
+  // Each dimension resolves on its own — a stale URL pick is dropped, an
+  // absent one falls back to the declared default.
+  const providers = probe.data?.providers ?? [];
+  const model = resolveModel(providers, search.provider, search.model);
+  const permissionModes = orderPermissionModes(harnessAgent?.permissionModes ?? []);
+  const permissionMode = resolvePermissionMode(harnessAgent, search.permission);
 
   // Create the session and start its first turn against the manager's persisted
   // store, then navigate — the session route re-attaches the same Chat with the
@@ -70,9 +141,11 @@ function DraftRoute() {
       if (!selected) throw new Error("No project selected");
       const ref = await orpcQueryUtils.session.create.call({
         projectId: selected.id,
-        harnessAgentId: "claude-code",
-        model,
-        permissionMode,
+        harnessAgentId,
+        // Omitted when the harness declares no such dimension, which is how it
+        // ends up using its own configured default.
+        ...(model !== undefined ? { providerId: model.providerId, modelId: model.modelId } : {}),
+        ...(permissionMode !== undefined ? { permissionMode } : {}),
       });
       void manager.attach(ref).prompt(text);
       return ref;
@@ -117,7 +190,9 @@ function DraftRoute() {
     // otherwise bare Enter is consumed by the default newline behavior before
     // the keymap ever sees it.
     extensions: (self) => [
-      ...createChatBaseExtensions({ placeholder: () => "Ask Claude Code anything..." }),
+      ...createChatBaseExtensions({
+        placeholder: () => `Ask ${harnessAgent?.name ?? "your agent"} anything...`,
+      }),
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
@@ -189,8 +264,15 @@ function DraftRoute() {
     <div className="flex h-full items-center justify-center p-4">
       <div className="flex w-full max-w-2xl flex-col gap-2">
         <ProjectSelect
+          // Harness config survives a project switch — it says how the session
+          // runs, not what it is about. A pick the new project's catalog doesn't
+          // offer is dropped by the resolvers, not carried into the session.
           onChange={(next) =>
-            navigate({ to: "/draft", search: { projectId: next }, replace: true })
+            navigate({
+              to: "/draft",
+              search: (prev) => ({ ...prev, projectId: next }),
+              replace: true,
+            })
           }
           projects={projects.data}
           value={selected?.id ?? null}
@@ -204,12 +286,37 @@ function DraftRoute() {
           <ChatInputProvider controller={controller}>
             <ChatInput />
             <PromptInputToolbar>
+              {/* Harness first: it decides what the other two can offer. */}
               <PromptInputTools>
-                <ModelSelect value={model} onChange={setModel} />
+                <HarnessSelect
+                  value={harnessAgentId}
+                  onChange={(next) =>
+                    void navigate({
+                      to: "/draft",
+                      search: (prev) => ({
+                        ...optional("projectId", prev.projectId),
+                        harness: next,
+                      }),
+                    })
+                  }
+                />
+                <ModelSelect
+                  providers={providers}
+                  providerId={model?.providerId}
+                  modelId={model?.modelId}
+                  onChange={(providerId, modelId) =>
+                    void navigate({
+                      to: "/draft",
+                      search: (prev) => ({ ...prev, provider: providerId, model: modelId }),
+                    })
+                  }
+                />
                 <PermissionModeSelect
-                  harnessAgentId="claude-code"
+                  permissionModes={permissionModes}
                   value={permissionMode}
-                  onChange={setPermissionMode}
+                  onChange={(permission) =>
+                    void navigate({ to: "/draft", search: (prev) => ({ ...prev, permission }) })
+                  }
                 />
               </PromptInputTools>
               <PromptInputSubmit disabled={!hasContent || !selected || startSession.isPending} />

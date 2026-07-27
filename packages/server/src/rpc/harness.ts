@@ -1,35 +1,27 @@
 import "@orpc/experimental-effect/extensions/effect";
 import { implement } from "@orpc/server";
 import { harnessContract } from "@vibest/contract/harness";
-import { Effect } from "effect";
 
-import { HarnessAgentRegistry } from "../harness";
+import { HarnessListService, HarnessProbeService } from "../harness";
 import type { RpcContext } from "./context";
 
 const orpc = implement(harnessContract).$context<RpcContext>();
 
 export const harnessRouter = orpc.router({
-  // One-shot negotiation: fold every registered harness's descriptor,
-  // availability, and capabilities into a single result the client holds.
-  negotiate: orpc.negotiate.effect(function* () {
-    const registry = yield* HarnessAgentRegistry;
-    const descriptors = yield* registry.list;
-    const harnessAgents = yield* Effect.forEach(descriptors, (descriptor) =>
-      Effect.gen(function* () {
-        // `descriptor.id` came from `registry.list`, so the lookup can't miss.
-        const adapter = yield* registry.get(descriptor.id).pipe(Effect.orDie);
-        const availability = yield* adapter.checkAvailability;
-        const capabilities = yield* adapter.capabilities;
-        return {
-          id: descriptor.id,
-          name: descriptor.name,
-          available: availability.available,
-          ...(availability.reason ? { reason: availability.reason } : {}),
-          capabilities,
-        };
-      }),
-    );
-    return { harnessAgents };
+  // Declared data: every registered harness's descriptor, availability and
+  // permission subset. A PATH lookup each and nothing more, so the client can
+  // await it before first paint.
+  list: orpc.list.effect(function* () {
+    const list = yield* HarnessListService;
+    return yield* list.list;
+  }),
+  // Probed data, per directory: costs a CLI spawn, so caching, in-flight
+  // de-duplication and the timeout all live in the service — this route is just
+  // the wire. A failed probe fails the call; collapsing it into an empty result
+  // would cache "no models" over what is actually "login expired".
+  probe: orpc.probe.effect(function* ({ input }) {
+    const probe = yield* HarnessProbeService;
+    return yield* probe.probe(input);
   }),
 });
 

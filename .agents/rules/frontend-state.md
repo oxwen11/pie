@@ -8,6 +8,12 @@ Zustand, and selections store an id, not the object.
   `queryOptions({input}).queryKey`; `.key()` omits the `type:"query"` segment, so
   using it for `setQueryData` silently writes a cache the UI never reads. `.key()`
   is for `invalidateQueries` only.
+- **Narrow a query with `select`, not in the component.** When a hook needs one
+  field out of a list query, derive it inside `useQuery`'s `select` — narrowing
+  after the fact (`data?.find(...)`) subscribes the component to the whole list.
+  A `select` that closes over a prop must be memoised (`select: useCallback(fn,
+[dep])`) or it re-runs every render and loses referential stability; say so in
+  a comment so nobody "simplifies" the `useCallback` away.
 - Zustand here is not a global store: each `Chat` instance creates its own vanilla
   store as the AI SDK `ChatState`. `ChatManager` caches Chat instances by
   sessionId so transcripts survive navigation, and is constructed at App mount

@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   CollectionEventTypes,
+  HarnessListOutputSchema,
+  HarnessProbeInputSchema,
+  HarnessProbeOutputSchema,
   type ServerEvent,
   serverErrors,
   ServerErrorCodes,
@@ -98,5 +101,101 @@ describe("event partition", () => {
 describe("server error map", () => {
   it("exposes every stable code as an oRPC error entry", () => {
     for (const code of ServerErrorCodes) expect(serverErrors).toHaveProperty(code);
+  });
+});
+
+describe("HarnessListOutput", () => {
+  const listing = (entry: Record<string, unknown>) => ({
+    harnessAgents: [{ id: "codex", name: "Codex", available: true, ...entry }],
+  });
+
+  it("carries the permission subset as our closed vocabulary, with its default", () => {
+    expect(
+      accepts(
+        HarnessListOutputSchema,
+        listing({ permissionModes: ["read-only", "ask", "full"], defaultPermissionMode: "ask" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts an empty subset — how a harness says it has no permission protocol", () => {
+    expect(accepts(HarnessListOutputSchema, listing({ permissionModes: [] }))).toBe(true);
+  });
+
+  it("rejects a mode outside the vocabulary — labels and native ids never travel", () => {
+    expect(
+      accepts(HarnessListOutputSchema, listing({ permissionModes: ["bypassPermissions"] })),
+    ).toBe(false);
+    expect(
+      accepts(HarnessListOutputSchema, listing({ permissionModes: [{ id: "ask", label: "Ask" }] })),
+    ).toBe(false);
+  });
+
+  it("requires the subset — the field is an answer, not an option", () => {
+    expect(
+      accepts(HarnessListOutputSchema, {
+        harnessAgents: [{ id: "codex", name: "Codex", available: false }],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("HarnessProbeOutput", () => {
+  const output = (providers: unknown) => ({ providers });
+
+  it("keeps models inside their provider", () => {
+    expect(
+      accepts(
+        HarnessProbeOutputSchema,
+        output([{ id: "codex", models: [{ id: "gpt-5.6-sol", label: "GPT 5.6 Sol" }] }]),
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts an empty provider list — how a harness says it has no model switch", () => {
+    expect(accepts(HarnessProbeOutputSchema, output([]))).toBe(true);
+  });
+
+  it("carries normalized traits next to the opaque id", () => {
+    expect(
+      accepts(
+        HarnessProbeOutputSchema,
+        output([
+          {
+            id: "codex",
+            models: [
+              {
+                id: "gpt-5.6-sol",
+                reasoningEfforts: ["low", "medium", "high"],
+                defaultReasoningEffort: "medium",
+                modalities: ["text", "image"],
+              },
+            ],
+          },
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects an reasoningEffort outside the vocabulary — adapters must drop what they can't translate", () => {
+    expect(
+      accepts(
+        HarnessProbeOutputSchema,
+        output([{ id: "codex", models: [{ id: "m", reasoningEfforts: ["turbo"] }] }]),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a model without an id", () => {
+    expect(
+      accepts(HarnessProbeOutputSchema, output([{ id: "codex", models: [{ label: "Sonnet" }] }])),
+    ).toBe(false);
+  });
+
+  it("addresses a probe by directory, not by project", () => {
+    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "codex", cwd: "/work/app" })).toBe(
+      true,
+    );
+    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "codex" })).toBe(false);
   });
 });
