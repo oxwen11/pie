@@ -18,14 +18,20 @@ import type { ServerConnection } from "./server-connection";
 // component stack and source locations, for pasting into a coding agent. The
 // guard is statically false in production, so react-grab is dead-code-eliminated
 // from both the Vite and electron-vite builds. See https://react-grab.com.
+//
+// `/core` is the entry that doesn't auto-init, so it takes `telemetry: false` —
+// the default init fires a version check at react-grab.com, which the Electron
+// renderer's CSP blocks with a console error.
 if (import.meta.env.DEV) {
-  void import("react-grab");
+  void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
 }
 
 // Dev only: highlights components as they re-render so you can spot wasted
 // renders. Loaded just after React (a tick later than react-scan's ideal
 // "before React" position), so it may miss the very first render but catches
 // everything after. Dead-code-eliminated from production. See https://react-scan.com.
+// Its own version check has no opt-out and is patched out instead — see
+// `patches/react-scan@0.5.7.patch`.
 if (import.meta.env.DEV) {
   void import("react-scan").then(({ scan }) => scan());
 }
