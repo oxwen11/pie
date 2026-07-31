@@ -8,10 +8,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+<<<<<<< HEAD
   SidebarTrigger,
   useSidebar,
 } from "@pie/ui/components/sidebar";
 import { Blocks, Search, SquarePen } from "lucide-react";
+=======
+} from "@vibest/ui/components/sidebar";
+import { FolderPlus, SquarePen } from "lucide-react";
+>>>>>>> 84594b23 (fix(app): remove unimplemented sidebar actions)
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -45,7 +50,10 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
+<<<<<<< HEAD
         {/* New chat is wired; the rest are placeholders. */}
+=======
+>>>>>>> 84594b23 (fix(app): remove unimplemented sidebar actions)
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -56,6 +64,7 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
+<<<<<<< HEAD
                 <SidebarMenuButton>
                   <Search />
                   <span>Search</span>
@@ -65,6 +74,11 @@ export function AppSidebar({
                 <SidebarMenuButton>
                   <Blocks />
                   <span>Skills &amp; plugins</span>
+=======
+                <SidebarMenuButton onClick={() => setImportOpen(true)}>
+                  <FolderPlus />
+                  <span>Import project</span>
+>>>>>>> 84594b23 (fix(app): remove unimplemented sidebar actions)
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
