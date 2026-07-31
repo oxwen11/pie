@@ -6,7 +6,34 @@ import react from "@vitejs/plugin-react";
 import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "vite";
 
+/**
+ * The dev server the browser talks to. The vibest server no longer embeds Vite,
+ * so this proxies the two prefixes it owns — which also keeps the app
+ * same-origin with the RPC, the way it is when the server serves the built
+ * bundle. Add a prefix here whenever the server grows one.
+ *
+ * 4180/4190 rather than 4000/5173, which are taken: 4000 is the daemon's
+ * default, spawned by the desktop app and guarded by an auth token this browser
+ * cannot present — proxying there answers `/api/health` but 401s the ws-ticket,
+ * so the app loads and silently never connects. 5173 is `apps/desktop`'s
+ * electron-vite renderer. 4180/4190 are claimed by no common dev tool. Open
+ * 4190: 4180 serves the last *built* bundle, so it works but shows stale UI.
+ */
+const SERVER_PORT = Number(process.env.VIBEST_PORT ?? 4180);
+const serverTarget = `http://127.0.0.1:${SERVER_PORT}`;
+
 export default defineConfig({
+  server: {
+    // Strict, so a taken port fails the boot instead of silently drifting to
+    // the next one — that drift is how you end up reading someone else's dev
+    // server at the URL you expected to be ours.
+    port: 4190,
+    strictPort: true,
+    proxy: {
+      "/api": { target: serverTarget, changeOrigin: true },
+      "/ws/rpc": { target: serverTarget, changeOrigin: true, ws: true },
+    },
+  },
   resolve: {
     tsconfigPaths: true,
     alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
