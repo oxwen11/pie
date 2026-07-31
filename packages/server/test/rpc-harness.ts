@@ -1,4 +1,3 @@
-import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { createRouterClient } from "@orpc/server";
 import { Layer, ManagedRuntime } from "effect";
 
@@ -22,6 +21,7 @@ import {
   SessionRepositoryLayer,
   SessionServiceLayer,
 } from "../src/session";
+import { NodePlatformLayer } from "./platform";
 
 /**
  * A router client backed by the full `RpcContext`, with an adapterless session
@@ -32,10 +32,17 @@ export async function makeRpcTestHarness(
   home: string,
   adapters: ReadonlyArray<HarnessAgentAdapter> = [],
 ) {
-  const paths = layerPaths(home);
+  // Paths plus the platform services the repositories' JSON store runs on.
+  const paths = Layer.provideMerge(layerPaths(home), NodePlatformLayer);
   const registryLayer = Layer.sync(HarnessAgentRegistry, () => makeHarnessAgentRegistry(adapters));
-  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(Layer.provide(registryLayer));
-  const listLayer = HarnessListLayer.pipe(Layer.provide(registryLayer));
+  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
+    Layer.provide(registryLayer),
+    Layer.provide(NodePlatformLayer),
+  );
+  const listLayer = HarnessListLayer.pipe(
+    Layer.provide(registryLayer),
+    Layer.provide(NodePlatformLayer),
+  );
   const probeLayer = HarnessProbeLayer.pipe(Layer.provide(registryLayer));
   const projectLayer = ProjectModuleLayer.pipe(Layer.provide(paths));
   const sessionServiceLayer = SessionServiceLayer.pipe(
@@ -44,6 +51,7 @@ export async function makeRpcTestHarness(
     Layer.provide(HarnessAgentSessionPortLayer.pipe(Layer.provide(harnessSessionLayer))),
     Layer.provide(SessionManagerLayer.pipe(Layer.provide(EventBusLayer))),
     Layer.provide(EventBusLayer),
+    Layer.provide(NodePlatformLayer),
   );
   // registryLayer is merged in as well as provided into the session service;
   // Layer memoization (same reference) keeps it one registry instance.
@@ -55,8 +63,8 @@ export async function makeRpcTestHarness(
       registryLayer,
       listLayer,
       probeLayer,
-      FileSystemServiceLayer,
-      NodeFileSystem.layer,
+      FileSystemServiceLayer.pipe(Layer.provide(NodePlatformLayer)),
+      NodePlatformLayer,
     ),
   );
   // Layer construction does file I/O now (the project document loads eagerly),

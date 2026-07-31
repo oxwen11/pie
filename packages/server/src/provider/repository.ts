@@ -2,7 +2,7 @@ import { Context, Effect, Layer } from "effect";
 
 import { Paths } from "../config/paths";
 import type { StoreReadError, StoreWriteError } from "../errors";
-import { readJson, writeJsonAtomic } from "../infra/json-store";
+import { boundJsonStore, type JsonStorePlatform } from "../infra/json-store";
 import type { ProviderConfig, RuntimeConfig } from "../types";
 
 /**
@@ -20,21 +20,24 @@ export class ProviderRepository extends Context.Service<
   }
 >()("ProviderRepository") {}
 
-export const ProviderRepositoryLayer: Layer.Layer<ProviderRepository, never, Paths> = Layer.effect(
+export const ProviderRepositoryLayer: Layer.Layer<
+  ProviderRepository,
+  never,
+  Paths | JsonStorePlatform
+> = Layer.effect(
   ProviderRepository,
   Effect.gen(function* () {
     const paths = yield* Paths;
-    const readConfig = () => readJson<RuntimeConfig>(paths.configFile, {});
+    const json = yield* boundJsonStore;
+    const readConfig = () => json.read<RuntimeConfig>(paths.configFile, {});
     return {
       list: () => readConfig().pipe(Effect.map((config) => config.provider ?? [])),
       save: (providers) =>
-        Effect.gen(function* () {
-          const config = yield* readConfig();
-          yield* writeJsonAtomic(paths.configFile, {
-            ...config,
-            provider: providers,
-          });
-        }),
+        readConfig().pipe(
+          Effect.flatMap((config) =>
+            json.write(paths.configFile, { ...config, provider: providers }),
+          ),
+        ),
     };
   }),
 );

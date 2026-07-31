@@ -36,19 +36,20 @@ export const fsRouter = orpc.router({
   }),
   browse: orpc.browse.effect(function* ({ input, errors }) {
     const fs = yield* FileSystem;
-    const root = path.resolve(input.path ?? os.homedir());
+    // Resolving and joining are pure string math, so they stay on `node:path`.
+    const dir = path.resolve(input.path ?? os.homedir());
     // Folder-picker policy (owned here, not a shared fs service): directories
     // only, hide dotfolders and node_modules, sorted by name.
     const names = yield* fs
-      .readDirectory(root)
-      .pipe(Effect.mapError(() => errors.READ_FAILED({ data: { path: root } })));
+      .readDirectory(dir)
+      .pipe(Effect.mapError(() => errors.READ_FAILED({ data: { path: dir } })));
     const candidates = names.filter((name) => !name.startsWith(".") && !IGNORED_DIRS.has(name));
     // readDirectory yields names only, so stat each to keep just directories. A
     // failing stat (e.g. broken symlink) drops that entry rather than the list.
     const flagged = yield* Effect.forEach(
       candidates,
       (name) =>
-        fs.stat(path.join(root, name)).pipe(
+        fs.stat(path.join(dir, name)).pipe(
           Effect.map((info) => info.type === "Directory"),
           Effect.catch(() => Effect.succeed(false)),
           Effect.map((isDirectory) => ({ name, isDirectory })),
@@ -57,10 +58,10 @@ export const fsRouter = orpc.router({
     );
     const directories = flagged
       .filter((e) => e.isDirectory)
-      .map((e) => ({ name: e.name, path: path.join(root, e.name) }));
+      .map((e) => ({ name: e.name, path: path.join(dir, e.name) }));
     directories.sort((a, b) => a.name.localeCompare(b.name));
-    const parent = path.dirname(root);
-    return { path: root, parent: parent === root ? null : parent, directories };
+    const parent = path.dirname(dir);
+    return { path: dir, parent: parent === dir ? null : parent, directories };
   }),
 });
 

@@ -2,7 +2,7 @@ import { Context, Effect, Layer } from "effect";
 
 import { Paths } from "../config/paths";
 import type { StoreReadError, StoreWriteError } from "../errors";
-import { readJson, writeJsonAtomic } from "../infra/json-store";
+import { boundJsonStore, type JsonStorePlatform } from "../infra/json-store";
 import type { McpServerConfig, RuntimeConfig } from "../types";
 
 /**
@@ -19,21 +19,19 @@ export class McpRepository extends Context.Service<
   }
 >()("McpRepository") {}
 
-export const McpRepositoryLayer: Layer.Layer<McpRepository, never, Paths> = Layer.effect(
-  McpRepository,
-  Effect.gen(function* () {
-    const paths = yield* Paths;
-    const readConfig = () => readJson<RuntimeConfig>(paths.configFile, {});
-    return {
-      list: () => readConfig().pipe(Effect.map((config) => config.mcp ?? [])),
-      save: (servers) =>
-        Effect.gen(function* () {
-          const config = yield* readConfig();
-          yield* writeJsonAtomic(paths.configFile, {
-            ...config,
-            mcp: servers,
-          });
-        }),
-    };
-  }),
-);
+export const McpRepositoryLayer: Layer.Layer<McpRepository, never, Paths | JsonStorePlatform> =
+  Layer.effect(
+    McpRepository,
+    Effect.gen(function* () {
+      const paths = yield* Paths;
+      const json = yield* boundJsonStore;
+      const readConfig = () => json.read<RuntimeConfig>(paths.configFile, {});
+      return {
+        list: () => readConfig().pipe(Effect.map((config) => config.mcp ?? [])),
+        save: (servers) =>
+          readConfig().pipe(
+            Effect.flatMap((config) => json.write(paths.configFile, { ...config, mcp: servers })),
+          ),
+      };
+    }),
+  );
