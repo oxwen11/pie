@@ -64,11 +64,11 @@ exactly one `Path.Path`, in `http/ui.ts`, and it is not ours —
   / `NodePath.layer` / `NodeCrypto.layer` appear.
 - **A service shape stays `R`-free.** Bind the platform once while building the
   Layer — `const platform = yield* Effect.context<FileSystem | Crypto>()` — and
-  `Effect.provide(platform)` each method. `infra/json-store.ts` plus the four
+  `Effect.provide(platform)` each method. The `project` and `session`
   repositories are the pattern to copy.
-- **Platform failures get mapped at the seam,** not propagated raw: the store's
-  `StoreReadError` / `StoreWriteError` wrap them, and "file isn't there" is
-  `error.reason._tag === "NotFound"` (`isNotFound`), never an errno string.
+- **Platform failures get mapped at the seam,** not propagated raw: the
+  repositories' `StoreReadError` / `StoreWriteError` wrap them, and "file isn't
+  there" is `error.reason._tag === "NotFound"`, never an errno string.
 - **One gap to route around.** `FileSystem.access` has no `X_OK` — test
   executability with `stat` + `(info.mode & 0o111) !== 0`, as both executable
   resolvers do.
@@ -105,7 +105,6 @@ already written" is not a reason to add to the list:
 | `http/server.ts`'s `upgrade` path                                         | oRPC owns that event; Effect's own websocket handler would fight it for the listener                 |
 | Call sites inside an exempt file                                          | e.g. `http/auth.ts`'s ticket `randomUUID`, called synchronously from Promise-shaped `http/server.ts` |
 | `apps/desktop/src/main`'s Electron-bound files                            | `app-protocol`, `main-window`, `desktop-config`, `lib/utils` are tied to the Electron lifecycle      |
-| `packages/services`' terminal-manager                                     | node-pty has no Effect equivalent (and the package is dormant)                                       |
 | `node:os.homedir` (`config/paths.ts`, `rpc/fs.ts`)                        | Effect has no OS/home-directory service                                                              |
 | `node:module.createRequire` (`harness/claude-code/executable.ts`)         | no Effect equivalent                                                                                 |
 | `daemon/port.ts`, and the `process.kill` signals in `liveness`/`launcher` | Effect has no port-probe or process-signal service                                                   |
