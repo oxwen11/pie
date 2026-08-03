@@ -8,7 +8,6 @@ import "./index.css";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
-import { useSessionListSync } from "./features/projects/use-session-list-sync";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
@@ -52,14 +51,11 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
-  const [router] = useState(() => createRouter({ queryClient, orpcQueryUtils }));
+  const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient, ref)),
   );
-  // Keeps every `session.list` cache converged from the server's collection
-  // events (multi-tab / desktop), independent of which surface is mounted.
-  useSessionListSync({ client: orpcClient, queryClient, orpcQueryUtils });
 
   return (
     <QueryClientProvider client={queryClient}>

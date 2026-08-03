@@ -9,9 +9,11 @@ import {
 import { cn } from "@vibest/ui/lib/utils";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import type { AppClients } from "@/lib/orpc";
 
 export interface RouterAppContext {
+  orpcClient: AppClients["orpcClient"];
   orpcQueryUtils: AppClients["orpcQueryUtils"];
   queryClient: QueryClient;
 }
@@ -29,6 +31,9 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
+  // Keeps every `session.list` cache converged from the server's events
+  // (multi-tab / desktop), independent of which route is mounted.
+  useSessionListSync();
   const navigate = useNavigate();
 
   const handleNewChat = () => navigate({ to: "/draft" });
