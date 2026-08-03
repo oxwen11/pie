@@ -28,11 +28,21 @@ export function isAllowedOrigin(origin: string, extra: readonly string[] = []): 
  * is a DNS-rebinding attempt (an attacker page whose domain now resolves to
  * loopback, which CORS does not stop) and must be refused. A request with no
  * Host is not a browser and is left to the auth layer.
+ *
+ * `extra` lists additional trusted hostnames — a reverse proxy the user runs
+ * in front of the daemon (e.g. `tailscale serve` forwarding a tailnet MagicDNS
+ * name) preserves its public Host, which is indistinguishable from a rebound
+ * one without an explicit allowlist (`VIBEST_ALLOWED_HOSTS`).
  */
-export function isLoopbackHost(host: string | undefined): boolean {
+export function isLoopbackHost(host: string | undefined, extra: readonly string[] = []): boolean {
   if (host === undefined) return true;
   const hostname = host.replace(/:\d+$/, "").toLowerCase();
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    extra.some((allowed) => allowed.toLowerCase() === hostname)
+  );
 }
 
 /**

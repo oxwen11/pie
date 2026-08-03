@@ -27,6 +27,7 @@ function serverArgv(): string[] {
 type DaemonStartInput = {
   readonly port: Option.Option<number>;
   readonly corsOrigin: ReadonlyArray<string>;
+  readonly allowedHost: ReadonlyArray<string>;
 };
 
 // Default startup is the daemon: a short-lived `vibest` command must operate a
