@@ -1,11 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { VibestClient } from "@vibest/client";
-import type {
-  CollectionEvent,
-  ListSessionsOutput,
-  SessionPhase,
-  SessionScopedEvent,
-} from "@vibest/contract";
+import type { CollectionEvent, ListSessionsOutput, SessionScopedEvent } from "@vibest/contract";
 import { isSessionScopedEvent } from "@vibest/contract";
 import { useEffect } from "react";
 
@@ -96,22 +91,22 @@ export function SessionEventsSync({
       }
     };
 
-    // Coarse phase from the turn lifecycle: enough for a busy indicator, and
-    // exactly the transitions the firehose is guaranteed to carry. A phase for
-    // a row we don't hold is dropped — the next list load carries its status.
+    // The runtime stamps its post-event phase onto every session-scoped event,
+    // so the sidebar copies it rather than re-deriving from event types. Chunk
+    // events are skipped for traffic (their phase never differs from the
+    // lifecycle event that opened the turn), and an unchanged phase returns
+    // the previous cache object so subscribers don't re-render per event. A
+    // phase for a row we don't hold is dropped — the next list load carries
+    // its status.
     const applyScoped = (event: SessionScopedEvent) => {
-      const phase: SessionPhase | null =
-        event.type === "session.turn.started"
-          ? "running"
-          : event.type === "session.turn.ended"
-            ? "idle"
-            : event.type === "session.crashed"
-              ? "crashed"
-              : null;
-      if (phase === null) return;
-      queryClient.setQueryData<ListSessionsOutput>(listKeyFor(event.ref.projectId), (prev) =>
-        prev?.map((s) => (s.sessionId === event.ref.sessionId ? { ...s, status: { phase } } : s)),
-      );
+      const phase = event.phase;
+      if (phase === undefined || event.type === "session.message.chunk") return;
+      queryClient.setQueryData<ListSessionsOutput>(listKeyFor(event.ref.projectId), (prev) => {
+        if (!prev) return prev;
+        const row = prev.find((s) => s.sessionId === event.ref.sessionId);
+        if (!row || row.status?.phase === phase) return prev;
+        return prev.map((s) => (s === row ? { ...s, status: { phase } } : s));
+      });
     };
 
     const run = async () => {

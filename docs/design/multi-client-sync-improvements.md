@@ -205,15 +205,28 @@ receipt;内容不同 → `INVALID_ARGUMENT`。做 P1-1 收件箱时顺手做掉�
 - **慢消费者背压改造。** 我们已经是"队列满 → 发 `closed{slow_consumer}` → 客户端
   凭 cursor 补齐"(`events/event-bus.ts:74-90`),比 OpenCode 的"丢流 → 全量重拉"更好。
 
-## 3.5 后续定案:客户端单消费者重构(单独 PR)
+## 3.5 单消费者重构(review 中定案并已落地)
 
-review 中定下方向:**不再走 AI SDK 的 `sendMessages` 流式契约,自己实现 prompt**。
-发送退化为纯 fire-and-forget RPC(拿 turnId 回执);自己的轮次与别人的轮次走
-同一条渲染路径(常驻订阅)。这会整块删除 own-turn 认领、prompt/observer 双平面
-竞态处理和 `promptChunks` 的断线恢复逻辑——今天 transport 里最微妙的三块代码
-都是"同一份广播、两个消费者"的衍生复杂度。需要自己接管的是 `sendMessages`
-原本附送的:乐观插入用户消息、streaming/ready 状态机、错误呈现。观察者路径
-已经会把广播折叠成消息,地基现成。
+review 中定下三条原则并当场重构:**快照同步状态、事件同步增量、词汇表只有一套
+(contract)**。
+
+- **不走 AI SDK 的 `sendMessages` 流式契约,自己实现 prompt**:发送退化为纯
+  fire-and-forget RPC(拿 turnId 回执);自己的轮次与别人的轮次走同一条渲染
+  路径(常驻订阅)。own-turn 认领、prompt/observer 双平面竞态处理和
+  `promptChunks` 的断线恢复逻辑整块删除——它们都是"同一份广播、两个消费者"
+  的衍生复杂度。`sendMessages` 原本附送的乐观插入、状态机、错误呈现由 Chat
+  自己接管。
+- **port 不再造 UI 事件层**:Chat 直接消费 wire 的 `SessionScopedEvent`;
+  transport 唯一的合成变体是 `attached`(带快照,服务端没有对应事件因为对它
+  是查询)。cursor 门控、折叠、对账策略全在 Chat,transport 只剩订阅重连。
+- **状态抄写不推导**:runtime 在发布事件时盖上 post-fold 的 `phase`,侧边栏与
+  Chat 均照抄(顺带修正了客户端推导不出 `requires_action` 的问题);
+  pendingRequests 由快照整体替换 + 事件加减,删除了 delivered/resolved 差量
+  记账。
+- **截断尾巴续播**:新加入者对被截断的缓冲先做孤儿片段过滤
+  (`sanitize-tail.ts`,按 ai fold 的真实配对规则),从第一个干净开头起直播
+  尾巴,轮次结束由历史对账补全开头;断点落在洞里的老观众仍整轮等回放
+  (拼接会伪造"看起来完整"的消息)。
 
 ## 4. 机制对照
 

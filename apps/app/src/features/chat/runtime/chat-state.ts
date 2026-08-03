@@ -1,4 +1,4 @@
-import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
+import type { ChatStatus, UIMessage } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest } from "./agent-requests";
@@ -11,9 +11,9 @@ export type ChatStoreState = {
   pendingRequests: AgentRequest[];
 };
 
-// The ChatState interface AbstractChat requires, backed by the per-Chat store
-// (no global store, no adapter).
-export class ChatState implements AiChatState<UIMessage> {
+// Chat's state container, backed by the per-Chat store (no global store, no
+// adapter).
+export class ChatState {
   readonly store: StoreApi<ChatStoreState>;
 
   constructor(initialMessages: UIMessage[] = []) {
@@ -49,23 +49,10 @@ export class ChatState implements AiChatState<UIMessage> {
   pushMessage = (message: UIMessage) => {
     this.store.setState((s) => ({ messages: [...s.messages, message] }));
   };
-  popMessage = () => {
-    this.store.setState((s) => ({ messages: s.messages.slice(0, -1) }));
-  };
-  replaceMessage = (index: number, message: UIMessage) => {
-    this.store.setState((s) => {
-      const next = s.messages.slice();
-      // AbstractChat's stream reduction mutates one message object in place and
-      // calls replaceMessage with that same reference on every chunk. Clone on
-      // write so each update carries fresh part identities — otherwise memos
-      // keyed on `message.parts` never recompute (same as ReactChatState).
-      next[index] = this.snapshot(message);
-      return { messages: next };
-    });
-  };
-  // Replace-by-id or append: the observer projection (turns other clients
-  // drive) folds message snapshots that evolve under a stable id. Clones for
-  // the same reason as replaceMessage.
+  // Replace-by-id or append: the turn folds produce message snapshots that
+  // evolve under a stable id, and the reducer mutates one message object in
+  // place across chunks. Clone on write so each update carries fresh part
+  // identities — otherwise memos keyed on `message.parts` never recompute.
   upsertMessage = (message: UIMessage) => {
     this.store.setState((s) => {
       const index = s.messages.findIndex((m) => m.id === message.id);
@@ -77,7 +64,12 @@ export class ChatState implements AiChatState<UIMessage> {
   };
   snapshot = <T>(value: T): T => structuredClone(value);
 
-  // Pending agent requests (cleared when the turn ends).
+  // Pending agent requests (cleared when the turn ends). The server owns this
+  // state: a snapshot hydration replaces the list wholesale, live events add
+  // and remove.
+  setPendingRequests = (pendingRequests: AgentRequest[]) => {
+    this.store.setState({ pendingRequests });
+  };
   addPendingRequest = (request: AgentRequest) => {
     this.store.setState((s) => ({
       pendingRequests: s.pendingRequests.some((r) => r.id === request.id)

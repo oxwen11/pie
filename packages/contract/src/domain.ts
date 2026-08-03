@@ -241,7 +241,19 @@ export type SessionScopedEventBody =
 /** A session-scoped event before the SessionRuntime stamps its `seq`. */
 export type SessionScopedEventDraft = { readonly ref: SessionRef } & SessionScopedEventBody;
 
-export type SessionScopedEvent = { readonly seq: number } & SessionScopedEventDraft;
+export type SessionScopedEvent = {
+  readonly seq: number;
+  /**
+   * The session's phase *after* this event applied, stamped by the
+   * SessionRuntime alongside `seq`. Consumers copy it (sidebar status, chat
+   * composer state) instead of re-deriving phase from event types — the
+   * runtime is the only place that knows the full transition table
+   * (`requires_action` in particular is invisible to a client-side mapping).
+   * Absent only on chunk events replayed from a snapshot's retained buffer;
+   * there the snapshot's own `status` is the phase source.
+   */
+  readonly phase?: SessionPhase;
+} & SessionScopedEventDraft;
 
 export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }

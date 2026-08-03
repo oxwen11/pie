@@ -33,8 +33,6 @@ export class ChatManager implements ChatManagerApi {
       transport: this.createTransport(sessionRef),
     });
     this.#chats.set(sessionRef.sessionId, chat);
-    // History backfill is the transport's job (delivered via onHistory before
-    // any replayed or live event), so nothing to kick off here.
     return chat;
   }
 }

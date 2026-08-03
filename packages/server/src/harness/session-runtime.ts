@@ -355,8 +355,14 @@ export const makeHarnessAgentSessionRuntime = (
             Ref.get(projection).pipe(
               Effect.flatMap((current) => {
                 const event: SessionScopedEvent = { seq: current.seq + 1, ref, ...wireBody };
-                return Ref.set(projection, fold(current, event)).pipe(
-                  Effect.andThen(bus.publish(event)),
+                const next = fold(current, event);
+                // Publish with the post-fold phase stamped on: consumers copy
+                // the session's phase off the event instead of re-deriving it
+                // from event types. (The buffered chunk copy inside `next`
+                // keeps the un-stamped draft — snapshot replays read phase
+                // from the snapshot's own status.)
+                return Ref.set(projection, next).pipe(
+                  Effect.andThen(bus.publish({ ...event, phase: next.phase })),
                 );
               }),
             ),
