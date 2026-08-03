@@ -41,7 +41,7 @@ export class SessionNotActive extends Data.TaggedError("SessionNotActive")<{
 // the buffer truncated — consumers then skip it and recover the turn from
 // the history read once it ends.
 const MAX_BUFFERED_CHUNKS = 65536;
-const MAX_BUFFERED_BYTES = 64 * 1024 * 1024;
+const MAX_BUFFERED_BYTES = 10 * 1024 * 1024;
 
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */
