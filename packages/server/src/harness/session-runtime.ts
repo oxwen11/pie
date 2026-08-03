@@ -34,13 +34,14 @@ export class SessionNotActive extends Data.TaggedError("SessionNotActive")<{
   readonly sessionId: string;
 }> {}
 
-// The buffer caps below bound what one turn may retain for mid-turn joiners
-// and reconnect replay. A pathological turn (endless huge tool output) would
-// otherwise hold its entire chunk history in memory and ship it on every
-// snapshot. Overflow drops the oldest chunks and marks the buffer truncated —
-// consumers then skip it and recover the turn from the history read instead.
-const MAX_BUFFERED_CHUNKS = 4096;
-const MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
+// Safety valve, not memory management: normal turns must never hit these.
+// The buffer holds only the one in-flight turn and is dropped when the next
+// turn starts, so the sole unbounded case is a runaway turn that never ends
+// (an agent loop left running). Overflow drops the oldest chunks and marks
+// the buffer truncated — consumers then skip it and recover the turn from
+// the history read once it ends.
+const MAX_BUFFERED_CHUNKS = 65536;
+const MAX_BUFFERED_BYTES = 64 * 1024 * 1024;
 
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */

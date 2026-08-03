@@ -245,8 +245,9 @@ it.effect("bounds the active turn buffer and marks it truncated on overflow", ()
         sessionId: nativeId,
         turnId: "turn-1",
       });
-      // Three ~1MB deltas cross the byte cap; eviction keeps the newest tail.
-      const big = "x".repeat(1024 * 1024);
+      // Three ~24MiB deltas cross the 64MiB byte cap; eviction keeps the
+      // newest tail.
+      const big = "x".repeat(24 * 1024 * 1024);
       for (let index = 0; index < 3; index += 1) {
         yield* Queue.offer(queue, { type: "text-delta", id: "t", delta: big });
       }

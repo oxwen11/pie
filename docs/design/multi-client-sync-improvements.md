@@ -80,9 +80,16 @@ chunks: [...current.activeTurn.chunks, event],
 
 1. 用可变数组 + 冻结读(fold 内 `push`,`toSnapshot` 时才 slice),或者保留不可变
    语义但改成分块累积。消除 O(n²)。
-2. 给缓冲设上限(按 chunk 数或累计字节,例如 2000 块 / 1MB):超限后丢弃最旧的,
-   并在快照里带 `truncated: true`。客户端见到 `truncated` 就不吃缓冲,直接走
-   `getMessages()` 历史读 —— 地板已经在那儿了,这是安全的降级。
+2. 给缓冲设上限:超限后丢弃最旧的,并在快照里带 `truncated: true`。客户端见到
+   `truncated` 就不吃缓冲,直接走 `getMessages()` 历史读 —— 地板已经在那儿了,
+   这是安全的降级。
+
+**上限的定位是保险丝,不是内存管理**(review 中定案):缓冲只存进行中的一轮、
+下一轮开始即整体释放,正常运行不需要上限参与;唯一的病理场景是跑飞的 agent
+循环(一轮永不结束)。因此数字取"正常使用永远碰不到"的量级——
+**65536 块 / 64MiB**——触发即意味着出了别的问题。若真实世界观察到截断,升级
+路径是把进行中轮次溢写到临时 jsonl(空间换内存),当前不为极端 Case 建这套
+带文件生命周期与写盘错误处理的子系统。
 
 **代价**:contract 加一个布尔字段;客户端 `hydratePendingRequests` 加一个分支。
 
@@ -192,6 +199,16 @@ receipt;内容不同 → `INVALID_ARGUMENT`。做 P1-1 收件箱时顺手做掉�
   但目前只服务于 server↔server 复制,没有 UI 客户端消费。
 - **慢消费者背压改造。** 我们已经是"队列满 → 发 `closed{slow_consumer}` → 客户端
   凭 cursor 补齐"(`events/event-bus.ts:74-90`),比 OpenCode 的"丢流 → 全量重拉"更好。
+
+## 3.5 后续定案:客户端单消费者重构(单独 PR)
+
+review 中定下方向:**不再走 AI SDK 的 `sendMessages` 流式契约,自己实现 prompt**。
+发送退化为纯 fire-and-forget RPC(拿 turnId 回执);自己的轮次与别人的轮次走
+同一条渲染路径(常驻订阅)。这会整块删除 own-turn 认领、prompt/observer 双平面
+竞态处理和 `promptChunks` 的断线恢复逻辑——今天 transport 里最微妙的三块代码
+都是"同一份广播、两个消费者"的衍生复杂度。需要自己接管的是 `sendMessages`
+原本附送的:乐观插入用户消息、streaming/ready 状态机、错误呈现。观察者路径
+已经会把广播折叠成消息,地基现成。
 
 ## 4. 机制对照
 
