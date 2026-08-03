@@ -18,7 +18,7 @@ const isAbortError = (error: unknown) =>
 // the coarse turn lifecycle is consumed — it drives the sidebar's busy
 // indicator for sessions this client never opened; chunks and requests still
 // belong to the per-session Chat transport.
-export function SessionEventsSync({
+export function SessionListSync({
   client,
   queryClient,
   orpcQueryUtils,

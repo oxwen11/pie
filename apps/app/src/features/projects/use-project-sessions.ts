@@ -15,7 +15,7 @@ const selectNewestFirst = (
  * The sessions under one project, newest-first.
  *
  * Held briefly, unlike `project.list`: this key has writers we don't drive —
- * the draft route seeds an optimistic row, `SessionEventsSync` patches titles
+ * the draft route seeds an optimistic row, `SessionListSync` patches titles
  * in from `session.updated`.
  */
 export function useProjectSessions(projectId: string): ReadonlyArray<SessionSummary> {
