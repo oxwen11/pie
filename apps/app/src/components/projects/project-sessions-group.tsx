@@ -60,6 +60,16 @@ export function ProjectSessionsGroup({ project }: { project: Project }) {
                 }
               >
                 <span className="truncate">{session.title ?? "New chat"}</span>
+                {/* Busy elsewhere too: status is server-derived, so a turn any
+                    client is running shows here. requires_action keeps the
+                    turn open, so it counts as busy. */}
+                {(session.status?.phase === "running" ||
+                  session.status?.phase === "requires_action") && (
+                  <span
+                    className="ms-auto size-2 shrink-0 animate-pulse rounded-full bg-emerald-500"
+                    title="A turn is running in this session"
+                  />
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

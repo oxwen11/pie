@@ -1,6 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { VibestClient } from "@vibest/client";
-import type { CollectionEvent, ListSessionsOutput } from "@vibest/contract";
+import type {
+  CollectionEvent,
+  ListSessionsOutput,
+  SessionPhase,
+  SessionScopedEvent,
+} from "@vibest/contract";
 import { isSessionScopedEvent } from "@vibest/contract";
 import { useEffect } from "react";
 
@@ -14,8 +19,10 @@ const isAbortError = (error: unknown) =>
 // The one always-mounted consumer of the global (firehose) subscription's
 // collection events. It keeps every open `session.list` cache converged —
 // across tabs and the desktop app, not just the tab that drove the change —
-// by patching the affected row in place. Session-scoped events (turn chunks,
-// requests) are ignored here; those belong to the per-session Chat transport.
+// by patching the affected row in place. Of the session-scoped events, only
+// the coarse turn lifecycle is consumed — it drives the sidebar's busy
+// indicator for sessions this client never opened; chunks and requests still
+// belong to the per-session Chat transport.
 export function SessionEventsSync({
   client,
   queryClient,
@@ -89,6 +96,24 @@ export function SessionEventsSync({
       }
     };
 
+    // Coarse phase from the turn lifecycle: enough for a busy indicator, and
+    // exactly the transitions the firehose is guaranteed to carry. A phase for
+    // a row we don't hold is dropped — the next list load carries its status.
+    const applyScoped = (event: SessionScopedEvent) => {
+      const phase: SessionPhase | null =
+        event.type === "session.turn.started"
+          ? "running"
+          : event.type === "session.turn.ended"
+            ? "idle"
+            : event.type === "session.crashed"
+              ? "crashed"
+              : null;
+      if (phase === null) return;
+      queryClient.setQueryData<ListSessionsOutput>(listKeyFor(event.ref.projectId), (prev) =>
+        prev?.map((s) => (s.sessionId === event.ref.sessionId ? { ...s, status: { phase } } : s)),
+      );
+    };
+
     const run = async () => {
       while (!abort.signal.aborted) {
         try {
@@ -97,17 +122,20 @@ export function SessionEventsSync({
             { signal: abort.signal },
           );
           for await (const item of stream) {
-            if (item.type === "event" && !isSessionScopedEvent(item.event)) {
-              apply(item.event);
-            }
+            if (item.type !== "event") continue;
+            if (isSessionScopedEvent(item.event)) applyScoped(item.event);
+            else apply(item.event);
           }
         } catch (error) {
           if (abort.signal.aborted || isAbortError(error)) return;
         }
         if (abort.signal.aborted) return;
-        // The stream ended (server teardown / dropped connection). Back off, then
-        // re-subscribe; the list query's own mount-time fetch covers any gap.
-        // Resolves early on abort so unmount doesn't wait out the delay.
+        // The stream ended (server teardown / dropped connection): phase
+        // transitions may have been missed, so the patched statuses can be
+        // stale — refetch every list rather than trust them.
+        void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.session.list.key() });
+        // Back off, then re-subscribe. Resolves early on abort so unmount
+        // doesn't wait out the delay.
         await new Promise<void>((resolve) => {
           backoff = setTimeout(resolve, RESUBSCRIBE_DELAY_MS);
           abort.signal.addEventListener("abort", () => resolve(), { once: true });

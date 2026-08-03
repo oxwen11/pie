@@ -155,7 +155,12 @@ const makeSession = (
           };
           if (prompt.started) {
             yield* Ref.set(activeTurn, prompt.turnId);
-            yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
+            yield* emit({
+              type: "session.turn.started",
+              sessionId,
+              turnId: prompt.turnId,
+              ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
+            });
           }
 
           const finished = yield* Ref.make(false);

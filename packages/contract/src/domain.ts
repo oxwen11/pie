@@ -184,6 +184,7 @@ export type SessionStatus = typeof SessionStatusSchema.Type;
 
 export const SessionScopedEventTypes = [
   "session.message.chunk",
+  "session.prompt.submitted",
   "session.turn.started",
   "session.turn.ended",
   "session.request.asked",
@@ -207,7 +208,20 @@ export type SessionScopedEventBody =
       readonly turnId: string;
       readonly chunk: UIMessageChunk;
     }
-  | { readonly type: "session.turn.started"; readonly turnId: string }
+  // A user prompt was accepted for this session. Published by the session
+  // service *before* the harness call, so it always precedes the turn's own
+  // events in seq order; `messageId` echoes the client-supplied id (or a
+  // server-minted one), letting the prompting client dedupe its optimistic
+  // message while every other client appends it.
+  | {
+      readonly type: "session.prompt.submitted";
+      readonly messageId: string;
+      readonly parts: ReadonlyArray<PromptPart>;
+    }
+  // `messageId` links the turn to the `session.prompt.submitted` that caused
+  // it: the prompting client matches it against its own optimistic message to
+  // claim the turn before the prompt RPC's receipt lands.
+  | { readonly type: "session.turn.started"; readonly turnId: string; readonly messageId?: string }
   | {
       readonly type: "session.turn.ended";
       readonly turnId: string;
@@ -302,6 +316,21 @@ export type ActiveTurnSnapshot = {
   // A finished turn's buffer is retained (complete: true) until the next turn
   // starts, so recovery can replay a tail that ended mid-disconnect.
   readonly complete: boolean;
+  // The buffer is bounded; a turn that overflowed it had its oldest chunks
+  // dropped. A truncated buffer cannot rebuild the turn's message from its
+  // start — consumers skip it and recover the turn from the history read
+  // once it ends.
+  readonly truncated: boolean;
+};
+
+// The latest accepted prompt, retained like the active turn's buffer:
+// `session.prompt.submitted` is never re-sent, so a client attaching mid-turn
+// recovers the user message from here. `seq` is the submit event's seq — replay
+// gates on it, so a client that saw the live event never renders it twice.
+export type ActivePromptSnapshot = {
+  readonly messageId: string;
+  readonly parts: ReadonlyArray<PromptPart>;
+  readonly seq: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -425,6 +454,7 @@ export type SessionRuntimeSnapshot = {
   readonly status: SessionStatus;
   readonly pendingRequests: ReadonlyArray<AgentRequest>;
   readonly activeTurn: ActiveTurnSnapshot | null;
+  readonly activePrompt: ActivePromptSnapshot | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
   readonly cursor: number;
 };
@@ -468,6 +498,10 @@ export type PromptPart = typeof PromptPartSchema.Type;
 export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
+  // The client's own id for the optimistic user message, echoed back in
+  // `session.prompt.submitted` so the sender can recognise (and skip) its own
+  // prompt while other clients render it. Absent → the server mints one.
+  messageId: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 

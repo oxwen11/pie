@@ -39,7 +39,9 @@ const sid = { sessionId: Schema.String };
 
 export const SessionTurnStarted = defineEvent({
   type: "session.turn.started",
-  schema: { ...sid, turnId: Schema.String },
+  // `messageId` = the prompt's server-resolved message id, threaded through so
+  // the wire event can link the turn back to its `session.prompt.submitted`.
+  schema: { ...sid, turnId: Schema.String, messageId: Schema.optionalKey(Schema.String) },
 });
 export const SessionTurnEnded = defineEvent({
   type: "session.turn.ended",

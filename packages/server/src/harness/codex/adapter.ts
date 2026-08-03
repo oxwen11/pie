@@ -26,6 +26,7 @@ import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
 import { findExecutable } from "../executable";
 import { streamFromQueueOne } from "../queue-stream";
 import type { CodexAgent } from "./agent";
+import { turnsToUIMessages } from "./history";
 
 const EVENT_QUEUE_CAPACITY = 1024;
 
@@ -243,7 +244,12 @@ const makeSession = (
           };
           if (prompt.started) {
             yield* Ref.set(activeTurn, prompt.turnId);
-            yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
+            yield* emit({
+              type: "session.turn.started",
+              sessionId,
+              turnId: prompt.turnId,
+              ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
+            });
           }
 
           const finished = yield* Ref.make(false);
@@ -317,6 +323,16 @@ const makeSession = (
         supportsResume: true,
         supportsSteering: true,
         supportsPermissions: true,
+      }),
+      // Native history read: `thread/read` returns the stored turns in the
+      // same ThreadItem vocabulary the live transform streams, so the cold
+      // fold and the live track can't drift apart.
+      getMessages: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        const thread = yield* agent.session
+          .read({ sessionId, includeTurns: true })
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "get-messages", cause)));
+        return turnsToUIMessages(thread.turns);
       }),
       close,
     } satisfies HarnessAgentSession;

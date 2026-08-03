@@ -378,6 +378,76 @@ describe("HarnessAgentSessionService", () => {
     expect(event?.type === "session.updated" ? event.title : undefined).toBe("Fix the login bug");
   });
 
+  // A session whose native stream stays open (turn: "open" concats
+  // Stream.never) keeps its runtime alive — emit needs one; a drained-out
+  // stream drops the runtime and the broadcast is silently skipped.
+  const takePromptSubmitted = (fixture: Fixture, ref: SessionRef, promptInput: object) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
+        yield* fixture.service.prompt({
+          ref,
+          parts: [{ type: "text", text: "hello there" }],
+          ...promptInput,
+        });
+        const items = yield* Stream.runCollect(
+          Stream.take(
+            Stream.filter(
+              stream,
+              (item) => item.type === "event" && item.event.type === "session.prompt.submitted",
+            ),
+            1,
+          ),
+        );
+        const item = Array.from(items)[0];
+        return item?.type === "event" ? item.event : undefined;
+      }),
+    );
+
+  it("broadcasts session.prompt.submitted echoing the client messageId", async () => {
+    const event = await run({ turn: "open" }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        return yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
+      }),
+    );
+    expect(event).toMatchObject({
+      type: "session.prompt.submitted",
+      messageId: "client-msg-1",
+      parts: [{ type: "text", text: "hello there" }],
+    });
+    // Shares the session's contiguous seq counter with harness events.
+    expect(event && isSessionScopedEvent(event) ? event.seq : 0).toBeGreaterThan(0);
+  });
+
+  it("retains the accepted prompt in the runtime snapshot for mid-turn joiners", async () => {
+    const snapshot = await run({ turn: "open" }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
+        return yield* fixture.service.getSnapshot(ref);
+      }),
+    );
+    // `session.prompt.submitted` is never re-sent, so the snapshot is the only
+    // recovery for a client that attaches after it fired.
+    expect(snapshot.activePrompt).toMatchObject({
+      messageId: "client-msg-1",
+      parts: [{ type: "text", text: "hello there" }],
+    });
+    expect(snapshot.activePrompt?.seq).toBeGreaterThan(0);
+  });
+
+  it("mints a messageId when the prompt carries none", async () => {
+    const event = await run({ turn: "open" }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        return yield* takePromptSubmitted(fixture, ref, {});
+      }),
+    );
+    expect(event?.type).toBe("session.prompt.submitted");
+    expect(event && "messageId" in event ? event.messageId : undefined).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   it("keeps the first prompt's title; later prompts don't rename", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {

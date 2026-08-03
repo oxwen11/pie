@@ -58,6 +58,10 @@ export type UserInputPart = typeof UserInputPartSchema.Type;
 
 export const UserInputSchema = Schema.Struct({
   parts: Schema.Array(UserInputPartSchema),
+  // The prompt's server-resolved message id (the one `session.prompt.submitted`
+  // broadcast). Adapters stamp it onto their `session.turn.started` so clients
+  // can attribute the turn; harnesses never interpret it.
+  messageId: Schema.optionalKey(Schema.String),
 });
 export type UserInput = typeof UserInputSchema.Type;
 

@@ -63,6 +63,18 @@ export class ChatState implements AiChatState<UIMessage> {
       return { messages: next };
     });
   };
+  // Replace-by-id or append: the observer projection (turns other clients
+  // drive) folds message snapshots that evolve under a stable id. Clones for
+  // the same reason as replaceMessage.
+  upsertMessage = (message: UIMessage) => {
+    this.store.setState((s) => {
+      const index = s.messages.findIndex((m) => m.id === message.id);
+      const next = s.messages.slice();
+      if (index === -1) next.push(this.snapshot(message));
+      else next[index] = this.snapshot(message);
+      return { messages: next };
+    });
+  };
   snapshot = <T>(value: T): T => structuredClone(value);
 
   // Pending agent requests (cleared when the turn ends).

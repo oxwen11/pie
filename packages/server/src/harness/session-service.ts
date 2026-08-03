@@ -501,7 +501,35 @@ export const makeHarnessAgentSessionService = (deps: {
               // The first prompt names the session before it reaches the harness.
               stampTitleFromFirstPrompt(metadata, input.parts).pipe(
                 Effect.andThen(manager.get(metadata.harnessSessionId)),
-                Effect.flatMap((session) => session.prompt(userInput)),
+                Effect.flatMap((session) =>
+                  // Broadcast the accepted prompt *before* the harness call so
+                  // it always precedes the turn's own events in seq order.
+                  // Best-effort: a session whose runtime is gone will fail the
+                  // prompt itself with the real error a line later; and if the
+                  // harness then rejects the prompt, other clients briefly
+                  // rendered a user message for a turn that never ran — the
+                  // same thing the sender's optimistic transcript shows.
+                  (input.messageId !== undefined
+                    ? Effect.succeed(input.messageId)
+                    : newSessionId
+                  ).pipe(
+                    Effect.flatMap((messageId) =>
+                      manager
+                        .emit(input.ref, {
+                          type: "session.prompt.submitted",
+                          messageId,
+                          parts: input.parts,
+                        })
+                        .pipe(
+                          Effect.catchTag("SessionNotActive", () => Effect.void),
+                          // The same id rides into the harness so the adapter
+                          // stamps it on `session.turn.started` — that link is
+                          // how clients attribute the turn to this prompt.
+                          Effect.andThen(session.prompt({ ...userInput, messageId })),
+                        ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

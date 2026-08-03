@@ -1,5 +1,6 @@
 import type {
   AgentRequest,
+  PromptPart,
   SessionMessageChunkEvent,
   SessionPhase,
   SessionRef,
@@ -8,7 +9,7 @@ import type {
   SessionScopedEventBody,
   SessionStatus,
 } from "@vibest/contract";
-import { Data, Deferred, Effect, Fiber, Ref, Scope, Stream } from "effect";
+import { Data, Deferred, Effect, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";
 import type { AgentOperationError } from "./errors";
@@ -33,11 +34,45 @@ export class SessionNotActive extends Data.TaggedError("SessionNotActive")<{
   readonly sessionId: string;
 }> {}
 
+// The buffer caps below bound what one turn may retain for mid-turn joiners
+// and reconnect replay. A pathological turn (endless huge tool output) would
+// otherwise hold its entire chunk history in memory and ship it on every
+// snapshot. Overflow drops the oldest chunks and marks the buffer truncated —
+// consumers then skip it and recover the turn from the history read instead.
+const MAX_BUFFERED_CHUNKS = 4096;
+const MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
+
+/** Cheap size estimate: the delta/text payload for streaming chunks, a
+ * serialization for the (rare, potentially large) structured ones. */
+const chunkBytes = (chunk: WireChunk): number => {
+  const delta = (chunk as { delta?: unknown }).delta;
+  if (typeof delta === "string") return delta.length + 32;
+  const text = (chunk as { text?: unknown }).text;
+  if (typeof text === "string") return text.length + 32;
+  try {
+    return JSON.stringify(chunk).length;
+  } catch {
+    return 1024;
+  }
+};
+
 type ActiveTurn = {
   readonly turnId: string;
   readonly messageId: string | null;
-  readonly chunks: ReadonlyArray<SessionMessageChunkEvent>;
+  // Mutable on purpose: `fold` appends in place under the runtime's applyLock
+  // (previous Projection values alias the same array — nothing retains them),
+  // so a long turn is O(n) total instead of O(n²) copying. `toSnapshot` hands
+  // out defensive copies.
+  readonly chunks: SessionMessageChunkEvent[];
+  readonly bytes: number;
   readonly complete: boolean;
+  readonly truncated: boolean;
+};
+
+type ActivePrompt = {
+  readonly messageId: string;
+  readonly parts: ReadonlyArray<PromptPart>;
+  readonly seq: number;
 };
 
 type Projection = {
@@ -45,6 +80,7 @@ type Projection = {
   readonly cursor: number;
   readonly phase: SessionPhase;
   readonly activeTurn: ActiveTurn | null;
+  readonly activePrompt: ActivePrompt | null;
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
 };
 
@@ -53,6 +89,7 @@ const initialProjection: Projection = {
   cursor: 0,
   phase: "idle",
   activeTurn: null,
+  activePrompt: null,
   pendingRequests: new Map(),
 };
 
@@ -69,7 +106,11 @@ const toWireBody = (
   const event = body as SessionEvent;
   switch (event.type) {
     case "session.turn.started":
-      return { type: "session.turn.started", turnId: event.turnId };
+      return {
+        type: "session.turn.started",
+        turnId: event.turnId,
+        ...(event.messageId !== undefined ? { messageId: event.messageId } : {}),
+      };
     case "session.turn.ended":
       return {
         type: "session.turn.ended",
@@ -101,12 +142,28 @@ const startChunkMessageId = (chunk: WireChunk): string | null =>
 const fold = (current: Projection, event: SessionScopedEvent): Projection => {
   const base = { ...current, seq: event.seq, cursor: event.seq };
   switch (event.type) {
+    case "session.prompt.submitted":
+      // The turn machine reacts only to the harness's own turn events, but the
+      // prompt is retained (like the finished turn's buffer): the submit event
+      // is never re-sent, so a client attaching mid-turn recovers the user
+      // message from the snapshot. The next accepted prompt replaces it.
+      return {
+        ...base,
+        activePrompt: { messageId: event.messageId, parts: event.parts, seq: event.seq },
+      };
     case "session.turn.started":
       // Starting a turn releases the previous turn's retained buffer.
       return {
         ...base,
         phase: "running",
-        activeTurn: { turnId: event.turnId, messageId: null, chunks: [], complete: false },
+        activeTurn: {
+          turnId: event.turnId,
+          messageId: null,
+          chunks: [],
+          bytes: 0,
+          complete: false,
+          truncated: false,
+        },
       };
     case "session.message.chunk": {
       if (
@@ -116,12 +173,40 @@ const fold = (current: Projection, event: SessionScopedEvent): Projection => {
       ) {
         return base;
       }
+      // In-place append (see the ActiveTurn comment); overflow evicts from the
+      // front — the newest chunks are what a reconnecting consumer is missing.
+      // Eviction drops a quarter of the cap at once so a saturated buffer
+      // amortizes to O(1) per chunk instead of shifting on every append.
+      const chunks = current.activeTurn.chunks;
+      chunks.push(event);
+      let bytes = current.activeTurn.bytes + chunkBytes(event.chunk);
+      let truncated = current.activeTurn.truncated;
+      if (chunks.length > MAX_BUFFERED_CHUNKS || bytes > MAX_BUFFERED_BYTES) {
+        const targetCount = Math.floor(MAX_BUFFERED_CHUNKS * 0.75);
+        const targetBytes = Math.floor(MAX_BUFFERED_BYTES * 0.75);
+        let drop = 0;
+        while (
+          chunks.length - drop > 1 &&
+          (chunks.length - drop > targetCount || bytes > targetBytes)
+        ) {
+          const evicted = chunks[drop];
+          if (evicted === undefined) break;
+          bytes -= chunkBytes(evicted.chunk);
+          drop += 1;
+        }
+        if (drop > 0) {
+          chunks.splice(0, drop);
+          truncated = true;
+        }
+      }
       return {
         ...base,
         activeTurn: {
           ...current.activeTurn,
           messageId: current.activeTurn.messageId ?? startChunkMessageId(event.chunk),
-          chunks: [...current.activeTurn.chunks, event],
+          chunks,
+          bytes,
+          truncated,
         },
       };
     }
@@ -147,7 +232,13 @@ const fold = (current: Projection, event: SessionScopedEvent): Projection => {
       return { ...base, phase, pendingRequests };
     }
     case "session.crashed":
-      return { ...base, phase: "crashed", activeTurn: null, pendingRequests: new Map() };
+      return {
+        ...base,
+        phase: "crashed",
+        activeTurn: null,
+        activePrompt: null,
+        pendingRequests: new Map(),
+      };
   }
 };
 
@@ -161,8 +252,10 @@ const toSnapshot = (ref: SessionRef, projection: Projection): SessionRuntimeSnap
         messageId: projection.activeTurn.messageId,
         chunks: [...projection.activeTurn.chunks],
         complete: projection.activeTurn.complete,
+        truncated: projection.activeTurn.truncated,
       }
     : null,
+  activePrompt: projection.activePrompt,
   cursor: projection.cursor,
 });
 
@@ -174,11 +267,13 @@ const toStatus = (projection: Projection): SessionStatus => ({
 });
 
 // One live in-memory session (ours): projection + seq + the fiber draining the
-// HarnessAgent's native event stream. The runtime owns a map of these.
+// HarnessAgent's native event stream, plus the wire-body applier so events
+// originating outside the native stream (`emit`) share the same seq counter.
 type SessionRuntime = {
   readonly ref: SessionRef;
   readonly projection: Ref.Ref<Projection>;
   readonly fiber: Fiber.Fiber<void>;
+  readonly applyWire: (body: SessionScopedEventBody) => Effect.Effect<void>;
 };
 
 export type HarnessAgentSessionRuntimeShape = {
@@ -197,6 +292,14 @@ export type HarnessAgentSessionRuntimeShape = {
   readonly stop: (ref: SessionRef) => Effect.Effect<void>;
   readonly snapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot, SessionNotActive>;
   readonly status: (ref: SessionRef) => Effect.Effect<SessionStatus, SessionNotActive>;
+  /**
+   * Inject a server-originated wire event into the session's stream: it gets
+   * the same contiguous seq stamping and bus fan-out as harness-driven events.
+   */
+  readonly emit: (
+    ref: SessionRef,
+    body: SessionScopedEventBody,
+  ) => Effect.Effect<void, SessionNotActive>;
 };
 
 export const makeHarnessAgentSessionRuntime = (
@@ -241,6 +344,23 @@ export const makeHarnessAgentSessionRuntime = (
 
         const projection = yield* Ref.make(initialProjection);
 
+        // Serializes stamp+publish across the drain fiber and `emit` callers:
+        // without it two fibers could stamp seqs n/n+1 but publish n+1 first,
+        // and the clients' `seq <= cursor` replay guard would drop n forever.
+        const applyLock = Semaphore.makeUnsafe(1);
+
+        const applyWire = (wireBody: SessionScopedEventBody): Effect.Effect<void> =>
+          applyLock.withPermit(
+            Ref.get(projection).pipe(
+              Effect.flatMap((current) => {
+                const event: SessionScopedEvent = { seq: current.seq + 1, ref, ...wireBody };
+                return Ref.set(projection, fold(current, event)).pipe(
+                  Effect.andThen(bus.publish(event)),
+                );
+              }),
+            ),
+          );
+
         const apply = (body: SessionEnvelopeBody) =>
           Ref.get(projection).pipe(
             Effect.flatMap((current) => {
@@ -250,10 +370,7 @@ export const makeHarnessAgentSessionRuntime = (
                   : undefined;
               const wireBody = toWireBody(body, activeTurn);
               if (!wireBody) return Effect.void;
-              const event: SessionScopedEvent = { seq: current.seq + 1, ref, ...wireBody };
-              return Ref.set(projection, fold(current, event)).pipe(
-                Effect.andThen(bus.publish(event)),
-              );
+              return applyWire(wireBody);
             }),
           );
 
@@ -278,7 +395,10 @@ export const makeHarnessAgentSessionRuntime = (
         // its never-activated fiber and defers to the winner.
         const won = yield* Ref.modify(runtimes, (current) => {
           if (current.has(ref.sessionId)) return [false, current] as const;
-          return [true, new Map(current).set(ref.sessionId, { ref, projection, fiber })] as const;
+          return [
+            true,
+            new Map(current).set(ref.sessionId, { ref, projection, fiber, applyWire }),
+          ] as const;
         });
         if (!won) {
           yield* Fiber.interrupt(fiber);
@@ -312,5 +432,7 @@ export const makeHarnessAgentSessionRuntime = (
           Effect.flatMap((runtime) => Ref.get(runtime.projection)),
           Effect.map(toStatus),
         ),
+      emit: (ref, body) =>
+        getRuntime(ref).pipe(Effect.flatMap((runtime) => runtime.applyWire(body))),
     };
   });
