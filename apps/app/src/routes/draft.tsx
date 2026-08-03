@@ -169,7 +169,7 @@ function DraftRoute() {
       // Optimistic title: seed the row with the prompt text so it appears named
       // the instant we navigate. The server owns the durable title — it stamps a
       // whitespace-collapsed, length-clamped version from this same first prompt
-      // and emits `session.updated`, which SessionListSync patches over this
+      // and emits `session.updated`, which useSessionListSync patches over this
       // row. So this is the real value, reconciled in place, never a placeholder
       // that flashes "New chat".
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {

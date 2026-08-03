@@ -147,7 +147,7 @@ re-resolve(`packages/app/src/context/server-session.ts:979-984`)。
 
 ### P1-3 会话列表缺全局 busy 态
 
-**现状**:`SessionListSync`(`apps/app/src/core/session/session-events-sync.tsx`)
+**现状**:`useSessionListSync`(`apps/app/src/core/session/session-events-sync.tsx`)
 是全局 firehose 的唯一消费者,但它**只处理 collection 事件**(created/updated/
 renamed/deleted),session-scoped 事件直接跳过(`:100-101`)。所以另一个客户端
 正在跑的会话,在侧边栏列表里没有任何"忙"的迹象——除非你把它打开。
@@ -160,7 +160,7 @@ renamed/deleted),session-scoped 事件直接跳过(`:100-101`)。所以另一个
 
 1. 服务端加一个 `session.listActive`(直接读内存投影,零成本),
    客户端在挂载和每次全局订阅重连后拉一次。
-2. `SessionListSync` 顺带消费 `session.turn.started/ended`,在 list 缓存里
+2. `useSessionListSync` 顺带消费 `session.turn.started/ended`,在 list 缓存里
    打 busy 标记(注意用 `queryOptions({input}).queryKey`,不是 `.key()`)。
 
 **代价**:小。

@@ -11,14 +11,14 @@ const RESUBSCRIBE_DELAY_MS = 1000;
 const isAbortError = (error: unknown) =>
   error instanceof DOMException && error.name === "AbortError";
 
-// The one always-mounted consumer of the global (firehose) subscription's
-// collection events. It keeps every open `session.list` cache converged —
-// across tabs and the desktop app, not just the tab that drove the change —
-// by patching the affected row in place. Of the session-scoped events, only
-// the coarse turn lifecycle is consumed — it drives the sidebar's busy
-// indicator for sessions this client never opened; chunks and requests still
-// belong to the per-session Chat transport.
-export function SessionListSync({
+// The one always-on consumer of the global (firehose) subscription's
+// collection events, called once at the composition root. It keeps every open
+// `session.list` cache converged — across tabs and the desktop app, not just
+// the tab that drove the change — by patching the affected row in place. Of
+// the session-scoped events, only the server-stamped phase is consumed — it
+// drives the sidebar's busy indicator for sessions this client never opened;
+// chunks and requests still belong to the per-session Chat transport.
+export function useSessionListSync({
   client,
   queryClient,
   orpcQueryUtils,
@@ -26,7 +26,7 @@ export function SessionListSync({
   readonly client: VibestClient;
   readonly queryClient: QueryClient;
   readonly orpcQueryUtils: AppClients["orpcQueryUtils"];
-}): null {
+}): void {
   // The cleanup below does own every allocation, but the rule only recognizes
   // teardown it can name (`unsubscribe()`, `clearTimeout`, `socket.close`) and
   // can't follow an AbortController: aborting the signal cancels the in-flight
@@ -144,6 +144,4 @@ export function SessionListSync({
       clearTimeout(backoff);
     };
   }, [client, queryClient, orpcQueryUtils]);
-
-  return null;
 }
