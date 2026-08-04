@@ -1,4 +1,4 @@
-import type { ChatStatus, UIMessage } from "ai";
+import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest } from "./agent-requests";
@@ -11,9 +11,17 @@ export type ChatStoreState = {
   pendingRequests: AgentRequest[];
 };
 
+// The slice of ai-sdk's ChatState this runtime still honors — the shared data
+// vocabulary (messages/status/error) plus the append and snapshot primitives.
+// The index-addressed mutators are omitted deliberately: under multi-client
+// reconcile the transcript is rewritten wholesale, so indexes are unstable and
+// replacement is id-based (upsertMessage). Implementing the remainder keeps
+// this state pinned to the ai-sdk shape — drift in `ai` fails typecheck here.
+type AiChatStateSlice = Omit<AiChatState<UIMessage>, "popMessage" | "replaceMessage">;
+
 // Chat's state container, backed by the per-Chat store (no global store, no
 // adapter).
-export class ChatState {
+export class ChatState implements AiChatStateSlice {
   readonly store: StoreApi<ChatStoreState>;
 
   constructor(initialMessages: UIMessage[] = []) {
