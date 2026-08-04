@@ -61,7 +61,7 @@ export const test = base.extend<{
     // a per-test daemon — stop it here or every test leaks one.
     try {
       const record = JSON.parse(
-        fs.readFileSync(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
+        await fs.promises.readFile(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
       ) as { pid?: number };
       if (typeof record.pid === "number" && record.pid > 0) {
         process.kill(record.pid, "SIGTERM");

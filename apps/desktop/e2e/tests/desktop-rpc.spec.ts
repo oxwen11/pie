@@ -211,7 +211,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
     // spawned) — the daemon deliberately outlives Electron.
     try {
       const record = JSON.parse(
-        fs.readFileSync(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
+        await fs.promises.readFile(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
       ) as { pid?: number };
       if (typeof record.pid === "number" && record.pid > 0) {
         process.kill(record.pid, "SIGTERM");
