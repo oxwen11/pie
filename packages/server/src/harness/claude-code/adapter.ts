@@ -345,12 +345,7 @@ const makeSession = (
             );
           const receipt = { turnId: prompt.turnId };
           yield* Ref.set(activeTurn, prompt.turnId);
-          yield* emit({
-            type: "session.turn.started",
-            sessionId,
-            turnId: prompt.turnId,
-            ...(input.messageId !== undefined ? { messageId: input.messageId } : {}),
-          });
+          yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
 
           const ended = yield* Ref.make(false);
           const pump = Stream.runForEach(prompt.output, (message) =>

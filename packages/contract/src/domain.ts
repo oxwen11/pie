@@ -229,10 +229,7 @@ export type SessionScopedEventBody =
       readonly messageId: string;
       readonly reason?: string;
     }
-  // `messageId` links the turn to the `session.prompt.submitted` that caused
-  // it: the prompting client matches it against its own optimistic message to
-  // claim the turn before the prompt RPC's receipt lands.
-  | { readonly type: "session.turn.started"; readonly turnId: string; readonly messageId?: string }
+  | { readonly type: "session.turn.started"; readonly turnId: string }
   | {
       readonly type: "session.turn.ended";
       readonly turnId: string;

@@ -58,8 +58,7 @@ export interface ChatSessionTransport {
    * Submit a prompt: fire-and-forget at the wire level. The returned receipt
    * only acknowledges acceptance — the turn's content arrives through the
    * subscription like everyone else's. `messageId` is the optimistic user
-   * message's id; the server echoes it on `session.prompt.submitted` (dedupe)
-   * and `session.turn.started` (linkage).
+   * message's id; the server echoes it on `session.prompt.submitted` (dedupe).
    */
   prompt(input: {
     readonly messageId: string;

@@ -342,7 +342,7 @@ describe("Chat prompting", () => {
       parts: [{ type: "text", text: "go" }],
       phase: "idle",
     });
-    live(2, { type: "session.turn.started", turnId: "turn-1", messageId, phase: "running" });
+    live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
     for (const [index, chunk] of textChunks("t", "reply").entries()) {
       live(3 + index, { type: "session.message.chunk", turnId: "turn-1", chunk });
     }

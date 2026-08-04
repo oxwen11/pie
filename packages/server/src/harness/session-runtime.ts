@@ -107,11 +107,7 @@ const toWireBody = (
   const event = body as SessionEvent;
   switch (event.type) {
     case "session.turn.started":
-      return {
-        type: "session.turn.started",
-        turnId: event.turnId,
-        ...(event.messageId !== undefined ? { messageId: event.messageId } : {}),
-      };
+      return { type: "session.turn.started", turnId: event.turnId };
     case "session.turn.ended":
       return {
         type: "session.turn.ended",

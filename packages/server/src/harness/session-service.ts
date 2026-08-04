@@ -522,11 +522,8 @@ export const makeHarnessAgentSessionService = (deps: {
                         })
                         .pipe(
                           Effect.catchTag("SessionNotActive", () => Effect.void),
-                          // The same id rides into the harness so the adapter
-                          // stamps it on `session.turn.started` — that link is
-                          // how clients attribute the turn to this prompt.
                           Effect.andThen(
-                            session.prompt({ ...userInput, messageId }).pipe(
+                            session.prompt(userInput).pipe(
                               Effect.tapError((promptError) =>
                                 manager
                                   .emit(input.ref, {
