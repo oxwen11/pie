@@ -206,6 +206,19 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+    // This test builds its own $VIBEST_HOME instead of using the fixture, so
+    // it also owns stopping the per-test daemon the app attached to (or
+    // spawned) — the daemon deliberately outlives Electron.
+    try {
+      const record = JSON.parse(
+        fs.readFileSync(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
+      ) as { pid?: number };
+      if (typeof record.pid === "number" && record.pid > 0) {
+        process.kill(record.pid, "SIGTERM");
+      }
+    } catch {
+      // No daemon record (never spawned) or the process is already gone.
+    }
   }
 });
 
@@ -256,13 +269,18 @@ test("reports a server crash and recovers on the pinned connection", async ({
   await expect(window.getByText("Vibest could not start")).toHaveCount(0);
 });
 
-test("disposes the server process during Electron shutdown", async ({ electronApp, window }) => {
+test("leaves the daemon running through Electron shutdown", async ({ electronApp, window }) => {
   await expect(window).toHaveTitle("Vibest");
   const pid = await waitForServer(appPid(electronApp));
 
   await electronApp.close();
 
-  await expect.poll(() => processExists(pid), { timeout: 5_000 }).toBe(false);
+  // The server is the shared vibest daemon the app attached to (or spawned) —
+  // it deliberately outlives Electron so the CLI and the next app launch
+  // converge on the same backend. `vibest daemon stop` is how it ends (the
+  // fixture teardown does the equivalent for the per-test daemon).
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  expect(processExists(pid)).toBe(true);
 });
 
 test("offers Retry after repeated server failures", async ({ electronApp, window }) => {

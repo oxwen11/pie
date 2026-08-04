@@ -55,6 +55,20 @@ export const test = base.extend<{
       userData: path.join(output, "user-data"),
       vibestHome,
     });
+
+    // The app attaches to (or spawns) the shared vibest daemon, which
+    // deliberately outlives Electron. With a per-test $VIBEST_HOME that means
+    // a per-test daemon — stop it here or every test leaks one.
+    try {
+      const record = JSON.parse(
+        fs.readFileSync(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
+      ) as { pid?: number };
+      if (typeof record.pid === "number" && record.pid > 0) {
+        process.kill(record.pid, "SIGTERM");
+      }
+    } catch {
+      // No daemon record (never spawned) or the process is already gone.
+    }
   },
 
   // Playwright requires the first parameter to be an object-destructuring
