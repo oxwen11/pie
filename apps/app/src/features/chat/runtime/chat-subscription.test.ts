@@ -85,7 +85,7 @@ describe("RecoveringSubscription", () => {
       retryDelayMs: () => 0,
     });
     subscription.start();
-    while (opens < 2) await flush();
+    await expect.poll(() => opens).toBeGreaterThanOrEqual(2);
     expect(events).not.toContain("closed");
     subscription.stop();
   });
