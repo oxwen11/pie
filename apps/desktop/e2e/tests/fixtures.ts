@@ -29,6 +29,27 @@ export const test = base.extend<{
     // sessions leak into the UI and test chats write into their history.
     const vibestHome = path.join(output, "vibest-home");
     fs.mkdirSync(vibestHome, { recursive: true });
+    // A fresh home renders the first-project onboarding instead of the
+    // composer, so chat flows need a project seeded up front.
+    const workspace = path.join(output, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const storage = path.join(vibestHome, "storage");
+    fs.mkdirSync(storage, { recursive: true });
+    fs.writeFileSync(
+      path.join(storage, "projects.json"),
+      JSON.stringify({
+        version: 1,
+        data: [
+          {
+            // The contract validates projectId as a UUID.
+            id: "11111111-1111-4111-8111-111111111111",
+            name: "e2e-workspace",
+            path: workspace,
+            createdAt: "2026-08-03T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
     await use({
       fakeClaudeLog: path.join(output, "fake-claude.jsonl"),
       userData: path.join(output, "user-data"),

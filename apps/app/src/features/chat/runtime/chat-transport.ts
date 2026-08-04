@@ -126,8 +126,13 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
             subscription.close();
           }
         } catch (streamError) {
-          if (outer.signal.aborted || isAbortError(streamError)) return;
-          console.error("Session events stream error:", streamError);
+          // Terminal only when *we* unsubscribed. A dead socket also surfaces
+          // as an AbortError (the link aborts in-flight calls when the
+          // connection drops), and that one must recover like any failure.
+          if (outer.signal.aborted) return;
+          if (!isAbortError(streamError)) {
+            console.error("Session events stream error:", streamError);
+          }
         }
         // Every non-unsubscribe exit — server close, iterator error, failed
         // attach, even a naturally ended stream — recovers the same way:

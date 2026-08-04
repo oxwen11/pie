@@ -1,5 +1,7 @@
 import childProcess from "node:child_process";
 import fs from "node:fs";
+import type { AddressInfo } from "node:net";
+import net from "node:net";
 import path from "node:path";
 
 import { type Browser, expect, type Page, test } from "@playwright/test";
@@ -150,22 +152,74 @@ test("two clients on one session render each other's turns live", async ({ brows
   await expect(pageB.getByText(FAKE_REPLY)).toHaveCount(2, { timeout: 15_000 });
 });
 
+// A TCP proxy in front of the server, so a test can sever a client's
+// connections deterministically. (`context.setOffline` is not reliable here:
+// Chromium does not always terminate an established WebSocket, leaving the
+// client on a half-open socket that never errors — flaky by construction.)
+type TcpProxy = { readonly port: number; readonly stop: () => Promise<void> };
+const startProxy = (upstreamPort: number, port = 0): Promise<TcpProxy> =>
+  new Promise((resolve) => {
+    const sockets = new Set<net.Socket>();
+    const listener = net.createServer((client) => {
+      const target = net.connect(upstreamPort, "127.0.0.1");
+      sockets.add(client);
+      sockets.add(target);
+      client.pipe(target);
+      target.pipe(client);
+      const drop = () => {
+        sockets.delete(client);
+        sockets.delete(target);
+        client.destroy();
+        target.destroy();
+      };
+      client.on("close", drop);
+      target.on("close", drop);
+      client.on("error", () => undefined);
+      target.on("error", () => undefined);
+    });
+    listener.listen(port, "127.0.0.1", () => {
+      resolve({
+        port: (listener.address() as AddressInfo).port,
+        // Destroys live connections and stops accepting new ones: severed
+        // clients see a real TCP error, retries see connection refused.
+        stop: () =>
+          new Promise((done) => {
+            listener.close(() => done());
+            for (const socket of sockets) socket.destroy();
+          }),
+      });
+    });
+  });
+
 test("a disconnected client recovers a turn it missed, without a reload", async ({ browser }) => {
   const pageA = await createSession(browser, "warm-up turn");
-  const pageB = await joinSession(browser, pageA.url());
+  // B reaches the server through the severable proxy; A connects directly.
+  const serverPort = Number(new URL(baseUrl).port);
+  const proxy = await startProxy(serverPort);
+  const sessionUrl = new URL(pageA.url());
+  const pageB = await joinSession(
+    browser,
+    `http://127.0.0.1:${proxy.port}${sessionUrl.pathname}${sessionUrl.search}`,
+  );
+  // A barrier turn B observes live: it proves B's first attach completed
+  // before the drop. (Severing during the initial attach would turn the
+  // recovery into a *first* attach, where a completed buffer defers to the
+  // history floor — which the fake harness cannot provide.)
+  await send(pageA, "barrier turn");
+  await expect(pageB.getByText("barrier turn")).toBeVisible({ timeout: 15_000 });
 
-  // Sever B's network: its WebSocket (and the event stream on it) drops.
-  await pageB.context().setOffline(true);
+  // Sever B: its event stream dies with a real error, and reconnect attempts
+  // are refused while the proxy is down.
+  await proxy.stop();
   await send(pageA, "sent while B was offline");
-  await expect(pageA.getByText(FAKE_REPLY)).toHaveCount(2, { timeout: 15_000 });
-  // The drop must be real: an offline B cannot have seen the turn live. If
-  // this fires, setOffline failed to sever the socket and the recovery
-  // assertion below would pass vacuously.
+  await expect(pageA.getByText(FAKE_REPLY)).toHaveCount(3, { timeout: 15_000 });
   await expect(pageB.getByText("sent while B was offline")).toBeHidden();
 
-  // Back online: the transport's retry loop re-attaches on its own, and the
-  // snapshot replays the retained prompt and completed turn buffer.
-  await pageB.context().setOffline(false);
+  // The proxy returns on the same port: the transport's retry loop re-attaches
+  // on its own, and the snapshot replays the retained prompt and completed
+  // turn buffer.
+  const revived = await startProxy(serverPort, proxy.port);
   await expect(pageB.getByText("sent while B was offline")).toBeVisible({ timeout: 30_000 });
   await expect(pageB.getByText(FAKE_REPLY).first()).toBeVisible({ timeout: 30_000 });
+  await revived.stop();
 });

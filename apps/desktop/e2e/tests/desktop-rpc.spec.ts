@@ -213,17 +213,25 @@ test("chats through Claude Agent SDK and the fake Claude executable", async ({
   e2ePaths,
   window,
 }) => {
-  // The app lands on /draft, the new-session surface: typing the first
-  // message creates the session and navigates into it.
+  // The app lands on /draft, the new-session surface: picking the seeded
+  // project and typing the first message creates the session and navigates
+  // into it. There is no default project — the composer blocks until one is
+  // chosen.
   await waitForConnectedUi(window);
+
+  await window.getByRole("combobox").filter({ hasText: "Select a project" }).click();
+  await window.getByRole("option", { name: /e2e-workspace/ }).click();
 
   const input = window.locator("[contenteditable='true']");
   await input.fill("Desktop SDK E2E");
   await input.press("Enter");
 
   await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
-  await expect(window.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
-  await expect(window.getByText("Desktop fake Claude reply", { exact: true })).toBeVisible();
+  // Scoped to the transcript: the prompt text also becomes the session's
+  // optimistic title in the sidebar.
+  const transcript = window.getByRole("log");
+  await expect(transcript.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
+  await expect(transcript.getByText("Desktop fake Claude reply", { exact: true })).toBeVisible();
   await expect
     .poll(() =>
       fs.existsSync(e2ePaths.fakeClaudeLog) ? fs.readFileSync(e2ePaths.fakeClaudeLog, "utf8") : "",
