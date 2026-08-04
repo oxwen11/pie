@@ -18,6 +18,17 @@ function hostnameOf(host: string): string {
 }
 
 /**
+ * The two configured trust extensions, named so call sites cannot swap them:
+ * `extraOrigins` (`VIBEST_CORS_ORIGINS`) allowlists exact Origin values, while
+ * `allowedHosts` (`VIBEST_ALLOWED_HOSTS`) trusts a reverse proxy's Host — and,
+ * through {@link isAllowedOrigin}, the origins it serves.
+ */
+export type OriginPolicy = {
+  readonly extraOrigins?: readonly string[];
+  readonly allowedHosts?: readonly string[];
+};
+
+/**
  * Whether a browser Origin may talk to the daemon — used for both the CORS
  * response headers and the WebSocket-upgrade guard. A same-origin browser
  * request and a native client both send no Origin, which callers handle before
@@ -29,12 +40,9 @@ function hostnameOf(host: string): string {
  * regardless of scheme or port — otherwise `VIBEST_ALLOWED_HOSTS` would render
  * the page but leave its WebSocket unable to connect.
  */
-export function isAllowedOrigin(
-  origin: string,
-  extra: readonly string[] = [],
-  allowedHosts: readonly string[] = [],
-): boolean {
-  if (origin === DESKTOP_ORIGIN || LOOPBACK_ORIGIN.test(origin) || extra.includes(origin)) {
+export function isAllowedOrigin(origin: string, policy: OriginPolicy = {}): boolean {
+  const { extraOrigins = [], allowedHosts = [] } = policy;
+  if (origin === DESKTOP_ORIGIN || LOOPBACK_ORIGIN.test(origin) || extraOrigins.includes(origin)) {
     return true;
   }
   if (allowedHosts.length === 0) return false;
@@ -79,10 +87,9 @@ export function isLoopbackHost(host: string | undefined, extra: readonly string[
  */
 export function corsHeaders(
   origin: string | undefined,
-  extra: readonly string[] = [],
-  allowedHosts: readonly string[] = [],
+  policy: OriginPolicy = {},
 ): Record<string, string> | null {
-  if (!origin || !isAllowedOrigin(origin, extra, allowedHosts)) return null;
+  if (!origin || !isAllowedOrigin(origin, policy)) return null;
 
   return {
     "access-control-allow-origin": origin,
