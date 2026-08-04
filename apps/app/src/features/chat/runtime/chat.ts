@@ -90,6 +90,12 @@ export class Chat {
   // history at the next safe point. Cleared when a reconcile lands.
   #needsReconcile = false;
 
+  // Set when the session was closed or deleted server-side: the subscription
+  // has stopped for good, and nothing may overwrite the terminal state — an
+  // in-flight history-floor read completing late would otherwise re-hydrate
+  // over it.
+  #terminated = false;
+
   constructor({ sessionRef, transport }: ChatInit) {
     this.harnessAgentId = sessionRef.harnessAgentId;
     this.#state = new ChatState();
@@ -97,6 +103,7 @@ export class Chat {
     this.#transport = transport;
     this.#unsubscribe = transport.subscribe((event) => {
       if (event.type === "attached") this.#hydrate(event.snapshot);
+      else if (event.type === "closed") this.#terminate(event.reason);
       else if (this.#queuedEvents) this.#queuedEvents.push(event);
       else this.#apply(event);
     });
@@ -107,6 +114,7 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   #apply(event: SessionScopedEvent): void {
+    if (this.#terminated) return;
     if (event.seq <= this.#cursor) return;
     this.#cursor = event.seq;
     switch (event.type) {
@@ -184,6 +192,21 @@ export class Chat {
     }
   }
 
+  // The stream ended for good: the session was closed or deleted server-side,
+  // so the runtime is gone and prompting or answering could only fail. Enter
+  // the same terminal shape a crash does, with the reason on the error.
+  #terminate(reason: "session_closed" | "session_deleted"): void {
+    this.#terminated = true;
+    for (const fold of this.#turnFolds.values()) fold.close();
+    this.#turnFolds.clear();
+    this.#queuedEvents = null;
+    this.#state.clearPendingRequests();
+    this.#state.error = new Error(
+      reason === "session_deleted" ? "Session deleted" : "Session closed",
+    );
+    this.#setStatus("error");
+  }
+
   // ---------------------------------------------------------------------
   // Hydration (state sync at attach / re-attach)
   // ---------------------------------------------------------------------
@@ -236,6 +259,7 @@ export class Chat {
     snapshot: SessionRuntimeSnapshot,
     options?: { readonly skipGapCheck?: boolean },
   ): void {
+    if (this.#terminated) return;
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);

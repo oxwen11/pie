@@ -34,9 +34,16 @@ import type { AgentResponse } from "./agent-requests";
  * Delivery is seq-agnostic: the transport does not gate. Buffered chunks
  * inside the snapshot and live events may overlap around the attach point;
  * the consumer holds the cursor and drops what it has already folded.
+ *
+ * "closed" is attached's terminal counterpart, in the server's own words
+ * (the stream's close reason, verbatim): the session was closed or deleted,
+ * the runtime is gone, and the subscription has stopped for good — no
+ * further "attached" will follow. Recoverable close reasons (slow_consumer)
+ * never surface here; the transport re-attaches through them silently.
  */
 export type ChatTransportEvent =
   | { readonly type: "attached"; readonly snapshot: SessionRuntimeSnapshot }
+  | { readonly type: "closed"; readonly reason: "session_closed" | "session_deleted" }
   | SessionScopedEvent;
 
 export interface ChatSessionTransport {

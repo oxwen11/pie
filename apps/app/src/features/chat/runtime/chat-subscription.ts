@@ -55,36 +55,45 @@ export class RecoveringSubscription {
   async #run(): Promise<void> {
     let attempt = 0;
     while (!this.#signal.aborted) {
-      const attached = await this.#attachOnce();
-      if (this.#signal.aborted) return;
+      const outcome = await this.#attachOnce();
+      if (outcome.terminal || this.#signal.aborted) return;
       // A completed attach resets the backoff: this exit is the first failure
       // of a new sequence, not a deeper retry.
-      attempt = attached ? 1 : attempt + 1;
+      attempt = outcome.attached ? 1 : attempt + 1;
       await sleep(this.#options.retryDelayMs(attempt), this.#signal);
     }
   }
 
   /**
-   * One attach cycle; true when the attach completed (snapshot emitted).
-   * Subscribe before the snapshot: an event landing between the two is then
-   * waiting in the stream rather than lost, and the consumer's cursor (seeded
-   * from the snapshot) drops the overlap.
+   * One attach cycle: `attached` is true when the snapshot was emitted, and
+   * `terminal` ends the loop for good (the session itself is gone, so a
+   * retry could only ever fail). Subscribe before the snapshot: an event
+   * landing between the two is then waiting in the stream rather than lost,
+   * and the consumer's cursor (seeded from the snapshot) drops the overlap.
    */
-  async #attachOnce(): Promise<boolean> {
+  async #attachOnce(): Promise<{ readonly attached: boolean; readonly terminal: boolean }> {
     let attached = false;
     try {
       const subscription = await this.#open();
       this.#closeCurrent = subscription.close;
       try {
         const snapshot = await this.#options.getSnapshot();
-        if (this.#signal.aborted) return attached;
+        if (this.#signal.aborted) return { attached, terminal: false };
         this.#options.onEvent({ type: "attached", snapshot });
         attached = true;
         for await (const item of subscription.events) {
-          if (this.#signal.aborted) return attached;
-          // Server-side drop (slow consumer / teardown): recover by
-          // re-attaching — the live stream has no replay.
-          if (item.type === "closed") break;
+          if (this.#signal.aborted) return { attached, terminal: false };
+          if (item.type === "closed") {
+            // The session being closed or deleted is terminal — surface it
+            // and stop. Every other reason (slow_consumer today, anything
+            // the server adds later) is a per-subscriber drop: recover by
+            // re-attaching — the live stream has no replay.
+            if (item.reason === "session_closed" || item.reason === "session_deleted") {
+              this.#options.onEvent({ type: "closed", reason: item.reason });
+              return { attached, terminal: true };
+            }
+            break;
+          }
           if (isSessionScopedEvent(item.event)) this.#options.onEvent(item.event);
         }
       } finally {
@@ -98,7 +107,7 @@ export class RecoveringSubscription {
         console.error("Session events stream error:", streamError);
       }
     }
-    return attached;
+    return { attached, terminal: false };
   }
 
   /**

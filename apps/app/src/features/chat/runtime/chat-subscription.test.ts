@@ -31,6 +31,24 @@ const hangingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
   }),
 });
 
+// Yields the given items, then ends.
+const iterableOf = (
+  items: readonly SubscribeStreamEvent[],
+): AsyncIterable<SubscribeStreamEvent> => ({
+  [Symbol.asyncIterator]() {
+    let index = 0;
+    return {
+      next: async () => {
+        const item = items[index];
+        index += 1;
+        return item
+          ? { done: false as const, value: item }
+          : { done: true as const, value: undefined };
+      },
+    };
+  },
+});
+
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("RecoveringSubscription", () => {
@@ -49,6 +67,47 @@ describe("RecoveringSubscription", () => {
     subscription.start();
     await flush();
     expect(opens).toBe(1);
+    subscription.stop();
+  });
+
+  it("recovers from a slow_consumer close without surfacing it", async () => {
+    let opens = 0;
+    const events: string[] = [];
+    const subscription = new RecoveringSubscription({
+      subscribe: async () => {
+        opens += 1;
+        return opens === 1
+          ? iterableOf([{ type: "closed", reason: "slow_consumer" }])
+          : hangingIterable();
+      },
+      getSnapshot: async () => snapshot,
+      onEvent: (event) => events.push(event.type),
+      retryDelayMs: () => 0,
+    });
+    subscription.start();
+    while (opens < 2) await flush();
+    expect(events).not.toContain("closed");
+    subscription.stop();
+  });
+
+  it("stops for good on session_closed and surfaces it exactly once", async () => {
+    let opens = 0;
+    const events: string[] = [];
+    const subscription = new RecoveringSubscription({
+      subscribe: async () => {
+        opens += 1;
+        return iterableOf([{ type: "closed", reason: "session_closed" }]);
+      },
+      getSnapshot: async () => snapshot,
+      onEvent: (event) => events.push(event.type),
+      retryDelayMs: () => 0,
+    });
+    subscription.start();
+    while (!events.includes("closed")) await flush();
+    // Give the loop every chance to (wrongly) come around again.
+    for (let i = 0; i < 5; i += 1) await flush();
+    expect(opens).toBe(1);
+    expect(events.filter((type) => type === "closed")).toHaveLength(1);
     subscription.stop();
   });
 

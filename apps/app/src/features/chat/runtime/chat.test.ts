@@ -585,6 +585,30 @@ describe("Chat lifecycle", () => {
     expect(chat.store.getState().pendingRequests).toEqual([]);
   });
 
+  it("enters a terminal error state when the session is deleted", async () => {
+    const { chat, emit, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.request.asked", request: toolRequest, phase: "requires_action" });
+
+    emit({ type: "closed", reason: "session_deleted" });
+    expect(chat.store.getState().status).toBe("error");
+    expect(chat.store.getState().error?.message).toBe("Session deleted");
+    expect(chat.store.getState().pendingRequests).toEqual([]);
+
+    // The terminal state is final: nothing may hydrate or fold over it.
+    live(2, { type: "session.turn.started", turnId: "turn-late", phase: "running" });
+    await attach({ status: { phase: "idle" } });
+    expect(chat.store.getState().status).toBe("error");
+  });
+
+  it("names the close reason when the session was closed", async () => {
+    const { chat, emit, attach } = makeChat();
+    await attach({});
+    emit({ type: "closed", reason: "session_closed" });
+    expect(chat.store.getState().status).toBe("error");
+    expect(chat.store.getState().error?.message).toBe("Session closed");
+  });
+
   it("dispose tears down the subscription and folds", async () => {
     const { chat, transport, attach } = makeChat();
     await attach({});
