@@ -58,7 +58,7 @@ for per-agent tool rendering.
   store as the AI SDK `ChatState`. `ChatManager` caches Chat instances by
   sessionId so transcripts survive navigation, and is constructed at App mount
   (module scope has no host connection yet).
-- `SessionEventsSync` is the only consumer of the global event firehose; session
+- `useSessionListSync` is the only consumer of the global event firehose; session
   events (chunks, requests) belong to the per-session chat transport.
 - The live stream has no replay: subscribe before `session.prompt`, and recover
   from a drop with `getSnapshot` + `seq > cursor`, not by replaying.

@@ -74,7 +74,7 @@ export type DaemonPlatform = FileSystem.FileSystem | Crypto.Crypto;
 /**
  * The shared launcher (the local twin of the SSH launch script): read
  * `daemon/daemon.pid`; if a healthy daemon is there, attach; otherwise spawn the
- * foreground server detached, wait for it to answer health, and record it. Both
+ * foreground server detached, record it, and wait for it to answer health. Both
  * the CLI and the desktop go through here so there is exactly one daemon per
  * daemon directory — concurrent launchers are serialized by an exclusive-create
  * launch lock, and the loser attaches to the winner's daemon.
@@ -109,11 +109,17 @@ export const resolveOrSpawnDaemon = (
     yield* clearTombstone(options.daemonDir);
 
     if (existing !== undefined) {
-      // Wedged (pid alive but unhealthy) daemons must die before we replace
-      // them, or they leak as orphans still holding their port. A dead pid is
-      // a no-op here.
-      yield* killPid(existing.pid);
-      yield* removeRecord(options.daemonDir);
+      // The record lands before the health wait, so an unhealthy record with a
+      // live lock holder is a daemon still booting under another launcher —
+      // defer to `spawnLocked`'s wait instead of killing it mid-boot. Without
+      // a live holder it is wedged (pid alive but unhealthy) or dead, and must
+      // die before we replace it, or it leaks as an orphan still holding its
+      // port. A dead pid makes the kill a no-op.
+      const holder = yield* readLockPid(options.daemonDir);
+      if (holder === undefined || !pidAlive(holder)) {
+        yield* killPid(existing.pid);
+        yield* removeRecord(options.daemonDir);
+      }
     }
     return yield* spawnLocked(options);
   });
@@ -268,16 +274,13 @@ const spawnDaemon = (
         }),
     });
 
-    const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
-    if (!(yield* waitHealthy(address, pid, timeoutMs))) {
-      signal(pid, "SIGTERM");
-      return yield* Effect.fail(
-        new DaemonLaunchError({
-          message: `vibest daemon did not become healthy within ${timeoutMs}ms; see ${daemonLogPath(options.daemonDir)}`,
-        }),
-      );
-    }
-
+    // Record the daemon before waiting for health, not after: a launcher that
+    // dies mid-wait (the app quitting seconds after first launch) must not
+    // orphan an unrecorded daemon — unrecorded means undiscoverable, so
+    // nothing can ever attach to it or stop it, and the next launch spawns a
+    // second daemon beside it. Readers tolerate a recorded-but-booting daemon:
+    // `resolveOrSpawnDaemon` defers to the live launch lock, and
+    // `waitForRecord` polls until health answers.
     const record: DaemonRecord = {
       pid,
       address,
@@ -294,6 +297,17 @@ const spawnDaemon = (
       ),
       Effect.tapError(() => Effect.andThen(killPid(pid), removeRecord(options.daemonDir))),
     );
+
+    const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
+    if (!(yield* waitHealthy(address, pid, timeoutMs))) {
+      yield* killPid(pid);
+      yield* removeRecord(options.daemonDir);
+      return yield* Effect.fail(
+        new DaemonLaunchError({
+          message: `vibest daemon did not become healthy within ${timeoutMs}ms; see ${daemonLogPath(options.daemonDir)}`,
+        }),
+      );
+    }
     return attach(record, false);
   });
 

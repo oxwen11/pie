@@ -153,6 +153,27 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       }),
     );
 
+    it.effect("kills the daemon and removes its record when it never becomes healthy", () =>
+      Effect.gen(function* () {
+        const { home, daemonDir } = yield* tempHome;
+        // A process that stays alive but never answers health. The record is
+        // written before the health wait (so a dying launcher cannot orphan an
+        // undiscoverable daemon), which makes this cleanup the path that takes
+        // it back out.
+        const error = yield* Effect.flip(
+          resolveOrSpawnDaemon({
+            serverArgv: [process.execPath, "-e", "setInterval(() => {}, 1000)"],
+            home,
+            daemonDir,
+            port: 0,
+            readyTimeoutMs: 500,
+          }),
+        );
+        assert.match(error.message, /did not become healthy/);
+        assert.equal(yield* readRecord(daemonDir), undefined);
+      }),
+    );
+
     it.effect("kills a wedged daemon (pid alive, health failing) before respawning", () =>
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
