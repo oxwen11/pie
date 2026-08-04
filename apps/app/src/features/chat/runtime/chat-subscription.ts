@@ -1,12 +1,9 @@
 import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@vibest/contract";
 import { isSessionScopedEvent } from "@vibest/contract";
 
-import { sleep } from "@/lib/utils";
+import { isAbortError, sleep } from "@/lib/utils";
 
 import type { ChatTransportEvent } from "./chat-transport-port";
-
-const isAbortError = (error: unknown) =>
-  error instanceof DOMException && error.name === "AbortError";
 
 export type RecoveringSubscriptionOptions = {
   /** Open the wire subscription; aborting the signal cancels the event iterator. */
@@ -28,7 +25,6 @@ export type RecoveringSubscriptionOptions = {
 export class RecoveringSubscription {
   readonly #controller = new AbortController();
   readonly #options: RecoveringSubscriptionOptions;
-  #closeCurrent: (() => void) | undefined;
   #started = false;
 
   constructor(options: RecoveringSubscriptionOptions) {
@@ -43,9 +39,10 @@ export class RecoveringSubscription {
     void this.#run();
   }
 
+  // Aborting #controller is the whole teardown: #open chains each cycle's own
+  // controller to it, so the live iterator is cancelled through that listener.
   stop(): void {
     this.#controller.abort();
-    this.#closeCurrent?.();
   }
 
   get #signal(): AbortSignal {
@@ -75,7 +72,6 @@ export class RecoveringSubscription {
     let attached = false;
     try {
       const subscription = await this.#open();
-      this.#closeCurrent = subscription.close;
       try {
         const snapshot = await this.#options.getSnapshot();
         if (this.#signal.aborted) return { attached, terminal: false };

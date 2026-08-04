@@ -21,12 +21,21 @@ export interface ChatInit {
   transport: ChatSessionTransport;
 }
 
-// Runtime phase → AI-SDK chat status. requires_action keeps "streaming": the
-// turn is still open, the composer stays blocked either way. "submitted" is a
-// sender-local optimistic state (set in prompt(), cleared by the next
-// server-stamped phase) and never comes from the server.
-const statusFromPhase = (phase: SessionPhase): "streaming" | "ready" | "error" =>
-  phase === "idle" ? "ready" : phase === "crashed" ? "error" : "streaming";
+// Runtime phase → AI-SDK chat status. "submitted" is a sender-local optimistic
+// state (set in prompt(), cleared by the next server-stamped phase) and never
+// comes from the server.
+function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
+  switch (phase) {
+    case "idle":
+      return "ready";
+    case "crashed":
+      return "error";
+    // requires_action keeps "streaming": the turn is still open, the composer
+    // stays blocked either way.
+    default:
+      return "streaming";
+  }
+}
 
 /** Wire prompt parts → the user UIMessage every client renders. */
 const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIMessage => ({
@@ -352,10 +361,11 @@ export class Chat {
     if (activeTurn.complete) {
       this.#turnFolds.get(activeTurn.turnId)?.close();
       this.#turnFolds.delete(activeTurn.turnId);
-      const flagged =
-        this.#recoverTurnIds.delete(activeTurn.turnId) ||
-        this.#erroredTurnIds.delete(activeTurn.turnId);
-      if (flagged) void this.#reconcileHistory();
+      // Two statements, not `a || b`: both sets must drop the turn, and the
+      // short-circuit would leave the second entry behind.
+      const recovered = this.#recoverTurnIds.delete(activeTurn.turnId);
+      const errored = this.#erroredTurnIds.delete(activeTurn.turnId);
+      if (recovered || errored) void this.#reconcileHistory();
     }
   }
 

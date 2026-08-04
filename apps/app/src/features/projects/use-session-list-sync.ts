@@ -1,12 +1,11 @@
 import { useRouteContext } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { isAbortError, sleep } from "@/lib/utils";
+
 import { applySessionListEvent } from "./session-list-cache";
 
 const RESUBSCRIBE_DELAY_MS = 1000;
-
-const isAbortError = (error: unknown) =>
-  error instanceof DOMException && error.name === "AbortError";
 
 // The one always-on consumer of the global (firehose) subscription, called
 // once from the root layout. It keeps every open `session.list` cache
@@ -18,13 +17,10 @@ export function useSessionListSync(): void {
   // The cleanup below does own every allocation, but the rule only recognizes
   // teardown it can name (`unsubscribe()`, `clearTimeout`, `socket.close`) and
   // can't follow an AbortController: aborting the signal cancels the in-flight
-  // `subscribe` and terminates the `for await`, and the timer is cleared too.
+  // `subscribe`, terminates the `for await`, and settles a pending `sleep`.
   // react-doctor-disable-next-line effect-needs-cleanup
   useEffect(() => {
     const abort = new AbortController();
-    // Tracked so cleanup owns every allocation: aborting mid-backoff must clear
-    // the pending timer, not leave it to fire into an unmounted component.
-    let backoff: ReturnType<typeof setTimeout> | undefined;
 
     // The exact key the sidebar's `session.list` query reads — the `queryOptions`
     // key carries `type: "query"`, which the bare `.key({ input })` omits, so
@@ -53,17 +49,11 @@ export function useSessionListSync(): void {
         void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.session.list.key() });
         // Back off, then re-subscribe. Resolves early on abort so unmount
         // doesn't wait out the delay.
-        await new Promise<void>((resolve) => {
-          backoff = setTimeout(resolve, RESUBSCRIBE_DELAY_MS);
-          abort.signal.addEventListener("abort", () => resolve(), { once: true });
-        });
+        await sleep(RESUBSCRIBE_DELAY_MS, abort.signal);
       }
     };
 
     void run();
-    return () => {
-      abort.abort();
-      clearTimeout(backoff);
-    };
+    return () => abort.abort();
   }, [orpcClient, queryClient, orpcQueryUtils]);
 }

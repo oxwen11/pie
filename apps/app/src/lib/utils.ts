@@ -1,3 +1,6 @@
+export const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "AbortError";
+
 /** Resolves after `ms`, or immediately when the signal aborts — never rejects. */
 export const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   new Promise<void>((resolve) => {
