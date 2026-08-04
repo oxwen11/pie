@@ -13,6 +13,7 @@ import type {
   HarnessAgentSession,
   SessionInfoResult,
 } from "../../src/harness/adapter";
+import { TurnAlreadyRunning } from "../../src/harness/errors";
 import { makeHarnessAgentRegistry } from "../../src/harness/registry";
 import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
 import {
@@ -56,6 +57,8 @@ describe("HarnessAgentSessionService", () => {
       // Feed the projection a turn: "open" leaves it in flight, "finished"
       // ends it (the runtime retains the completed buffer until the next turn).
       turn?: "open" | "finished";
+      // The harness rejects every prompt (a turn is already running).
+      promptFails?: boolean;
     },
     program: (fixture: Fixture) => Effect.Effect<A, E>,
   ) =>
@@ -96,7 +99,9 @@ describe("HarnessAgentSessionService", () => {
             sessionId,
             harnessAgentId: "claude-code",
             events: turnEvents(sessionId),
-            prompt: () => Effect.succeed({ turnId: "turn-1" }),
+            prompt: opts.promptFails
+              ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
+              : () => Effect.succeed({ turnId: "turn-1" }),
             setModel: () => Effect.void,
             setReasoningEffort: () => Effect.void,
             setPermissionMode: () => Effect.void,
@@ -435,6 +440,52 @@ describe("HarnessAgentSessionService", () => {
       parts: [{ type: "text", text: "hello there" }],
     });
     expect(snapshot.activePrompt?.seq).toBeGreaterThan(0);
+  });
+
+  it("compensates a harness-rejected prompt: rejected event follows, no retained phantom", async () => {
+    const result = await run({ turn: "open", promptFails: true }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
+            const rejection = yield* Effect.flip(
+              fixture.service.prompt({
+                ref,
+                parts: [{ type: "text", text: "loser prompt" }],
+                messageId: "loser-msg",
+              }),
+            );
+            const items = yield* Stream.runCollect(
+              Stream.take(
+                Stream.filter(
+                  stream,
+                  (item) =>
+                    item.type === "event" &&
+                    (item.event.type === "session.prompt.submitted" ||
+                      item.event.type === "session.prompt.rejected"),
+                ),
+                2,
+              ),
+            );
+            const snapshot = yield* fixture.service.getSnapshot(ref);
+            return {
+              rejection,
+              broadcast: Array.from(items).map((item) =>
+                item.type === "event" ? item.event.type : item.type,
+              ),
+              activePrompt: snapshot.activePrompt,
+            };
+          }),
+        );
+      }),
+    );
+    expect(result.rejection._tag).toBe("TurnAlreadyRunning");
+    // The submit broadcast still precedes the harness call (seq-order
+    // invariant), so the rejection must compensate it — and the snapshot must
+    // not retain the phantom for mid-turn joiners.
+    expect(result.broadcast).toEqual(["session.prompt.submitted", "session.prompt.rejected"]);
+    expect(result.activePrompt).toBeNull();
   });
 
   it("mints a messageId when the prompt carries none", async () => {

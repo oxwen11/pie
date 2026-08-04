@@ -81,6 +81,14 @@ export class Chat {
   // nothing folds ahead of the floor. Drained (in order, cursor-gated) once
   // the floor and the snapshot hydration are down.
   #queuedEvents: SessionScopedEvent[] | null = null;
+  // The snapshot the floor's hydration will use. A re-attach while the floor
+  // is still loading replaces it, so hydration always folds the freshest
+  // server state — never a stale first snapshot over a newer one.
+  #floorSnapshot: SessionRuntimeSnapshot | null = null;
+  // The live view is known to miss settled content (a turn completed inside a
+  // subscription drop, a fold whose tail streamed while detached): re-read
+  // history at the next safe point. Cleared when a reconcile lands.
+  #needsReconcile = false;
 
   constructor({ sessionRef, transport }: ChatInit) {
     this.harnessAgentId = sessionRef.harnessAgentId;
@@ -114,6 +122,13 @@ export class Chat {
       case "session.prompt.submitted":
         this.#pushUserMessage(event.messageId, event.parts);
         break;
+      // The harness rejected a prompt whose submitted event already broadcast:
+      // drop the phantom user message (the sender's optimistic copy included).
+      case "session.prompt.rejected":
+        this.#state.messages = this.#state.messages.filter(
+          (message) => message.id !== event.messageId,
+        );
+        break;
       case "session.turn.started":
         break;
       case "session.turn.ended":
@@ -128,7 +143,10 @@ export class Chat {
         if (
           event.outcome !== "completed" ||
           this.#recoverTurnIds.has(event.turnId) ||
-          this.#erroredTurnIds.has(event.turnId)
+          this.#erroredTurnIds.has(event.turnId) ||
+          // A reconcile deferred earlier (skipped mid-stream) retries at the
+          // next turn boundary, when the replace is safe again.
+          this.#needsReconcile
         ) {
           void this.#reconcileHistory();
         }
@@ -145,17 +163,22 @@ export class Chat {
       case "session.crashed":
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
+        // The server projection drops its pending requests on crash; a card
+        // left behind here could never be answered.
+        this.#state.clearPendingRequests();
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
     // phase), never derived from event types here. Lifecycle events only:
-    // chunk phases are redundant, and `prompt.submitted` still carries the
-    // pre-turn "idle" — copying it would wipe the sender's optimistic
-    // "submitted" until turn.started lands.
+    // chunk phases are redundant, and the prompt events carry a phase the
+    // sender's optimistic "submitted" / error state must outlive — copying
+    // it would wipe that local state before turn.started (or the prompt
+    // RPC's own rejection) lands.
     if (
       event.phase !== undefined &&
       event.type !== "session.message.chunk" &&
-      event.type !== "session.prompt.submitted"
+      event.type !== "session.prompt.submitted" &&
+      event.type !== "session.prompt.rejected"
     ) {
       this.#setStatus(statusFromPhase(event.phase));
     }
@@ -171,13 +194,22 @@ export class Chat {
     if (!this.#historyLoaded) {
       this.#historyLoaded = true;
       this.#queuedEvents = [];
-      void this.#loadHistoryFloor(snapshot);
+      this.#floorSnapshot = snapshot;
+      void this.#loadHistoryFloor();
+      return;
+    }
+    if (this.#queuedEvents !== null) {
+      // Re-attach while the floor is still loading: the fresher snapshot
+      // supersedes the one the floor started with. Hydration happens once,
+      // from the latest — hydrating now and again on floor completion would
+      // let the stale first snapshot win.
+      this.#floorSnapshot = snapshot;
       return;
     }
     this.#hydrateFromSnapshot(snapshot);
   }
 
-  async #loadHistoryFloor(snapshot: SessionRuntimeSnapshot): Promise<void> {
+  async #loadHistoryFloor(): Promise<void> {
     try {
       const history = await this.#transport.getMessages();
       // Guarded on the transcript, not on status: a non-empty transcript is
@@ -190,13 +222,20 @@ export class Chat {
     } catch (historyError) {
       console.error("Failed to load session history", historyError);
     }
-    this.#hydrateFromSnapshot(snapshot);
+    const snapshot = this.#floorSnapshot;
+    this.#floorSnapshot = null;
+    // The floor read itself just fetched settled history, so the gap check
+    // would only re-read what this hydration already has.
+    if (snapshot) this.#hydrateFromSnapshot(snapshot, { skipGapCheck: true });
     const queued = this.#queuedEvents ?? [];
     this.#queuedEvents = null;
     for (const event of queued) this.#apply(event);
   }
 
-  #hydrateFromSnapshot(snapshot: SessionRuntimeSnapshot): void {
+  #hydrateFromSnapshot(
+    snapshot: SessionRuntimeSnapshot,
+    options?: { readonly skipGapCheck?: boolean },
+  ): void {
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
@@ -205,11 +244,13 @@ export class Chat {
 
     // A fold whose turn is no longer active ended while we were detached —
     // its turn.ended will never arrive, so nothing else closes it (and an
-    // open fold blocks the reconcile guard below).
+    // open fold blocks the reconcile guard below). Its tail streamed while
+    // we were gone, so only the settled transcript still has it.
     for (const [turnId, fold] of this.#turnFolds) {
       if (activeTurn?.turnId !== turnId) {
         fold.close();
         this.#turnFolds.delete(turnId);
+        this.#needsReconcile = true;
       }
     }
     // On first attach (cursor 0) a buffer marked complete is history, not
@@ -225,20 +266,32 @@ export class Chat {
       this.#pushUserMessage(activePrompt.messageId, activePrompt.parts);
     }
 
-    if (activeTurn && !stale) this.#replayActiveTurn(activeTurn);
-
     // A turn flagged for recovery that is no longer active ended while we
     // were detached — its turn.ended (and the reconcile it would have
-    // triggered) is gone, so reconcile now.
-    let missedRecovery = false;
+    // triggered) is gone.
     for (const turnId of this.#recoverTurnIds) {
       if (activeTurn?.turnId !== turnId) {
         this.#recoverTurnIds.delete(turnId);
         this.#erroredTurnIds.delete(turnId);
-        missedRecovery = true;
+        this.#needsReconcile = true;
       }
     }
-    if (missedRecovery) void this.#reconcileHistory();
+
+    // The snapshot retains only the latest prompt and the current turn's
+    // buffer. If the seq gap since our cursor starts before anything the
+    // snapshot retains, whole events — typically an entire completed turn —
+    // fell inside the drop, and only the settled transcript still has them.
+    if (!options?.skipGapCheck && snapshot.cursor > this.#cursor) {
+      const retainedFloor = Math.min(
+        activePrompt?.seq ?? Infinity,
+        !stale && activeTurn ? (activeTurn.chunks[0]?.seq ?? Infinity) : Infinity,
+      );
+      if (retainedFloor > this.#cursor + 1) this.#needsReconcile = true;
+    }
+
+    if (activeTurn && !stale) this.#replayActiveTurn(activeTurn);
+
+    if (this.#needsReconcile) void this.#reconcileHistory();
 
     this.#cursor = Math.max(this.#cursor, snapshot.cursor);
     this.#setStatus(statusFromPhase(snapshot.status.phase));
@@ -313,10 +366,17 @@ export class Chat {
   async #reconcileHistory(): Promise<void> {
     try {
       const history = await this.#transport.getMessages();
-      if (history === null || history.length === 0) return;
+      if (history === null) {
+        // Capability absent: no settled transcript will ever materialize, so
+        // a deferred reconcile must not retry forever.
+        this.#needsReconcile = false;
+        return;
+      }
+      if (history.length === 0) return;
       if (this.#state.status === "streaming" || this.#state.status === "submitted") return;
       if (this.#turnFolds.size > 0) return;
       this.#state.messages = Array.from(history);
+      this.#needsReconcile = false;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
     }

@@ -505,10 +505,10 @@ export const makeHarnessAgentSessionService = (deps: {
                   // Broadcast the accepted prompt *before* the harness call so
                   // it always precedes the turn's own events in seq order.
                   // Best-effort: a session whose runtime is gone will fail the
-                  // prompt itself with the real error a line later; and if the
-                  // harness then rejects the prompt, other clients briefly
-                  // rendered a user message for a turn that never ran — the
-                  // same thing the sender's optimistic transcript shows.
+                  // prompt itself with the real error a line later. If the
+                  // harness then rejects the prompt, `session.prompt.rejected`
+                  // compensates — clients drop the phantom user message and
+                  // the runtime clears the retained activePrompt.
                   (input.messageId !== undefined
                     ? Effect.succeed(input.messageId)
                     : newSessionId
@@ -525,7 +525,19 @@ export const makeHarnessAgentSessionService = (deps: {
                           // The same id rides into the harness so the adapter
                           // stamps it on `session.turn.started` — that link is
                           // how clients attribute the turn to this prompt.
-                          Effect.andThen(session.prompt({ ...userInput, messageId })),
+                          Effect.andThen(
+                            session.prompt({ ...userInput, messageId }).pipe(
+                              Effect.tapError((promptError) =>
+                                manager
+                                  .emit(input.ref, {
+                                    type: "session.prompt.rejected",
+                                    messageId,
+                                    reason: promptError.message,
+                                  })
+                                  .pipe(Effect.catchTag("SessionNotActive", () => Effect.void)),
+                              ),
+                            ),
+                          ),
                         ),
                     ),
                   ),

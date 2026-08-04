@@ -32,6 +32,9 @@ class FakeTransport implements ChatSessionTransport {
   onEvent: ((event: ChatTransportEvent) => void) | null = null;
   disposed = 0;
   history: readonly UIMessage[] | null = null;
+  // When set, getMessages blocks on it — for tests that race the history
+  // floor against live traffic.
+  historyGate: Promise<void> | null = null;
   getMessagesCalls = 0;
   promptCalls: Array<{ messageId: string; parts: ReadonlyArray<PromptPart> }> = [];
   responded: Array<{ requestId: string; response: AgentResponse }> = [];
@@ -48,6 +51,7 @@ class FakeTransport implements ChatSessionTransport {
   };
   getMessages = async () => {
     this.getMessagesCalls += 1;
+    if (this.historyGate) await this.historyGate;
     return this.history;
   };
   respondToAgentRequest = async (requestId: string, response: AgentResponse) => {
@@ -195,6 +199,64 @@ describe("Chat hydration", () => {
     expect(chat.store.getState().status).toBe("ready");
   });
 
+  it("hydrates from the freshest snapshot when a re-attach races the history floor", async () => {
+    const { chat, transport, attach } = makeChat();
+    let openGate: () => void = () => undefined;
+    transport.historyGate = new Promise((resolve) => {
+      openGate = resolve;
+    });
+    transport.history = [userMessage("user-1", "old prompt"), userMessage("assistant-1", "reply")];
+    // Attach #1 starts the (slow) floor read with an idle, empty snapshot.
+    await attach({});
+    // Server-side drop; re-attach with fresher state: a pending request and a
+    // running turn. The floor is still in flight.
+    await attach({
+      status: { phase: "requires_action" },
+      activePrompt: { messageId: "m2", parts: [{ type: "text", text: "hi" }], seq: 11 },
+      activeTurn: activeTurn({ turnId: "turn-2", chunks: [] }),
+      pendingRequests: [toolRequest],
+      cursor: 12,
+    });
+    expect(transport.getMessagesCalls).toBe(1);
+    openGate();
+    await settle();
+    // Hydration ran once, from the fresher snapshot: its server state
+    // survives, with the settled floor laid underneath.
+    const state = chat.store.getState();
+    expect(state.pendingRequests.map((request) => request.id)).toEqual(["request-1"]);
+    expect(state.status).toBe("streaming");
+    expect(state.messages.map((message) => message.id)).toEqual(["user-1", "assistant-1", "m2"]);
+  });
+
+  it("re-reads history when a whole turn completed inside a subscription drop", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    expect(transport.getMessagesCalls).toBe(1);
+    // While detached, turn-1 (seqs 1..9) ran to completion and turn-2 already
+    // started: the snapshot retains only turn-2's prompt and buffer.
+    transport.history = [userMessage("user-1", "first"), userMessage("assistant-1", "reply")];
+    const [start] = textChunks("t2", "");
+    await attach({
+      status: { phase: "running" },
+      activePrompt: { messageId: "m2", parts: [{ type: "text", text: "second" }], seq: 10 },
+      activeTurn: activeTurn({ turnId: "turn-2", chunks: [chunkEvent(12, "turn-2", start!)] }),
+      cursor: 12,
+    });
+    await settle();
+    // The gap (seqs 1..9) starts before anything the snapshot retains — only
+    // the settled transcript still has turn-1, so it is re-read…
+    expect(transport.getMessagesCalls).toBe(2);
+    // …but not applied over the streaming turn: the deferred reconcile lands
+    // at the turn boundary.
+    live(13, { type: "session.turn.ended", turnId: "turn-2", outcome: "completed", phase: "idle" });
+    await settle();
+    expect(transport.getMessagesCalls).toBe(3);
+    expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
+      "user-1",
+      "assistant-1",
+    ]);
+  });
+
   it("replays the retained prompt so the user bubble lands above the streaming reply", async () => {
     const { chat, attach } = makeChat();
     const [start] = textChunks("t", "");
@@ -249,6 +311,24 @@ describe("Chat prompting", () => {
     const messages = chat.store.getState().messages;
     expect(messages).toHaveLength(1);
     expect(messages[0]!.id).toBe("other-1");
+  });
+
+  it("drops the phantom message when the harness rejects a broadcast prompt", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    await chat.prompt("loser");
+    const { messageId } = transport.promptCalls[0]!;
+    live(1, {
+      type: "session.prompt.submitted",
+      messageId,
+      parts: [{ type: "text", text: "loser" }],
+      phase: "idle",
+    });
+    expect(chat.store.getState().messages).toHaveLength(1);
+    // The harness rejected the prompt (turn already running): the compensating
+    // event removes the user bubble everywhere, optimistic copy included.
+    live(2, { type: "session.prompt.rejected", messageId, reason: "turn running", phase: "idle" });
+    expect(chat.store.getState().messages).toEqual([]);
   });
 
   it("folds this client's own turn through the same subscription path", async () => {
@@ -492,6 +572,17 @@ describe("Chat lifecycle", () => {
     await attach({});
     live(1, { type: "session.crashed", reason: "boom", phase: "crashed" });
     expect(chat.store.getState().status).toBe("error");
+  });
+
+  it("clears pending requests when the session crashes", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.request.asked", request: toolRequest, phase: "requires_action" });
+    expect(chat.store.getState().pendingRequests).toHaveLength(1);
+    // The server projection drops its requests on crash; a surviving card
+    // here could never be answered.
+    live(2, { type: "session.crashed", reason: "boom", phase: "crashed" });
+    expect(chat.store.getState().pendingRequests).toEqual([]);
   });
 
   it("dispose tears down the subscription and folds", async () => {

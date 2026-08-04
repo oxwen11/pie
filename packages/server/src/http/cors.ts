@@ -12,14 +12,39 @@ const DESKTOP_ORIGIN = "vibest://app";
 /** `http(s)://localhost | 127.0.0.1 | [::1]` on any port — the loopback web clients. */
 const LOOPBACK_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):\d+$/;
 
+/** A Host header or allowlist entry reduced to a bare lowercase hostname. */
+function hostnameOf(host: string): string {
+  return host.replace(/:\d+$/, "").toLowerCase();
+}
+
 /**
  * Whether a browser Origin may talk to the daemon — used for both the CORS
  * response headers and the WebSocket-upgrade guard. A same-origin browser
  * request and a native client both send no Origin, which callers handle before
  * reaching here.
+ *
+ * `allowedHosts` extends trust to origins served *by* a trusted reverse proxy:
+ * a page loaded from an allowlisted Host connects back with an Origin naming
+ * that same hostname, so any origin whose hostname is allowlisted is accepted
+ * regardless of scheme or port — otherwise `VIBEST_ALLOWED_HOSTS` would render
+ * the page but leave its WebSocket unable to connect.
  */
-export function isAllowedOrigin(origin: string, extra: readonly string[] = []): boolean {
-  return origin === DESKTOP_ORIGIN || LOOPBACK_ORIGIN.test(origin) || extra.includes(origin);
+export function isAllowedOrigin(
+  origin: string,
+  extra: readonly string[] = [],
+  allowedHosts: readonly string[] = [],
+): boolean {
+  if (origin === DESKTOP_ORIGIN || LOOPBACK_ORIGIN.test(origin) || extra.includes(origin)) {
+    return true;
+  }
+  if (allowedHosts.length === 0) return false;
+  let hostname: string;
+  try {
+    hostname = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return allowedHosts.some((allowed) => hostnameOf(allowed) === hostname);
 }
 
 /**
@@ -36,12 +61,14 @@ export function isAllowedOrigin(origin: string, extra: readonly string[] = []): 
  */
 export function isLoopbackHost(host: string | undefined, extra: readonly string[] = []): boolean {
   if (host === undefined) return true;
-  const hostname = host.replace(/:\d+$/, "").toLowerCase();
+  const hostname = hostnameOf(host);
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname === "[::1]" ||
-    extra.some((allowed) => allowed.toLowerCase() === hostname)
+    // Entries are normalized the same way as the incoming Host, so a
+    // configured `proxy.example.com:8443` matches requests on any port.
+    extra.some((allowed) => hostnameOf(allowed) === hostname)
   );
 }
 
@@ -53,8 +80,9 @@ export function isLoopbackHost(host: string | undefined, extra: readonly string[
 export function corsHeaders(
   origin: string | undefined,
   extra: readonly string[] = [],
+  allowedHosts: readonly string[] = [],
 ): Record<string, string> | null {
-  if (!origin || !isAllowedOrigin(origin, extra)) return null;
+  if (!origin || !isAllowedOrigin(origin, extra, allowedHosts)) return null;
 
   return {
     "access-control-allow-origin": origin,

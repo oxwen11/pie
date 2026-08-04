@@ -51,7 +51,7 @@ export const makeRequestApp = (
       return forbidden;
     }
 
-    const headers = corsHeaders(request.headers.origin, options.corsOrigins);
+    const headers = corsHeaders(request.headers.origin, options.corsOrigins, options.allowedHosts);
     const withCors = (response: HttpServerResponse.HttpServerResponse) =>
       headers ? HttpServerResponse.setHeaders(response, headers) : response;
 

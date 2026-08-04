@@ -152,6 +152,12 @@ const fold = (current: Projection, event: SessionScopedEvent): Projection => {
         ...base,
         activePrompt: { messageId: event.messageId, parts: event.parts, seq: event.seq },
       };
+    case "session.prompt.rejected":
+      // Only the still-retained prompt is cleared — a newer accepted prompt
+      // must not be dropped by a stale rejection.
+      return current.activePrompt?.messageId === event.messageId
+        ? { ...base, activePrompt: null }
+        : base;
     case "session.turn.started":
       // Starting a turn releases the previous turn's retained buffer.
       return {

@@ -185,6 +185,7 @@ export type SessionStatus = typeof SessionStatusSchema.Type;
 export const SessionScopedEventTypes = [
   "session.message.chunk",
   "session.prompt.submitted",
+  "session.prompt.rejected",
   "session.turn.started",
   "session.turn.ended",
   "session.request.asked",
@@ -212,11 +213,21 @@ export type SessionScopedEventBody =
   // service *before* the harness call, so it always precedes the turn's own
   // events in seq order; `messageId` echoes the client-supplied id (or a
   // server-minted one), letting the prompting client dedupe its optimistic
-  // message while every other client appends it.
+  // message while every other client appends it. If the harness then rejects
+  // the prompt, `session.prompt.rejected` compensates.
   | {
       readonly type: "session.prompt.submitted";
       readonly messageId: string;
       readonly parts: ReadonlyArray<PromptPart>;
+    }
+  // Compensates a `session.prompt.submitted` whose harness call was then
+  // rejected (turn already running, session closed, harness error): clients
+  // drop the message with this id, and the runtime clears the retained
+  // activePrompt so a mid-turn joiner never hydrates a prompt that never ran.
+  | {
+      readonly type: "session.prompt.rejected";
+      readonly messageId: string;
+      readonly reason?: string;
     }
   // `messageId` links the turn to the `session.prompt.submitted` that caused
   // it: the prompting client matches it against its own optimistic message to

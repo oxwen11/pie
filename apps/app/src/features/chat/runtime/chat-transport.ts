@@ -16,6 +16,22 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 const isAbortError = (error: unknown) =>
   error instanceof DOMException && error.name === "AbortError";
 
+// Exponential backoff between subscription recoveries: 500ms doubling to a
+// 10s ceiling, reset by every successful attach.
+const defaultRetryDelayMs = (attempt: number) => Math.min(500 * 2 ** (attempt - 1), 10_000);
+
+/** Resolves after `ms`, or immediately when the signal aborts — never rejects. */
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const settle = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", settle);
+      resolve();
+    };
+    const timer = setTimeout(settle, ms);
+    signal.addEventListener("abort", settle, { once: true });
+  });
+
 type VibestSessionClient = VibestClient["session"];
 
 type SessionClient = Pick<
@@ -47,12 +63,15 @@ export type ChatTransportClient = {
 // in Chat.
 export class OrpcChatSessionTransport implements ChatSessionTransport {
   readonly #ref: SessionRef;
+  readonly #retryDelayMs: (attempt: number) => number;
 
   constructor(
     private readonly client: ChatTransportClient,
     sessionRef: SessionRef,
+    options?: { readonly retryDelayMs?: (attempt: number) => number },
   ) {
     this.#ref = sessionRef;
+    this.#retryDelayMs = options?.retryDelayMs ?? defaultRetryDelayMs;
   }
 
   subscribe(onEvent: (event: ChatTransportEvent) => void): () => void {
@@ -83,37 +102,42 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
     };
 
     const run = async () => {
+      let attempt = 0;
       while (!outer.signal.aborted) {
-        // Subscribe before the snapshot: an event landing between the two is
-        // then waiting in the stream rather than lost, and the consumer's
-        // cursor (seeded from the snapshot) drops the overlap.
-        const subscription = await openSubscription();
-        closeCurrent = subscription.close;
-        let dropped = false;
         try {
-          const snapshot = await this.client.session.getSnapshot({ ref: this.#ref });
-          if (outer.signal.aborted) return;
-          onEvent({ type: "attached", snapshot });
-          for await (const item of subscription.events) {
+          // Subscribe before the snapshot: an event landing between the two is
+          // then waiting in the stream rather than lost, and the consumer's
+          // cursor (seeded from the snapshot) drops the overlap.
+          const subscription = await openSubscription();
+          closeCurrent = subscription.close;
+          try {
+            const snapshot = await this.client.session.getSnapshot({ ref: this.#ref });
             if (outer.signal.aborted) return;
-            if (item.type === "closed") {
+            onEvent({ type: "attached", snapshot });
+            attempt = 0;
+            for await (const item of subscription.events) {
+              if (outer.signal.aborted) return;
               // Server-side drop (slow consumer / teardown): recover by
               // re-attaching — the live stream has no replay.
-              dropped = true;
-              break;
+              if (item.type === "closed") break;
+              if (isSessionScopedEvent(item.event)) onEvent(item.event);
             }
-            if (isSessionScopedEvent(item.event)) onEvent(item.event);
+          } finally {
+            subscription.close();
           }
-        } finally {
-          subscription.close();
+        } catch (streamError) {
+          if (outer.signal.aborted || isAbortError(streamError)) return;
+          console.error("Session events stream error:", streamError);
         }
-        if (!dropped) return;
+        // Every non-unsubscribe exit — server close, iterator error, failed
+        // attach, even a naturally ended stream — recovers the same way:
+        // back off and re-attach. Only the outer abort ends the loop.
+        attempt += 1;
+        await sleep(this.#retryDelayMs(attempt), outer.signal);
       }
     };
 
-    void run().catch((streamError) => {
-      if (!isAbortError(streamError)) console.error("Session events stream error:", streamError);
-    });
+    void run();
 
     return () => {
       outer.abort();

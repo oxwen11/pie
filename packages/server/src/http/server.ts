@@ -113,7 +113,7 @@ function wireServer(options: {
     const origin = req.headers.origin;
     if (
       !isLoopbackHost(req.headers.host, allowedHosts) ||
-      (origin !== undefined && !isAllowedOrigin(origin, corsOrigins))
+      (origin !== undefined && !isAllowedOrigin(origin, corsOrigins, allowedHosts))
     ) {
       socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
       socket.destroy();

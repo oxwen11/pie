@@ -42,6 +42,37 @@ const asyncIterableOf = (
   },
 });
 
+// Yields `items`, then stays open (pending forever) — the subscription
+// survives until unsubscribe aborts it, letting a test assert on a recovered
+// stream without the recovery loop spinning further.
+const hangingIterableOf = (
+  items: readonly SubscribeStreamEvent[],
+  onDrained: () => void = () => undefined,
+): AsyncIterable<SubscribeStreamEvent> => ({
+  [Symbol.asyncIterator]() {
+    let index = 0;
+    return {
+      next: () => {
+        const item = items[index];
+        index += 1;
+        if (item) return Promise.resolve({ done: false as const, value: item });
+        onDrained();
+        return new Promise<never>(() => undefined);
+      },
+    };
+  },
+});
+
+const throwingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
+  [Symbol.asyncIterator]() {
+    return {
+      next: async () => {
+        throw new Error("connection reset");
+      },
+    };
+  },
+});
+
 const baseSession = {
   getSnapshot: async () => snapshot,
   prompt: unexpectedCall,
@@ -52,6 +83,8 @@ const baseSession = {
   respondToAgentRequest: unexpectedCall,
   subscribe: unexpectedCall,
 };
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("OrpcChatSessionTransport subscription", () => {
   it("emits attached (subscription first, then snapshot) and forwards session-scoped events", async () => {
@@ -103,39 +136,120 @@ describe("OrpcChatSessionTransport subscription", () => {
     unsubscribe();
   });
 
-  it("re-attaches after a server-side drop and stops on natural stream end", async () => {
-    let finishStream: () => void = () => undefined;
-    const streamDone = new Promise<void>((resolve) => {
-      finishStream = resolve;
+  it("re-attaches after a server-side drop", async () => {
+    let drained: () => void = () => undefined;
+    const secondDrained = new Promise<void>((resolve) => {
+      drained = resolve;
     });
     let subscriptionCalls = 0;
-    const streams: SubscribeStreamEvent[][] = [
-      [{ type: "closed", reason: "slow_consumer" }],
-      [{ type: "event", event: { seq: 5, ref, type: "session.turn.started", turnId: "turn-2" } }],
-    ];
     const client = {
       session: {
         ...baseSession,
         subscribe: async () => {
-          const items = streams[subscriptionCalls] ?? [];
           subscriptionCalls += 1;
-          return asyncIterableOf(items, subscriptionCalls === 2 ? finishStream : undefined);
+          return subscriptionCalls === 1
+            ? asyncIterableOf([{ type: "closed", reason: "slow_consumer" }])
+            : hangingIterableOf(
+                [
+                  {
+                    type: "event",
+                    event: { seq: 5, ref, type: "session.turn.started", turnId: "turn-2" },
+                  },
+                ],
+                drained,
+              );
         },
       },
     } satisfies ChatTransportClient;
     const received: ChatTransportEvent[] = [];
-    const transport = new OrpcChatSessionTransport(client, ref);
+    const transport = new OrpcChatSessionTransport(client, ref, { retryDelayMs: () => 0 });
     const unsubscribe = transport.subscribe((event) => received.push(event));
-    await streamDone;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    // Two attaches (one per subscription); the natural end of the second
-    // stream terminates the loop without a third.
+    await secondDrained;
+    await flush();
     expect(subscriptionCalls).toBe(2);
     expect(received.map((event) => event.type)).toEqual([
       "attached",
       "attached",
       "session.turn.started",
     ]);
+    unsubscribe();
+  });
+
+  it("recovers when the stream ends without a closed event", async () => {
+    let drained: () => void = () => undefined;
+    const secondDrained = new Promise<void>((resolve) => {
+      drained = resolve;
+    });
+    let subscriptionCalls = 0;
+    const client = {
+      session: {
+        ...baseSession,
+        subscribe: async () => {
+          subscriptionCalls += 1;
+          return subscriptionCalls === 1 ? asyncIterableOf([]) : hangingIterableOf([], drained);
+        },
+      },
+    } satisfies ChatTransportClient;
+    const received: ChatTransportEvent[] = [];
+    const transport = new OrpcChatSessionTransport(client, ref, { retryDelayMs: () => 0 });
+    const unsubscribe = transport.subscribe((event) => received.push(event));
+    await secondDrained;
+    await flush();
+    expect(received.filter((event) => event.type === "attached")).toHaveLength(2);
+    unsubscribe();
+  });
+
+  it("re-subscribes after the event iterator throws (network blip)", async () => {
+    let drained: () => void = () => undefined;
+    const recoveredDrained = new Promise<void>((resolve) => {
+      drained = resolve;
+    });
+    let subscriptionCalls = 0;
+    const client = {
+      session: {
+        ...baseSession,
+        subscribe: async () => {
+          subscriptionCalls += 1;
+          return subscriptionCalls === 1 ? throwingIterable() : hangingIterableOf([], drained);
+        },
+      },
+    } satisfies ChatTransportClient;
+    const received: ChatTransportEvent[] = [];
+    const transport = new OrpcChatSessionTransport(client, ref, { retryDelayMs: () => 0 });
+    const unsubscribe = transport.subscribe((event) => received.push(event));
+    await recoveredDrained;
+    await flush();
+    expect(subscriptionCalls).toBe(2);
+    expect(received.filter((event) => event.type === "attached")).toHaveLength(2);
+    unsubscribe();
+  });
+
+  it("keeps retrying when the attach snapshot read fails", async () => {
+    let drained: () => void = () => undefined;
+    const recoveredDrained = new Promise<void>((resolve) => {
+      drained = resolve;
+    });
+    let snapshotCalls = 0;
+    const client = {
+      session: {
+        ...baseSession,
+        getSnapshot: async () => {
+          snapshotCalls += 1;
+          if (snapshotCalls === 1) throw new Error("rpc failed");
+          return snapshot;
+        },
+        // subscribe runs before each getSnapshot: the first call sees 0 failed
+        // reads, the recovery call sees 1 — only the latter signals drained.
+        subscribe: async () =>
+          hangingIterableOf([], snapshotCalls >= 1 ? drained : () => undefined),
+      },
+    } satisfies ChatTransportClient;
+    const received: ChatTransportEvent[] = [];
+    const transport = new OrpcChatSessionTransport(client, ref, { retryDelayMs: () => 0 });
+    const unsubscribe = transport.subscribe((event) => received.push(event));
+    await recoveredDrained;
+    await flush();
+    expect(received.some((event) => event.type === "attached")).toBe(true);
     unsubscribe();
   });
 });
