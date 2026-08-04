@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, type Page } from "@playwright/test";
 
-import { expect, test } from "./fixtures.js";
+import { expect, stopDaemonFor, test } from "./fixtures.js";
 
 function appPid(electronApp: ElectronApplication): number {
   const pid = electronApp.process().pid;
@@ -207,18 +207,8 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
       server.close((error) => (error ? reject(error) : resolve())),
     );
     // This test builds its own $VIBEST_HOME instead of using the fixture, so
-    // it also owns stopping the per-test daemon the app attached to (or
-    // spawned) — the daemon deliberately outlives Electron.
-    try {
-      const record = JSON.parse(
-        await fs.promises.readFile(path.join(vibestHome, "daemon", "daemon.pid"), "utf8"),
-      ) as { pid?: number };
-      if (typeof record.pid === "number" && record.pid > 0) {
-        process.kill(record.pid, "SIGTERM");
-      }
-    } catch {
-      // No daemon record (never spawned) or the process is already gone.
-    }
+    // it also owns stopping the per-test daemon.
+    await stopDaemonFor(vibestHome);
   }
 });
 

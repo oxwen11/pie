@@ -6,6 +6,8 @@ import path from "node:path";
 
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
+import { PROJECT_ID, seedProject } from "./fixtures.js";
+
 /**
  * Browser-mode multi-client session sync. Unlike the Electron spec, this
  * drives `vibest serve` (the daemon's foreground form) plus two ordinary
@@ -26,7 +28,6 @@ const repoRoot = path.join(import.meta.dirname, "../../../..");
 const appDist = path.join(repoRoot, "apps/app/dist");
 const fakeClaude = path.join(repoRoot, "tools/testing/fake-claude.mjs");
 
-const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const FAKE_REPLY = "E2E fake Claude reply";
 
 test.skip(
@@ -40,24 +41,7 @@ let baseUrl = "";
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
 test.beforeAll(async ({}, testInfo) => {
   const home = testInfo.outputPath("vibest-home");
-  const workspace = testInfo.outputPath("workspace");
-  fs.mkdirSync(workspace, { recursive: true });
-  const storage = path.join(home, "storage");
-  fs.mkdirSync(storage, { recursive: true });
-  fs.writeFileSync(
-    path.join(storage, "projects.json"),
-    JSON.stringify({
-      version: 1,
-      data: [
-        {
-          id: PROJECT_ID,
-          name: "e2e-workspace",
-          path: workspace,
-          createdAt: "2026-08-03T00:00:00.000Z",
-        },
-      ],
-    }),
-  );
+  seedProject(home, testInfo.outputPath("workspace"));
 
   server = childProcess.spawn(
     path.join(repoRoot, "node_modules/.bin/tsx"),
