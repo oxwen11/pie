@@ -29,12 +29,17 @@ export class RecoveringSubscription {
   readonly #controller = new AbortController();
   readonly #options: RecoveringSubscriptionOptions;
   #closeCurrent: (() => void) | undefined;
+  #started = false;
 
   constructor(options: RecoveringSubscriptionOptions) {
     this.#options = options;
   }
 
+  /** Idempotent: a second call must not race a second #run loop beside the
+   * first — two loops would double-subscribe and double-deliver every event. */
   start(): void {
+    if (this.#started) return;
+    this.#started = true;
     void this.#run();
   }
 
