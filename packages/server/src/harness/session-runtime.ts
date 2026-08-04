@@ -42,6 +42,10 @@ export class SessionNotActive extends Data.TaggedError("SessionNotActive")<{
 // the history read once it ends.
 const MAX_BUFFERED_CHUNKS = 65536;
 const MAX_BUFFERED_BYTES = 10 * 1024 * 1024;
+// Eviction drops down to 3/4 of each cap at once so a saturated buffer
+// amortizes to O(1) per chunk instead of shifting on every append.
+const EVICT_TO_CHUNKS = Math.floor(MAX_BUFFERED_CHUNKS * 0.75);
+const EVICT_TO_BYTES = Math.floor(MAX_BUFFERED_BYTES * 0.75);
 
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */
@@ -136,6 +140,39 @@ const startChunkMessageId = (chunk: WireChunk): string | null =>
     ? (chunk as { messageId: string }).messageId
     : null;
 
+// In-place append under the caps (see the ActiveTurn comment); overflow evicts
+// from the front and marks the turn truncated — the newest chunks are what a
+// reconnecting consumer is missing.
+const appendChunk = (turn: ActiveTurn, event: SessionMessageChunkEvent): ActiveTurn => {
+  const chunks = turn.chunks;
+  chunks.push(event);
+  let bytes = turn.bytes + chunkBytes(event.chunk);
+  let truncated = turn.truncated;
+  if (chunks.length > MAX_BUFFERED_CHUNKS || bytes > MAX_BUFFERED_BYTES) {
+    let drop = 0;
+    while (
+      chunks.length - drop > 1 &&
+      (chunks.length - drop > EVICT_TO_CHUNKS || bytes > EVICT_TO_BYTES)
+    ) {
+      const evicted = chunks[drop];
+      if (evicted === undefined) break;
+      bytes -= chunkBytes(evicted.chunk);
+      drop += 1;
+    }
+    if (drop > 0) {
+      chunks.splice(0, drop);
+      truncated = true;
+    }
+  }
+  return {
+    ...turn,
+    messageId: turn.messageId ?? startChunkMessageId(event.chunk),
+    chunks,
+    bytes,
+    truncated,
+  };
+};
+
 const fold = (current: Projection, event: SessionScopedEvent): Projection => {
   const base = { ...current, seq: event.seq, cursor: event.seq };
   switch (event.type) {
@@ -176,42 +213,7 @@ const fold = (current: Projection, event: SessionScopedEvent): Projection => {
       ) {
         return base;
       }
-      // In-place append (see the ActiveTurn comment); overflow evicts from the
-      // front — the newest chunks are what a reconnecting consumer is missing.
-      // Eviction drops a quarter of the cap at once so a saturated buffer
-      // amortizes to O(1) per chunk instead of shifting on every append.
-      const chunks = current.activeTurn.chunks;
-      chunks.push(event);
-      let bytes = current.activeTurn.bytes + chunkBytes(event.chunk);
-      let truncated = current.activeTurn.truncated;
-      if (chunks.length > MAX_BUFFERED_CHUNKS || bytes > MAX_BUFFERED_BYTES) {
-        const targetCount = Math.floor(MAX_BUFFERED_CHUNKS * 0.75);
-        const targetBytes = Math.floor(MAX_BUFFERED_BYTES * 0.75);
-        let drop = 0;
-        while (
-          chunks.length - drop > 1 &&
-          (chunks.length - drop > targetCount || bytes > targetBytes)
-        ) {
-          const evicted = chunks[drop];
-          if (evicted === undefined) break;
-          bytes -= chunkBytes(evicted.chunk);
-          drop += 1;
-        }
-        if (drop > 0) {
-          chunks.splice(0, drop);
-          truncated = true;
-        }
-      }
-      return {
-        ...base,
-        activeTurn: {
-          ...current.activeTurn,
-          messageId: current.activeTurn.messageId ?? startChunkMessageId(event.chunk),
-          chunks,
-          bytes,
-          truncated,
-        },
-      };
+      return { ...base, activeTurn: appendChunk(current.activeTurn, event) };
     }
     case "session.turn.ended":
       // Keep the finished turn's chunks (marked complete) until the next turn
@@ -352,10 +354,18 @@ export const makeHarnessAgentSessionRuntime = (
         // and the clients' `seq <= cursor` replay guard would drop n forever.
         const applyLock = Semaphore.makeUnsafe(1);
 
-        const applyWire = (wireBody: SessionScopedEventBody): Effect.Effect<void> =>
+        // The body builder runs under the same permit as the fold+publish so
+        // both read one consistent projection — deriving the active turn from
+        // a read outside the lock would reintroduce exactly the interleaving
+        // the lock exists to stop.
+        const applyWith = (
+          make: (current: Projection) => SessionScopedEventBody | null,
+        ): Effect.Effect<void> =>
           applyLock.withPermit(
             Ref.get(projection).pipe(
               Effect.flatMap((current) => {
+                const wireBody = make(current);
+                if (!wireBody) return Effect.void;
                 const event: SessionScopedEvent = { seq: current.seq + 1, ref, ...wireBody };
                 const next = fold(current, event);
                 // Publish with the post-fold phase stamped on: consumers copy
@@ -370,17 +380,17 @@ export const makeHarnessAgentSessionRuntime = (
             ),
           );
 
+        const applyWire = (wireBody: SessionScopedEventBody): Effect.Effect<void> =>
+          applyWith(() => wireBody);
+
         const apply = (body: SessionEnvelopeBody) =>
-          Ref.get(projection).pipe(
-            Effect.flatMap((current) => {
-              const activeTurn =
-                current.activeTurn && !current.activeTurn.complete
-                  ? current.activeTurn.turnId
-                  : undefined;
-              const wireBody = toWireBody(body, activeTurn);
-              if (!wireBody) return Effect.void;
-              return applyWire(wireBody);
-            }),
+          applyWith((current) =>
+            toWireBody(
+              body,
+              current.activeTurn && !current.activeTurn.complete
+                ? current.activeTurn.turnId
+                : undefined,
+            ),
           );
 
         const crash = (reason: string) =>
