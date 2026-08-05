@@ -33,9 +33,10 @@ export function ProjectSessionsGroup({ project }: { project: Project }) {
   return (
     <Collapsible defaultOpen>
       <section className="relative min-w-0" aria-labelledby={`project-${project.id}`}>
-        {/* pe-8 keeps a long name from running under the absolutely positioned action. */}
+        {/* pe-8 keeps a long name off the absolutely positioned action; w-full is what
+            makes it and `truncate` bite, since the label renders as a shrink-to-fit <button>. */}
         <SidebarGroupLabel
-          className="text-sidebar-accent-foreground h-7 min-w-0 pe-8 text-sm"
+          className="text-sidebar-accent-foreground h-7 w-full min-w-0 pe-8 text-sm"
           id={`project-${project.id}`}
           title={project.path}
           render={
