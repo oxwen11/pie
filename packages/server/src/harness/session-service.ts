@@ -129,8 +129,13 @@ export type HarnessAgentSessionServiceShape = {
     ref: SessionRef,
     name: string,
   ) => Effect.Effect<void, SessionNotFound | SessionRefMismatch | StoreReadError>;
+  readonly archive: (
+    ref: SessionRef,
+    archived: boolean,
+  ) => Effect.Effect<void, SessionNotFound | SessionRefMismatch | StoreReadError | StoreWriteError>;
   readonly list: (
     projectId: string,
+    archived: boolean,
   ) => Effect.Effect<ReadonlyArray<SessionSummary>, StoreReadError>;
   /**
    * The session's native history as final-form UIMessages, then trimmed of the
@@ -413,6 +418,7 @@ export const makeHarnessAgentSessionService = (deps: {
                 // so an imported/rehomed session stays self-contained and a
                 // resume has cwd before it can call getSessionInfo.
                 cwd,
+                archived: false,
               };
               return repo.write(metadata).pipe(
                 // A failed metadata write must not leak the native session.
@@ -467,13 +473,33 @@ export const makeHarnessAgentSessionService = (deps: {
         Effect.andThen(bus.publish({ ref, type: "session.renamed", name })),
       ),
 
+    archive: (ref, archived) =>
+      readChecked(ref).pipe(
+        Effect.flatMap((metadata) => {
+          const changed = (metadata.archived ?? false) !== archived;
+          const persist = changed ? repo.write({ ...metadata, archived }) : Effect.void;
+          // Archive is also a lifecycle boundary: persist first so a failed
+          // metadata write never kills live work. Restore stays cold until open.
+          const close = archived
+            ? manager.close(ref).pipe(Effect.andThen(bus.closeSession(ref, "session_closed")))
+            : Effect.void;
+          const publish = changed
+            ? bus.publish({ ref, type: "session.archived", archived })
+            : Effect.void;
+          return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
+        }),
+      ),
+
     // A pure read of our own records — display data is self-owned (title from
     // the first prompt, createdAt/cwd from create), so no per-session backend
     // lookup. `status` is the one overlay, and it comes from the manager's
     // live sessions, not the harness index: a row with no status is one this
     // process has not touched, which is different from one sitting idle.
-    list: (projectId) =>
+    list: (projectId, archived) =>
       repo.list(projectId).pipe(
+        Effect.map((sessions) =>
+          sessions.filter((metadata) => (metadata.archived ?? false) === archived),
+        ),
         Effect.flatMap((sessions) =>
           Effect.forEach(sessions, (metadata) =>
             manager
@@ -489,6 +515,7 @@ export const makeHarnessAgentSessionService = (deps: {
                       projectId: metadata.projectId,
                       harnessAgentId: metadata.harnessAgentId,
                       sessionId: metadata.sessionId,
+                      archived: metadata.archived ?? false,
                       createdAt: metadata.createdAt,
                       // We own the record, so the session exists as far as we
                       // know; a resume (or a getMessages read) proves
