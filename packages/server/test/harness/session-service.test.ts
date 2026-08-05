@@ -4,13 +4,13 @@ import path from "node:path";
 
 import { isSessionScopedEvent, type SessionRef } from "@vibest/contract";
 import type { UIMessage } from "ai";
-import { Crypto, Effect, Stream } from "effect";
+import { Crypto, Effect, FileSystem, type Scope, Stream } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type {
   HarnessAgentAdapter,
-  HarnessAgentSession,
+  HarnessAgentRuntime,
   SessionInfoResult,
 } from "../../src/harness/adapter";
 import { TurnAlreadyRunning } from "../../src/harness/errors";
@@ -37,6 +37,13 @@ type Fixture = {
   readonly repo: HarnessAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly spy: Spy;
+  /**
+   * A second service over the same storage and the same adapter — what a
+   * server restart looks like from the session domain: the records survive,
+   * nothing is live, and the spy keeps counting across both so "how many
+   * processes has this session cost" stays answerable.
+   */
+  readonly restart: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem>;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -54,13 +61,15 @@ describe("HarnessAgentSessionService", () => {
     opts: {
       unavailable?: string;
       history?: ReadonlyArray<UIMessage>;
+      // The adapter reads history cold, off disk — no runtime involved.
+      coldHistory?: ReadonlyArray<UIMessage>;
       // Feed the projection a turn: "open" leaves it in flight, "finished"
       // ends it (the runtime retains the completed buffer until the next turn).
       turn?: "open" | "finished";
       // The harness rejects every prompt (a turn is already running).
       promptFails?: boolean;
     },
-    program: (fixture: Fixture) => Effect.Effect<A, E>,
+    program: (fixture: Fixture) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem>,
   ) =>
     Effect.runPromise(
       Effect.scoped(
@@ -95,7 +104,7 @@ describe("HarnessAgentSessionService", () => {
           };
           // Sessions drain an empty native stream by default — enough to
           // exercise the orchestration without any live projection state.
-          const makeSession = (sessionId: string): HarnessAgentSession => ({
+          const makeSession = (sessionId: string): HarnessAgentRuntime => ({
             sessionId,
             harnessAgentId: "claude-code",
             events: turnEvents(sessionId),
@@ -137,23 +146,30 @@ describe("HarnessAgentSessionService", () => {
                 spy.resume.push({ sessionId, cwd });
                 return makeSession(sessionId);
               }),
+            ...(opts.coldHistory !== undefined
+              ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
+              : {}),
             getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
           } satisfies HarnessAgentAdapter;
           const registry = makeHarnessAgentRegistry([adapter]);
-          const bus = yield* makeEventBus();
-          const manager = yield* makeHarnessAgentSessionManager(registry, bus);
-          const repo = yield* makeHarnessAgentSessionRepository(
-            path.join(home, "storage", "sessions"),
-          );
           const crypto = yield* Crypto.Crypto;
-          const service = makeHarnessAgentSessionService({
-            manager,
-            registry,
-            repo,
-            bus,
-            newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
-          });
-          return yield* program({ service, repo, bus, spy });
+          const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
+            Effect.gen(function* () {
+              const bus = yield* makeEventBus();
+              const manager = yield* makeHarnessAgentSessionManager(registry, bus);
+              const repo = yield* makeHarnessAgentSessionRepository(
+                path.join(home, "storage", "sessions"),
+              );
+              const service = makeHarnessAgentSessionService({
+                manager,
+                registry,
+                repo,
+                bus,
+                newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
+              });
+              return { service, repo, bus, spy, restart: build };
+            });
+          return yield* program(yield* build);
         }),
       ).pipe(Effect.provide(NodePlatformLayer)),
     );
@@ -192,22 +208,31 @@ describe("HarnessAgentSessionService", () => {
     expect(result.listed).toHaveLength(0);
   });
 
-  it("resume translates the ref to the native id and passes the cwd", async () => {
-    const resumeSpy = await run({}, (fixture) =>
+  it("attach backfills the cwd and starts nothing", async () => {
+    const result = await run({}, (fixture) =>
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
         yield* fixture.service.close(ref);
-        yield* fixture.service.resume(ref, "/tmp/vibest-app");
-        return fixture.spy.resume;
+        // A record from before we stored cwd — the case the backfill exists for.
+        const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        const { cwd: _dropped, ...withoutCwd } = stored;
+        yield* fixture.repo.write(withoutCwd);
+
+        yield* fixture.service.attach(ref, "/tmp/vibest-app");
+        const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        return { cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
       }),
     );
-    expect(resumeSpy).toEqual([{ sessionId: "native-1", cwd: "/tmp/vibest-app" }]);
+    expect(result.cwd).toBe("/tmp/vibest-app");
+    // Opening a session page costs no process — the whole point of `attach`.
+    expect(result.resume).toEqual([]);
+    expect(result.open).toHaveLength(1);
   });
 
-  it("resume fails with SessionNotFound for an unknown session", async () => {
+  it("attach fails with SessionNotFound for an unknown session", async () => {
     const err = await run({}, (fixture) =>
       Effect.flip(
-        fixture.service.resume(
+        fixture.service.attach(
           { projectId: "proj-a", harnessAgentId: "claude-code", sessionId: "missing" },
           "/tmp/vibest-app",
         ),
@@ -216,12 +241,12 @@ describe("HarnessAgentSessionService", () => {
     expect(err._tag).toBe("SessionNotFound");
   });
 
-  it("resume fails with SessionRefMismatch when the ref's agent disagrees with metadata", async () => {
+  it("attach fails with SessionRefMismatch when the ref's agent disagrees with metadata", async () => {
     const err = await run({}, (fixture) =>
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
         return yield* Effect.flip(
-          fixture.service.resume({ ...ref, harnessAgentId: "codex" }, "/tmp/vibest-app"),
+          fixture.service.attach({ ...ref, harnessAgentId: "codex" }, "/tmp/vibest-app"),
         );
       }),
     );
@@ -299,10 +324,9 @@ describe("HarnessAgentSessionService", () => {
   ): Effect.Effect<void> =>
     Effect.gen(function* () {
       while (true) {
-        const turn = yield* fixture.service.getSnapshot(ref).pipe(
-          Effect.map((snapshot) => snapshot.activeTurn),
-          Effect.catchTag("SessionNotActive", () => Effect.succeed(null)),
-        );
+        const turn = yield* fixture.service
+          .getSnapshot(ref)
+          .pipe(Effect.map((snapshot) => snapshot.activeTurn));
         if (done(turn)) return;
         yield* Effect.sleep("10 millis");
       }
@@ -330,6 +354,21 @@ describe("HarnessAgentSessionService", () => {
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "u2", "a2"]);
   });
 
+  it("getMessages reads cold through the adapter without starting anything", async () => {
+    const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+    const result = await run({ coldHistory: history }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* fixture.service.close(ref);
+        const messages = yield* fixture.service.getMessages(ref, "/tmp/vibest-app");
+        return { messages, resume: fixture.spy.resume };
+      }),
+    );
+    expect(result.messages).toEqual(history);
+    // A harness that can read its own transcript is never asked for a process.
+    expect(result.resume).toEqual([]);
+  });
+
   it("getMessages fails CapabilityUnsupported when the harness has no history read", async () => {
     const err = await run({}, (fixture) =>
       Effect.gen(function* () {
@@ -338,6 +377,90 @@ describe("HarnessAgentSessionService", () => {
       }),
     );
     expect(err._tag).toBe("CapabilityUnsupported");
+  });
+
+  it("interrupt succeeds with nothing running instead of starting an agent", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* fixture.service.close(ref);
+        yield* fixture.service.interrupt(ref);
+        return fixture.spy.resume;
+      }),
+    );
+    // The turn it would have stopped died with the process; resuming one in
+    // order to interrupt it would be absurd.
+    expect(result).toEqual([]);
+  });
+
+  it("respondToAgentRequest reports the request as gone with nothing running", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* fixture.service.close(ref);
+        const err = yield* Effect.flip(
+          fixture.service.respondToAgentRequest(ref, "req-1", {
+            type: "tool",
+            behavior: "allow",
+          }),
+        );
+        return { err, resume: fixture.spy.resume };
+      }),
+    );
+    expect(result.err._tag).toBe("AgentRequestUnavailable");
+    expect(result.resume).toEqual([]);
+  });
+
+  // The bug this whole shape exists for: a browser left open across a server
+  // restart used to hit SESSION_NOT_ACTIVE on every snapshot and retry forever,
+  // because nothing on the observation path could make the error go away.
+  it("a restarted server answers for a session it has never touched", async () => {
+    const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+    const result = await run({ coldHistory: history }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const restarted = yield* fixture.restart;
+
+        yield* restarted.service.attach(ref, "/tmp/vibest-app");
+        const status = yield* restarted.service.getStatus(ref);
+        const snapshot = yield* restarted.service.getSnapshot(ref);
+        const listed = yield* restarted.service.list("proj-a");
+        const messages = yield* restarted.service.getMessages(ref, "/tmp/vibest-app");
+        return { ref, status, snapshot, listed, messages, spy: fixture.spy };
+      }),
+    );
+
+    // Everything a reattaching client asks for is answerable …
+    expect(result.status).toEqual({ phase: "idle" });
+    expect(result.snapshot.cursor).toBe(0);
+    expect(result.snapshot.activeTurn).toBeNull();
+    expect(result.messages).toEqual(history);
+    // … a session nothing has touched carries no status at all, so the sidebar
+    // does not light up every row as active …
+    expect(result.listed).toHaveLength(1);
+    expect(result.listed[0]?.status).toBeUndefined();
+    // … and none of it started an agent. `open` is the one at create time.
+    expect(result.spy.open).toHaveLength(1);
+    expect(result.spy.resume).toEqual([]);
+  });
+
+  // `turn: "finished"` keeps the fake's event stream open, which is what a real
+  // runtime does: a stream that ends means the agent is done and the session
+  // lets it go, so an empty one would be released between the two prompts.
+  it("the first prompt after a restart starts exactly one agent", async () => {
+    const result = await run({ turn: "finished" }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const restarted = yield* fixture.restart;
+        yield* restarted.service.attach(ref, "/tmp/vibest-app");
+
+        yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
+        yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "again" }] });
+        return fixture.spy.resume;
+      }),
+    );
+    // Two prompts, one resume: the session keeps the runtime it acquired.
+    expect(result).toEqual([{ sessionId: "native-1", cwd: "/tmp/vibest-app" }]);
   });
 
   it("titles a session from its first prompt, collapsing whitespace", async () => {
