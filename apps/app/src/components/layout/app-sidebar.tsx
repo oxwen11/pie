@@ -21,7 +21,13 @@ export function AppSidebar({ onNewChat }: { onNewChat: () => void }) {
   const { os } = usePlatform();
 
   return (
-    <Sidebar variant="inset" collapsible="offcanvas" className="md:p-1.5">
+    <Sidebar
+      variant="inset"
+      collapsible="offcanvas"
+      // `pe-0` closes the gutter to the inset (which already has `ms-0`), and
+      // `mx-0` undoes the scrollbar's own `m-1`, so both land on one seam.
+      className="md:p-1.5 md:pe-0 [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
+    >
       {/*
        * Reserves the traffic-light / pinned-toggle row (see __root.tsx). On
        * macOS the row belongs to the native traffic lights; everywhere else it
