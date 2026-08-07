@@ -9,6 +9,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
+import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 import { useProjectSessions } from "@/features/projects/use-project-sessions";
 
@@ -58,7 +59,9 @@ export function ProjectSessionsGroup({
           {/* Names the button per project: element content wins over `title` in the accessible-name computation, so a bare "New chat" would make every project's action announce identically. */}
           <span className="sr-only">New chat in {project.name}</span>
         </SidebarGroupAction>
-        <CollapsiblePanel>
+        {/* keepMounted: see panel-motion.ts — an unmounting panel makes every
+            expand rebuild this project's whole session list. */}
+        <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
           <SidebarGroupContent>
             <SidebarMenu>
               {rows.map((session) => (
