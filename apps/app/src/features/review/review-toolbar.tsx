@@ -14,6 +14,9 @@ import { RefreshCwIcon } from "lucide-react";
 
 import { REVIEW_MODE_ITEMS, splitCompareRefs } from "./review-file-status";
 
+const GHOST_SELECT_TRIGGER =
+  "hover:bg-accent border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent";
+
 export function ReviewToolbar({
   mode,
   other,
@@ -48,7 +51,11 @@ export function ReviewToolbar({
         }}
         value={mode}
       >
-        <SelectTrigger aria-label="Compare mode" className="w-[10.5rem] shrink-0" size="sm">
+        <SelectTrigger
+          aria-label="Compare mode"
+          className={cn(GHOST_SELECT_TRIGGER, "w-auto shrink-0")}
+          size="sm"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent alignItemWithTrigger={false}>
@@ -68,7 +75,11 @@ export function ReviewToolbar({
           }}
           value={otherValue}
         >
-          <SelectTrigger aria-label="Compare with branch" className="min-w-0 flex-1" size="sm">
+          <SelectTrigger
+            aria-label="Compare with branch"
+            className={cn(GHOST_SELECT_TRIGGER, "min-w-0 flex-1")}
+            size="sm"
+          >
             <SelectValue placeholder="Select a branch" />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
