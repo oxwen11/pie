@@ -28,6 +28,14 @@ layer(NodePlatformLayer)("GitService", (it) => {
     return dir;
   });
 
+  const addRemoteMain = (dir: string) =>
+    Effect.promise(async () => {
+      const git = simpleGit(dir);
+      const sha = (await git.revparse(["main"])).trim();
+      await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
+      await git.raw(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+    });
+
   it.effect("reports working-tree status with untracked files", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -41,7 +49,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("lists branches and the default branch", () =>
+  it.effect("lists branches and the local default branch", () =>
     Effect.gen(function* () {
       const dir = yield* repo;
       const git = yield* GitService;
@@ -52,7 +60,21 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("reviews uncommitted work on the default branch against HEAD", () =>
+  it.effect("lists local and remote-tracking refs without fetching", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      yield* addRemoteMain(dir);
+      const git = yield* GitService;
+      const branch = yield* git.branch(dir);
+      assert.equal(branch.current, "main");
+      assert.equal(branch.defaultBranch, "origin/main");
+      assert.ok(branch.branches.includes("main"));
+      assert.ok(branch.branches.includes("origin/main"));
+      assert.ok(branch.branches.includes("origin/HEAD"));
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("defaults review to uncommitted work against HEAD", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const dir = yield* repo;
@@ -60,7 +82,9 @@ layer(NodePlatformLayer)("GitService", (it) => {
       yield* fs.writeFileString(path.join(dir, "added.txt"), "new\n");
 
       const git = yield* GitService;
-      const review = yield* git.review(dir);
+      const review = yield* git.review({ cwd: dir });
+      assert.equal(review.mode, "uncommitted");
+      assert.equal(review.other, null);
       assert.equal(review.branch, "main");
       assert.equal(review.base, "HEAD");
       assert.equal(review.baseBranch, null);
@@ -69,19 +93,19 @@ layer(NodePlatformLayer)("GitService", (it) => {
         "added.txt",
       ]);
 
-      const modified = yield* git.diff(dir, "a.txt");
+      const modified = yield* git.diff({ cwd: dir, path: "a.txt" });
       assert.equal(modified.status, "modified");
       assert.equal(modified.oldContents, "hi\n");
       assert.equal(modified.newContents, "hello\n");
 
-      const added = yield* git.diff(dir, "added.txt");
+      const added = yield* git.diff({ cwd: dir, path: "added.txt" });
       assert.equal(added.status, "added");
       assert.equal(added.oldContents, null);
       assert.equal(added.newContents, "new\n");
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("reviews a feature branch against merge-base with main", () =>
+  it.effect("committed mode diffs HEAD against merge-base and ignores the worktree", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const dir = yield* repo;
@@ -95,23 +119,25 @@ layer(NodePlatformLayer)("GitService", (it) => {
         await git.add("feature.txt");
         await git.commit("feature work");
       });
+      yield* fs.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
 
       const git = yield* GitService;
-      const review = yield* git.review(dir);
+      const review = yield* git.review({ cwd: dir, mode: "committed" });
+      assert.equal(review.mode, "committed");
       assert.equal(review.branch, "feature");
       assert.equal(review.baseBranch, "main");
       assert.notEqual(review.base, "HEAD");
-      assert.ok(
-        review.files.some((file) => file.path === "feature.txt" && file.status === "added"),
-      );
+      assert.deepEqual(Array.from(review.files.map((file) => file.path)).toSorted(), [
+        "feature.txt",
+      ]);
 
-      const diff = yield* git.diff(dir, "feature.txt");
+      const diff = yield* git.diff({ cwd: dir, mode: "committed", path: "feature.txt" });
       assert.equal(diff.oldContents, null);
       assert.equal(diff.newContents, "branch\n");
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("ignores later main commits when reviewing a feature branch", () =>
+  it.effect("branch mode includes uncommitted files against a local or remote ref", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const dir = yield* repo;
@@ -132,18 +158,55 @@ layer(NodePlatformLayer)("GitService", (it) => {
         const git = simpleGit(dir);
         await git.add(["a.txt", "extra.txt"]);
         await git.commit("main moved forward");
+        const sha = (await git.revparse(["main"])).trim();
+        await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
         await git.checkout("feature");
       });
       yield* fs.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
 
       const git = yield* GitService;
-      const review = yield* git.review(dir);
-      assert.equal(review.branch, "feature");
-      assert.equal(review.baseBranch, "main");
-      assert.deepEqual(Array.from(review.files.map((file) => file.path)).toSorted(), [
+      const uncommitted = yield* git.review({ cwd: dir });
+      assert.equal(uncommitted.mode, "uncommitted");
+      assert.deepEqual(Array.from(uncommitted.files.map((file) => file.path)).toSorted(), [
+        "wip.txt",
+      ]);
+
+      const vsMain = yield* git.review({ cwd: dir, mode: "branch", other: "main" });
+      assert.equal(vsMain.mode, "branch");
+      assert.equal(vsMain.other, "main");
+      assert.equal(vsMain.baseBranch, "main");
+      assert.deepEqual(Array.from(vsMain.files.map((file) => file.path)).toSorted(), [
         "feature.txt",
         "wip.txt",
       ]);
+
+      const vsOrigin = yield* git.review({ cwd: dir, mode: "branch", other: "origin/main" });
+      assert.equal(vsOrigin.other, "origin/main");
+      assert.deepEqual(Array.from(vsOrigin.files.map((file) => file.path)).toSorted(), [
+        "feature.txt",
+        "wip.txt",
+      ]);
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("rejects an unknown or missing compare ref", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const git = yield* GitService;
+
+      const missingOther = yield* git.review({ cwd: dir, mode: "branch" }).pipe(Effect.flip);
+      assert.equal(missingOther._tag, "GitRefNotFound");
+
+      const unknown = yield* git
+        .review({ cwd: dir, mode: "branch", other: "no-such-branch" })
+        .pipe(Effect.flip);
+      assert.equal(unknown._tag, "GitRefNotFound");
+      if (unknown._tag === "GitRefNotFound") assert.equal(unknown.ref, "no-such-branch");
+
+      const unsafe = yield* git
+        .review({ cwd: dir, mode: "branch", other: "../main" })
+        .pipe(Effect.flip);
+      assert.equal(unsafe._tag, "GitRefNotFound");
     }).pipe(Effect.provide(GitLayer)),
   );
 
@@ -154,7 +217,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
       yield* fs.remove(path.join(dir, "a.txt"));
 
       const git = yield* GitService;
-      const diff = yield* git.diff(dir, "a.txt");
+      const diff = yield* git.diff({ cwd: dir, path: "a.txt" });
       assert.equal(diff.status, "deleted");
       assert.equal(diff.oldContents, "hi\n");
       assert.equal(diff.newContents, null);
@@ -170,7 +233,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
       const relative = yield* git.status("relative/workspace").pipe(Effect.flip);
       assert.equal(relative._tag, "WorkspacePathEscape");
 
-      const missing = yield* git.review(dir).pipe(Effect.flip);
+      const missing = yield* git.review({ cwd: dir }).pipe(Effect.flip);
       assert.equal(missing._tag, "GitNotRepository");
     }).pipe(Effect.provide(GitLayer)),
   );
@@ -179,7 +242,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
     Effect.gen(function* () {
       const dir = yield* repo;
       const git = yield* GitService;
-      const missing = yield* git.diff(dir, "nope.ts").pipe(Effect.flip);
+      const missing = yield* git.diff({ cwd: dir, path: "nope.ts" }).pipe(Effect.flip);
       assert.equal(missing._tag, "WorkspaceFileNotFound");
     }).pipe(Effect.provide(GitLayer)),
   );

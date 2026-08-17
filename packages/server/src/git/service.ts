@@ -2,9 +2,12 @@ import path from "node:path";
 
 import type {
   GitBranch,
+  GitDiffQuery,
   GitFileDiff,
   GitReview,
   GitReviewFile,
+  GitReviewMode,
+  GitReviewQuery,
   GitStatus,
   GitStatusFile,
 } from "@vibest/contract/git";
@@ -14,6 +17,7 @@ import { simpleGit } from "simple-git";
 import {
   GitError,
   GitNotRepository,
+  GitRefNotFound,
   WorkspaceBinaryFile,
   WorkspaceFileNotFound,
   WorkspaceFileTooLarge,
@@ -75,6 +79,17 @@ const decodeText = (
   }
 };
 
+/** Reject anything that is not a listed ref name — no `../`, flags, or rev magic. */
+const isUnsafeRef = (ref: string): boolean =>
+  ref === "" ||
+  ref.startsWith("-") ||
+  ref.includes("..") ||
+  ref.includes("\\") ||
+  ref.includes("\0") ||
+  ref.includes(":") ||
+  ref.includes("@{") ||
+  /\s/.test(ref);
+
 type GitFailure =
   | WorkspacePathEscape
   | WorkspaceNotDirectory
@@ -82,12 +97,23 @@ type GitFailure =
   | GitNotRepository
   | GitError;
 
+type GitReviewFailure = GitFailure | GitRefNotFound;
+
 type GitDiffFailure =
-  | GitFailure
+  | GitReviewFailure
   | WorkspaceFileNotFound
   | WorkspaceNotFile
   | WorkspaceBinaryFile
   | WorkspaceFileTooLarge;
+
+type ComparePlan = {
+  readonly mode: GitReviewMode;
+  readonly other: string | null;
+  readonly base: string;
+  readonly baseBranch: string | null;
+  readonly head: string | null;
+  readonly includeUntracked: boolean;
+};
 
 /**
  * Read-only `git` module. Workspace confinement matches `FileSystemService`:
@@ -99,8 +125,8 @@ export class GitService extends Context.Service<
   {
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
-    readonly review: (cwd: string) => Effect.Effect<GitReview, GitFailure>;
-    readonly diff: (cwd: string, path: string) => Effect.Effect<GitFileDiff, GitDiffFailure>;
+    readonly review: (query: GitReviewQuery) => Effect.Effect<GitReview, GitReviewFailure>;
+    readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
 >()("GitService") {}
 
@@ -165,7 +191,25 @@ export const GitServiceLayer: Layer.Layer<
       return { path: nextPath, status: file.status, oldPath };
     };
 
-    const resolveDefaultRef = (cwd: string) =>
+    const parseRefNames = (output: string): string[] => {
+      const names: string[] = [];
+      for (const line of output.split("\n")) {
+        const ref = line.trim();
+        if (ref.startsWith("refs/heads/")) {
+          names.push(ref.slice("refs/heads/".length));
+        } else if (ref.startsWith("refs/remotes/")) {
+          names.push(ref.slice("refs/remotes/".length));
+        }
+      }
+      return names;
+    };
+
+    const listRefs = (cwd: string) =>
+      raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
+        Effect.map(parseRefNames),
+      );
+
+    const resolvePreferredCompareRef = (cwd: string) =>
       Effect.gen(function* () {
         const remoteHead = yield* raw(cwd, [
           "symbolic-ref",
@@ -178,39 +222,73 @@ export const GitServiceLayer: Layer.Layer<
         if (remoteHead.startsWith("refs/remotes/")) {
           return remoteHead.slice("refs/remotes/".length);
         }
-        const local = yield* raw(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
-        const names = new Set(
-          local
-            .split("\n")
-            .map((name) => name.trim())
-            .filter(Boolean),
-        );
+        const local = yield* raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads"]);
+        const names = new Set(parseRefNames(local));
         for (const name of DEFAULT_BRANCH_NAMES) {
           if (names.has(name)) return name;
         }
         return null;
       });
 
-    const shortBranchName = (ref: string): string => ref.replace(/^origin\//, "");
+    const mergeBase = (cwd: string, other: string) =>
+      raw(cwd, ["merge-base", "HEAD", other]).pipe(
+        Effect.map((value) => value.trim()),
+        Effect.flatMap((sha) =>
+          sha === ""
+            ? Effect.fail(new GitError({ cwd, cause: `empty merge-base with ${other}` }))
+            : Effect.succeed(sha),
+        ),
+      );
 
-    const isOnDefault = (current: string | null, defaultRef: string): boolean => {
-      if (current === null || current === "HEAD") return false;
-      return current === defaultRef || current === shortBranchName(defaultRef);
-    };
-
-    const resolveReviewBase = (cwd: string, current: string | null) =>
+    const resolveCompare = (
+      cwd: string,
+      query: { readonly mode?: GitReviewMode; readonly other?: string },
+    ): Effect.Effect<ComparePlan, GitReviewFailure> =>
       Effect.gen(function* () {
-        const defaultRef = yield* resolveDefaultRef(cwd);
-        if (defaultRef === null || isOnDefault(current, defaultRef)) {
-          return { base: "HEAD", baseBranch: null as string | null };
+        const mode = query.mode ?? "uncommitted";
+        if (mode === "uncommitted") {
+          return {
+            mode,
+            other: null,
+            base: "HEAD",
+            baseBranch: null,
+            head: null,
+            includeUntracked: true,
+          };
         }
-        const mergeBase = yield* raw(cwd, ["merge-base", "HEAD", defaultRef]).pipe(
-          Effect.map((value) => value.trim()),
-          Effect.catch(() => Effect.succeed("")),
-        );
+
+        if (mode === "committed") {
+          const defaultRef = yield* resolvePreferredCompareRef(cwd);
+          if (defaultRef === null) {
+            return yield* new GitError({ cwd, cause: "no default branch to compare" });
+          }
+          const base = yield* mergeBase(cwd, defaultRef);
+          return {
+            mode,
+            other: null,
+            base,
+            baseBranch: defaultRef,
+            head: "HEAD",
+            includeUntracked: false,
+          };
+        }
+
+        const other = query.other;
+        if (other === undefined || isUnsafeRef(other)) {
+          return yield* new GitRefNotFound({ ref: other ?? "" });
+        }
+        const refs = yield* listRefs(cwd);
+        if (!refs.includes(other)) {
+          return yield* new GitRefNotFound({ ref: other });
+        }
+        const base = yield* mergeBase(cwd, other);
         return {
-          base: mergeBase === "" ? defaultRef : mergeBase,
-          baseBranch: shortBranchName(defaultRef),
+          mode,
+          other,
+          base,
+          baseBranch: other,
+          head: null,
+          includeUntracked: true,
         };
       });
 
@@ -222,20 +300,31 @@ export const GitServiceLayer: Layer.Layer<
         }),
       );
 
-    const reviewFiles = (cwd: string, repoRoot: string, base: string) =>
+    const reviewFiles = (cwd: string, repoRoot: string, plan: ComparePlan) =>
       Effect.gen(function* () {
-        const nameStatus = yield* raw(cwd, ["diff", "--name-status", "-z", "--find-renames", base]);
+        const diffArgs =
+          plan.head === null
+            ? ["diff", "--name-status", "-z", "--find-renames", plan.base]
+            : ["diff", "--name-status", "-z", "--find-renames", plan.base, plan.head];
+        const nameStatus = yield* raw(cwd, diffArgs);
         const tracked = parseNameStatus(nameStatus)
           .map((file) => relocate(cwd, repoRoot, file))
           .filter((file): file is GitReviewFile => file !== null);
-        const untrackedRaw = yield* raw(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]);
-        const seen = new Set(tracked.map((file) => file.path));
         const files = [...tracked];
-        for (const gitPath of parseNulPaths(untrackedRaw)) {
-          const nextPath = toWorkspacePath(cwd, repoRoot, gitPath);
-          if (nextPath === null || seen.has(nextPath)) continue;
-          seen.add(nextPath);
-          files.push({ path: nextPath, status: "added" });
+        const seen = new Set(tracked.map((file) => file.path));
+        if (plan.includeUntracked) {
+          const untrackedRaw = yield* raw(cwd, [
+            "ls-files",
+            "-z",
+            "--others",
+            "--exclude-standard",
+          ]);
+          for (const gitPath of parseNulPaths(untrackedRaw)) {
+            const nextPath = toWorkspacePath(cwd, repoRoot, gitPath);
+            if (nextPath === null || seen.has(nextPath)) continue;
+            seen.add(nextPath);
+            files.push({ path: nextPath, status: "added" });
+          }
         }
         files.sort((left, right) =>
           left.path.localeCompare(right.path, undefined, { numeric: true, sensitivity: "base" }),
@@ -246,9 +335,12 @@ export const GitServiceLayer: Layer.Layer<
     const readWorktreeText = (cwd: string, relativePath: string) =>
       workspace.readFileString(cwd, relativePath);
 
-    const readBlobText = (cwd: string, base: string, blobPath: string) =>
+    const toBlobPath = (cwd: string, repoRoot: string, relativePath: string): string =>
+      toPosixPath(path.relative(repoRoot, path.resolve(cwd, relativePath)));
+
+    const readBlobText = (cwd: string, treeish: string, blobPath: string) =>
       Effect.gen(function* () {
-        const sizeRaw = yield* raw(cwd, ["cat-file", "-s", `${base}:${blobPath}`]).pipe(
+        const sizeRaw = yield* raw(cwd, ["cat-file", "-s", `${treeish}:${blobPath}`]).pipe(
           Effect.catch(() => Effect.succeed("")),
         );
         if (sizeRaw.trim() === "") return null;
@@ -260,7 +352,7 @@ export const GitServiceLayer: Layer.Layer<
             limit: MAX_FILE_BYTES,
           });
         }
-        const text = yield* raw(cwd, ["cat-file", "-p", `${base}:${blobPath}`]);
+        const text = yield* raw(cwd, ["cat-file", "-p", `${treeish}:${blobPath}`]);
         const bytes = new TextEncoder().encode(text);
         if (bytes.byteLength > MAX_FILE_BYTES) {
           return yield* new WorkspaceFileTooLarge({
@@ -307,55 +399,51 @@ export const GitServiceLayer: Layer.Layer<
         Effect.gen(function* () {
           const realRoot = yield* resolveRoot(cwd);
           const current = yield* currentBranch(realRoot);
-          const defaultRef = yield* resolveDefaultRef(realRoot);
-          const listed = yield* raw(realRoot, [
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "refs/heads",
-          ]);
-          const branches = listed
-            .split("\n")
-            .map((name) => name.trim())
-            .filter(Boolean);
+          const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
+          const branches = yield* listRefs(realRoot);
+          return { current, defaultBranch, branches };
+        }),
+
+      review: (query) =>
+        Effect.gen(function* () {
+          const realRoot = yield* resolveRoot(query.cwd);
+          const repoRoot = yield* resolveRepoRoot(realRoot);
+          const branch = yield* currentBranch(realRoot);
+          const plan = yield* resolveCompare(realRoot, query);
+          const files = yield* reviewFiles(realRoot, repoRoot, plan);
           return {
-            current,
-            defaultBranch: defaultRef === null ? null : shortBranchName(defaultRef),
-            branches,
+            mode: plan.mode,
+            other: plan.other,
+            branch,
+            base: plan.base,
+            baseBranch: plan.baseBranch,
+            files,
           };
         }),
 
-      review: (cwd) =>
+      diff: (query) =>
         Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch = yield* currentBranch(realRoot);
-          const { base, baseBranch } = yield* resolveReviewBase(realRoot, branch);
-          const files = yield* reviewFiles(realRoot, repoRoot, base);
-          return { branch, base, baseBranch, files };
-        }),
-
-      diff: (cwd, relativePath) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(cwd);
-          if (path.isAbsolute(relativePath) || relativePath.split(/[\\/]/).includes("..")) {
-            return yield* new WorkspacePathEscape({ cwd: realRoot, path: relativePath });
+          const realRoot = yield* resolveRoot(query.cwd);
+          if (path.isAbsolute(query.path) || query.path.split(/[\\/]/).includes("..")) {
+            return yield* new WorkspacePathEscape({ cwd: realRoot, path: query.path });
           }
           const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch = yield* currentBranch(realRoot);
-          const { base } = yield* resolveReviewBase(realRoot, branch);
-          const files = yield* reviewFiles(realRoot, repoRoot, base);
-          const file = files.find((entry) => entry.path === relativePath);
+          const plan = yield* resolveCompare(realRoot, query);
+          const files = yield* reviewFiles(realRoot, repoRoot, plan);
+          const file = files.find((entry) => entry.path === query.path);
           if (file === undefined) {
-            return yield* new WorkspaceFileNotFound({ path: relativePath });
+            return yield* new WorkspaceFileNotFound({ path: query.path });
           }
-          const workspaceBlob = file.oldPath ?? file.path;
-          const blobPath = toPosixPath(
-            path.relative(repoRoot, path.resolve(realRoot, workspaceBlob)),
-          );
+          const oldBlobPath = toBlobPath(realRoot, repoRoot, file.oldPath ?? file.path);
+          const newBlobPath = toBlobPath(realRoot, repoRoot, file.path);
           const oldContents =
-            file.status === "added" ? null : yield* readBlobText(realRoot, base, blobPath);
+            file.status === "added" ? null : yield* readBlobText(realRoot, plan.base, oldBlobPath);
           const newContents =
-            file.status === "deleted" ? null : yield* readWorktreeText(realRoot, file.path);
+            file.status === "deleted"
+              ? null
+              : plan.head === null
+                ? yield* readWorktreeText(realRoot, file.path)
+                : yield* readBlobText(realRoot, plan.head, newBlobPath);
           return {
             path: file.path,
             status: file.status,

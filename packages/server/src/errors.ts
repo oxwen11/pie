@@ -26,6 +26,11 @@ export class GitNotRepository extends Data.TaggedError("GitNotRepository")<{
   readonly cwd: string;
 }> {}
 
+/** `other` is not a local head or remote-tracking ref in this repository. */
+export class GitRefNotFound extends Data.TaggedError("GitRefNotFound")<{
+  readonly ref: string;
+}> {}
+
 export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly projectId: string;
   readonly sessionId: string;

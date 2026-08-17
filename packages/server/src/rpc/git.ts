@@ -41,7 +41,7 @@ export const gitRouter = orpc.router({
   }),
   review: orpc.review.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    return yield* git.review(input.cwd).pipe(
+    return yield* git.review(input).pipe(
       Effect.catchTags({
         WorkspacePathEscape: (error) =>
           Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
@@ -51,12 +51,13 @@ export const gitRouter = orpc.router({
         GitNotRepository: (error) =>
           Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
         GitError: (error) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+        GitRefNotFound: (error) => Effect.fail(errors.REF_NOT_FOUND({ data: { ref: error.ref } })),
       }),
     );
   }),
   diff: orpc.diff.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    return yield* git.diff(input.cwd, input.path).pipe(
+    return yield* git.diff(input).pipe(
       Effect.catchTags({
         WorkspacePathEscape: (error) =>
           Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
@@ -66,6 +67,7 @@ export const gitRouter = orpc.router({
         GitNotRepository: (error) =>
           Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
         GitError: (error) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+        GitRefNotFound: (error) => Effect.fail(errors.REF_NOT_FOUND({ data: { ref: error.ref } })),
         WorkspaceFileNotFound: (error) =>
           Effect.fail(errors.NOT_FOUND({ data: { path: error.path } })),
         WorkspaceNotFile: (error) => Effect.fail(errors.NOT_FOUND({ data: { path: error.path } })),

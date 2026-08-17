@@ -27,6 +27,8 @@ describe("git router", () => {
     const harness = await makeRpcTestHarness(home);
     try {
       const review = await harness.client.git.review({ cwd });
+      expect(review.mode).toBe("uncommitted");
+      expect(review.other).toBeNull();
       expect(review.branch).toBe("main");
       expect(review.base).toBe("HEAD");
       expect(review.baseBranch).toBeNull();
@@ -35,6 +37,22 @@ describe("git router", () => {
       const diff = await harness.client.git.diff({ cwd, path: "a.txt" });
       expect(diff.oldContents).toBe("hi\n");
       expect(diff.newContents).toBe("hello\n");
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("maps a missing compare ref to REF_NOT_FOUND", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
+    const cwd = await makeRepo();
+    const harness = await makeRpcTestHarness(home);
+    try {
+      await expect(
+        harness.client.git.review({ cwd, mode: "branch", other: "nope" }),
+      ).rejects.toMatchObject({
+        code: "REF_NOT_FOUND",
+        data: { ref: "nope" },
+      });
     } finally {
       await harness.dispose();
     }

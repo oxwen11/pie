@@ -1,17 +1,19 @@
 import { Button } from "@vibest/ui/components/button";
 import { Sheet, SheetHeader, SheetPopup, SheetTitle } from "@vibest/ui/components/sheet";
 import { useIsMobile } from "@vibest/ui/hooks/use-media-query";
-import { ListTreeIcon } from "lucide-react";
+import { FilesIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 const MIN_SPLIT_WIDTH = 24 * 16 + 6;
 
 export function ReviewWorkspaceLayout({
+  toolbar,
   preview,
   files,
   filesLabel,
 }: {
+  toolbar: ReactNode;
   preview: ReactNode;
   files: ReactNode;
   filesLabel: string;
@@ -42,24 +44,28 @@ export function ReviewWorkspaceLayout({
 
   return (
     <div ref={containerRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      {useDrawer ? (
-        <>
-          {preview}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2">
+        {toolbar}
+        {useDrawer ? (
           <Button
             aria-controls={drawerId}
             aria-expanded={filesOpen}
-            aria-label={`Open changed files for ${filesLabel}`}
-            className="absolute end-11 top-1.5 z-10"
+            aria-label={`Open file tree for ${filesLabel}`}
             onClick={() => setFilesOpen(true)}
             size="icon-xs"
             variant="ghost"
           >
-            <ListTreeIcon className="size-3.5" />
+            <FilesIcon className="size-3.5" />
           </Button>
+        ) : null}
+      </div>
+      {useDrawer ? (
+        <>
+          {preview}
           <Sheet onOpenChange={setFilesOpen} open={filesOpen}>
             <SheetPopup className="w-[min(90vw,24rem)]" id={drawerId} side="right">
               <SheetHeader className="border-b p-3">
-                <SheetTitle className="text-base">Changed files</SheetTitle>
+                <SheetTitle className="text-base">Project files</SheetTitle>
               </SheetHeader>
               <div className="flex min-h-0 flex-1">{files}</div>
             </SheetPopup>
@@ -79,7 +85,7 @@ export function ReviewWorkspaceLayout({
             {preview}
           </Panel>
           <Separator
-            aria-label="Resize changed files"
+            aria-label="Resize file tree"
             className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
           />
           <Panel

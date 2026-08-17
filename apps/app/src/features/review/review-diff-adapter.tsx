@@ -1,6 +1,12 @@
 import { parseDiffFromFile } from "@pierre/diffs";
-import { FileDiff, Virtualizer } from "@pierre/diffs/react";
-import { useMemo, useSyncExternalStore } from "react";
+import {
+  CodeView,
+  type CodeViewHandle,
+  type CodeViewItem,
+  type CodeViewReactOptions,
+} from "@pierre/diffs/react";
+import type { GitFileDiff } from "@vibest/contract/git";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 const DIFF_UNSAFE_CSS = `
   :host {
@@ -17,6 +23,10 @@ const DIFF_UNSAFE_CSS = `
     min-height: 100%;
     width: 100%;
   }
+
+  [data-diffs-header] {
+    cursor: pointer;
+  }
 `;
 
 const getAppThemeType = (): "dark" | "light" =>
@@ -31,49 +41,103 @@ const subscribeToAppTheme = (listener: () => void): (() => void) => {
   return () => observer.disconnect();
 };
 
+function parseReviewDiff(diff: GitFileDiff) {
+  return parseDiffFromFile(
+    diff.oldContents === null
+      ? null
+      : { name: diff.oldPath ?? diff.path, contents: diff.oldContents },
+    diff.newContents === null ? null : { name: diff.path, contents: diff.newContents },
+  );
+}
+
+function itemIdFromInstance(instance: object): string | undefined {
+  if (!("fileDiff" in instance)) return undefined;
+  const fileDiff = instance.fileDiff;
+  if (fileDiff === null || typeof fileDiff !== "object" || !("name" in fileDiff)) return undefined;
+  const name = fileDiff.name;
+  return typeof name === "string" ? name : undefined;
+}
+
 export function ReviewDiffAdapter({
-  path,
-  oldPath,
-  oldContents,
-  newContents,
+  diffs,
+  locatePath,
+  locateRequest,
 }: {
-  path: string;
-  oldPath?: string;
-  oldContents: string | null;
-  newContents: string | null;
+  diffs: ReadonlyArray<GitFileDiff>;
+  locatePath?: string;
+  locateRequest: number;
 }) {
   const themeType = useSyncExternalStore(
     subscribeToAppTheme,
     getAppThemeType,
     () => "light" as const,
   );
-  const fileDiff = useMemo(
-    () =>
-      parseDiffFromFile(
-        oldContents === null ? null : { name: oldPath ?? path, contents: oldContents },
-        newContents === null ? null : { name: path, contents: newContents },
-      ),
-    [newContents, oldContents, oldPath, path],
+  const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const [appliedLocate, setAppliedLocate] = useState(locateRequest);
+  if (locateRequest !== appliedLocate) {
+    setAppliedLocate(locateRequest);
+    if (locatePath !== undefined && collapsed.has(locatePath)) {
+      const next = new Set(collapsed);
+      next.delete(locatePath);
+      setCollapsed(next);
+    }
+  }
+  const fileDiffs = useMemo(
+    () => diffs.map((diff) => ({ path: diff.path, fileDiff: parseReviewDiff(diff) })),
+    [diffs],
   );
-  const options = useMemo(
+
+  const items = useMemo<ReadonlyArray<CodeViewItem>>(
+    () =>
+      fileDiffs.map(({ path, fileDiff }) => ({
+        id: path,
+        type: "diff",
+        fileDiff,
+        collapsed: collapsed.has(path),
+      })),
+    [collapsed, fileDiffs],
+  );
+
+  const options = useMemo<CodeViewReactOptions>(
     () => ({
-      disableFileHeader: true,
-      overflow: "scroll" as const,
-      theme: { dark: "pierre-dark" as const, light: "pierre-light" as const },
+      overflow: "scroll",
+      stickyHeaders: true,
+      theme: { dark: "pierre-dark", light: "pierre-light" },
       themeType,
       unsafeCSS: DIFF_UNSAFE_CSS,
+      onPostRender(node, instance, phase) {
+        if (phase === "unmount") return;
+        const header = node.shadowRoot?.querySelector("[data-diffs-header]");
+        if (!(header instanceof HTMLElement)) return;
+        const id = itemIdFromInstance(instance);
+        if (id !== undefined) header.dataset.reviewPath = id;
+        if (header.dataset.reviewCollapseBound === "true") return;
+        header.dataset.reviewCollapseBound = "true";
+        header.addEventListener("click", () => {
+          const path = header.dataset.reviewPath;
+          if (path === undefined) return;
+          setCollapsed((current) => {
+            const next = new Set(current);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+          });
+        });
+      },
     }),
     [themeType],
   );
 
+  useLayoutEffect(() => {
+    if (locatePath === undefined) return;
+    if (!fileDiffs.some((entry) => entry.path === locatePath)) return;
+    codeViewRef.current?.scrollTo({ type: "item", id: locatePath, align: "start" });
+  }, [fileDiffs, locatePath, locateRequest]);
+
   return (
-    <div className="h-full w-full">
-      <Virtualizer
-        className="h-full w-full overflow-auto"
-        contentStyle={{ display: "flex", minHeight: "100%", width: "100%" }}
-      >
-        <FileDiff className="min-h-full min-w-full" fileDiff={fileDiff} options={options} />
-      </Virtualizer>
+    <div className="h-full min-h-0 w-full">
+      <CodeView className="h-full w-full" items={items} options={options} ref={codeViewRef} />
     </div>
   );
 }
