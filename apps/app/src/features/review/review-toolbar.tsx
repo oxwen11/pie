@@ -33,7 +33,7 @@ export function ReviewToolbar({
   onOtherChange: (other: string) => void;
   onRefresh: () => void;
 }) {
-  const refs = splitCompareRefs(branch?.branches ?? []);
+  const refs = splitCompareRefs(branch?.branches ?? [], branch?.remotes ?? []);
   const otherValue = other ?? branch?.defaultBranch ?? null;
   const otherItems = (branch?.branches ?? []).map((name) => ({ label: name, value: name }));
 

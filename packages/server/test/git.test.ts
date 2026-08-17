@@ -57,6 +57,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
       assert.equal(branch.current, "main");
       assert.equal(branch.defaultBranch, "main");
       assert.ok(branch.branches.includes("main"));
+      assert.deepEqual(branch.remotes, []);
     }).pipe(Effect.provide(GitLayer)),
   );
 
@@ -71,6 +72,9 @@ layer(NodePlatformLayer)("GitService", (it) => {
       assert.ok(branch.branches.includes("main"));
       assert.ok(branch.branches.includes("origin/main"));
       assert.ok(branch.branches.includes("origin/HEAD"));
+      assert.ok(branch.remotes.includes("origin/main"));
+      assert.ok(branch.remotes.includes("origin/HEAD"));
+      assert.ok(!branch.remotes.includes("main"));
     }).pipe(Effect.provide(GitLayer)),
   );
 

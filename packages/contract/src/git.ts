@@ -30,6 +30,8 @@ export const GitBranchSchema = Schema.Struct({
   defaultBranch: Schema.Union([Schema.String, Schema.Null]),
   /** Local heads and remote-tracking refs (`main`, `origin/main`). */
   branches: Schema.Array(Schema.String),
+  /** Remote-tracking refs only (`origin/main`). Local names may contain `/`. */
+  remotes: Schema.Array(Schema.String),
 });
 export type GitBranch = typeof GitBranchSchema.Type;
 

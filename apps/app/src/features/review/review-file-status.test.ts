@@ -62,9 +62,14 @@ describe("isReviewMode", () => {
 });
 
 describe("splitCompareRefs", () => {
-  it("keeps local and remote-tracking names in separate groups", () => {
-    expect(splitCompareRefs(["main", "feature", "origin/main", "origin/HEAD"])).toEqual({
-      local: ["main", "feature"],
+  it("keeps slashed local names out of the remote group", () => {
+    expect(
+      splitCompareRefs(
+        ["main", "feature/oauth", "origin/main", "origin/HEAD"],
+        ["origin/main", "origin/HEAD"],
+      ),
+    ).toEqual({
+      local: ["main", "feature/oauth"],
       remote: ["origin/main", "origin/HEAD"],
     });
   });

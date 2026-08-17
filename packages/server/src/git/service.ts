@@ -206,7 +206,19 @@ export const GitServiceLayer: Layer.Layer<
 
     const listRefs = (cwd: string) =>
       raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
-        Effect.map(parseRefNames),
+        Effect.map((output) => {
+          const local: string[] = [];
+          const remotes: string[] = [];
+          for (const line of output.split("\n")) {
+            const ref = line.trim();
+            if (ref.startsWith("refs/heads/")) {
+              local.push(ref.slice("refs/heads/".length));
+            } else if (ref.startsWith("refs/remotes/")) {
+              remotes.push(ref.slice("refs/remotes/".length));
+            }
+          }
+          return { local, remotes, all: [...local, ...remotes] };
+        }),
       );
 
     const resolvePreferredCompareRef = (cwd: string) =>
@@ -278,7 +290,7 @@ export const GitServiceLayer: Layer.Layer<
           return yield* new GitRefNotFound({ ref: other ?? "" });
         }
         const refs = yield* listRefs(cwd);
-        if (!refs.includes(other)) {
+        if (!refs.all.includes(other)) {
           return yield* new GitRefNotFound({ ref: other });
         }
         const base = yield* mergeBase(cwd, other);
@@ -400,8 +412,13 @@ export const GitServiceLayer: Layer.Layer<
           const realRoot = yield* resolveRoot(cwd);
           const current = yield* currentBranch(realRoot);
           const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
-          const branches = yield* listRefs(realRoot);
-          return { current, defaultBranch, branches };
+          const listed = yield* listRefs(realRoot);
+          return {
+            current,
+            defaultBranch,
+            branches: listed.all,
+            remotes: listed.remotes,
+          };
         }),
 
       review: (query) =>
