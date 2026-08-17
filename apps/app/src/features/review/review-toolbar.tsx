@@ -51,7 +51,7 @@ export function ReviewToolbar({
         <SelectTrigger aria-label="Compare mode" className="w-[10.5rem] shrink-0" size="sm">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent alignItemWithTrigger={false}>
           {REVIEW_MODE_ITEMS.map((item) => (
             <SelectItem key={item.value} value={item.value}>
               {item.label}
@@ -71,7 +71,7 @@ export function ReviewToolbar({
           <SelectTrigger aria-label="Compare with branch" className="min-w-0 flex-1" size="sm">
             <SelectValue placeholder="Select a branch" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent alignItemWithTrigger={false}>
             {refs.local.length > 0 ? (
               <SelectGroup>
                 <SelectGroupLabel>Local</SelectGroupLabel>
