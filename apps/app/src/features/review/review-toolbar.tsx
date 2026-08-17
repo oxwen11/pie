@@ -10,12 +10,36 @@ import {
   SelectValue,
 } from "@vibest/ui/components/select";
 import { cn } from "@vibest/ui/lib/utils";
-import { RefreshCwIcon } from "lucide-react";
+import { ChevronDownIcon, RefreshCwIcon } from "lucide-react";
+import type { ComponentProps } from "react";
 
 import { REVIEW_MODE_ITEMS, splitCompareRefs } from "./review-file-status";
 
-const GHOST_SELECT_TRIGGER =
-  "hover:bg-accent border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent";
+function GhostSelectTrigger({
+  className,
+  placeholder,
+  ...props
+}: Omit<ComponentProps<typeof SelectTrigger>, "render"> & {
+  placeholder?: string;
+}) {
+  // Drop SelectTrigger's field chrome and its hard-coded up/down icon.
+  return (
+    <SelectTrigger
+      {...props}
+      render={({ children: _children, className: _className, ...triggerProps }) => (
+        <Button
+          {...triggerProps}
+          className={cn("min-w-0 gap-1 px-2 font-normal", className)}
+          size="sm"
+          variant="ghost"
+        >
+          <SelectValue placeholder={placeholder} />
+          <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-70" />
+        </Button>
+      )}
+    />
+  );
+}
 
 export function ReviewToolbar({
   mode,
@@ -51,13 +75,7 @@ export function ReviewToolbar({
         }}
         value={mode}
       >
-        <SelectTrigger
-          aria-label="Compare mode"
-          className={cn(GHOST_SELECT_TRIGGER, "w-auto shrink-0")}
-          size="sm"
-        >
-          <SelectValue />
-        </SelectTrigger>
+        <GhostSelectTrigger aria-label="Compare mode" className="w-auto shrink-0" />
         <SelectContent alignItemWithTrigger={false}>
           {REVIEW_MODE_ITEMS.map((item) => (
             <SelectItem key={item.value} value={item.value}>
@@ -75,13 +93,11 @@ export function ReviewToolbar({
           }}
           value={otherValue}
         >
-          <SelectTrigger
+          <GhostSelectTrigger
             aria-label="Compare with branch"
-            className={cn(GHOST_SELECT_TRIGGER, "min-w-0 flex-1")}
-            size="sm"
-          >
-            <SelectValue placeholder="Select a branch" />
-          </SelectTrigger>
+            className="min-w-0 flex-1"
+            placeholder="Select a branch"
+          />
           <SelectContent alignItemWithTrigger={false}>
             {refs.local.length > 0 ? (
               <SelectGroup>
