@@ -25,5 +25,5 @@ export const HarnessAgentDomainLayer = Layer.mergeAll(
   ProjectServiceLayer.pipe(Layer.provide(ProjectRepositoryLayer)),
   EventBusLayer,
   FileSystemServiceLayer,
-  GitServiceLayer,
+  GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer)),
 );

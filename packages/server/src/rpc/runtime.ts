@@ -8,6 +8,7 @@ import { Context, Effect, type FileSystem, Layer } from "effect";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
+import { GitServiceLayer } from "../git";
 import {
   type HarnessAgentAdapter,
   HarnessAgentRegistry,
@@ -142,6 +143,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   HarnessListProvided,
   HarnessProbeProvided,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
+  GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(PlatformLayer)),
   PlatformLayer,
   // For the HTTP request app: `HttpStaticServer` needs it to turn a file into a
   // response. Sealed by the vendor layer, hence no `Layer.provide` here.

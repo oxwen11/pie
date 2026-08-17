@@ -3,6 +3,7 @@ import type { FileSystem } from "effect/FileSystem";
 
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
+import type { GitService } from "../git";
 import type {
   HarnessAgentRegistry,
   HarnessAgentSessionService,
@@ -21,4 +22,5 @@ export type RpcContext = WithEffectContext<
   | HarnessProbeService
   | ProjectService
   | FileSystemService
+  | GitService
 >;

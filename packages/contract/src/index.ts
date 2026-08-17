@@ -1,4 +1,5 @@
 import { fsContract } from "./fs";
+import { gitContract } from "./git";
 import { harnessContract } from "./harness";
 import { projectContract } from "./project";
 import { sessionContract } from "./session";
@@ -11,7 +12,8 @@ export const contract = {
   session: sessionContract,
   project: projectContract,
   fs: fsContract,
+  git: gitContract,
 };
 export type Contract = typeof contract;
 
-export { fsContract, harnessContract, projectContract, sessionContract };
+export { fsContract, gitContract, harnessContract, projectContract, sessionContract };

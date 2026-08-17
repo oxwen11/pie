@@ -2,6 +2,7 @@ import { os } from "@orpc/server";
 
 import type { RpcContext } from "./context";
 import { fsRouter } from "./fs";
+import { gitRouter } from "./git";
 import { harnessRouter } from "./harness";
 import { projectRouter } from "./project";
 import { sessionRouter } from "./session";
@@ -13,5 +14,6 @@ export const router = orpc.router({
   session: sessionRouter,
   project: projectRouter,
   fs: fsRouter,
+  git: gitRouter,
 });
 export type Router = typeof router;

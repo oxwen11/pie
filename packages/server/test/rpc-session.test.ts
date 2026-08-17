@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
+import { GitServiceLayer } from "../src/git";
 import {
   HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
@@ -102,6 +103,7 @@ async function setup() {
     HarnessListLayer.pipe(Layer.provide(registryLayer), Layer.provide(NodeServices.layer)),
     HarnessProbeLayer.pipe(Layer.provide(registryLayer)),
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(NodeServices.layer)),
     NodeServices.layer,
   );
   const runtime = ManagedRuntime.make(appLayer);
