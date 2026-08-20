@@ -4,7 +4,7 @@ import { Spinner } from "@vibest/ui/components/spinner";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
-import { asRecord, type PanelHandle } from "@/components/layout/content-panel/core/panel";
+import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
