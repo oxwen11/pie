@@ -232,15 +232,33 @@ export const makeHarnessAgentSessionManager = (
         ),
       );
 
+    /**
+     * The heaviest thing this server does: `open`/`resume` is where an agent
+     * CLI is actually spawned or an SDK handle established. It is also the
+     * likeliest to fail — a CLI that is not installed, an expired login, a cwd
+     * that vanished — and the failure reaches the user as a session that "does
+     * nothing".
+     *
+     * The native span correlates logs emitted during each acquisition. Which
+     * session and harness come from the caller's `inSession`; the harness's own
+     * id is attached after the adapter answers because it does not exist before
+     * then — it is what a `claude --resume` command would take.
+     */
     const acquireOpen = (
       harnessAgentId: HarnessAgentId,
       input: CreateSessionInput,
     ): AcquireRuntime =>
-      checkAvailable(harnessAgentId).pipe(Effect.flatMap((adapter) => adapter.open(input)));
+      checkAvailable(harnessAgentId).pipe(
+        Effect.flatMap((adapter) => adapter.open(input)),
+        Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
+        Effect.withSpan("harness.open"),
+      );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
       checkAvailable(input.harnessAgentId).pipe(
         Effect.flatMap((adapter) => adapter.resume({ sessionId: input.sessionId, cwd: input.cwd })),
+        Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
+        Effect.withSpan("harness.resume"),
       );
 
     /** Acquire through a session, retrying against a fresh one when the session

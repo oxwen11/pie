@@ -41,6 +41,7 @@ import {
 } from "./errors";
 import type { HarnessAgentRegistryShape } from "./registry";
 import { HarnessAgentRegistry } from "./registry";
+import { inSession } from "./session-identity";
 import type { SessionConfig } from "./session-io";
 import type { HarnessAgentSessionManagerShape } from "./session-manager";
 import { HarnessAgentSessionManager } from "./session-manager";
@@ -425,6 +426,21 @@ export const makeHarnessAgentSessionService = (deps: {
       ),
     );
 
+  /**
+   * The lifecycle boundaries, at `info` — a session appearing, going away, or
+   * being put aside. There are only a few dozen in a working day, so they sit
+   * at a level that shows by default: read on their own they are the story of
+   * what was worked on and when.
+   *
+   * Identity comes from the method's own `inSession`, so what is named here is
+   * only what this particular boundary adds.
+   *
+   * Deliberately after the operation, never before: a line saying a session was
+   * deleted, written before the delete could fail, is worse than no line.
+   */
+  const logLifecycle = (event: string, message: string, extra: Record<string, unknown> = {}) =>
+    Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
+
   return {
     create: (projectId, harnessAgentId, cwd, config) =>
       checkPermissionMode(harnessAgentId, config?.permissionMode).pipe(
@@ -449,9 +465,16 @@ export const makeHarnessAgentSessionService = (deps: {
                 // A failed metadata write must not leak the native session.
                 Effect.tapError(() => manager.close(ref)),
                 Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                Effect.andThen(
+                  logLifecycle("session.created", "session created", {
+                    cwd,
+                    harnessSessionId: session.sessionId,
+                  }),
+                ),
                 Effect.as(ref),
               );
             }),
+            inSession(ref),
           );
         }),
       ),
@@ -483,12 +506,15 @@ export const makeHarnessAgentSessionService = (deps: {
             ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
             : Effect.void,
         ),
+        inSession(ref),
       ),
 
     close: (ref) =>
       resolveHarnessSessionId(ref).pipe(
         Effect.andThen(manager.close(ref)),
         Effect.andThen(bus.closeSession(ref, "session_closed")),
+        Effect.andThen(logLifecycle("session.closed", "session closed")),
+        inSession(ref),
       ),
 
     delete: (ref) =>
@@ -499,8 +525,11 @@ export const makeHarnessAgentSessionService = (deps: {
           Effect.andThen(bus.closeSession(ref, "session_deleted")),
           Effect.andThen(repo.remove(ref.projectId, ref.sessionId)),
           Effect.andThen(bus.publish({ ref, type: "session.deleted" })),
+          // The one line that outlives what it describes: the metadata is gone,
+          // so this is all that is left to say the session ever existed.
+          Effect.andThen(logLifecycle("session.deleted", "session deleted")),
         ),
-      ),
+      ).pipe(inSession(ref)),
 
     rename: (ref, title) =>
       withMetadataMutation(
@@ -517,7 +546,7 @@ export const makeHarnessAgentSessionService = (deps: {
                   .pipe(Effect.andThen(bus.publish({ ref, type: "session.renamed", title }))),
           ),
         ),
-      ),
+      ).pipe(inSession(ref)),
 
     archive: (ref, archived) =>
       withMetadataMutation(
@@ -532,12 +561,18 @@ export const makeHarnessAgentSessionService = (deps: {
               ? manager.close(ref).pipe(Effect.andThen(bus.closeSession(ref, "session_closed")))
               : Effect.void;
             const publish = changed
-              ? bus.publish({ ref, type: "session.archived", archived })
+              ? bus.publish({ ref, type: "session.archived", archived }).pipe(
+                  Effect.andThen(
+                    logLifecycle("session.archived", "session archive state changed", {
+                      archived,
+                    }),
+                  ),
+                )
               : Effect.void;
             return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
           }),
         ),
-      ),
+      ).pipe(inSession(ref)),
 
     // A pure read of our own records — display data is self-owned (title from
     // the first prompt, createdAt/cwd from create), so no per-session backend
@@ -607,6 +642,7 @@ export const makeHarnessAgentSessionService = (deps: {
             ),
           ),
         ),
+        inSession(ref),
       ),
 
     prompt: (input) =>
@@ -647,19 +683,23 @@ export const makeHarnessAgentSessionService = (deps: {
             }),
           ),
         );
-      }),
+      }).pipe(inSession(input.ref)),
 
     interrupt: (ref) =>
       readChecked(ref).pipe(
         Effect.andThen(manager.peek(ref)),
         Effect.flatMap((runtime) => runtime?.interrupt ?? Effect.void),
+        inSession(ref),
       ),
 
     setModel: (ref, model) =>
-      readChecked(ref).pipe(Effect.andThen(manager.setConfig(ref, { model }))),
+      readChecked(ref).pipe(Effect.andThen(manager.setConfig(ref, { model })), inSession(ref)),
 
     setReasoningEffort: (ref, reasoningEffort) =>
-      readChecked(ref).pipe(Effect.andThen(manager.setConfig(ref, { reasoningEffort }))),
+      readChecked(ref).pipe(
+        Effect.andThen(manager.setConfig(ref, { reasoningEffort })),
+        inSession(ref),
+      ),
 
     setPermissionMode: (ref, permissionMode) =>
       readChecked(ref).pipe(
@@ -677,6 +717,7 @@ export const makeHarnessAgentSessionService = (deps: {
           ),
         ),
         Effect.andThen(manager.setConfig(ref, { permissionMode })),
+        inSession(ref),
       ),
 
     respondToAgentRequest: (ref, requestId, response) =>
@@ -687,15 +728,17 @@ export const makeHarnessAgentSessionService = (deps: {
             ? runtime.respondToAgentRequest(requestId, response)
             : Effect.fail(new AgentRequestUnavailable({ sessionId: ref.sessionId, requestId })),
         ),
+        inSession(ref),
       ),
 
+    // The one operation still gated on something running: what a harness can
+    // do is negotiated with the live agent, and there is nothing to ask when
+    // no agent is there.
     getCapabilities: (ref) =>
-      // The one operation still gated on something running: what a harness can
-      // do is negotiated with the live agent, and there is nothing to ask when
-      // no agent is there.
       readChecked(ref).pipe(
         Effect.andThen(manager.get(ref)),
         Effect.flatMap((runtime) => runtime.getCapabilities),
+        inSession(ref),
       ),
 
     getSessionInfo: (ref) =>
@@ -709,8 +752,11 @@ export const makeHarnessAgentSessionService = (deps: {
               ),
             ),
         ),
+        inSession(ref),
       ),
 
+    // Not wrapped: both are pure reads of in-memory state, and `getSnapshot` is
+    // on the subscribe path, which runs per reconnect.
     getStatus: (ref) => manager.status(ref),
     getSnapshot: (ref) => manager.snapshot(ref),
 

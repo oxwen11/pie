@@ -4,7 +4,17 @@ import path from "node:path";
 
 import { isSessionScopedEvent, type SessionRef } from "@vibest/contract";
 import type { UIMessage } from "ai";
-import { Crypto, Effect, Fiber, FileSystem, type Scope, Stream } from "effect";
+import {
+  Crypto,
+  Effect,
+  Fiber,
+  FileSystem,
+  Layer,
+  Logger,
+  References,
+  type Scope,
+  Stream,
+} from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
@@ -24,6 +34,7 @@ import {
   type HarnessAgentSessionServiceShape,
   makeHarnessAgentSessionService,
 } from "../../src/harness/session-service";
+import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
 
 type Spy = {
@@ -144,11 +155,17 @@ describe("HarnessAgentSessionService", () => {
             ),
             permissionModes: [],
             open: ({ cwd }) =>
-              Effect.sync(() => {
-                spy.open.push({ cwd });
-                opened += 1;
-                return makeSession(`native-${opened}`);
-              }),
+              // An adapter sees `cwd` and never a `SessionRef` — this line is
+              // the probe for whether the identity reaches it anyway.
+              Effect.logDebug("adapter opening").pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    spy.open.push({ cwd });
+                    opened += 1;
+                    return makeSession(`native-${opened}`);
+                  }),
+                ),
+              ),
             resume: ({ sessionId, cwd }) =>
               Effect.sync(() => {
                 spy.resume.push({ sessionId, cwd });
@@ -711,6 +728,77 @@ describe("HarnessAgentSessionService", () => {
     );
     expect(listed).toHaveLength(1);
     expect(listed[0]?.title).toBeUndefined();
+  });
+
+  // The lifecycle log is what a periodic read of `$VIBEST_HOME/logs` is for:
+  // read on its own it says what was worked on, when, and where. It has to hold
+  // together across the whole span of a session, so it is asserted as a
+  // sequence rather than one line at a time.
+  it("logs each lifecycle boundary once, in order, at info", async () => {
+    const records: Array<LogRecord> = [];
+    await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* fixture.service.archive(ref, true);
+        yield* fixture.service.delete(ref);
+      }).pipe(
+        Effect.provide(
+          Logger.layer([
+            Logger.map(structured, (record) => {
+              records.push(record);
+            }),
+          ]),
+        ),
+      ),
+    );
+
+    // Only lifecycle events are logs. The native `harness.open` span correlates
+    // logs inside it but does not synthesize its own completion record.
+    expect(records.map((record) => record.annotations.event)).toEqual([
+      "session.created",
+      "session.archived",
+      "session.deleted",
+    ]);
+    expect(records.every((record) => record.level === "INFO")).toBe(true);
+
+    const created = records[0];
+    expect(created?.annotations.cwd).toBe("/tmp/vibest-app");
+    expect(created?.annotations.harnessSessionId).toBe("native-1");
+    expect(created?.annotations.projectId).toBe("proj-a");
+    // Every line carries the id, so one session's whole life greps out of a
+    // file holding many.
+    const sessionId = created?.annotations.sessionId;
+    expect(typeof sessionId).toBe("string");
+    expect(records.every((r) => r.annotations.sessionId === sessionId)).toBe(true);
+  });
+
+  // The identity is bound once at the service boundary, not repeated at each
+  // log site — so a layer that has never heard of a `SessionRef` (an adapter
+  // sees `cwd` and nothing else) still writes lines that grep out with the
+  // session's own. This is the test that keeps that wrap from being "tidied"
+  // back into per-site annotations.
+  it("puts the session's identity on what the layers below it log", async () => {
+    const records: Array<LogRecord> = [];
+    await run({}, (fixture) =>
+      fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app").pipe(
+        Effect.provide(
+          Layer.merge(
+            Logger.layer([
+              Logger.map(structured, (record) => {
+                records.push(record);
+              }),
+            ]),
+            Layer.succeed(References.MinimumLogLevel, "Debug"),
+          ),
+        ),
+      ),
+    );
+
+    const adapterLine = records.find((record) => record.message === "adapter opening");
+    expect(adapterLine).toBeDefined();
+    expect(adapterLine?.annotations.projectId).toBe("proj-a");
+    expect(adapterLine?.annotations.harnessAgentId).toBe("claude-code");
+    expect(adapterLine?.annotations.sessionId).toMatch(UUID_RE);
   });
 
   // The rename used to be broadcast-only, so every client showed the new title
