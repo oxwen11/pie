@@ -281,14 +281,10 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("lists models and switches the active model via Pi RPC", () =>
+  it.effect("reads and switches the active model via Pi RPC", () =>
     Effect.gen(function* () {
       const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
-
-      const models = yield* agent.session.listModels(sessionId);
-      assert.equal(models.length, 2);
-      assert.deepEqual(models[0], { provider: "p", modelId: "m1", name: "Model 1" });
 
       const initial = yield* agent.session.getModelState(sessionId);
       assert.deepEqual(initial, { provider: "p", modelId: "m1", name: "Model 1" });

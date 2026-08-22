@@ -2,7 +2,6 @@ import type {
   AgentResponse,
   InspectorTarget,
   SessionCapabilities,
-  AgentModel,
   AgentModelState,
 } from "@pie/contract";
 import { InspectorTargetSchema, SessionCapabilitiesSchema } from "@pie/contract";
@@ -98,10 +97,6 @@ export interface HarnessAgentRuntime {
   /** Warm history read from a live Pi child (`get_entries`). */
   readonly getMessages?: Effect.Effect<
     ReadonlyArray<UIMessage>,
-    SessionClosed | AgentOperationError
-  >;
-  readonly listModels?: Effect.Effect<
-    ReadonlyArray<AgentModel>,
     SessionClosed | AgentOperationError
   >;
   readonly getModelState?: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
