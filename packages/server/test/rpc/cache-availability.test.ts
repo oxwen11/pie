@@ -8,8 +8,7 @@ import type { HarnessAgentAdapter } from "../../src/harness/adapter";
 import { cacheAvailability } from "../../src/rpc/runtime";
 
 const unusedAdapter = {
-  id: "pi",
-  descriptor: { id: "pi", name: "Pi" },
+  descriptor: { name: "Pi" },
   permissionModes: [],
   open: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),

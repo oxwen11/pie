@@ -5,7 +5,6 @@ import { sameSessionRef, sessionRefKey } from "./session-ref";
 
 const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "11111111-1111-4111-8111-111111111111",
-  harnessAgentId: "pi",
   sessionId: "shared-session-id",
   ...overrides,
 });

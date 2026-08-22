@@ -1,6 +1,5 @@
 import type {
   AgentResponse,
-  HarnessAgentId,
   InspectorTarget,
   PermissionMode,
   ModelInfo,
@@ -57,7 +56,6 @@ export type {
 };
 
 export type AgentDescriptor = {
-  readonly id: HarnessAgentId;
   readonly name: string;
 };
 
@@ -94,7 +92,6 @@ export type SessionInfoResult =
  */
 export interface HarnessAgentRuntime {
   readonly sessionId: string;
-  readonly harnessAgentId: HarnessAgentId;
   readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
   readonly prompt: (
     input: UserInput,
@@ -139,7 +136,6 @@ export interface HarnessAgentRuntime {
 }
 
 export interface HarnessAgentAdapter {
-  readonly id: HarnessAgentId;
   readonly descriptor: AgentDescriptor;
   /**
    * A PATH lookup, so it reads the filesystem — the requirement rides the `R`

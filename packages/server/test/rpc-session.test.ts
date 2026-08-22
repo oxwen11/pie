@@ -14,8 +14,6 @@ import {
   HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
   HarnessAgentSessionServiceLayer,
-  HarnessListLayer,
-  HarnessProbeLayer,
   makeHarnessAgentRegistry,
 } from "../src/harness";
 import { makePiAdapter, makePiAgent } from "../src/harness/pi";
@@ -72,7 +70,7 @@ async function setup() {
     HarnessAgentRegistry,
     Effect.gen(function* () {
       const pi = yield* Pi;
-      return makeHarnessAgentRegistry([makePiAdapter(pi, { executablePath })]);
+      return makeHarnessAgentRegistry(makePiAdapter(pi, { executablePath }));
     }),
   ).pipe(Layer.provide(piLayer));
 
@@ -99,8 +97,6 @@ async function setup() {
     harnessSessionLayer,
     projectServiceLayer,
     registryLayer,
-    HarnessListLayer.pipe(Layer.provide(registryLayer), Layer.provide(NodeServices.layer)),
-    HarnessProbeLayer.pipe(Layer.provide(registryLayer)),
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,
@@ -120,10 +116,8 @@ describe("session router", () => {
       const project = await client.project.create({ path: workspace });
       const ref = await client.session.create({
         projectId: project.id,
-        harnessAgentId: "pi",
       });
       expect(ref.projectId).toBe(project.id);
-      expect(ref.harnessAgentId).toBe("pi");
 
       const events = await client.session.subscribe({ scope: { kind: "session", ref } });
       const receipt = await client.session.prompt({
@@ -154,7 +148,7 @@ describe("session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
+      const ref = await client.session.create({ projectId: project.id });
       await client.session.close({ ref });
 
       const prepared = await client.session.prepare({ ref });
@@ -174,7 +168,7 @@ describe("session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
+      const ref = await client.session.create({ projectId: project.id });
 
       const active = await client.session.list({ projectId: project.id });
       expect(active).toHaveLength(1);
@@ -213,7 +207,7 @@ describe("session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
+      const ref = await client.session.create({ projectId: project.id });
 
       const observer = await client.session.subscribe({ scope: { kind: "global" } });
       await client.session.rename({ ref, title: "Login bug" });

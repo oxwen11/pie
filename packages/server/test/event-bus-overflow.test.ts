@@ -6,7 +6,7 @@ import { Effect, Stream } from "effect";
 
 import { makeEventBus } from "../src/events";
 
-const ref: SessionRef = { projectId: "p1", harnessAgentId: "pi", sessionId: "s1" };
+const ref: SessionRef = { projectId: "p1", sessionId: "s1" };
 
 const started = (seq: number): SessionScopedEvent => ({
   seq,

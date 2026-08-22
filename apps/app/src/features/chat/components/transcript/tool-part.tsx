@@ -13,7 +13,7 @@ const genericToolName = (part: AnyToolPart): string =>
 // One malformed payload degrades to a single fallback line instead of blanking
 // the whole transcript; resetKeys re-arms the boundary when the part
 // transitions state.
-export function ToolPart({ part }: { message: UIMessage; part: AnyToolPart }) {
+export function ToolPart({ message: _message, part }: { message: UIMessage; part: AnyToolPart }) {
   if (part.state === "input-streaming") return null;
   return (
     <ErrorBoundary

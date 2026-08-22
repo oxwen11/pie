@@ -31,7 +31,6 @@ export const inSession =
     const identity = {
       sessionId: ref.sessionId,
       projectId: ref.projectId,
-      harnessAgentId: ref.harnessAgentId,
     };
     return effect.pipe(Effect.annotateLogs(identity), Effect.annotateSpans(identity));
   };

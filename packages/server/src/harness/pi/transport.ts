@@ -241,7 +241,6 @@ export const makePiTransport = (
           Effect.flatMap((tail) =>
             terminate(
               new AgentProcessExited({
-                harnessAgentId: "pi",
                 code,
                 ...(tail.length > 0 ? { stderrTail: tail } : {}),
               }),

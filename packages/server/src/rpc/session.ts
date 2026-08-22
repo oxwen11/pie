@@ -24,41 +24,12 @@ export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* HarnessAgentSessionService;
-    // The providerId/modelId pair is validated and unpacked here: the two are
-    // only meaningful together (a half pair is a client bug), and today a
-    // harness can only consume its own built-in provider, so anything else is
-    // a request this server cannot honour. Past this point the model travels
-    // as a provider-local id.
-    if ((input.providerId === undefined) !== (input.modelId === undefined)) {
-      return yield* Effect.fail(
-        errors.INVALID_ARGUMENT({
-          message: "providerId and modelId must be given together",
-        }),
-      );
-    }
-    if (input.providerId !== undefined && input.providerId !== input.harnessAgentId) {
-      return yield* Effect.fail(
-        errors.UNSUPPORTED({
-          message: `provider ${input.providerId} is not consumable by ${input.harnessAgentId}`,
-        }),
-      );
-    }
     return yield* projects.findById(input.projectId).pipe(
-      Effect.flatMap((project) =>
-        sessions.create(input.projectId, input.harnessAgentId, project.path, {
-          ...(input.modelId !== undefined ? { model: input.modelId } : {}),
-          ...(input.reasoningEffort !== undefined
-            ? { reasoningEffort: input.reasoningEffort }
-            : {}),
-          ...(input.permissionMode !== undefined ? { permissionMode: input.permissionMode } : {}),
-        }),
-      ),
+      Effect.flatMap((project) => sessions.create(input.projectId, project.path)),
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        HarnessAgentNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        AgentUnavailable: (e) =>
-          Effect.fail(errors.UNSUPPORTED({ message: `${e.harnessAgentId}: ${e.reason}` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         PermissionModeUnsupported: (e) =>
           Effect.fail(errors.INVALID_ARGUMENT({ message: e.message })),
@@ -78,13 +49,8 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        HarnessAgentNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
@@ -96,10 +62,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
       }),
     );
   }),
@@ -122,10 +84,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
       }),
     );
   }),
@@ -135,10 +93,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
       }),
     );
   }),
@@ -148,10 +102,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
       }),
     );
   }),
@@ -166,13 +116,7 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
-        HarnessAgentNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        AgentUnavailable: (e) =>
-          Effect.fail(errors.UNSUPPORTED({ message: `${e.harnessAgentId}: ${e.reason}` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -208,17 +152,11 @@ export const sessionRouter = orpc.router({
           Effect.fail(
             errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
           ),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         UnsupportedPromptPart: (e) =>
           Effect.fail(errors.UNSUPPORTED({ message: `unsupported prompt part: ${e.kind}` })),
         // A prompt is what starts an agent, so it is also where starting one
         // can fail. Same mapping the create path uses.
-        HarnessAgentNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        AgentUnavailable: (e) =>
-          Effect.fail(errors.UNSUPPORTED({ message: `${e.harnessAgentId}: ${e.reason}` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -238,10 +176,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         SessionClosed: (e) =>
           Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -250,23 +184,10 @@ export const sessionRouter = orpc.router({
   }),
   setModel: orpc.setModel.effect(function* ({ input, errors }) {
     const sessions = yield* HarnessAgentSessionService;
-    // Same providerId gate as `create`: a harness only consumes its own
-    // built-in provider today.
-    if (input.providerId !== input.ref.harnessAgentId) {
-      return yield* Effect.fail(
-        errors.UNSUPPORTED({
-          message: `provider ${input.providerId} is not consumable by ${input.ref.harnessAgentId}`,
-        }),
-      );
-    }
     yield* sessions.setModel(input.ref, input.modelId).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         SessionClosed: (e) =>
           Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -279,10 +200,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         SessionClosed: (e) =>
           Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -295,10 +212,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         // Our closed vocabulary, but outside this harness's declared subset —
         // a client bug (the subset is fully known client-side), never ignored.
         PermissionModeUnsupported: (e) =>
@@ -315,10 +228,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionRefMismatch: (e) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `ref mismatch for session ${e.sessionId}` }),
-          ),
         AgentRequestUnavailable: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `request ${e.requestId} is not pending` })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),

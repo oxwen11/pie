@@ -39,13 +39,6 @@ export interface RouterAppContext {
 contentPanel.registerAll([filesPanel, filePanel, terminalPanel, diffPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
-  // Fetch the harness list once, right after the client connects and before
-  // any route renders. Every consumer (e.g. the permission-mode picker) then
-  // reads the held result by id.
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(
-      context.orpcQueryUtils.harness.list.queryOptions({ input: {} }),
-    ),
   component: RootLayout,
 });
 

@@ -34,7 +34,6 @@ describe("pi request mapping", () => {
     const request = buildUiRequest(confirm);
     expect(request).toMatchObject({
       type: "question",
-      harnessAgentId: "pi",
       id: "u1",
       native: confirm,
     });

@@ -12,7 +12,6 @@ import type { Session } from "../types";
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  harnessAgentId: Schema.Literals(["pi"]),
   harnessSessionId: Schema.String,
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),

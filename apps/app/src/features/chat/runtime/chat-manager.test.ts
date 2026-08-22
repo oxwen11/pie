@@ -7,7 +7,6 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 
 const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId,
   ...overrides,
 });

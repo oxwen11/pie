@@ -18,9 +18,6 @@ export function useChatHandle(sessionRef: SessionRef): Chat {
   const manager = useChatManager();
   // Depend on the primitive fields, not the (per-render) ref object identity, so
   // the lookup runs once per distinct session rather than on every render.
-  const { projectId, harnessAgentId, sessionId } = sessionRef;
-  return useMemo(
-    () => manager.chatFor({ projectId, harnessAgentId, sessionId }),
-    [manager, projectId, harnessAgentId, sessionId],
-  );
+  const { projectId, sessionId } = sessionRef;
+  return useMemo(() => manager.chatFor({ projectId, sessionId }), [manager, projectId, sessionId]);
 }

@@ -6,7 +6,6 @@ import { RecoveringSubscription } from "./chat-subscription";
 const snapshot: SessionRuntimeSnapshot = {
   ref: {
     projectId: "project-1",
-    harnessAgentId: "pi",
     sessionId: "session-1",
   },
   status: { phase: "idle" },

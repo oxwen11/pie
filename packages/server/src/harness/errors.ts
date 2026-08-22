@@ -1,4 +1,3 @@
-import { HarnessAgentIdSchema } from "@pie/contract";
 import { Schema } from "effect";
 
 // A cause's one-line story, for error messages that would otherwise swallow
@@ -12,42 +11,30 @@ const causeSummary = (cause: unknown): string => {
   return String(cause);
 };
 
-export class HarnessAgentNotFound extends Schema.TaggedError<HarnessAgentNotFound>()(
-  "HarnessAgentNotFound",
-  { harnessAgentId: HarnessAgentIdSchema },
-) {
-  override get message() {
-    return `Harness agent '${this.harnessAgentId}' is not registered.`;
-  }
-}
-
 export class AgentUnavailable extends Schema.TaggedError<AgentUnavailable>()("AgentUnavailable", {
-  harnessAgentId: HarnessAgentIdSchema,
   reason: Schema.String,
 }) {
   override get message() {
-    return `Harness agent '${this.harnessAgentId}' is unavailable: ${this.reason}`;
+    return `Pi is unavailable: ${this.reason}`;
   }
 }
 
 export class ExecutableNotFound extends Schema.TaggedError<ExecutableNotFound>()(
   "ExecutableNotFound",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     executable: Schema.String,
   },
 ) {
   override get message() {
-    return `Executable '${this.executable}' for '${this.harnessAgentId}' was not found.`;
+    return `Executable '${this.executable}' for Pi was not found.`;
   }
 }
 
 export class AgentOpenError extends Schema.TaggedError<AgentOpenError>()("AgentOpenError", {
-  harnessAgentId: HarnessAgentIdSchema,
   cause: Schema.Defect(),
 }) {
   override get message() {
-    return `Failed to open a '${this.harnessAgentId}' session: ${causeSummary(this.cause)}`;
+    return `Failed to open a Pi session: ${causeSummary(this.cause)}`;
   }
 }
 
@@ -150,7 +137,6 @@ export class PiRpcError extends Schema.TaggedError<PiRpcError>()("PiRpcError", {
 export class AgentProcessExited extends Schema.TaggedError<AgentProcessExited>()(
   "AgentProcessExited",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     code: Schema.optionalKey(Schema.Number),
     signal: Schema.optionalKey(Schema.String),
     stderrTail: Schema.optionalKey(Schema.String),
@@ -159,77 +145,67 @@ export class AgentProcessExited extends Schema.TaggedError<AgentProcessExited>()
   override get message() {
     const detail = this.stderrTail ? ` ${this.stderrTail.trim()}` : "";
     if (this.code !== undefined) {
-      return `The '${this.harnessAgentId}' process exited with code ${this.code}.${detail}`;
+      return `The Pi process exited with code ${this.code}.${detail}`;
     }
     if (this.signal !== undefined) {
-      return `The '${this.harnessAgentId}' process exited from signal ${this.signal}.${detail}`;
+      return `The Pi process exited from signal ${this.signal}.${detail}`;
     }
-    return `The '${this.harnessAgentId}' process exited.${detail}`;
+    return `The Pi process exited.${detail}`;
   }
 }
 
 export class AgentProtocolError extends Schema.TaggedError<AgentProtocolError>()(
   "AgentProtocolError",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     reason: Schema.String,
     cause: Schema.optionalKey(Schema.Defect()),
   },
 ) {
   override get message() {
-    return `The '${this.harnessAgentId}' protocol failed: ${this.reason}`;
+    return `The Pi protocol failed: ${this.reason}`;
   }
 }
 
-// The requested permission mode is a member of pie's vocabulary, but not of
-// this harness's declared subset — a client bug by definition (the subset is
-// closed and fully known to the client), so it maps to INVALID_ARGUMENT at the
-// RPC boundary rather than being silently ignored or half-applied.
 export class PermissionModeUnsupported extends Schema.TaggedError<PermissionModeUnsupported>()(
   "PermissionModeUnsupported",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     mode: Schema.String,
   },
 ) {
   override get message() {
-    return `Harness agent '${this.harnessAgentId}' does not support permission mode '${this.mode}'.`;
+    return `Pi does not support permission mode '${this.mode}'.`;
   }
 }
 
 export class CapabilityProbeFailed extends Schema.TaggedError<CapabilityProbeFailed>()(
   "CapabilityProbeFailed",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     cause: Schema.Defect(),
   },
 ) {
   override get message() {
-    return `Failed to probe '${this.harnessAgentId}' capabilities: ${causeSummary(this.cause)}`;
+    return `Failed to probe Pi capabilities: ${causeSummary(this.cause)}`;
   }
 }
 
 export class CapabilityUnsupported extends Schema.TaggedError<CapabilityUnsupported>()(
   "CapabilityUnsupported",
   {
-    harnessAgentId: HarnessAgentIdSchema,
     capability: Schema.String,
   },
 ) {
   override get message() {
-    return `Harness agent '${this.harnessAgentId}' does not support '${this.capability}'.`;
+    return `Pi does not support '${this.capability}'.`;
   }
 }
 
 export type CreateSessionError =
-  | HarnessAgentNotFound
   | AgentUnavailable
   | ExecutableNotFound
   | PermissionModeUnsupported
   | AgentOpenError;
 
 export type ResumeSessionError =
-  | HarnessAgentNotFound
   | HarnessSessionNotFound
   | SessionNotResumable
   | AgentUnavailable

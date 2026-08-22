@@ -1,5 +1,6 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { createRouterClient } from "@orpc/server";
-import { Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime } from "effect";
 
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
@@ -8,68 +9,57 @@ import {
   HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
   HarnessAgentSessionServiceLayer,
-  HarnessListLayer,
-  HarnessProbeLayer,
   makeHarnessAgentRegistry,
-  type HarnessAgentAdapter,
 } from "../src/harness";
-import { ProjectModuleLayer } from "../src/project";
+import { makePiAdapter, makePiAgent } from "../src/harness/pi";
+import * as Observability from "../src/observability";
+import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { NodePlatformLayer } from "./platform";
+import { Pi } from "../src/rpc/runtime";
 
-/**
- * A router client backed by the full `RpcContext`, with an adapterless session
- * service and project storage under `home`. Tests that need live adapters
- * (rpc-session) build their own layers instead.
- */
-export async function makeRpcTestHarness(
-  home: string,
-  adapters: ReadonlyArray<HarnessAgentAdapter> = [],
-) {
-  // Paths plus the platform services the repositories' JSON store runs on.
-  const paths = Layer.provideMerge(layerPaths(home), NodePlatformLayer);
-  const registryLayer = Layer.sync(HarnessAgentRegistry, () => makeHarnessAgentRegistry(adapters));
-  // EventBusLayer is one reference so publish (manager/service) and subscribe
-  // (RPC) share the single bus instance; same for registryLayer.
+export async function makeRpcTestHarness(home: string) {
+  const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
+  const piLayer = Layer.effect(Pi, makePiAgent()).pipe(Layer.provide(NodeServices.layer));
+  const registryLayer = Layer.effect(
+    HarnessAgentRegistry,
+    Effect.gen(function* () {
+      const pi = yield* Pi;
+      return makeHarnessAgentRegistry(makePiAdapter(pi));
+    }),
+  ).pipe(Layer.provide(piLayer));
+
   const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
     Layer.provide(
       HarnessAgentSessionManagerLayer.pipe(
         Layer.provide(registryLayer),
         Layer.provide(EventBusLayer),
-        Layer.provide(NodePlatformLayer),
+        Layer.provide(NodeServices.layer),
       ),
     ),
     Layer.provide(registryLayer),
     Layer.provide(EventBusLayer),
-    Layer.provide(paths),
-    Layer.provide(NodePlatformLayer),
+    Layer.provide(pathsLayer),
+    Layer.provide(NodeServices.layer),
   );
-  const listLayer = HarnessListLayer.pipe(
-    Layer.provide(registryLayer),
-    Layer.provide(NodePlatformLayer),
+  const projectServiceLayer = ProjectServiceLayer.pipe(
+    Layer.provide(ProjectRepositoryLayer),
+    Layer.provide(pathsLayer),
   );
-  const probeLayer = HarnessProbeLayer.pipe(Layer.provide(registryLayer));
-  const projectLayer = ProjectModuleLayer.pipe(Layer.provide(paths));
-  const runtime = ManagedRuntime.make(
-    Layer.mergeAll(
-      EventBusLayer,
-      harnessSessionLayer,
-      projectLayer,
-      registryLayer,
-      listLayer,
-      probeLayer,
-      FileSystemServiceLayer.pipe(Layer.provide(NodePlatformLayer)),
-      NodePlatformLayer,
-    ),
+
+  const appLayer = Layer.mergeAll(
+    EventBusLayer,
+    harnessSessionLayer,
+    projectServiceLayer,
+    registryLayer,
+    FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    NodeServices.layer,
+    Observability.discard,
   );
-  // Layer construction does file I/O now (the project document loads eagerly),
-  // so the context must be built asynchronously.
+  const runtime = ManagedRuntime.make(appLayer);
   const context: RpcContext = {
     "effect/context": await runtime.runPromise(runtime.contextEffect),
   };
-  return {
-    client: createRouterClient(router, { context }),
-    dispose: () => runtime.dispose(),
-  };
+  const client = createRouterClient(router, { context });
+  return { client, dispose: () => runtime.dispose() };
 }

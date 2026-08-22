@@ -10,7 +10,6 @@ import {
 
 const ref: SessionRef = {
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId: "session-1",
 };
 

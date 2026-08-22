@@ -14,7 +14,6 @@ import { type HarnessAgentSessionShape, makeHarnessAgentSession } from "../../sr
 
 const ref: SessionRef = {
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId: "session-1",
 };
 
@@ -47,10 +46,7 @@ const runtimeFrom = (
   options: { readonly closes?: Ref.Ref<number>; readonly models?: Ref.Ref<Array<string>> } = {},
 ): HarnessAgentRuntime => ({
   sessionId: nativeId,
-  harnessAgentId: "pi",
-  events: streamFromQueueOne(queue).pipe(
-    Stream.map((body) => ({ harnessAgentId: "pi" as const, sessionId: nativeId, body })),
-  ),
+  events: streamFromQueueOne(queue).pipe(Stream.map((body) => ({ sessionId: nativeId, body }))),
   prompt: () => Effect.succeed({ turnId: "turn-1" }),
   setModel: (model) =>
     options.models ? Ref.update(options.models, (seen) => [...seen, model]) : Effect.void,
@@ -220,9 +216,7 @@ it.effect("a failed acquisition holds nothing and lets a later one retry", () =>
     Effect.gen(function* () {
       const session = yield* SessionService;
       const failed = yield* Effect.exit(
-        session.ensureRuntime(
-          Effect.fail(new AgentUnavailable({ harnessAgentId: "pi", reason: "not today" })),
-        ),
+        session.ensureRuntime(Effect.fail(new AgentUnavailable({ reason: "not today" }))),
       );
       assert.equal(failed._tag, "Failure");
       // Still observable, still holding nothing …

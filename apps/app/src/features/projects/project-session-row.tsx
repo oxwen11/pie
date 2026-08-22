@@ -24,7 +24,7 @@ export function ProjectSessionRow({
           navigate({
             to: "/session/$sessionId",
             params: { sessionId: session.sessionId },
-            search: { projectId: session.projectId, harness: session.harnessAgentId },
+            search: { projectId: session.projectId },
           })
         }
       >

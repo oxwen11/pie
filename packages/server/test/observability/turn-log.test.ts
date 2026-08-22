@@ -10,7 +10,6 @@ import { structured, type LogRecord } from "../log-record";
 
 const ref: SessionRef = {
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId: "session-1",
 };
 

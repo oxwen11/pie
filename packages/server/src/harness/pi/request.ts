@@ -45,7 +45,6 @@ function toQuestion(request: PiUiRequest): AgentRequestQuestion {
 /** Build a `question` AgentRequest (pi arm) from a blocking extension-UI request. */
 export function buildUiRequest(request: PiUiRequest): PiQuestionRequest {
   return {
-    harnessAgentId: "pi",
     type: "question",
     id: request.id,
     questions: [toQuestion(request)],

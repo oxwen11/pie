@@ -7,7 +7,6 @@ import type { ChatTransportEvent } from "./chat-transport-port";
 
 const ref = {
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId: "session-1",
 } as const;
 

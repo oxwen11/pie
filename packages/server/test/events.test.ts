@@ -8,7 +8,6 @@ import { EventBus, EventBusLayer } from "../src/index";
 
 const ref = (sessionId: string): SessionRef => ({
   projectId: "p1",
-  harnessAgentId: "pi",
   sessionId,
 });
 

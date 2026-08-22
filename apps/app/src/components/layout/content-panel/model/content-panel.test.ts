@@ -21,7 +21,6 @@ const file = definePanelFamily({
 
 const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "11111111-1111-4111-8111-111111111111",
-  harnessAgentId: "pi",
   sessionId: "session-1",
   ...overrides,
 });

@@ -51,7 +51,6 @@ export function RenameSessionDialog({
       orpcQueryUtils.session.rename.call({
         ref: {
           projectId: session.projectId,
-          harnessAgentId: session.harnessAgentId,
           sessionId: session.sessionId,
         },
         title: variables.title,
@@ -59,7 +58,6 @@ export function RenameSessionDialog({
     onSuccess: (_result, variables) => {
       const ref = {
         projectId: session.projectId,
-        harnessAgentId: session.harnessAgentId,
         sessionId: session.sessionId,
       };
       reconcileSessionRenameSuccess(

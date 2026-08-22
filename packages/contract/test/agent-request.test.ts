@@ -10,7 +10,6 @@ describe("AgentRequest", () => {
     const req = {
       type: "tool",
       id: "r1",
-      harnessAgentId: "pi",
       toolName: "Bash",
       input: { command: "ls" },
       actions: [{ id: "allow", label: "Allow", behavior: "allow" }],

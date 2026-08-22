@@ -1,5 +1,4 @@
 import type {
-  HarnessAgentId,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEventBody,
@@ -55,7 +54,6 @@ export type HarnessAgentSessionManagerShape = {
    * by the same seeding path.
    */
   readonly open: (
-    harnessAgentId: HarnessAgentId,
     input: CreateSessionInput,
     config: SessionConfig,
     ref: SessionRef,
@@ -213,8 +211,8 @@ export const makeHarnessAgentSessionManager = (
         }),
       );
 
-    const checkAvailable = (harnessAgentId: HarnessAgentId) =>
-      registry.get(harnessAgentId).pipe(
+    const checkAvailable = () =>
+      Effect.succeed(registry.adapter).pipe(
         Effect.tap((adapter) =>
           adapter.checkAvailability.pipe(
             Effect.flatMap((availability) =>
@@ -222,7 +220,6 @@ export const makeHarnessAgentSessionManager = (
                 ? Effect.void
                 : Effect.fail(
                     new AgentUnavailable({
-                      harnessAgentId,
                       reason: availability.reason ?? "Unavailable",
                     }),
                   ),
@@ -244,18 +241,15 @@ export const makeHarnessAgentSessionManager = (
      * id is attached after the adapter answers because it does not exist before
      * then — it is what a `claude --resume` command would take.
      */
-    const acquireOpen = (
-      harnessAgentId: HarnessAgentId,
-      input: CreateSessionInput,
-    ): AcquireRuntime =>
-      checkAvailable(harnessAgentId).pipe(
+    const acquireOpen = (input: CreateSessionInput): AcquireRuntime =>
+      checkAvailable().pipe(
         Effect.flatMap((adapter) => adapter.open(input)),
         Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
         Effect.withSpan("harness.open"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
-      checkAvailable(input.harnessAgentId).pipe(
+      checkAvailable().pipe(
         Effect.flatMap((adapter) => adapter.resume({ sessionId: input.sessionId, cwd: input.cwd })),
         Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
         Effect.withSpan("harness.resume"),
@@ -325,7 +319,7 @@ export const makeHarnessAgentSessionManager = (
     );
 
     return {
-      open: (harnessAgentId, input, config, ref) =>
+      open: (input, config, ref) =>
         // The create-time choice becomes the session's config before anything
         // is opened, so seeding on acquisition is the only path that applies
         // it — including on every runtime the session takes after this one.
@@ -334,7 +328,7 @@ export const makeHarnessAgentSessionManager = (
             Effect.flatMap((session) => session.setConfig(config)),
             // Nothing is running yet, so recording the choice cannot fail.
             Effect.orDie,
-            Effect.andThen(acquireVia(ref, acquireOpen(harnessAgentId, input))),
+            Effect.andThen(acquireVia(ref, acquireOpen(input))),
           )
           .pipe(
             // `AcquireRuntime` carries the resume union; the two members only a
@@ -343,7 +337,7 @@ export const makeHarnessAgentSessionManager = (
             Effect.mapError(
               (error): CreateSessionError =>
                 error instanceof SessionNotResumable || error instanceof HarnessSessionNotFound
-                  ? new AgentOpenError({ harnessAgentId, cause: error })
+                  ? new AgentOpenError({ cause: error })
                   : error,
             ),
           ),

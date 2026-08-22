@@ -28,7 +28,6 @@ export function SessionActionsMenu({
       orpcQueryUtils.session.archive.call({
         ref: {
           projectId: session.projectId,
-          harnessAgentId: session.harnessAgentId,
           sessionId: session.sessionId,
         },
         archived,

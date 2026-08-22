@@ -13,8 +13,6 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
 import { MessageView } from "./transcript/message-view";
-import { TranscriptRenderProvider } from "./transcript/transcript-render-provider";
-
 // What an empty transcript means, in one place: nothing until the settled
 // history floor has landed, so an unread session shows the read rather than a
 // verdict about the conversation. "settled" renders nothing — a session with no
@@ -79,11 +77,7 @@ function ChatTranscriptView({
 // message updates re-render only the transcript, never its siblings (the
 // composer subscribes narrowly on its own).
 export function ChatTranscript() {
-  const { store, harnessAgentId, respondToRequest } = useChatSession();
+  const { store, respondToRequest } = useChatSession();
   const snapshot = useStore(store);
-  return (
-    <TranscriptRenderProvider harnessAgentId={harnessAgentId}>
-      <ChatTranscriptView snapshot={snapshot} onRespond={respondToRequest} />
-    </TranscriptRenderProvider>
-  );
+  return <ChatTranscriptView snapshot={snapshot} onRespond={respondToRequest} />;
 }

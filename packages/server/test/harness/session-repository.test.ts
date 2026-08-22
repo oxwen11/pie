@@ -28,7 +28,6 @@ const makeLayer = (home: string) =>
 const meta = (sessionId: string, projectId: string, harnessSessionId: string): Session => ({
   sessionId,
   projectId,
-  harnessAgentId: "pi",
   harnessSessionId,
   createdAt: "2026-07-16T00:00:00.000Z",
 });

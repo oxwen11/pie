@@ -110,11 +110,7 @@ const seedConfig = (
     if (config.permissionMode) {
       yield* runtime
         .setPermissionMode(config.permissionMode)
-        .pipe(
-          Effect.mapError(
-            (cause) => new AgentOpenError({ harnessAgentId: runtime.harnessAgentId, cause }),
-          ),
-        );
+        .pipe(Effect.mapError((cause) => new AgentOpenError({ cause })));
     }
     if (config.model) {
       yield* runtime

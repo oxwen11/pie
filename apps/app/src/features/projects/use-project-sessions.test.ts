@@ -30,7 +30,6 @@ const session = (
   archived = false,
 ): SessionSummary => ({
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId,
   ...(title === undefined ? {} : { title }),
   archived,
@@ -43,7 +42,6 @@ let host: HTMLDivElement | undefined;
 
 const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId,
   ...overrides,
 });

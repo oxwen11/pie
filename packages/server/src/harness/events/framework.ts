@@ -1,10 +1,4 @@
-import {
-  AgentRequestSchema,
-  HarnessAgentIdSchema,
-  TokenUsageSchema,
-  TurnErrorSchema,
-} from "@pie/contract";
-import type { HarnessAgentId } from "@pie/contract";
+import { AgentRequestSchema, TokenUsageSchema, TurnErrorSchema } from "@pie/contract";
 import type { UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
@@ -69,7 +63,7 @@ export const SessionCrashed = defineEvent({
 });
 export const SessionCreated = defineEvent({
   type: "session.created",
-  schema: { sessionId: Schema.String, harnessAgentId: HarnessAgentIdSchema },
+  schema: { sessionId: Schema.String },
 });
 export const SessionUpdated = defineEvent({
   type: "session.updated",
@@ -132,7 +126,6 @@ export type GlobalEvent = EventValue<(typeof GlobalEventDefs)[number]>;
 
 export type SessionEnvelopeBody = UIMessageChunk | SessionEvent;
 export type SessionEnvelope = {
-  readonly harnessAgentId: HarnessAgentId;
   readonly sessionId: string;
   readonly seq: number;
   readonly body: SessionEnvelopeBody;

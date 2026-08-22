@@ -13,8 +13,6 @@ import {
   HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
   HarnessAgentSessionServiceLayer,
-  HarnessListLayer,
-  HarnessProbeLayer,
   makeHarnessAgentRegistry,
 } from "../harness";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
@@ -43,24 +41,10 @@ export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent(piAgentOpti
 const ProvidersLayer = PiLayer;
 
 /**
- * Which CLI is installed, and whether it is new enough, is fixed for the life
- * of the process — but `harness.list` is awaited before first paint and every
- * `session.create` asks again. Cache it here, at the one place that builds the
- * registry, so the answer costs one spawn per server rather than one per call.
- *
- * The trade is that a CLI installed while the server is running is not noticed
- * until it restarts.
+ * Whether Pi is installed is fixed for the life of the process — but every
+ * `session.create` asks again. Cache it here so the answer costs one spawn per
+ * server rather than one per call.
  */
-// The `uninterruptible` around the CALL is load-bearing: `Effect.cached` runs
-// the computation on the first caller's fiber and stores whatever exit it
-// observes — forever, including an interruption. A client that disconnects
-// mid-`harness.list` interrupts that fiber, and the poisoned cache then
-// replays the interruption to every later caller: the endpoint 500s until the
-// server restarts. Wrapping the computation alone is not enough (the pending
-// interrupt lands exactly when interruptibility is restored, before the cache
-// stores the exit), so the guard covers the whole cached call. The check is
-// bounded (one `--version` spawn with its own timeout), so riding out the
-// interruption is safe.
 export const cacheAvailability = (
   adapter: HarnessAgentAdapter,
 ): Effect.Effect<HarnessAgentAdapter, never, FileSystem.FileSystem> =>
@@ -73,27 +57,14 @@ const RegistryLayer = Layer.effect(
   HarnessAgentRegistry,
   Effect.gen(function* () {
     const pi = yield* Pi;
-    const adapters = yield* Effect.forEach([makePiAdapter(pi, piAgentOptions)], cacheAvailability);
-    return makeHarnessAgentRegistry(adapters);
+    const adapter = yield* cacheAvailability(makePiAdapter(pi, piAgentOptions));
+    return makeHarnessAgentRegistry(adapter);
   }),
 ).pipe(Layer.provide(ProvidersLayer), Layer.provide(PlatformLayer));
-
-// Both harness routes read the same registry instance. It matters most for the
-// probe: one cache, shared by every connecting client, so N tabs on the same
-// directory still cost one CLI spawn.
-const HarnessListProvided = HarnessListLayer.pipe(
-  Layer.provide(RegistryLayer),
-  Layer.provide(PlatformLayer),
-);
-const HarnessProbeProvided = HarnessProbeLayer.pipe(Layer.provide(RegistryLayer));
 
 // The session stack: the manager owns all live state (instances + projections,
 // publishing wire events onto the bus); the outward façade on top does the
 // identity translation, metadata persistence, and collection events.
-// EventBusLayer is ONE const reference everywhere below — Effect memoizes
-// layers by reference, so publish (manager/service) and subscribe (RPC) share
-// the single bus instance. A second reference (or Layer.fresh) would split the
-// bus and silently drop events.
 const HarnessSessionManagerProvided = HarnessAgentSessionManagerLayer.pipe(
   Layer.provide(RegistryLayer),
   Layer.provide(EventBusLayer),
@@ -113,19 +84,12 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
-// RegistryLayer is merged in as well as provided into the session stack;
-// Effect memoizes it by reference, so both see the one registry instance while
-// the harness route can resolve capabilities directly off it.
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   HarnessSessionServiceProvided,
   ProjectServiceProvided,
   RegistryLayer,
-  HarnessListProvided,
-  HarnessProbeProvided,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   PlatformLayer,
-  // For the HTTP request app: `HttpStaticServer` needs it to turn a file into a
-  // response. Sealed by the vendor layer, hence no `Layer.provide` here.
   NodeHttpPlatform.layer,
 );
