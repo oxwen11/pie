@@ -11,12 +11,10 @@ import type { CreateSessionInput, HarnessAgentRuntime } from "./adapter";
 import type { HarnessAgentAdapter } from "./adapter";
 import {
   AgentOpenError,
-  type AgentOperationError,
   AgentUnavailable,
   type CreateSessionError,
   HarnessSessionNotFound,
   type ResumeSessionError,
-  SessionClosed,
   SessionNotResumable,
 } from "./errors";
 import { PiAdapter } from "./pi-adapter";
@@ -26,7 +24,7 @@ import {
   makeHarnessAgentSession,
 } from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
-import type { ResumeManagedSessionInput, SessionConfig } from "./session-io";
+import type { ResumeManagedSessionInput } from "./session-io";
 
 /**
  * The sole owner of live session state: one {@link HarnessAgentSessionShape}
@@ -49,13 +47,10 @@ export type HarnessAgentSessionManagerShape = {
   /**
    * Open a fresh native session via the adapter and take ownership of it. The
    * one eager path: a session that does not exist yet has no native id to
-   * resume by, so creating it *is* opening it. `config` becomes the session's
-   * config, so the create-time choice reaches this runtime and every later one
-   * by the same seeding path.
+   * resume by, so creating it *is* opening it.
    */
   readonly open: (
     input: CreateSessionInput,
-    config: SessionConfig,
     ref: SessionRef,
   ) => Effect.Effect<HarnessAgentRuntime, CreateSessionError>;
   /**
@@ -77,16 +72,6 @@ export type HarnessAgentSessionManagerShape = {
   /** The same lookup as {@link get}, for callers that have something else to do
    * when nothing is running rather than an error to raise. */
   readonly peek: (ref: SessionRef) => Effect.Effect<HarnessAgentRuntime | undefined>;
-  /**
-   * Record what a session's config should be, and push it to its runtime if one
-   * is live. A write, so it materializes the session: choosing a model for a
-   * session that isn't running is a legitimate thing to do, and every runtime
-   * the session acquires afterwards is seeded with the choice.
-   */
-  readonly setConfig: (
-    ref: SessionRef,
-    patch: SessionConfig,
-  ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
   /**
    * Close and forget a session — runtime and session state alike; idempotent.
    * This is the only path that discards a crashed session (a crash alone
@@ -213,8 +198,8 @@ export const makeHarnessAgentSessionManager = (
 
     const checkAvailable = () =>
       Effect.succeed(adapter).pipe(
-        Effect.tap((adapter) =>
-          adapter.checkAvailability.pipe(
+        Effect.tap((availAdapter) =>
+          availAdapter.checkAvailability.pipe(
             Effect.flatMap((availability) =>
               availability.available
                 ? Effect.void
@@ -321,28 +306,18 @@ export const makeHarnessAgentSessionManager = (
     );
 
     return {
-      open: (input, config, ref) =>
-        // The create-time choice becomes the session's config before anything
-        // is opened, so seeding on acquisition is the only path that applies
-        // it — including on every runtime the session takes after this one.
-        sessionFor(ref)
-          .pipe(
-            Effect.flatMap((session) => session.setConfig(config)),
-            // Nothing is running yet, so recording the choice cannot fail.
-            Effect.orDie,
-            Effect.andThen(acquireVia(ref, acquireOpen(input))),
-          )
-          .pipe(
-            // `AcquireRuntime` carries the resume union; the two members only a
-            // resume can raise are unreachable here, so a sighting is an adapter
-            // misbehaving and folds into AgentOpenError.
-            Effect.mapError(
-              (error): CreateSessionError =>
-                error instanceof SessionNotResumable || error instanceof HarnessSessionNotFound
-                  ? new AgentOpenError({ cause: error })
-                  : error,
-            ),
+      open: (input, ref) =>
+        acquireVia(ref, acquireOpen(input)).pipe(
+          // `AcquireRuntime` carries the resume union; the two members only a
+          // resume can raise are unreachable here, so a sighting is an adapter
+          // misbehaving and folds into AgentOpenError.
+          Effect.mapError(
+            (error): CreateSessionError =>
+              error instanceof SessionNotResumable || error instanceof HarnessSessionNotFound
+                ? new AgentOpenError({ cause: error })
+                : error,
           ),
+        ),
       ensureRuntime: (input, ref) => acquireVia(ref, acquireResume(input)),
       get: (ref) =>
         peek(ref).pipe(
@@ -353,8 +328,6 @@ export const makeHarnessAgentSessionManager = (
           ),
         ),
       peek,
-      setConfig: (ref, patch) =>
-        sessionFor(ref).pipe(Effect.flatMap((session) => session.setConfig(patch))),
       close,
       status: (ref) => withSession(ref, (session) => session.status, toStatus(initialSessionState)),
       snapshot: (ref) =>

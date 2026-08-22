@@ -1,8 +1,6 @@
 import type {
   AgentResponse,
-  PermissionMode,
   PromptInput,
-  ReasoningEffort,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
@@ -31,15 +29,9 @@ import type {
   SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import {
-  AgentRequestUnavailable,
-  CapabilityUnsupported,
-  PermissionModeUnsupported,
-  SessionNotResumable,
-} from "./errors";
+import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
 import { PiAdapter } from "./pi-adapter";
 import { inSession } from "./session-identity";
-import type { SessionConfig } from "./session-io";
 import type { HarnessAgentSessionManagerShape } from "./session-manager";
 import { HarnessAgentSessionManager } from "./session-manager";
 import {
@@ -68,7 +60,6 @@ export type HarnessAgentSessionServiceShape = {
   readonly create: (
     projectId: string,
     cwd: string,
-    config?: SessionConfig,
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -120,25 +111,6 @@ export type HarnessAgentSessionServiceShape = {
   readonly interrupt: (
     ref: SessionRef,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setModel: (
-    ref: SessionRef,
-    model: string,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setReasoningEffort: (
-    ref: SessionRef,
-    reasoningEffort: ReasoningEffort,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setPermissionMode: (
-    ref: SessionRef,
-    permissionMode: PermissionMode,
-  ) => Effect.Effect<
-    void,
-    | SessionNotFound
-    | StoreReadError
-    | PermissionModeUnsupported
-    | SessionClosed
-    | AgentOperationError
-  >;
   readonly respondToAgentRequest: (
     ref: SessionRef,
     requestId: string,
@@ -192,12 +164,7 @@ export const makeHarnessAgentSessionService = (deps: {
     return lock.withPermit(effect);
   };
 
-  const checkPermissionMode = (mode: PermissionMode | undefined) =>
-    mode === undefined
-      ? Effect.void
-      : adapter.permissionModes.includes(mode)
-        ? Effect.void
-        : Effect.fail(new PermissionModeUnsupported({ mode }));
+  const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
 
   const readHistory = (
     ref: SessionRef,
@@ -225,8 +192,6 @@ export const makeHarnessAgentSessionService = (deps: {
       );
   };
 
-  const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
-
   const resolveAgentSessionId = (ref: SessionRef) =>
     readMetadata(ref).pipe(Effect.map((metadata) => metadata.agentSessionId));
 
@@ -252,12 +217,11 @@ export const makeHarnessAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd, config) =>
-      checkPermissionMode(config?.permissionMode).pipe(
-        Effect.andThen(newSessionId),
+    create: (projectId, cwd) =>
+      newSessionId.pipe(
         Effect.flatMap((sessionId) => {
           const ref: SessionRef = { projectId, sessionId };
-          return manager.open({ cwd }, config ?? {}, ref).pipe(
+          return manager.open({ cwd }, ref).pipe(
             Effect.flatMap((session) => {
               const metadata: Session = {
                 sessionId,
@@ -448,22 +412,6 @@ export const makeHarnessAgentSessionService = (deps: {
       readMetadata(ref).pipe(
         Effect.andThen(manager.peek(ref)),
         Effect.flatMap((runtime) => runtime?.interrupt ?? Effect.void),
-        inSession(ref),
-      ),
-
-    setModel: (ref, model) =>
-      readMetadata(ref).pipe(Effect.andThen(manager.setConfig(ref, { model })), inSession(ref)),
-
-    setReasoningEffort: (ref, reasoningEffort) =>
-      readMetadata(ref).pipe(
-        Effect.andThen(manager.setConfig(ref, { reasoningEffort })),
-        inSession(ref),
-      ),
-
-    setPermissionMode: (ref, permissionMode) =>
-      readMetadata(ref).pipe(
-        Effect.andThen(checkPermissionMode(permissionMode)),
-        Effect.andThen(manager.setConfig(ref, { permissionMode })),
         inSession(ref),
       ),
 

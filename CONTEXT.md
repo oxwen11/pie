@@ -14,7 +14,7 @@ _Avoid_: bare sessionId as a wire identity or client-state key; harnessAgentId (
 
 **Agent session id** (`agentSessionId`):
 The Pi-native session identity held in the session's metadata. Internal plumbing for resume/history — never exposed as wire identity. Persisted in `storage/sessions/<projectId>/<sessionId>.json`.
-_Avoid_: harnessSessionId (legacy field name), native id
+_Avoid_: harnessSessionId (removed — no migration), native id
 
 **Attach**:
 A client connecting to a session's live event stream — `session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.

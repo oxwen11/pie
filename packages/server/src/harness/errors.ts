@@ -166,28 +166,6 @@ export class AgentProtocolError extends Schema.TaggedError<AgentProtocolError>()
   }
 }
 
-export class PermissionModeUnsupported extends Schema.TaggedError<PermissionModeUnsupported>()(
-  "PermissionModeUnsupported",
-  {
-    mode: Schema.String,
-  },
-) {
-  override get message() {
-    return `Pi does not support permission mode '${this.mode}'.`;
-  }
-}
-
-export class CapabilityProbeFailed extends Schema.TaggedError<CapabilityProbeFailed>()(
-  "CapabilityProbeFailed",
-  {
-    cause: Schema.Defect(),
-  },
-) {
-  override get message() {
-    return `Failed to probe Pi capabilities: ${causeSummary(this.cause)}`;
-  }
-}
-
 export class CapabilityUnsupported extends Schema.TaggedError<CapabilityUnsupported>()(
   "CapabilityUnsupported",
   {
@@ -199,11 +177,7 @@ export class CapabilityUnsupported extends Schema.TaggedError<CapabilityUnsuppor
   }
 }
 
-export type CreateSessionError =
-  | AgentUnavailable
-  | ExecutableNotFound
-  | PermissionModeUnsupported
-  | AgentOpenError;
+export type CreateSessionError = AgentUnavailable | ExecutableNotFound | AgentOpenError;
 
 export type ResumeSessionError =
   | HarnessSessionNotFound

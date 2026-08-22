@@ -23,7 +23,6 @@ export interface Session {
   readonly createdAt: string;
   /**
    * Working directory. Our input at `create` (currently the project path).
-   * Optional for legacy records; callers fall back to the project path.
    */
   readonly cwd?: string;
   /** Display title, set from the session's first prompt. */

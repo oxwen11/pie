@@ -73,57 +73,6 @@ describe("SessionRepository", () => {
     expect(raw.data).not.toHaveProperty("version");
   });
 
-  it("reads a pre-envelope record and adopts it into envelope form", async () => {
-    const file = path.join(home, "storage", "sessions", "proj-a", "sess-1.json");
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    // Pre-envelope records inline the version, from before the envelope
-    // existed to hold it — adoption lifts it out rather than keeping both.
-    await fs.writeFile(
-      file,
-      JSON.stringify({ version: 1, ...meta("sess-1", "proj-a", "claude-uuid-1") }),
-      "utf8",
-    );
-
-    const read = await run(
-      Effect.gen(function* () {
-        const repo = yield* SessionRepository;
-        return yield* repo.read("proj-a", "sess-1");
-      }),
-    );
-    expect(read.agentSessionId).toBe("claude-uuid-1");
-
-    const raw = JSON.parse(await fs.readFile(file, "utf8"));
-    expect(raw.version).toBe(1);
-    expect(raw.data.sessionId).toBe("sess-1");
-    expect(raw.data).not.toHaveProperty("version");
-  });
-
-  it("reads harnessSessionId metadata and maps it to agentSessionId", async () => {
-    const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(
-      file,
-      JSON.stringify({
-        version: 1,
-        data: {
-          sessionId: "sess-legacy",
-          projectId: "proj-a",
-          harnessSessionId: "pi-native-1",
-          createdAt: "2026-07-16T00:00:00.000Z",
-        },
-      }),
-      "utf8",
-    );
-
-    const read = await run(
-      Effect.gen(function* () {
-        const repo = yield* SessionRepository;
-        return yield* repo.read("proj-a", "sess-legacy");
-      }),
-    );
-    expect(read.agentSessionId).toBe("pi-native-1");
-  });
-
   it("lists all sessions of a project", async () => {
     const listed = await run(
       Effect.gen(function* () {

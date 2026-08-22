@@ -16,9 +16,6 @@ import {
   SessionRefSchema,
   type SessionRuntimeSnapshot,
   SessionStatusSchema,
-  SetSessionReasoningEffortInputSchema,
-  SetSessionModelInputSchema,
-  SetSessionPermissionModeInputSchema,
   SubscribeInputSchema,
   type SubscribeStreamEvent,
   toStandardSchema,
@@ -60,10 +57,6 @@ export const sessionContract = {
     .input(toStandardSchema(PromptInputSchema))
     .output(toStandardSchema(PromptOutputSchema)),
   interrupt: base.input(toStandardSchema(RefInputSchema)),
-  // Session-scoped config, changed via dedicated calls — never on a prompt turn.
-  setModel: base.input(toStandardSchema(SetSessionModelInputSchema)),
-  setReasoningEffort: base.input(toStandardSchema(SetSessionReasoningEffortInputSchema)),
-  setPermissionMode: base.input(toStandardSchema(SetSessionPermissionModeInputSchema)),
   respondToAgentRequest: base.input(toStandardSchema(RespondToAgentRequestInputSchema)),
   getStatus: base
     .input(toStandardSchema(RefInputSchema))

@@ -1,7 +1,5 @@
 import type {
-  PermissionMode,
   PromptPart,
-  ReasoningEffort,
   SessionMessageChunkEvent,
   SessionPhase,
   SessionRef,
@@ -545,20 +543,6 @@ export class Chat {
       this.#setStatus("error");
       throw promptError;
     }
-  };
-
-  // Model / reasoningEffort / permission are session config, changed via their
-  // own calls — never bundled into a prompt turn.
-  setModel = async (providerId: string, modelId: string): Promise<void> => {
-    await this.#transport.setModel(providerId, modelId);
-  };
-
-  setReasoningEffort = async (reasoningEffort: ReasoningEffort): Promise<void> => {
-    await this.#transport.setReasoningEffort(reasoningEffort);
-  };
-
-  setPermissionMode = async (mode: PermissionMode): Promise<void> => {
-    await this.#transport.setPermissionMode(mode);
   };
 
   respondToAgentRequest = async (requestId: string, response: AgentResponse): Promise<void> => {

@@ -1,8 +1,6 @@
 import type {
   AgentRequest,
-  PermissionMode,
   PromptPart,
-  ReasoningEffort,
   SessionMessageChunkEvent,
   SessionPhase,
   SessionRuntimeSnapshot,
@@ -58,9 +56,6 @@ class FakeTransport implements ChatSessionTransport {
   respondToAgentRequest = async (requestId: string, response: AgentResponse) => {
     this.responded.push({ requestId, response });
   };
-  setModel = async (_providerId: string, _modelId: string) => {};
-  setReasoningEffort = async (_effort: ReasoningEffort) => {};
-  setPermissionMode = async (_mode: PermissionMode) => {};
 }
 
 const makeChat = (options?: { onTerminated?: () => void }) => {

@@ -87,9 +87,6 @@ const makeFixture = Effect.gen(function* () {
             });
             return { turnId: "turn-1" };
           }),
-        setModel: () => Effect.void,
-        setReasoningEffort: () => Effect.void,
-        setPermissionMode: () => Effect.void,
         interrupt: Effect.void,
         respondToAgentRequest: () => Effect.void,
         getCapabilities: Effect.succeed({
@@ -104,7 +101,6 @@ const makeFixture = Effect.gen(function* () {
   const adapter = {
     descriptor: { name: "Pi" },
     checkAvailability: Effect.succeed({ available: true }),
-    permissionModes: [],
     open: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
       Ref.update(resumeCalls, (current) => current + 1).pipe(
@@ -140,7 +136,7 @@ it.effect("drains the native stream into the session and tears down on close", (
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    const session = yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
+    const session = yield* fixture.manager.open({ cwd: "/tmp" }, ref);
 
     const receipt = yield* session.prompt({ parts: [{ type: "text", text: "hello" }] });
     // The manager's drain folds the emitted turn into the session: 3 events, seq 3.
@@ -196,7 +192,7 @@ it.effect("waits for an in-flight close before reopening the same session id", (
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    const session = yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
+    const session = yield* fixture.manager.open({ cwd: "/tmp" }, ref);
     yield* Ref.set(fixture.holdClose, true);
     const close = yield* Effect.forkChild(fixture.manager.close(ref));
     yield* Effect.eventually(
@@ -260,7 +256,7 @@ it.effect("shares one idempotent close operation", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
+    yield* fixture.manager.open({ cwd: "/tmp" }, ref);
     const first = yield* Effect.forkChild(fixture.manager.close(ref));
     const second = yield* Effect.forkChild(fixture.manager.close(ref));
 
@@ -274,7 +270,7 @@ it.effect("a crash releases the runtime but keeps the session queryable", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
+    yield* fixture.manager.open({ cwd: "/tmp" }, ref);
 
     yield* Deferred.succeed(fixture.crashGate, undefined);
     // The crash closes the native runtime (onCrash) …

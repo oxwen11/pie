@@ -1,7 +1,5 @@
 import type {
-  PermissionMode,
   PromptPart,
-  ReasoningEffort,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
@@ -77,13 +75,6 @@ export interface ChatSessionTransport {
    * outcome, not a failure, from the responder's point of view).
    */
   respondToAgentRequest(requestId: string, response: AgentResponse): Promise<void>;
-  // Session-scoped config setters — separate session calls, never bundled into
-  // a prompt turn. The transport already knows its SessionRef. The model is
-  // the flat providerId/modelId pair — always together, modelId alone is only
-  // unique within its provider.
-  setModel(providerId: string, modelId: string): Promise<void>;
-  setReasoningEffort(reasoningEffort: ReasoningEffort): Promise<void>;
-  setPermissionMode(mode: PermissionMode): Promise<void>;
 }
 
 // Binds a SessionRef to a transport. ChatManager holds one of these instead of

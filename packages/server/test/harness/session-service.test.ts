@@ -120,9 +120,6 @@ describe("HarnessAgentSessionService", () => {
             prompt: opts.promptFails
               ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
               : () => Effect.succeed({ turnId: "turn-1" }),
-            setModel: () => Effect.void,
-            setReasoningEffort: () => Effect.void,
-            setPermissionMode: () => Effect.void,
             interrupt: Effect.void,
             respondToAgentRequest: () => Effect.void,
             getCapabilities: Effect.succeed({
@@ -148,7 +145,6 @@ describe("HarnessAgentSessionService", () => {
                 ? { available: false, reason: opts.unavailable }
                 : { available: true },
             ),
-            permissionModes: [],
             open: ({ cwd }) =>
               // An adapter sees `cwd` and never a `SessionRef` — this line is
               // the probe for whether the identity reaches it anyway.

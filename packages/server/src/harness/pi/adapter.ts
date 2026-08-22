@@ -193,11 +193,6 @@ const makeRuntime = (
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
-      // Pi has neither a model switch, an reasoningEffort switch, nor a permission
-      // protocol; accept the config calls and no-op rather than fail the caller.
-      setModel: () => Effect.void,
-      setReasoningEffort: () => Effect.void,
-      setPermissionMode: () => Effect.void,
       interrupt,
       respondToAgentRequest: (requestId, response) =>
         agent.session.respondPermission(sessionId, requestId, response).pipe(
@@ -233,10 +228,6 @@ export const makePiAdapter = (
   options: { readonly executablePath?: string } = {},
 ): HarnessAgentAdapter => ({
   descriptor: { name: "Pi" },
-  // Pi has neither a permission protocol nor a model catalogue — declaring
-  // nothing (empty subset, no probe) is what makes the UI render no config
-  // controls for it.
-  permissionModes: [],
   checkAvailability: findExecutable(options.executablePath ?? "pi").pipe(
     Effect.map((found) =>
       found ? { available: true } : { available: false, reason: "Pi was not found on PATH." },

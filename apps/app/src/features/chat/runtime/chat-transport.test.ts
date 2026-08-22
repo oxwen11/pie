@@ -75,9 +75,6 @@ const throwingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
 const baseSession = {
   getSnapshot: async () => snapshot,
   prompt: unexpectedCall,
-  setModel: unexpectedCall,
-  setReasoningEffort: unexpectedCall,
-  setPermissionMode: unexpectedCall,
   getMessages: unexpectedCall,
   respondToAgentRequest: unexpectedCall,
   subscribe: unexpectedCall,

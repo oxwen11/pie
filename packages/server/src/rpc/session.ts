@@ -31,8 +31,6 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
         AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        PermissionModeUnsupported: (e) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: e.message })),
         AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
     );
@@ -176,46 +174,6 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
-  }),
-  setModel: orpc.setModel.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
-    yield* sessions.setModel(input.ref, input.modelId).pipe(
-      Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
-  }),
-  setReasoningEffort: orpc.setReasoningEffort.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
-    yield* sessions.setReasoningEffort(input.ref, input.reasoningEffort).pipe(
-      Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
-  }),
-  setPermissionMode: orpc.setPermissionMode.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
-    yield* sessions.setPermissionMode(input.ref, input.permissionMode).pipe(
-      Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        // Our closed vocabulary, but outside this harness's declared subset —
-        // a client bug (the subset is fully known client-side), never ignored.
-        PermissionModeUnsupported: (e) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: e.message })),
         SessionClosed: (e) =>
           Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),

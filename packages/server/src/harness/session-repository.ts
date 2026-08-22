@@ -4,24 +4,19 @@ import { Effect, Option, Schema } from "effect";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
-const SessionFields = {
+const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
+  agentSessionId: Schema.String,
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
   historyAvailable: Schema.optionalKey(Schema.Boolean),
-};
-
-const SessionWireSchema = Schema.Struct({
-  ...SessionFields,
-  agentSessionId: Schema.optionalKey(Schema.String),
-  harnessSessionId: Schema.optionalKey(Schema.String),
 });
 
-const omitUndefinedOptionals = (metadata: Session): typeof SessionWireSchema.Type => ({
+const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   sessionId: metadata.sessionId,
   projectId: metadata.projectId,
   agentSessionId: metadata.agentSessionId,
@@ -33,18 +28,6 @@ const omitUndefinedOptionals = (metadata: Session): typeof SessionWireSchema.Typ
   ...(metadata.historyAvailable !== undefined
     ? { historyAvailable: metadata.historyAvailable }
     : {}),
-});
-
-const toSession = (wire: typeof SessionWireSchema.Type): Session => ({
-  sessionId: wire.sessionId,
-  projectId: wire.projectId,
-  agentSessionId: wire.agentSessionId ?? wire.harnessSessionId ?? "",
-  createdAt: wire.createdAt,
-  ...(wire.cwd !== undefined ? { cwd: wire.cwd } : {}),
-  ...(wire.title !== undefined ? { title: wire.title } : {}),
-  ...(wire.archived !== undefined ? { archived: wire.archived } : {}),
-  ...(wire.updatedAt !== undefined ? { updatedAt: wire.updatedAt } : {}),
-  ...(wire.historyAvailable !== undefined ? { historyAvailable: wire.historyAvailable } : {}),
 });
 
 /**
@@ -86,11 +69,7 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
   Effect.gen(function* () {
     const sessions = yield* makeJsonCollection({
       dir: sessionsDir,
-      schema: SessionWireSchema,
-      legacy: {
-        schema: SessionWireSchema,
-        migrate: (session) => toSession(session),
-      },
+      schema: SessionSchema,
     });
     const entryId = (projectId: string, sessionId: string) => `${projectId}/${sessionId}`;
     const asReadError = (error: JsonStoreLoadError) =>
@@ -100,11 +79,9 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
 
     return {
       list: (projectId) =>
-        // Scoped to the project's own subdirectory: a corrupt record in
-        // another project cannot fail this listing.
         isSafeId(projectId)
           ? sessions.list({ under: projectId }).pipe(
-              Effect.map((entries) => entries.map((entry) => toSession(entry.data))),
+              Effect.map((entries) => entries.map((entry) => entry.data)),
               Effect.mapError(asReadError),
             )
           : Effect.succeed([]),
@@ -116,13 +93,12 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
               Effect.mapError(asReadError),
               Effect.flatMap((found) =>
                 Option.isSome(found)
-                  ? Effect.succeed(toSession(found.value))
+                  ? Effect.succeed(found.value)
                   : Effect.fail(new SessionNotFound({ projectId, sessionId })),
               ),
             ),
 
       findBySessionId: (sessionId) =>
-        // Scan filenames only (no entry bodies), then read the single match.
         !isSafeId(sessionId)
           ? Effect.fail(new SessionRefNotFound({ sessionId }))
           : Effect.gen(function* () {
@@ -130,17 +106,17 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
               const id = ids.find((candidate) => candidate.endsWith(`/${sessionId}`));
               const found =
                 id === undefined
-                  ? Option.none<typeof SessionWireSchema.Type>()
+                  ? Option.none<typeof SessionSchema.Type>()
                   : yield* sessions.get(id).pipe(Effect.mapError(asReadError));
               if (Option.isNone(found)) {
                 return yield* Effect.fail(new SessionRefNotFound({ sessionId }));
               }
-              return toSession(found.value);
+              return found.value;
             }),
 
       write: (metadata) =>
         sessions
-          .put(entryId(metadata.projectId, metadata.sessionId), omitUndefinedOptionals(metadata))
+          .put(entryId(metadata.projectId, metadata.sessionId), toStorage(metadata))
           .pipe(Effect.mapError(asWriteError)),
 
       remove: (projectId, sessionId) =>
