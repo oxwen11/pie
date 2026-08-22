@@ -1,4 +1,4 @@
-import type { AgentRequest, AgentResponse } from "@pie/contract";
+import type { AgentRequest, AgentResponse, AgentModel, AgentModelState } from "@pie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -26,6 +26,17 @@ import type { PiUIMessageChunk } from "./ui-message";
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
+
+type PiModel = NonNullable<RpcSessionState["model"]>;
+
+const toAgentModel = (model: PiModel): AgentModel => ({
+  provider: model.provider,
+  modelId: model.id,
+  name: model.name,
+});
+
+const toAgentModelState = (state: RpcSessionState): AgentModelState =>
+  state.model ? toAgentModel(state.model) : {};
 
 type PendingRequest = {
   readonly deferred: Deferred.Deferred<unknown>;
@@ -124,6 +135,16 @@ export interface PiAgent {
     ) => Effect.Effect<boolean, HarnessSessionNotFound | AgentRequestUnavailable>;
     readonly interrupt: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
     readonly abort: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
+    readonly getModelState: (
+      sessionId: string,
+    ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
+    readonly listModels: (
+      sessionId: string,
+    ) => Effect.Effect<ReadonlyArray<AgentModel>, HarnessSessionNotFound | PiTransportFailure>;
+    readonly setModel: (
+      sessionId: string,
+      model: { readonly provider: string; readonly modelId: string },
+    ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
   };
 }
 
@@ -578,6 +599,33 @@ export const makePiAgentWithDependencies = <R>(
           }),
         interrupt,
         abort,
+        getModelState: (sessionId) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command<RpcSessionState>({ type: "get_state" }),
+            ),
+            Effect.map(toAgentModelState),
+          ),
+        listModels: (sessionId) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command<{ models: ReadonlyArray<PiModel> }>({
+                type: "get_available_models",
+              }),
+            ),
+            Effect.map((data) => data.models.map(toAgentModel)),
+          ),
+        setModel: (sessionId, model) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command<PiModel>({
+                type: "set_model",
+                provider: model.provider,
+                modelId: model.modelId,
+              }),
+            ),
+            Effect.map(toAgentModel),
+          ),
       },
     } satisfies PiAgent;
   });

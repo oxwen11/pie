@@ -206,6 +206,79 @@ export const sessionRouter = orpc.router({
     return yield* sessions.getSnapshot(input.ref);
   }),
 
+  listModels: orpc.listModels.effect(function* ({ input, errors }) {
+    const projects = yield* ProjectService;
+    const sessions = yield* HarnessAgentSessionService;
+    return yield* projects.findById(input.ref.projectId).pipe(
+      Effect.flatMap((project) => sessions.listModels(input.ref, project.path)),
+      Effect.map((models) => ({ models })),
+      Effect.catchTags({
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  getModelState: orpc.getModelState.effect(function* ({ input, errors }) {
+    const projects = yield* ProjectService;
+    const sessions = yield* HarnessAgentSessionService;
+    return yield* projects.findById(input.ref.projectId).pipe(
+      Effect.flatMap((project) => sessions.getModelState(input.ref, project.path)),
+      Effect.catchTags({
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  setModel: orpc.setModel.effect(function* ({ input, errors }) {
+    const projects = yield* ProjectService;
+    const sessions = yield* HarnessAgentSessionService;
+    return yield* projects.findById(input.ref.projectId).pipe(
+      Effect.flatMap((project) =>
+        sessions.setModel(input.ref, project.path, {
+          provider: input.provider,
+          modelId: input.modelId,
+        }),
+      ),
+      Effect.catchTags({
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+
   // events --------------------------------------------------------------------
   subscribe: orpc.subscribe.effect(function* ({ input }) {
     const bus = yield* EventBus;

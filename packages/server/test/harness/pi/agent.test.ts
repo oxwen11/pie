@@ -25,9 +25,22 @@ const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", pr
 const upd = (ev) => send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
+let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
+const availableModels = [
+  { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
+  { id: "m2", name: "Model 2", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
+];
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
-  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
+  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
+  if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: availableModels } }); return; }
+  if (msg.type === "set_model") {
+    const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);
+    if (!next) { send({ id: msg.id, type: "response", command: "set_model", success: false, error: "unknown model" }); return; }
+    currentModel = { provider: next.provider, modelId: next.id, name: next.name };
+    send({ id: msg.id, type: "response", command: "set_model", success: true, data: next });
+    return;
+  }
   if (msg.type === "extension_ui_response") {
     upd({ type: "start" });
     upd({ type: "text_start", contentIndex: 0 });
@@ -265,6 +278,28 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const siblingChunks = yield* Stream.runCollect(sibling.output);
       assert.equal(Array.from(siblingChunks).at(-1)?.type, "finish");
       yield* agent.session.abort(healthy.sessionId);
+    }),
+  );
+
+  it.effect("lists models and switches the active model via Pi RPC", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+
+      const models = yield* agent.session.listModels(sessionId);
+      assert.equal(models.length, 2);
+      assert.deepEqual(models[0], { provider: "p", modelId: "m1", name: "Model 1" });
+
+      const initial = yield* agent.session.getModelState(sessionId);
+      assert.deepEqual(initial, { provider: "p", modelId: "m1", name: "Model 1" });
+
+      const updated = yield* agent.session.setModel(sessionId, { provider: "p", modelId: "m2" });
+      assert.deepEqual(updated, { provider: "p", modelId: "m2", name: "Model 2" });
+
+      const after = yield* agent.session.getModelState(sessionId);
+      assert.deepEqual(after, { provider: "p", modelId: "m2", name: "Model 2" });
+
+      yield* agent.session.abort(sessionId);
     }),
   );
 

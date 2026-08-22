@@ -1,4 +1,6 @@
 import type {
+  AgentModel,
+  AgentModelState,
   AgentResponse,
   PromptInput,
   SessionRef,
@@ -19,7 +21,13 @@ import {
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import type { Session } from "../types";
-import type { PromptReceipt, SessionCapabilities, SessionInfoResult, UserInput } from "./adapter";
+import type {
+  PromptReceipt,
+  SessionCapabilities,
+  SessionInfoResult,
+  UserInput,
+  HarnessAgentRuntime,
+} from "./adapter";
 import type { HarnessAgentAdapter } from "./adapter";
 import type {
   AgentOperationError,
@@ -129,6 +137,43 @@ export type HarnessAgentSessionServiceShape = {
     | CapabilityUnsupported
     | AgentOperationError
   >;
+  readonly listModels: (
+    ref: SessionRef,
+    cwd: string,
+  ) => Effect.Effect<
+    ReadonlyArray<AgentModel>,
+    | SessionNotFound
+    | StoreReadError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
+  readonly getModelState: (
+    ref: SessionRef,
+    cwd: string,
+  ) => Effect.Effect<
+    AgentModelState,
+    | SessionNotFound
+    | StoreReadError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
+  readonly setModel: (
+    ref: SessionRef,
+    cwd: string,
+    model: { readonly provider: string; readonly modelId: string },
+  ) => Effect.Effect<
+    AgentModelState,
+    | SessionNotFound
+    | StoreReadError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
   readonly getSessionInfo: (
     ref: SessionRef,
   ) => Effect.Effect<SessionInfoResult, SessionNotFound | StoreReadError | AgentOperationError>;
@@ -194,6 +239,23 @@ export const makeHarnessAgentSessionService = (deps: {
 
   const resolveAgentSessionId = (ref: SessionRef) =>
     readMetadata(ref).pipe(Effect.map((metadata) => metadata.agentSessionId));
+
+  const runtimeInput = (agentSessionId: string, cwd: string) => ({
+    sessionId: agentSessionId,
+    cwd,
+  });
+
+  const withLiveRuntime = <A, E>(
+    ref: SessionRef,
+    agentSessionId: string,
+    cwd: string,
+    run: (
+      runtime: HarnessAgentRuntime,
+    ) => Effect.Effect<A, CapabilityUnsupported | SessionClosed | AgentOperationError | E>,
+  ): Effect.Effect<
+    A,
+    ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError | E
+  > => manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
 
   const readAndStampTitleFromFirstPrompt = (ref: SessionRef, parts: PromptInput["parts"]) =>
     withMetadataMutation(
@@ -430,6 +492,48 @@ export const makeHarnessAgentSessionService = (deps: {
       readMetadata(ref).pipe(
         Effect.andThen(manager.get(ref)),
         Effect.flatMap((runtime) => runtime.getCapabilities),
+        inSession(ref),
+      ),
+
+    listModels: (ref, cwd) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) =>
+          withLiveRuntime(
+            ref,
+            metadata.agentSessionId,
+            cwd,
+            (runtime) =>
+              runtime.listModels ??
+              Effect.fail(new CapabilityUnsupported({ capability: "listModels" })),
+          ),
+        ),
+        inSession(ref),
+      ),
+
+    getModelState: (ref, cwd) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) =>
+          withLiveRuntime(
+            ref,
+            metadata.agentSessionId,
+            cwd,
+            (runtime) =>
+              runtime.getModelState ??
+              Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+          ),
+        ),
+        inSession(ref),
+      ),
+
+    setModel: (ref, cwd, model) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) =>
+          withLiveRuntime(ref, metadata.agentSessionId, cwd, (runtime) =>
+            runtime.setModel
+              ? runtime.setModel(model)
+              : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+          ),
+        ),
         inSession(ref),
       ),
 

@@ -1,4 +1,10 @@
-import type { AgentResponse, InspectorTarget, SessionCapabilities } from "@pie/contract";
+import type {
+  AgentResponse,
+  InspectorTarget,
+  SessionCapabilities,
+  AgentModel,
+  AgentModelState,
+} from "@pie/contract";
 import { InspectorTargetSchema, SessionCapabilitiesSchema } from "@pie/contract";
 import type { UIMessage } from "ai";
 import { Effect, type FileSystem, type Scope, type Stream } from "effect";
@@ -94,6 +100,15 @@ export interface HarnessAgentRuntime {
     ReadonlyArray<UIMessage>,
     SessionClosed | AgentOperationError
   >;
+  readonly listModels?: Effect.Effect<
+    ReadonlyArray<AgentModel>,
+    SessionClosed | AgentOperationError
+  >;
+  readonly getModelState?: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly setModel?: (model: {
+    readonly provider: string;
+    readonly modelId: string;
+  }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
   readonly close: Effect.Effect<void>;
 }
 

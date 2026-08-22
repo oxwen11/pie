@@ -431,6 +431,36 @@ export const SessionCapabilitiesSchema = Schema.Struct({
 export type SessionCapabilities = typeof SessionCapabilitiesSchema.Type;
 
 // ---------------------------------------------------------------------------
+// Agent model (owned by Pi; queried via the live RPC child)
+// ---------------------------------------------------------------------------
+
+export const AgentModelSchema = Schema.Struct({
+  provider: Schema.String,
+  modelId: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+});
+export type AgentModel = typeof AgentModelSchema.Type;
+
+export const AgentModelStateSchema = Schema.Struct({
+  provider: Schema.optionalKey(Schema.String),
+  modelId: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+});
+export type AgentModelState = typeof AgentModelStateSchema.Type;
+
+export const SetAgentModelInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  provider: Schema.NonEmptyString,
+  modelId: Schema.NonEmptyString,
+});
+export type SetAgentModelInput = typeof SetAgentModelInputSchema.Type;
+
+export const ListAgentModelsOutputSchema = Schema.Struct({
+  models: Schema.Array(AgentModelSchema),
+});
+export type ListAgentModelsOutput = typeof ListAgentModelsOutputSchema.Type;
+
+// ---------------------------------------------------------------------------
 // Project
 // ---------------------------------------------------------------------------
 

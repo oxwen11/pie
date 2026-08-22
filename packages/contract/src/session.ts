@@ -1,9 +1,11 @@
 import { eventIterator, oc, type } from "@orpc/contract";
 
 import {
+  AgentModelStateSchema,
   ArchiveSessionInputSchema,
   CreateSessionInputSchema,
   serverErrors,
+  ListAgentModelsOutputSchema,
   ListSessionsInputSchema,
   type ListSessionsOutput,
   PromptInputSchema,
@@ -12,6 +14,7 @@ import {
   RenameSessionInputSchema,
   ResolveRefInputSchema,
   RespondToAgentRequestInputSchema,
+  SetAgentModelInputSchema,
   type SessionMessages,
   SessionRefSchema,
   type SessionRuntimeSnapshot,
@@ -62,6 +65,17 @@ export const sessionContract = {
     .input(toStandardSchema(RefInputSchema))
     .output(toStandardSchema(SessionStatusSchema)),
   getSnapshot: base.input(toStandardSchema(RefInputSchema)).output(type<SessionRuntimeSnapshot>()),
+
+  // agent model (Pi RPC — live child required)
+  listModels: base
+    .input(toStandardSchema(RefInputSchema))
+    .output(toStandardSchema(ListAgentModelsOutputSchema)),
+  getModelState: base
+    .input(toStandardSchema(RefInputSchema))
+    .output(toStandardSchema(AgentModelStateSchema)),
+  setModel: base
+    .input(toStandardSchema(SetAgentModelInputSchema))
+    .output(toStandardSchema(AgentModelStateSchema)),
 
   // events (scope covers both single-session and global firehose)
   subscribe: base

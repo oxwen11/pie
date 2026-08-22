@@ -220,6 +220,25 @@ const makeRuntime = (
           .pipe(Effect.mapError((cause) => operationError(sessionId, "get-messages", cause)));
         return entriesToUIMessages(entries, leafId, sessionId);
       }),
+      listModels: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* agent.session
+          .listModels(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "list-models", cause)));
+      }),
+      getModelState: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* agent.session
+          .getModelState(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "get-model-state", cause)));
+      }),
+      setModel: (model) =>
+        Effect.gen(function* () {
+          if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          return yield* agent.session
+            .setModel(sessionId, model)
+            .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
+        }),
       close,
     } satisfies HarnessAgentRuntime;
   });
