@@ -6,7 +6,7 @@ import { Effect } from "effect";
  * is one more step on a pipeline rather than a wrapper that indents the body:
  *
  * ```ts
- * resolveHarnessSessionId(ref).pipe(
+ * resolveAgentSessionId(ref).pipe(
  *   Effect.andThen(manager.close(ref)),
  *   inSession(ref),
  * )

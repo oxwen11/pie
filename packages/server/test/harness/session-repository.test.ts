@@ -25,10 +25,10 @@ const makeLayer = (home: string) =>
     makeHarnessAgentSessionRepository(path.join(home, "storage", "sessions")),
   ).pipe(Layer.provide(NodePlatformLayer));
 
-const meta = (sessionId: string, projectId: string, harnessSessionId: string): Session => ({
+const meta = (sessionId: string, projectId: string, agentSessionId: string): Session => ({
   sessionId,
   projectId,
-  harnessSessionId,
+  agentSessionId,
   createdAt: "2026-07-16T00:00:00.000Z",
 });
 
@@ -53,7 +53,7 @@ describe("SessionRepository", () => {
       }),
     );
     expect(read.sessionId).toBe("sess-1");
-    expect(read.harnessSessionId).toBe("claude-uuid-1");
+    expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
   it("persists at storage/sessions/<projectId>/<sessionId>.json, sessionId in the body too", async () => {
@@ -90,12 +90,38 @@ describe("SessionRepository", () => {
         return yield* repo.read("proj-a", "sess-1");
       }),
     );
-    expect(read.harnessSessionId).toBe("claude-uuid-1");
+    expect(read.agentSessionId).toBe("claude-uuid-1");
 
     const raw = JSON.parse(await fs.readFile(file, "utf8"));
     expect(raw.version).toBe(1);
     expect(raw.data.sessionId).toBe("sess-1");
     expect(raw.data).not.toHaveProperty("version");
+  });
+
+  it("reads harnessSessionId metadata and maps it to agentSessionId", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "sess-legacy",
+          projectId: "proj-a",
+          harnessSessionId: "pi-native-1",
+          createdAt: "2026-07-16T00:00:00.000Z",
+        },
+      }),
+      "utf8",
+    );
+
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        return yield* repo.read("proj-a", "sess-legacy");
+      }),
+    );
+    expect(read.agentSessionId).toBe("pi-native-1");
   });
 
   it("lists all sessions of a project", async () => {
@@ -157,7 +183,7 @@ describe("SessionRepository", () => {
     );
     expect(hit.projectId).toBe("proj-b");
     expect(hit.sessionId).toBe("sess-2");
-    expect(hit.harnessSessionId).toBe("u2");
+    expect(hit.agentSessionId).toBe("u2");
   });
 
   it("a corrupt record in another project does not break this project's list", async () => {

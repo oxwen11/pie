@@ -10,13 +10,9 @@ import { describe, expect, it } from "vitest";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
-import {
-  HarnessAgentRegistry,
-  HarnessAgentSessionManagerLayer,
-  HarnessAgentSessionServiceLayer,
-  makeHarnessAgentRegistry,
-} from "../src/harness";
+import { HarnessAgentSessionManagerLayer, HarnessAgentSessionServiceLayer } from "../src/harness";
 import { makePiAdapter, makePiAgent } from "../src/harness/pi";
+import { PiAdapter } from "../src/harness/pi-adapter";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
@@ -66,23 +62,23 @@ async function setup() {
   const piLayer = Layer.effect(Pi, makePiAgent({ executablePath })).pipe(
     Layer.provide(NodeServices.layer),
   );
-  const registryLayer = Layer.effect(
-    HarnessAgentRegistry,
+  const piAdapterLayer = Layer.effect(
+    PiAdapter,
     Effect.gen(function* () {
       const pi = yield* Pi;
-      return makeHarnessAgentRegistry(makePiAdapter(pi, { executablePath }));
+      return makePiAdapter(pi, { executablePath });
     }),
   ).pipe(Layer.provide(piLayer));
 
   const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
     Layer.provide(
       HarnessAgentSessionManagerLayer.pipe(
-        Layer.provide(registryLayer),
+        Layer.provide(piAdapterLayer),
         Layer.provide(EventBusLayer),
         Layer.provide(NodeServices.layer),
       ),
     ),
-    Layer.provide(registryLayer),
+    Layer.provide(piAdapterLayer),
     Layer.provide(EventBusLayer),
     Layer.provide(pathsLayer),
     Layer.provide(NodeServices.layer),
@@ -96,7 +92,7 @@ async function setup() {
     EventBusLayer,
     harnessSessionLayer,
     projectServiceLayer,
-    registryLayer,
+    piAdapterLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,

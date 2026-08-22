@@ -10,7 +10,7 @@ export * from "./adapter";
 export * from "./errors";
 export * from "./executable";
 export * from "./queue-stream";
-export * from "./registry";
+export * from "./pi-adapter";
 export * from "./session-io";
 export * from "./session-manager";
 // The session and repository modules are private collaborators, of the manager

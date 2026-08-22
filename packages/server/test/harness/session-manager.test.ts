@@ -15,7 +15,6 @@ import type {
 import { AgentOperationError } from "../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../src/harness/events/framework";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
-import { makeHarnessAgentRegistry } from "../../src/harness/registry";
 import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
 import { NodePlatformLayer } from "../platform";
 
@@ -115,9 +114,8 @@ const makeFixture = Effect.gen(function* () {
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   } satisfies HarnessAgentAdapter;
 
-  const registry = makeHarnessAgentRegistry(adapter);
   const bus = yield* makeEventBus();
-  const manager = yield* makeHarnessAgentSessionManager(registry, bus).pipe(
+  const manager = yield* makeHarnessAgentSessionManager(adapter, bus).pipe(
     Effect.provide(NodePlatformLayer),
   );
 

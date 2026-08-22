@@ -10,12 +10,11 @@ import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import {
   type HarnessAgentAdapter,
-  HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
   HarnessAgentSessionServiceLayer,
-  makeHarnessAgentRegistry,
 } from "../harness";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
+import { PiAdapter } from "../harness/pi-adapter";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 
 export class Pi extends Context.Service<Pi, PiAgent>()("Pi") {}
@@ -53,12 +52,12 @@ export const cacheAvailability = (
     checkAvailability: Effect.uninterruptible(cachedCheck),
   }));
 
-const RegistryLayer = Layer.effect(
-  HarnessAgentRegistry,
+const PiAdapterProvided = Layer.effect(
+  PiAdapter,
   Effect.gen(function* () {
     const pi = yield* Pi;
     const adapter = yield* cacheAvailability(makePiAdapter(pi, piAgentOptions));
-    return makeHarnessAgentRegistry(adapter);
+    return adapter;
   }),
 ).pipe(Layer.provide(ProvidersLayer), Layer.provide(PlatformLayer));
 
@@ -66,13 +65,13 @@ const RegistryLayer = Layer.effect(
 // publishing wire events onto the bus); the outward façade on top does the
 // identity translation, metadata persistence, and collection events.
 const HarnessSessionManagerProvided = HarnessAgentSessionManagerLayer.pipe(
-  Layer.provide(RegistryLayer),
+  Layer.provide(PiAdapterProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PlatformLayer),
 );
 const HarnessSessionServiceProvided = HarnessAgentSessionServiceLayer.pipe(
   Layer.provide(HarnessSessionManagerProvided),
-  Layer.provide(RegistryLayer),
+  Layer.provide(PiAdapterProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
@@ -88,7 +87,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   HarnessSessionServiceProvided,
   ProjectServiceProvided,
-  RegistryLayer,
+  PiAdapterProvided,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   PlatformLayer,
   NodeHttpPlatform.layer,

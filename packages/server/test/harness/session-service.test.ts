@@ -24,7 +24,6 @@ import type {
   SessionInfoResult,
 } from "../../src/harness/adapter";
 import { TurnAlreadyRunning } from "../../src/harness/errors";
-import { makeHarnessAgentRegistry } from "../../src/harness/registry";
 import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
 import {
   type HarnessAgentSessionRepositoryShape,
@@ -172,18 +171,17 @@ describe("HarnessAgentSessionService", () => {
               : {}),
             getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
           } satisfies HarnessAgentAdapter;
-          const registry = makeHarnessAgentRegistry(adapter);
           const crypto = yield* Crypto.Crypto;
           const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
             Effect.gen(function* () {
               const bus = yield* makeEventBus();
-              const manager = yield* makeHarnessAgentSessionManager(registry, bus);
+              const manager = yield* makeHarnessAgentSessionManager(adapter, bus);
               const repo = yield* makeHarnessAgentSessionRepository(
                 path.join(home, "storage", "sessions"),
               );
               const service = makeHarnessAgentSessionService({
                 manager,
-                registry,
+                adapter,
                 repo,
                 bus,
                 newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
@@ -209,7 +207,7 @@ describe("HarnessAgentSessionService", () => {
     // The harness saw the router-resolved cwd, never a projectId.
     expect(result.spy.open).toEqual([{ cwd: "/tmp/pie-app" }]);
     // Metadata stores the native id, keyed by the server sessionId (filename).
-    expect(result.stored.harnessSessionId).toBe("native-1");
+    expect(result.stored.agentSessionId).toBe("native-1");
     expect(result.stored.projectId).toBe("proj-a");
     expect(result.stored.cwd).toBe("/tmp/pie-app");
     expect(result.stored.archived).toBe(false);
@@ -741,7 +739,7 @@ describe("HarnessAgentSessionService", () => {
 
     const created = records[0];
     expect(created?.annotations.cwd).toBe("/tmp/pie-app");
-    expect(created?.annotations.harnessSessionId).toBe("native-1");
+    expect(created?.annotations.agentSessionId).toBe("native-1");
     expect(created?.annotations.projectId).toBe("proj-a");
     // Every line carries the id, so one session's whole life greps out of a
     // file holding many.

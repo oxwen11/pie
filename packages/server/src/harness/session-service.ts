@@ -22,6 +22,7 @@ import {
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import type { Session } from "../types";
 import type { PromptReceipt, SessionCapabilities, SessionInfoResult, UserInput } from "./adapter";
+import type { HarnessAgentAdapter } from "./adapter";
 import type {
   AgentOperationError,
   CreateSessionError,
@@ -36,8 +37,7 @@ import {
   PermissionModeUnsupported,
   SessionNotResumable,
 } from "./errors";
-import type { HarnessAgentRegistryShape } from "./registry";
-import { HarnessAgentRegistry } from "./registry";
+import { PiAdapter } from "./pi-adapter";
 import { inSession } from "./session-identity";
 import type { SessionConfig } from "./session-io";
 import type { HarnessAgentSessionManagerShape } from "./session-manager";
@@ -174,13 +174,12 @@ export class HarnessAgentSessionService extends Context.Service<
 
 export const makeHarnessAgentSessionService = (deps: {
   readonly manager: HarnessAgentSessionManagerShape;
-  readonly registry: HarnessAgentRegistryShape;
+  readonly adapter: HarnessAgentAdapter;
   readonly repo: HarnessAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly newSessionId: Effect.Effect<string>;
 }): HarnessAgentSessionServiceShape => {
-  const { manager, registry, repo, bus, newSessionId } = deps;
-  const adapter = registry.adapter;
+  const { manager, adapter, repo, bus, newSessionId } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -202,16 +201,16 @@ export const makeHarnessAgentSessionService = (deps: {
 
   const readHistory = (
     ref: SessionRef,
-    harnessSessionId: string,
+    agentSessionId: string,
     cwd: string,
   ): Effect.Effect<
     ReadonlyArray<UIMessage>,
     ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError
   > => {
     const cold = adapter.getMessages;
-    if (cold) return cold(harnessSessionId, cwd);
+    if (cold) return cold(agentSessionId, cwd);
     return manager
-      .ensureRuntime({ sessionId: harnessSessionId, cwd }, ref)
+      .ensureRuntime({ sessionId: agentSessionId, cwd }, ref)
       .pipe(
         Effect.flatMap(
           (
@@ -228,8 +227,8 @@ export const makeHarnessAgentSessionService = (deps: {
 
   const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
 
-  const resolveHarnessSessionId = (ref: SessionRef) =>
-    readMetadata(ref).pipe(Effect.map((metadata) => metadata.harnessSessionId));
+  const resolveAgentSessionId = (ref: SessionRef) =>
+    readMetadata(ref).pipe(Effect.map((metadata) => metadata.agentSessionId));
 
   const readAndStampTitleFromFirstPrompt = (ref: SessionRef, parts: PromptInput["parts"]) =>
     withMetadataMutation(
@@ -263,7 +262,7 @@ export const makeHarnessAgentSessionService = (deps: {
               const metadata: Session = {
                 sessionId,
                 projectId,
-                harnessSessionId: session.sessionId,
+                agentSessionId: session.sessionId,
                 createdAt: new Date().toISOString(),
                 cwd,
                 archived: false,
@@ -274,7 +273,7 @@ export const makeHarnessAgentSessionService = (deps: {
                 Effect.andThen(
                   logLifecycle("session.created", "session created", {
                     cwd,
-                    harnessSessionId: session.sessionId,
+                    agentSessionId: session.sessionId,
                   }),
                 ),
                 Effect.as(ref),
@@ -296,7 +295,7 @@ export const makeHarnessAgentSessionService = (deps: {
           }),
         ),
       ).pipe(
-        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.harnessSessionId, cwd)),
+        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, cwd)),
         Effect.flatMap((info) =>
           info._tag === "missing"
             ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
@@ -306,7 +305,7 @@ export const makeHarnessAgentSessionService = (deps: {
       ),
 
     close: (ref) =>
-      resolveHarnessSessionId(ref).pipe(
+      resolveAgentSessionId(ref).pipe(
         Effect.andThen(manager.close(ref)),
         Effect.andThen(bus.closeSession(ref, "session_closed")),
         Effect.andThen(logLifecycle("session.closed", "session closed")),
@@ -350,15 +349,13 @@ export const makeHarnessAgentSessionService = (deps: {
               ? manager.close(ref).pipe(Effect.andThen(bus.closeSession(ref, "session_closed")))
               : Effect.void;
             const publish = changed
-              ? bus
-                  .publish({ ref, type: "session.archived", archived })
-                  .pipe(
-                    Effect.andThen(
-                      logLifecycle("session.archived", "session archive state changed", {
-                        archived,
-                      }),
-                    ),
-                  )
+              ? bus.publish({ ref, type: "session.archived", archived }).pipe(
+                  Effect.andThen(
+                    logLifecycle("session.archived", "session archive state changed", {
+                      archived,
+                    }),
+                  ),
+                )
               : Effect.void;
             return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
           }),
@@ -401,7 +398,7 @@ export const makeHarnessAgentSessionService = (deps: {
     getMessages: (ref, cwd) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          readHistory(ref, metadata.harnessSessionId, cwd).pipe(
+          readHistory(ref, metadata.agentSessionId, cwd).pipe(
             Effect.flatMap((messages) =>
               manager.status(ref).pipe(
                 Effect.map((status) => {
@@ -431,7 +428,7 @@ export const makeHarnessAgentSessionService = (deps: {
         });
         const runtime = yield* manager.ensureRuntime(
           {
-            sessionId: metadata.harnessSessionId,
+            sessionId: metadata.agentSessionId,
             ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
           },
           input.ref,
@@ -490,9 +487,7 @@ export const makeHarnessAgentSessionService = (deps: {
 
     getSessionInfo: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) =>
-          adapter.getSessionInfo(metadata.harnessSessionId, metadata.cwd),
-        ),
+        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
         inSession(ref),
       ),
 
@@ -514,24 +509,19 @@ export const makeHarnessAgentSessionService = (deps: {
 export const HarnessAgentSessionServiceLayer: Layer.Layer<
   HarnessAgentSessionService,
   never,
-  | HarnessAgentSessionManager
-  | HarnessAgentRegistry
-  | EventBus
-  | Paths
-  | Crypto.Crypto
-  | FileSystem.FileSystem
+  HarnessAgentSessionManager | PiAdapter | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
 > = Layer.effect(
   HarnessAgentSessionService,
   Effect.gen(function* () {
     const manager = yield* HarnessAgentSessionManager;
-    const registry = yield* HarnessAgentRegistry;
+    const adapter = yield* PiAdapter;
     const bus = yield* EventBus;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makeHarnessAgentSessionRepository(paths.sessionsDir);
     return makeHarnessAgentSessionService({
       manager,
-      registry,
+      adapter,
       repo,
       bus,
       newSessionId: crypto.randomUUIDv4.pipe(

@@ -197,15 +197,15 @@ export interface HarnessAgentAdapter {
    * there is no separate flag.
    */
   readonly getMessages?: (
-    harnessSessionId: string,
+    agentSessionId: string,
     cwd?: string,
   ) => Effect.Effect<ReadonlyArray<UIMessage>, AgentOperationError>;
   /**
-   * Look up live display info for a persisted session by backend id, without
+   * Look up live display info for a persisted session by Pi session id, without
    * opening it. `cwd` (the session's cwd) narrows the backend search.
    */
   readonly getSessionInfo: (
-    harnessSessionId: string,
+    agentSessionId: string,
     cwd?: string,
   ) => Effect.Effect<SessionInfoResult, AgentOperationError>;
 }
