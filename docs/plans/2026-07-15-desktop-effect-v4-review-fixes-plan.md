@@ -154,7 +154,7 @@ export function makeDesktopRpcServer(
 
 3. **wrapper 语义写入注释并测试**：`succeedOnORPCError` 在 provide/wrap 之前执行，wrapper 只见非预期 failure / defect —— expected `ORPCError` 不打日志是有意策略。测试覆盖三类：expected ORPCError、defect、client cancellation。
 4. **console 清理**（实际站点：`node-backend-process.ts` 3 处、`desktop-router.ts` 1 处、`main-window.ts` 1 处；`desktop-runtime.ts` 无裸 console，其失败路径走 `dialog.showErrorBox`，保留）：
-   - 子进程输出泵改 `Effect.log` + `Effect.annotateLogs({ source: "vibest-server", fd: "stdout" | "stderr" })`；
+   - 子进程输出泵改 `Effect.log` + `Effect.annotateLogs({ source: "pie-server", fd: "stdout" | "stderr" })`；
    - `main-window.ts` 的 `loadURL().catch` 位于 Promise 回调、无 fiber 可依，不机械替换：`ensureOpen` 从 `Effect.sync` 改为 `Effect.gen`，同步建窗后 fork `Effect.tryPromise(() => window.loadURL(target))` 并 `Effect.catchCause(Effect.logError)`，让窗口加载进入结构化并发。
 5. 根部暂不配置自定义 Logger layer（默认 logger 落 console，行为不变）；打包版日志落盘成为将来在组合根加一个 Layer 的单点改动。
 6. `AGENTS.md` Effect usage 补两条：「RPC handler 通过 `effect/context` 与 wrapper 外层 provide 继承组合根 Context（含全部 references），这是有意把组合根 ServiceMap 交给 RPC，禁止 `Context.empty()`」；「Main 进程内禁止裸 `console.*`，统一 `Effect.log*`；子进程原始输出通过 annotation 标记来源」。

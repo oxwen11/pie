@@ -8,7 +8,7 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
   SessionStatus,
-} from "@vibest/contract";
+} from "@pie/contract";
 
 import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
 

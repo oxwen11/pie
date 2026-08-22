@@ -25,7 +25,7 @@ export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly sessionId: string;
 }> {}
 
-/** A SessionRef's harnessAgentId disagrees with the stored session metadata. */
+/** A SessionRef's projectId disagrees with the stored session metadata. */
 export class SessionRefMismatch extends Data.TaggedError("SessionRefMismatch")<{
   readonly projectId: string;
   readonly sessionId: string;

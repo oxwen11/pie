@@ -14,7 +14,7 @@ import { NodePlatformLayer } from "./platform";
 
 layer(NodePlatformLayer)("ProjectService", (it) => {
   const tempHome = FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "vibest-proj-" })),
+    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "pie-proj-" })),
   );
 
   // Kept separate from `tempHome` so the two tests that seed a projects.json can

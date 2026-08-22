@@ -5,7 +5,7 @@ import {
   pidAlive,
   resolveDaemonLocation,
   resolveOrSpawnDaemon,
-} from "@vibest/server/daemon";
+} from "@pie/server/daemon";
 import { Effect } from "effect";
 
 import { ServerSpawnError, type ServerProcessExit, type SpawnServer } from "./local-server";
@@ -20,8 +20,8 @@ export type DaemonServerProcessOptions = {
 
 /**
  * The daemon-backed `SpawnServer`: instead of forking a die-with-app child,
- * attach the daemon selected by `$VIBEST_DAEMON_DIR` (defaulting under
- * `$VIBEST_HOME`) via the shared launcher — the same attach-or-spawn the CLI
+ * attach the daemon selected by `$PIE_DAEMON_DIR` (defaulting under
+ * `$PIE_HOME`) via the shared launcher — the same attach-or-spawn the CLI
  * runs, so desktop and CLI with the same environment converge on one backend.
  * Consequences the supervisor inherits:
  *
@@ -30,7 +30,7 @@ export type DaemonServerProcessOptions = {
  *   recorded pid + `/api/health`; when the daemon dies, the supervisor loop
  *   re-runs this spawner, which re-spawns through the launcher (auto-heal).
  * - Respawn attempts (port !== 0) set `autoRespawn`, so an explicit
- *   `vibest daemon stop` is respected: the launcher refuses to resurrect a
+ *   `pie daemon stop` is respected: the launcher refuses to resurrect a
  *   tombstoned daemon and the supervisor surfaces "failed" instead. A fresh
  *   app launch (port === 0) is explicit intent and clears the tombstone.
  */
@@ -64,7 +64,7 @@ export function makeDaemonServerProcess(
           Effect.mapError(
             (cause) =>
               new ServerSpawnError({
-                message: `Unable to attach or spawn the vibest daemon: ${cause.message}`,
+                message: `Unable to attach or spawn the pie daemon: ${cause.message}`,
                 cause,
               }),
           ),

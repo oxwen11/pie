@@ -1,6 +1,6 @@
+import type { SessionRef, SessionSummary } from "@pie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import type { SessionRef, SessionSummary } from "@vibest/contract";
 import { useCallback } from "react";
 
 import { sameSessionRef } from "@/lib/session-ref";
@@ -53,16 +53,14 @@ export const selectProjectSessionTitle = (
 export function useProjectSessionTitle(ref: SessionRef | undefined): string | undefined {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const projectId = ref?.projectId;
-  const harnessAgentId = ref?.harnessAgentId;
   const sessionId = ref?.sessionId;
-  const enabled =
-    projectId !== undefined && harnessAgentId !== undefined && sessionId !== undefined;
+  const enabled = projectId !== undefined && sessionId !== undefined;
   const select = useCallback(
     (sessions: ReadonlyArray<SessionSummary>) =>
-      projectId === undefined || harnessAgentId === undefined || sessionId === undefined
+      projectId === undefined || sessionId === undefined
         ? undefined
-        : selectProjectSessionTitle(sessions, { projectId, harnessAgentId, sessionId }),
-    [harnessAgentId, projectId, sessionId],
+        : selectProjectSessionTitle(sessions, { projectId, sessionId }),
+    [projectId, sessionId],
   );
   const active = useQuery({
     ...orpcQueryUtils.session.list.queryOptions({

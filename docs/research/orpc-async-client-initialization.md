@@ -6,11 +6,11 @@ How should the shared React app and Electron renderer initialize oRPC when the d
 
 ## Primary-source findings
 
-1. **Creating an oRPC client is synchronous; opening its WebSocket does not have to be.** `createORPCClient` receives a link immediately, while the WebSocket adapter accepts an asynchronous `connect` callback. This permits early client creation, but does not require it; Vibest waits for the initial resolved server descriptor, then creates one stable client.
+1. **Creating an oRPC client is synchronous; opening its WebSocket does not have to be.** `createORPCClient` receives a link immediately, while the WebSocket adapter accepts an asynchronous `connect` callback. This permits early client creation, but does not require it; Pie waits for the initial resolved server descriptor, then creates one stable client.
    - [oRPC client at v2.0.0-beta.16](https://github.com/dinwwwh/orpc/blob/77f62470/packages/client/src/client.ts)
    - [oRPC WebSocket transport at v2.0.0-beta.16](https://github.com/dinwwwh/orpc/blob/77f62470/packages/client/src/adapters/websocket/transport.ts)
 
-2. **The WebSocket adapter is lazy by default.** `connectOnInit` defaults to false. Vibest passes the resolved server URL when it creates the client, while single-use ticket minting stays in `connect` so every reconnect receives a fresh ticket. The same client carries queries, mutations, and event iterators over the multiplexed connection.
+2. **The WebSocket adapter is lazy by default.** `connectOnInit` defaults to false. Pie passes the resolved server URL when it creates the client, while single-use ticket minting stays in `connect` so every reconnect receives a fresh ticket. The same client carries queries, mutations, and event iterators over the multiplexed connection.
    - [oRPC WebSocket adapter documentation](https://orpc.dev/docs/adapters/websocket#client-adapters)
 
 3. **The MessagePort adapter requires a concrete port.** Unlike Fetch and WebSocket, its transport options contain a direct `port` value. Electron's one-time port handoff and the first local-server connection are therefore separate UI resources with separate Suspense boundaries.

@@ -39,10 +39,10 @@ Two forces pull in opposite directions:
    (the SDK needs `cwd` to locate the session file). A brand-new session's title
    is just the first prompt, which the client already holds — this is what the
    optimistic-write in `apps/app/src/routes/draft.tsx` already exploits.
-2. **The harness sees things we can't.** A session driven _outside_ vibest
+2. **The harness sees things we can't.** A session driven _outside_ pie
    (`claude --resume <id>` in a terminal, another tool on the same session)
    advances its transcript, refines its auto-summary, gets `/rename`d, changes git
-   branch — none of which vibest observes. An _imported_ pre-existing session has
+   branch — none of which pie observes. An _imported_ pre-existing session has
    **no** floor at all; the harness index is its only source. And recency
    (`lastModified` / `recencyAt`) is tracked by the backend for free.
 
@@ -67,7 +67,7 @@ answer is a floor + overlay reconciled into one persisted record.
 1. **Triggers:** reconcile on **turn end** (authoritative signal:
    `SDKSessionStateChangedMessage` `idle` for claude, turn-completed for codex) and
    on **session open / resume** (turn-end alone never fires for sessions mutated
-   outside vibest; open-time reconcile closes that gap and is also how an imported
+   outside pie; open-time reconcile closes that gap and is also how an imported
    session first gets a record).
 2. **`updatedAt` is stamped locally** at turn end (we know a turn just ended — no
    `getSessionInfo` needed). `getSessionInfo` is called only for the
@@ -152,8 +152,8 @@ irreplaceable — none of it needed for what the sidebar shows today):
 - **pi is a first-class citizen.** It rides the floor; no overlay, no
   `session.updated`, no missing-title second-class rendering — which is exactly
   why the floor must exist.
-- **External drift is bounded, not perfect.** A session driven outside vibest is
-  reconciled the next time vibest opens/resumes it or runs a turn on it — not
+- **External drift is bounded, not perfect.** A session driven outside pie is
+  reconciled the next time pie opens/resumes it or runs a turn on it — not
   live. Acceptable; live external mirroring is a non-goal.
 - **We give up** the agent's auto-summary refinement and terminal-side `/rename`
   _between_ reconcile points. Both peer tools (t3code, paseo) give up the same or

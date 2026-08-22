@@ -4,7 +4,7 @@ import { daemonLockPath } from "./paths";
 
 /**
  * Create the launch lock atomically — an exclusive-create
- * `$VIBEST_DAEMON_DIR/daemon.lock` holding the acquiring launcher's pid. True
+ * `$PIE_DAEMON_DIR/daemon.lock` holding the acquiring launcher's pid. True
  * when acquired; false when someone holds it. It serializes spawns so two
  * launchers racing an empty daemon directory (or a respawn window) cannot both
  * spawn a daemon; the loser waits for the winner's record and attaches. A lock

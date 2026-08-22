@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the existing chat web app (`apps/web`, renamed to `apps/app`) the Electron desktop UI, backed by the existing `@vibest/cli` server spawned as a child process, and delete the obsolete worktree/task/terminal desktop app.
+**Goal:** Make the existing chat web app (`apps/web`, renamed to `apps/app`) the Electron desktop UI, backed by the existing `@pie/cli` server spawned as a child process, and delete the obsolete worktree/task/terminal desktop app.
 
-**Architecture:** Electron's main process spawns `@vibest/cli`'s built server using Electron's own Node runtime (`ELECTRON_RUN_AS_NODE=1`), on a loopback OS-assigned port, guarded by a per-launch bearer token. The renderer's HTML/JS/CSS are served **off disk** by a `vibest://app` custom protocol (never a proxy); the renderer calls the backend at its real `http://127.0.0.1:<port>` origin, which the server permits via a CORS allowlist. WebSocket RPC connects directly to loopback, authenticated with a single-use ticket, because a custom protocol cannot proxy a WS upgrade and browsers cannot set headers on a WS handshake. Browser mode (`npx vibest`) stays fully supported: host differences are expressed as a `Platform` discriminated union injected by each entry point, not sniffed at runtime.
+**Architecture:** Electron's main process spawns `@pie/cli`'s built server using Electron's own Node runtime (`ELECTRON_RUN_AS_NODE=1`), on a loopback OS-assigned port, guarded by a per-launch bearer token. The renderer's HTML/JS/CSS are served **off disk** by a `pie://app` custom protocol (never a proxy); the renderer calls the backend at its real `http://127.0.0.1:<port>` origin, which the server permits via a CORS allowlist. WebSocket RPC connects directly to loopback, authenticated with a single-use ticket, because a custom protocol cannot proxy a WS upgrade and browsers cannot set headers on a WS handshake. Browser mode (`npx pie`) stays fully supported: host differences are expressed as a `Platform` discriminated union injected by each entry point, not sniffed at runtime.
 
 **Tech Stack:** Electron 41 + electron-vite + electron-builder; React 19 + Vite + TanStack Router/Query; oRPC 2.0.0-beta.16 (fetch + websocket links); Node `http` + `ws` + `sirv`; Vitest; Playwright (Electron).
 
@@ -13,10 +13,10 @@
 - **oRPC is pinned to `2.0.0-beta.16`** across the workspace (`pnpm-workspace.yaml` `overrides`). Do not float it to stable — the stable client imports `ORPC_HEADER`, absent from the beta contract.
 - **Package manager is pnpm; task runner is Turborepo.** Run tasks from the repo root (`pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm check`). Never `npx` — use `pnpm dlx`/`pnpm exec`.
 - **Lint/format is Oxlint + Oxfmt from the repo root** (`pnpm lint`, `pnpm format`). Do not add ESLint/Prettier configs.
-- **Existing on-disk names are load-bearing.** The server's HTTP RPC prefix is exactly `/api/rpc`; the WS RPC path is exactly `/ws/rpc`; the WS subprotocol is exactly `"vibest"`; the health endpoint is exactly `/api/health`.
+- **Existing on-disk names are load-bearing.** The server's HTTP RPC prefix is exactly `/api/rpc`; the WS RPC path is exactly `/ws/rpc`; the WS subprotocol is exactly `"pie"`; the health endpoint is exactly `/api/health`.
 - **Never commit secrets.** The auth token is generated per launch at runtime; it must never be written to a file, a log line, or a commit.
 - **Commit messages carry no AI/Claude annotations.**
-- The desktop app's `productName` is `Vibest` and its `appId` is `com.vibest.desktop` (`apps/desktop/electron-builder.yml`). Keep both.
+- The desktop app's `productName` is `Pie` and its `appId` is `com.pie.desktop` (`apps/desktop/electron-builder.yml`). Keep both.
 
 ---
 
@@ -24,20 +24,20 @@
 
 **Renamed:**
 
-- `apps/web/` → `apps/app/` (package `@vibest/web` → `@vibest/app`)
+- `apps/web/` → `apps/app/` (package `@pie/web` → `@pie/app`)
 
 **Created:**
 
 - `apps/app/src/platform.ts` — the `Platform` discriminated union; the single seam between hosts.
 - `apps/app/src/app.tsx` — `createApp(platform)`: builds clients, router, chat manager; returns the React tree. Both entries call it.
 - `apps/app/vite.shared.ts` — the Vite plugin list + `@` alias, shared by `apps/app`'s own Vite config and `apps/desktop`'s electron-vite renderer config.
-- `packages/vibest/src/node/auth.ts` — bearer-token parsing/compare + the single-use WS ticket store.
-- `packages/vibest/src/node/cors.ts` — CORS header computation against an origin allowlist.
-- `packages/vibest/src/node/handshake.ts` — the stdout ready-line protocol, shared by the server and the desktop supervisor.
-- `packages/vibest/vitest.config.ts` — test config for the above.
+- `packages/pie/src/node/auth.ts` — bearer-token parsing/compare + the single-use WS ticket store.
+- `packages/pie/src/node/cors.ts` — CORS header computation against an origin allowlist.
+- `packages/pie/src/node/handshake.ts` — the stdout ready-line protocol, shared by the server and the desktop supervisor.
+- `packages/pie/vitest.config.ts` — test config for the above.
 - `apps/desktop/src/shared/bridge.ts` — the preload bridge's type (`DesktopBridge`).
-- `apps/desktop/src/main/backend.ts` — spawns/supervises the `@vibest/cli` server child process.
-- `apps/desktop/src/main/protocol.ts` — the `vibest://app` static-file protocol handler with SPA fallback.
+- `apps/desktop/src/main/backend.ts` — spawns/supervises the `@pie/cli` server child process.
+- `apps/desktop/src/main/protocol.ts` — the `pie://app` static-file protocol handler with SPA fallback.
 - `apps/desktop/src/renderer/main.tsx` — the desktop entry point; constructs the desktop `Platform`.
 
 **Deleted:**
@@ -47,8 +47,8 @@
 
 **Substantially modified:**
 
-- `packages/vibest/src/node/server.ts` — auth, CORS, ticket endpoint, ticketed WS upgrade.
-- `packages/vibest/src/node/cli.ts` — env-var config, token scrub, dynamic port, ready line.
+- `packages/pie/src/node/server.ts` — auth, CORS, ticket endpoint, ticketed WS upgrade.
+- `packages/pie/src/node/cli.ts` — env-var config, token scrub, dynamic port, ready line.
 - `packages/client/src/index.ts` — `headers` option on the HTTP client; `getTicket` option on the WS client.
 - `apps/app/src/lib/orpc.ts` — module-scope singletons become `createAppClients(platform)`.
 - `apps/desktop/src/main/index.ts` — single-instance lock, backend spawn, protocol registration, window creation.
@@ -56,7 +56,7 @@
 - `apps/desktop/electron.vite.config.ts`, `electron-builder.yml`, `package.json`, `tsconfig.*.json`.
 - `apps/desktop/e2e/tests/*` — rewritten against the chat UI.
 
-`packages/services` **stays in the tree, unreferenced.** Do not delete it; do remove `@vibest/services` from `apps/desktop`'s dependencies, since nothing in the new desktop app imports it.
+`packages/services` **stays in the tree, unreferenced.** Do not delete it; do remove `@pie/services` from `apps/desktop`'s dependencies, since nothing in the new desktop app imports it.
 
 ---
 
@@ -66,11 +66,11 @@
 
 - Move: `apps/web/` → `apps/app/`
 - Modify: `apps/app/package.json` (name)
-- Modify: `packages/vibest/src/node/server.ts:31-33` (static dir + vite root paths)
+- Modify: `packages/pie/src/node/server.ts:31-33` (static dir + vite root paths)
 
 **Interfaces:**
 
-- Produces: workspace package `@vibest/app` at `apps/app`, replacing `@vibest/web`.
+- Produces: workspace package `@pie/app` at `apps/app`, replacing `@pie/web`.
 
 - [ ] **Step 1: Move the directory with git**
 
@@ -83,12 +83,12 @@ git mv apps/web apps/app
 In `apps/app/package.json`, change the name field:
 
 ```json
-  "name": "@vibest/app",
+  "name": "@pie/app",
 ```
 
 - [ ] **Step 3: Update the server's path references**
 
-`packages/vibest/src/node/server.ts` — the `resolveStaticDir()` candidates and the dev Vite root both hardcode `apps/web`. Replace the whole `resolveStaticDir` function and the dev `root` option:
+`packages/pie/src/node/server.ts` — the `resolveStaticDir()` candidates and the dev Vite root both hardcode `apps/web`. Replace the whole `resolveStaticDir` function and the dev `root` option:
 
 ```ts
 /**
@@ -100,7 +100,7 @@ function resolveStaticDir(): string | undefined {
   const candidates = [
     new URL("./client/", import.meta.url), // packaged: dist/client next to dist/cli.js
     new URL("../../../../apps/app/dist/", import.meta.url), // monorepo, from src/node
-    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/vibest/dist
+    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/pie/dist
   ];
   for (const candidate of candidates) {
     const dir = path.resolve(fileURLToPath(candidate));
@@ -132,13 +132,13 @@ Also update the 503 message in the same file:
 ```ts
 serveUI = (_req, res) => {
   res.statusCode = 503;
-  res.end("Web UI not built. Run the @vibest/app build first.");
+  res.end("Web UI not built. Run the @pie/app build first.");
 };
 ```
 
 - [ ] **Step 4: Verify no stale references remain**
 
-Run: `rg -n "apps/web|@vibest/web" --glob '!node_modules' --glob '!pnpm-lock.yaml'`
+Run: `rg -n "apps/web|@pie/web" --glob '!node_modules' --glob '!pnpm-lock.yaml'`
 Expected: no matches. (`pnpm-lock.yaml` will be regenerated in the next step.)
 
 - [ ] **Step 5: Reinstall and typecheck**
@@ -159,10 +159,10 @@ git commit -m "refactor: rename apps/web to apps/app"
 
 **Files:**
 
-- Create: `packages/vibest/src/node/auth.ts`
-- Create: `packages/vibest/src/node/auth.test.ts`
-- Create: `packages/vibest/vitest.config.ts`
-- Modify: `packages/vibest/package.json` (add `test` script + vitest devDependency)
+- Create: `packages/pie/src/node/auth.ts`
+- Create: `packages/pie/src/node/auth.test.ts`
+- Create: `packages/pie/vitest.config.ts`
+- Modify: `packages/pie/package.json` (add `test` script + vitest devDependency)
 
 **Interfaces:**
 
@@ -174,7 +174,7 @@ git commit -m "refactor: rename apps/web to apps/app"
 
 - [ ] **Step 1: Add the test config and test script**
 
-Create `packages/vibest/vitest.config.ts`:
+Create `packages/pie/vitest.config.ts`:
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -187,7 +187,7 @@ export default defineConfig({
 });
 ```
 
-In `packages/vibest/package.json`, add to `scripts` (after `"start"`):
+In `packages/pie/package.json`, add to `scripts` (after `"start"`):
 
 ```json
     "test": "vitest run",
@@ -201,7 +201,7 @@ and add to `devDependencies`:
 
 - [ ] **Step 2: Write the failing test**
 
-Create `packages/vibest/src/node/auth.test.ts`:
+Create `packages/pie/src/node/auth.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -289,12 +289,12 @@ describe("createTicketStore", () => {
 
 - [ ] **Step 3: Run the test to verify it fails**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: FAIL — cannot resolve `./auth`.
 
 - [ ] **Step 4: Write the implementation**
 
-Create `packages/vibest/src/node/auth.ts`:
+Create `packages/pie/src/node/auth.ts`:
 
 ```ts
 import { randomUUID } from "node:crypto";
@@ -356,13 +356,13 @@ export function tokensMatch(expected: string, actual: string | null): boolean {
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: PASS — 15 tests.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/vibest
+git add packages/pie
 git commit -m "feat(cli): add bearer-token auth and single-use WS ticket store"
 ```
 
@@ -372,8 +372,8 @@ git commit -m "feat(cli): add bearer-token auth and single-use WS ticket store"
 
 **Files:**
 
-- Create: `packages/vibest/src/node/cors.ts`
-- Create: `packages/vibest/src/node/cors.test.ts`
+- Create: `packages/pie/src/node/cors.ts`
+- Create: `packages/pie/src/node/cors.test.ts`
 
 **Interfaces:**
 
@@ -382,20 +382,20 @@ git commit -m "feat(cli): add bearer-token auth and single-use WS ticket store"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `packages/vibest/src/node/cors.test.ts`:
+Create `packages/pie/src/node/cors.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
 
 import { corsHeaders } from "./cors";
 
-const ALLOWED = ["vibest://app", "http://localhost:5173"];
+const ALLOWED = ["pie://app", "http://localhost:5173"];
 
 describe("corsHeaders", () => {
   it("allows an allowlisted origin", () => {
-    const headers = corsHeaders("vibest://app", ALLOWED);
+    const headers = corsHeaders("pie://app", ALLOWED);
     expect(headers).not.toBeNull();
-    expect(headers?.["access-control-allow-origin"]).toBe("vibest://app");
+    expect(headers?.["access-control-allow-origin"]).toBe("pie://app");
   });
 
   it("echoes the request origin rather than a wildcard", () => {
@@ -404,12 +404,12 @@ describe("corsHeaders", () => {
   });
 
   it("permits the Authorization header, which the renderer sends on every RPC call", () => {
-    const headers = corsHeaders("vibest://app", ALLOWED);
+    const headers = corsHeaders("pie://app", ALLOWED);
     expect(headers?.["access-control-allow-headers"]).toContain("authorization");
   });
 
   it("varies on origin, so a shared cache cannot serve one origin's response to another", () => {
-    const headers = corsHeaders("vibest://app", ALLOWED);
+    const headers = corsHeaders("pie://app", ALLOWED);
     expect(headers?.vary).toBe("origin");
   });
 
@@ -422,25 +422,25 @@ describe("corsHeaders", () => {
   });
 
   it("returns null when nothing is allowlisted", () => {
-    expect(corsHeaders("vibest://app", [])).toBeNull();
+    expect(corsHeaders("pie://app", [])).toBeNull();
   });
 });
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: FAIL — cannot resolve `./cors`.
 
 - [ ] **Step 3: Write the implementation**
 
-Create `packages/vibest/src/node/cors.ts`:
+Create `packages/pie/src/node/cors.ts`:
 
 ```ts
 /**
  * Cross-origin headers for an allowlisted origin, or null to deny.
  *
- * The desktop renderer loads from `vibest://app` (or the Vite dev server in
+ * The desktop renderer loads from `pie://app` (or the Vite dev server in
  * dev) and calls the backend on `http://127.0.0.1:<port>` — a cross-origin
  * request. Browser mode is same-origin and sends no Origin header, so it never
  * reaches this path.
@@ -463,13 +463,13 @@ export function corsHeaders(
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: PASS — 7 new tests, 22 total.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/vibest
+git add packages/pie
 git commit -m "feat(cli): add CORS origin allowlist"
 ```
 
@@ -479,8 +479,8 @@ git commit -m "feat(cli): add CORS origin allowlist"
 
 **Files:**
 
-- Modify: `packages/vibest/src/node/server.ts`
-- Create: `packages/vibest/src/node/server.test.ts`
+- Modify: `packages/pie/src/node/server.ts`
+- Create: `packages/pie/src/node/server.test.ts`
 
 **Interfaces:**
 
@@ -500,7 +500,7 @@ export type CreateServerOptions = {
 
 - [ ] **Step 1: Write the failing test**
 
-Create `packages/vibest/src/node/server.test.ts`:
+Create `packages/pie/src/node/server.test.ts`:
 
 ```ts
 import type { AddressInfo } from "node:net";
@@ -572,17 +572,17 @@ describe("createServer auth", () => {
 
 describe("createServer CORS", () => {
   it("answers a preflight from an allowlisted origin", async () => {
-    const base = await start({ authToken: TOKEN, corsOrigins: ["vibest://app"] });
+    const base = await start({ authToken: TOKEN, corsOrigins: ["pie://app"] });
     const response = await fetch(`${base}/api/rpc`, {
       method: "OPTIONS",
-      headers: { origin: "vibest://app" },
+      headers: { origin: "pie://app" },
     });
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe("vibest://app");
+    expect(response.headers.get("access-control-allow-origin")).toBe("pie://app");
   });
 
   it("refuses a preflight from an unknown origin", async () => {
-    const base = await start({ authToken: TOKEN, corsOrigins: ["vibest://app"] });
+    const base = await start({ authToken: TOKEN, corsOrigins: ["pie://app"] });
     const response = await fetch(`${base}/api/rpc`, {
       method: "OPTIONS",
       headers: { origin: "https://evil.example" },
@@ -594,7 +594,7 @@ describe("createServer CORS", () => {
 describe("createServer WebSocket ticket", () => {
   async function connect(base: string, query: string): Promise<number> {
     const url = `${base.replace("http://", "ws://")}/ws/rpc${query}`;
-    const socket = new WebSocket(url, "vibest");
+    const socket = new WebSocket(url, "pie");
     return await new Promise<number>((resolve) => {
       socket.on("open", () => {
         socket.close();
@@ -640,12 +640,12 @@ describe("createServer WebSocket ticket", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: FAIL — `createServer` takes no arguments; `/api/ws-ticket` 404s.
 
 - [ ] **Step 3: Rewrite the server**
 
-Replace the whole of `packages/vibest/src/node/server.ts` with:
+Replace the whole of `packages/pie/src/node/server.ts` with:
 
 ```ts
 import fs from "node:fs";
@@ -654,7 +654,7 @@ import { createServer as createHttpServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createNodeRPCHandler, createWsRPCHandler } from "@vibest/server/rpc";
+import { createNodeRPCHandler, createWsRPCHandler } from "@pie/server/rpc";
 import sirv from "sirv";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
@@ -691,7 +691,7 @@ function resolveStaticDir(): string | undefined {
   const candidates = [
     new URL("./client/", import.meta.url), // packaged: dist/client next to dist/cli.js
     new URL("../../../../apps/app/dist/", import.meta.url), // monorepo, from src/node
-    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/vibest/dist
+    new URL("../../../apps/app/dist/", import.meta.url), // monorepo, from packages/pie/dist
   ];
   for (const candidate of candidates) {
     const dir = path.resolve(fileURLToPath(candidate));
@@ -795,7 +795,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
     if (!staticDir) {
       serveUI = (_req, res) => {
         res.statusCode = 503;
-        res.end("Web UI not built. Run the @vibest/app build first.");
+        res.end("Web UI not built. Run the @pie/app build first.");
       };
     } else {
       const assets = sirv(staticDir, {
@@ -843,13 +843,13 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: PASS — 11 new tests.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/vibest
+git add packages/pie
 git commit -m "feat(cli): enforce bearer auth, CORS, and ticketed WS upgrades"
 ```
 
@@ -859,24 +859,24 @@ git commit -m "feat(cli): enforce bearer auth, CORS, and ticketed WS upgrades"
 
 **Files:**
 
-- Create: `packages/vibest/src/node/handshake.ts`
-- Create: `packages/vibest/src/node/handshake.test.ts`
-- Modify: `packages/vibest/src/node/cli.ts`
-- Modify: `packages/vibest/package.json` (add an `exports` map)
+- Create: `packages/pie/src/node/handshake.ts`
+- Create: `packages/pie/src/node/handshake.test.ts`
+- Modify: `packages/pie/src/node/cli.ts`
+- Modify: `packages/pie/package.json` (add an `exports` map)
 
 **Interfaces:**
 
 - Consumes: `createServer(options)` (Task 4).
 - Produces:
-  - `READY_PREFIX: string` (`"vibest:ready "`)
+  - `READY_PREFIX: string` (`"pie:ready "`)
   - `formatReadyLine(info: ReadyInfo): string`
   - `parseReadyLine(line: string): ReadyInfo | null` where `ReadyInfo = { port: number }`
-  - Package subpath export `@vibest/cli/handshake` → `./src/node/handshake.ts` (imported by `apps/desktop`'s main process, which electron-vite bundles from TypeScript source).
-  - Env contract read by the CLI: `VIBEST_AUTH_TOKEN`, `VIBEST_CORS_ORIGINS` (comma-separated), `VIBEST_PORT` (default `4000`; `0` = OS-assigned).
+  - Package subpath export `@pie/cli/handshake` → `./src/node/handshake.ts` (imported by `apps/desktop`'s main process, which electron-vite bundles from TypeScript source).
+  - Env contract read by the CLI: `PIE_AUTH_TOKEN`, `PIE_CORS_ORIGINS` (comma-separated), `PIE_PORT` (default `4000`; `0` = OS-assigned).
 
 - [ ] **Step 1: Write the failing test**
 
-Create `packages/vibest/src/node/handshake.test.ts`:
+Create `packages/pie/src/node/handshake.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -894,7 +894,7 @@ describe("ready line", () => {
   });
 
   it("ignores an unrelated log line", () => {
-    expect(parseReadyLine("vibest listening on http://127.0.0.1:4000")).toBeNull();
+    expect(parseReadyLine("pie listening on http://127.0.0.1:4000")).toBeNull();
   });
 
   it("ignores a prefixed line with unparseable JSON", () => {
@@ -909,12 +909,12 @@ describe("ready line", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @vibest/cli test`
+Run: `pnpm --filter @pie/cli test`
 Expected: FAIL — cannot resolve `./handshake`.
 
 - [ ] **Step 3: Write the handshake module**
 
-Create `packages/vibest/src/node/handshake.ts`:
+Create `packages/pie/src/node/handshake.ts`:
 
 ```ts
 /**
@@ -922,7 +922,7 @@ Create `packages/vibest/src/node/handshake.ts`:
  * to, so it must tell its parent which port it actually got. One prefixed JSON
  * line on stdout, so a supervisor can pick it out of ordinary logging.
  */
-export const READY_PREFIX = "vibest:ready ";
+export const READY_PREFIX = "pie:ready ";
 
 export type ReadyInfo = {
   port: number;
@@ -949,7 +949,7 @@ export function parseReadyLine(line: string): ReadyInfo | null {
 
 - [ ] **Step 4: Rewrite the CLI entry**
 
-Replace the whole of `packages/vibest/src/node/cli.ts` with:
+Replace the whole of `packages/pie/src/node/cli.ts` with:
 
 ```ts
 #!/usr/bin/env node
@@ -967,20 +967,20 @@ const DEFAULT_PORT = 4000;
  * able to read the credential that guards the agent.
  */
 function takeAuthToken(): string | undefined {
-  const token = process.env.VIBEST_AUTH_TOKEN;
-  delete process.env.VIBEST_AUTH_TOKEN;
+  const token = process.env.PIE_AUTH_TOKEN;
+  delete process.env.PIE_AUTH_TOKEN;
   return token;
 }
 
 function readCorsOrigins(): string[] {
-  return (process.env.VIBEST_CORS_ORIGINS ?? "")
+  return (process.env.PIE_CORS_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 }
 
 function readPort(): number {
-  const raw = process.env.VIBEST_PORT;
+  const raw = process.env.PIE_PORT;
   if (raw === undefined) return DEFAULT_PORT;
   const port = Number.parseInt(raw, 10);
   return Number.isInteger(port) && port >= 0 ? port : DEFAULT_PORT;
@@ -994,7 +994,7 @@ async function main() {
     const { port } = server.address() as AddressInfo;
     // Machine-readable first, for the desktop supervisor; human-readable second.
     console.log(formatReadyLine({ port }));
-    console.log(`vibest listening on http://127.0.0.1:${port}`);
+    console.log(`pie listening on http://127.0.0.1:${port}`);
   });
 }
 
@@ -1003,7 +1003,7 @@ main();
 
 - [ ] **Step 5: Export the handshake as a subpath**
 
-In `packages/vibest/package.json`, add an `exports` map immediately after the `bin` field. The desktop main process imports this; electron-vite bundles it straight from TypeScript source, matching how the rest of the workspace resolves types from `src`.
+In `packages/pie/package.json`, add an `exports` map immediately after the `bin` field. The desktop main process imports this; electron-vite bundles it straight from TypeScript source, matching how the rest of the workspace resolves types from `src`.
 
 ```json
   "exports": {
@@ -1013,18 +1013,18 @@ In `packages/vibest/package.json`, add an `exports` map immediately after the `b
 
 - [ ] **Step 6: Run the tests and typecheck**
 
-Run: `pnpm --filter @vibest/cli test && pnpm --filter @vibest/cli typecheck`
+Run: `pnpm --filter @pie/cli test && pnpm --filter @pie/cli typecheck`
 Expected: PASS — 5 new tests; typecheck clean.
 
 - [ ] **Step 7: Verify the ready line end to end**
 
-Run: `pnpm --filter @vibest/cli build && VIBEST_PORT=0 node packages/vibest/dist/cli.mjs`
-Expected: first stdout line matches `vibest:ready {"port":<some port>}` with a non-zero port; second line is the human-readable URL. Stop it with Ctrl-C.
+Run: `pnpm --filter @pie/cli build && PIE_PORT=0 node packages/pie/dist/cli.mjs`
+Expected: first stdout line matches `pie:ready {"port":<some port>}` with a non-zero port; second line is the human-readable URL. Stop it with Ctrl-C.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add packages/vibest
+git add packages/pie
 git commit -m "feat(cli): configure via env, scrub token, bind dynamic port, emit ready line"
 ```
 
@@ -1039,8 +1039,8 @@ git commit -m "feat(cli): configure via env, scrub token, bind dynamic port, emi
 **Interfaces:**
 
 - Produces:
-  - `createVibestClient(options?: { url?: FetchLinkUrl; headers?: Record<string, string> }): VibestClient`
-  - `createVibestWsClient(options?: { url?: string | URL; protocols?: string | string[]; getTicket?: () => Promise<string> }): VibestClient`
+  - `createPieClient(options?: { url?: FetchLinkUrl; headers?: Record<string, string> }): PieClient`
+  - `createPieWsClient(options?: { url?: string | URL; protocols?: string | string[]; getTicket?: () => Promise<string> }): PieClient`
 
 **Background the implementer needs:** oRPC `2.0.0-beta.16` types the WebSocket link's `connect` as `(info) => Promisable<WebSocketLike>` — it may be async, and it is re-invoked on every reconnect attempt. That is what makes a _single-use_ ticket workable: each reconnect mints a fresh one.
 
@@ -1157,7 +1157,7 @@ and to `devDependencies`:
 
 - [ ] **Step 3: Run the test to verify it fails**
 
-Run: `pnpm --filter @vibest/client test`
+Run: `pnpm --filter @pie/client test`
 Expected: FAIL — `createWsConnect` is not exported.
 
 - [ ] **Step 4: Write the implementation**
@@ -1169,14 +1169,14 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { RPCLink as WebSocketRPCLink } from "@orpc/client/websocket";
 import type { RouterContractClient } from "@orpc/contract";
-import type { Contract } from "@vibest/contract";
+import type { Contract } from "@pie/contract";
 
-/** A fully typed client for the Vibest server, derived from the contract. */
-export type VibestClient = RouterContractClient<Contract>;
+/** A fully typed client for the Pie server, derived from the contract. */
+export type PieClient = RouterContractClient<Contract>;
 
 type FetchLinkUrl = NonNullable<ConstructorParameters<typeof RPCLink>[0]>["url"];
 
-export type CreateVibestClientOptions = {
+export type CreatePieClientOptions = {
   /**
    * RPC endpoint. Defaults to the relative `/api/rpc` — clients served
    * same-origin by the CLI server need no configuration. The desktop renderer
@@ -1191,7 +1191,7 @@ export type CreateVibestClientOptions = {
 };
 
 /** HTTP client (fetch link). One request per call; streams over SSE. */
-export function createVibestClient(options: CreateVibestClientOptions = {}): VibestClient {
+export function createPieClient(options: CreatePieClientOptions = {}): PieClient {
   const link = new RPCLink({
     url: options.url ?? "/api/rpc",
     ...(options.headers ? { headers: options.headers } : {}),
@@ -1199,10 +1199,10 @@ export function createVibestClient(options: CreateVibestClientOptions = {}): Vib
   return createORPCClient(link);
 }
 
-export type CreateVibestWsClientOptions = {
+export type CreatePieWsClientOptions = {
   /** WebSocket endpoint. Defaults to `/ws/rpc` on the current origin. */
   url?: string | URL;
-  /** WebSocket subprotocol; the CLI server upgrades on "vibest". */
+  /** WebSocket subprotocol; the CLI server upgrades on "pie". */
   protocols?: string | string[];
   /**
    * Mint a single-use ticket for the handshake. A browser cannot set headers on
@@ -1224,13 +1224,13 @@ function defaultWsUrl(): URL {
  * The link's `connect` factory. Exported so the ticket handshake is testable
  * without standing up a socket server.
  */
-export function createWsConnect(options: CreateVibestWsClientOptions): () => Promise<WebSocket> {
+export function createWsConnect(options: CreatePieWsClientOptions): () => Promise<WebSocket> {
   return async () => {
     const url = new URL(options.url ?? defaultWsUrl());
     if (options.getTicket) {
       url.searchParams.set("ticket", await options.getTicket());
     }
-    return new WebSocket(url, options.protocols ?? "vibest");
+    return new WebSocket(url, options.protocols ?? "pie");
   };
 }
 
@@ -1239,7 +1239,7 @@ export function createWsConnect(options: CreateVibestWsClientOptions): () => Pro
  * a lazy `connect` factory (oRPC 2.0.0-beta.16), so the socket is only opened
  * on first use — and re-opened, with a fresh ticket, on every reconnect.
  */
-export function createVibestWsClient(options: CreateVibestWsClientOptions = {}): VibestClient {
+export function createPieWsClient(options: CreatePieWsClientOptions = {}): PieClient {
   const link = new WebSocketRPCLink({
     connect: createWsConnect(options),
   });
@@ -1249,7 +1249,7 @@ export function createVibestWsClient(options: CreateVibestWsClientOptions = {}):
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `pnpm --filter @vibest/client test && pnpm --filter @vibest/client typecheck`
+Run: `pnpm --filter @pie/client test && pnpm --filter @pie/client typecheck`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -1277,12 +1277,12 @@ git commit -m "feat(client): support auth headers and ticketed WebSocket connect
 
 **Interfaces:**
 
-- Consumes: `createVibestClient({ url, headers })`, `createVibestWsClient({ url, getTicket })` (Task 6).
+- Consumes: `createPieClient({ url, headers })`, `createPieWsClient({ url, getTicket })` (Task 6).
 - Produces:
   - `Platform` (`apps/app/src/platform.ts`) — `{ host: "web" } | { host: "desktop"; os: string; backend: BackendConnection }`
   - `BackendConnection` — `{ httpBaseUrl: string; wsBaseUrl: string; token: string }`
   - `createAppClients(platform: Platform): AppClients` (`apps/app/src/lib/orpc.ts`)
-  - `AppClients` — `{ queryClient: QueryClient; orpcClient: VibestClient; orpcWsClient: VibestClient; orpc: OrpcUtils }`
+  - `AppClients` — `{ queryClient: QueryClient; orpcClient: PieClient; orpcWsClient: PieClient; orpc: OrpcUtils }`
   - `createApp(platform: Platform): ReactElement` (`apps/app/src/app.tsx`)
   - `createRouter(clients: AppClients)` (`apps/app/src/router.tsx`) — now takes an argument
   - `new ChatTransport(clients)` — now takes an argument
@@ -1308,7 +1308,7 @@ export type BackendConnection = {
 /**
  * The host this UI is running in, injected by the entry point — never sniffed
  * at runtime. Browser mode is same-origin and needs no connection details; the
- * Electron renderer loads from `vibest://app` and must be told where its
+ * Electron renderer loads from `pie://app` and must be told where its
  * backend is. Desktop-only capabilities (a native directory picker, for one)
  * belong on the `desktop` arm, where the compiler keeps web code away from them.
  */
@@ -1323,16 +1323,16 @@ Replace the whole of `apps/app/src/lib/orpc.ts` with:
 ```ts
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { createVibestClient, createVibestWsClient, type VibestClient } from "@vibest/client";
+import { createPieClient, createPieWsClient, type PieClient } from "@pie/client";
 import { toast } from "sonner";
 
 import type { Platform } from "@/platform";
 
 export type AppClients = {
   queryClient: QueryClient;
-  orpcClient: VibestClient;
-  orpcWsClient: VibestClient;
-  orpc: ReturnType<typeof createTanstackQueryUtils<VibestClient>>;
+  orpcClient: PieClient;
+  orpcWsClient: PieClient;
+  orpc: ReturnType<typeof createTanstackQueryUtils<PieClient>>;
 };
 
 function createQueryClient(): QueryClient {
@@ -1356,15 +1356,15 @@ function createQueryClient(): QueryClient {
 /**
  * Build the RPC clients for a host. Browser mode is same-origin, so the
  * defaults (relative `/api/rpc`, origin-derived `/ws/rpc`) are correct and no
- * credential is needed. The desktop renderer's origin is `vibest://app` while
+ * credential is needed. The desktop renderer's origin is `pie://app` while
  * its backend is on loopback, so every call is cross-origin and authenticated.
  */
 export function createAppClients(platform: Platform): AppClients {
   const queryClient = createQueryClient();
 
   if (platform.host === "web") {
-    const orpcClient = createVibestClient();
-    const orpcWsClient = createVibestWsClient();
+    const orpcClient = createPieClient();
+    const orpcWsClient = createPieWsClient();
     return {
       queryClient,
       orpcClient,
@@ -1377,10 +1377,10 @@ export function createAppClients(platform: Platform): AppClients {
   const headers = { authorization: `Bearer ${token}` };
 
   // oRPC's fetch link takes a ROOT-RELATIVE `url` plus a separate absolute
-  // `origin` — an absolute `url` does not typecheck. `createVibestClient`
+  // `origin` — an absolute `url` does not typecheck. `createPieClient`
   // exposes `origin` as a passthrough for exactly this.
-  const orpcClient = createVibestClient({ origin: httpBaseUrl, headers });
-  const orpcWsClient = createVibestWsClient({
+  const orpcClient = createPieClient({ origin: httpBaseUrl, headers });
+  const orpcWsClient = createPieWsClient({
     url: `${wsBaseUrl}/ws/rpc`,
     getTicket: async () => {
       const response = await fetch(`${httpBaseUrl}/api/ws-ticket`, { method: "POST", headers });
@@ -1451,7 +1451,7 @@ In `apps/app/src/core/chat/chat-transport.ts`, replace the module-scope import o
 
 ```ts
 import { consumeEventIterator, eventIteratorToStream } from "@orpc/client";
-import type { ToolPermissionRequest } from "@vibest/contract/claude-code";
+import type { ToolPermissionRequest } from "@pie/contract/claude-code";
 import type { ChatTransport as AiChatTransport, UIMessage, UIMessageChunk } from "ai";
 
 import type { AppClients } from "@/lib/orpc";
@@ -1599,12 +1599,12 @@ createRoot(rootElement).render(createApp({ host: "web" }));
 
 - [ ] **Step 10: Typecheck**
 
-Run: `pnpm --filter @vibest/app typecheck`
+Run: `pnpm --filter @pie/app typecheck`
 Expected: PASS. If anything still imports `orpcClient`, `orpcWsClient`, `queryClient`, `orpc`, or `chatManager` from `@/lib/orpc` or `./chat-manager`, fix it to take the value from `AppClients` / the provider — those module-scope exports are gone.
 
 - [ ] **Step 11: Verify browser mode still works**
 
-Run: `pnpm --filter @vibest/cli build && pnpm --filter @vibest/app build && node packages/vibest/dist/cli.mjs`
+Run: `pnpm --filter @pie/cli build && pnpm --filter @pie/app build && node packages/pie/dist/cli.mjs`
 Then open `http://127.0.0.1:4000` in a browser.
 Expected: the chat UI loads, with no console errors about RPC or WebSocket.
 Stop the server with Ctrl-C.
@@ -1630,7 +1630,7 @@ git commit -m "refactor(app): inject host capabilities via a Platform union"
 
 - Produces:
   - `appVitePlugins(): PluginOption[]` and `appAlias(): Record<string, string>` (`apps/app/vite.shared.ts`)
-  - Package subpath exports on `@vibest/app`: `./app`, `./platform`, `./vite`, `./index.css`
+  - Package subpath exports on `@pie/app`: `./app`, `./platform`, `./vite`, `./index.css`
 
 **Why:** the desktop renderer compiles `apps/app`'s source itself (it is _not_ a copy of `apps/app/dist`). For that to work, `apps/desktop`'s electron-vite renderer config must apply the same plugins — TanStack Router codegen, React, Tailwind — and the same `@` alias. Sharing one module keeps them from drifting. This mirrors opencode, whose `packages/desktop` imports `@opencode-ai/app/vite`.
 
@@ -1715,7 +1715,7 @@ In `apps/app/package.json`, add an `exports` map immediately after `"type": "mod
 
 - [ ] **Step 4: Verify the web build still works**
 
-Run: `pnpm --filter @vibest/app build`
+Run: `pnpm --filter @pie/app build`
 Expected: PASS — `apps/app/dist/index.html` exists.
 
 - [ ] **Step 5: Commit**
@@ -1802,7 +1802,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId("com.vibest.desktop");
+  electronApp.setAppUserModelId("com.pie.desktop");
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
@@ -1835,12 +1835,12 @@ In `apps/desktop/package.json`, remove these entries from `dependencies`:
 and these from `devDependencies`:
 
 ```
-"@orpc/publisher", "@orpc/server", "@pierre/diffs", "@vibest/services",
+"@orpc/publisher", "@orpc/server", "@pierre/diffs", "@pie/services",
 "@xterm/addon-fit", "@xterm/addon-serialize", "@xterm/addon-webgl",
 "@xterm/headless", "@xterm/xterm"
 ```
 
-Leave `@orpc/client`, `@orpc/contract`, `@orpc/tanstack-query`, `@tanstack/react-query`, `@vibest/ui`, React, Tailwind, electron, electron-builder, electron-vite, and Playwright in place — the new renderer needs them.
+Leave `@orpc/client`, `@orpc/contract`, `@orpc/tanstack-query`, `@tanstack/react-query`, `@pie/ui`, React, Tailwind, electron, electron-builder, electron-vite, and Playwright in place — the new renderer needs them.
 
 - [ ] **Step 4: Remove the node-pty external from the build config**
 
@@ -1934,11 +1934,11 @@ git commit -m "refactor(desktop): remove worktree/task/terminal app, leaving the
 
 - Create: `apps/desktop/src/main/backend.ts`
 - Create: `apps/desktop/src/main/backend.test.ts`
-- Modify: `apps/desktop/package.json` (add `@vibest/cli` dependency)
+- Modify: `apps/desktop/package.json` (add `@pie/cli` dependency)
 
 **Interfaces:**
 
-- Consumes: `READY_PREFIX`, `parseReadyLine` from `@vibest/cli/handshake` (Task 5); the env contract `VIBEST_AUTH_TOKEN` / `VIBEST_CORS_ORIGINS` / `VIBEST_PORT` (Task 5).
+- Consumes: `READY_PREFIX`, `parseReadyLine` from `@pie/cli/handshake` (Task 5); the env contract `PIE_AUTH_TOKEN` / `PIE_CORS_ORIGINS` / `PIE_PORT` (Task 5).
 - Produces:
   - `startBackend(options: StartBackendOptions): Promise<Backend>` where
     ```ts
@@ -1959,7 +1959,7 @@ git commit -m "refactor(desktop): remove worktree/task/terminal app, leaving the
 In `apps/desktop/package.json`, add to `dependencies`:
 
 ```json
-    "@vibest/cli": "workspace:*",
+    "@pie/cli": "workspace:*",
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -1975,15 +1975,13 @@ import { resolveServerEntry } from "./backend";
 
 describe("resolveServerEntry", () => {
   it("points at the bundled server in a packaged app", () => {
-    const entry = resolveServerEntry(true, "/Applications/Vibest.app/Contents/Resources");
-    expect(entry).toBe(
-      path.join("/Applications/Vibest.app/Contents/Resources", "server", "cli.mjs"),
-    );
+    const entry = resolveServerEntry(true, "/Applications/Pie.app/Contents/Resources");
+    expect(entry).toBe(path.join("/Applications/Pie.app/Contents/Resources", "server", "cli.mjs"));
   });
 
   it("points at the monorepo build when unpackaged", () => {
     const entry = resolveServerEntry(false, "/unused");
-    expect(entry).toMatch(/packages[/\\]vibest[/\\]dist[/\\]cli\.mjs$/);
+    expect(entry).toMatch(/packages[/\\]pie[/\\]dist[/\\]cli\.mjs$/);
   });
 });
 ```
@@ -2004,7 +2002,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
-import { parseReadyLine } from "@vibest/cli/handshake";
+import { parseReadyLine } from "@pie/cli/handshake";
 import { app } from "electron";
 
 const START_TIMEOUT_MS = 30_000;
@@ -2031,11 +2029,11 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
   if (isPackaged) {
     return path.join(resourcesPath, "server", "cli.mjs");
   }
-  return fileURLToPath(new URL("../../../../packages/vibest/dist/cli.mjs", import.meta.url));
+  return fileURLToPath(new URL("../../../../packages/pie/dist/cli.mjs", import.meta.url));
 }
 
 /**
- * Spawn the vibest server and wait for it to report the port it bound.
+ * Spawn the pie server and wait for it to report the port it bound.
  *
  * It runs on Electron's own Node runtime (`process.execPath` +
  * ELECTRON_RUN_AS_NODE), so a packaged app needs no Node installed. It binds a
@@ -2050,15 +2048,15 @@ export async function startBackend(options: StartBackendOptions): Promise<Backen
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: "1",
-      VIBEST_AUTH_TOKEN: token,
-      VIBEST_PORT: "0",
-      VIBEST_CORS_ORIGINS: options.corsOrigins.join(","),
+      PIE_AUTH_TOKEN: token,
+      PIE_PORT: "0",
+      PIE_CORS_ORIGINS: options.corsOrigins.join(","),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
   child.stderr?.on("data", (chunk: Buffer) => {
-    console.error(`[vibest-server] ${chunk.toString().trimEnd()}`);
+    console.error(`[pie-server] ${chunk.toString().trimEnd()}`);
   });
 
   const port = await new Promise<number>((resolve, reject) => {
@@ -2086,7 +2084,7 @@ export async function startBackend(options: StartBackendOptions): Promise<Backen
     lines.on("line", (line) => {
       const ready = parseReadyLine(line);
       if (!ready) {
-        console.log(`[vibest-server] ${line}`);
+        console.log(`[pie-server] ${line}`);
         return;
       }
       clearTimeout(timer);
@@ -2116,12 +2114,12 @@ Expected: PASS — 2 tests.
 
 ```bash
 git add apps/desktop
-git commit -m "feat(desktop): spawn the vibest server on Electron's node runtime"
+git commit -m "feat(desktop): spawn the pie server on Electron's node runtime"
 ```
 
 ---
 
-## Task 11: Desktop — the `vibest://app` protocol handler
+## Task 11: Desktop — the `pie://app` protocol handler
 
 **Files:**
 
@@ -2131,7 +2129,7 @@ git commit -m "feat(desktop): spawn the vibest server on Electron's node runtime
 **Interfaces:**
 
 - Produces:
-  - `SCHEME` (`"vibest"`), `HOST` (`"app"`), `APP_ORIGIN` (`"vibest://app"`)
+  - `SCHEME` (`"pie"`), `HOST` (`"app"`), `APP_ORIGIN` (`"pie://app"`)
   - `registerAppScheme(): void` — must be called **before** `app.whenReady()`
   - `registerAppProtocol(rendererRoot: string): void` — call after ready
   - `resolveAssetPath(rendererRoot: string, pathname: string): string | null` — exported for test
@@ -2190,7 +2188,7 @@ import { pathToFileURL } from "node:url";
 
 import { net, protocol } from "electron";
 
-export const SCHEME = "vibest";
+export const SCHEME = "pie";
 export const HOST = "app";
 export const APP_ORIGIN = `${SCHEME}://${HOST}`;
 
@@ -2259,7 +2257,7 @@ Expected: PASS — 5 new tests, 7 total.
 
 ```bash
 git add apps/desktop
-git commit -m "feat(desktop): serve the renderer over a vibest:// protocol"
+git commit -m "feat(desktop): serve the renderer over a pie:// protocol"
 ```
 
 ---
@@ -2278,11 +2276,11 @@ git commit -m "feat(desktop): serve the renderer over a vibest:// protocol"
 
 **Interfaces:**
 
-- Consumes: `startBackend` (Task 10); `registerAppScheme`, `registerAppProtocol`, `APP_ORIGIN` (Task 11); `createApp`, `Platform` from `@vibest/app` (Tasks 7–8).
+- Consumes: `startBackend` (Task 10); `registerAppScheme`, `registerAppProtocol`, `APP_ORIGIN` (Task 11); `createApp`, `Platform` from `@pie/app` (Tasks 7–8).
 - Produces:
   - `DesktopBridge` (`apps/desktop/src/shared/bridge.ts`) — `{ os: string; backend: BackendConnection }`
-  - `window.vibest: DesktopBridge` in the renderer
-  - IPC channel `vibest:bootstrap` (synchronous), main → preload
+  - `window.pie: DesktopBridge` in the renderer
+  - IPC channel `pie:bootstrap` (synchronous), main → preload
 
 **Why synchronous IPC:** the renderer needs the backend's origin and token before its first module evaluates. Passing them as `additionalArguments` would put the token in the renderer process's command line, where any local process can read it — which would undo the point of having a token. `ipcRenderer.sendSync` in the preload keeps it in memory.
 
@@ -2316,14 +2314,14 @@ import type { BackendConnection, DesktopBridge } from "../shared/bridge";
 // Synchronous on purpose: the renderer's first module needs the backend's
 // origin and token, and the main process already has both by the time this
 // window exists (it awaits the backend before creating the window).
-const backend = ipcRenderer.sendSync("vibest:bootstrap") as BackendConnection;
+const backend = ipcRenderer.sendSync("pie:bootstrap") as BackendConnection;
 
 const bridge: DesktopBridge = {
   os: process.platform,
   backend,
 };
 
-contextBridge.exposeInMainWorld("vibest", bridge);
+contextBridge.exposeInMainWorld("pie", bridge);
 ```
 
 - [ ] **Step 3: Type the global**
@@ -2335,7 +2333,7 @@ import type { DesktopBridge } from "../shared/bridge";
 
 declare global {
   interface Window {
-    vibest: DesktopBridge;
+    pie: DesktopBridge;
   }
 }
 
@@ -2347,13 +2345,13 @@ export {};
 Create `apps/desktop/src/renderer/main.tsx`:
 
 ```tsx
-import { createApp } from "@vibest/app/app";
-import type { Platform } from "@vibest/app/platform";
+import { createApp } from "@pie/app/app";
+import type { Platform } from "@pie/app/platform";
 import { createRoot } from "react-dom/client";
 
-import "@vibest/app/index.css";
+import "@pie/app/index.css";
 
-const bridge = window.vibest;
+const bridge = window.pie;
 
 if (!bridge) {
   throw new Error("Preload bridge missing — the renderer cannot reach its backend");
@@ -2376,15 +2374,15 @@ createRoot(rootElement).render(createApp(platform));
 
 - [ ] **Step 5: Update the renderer HTML**
 
-Replace the whole of `apps/desktop/src/renderer/index.html`. The `connect-src` additions are load-bearing: the renderer's origin is `vibest://app`, but it calls the backend on loopback over both HTTP and WebSocket.
+Replace the whole of `apps/desktop/src/renderer/index.html`. The `connect-src` additions are load-bearing: the renderer's origin is `pie://app`, but it calls the backend on loopback over both HTTP and WebSocket.
 
 ```html
 <!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Vibest</title>
-    <!-- The renderer is served from vibest://app but talks to the backend on
+    <title>Pie</title>
+    <!-- The renderer is served from pie://app but talks to the backend on
          loopback, so http:/ws: to 127.0.0.1 must be allowed explicitly. -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -2477,7 +2475,7 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(async () => {
-  electronApp.setAppUserModelId("com.vibest.desktop");
+  electronApp.setAppUserModelId("com.pie.desktop");
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
@@ -2492,7 +2490,7 @@ app.whenReady().then(async () => {
     backend = await startBackend({ corsOrigins });
   } catch (error) {
     dialog.showErrorBox(
-      "Vibest could not start",
+      "Pie could not start",
       `The local server failed to start.\n\n${(error as Error).message}`,
     );
     app.quit();
@@ -2500,7 +2498,7 @@ app.whenReady().then(async () => {
   }
 
   // The preload asks for this before the renderer's first module runs.
-  ipcMain.on("vibest:bootstrap", (event) => {
+  ipcMain.on("pie:bootstrap", (event) => {
     event.returnValue = backend
       ? { httpBaseUrl: backend.httpBaseUrl, wsBaseUrl: backend.wsBaseUrl, token: backend.token }
       : null;
@@ -2532,7 +2530,7 @@ app.on("before-quit", () => {
 Replace the whole of `apps/desktop/electron.vite.config.ts`:
 
 ```ts
-import { appAlias, appVitePlugins } from "@vibest/app/vite";
+import { appAlias, appVitePlugins } from "@pie/app/vite";
 import { defineConfig } from "electron-vite";
 
 export default defineConfig({
@@ -2579,13 +2577,13 @@ export default defineConfig({
 In `apps/desktop/package.json`, add to `dependencies`:
 
 ```json
-    "@vibest/app": "workspace:*",
+    "@pie/app": "workspace:*",
 ```
 
-and change the `dev` script, adding a `predev` before it. The backend is spawned from `packages/vibest/dist`, so it must be built before Electron starts — the same reason opencode has a `predev`.
+and change the `dev` script, adding a `predev` before it. The backend is spawned from `packages/pie/dist`, so it must be built before Electron starts — the same reason opencode has a `predev`.
 
 ```json
-    "predev": "pnpm --filter @vibest/cli build",
+    "predev": "pnpm --filter @pie/cli build",
     "dev": "electron-vite dev",
 ```
 
@@ -2597,13 +2595,13 @@ Expected: PASS — `apps/desktop/dist/{main,preload,renderer}` all produced.
 - [ ] **Step 10: Run the app for real**
 
 Run: `pnpm --filter desktop dev`
-Expected: the Vibest window opens showing the chat UI. Open DevTools (F12) and confirm: no CORS errors, no 401s, and the WebSocket to `ws://127.0.0.1:<port>/ws/rpc?ticket=...` shows status 101. Send a prompt and confirm the response streams.
+Expected: the Pie window opens showing the chat UI. Open DevTools (F12) and confirm: no CORS errors, no 401s, and the WebSocket to `ws://127.0.0.1:<port>/ws/rpc?ticket=...` shows status 101. Send a prompt and confirm the response streams.
 
 - [ ] **Step 11: Commit**
 
 ```bash
 git add apps/desktop
-git commit -m "feat(desktop): render the vibest app against a spawned backend"
+git commit -m "feat(desktop): render the pie app against a spawned backend"
 ```
 
 ---
@@ -2617,9 +2615,9 @@ git commit -m "feat(desktop): render the vibest app against a spawned backend"
 
 **Interfaces:**
 
-- Consumes: `resolveServerEntry(isPackaged=true, resourcesPath)` (Task 10), now → `<resources>/app.asar/node_modules/@vibest/cli/dist/cli.mjs`.
+- Consumes: `resolveServerEntry(isPackaged=true, resourcesPath)` (Task 10), now → `<resources>/app.asar/node_modules/@pie/cli/dist/cli.mjs`.
 
-**Why not `extraResources`:** copying `packages/vibest/dist` to `<resources>/server` puts `cli.mjs` on disk but leaves its imports (`@orpc/server`, `sirv`, `ws`, `ai`, the Claude Agent SDK) unresolvable — the bundle is not self-contained, and nothing supplies a `node_modules` next to the copy. Bundling those deps in is not an option either: the Claude Agent SDK locates its own manifest and native binary relative to its package directory. `@vibest/cli` is already a production dependency of the desktop app, so electron-builder collects it _with its whole dependency tree_, correctly flattened out of pnpm's store, into the asar. Spawn it from there. Electron's Node reads asar paths transparently, including under `ELECTRON_RUN_AS_NODE`.
+**Why not `extraResources`:** copying `packages/pie/dist` to `<resources>/server` puts `cli.mjs` on disk but leaves its imports (`@orpc/server`, `sirv`, `ws`, `ai`, the Claude Agent SDK) unresolvable — the bundle is not self-contained, and nothing supplies a `node_modules` next to the copy. Bundling those deps in is not an option either: the Claude Agent SDK locates its own manifest and native binary relative to its package directory. `@pie/cli` is already a production dependency of the desktop app, so electron-builder collects it _with its whole dependency tree_, correctly flattened out of pnpm's store, into the asar. Spawn it from there. Electron's Node reads asar paths transparently, including under `ELECTRON_RUN_AS_NODE`.
 
 - [ ] **Step 1: Point the packaged entry at the collected dependency**
 
@@ -2627,7 +2625,7 @@ In `apps/desktop/src/main/backend.ts`, the packaged branch of `resolveServerEntr
 
 ```ts
 if (isPackaged) {
-  return path.join(resourcesPath, "app.asar", "node_modules", "@vibest", "cli", "dist", "cli.mjs");
+  return path.join(resourcesPath, "app.asar", "node_modules", "@pie", "cli", "dist", "cli.mjs");
 }
 ```
 
@@ -2639,7 +2637,7 @@ In `apps/desktop/package.json`, change the build scripts so the server bundle ex
 
 ```json
     "build": "electron-vite build",
-    "prebuild": "pnpm --filter @vibest/cli build",
+    "prebuild": "pnpm --filter @pie/cli build",
     "build:unpack": "pnpm run build && electron-builder --dir",
     "build:mac": "pnpm run build && electron-builder --mac",
 ```
@@ -2651,19 +2649,19 @@ Expected: PASS.
 
 - [ ] **Step 4: Verify the server landed in the bundle**
 
-Check that `node_modules/@vibest/cli/dist/cli.mjs` is listed inside `apps/desktop/release/mac-arm64/Vibest.app/Contents/Resources/app.asar` (read the asar header, or run the entry directly with `ELECTRON_RUN_AS_NODE=1 VIBEST_PORT=0`, which should print a ready line).
+Check that `node_modules/@pie/cli/dist/cli.mjs` is listed inside `apps/desktop/release/mac-arm64/Pie.app/Contents/Resources/app.asar` (read the asar header, or run the entry directly with `ELECTRON_RUN_AS_NODE=1 PIE_PORT=0`, which should print a ready line).
 Expected: present, and it boots. (On a non-macOS host, substitute the platform's output directory under `apps/desktop/release/`.)
 
 - [ ] **Step 5: Launch the packaged app**
 
-Run: `open apps/desktop/release/mac-arm64/Vibest.app`
+Run: `open apps/desktop/release/mac-arm64/Pie.app`
 Expected: the window opens and the chat UI loads — proving the packaged app spawns its bundled server using Electron's own Node runtime, with no system Node involved.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add apps/desktop
-git commit -m "build(desktop): bundle the vibest server as an app resource"
+git commit -m "build(desktop): bundle the pie server as an app resource"
 ```
 
 ---
@@ -2678,9 +2676,9 @@ git commit -m "build(desktop): bundle the vibest server as an app resource"
 
 **Interfaces:**
 
-- Consumes: the built app from `apps/desktop/dist` and the built server from `packages/vibest/dist`.
+- Consumes: the built app from `apps/desktop/dist` and the built server from `packages/pie/dist`.
 
-**Why this task matters more than it looks:** `pnpm dev` loads the renderer from the Vite dev server, so the `vibest://` protocol handler — including its SPA fallback — **never runs in development**. This suite is the only thing that exercises it. The deep-link test below is not decoration; it is the regression test for "works in dev, blank window when packaged."
+**Why this task matters more than it looks:** `pnpm dev` loads the renderer from the Vite dev server, so the `pie://` protocol handler — including its SPA fallback — **never runs in development**. This suite is the only thing that exercises it. The deep-link test below is not decoration; it is the regression test for "works in dev, blank window when packaged."
 
 - [ ] **Step 1: Give the fixture more time to boot**
 
@@ -2713,15 +2711,15 @@ test.describe("App launch", () => {
     await expect(window.locator("#root")).not.toBeEmpty();
   });
 
-  test("serves the renderer over the vibest:// protocol", async ({ window }) => {
+  test("serves the renderer over the pie:// protocol", async ({ window }) => {
     const origin = await window.evaluate(() => location.origin);
-    expect(origin).toBe("vibest://app");
+    expect(origin).toBe("pie://app");
   });
 });
 
 test.describe("Backend connection", () => {
   test("hands the renderer a loopback backend and a token", async ({ window }) => {
-    const backend = await window.evaluate(() => window.vibest?.backend);
+    const backend = await window.evaluate(() => window.pie?.backend);
     expect(backend?.httpBaseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(backend?.wsBaseUrl).toMatch(/^ws:\/\/127\.0\.0\.1:\d+$/);
     expect(backend?.token).toBeTruthy();
@@ -2729,7 +2727,7 @@ test.describe("Backend connection", () => {
 
   test("the spawned server answers on its reported port", async ({ window }) => {
     const status = await window.evaluate(async () => {
-      const base = window.vibest.backend.httpBaseUrl;
+      const base = window.pie.backend.httpBaseUrl;
       const response = await fetch(`${base}/api/health`);
       return response.status;
     });
@@ -2738,7 +2736,7 @@ test.describe("Backend connection", () => {
 
   test("rejects an unauthenticated RPC call", async ({ window }) => {
     const status = await window.evaluate(async () => {
-      const base = window.vibest.backend.httpBaseUrl;
+      const base = window.pie.backend.httpBaseUrl;
       const response = await fetch(`${base}/api/ws-ticket`, { method: "POST" });
       return response.status;
     });
@@ -2754,7 +2752,7 @@ test.describe("Deep links", () => {
   test("reloading on a router path serves the app, not a 404", async ({ electronApp, window }) => {
     await electronApp.evaluate(async ({ BrowserWindow }) => {
       const [win] = BrowserWindow.getAllWindows();
-      await win?.loadURL("vibest://app/chat/deep-link-regression");
+      await win?.loadURL("pie://app/chat/deep-link-regression");
     });
 
     await window.waitForLoadState("domcontentloaded");
@@ -2767,7 +2765,7 @@ test.describe("Deep links", () => {
 
 - [ ] **Step 3: Make the e2e script build both bundles**
 
-In `apps/desktop/package.json`, change the e2e scripts — the packaged app spawns the server from `packages/vibest/dist`, so it must exist:
+In `apps/desktop/package.json`, change the e2e scripts — the packaged app spawns the server from `packages/pie/dist`, so it must exist:
 
 ```json
     "e2e": "pnpm run prebuild && pnpm run build && playwright test -c e2e/playwright.config.ts",
@@ -2797,7 +2795,7 @@ git commit -m "test(desktop): cover protocol, backend handshake, and deep-link r
 - [ ] **Step 1: Clean install**
 
 Run: `pnpm install`
-Expected: PASS, no peer warnings that mention `@vibest/web`.
+Expected: PASS, no peer warnings that mention `@pie/web`.
 
 - [ ] **Step 2: Full check**
 
@@ -2816,9 +2814,9 @@ Expected: PASS.
 
 - [ ] **Step 5: Verify browser mode is intact**
 
-Run: `node packages/vibest/dist/cli.mjs`
+Run: `node packages/pie/dist/cli.mjs`
 Then open `http://127.0.0.1:4000`.
-Expected: the chat UI loads and works. No token, no CORS, no ticket — the same-origin path is unchanged. This is the check that the desktop work did not quietly break `npx vibest`.
+Expected: the chat UI loads and works. No token, no CORS, no ticket — the same-origin path is unchanged. This is the check that the desktop work did not quietly break `npx pie`.
 Stop the server with Ctrl-C.
 
 - [ ] **Step 6: Verify desktop mode is intact**

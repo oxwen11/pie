@@ -1,5 +1,5 @@
 {
-  "extends": "@vibest/typescript/react-library.json",
+  "extends": "@pie/typescript/react-library.json",
   "compilerOptions": {
     "types": ["vite/client"],
     "paths": {

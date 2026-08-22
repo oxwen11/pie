@@ -6,7 +6,7 @@
 >
 > 相关 ADR：`docs/adr/0003-pi-history-role-segmentation.md`（分段规则与 steer 差异）。
 >
-> 2026-07-30 适配 #153「dissolve @vibest/harness into contract + server」：纯转换层
+> 2026-07-30 适配 #153「dissolve @pie/harness into contract + server」：纯转换层
 > 不再是独立包，落点改为 `packages/server/src/harness/pi/`；`ai` 已是 server 直接依赖。
 >
 > **勘误（2026-08-04，`fix/lazy-harness-agent-runtime`）**：§9 里两条否决结论已被
@@ -96,10 +96,10 @@ managed session 背后就是那个 pi 进程。PiAgent（`harness/pi/agent.ts`�
 
 ### 3.1 依赖关系图
 
-**包依赖**（#153 之后 `@vibest/harness` 已不存在；本设计**不新增任何包依赖**）：
+**包依赖**（#153 之后 `@pie/harness` 已不存在；本设计**不新增任何包依赖**）：
 
 ```
-      @vibest/contract  ◄────────  @vibest/server
+      @pie/contract  ◄────────  @pie/server
       叶子：谁都不得反向依赖它        全部运行时 + 全部转换（#153 併入）
       deps: ai · effect ·           deps: contract · ai ·
             @orpc/contract                @earendil-works/pi-coding-agent
@@ -393,10 +393,10 @@ part 的精确字段形状以 `ai@7.0.31` 类型为准；`PiUIMessage` 已带 `P
 - **跨 harness 能力面先行**（port 加 `getMessages` + `unsupported` 档）——用户选 pi 专项，
   能力面归 ticket 10/11 时再抽象。
 - **进程内 `SessionManager` 读盘**（曾短暂采纳）——0ms 且无副作用，但执行钉死的
-  0.80.7 包代码去读用户 CLI（0.82.1）写的文件，读写版本漂移；且 vibest 驱动 agent
+  0.80.7 包代码去读用户 CLI（0.82.1）写的文件，读写版本漂移；且 pie 驱动 agent
   一律走外部进程，进程内加载 pi runtime 是架构特例。用户 2026-07-30 定案改走 RPC。
   **须知这与官方建议相反**：`docs/rpc.md` 开篇建议 Node/TS 应用「直接用
-  `AgentSession` 而不是 spawn 子进程」。该建议隐含「pi 是你应用的依赖」；vibest 的
+  `AgentSession` 而不是 spawn 子进程」。该建议隐含「pi 是你应用的依赖」；pie 的
   前提不同——我们驱动的是**用户自己安装的 pi CLI**，读写必须同一二进制，故不适用。
 - **每次冷读起短命进程**（曾短暂采纳）——每读一次付 170MB 内存尖峰 + ~400ms 启动。
   用户 2026-07-30 否决。

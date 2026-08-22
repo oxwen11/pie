@@ -11,7 +11,7 @@
   },
   "rules": {
     "unicorn/prefer-node-protocol": "error",
-    "vibest/node-import-style": "error",
+    "pie/node-import-style": "error",
     "react/exhaustive-deps": [
       "error",
       {
@@ -72,11 +72,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "**/routeTree.gen.ts",
-    ".conductor",
-    "**/dist/**",
-    "**/node_modules/**",
-    "packages/contract/src/codex/protocol/**"
-  ]
+  "ignorePatterns": ["**/routeTree.gen.ts", ".conductor", "**/dist/**", "**/node_modules/**"]
 }

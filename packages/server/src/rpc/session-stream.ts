@@ -1,4 +1,4 @@
-import type { SubscribeStreamEvent, SubscriptionScope } from "@vibest/contract";
+import type { SubscribeStreamEvent, SubscriptionScope } from "@pie/contract";
 import { Effect, Exit, Scope, Stream } from "effect";
 
 import type { EventBusShape } from "../events";

@@ -108,12 +108,12 @@ git commit -m "feat(desktop): add buildFileTree utility for diff file tree"
 **Step 1: Create the file tree component**
 
 ```typescript
-import { Badge } from "@vibest/ui/components/badge";
+import { Badge } from "@pie/ui/components/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
+} from "@pie/ui/components/collapsible";
 import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { useState } from "react";
 
@@ -262,7 +262,7 @@ git commit -m "feat(desktop): add DiffFileTree component for staged/unstaged sec
 **Step 1: Create the diff content component**
 
 ```typescript
-import { Spinner } from "@vibest/ui/components/spinner";
+import { Spinner } from "@pie/ui/components/spinner";
 import { lazy, Suspense, useEffect, useRef } from "react";
 
 import type { FileDiff } from "../../types";
@@ -356,10 +356,10 @@ git commit -m "feat(desktop): add DiffContent component for rendering all diffs"
 **Step 1: Create the main worktree diff view component**
 
 ```typescript
-import { Button } from "@vibest/ui/components/button";
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@vibest/ui/components/empty";
-import { ScrollArea } from "@vibest/ui/components/scroll-area";
-import { Spinner } from "@vibest/ui/components/spinner";
+import { Button } from "@pie/ui/components/button";
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@pie/ui/components/empty";
+import { ScrollArea } from "@pie/ui/components/scroll-area";
+import { Spinner } from "@pie/ui/components/spinner";
 import { ArrowLeft, FileDiff as FileDiffIcon, PanelRightClose, PanelRightOpen, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

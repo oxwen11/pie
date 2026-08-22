@@ -1,0 +1,5 @@
+{
+  "extends": "@pie/typescript/node.json",
+  "compilerOptions": {},
+  "include": ["./"]
+}

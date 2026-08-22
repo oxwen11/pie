@@ -1,5 +1,5 @@
-import { Button } from "@vibest/ui/components/button";
-import { Input } from "@vibest/ui/components/input";
+import { Button } from "@pie/ui/components/button";
+import { Input } from "@pie/ui/components/input";
 import { GlobeIcon, RotateCwIcon } from "lucide-react";
 import { useStore } from "zustand";
 import { createStore, type StoreApi } from "zustand/vanilla";

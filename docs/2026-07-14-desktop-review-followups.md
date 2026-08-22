@@ -90,8 +90,8 @@ Developer ID + notarization, and a real update feed, before distributing.
 
 ## Low
 
-- **Expired WS tickets are never swept** (`packages/vibest/src/node/auth.ts`): entries are removed only on `consume`; issued-but-abandoned tickets live forever. Auth-gated, so slow growth, not a DoS. Add a lazy purge on `issue`.
-- **WS upgrade ignores the pathname** (`packages/vibest/src/node/server.ts`): a valid ticket upgrades a socket on any path, not just `/ws/rpc`. Needs a valid ticket→token, so not exploitable; just a looser contract.
+- **Expired WS tickets are never swept** (`packages/pie/src/node/auth.ts`): entries are removed only on `consume`; issued-but-abandoned tickets live forever. Auth-gated, so slow growth, not a DoS. Add a lazy purge on `issue`.
+- **WS upgrade ignores the pathname** (`packages/pie/src/node/server.ts`): a valid ticket upgrades a socket on any path, not just `/ws/rpc`. Needs a valid ticket→token, so not exploitable; just a looser contract.
 - **`decodeURIComponent` can throw uncaught** (`apps/desktop/src/main/protocol.ts`): a path with a lone `%` throws `URIError`, rejecting the handle promise instead of a clean 404. Wrap and 404.
 
 ## Attacks that did NOT land (verified, don't re-litigate)
@@ -102,5 +102,5 @@ Developer ID + notarization, and a real update feed, before distributing.
 - **`tokensMatch` not constant-time** — it's length-check then full-width XOR accumulate; runtime is independent of match position. Leaks only length, which for a fixed UUID isn't secret.
 - **`/api/health` info leak** — returns literal `"ok"`, nothing disclosed.
 - **No CSP** — false; the renderer ships a `connect-src`-restricted CSP meta tag.
-- **`VIBEST_CLAUDE_EXECUTABLE` injection** — setting an env var already requires local control; a footgun, not a remote vector.
+- **`PIE_CLAUDE_EXECUTABLE` injection** — setting an env var already requires local control; a footgun, not a remote vector.
 - **Chunked stdout splits the ready line** — `readline.createInterface` reassembles across chunks.

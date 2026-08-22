@@ -26,7 +26,7 @@ Allowed production dependencies:
 - `rpc/**` may depend on the application interface, the shared contract, oRPC, and Effect core.
 - `electron/**` may depend on Electron, `desktop-config.ts`, other `electron/**` modules, and generic callbacks supplied by the composition root.
 - `preload/**` may depend only on Electron and transport constants from `shared/**`.
-- `renderer/**` may depend on browser APIs, the shared contract, oRPC client packages, React, and the root `@vibest/app` composition interface. Compose `PlatformProvider` with `AppInterface`; do not reach into app subpaths or recreate its client/router/chat wiring in Desktop.
+- `renderer/**` may depend on browser APIs, the shared contract, oRPC client packages, React, and the root `@pie/app` composition interface. Compose `PlatformProvider` with `AppInterface`; do not reach into app subpaths or recreate its client/router/chat wiring in Desktop.
 - Create the BrowserWindow and React startup shell immediately, but mount `AppInterface` only after `server.connection` resolves for the first time. Keep `ServerStatusOverlay` outside that Suspense boundary so initial failure still exposes Retry/Quit, while later restarts leave the mounted app and its clients intact.
 
 Forbidden dependencies:
@@ -72,14 +72,14 @@ ManagedRuntime.make(
 - Main creates `MessageChannelMain` and transfers one port to the renderer document.
 - The preload is a narrow one-time relay from `ipcRenderer` to a DOM `MessagePort`.
 - `ipcRenderer` is allowed only in `src/preload/index.ts` for this port handoff.
-- Do not add `ipcMain`, `contextBridge`, `window.vibest`, invoke/send wrappers, or arbitrary IPC channels.
+- Do not add `ipcMain`, `contextBridge`, `window.pie`, invoke/send wrappers, or arbitrary IPC channels.
 - Do not implement a custom request/response protocol over `postMessage`; oRPC owns correlation, serialization, cancellation, and stream transport.
 - Server status is an oRPC AsyncIterator backed by an Effect Stream. Do not reintroduce polling or long-polling.
 - Keep the monotonic status revision as the resume cursor between bootstrap and stream subscription.
 
 ## Custom protocol
 
-- `vibest://app` is a renderer asset origin only.
+- `pie://app` is a renderer asset origin only.
 - It may serve the application entry, assets, and SPA fallback routes.
 - Do not route desktop RPC through the custom protocol.
 - Do not add CORS or Fetch RPC handling to `app-protocol.ts`.
@@ -117,7 +117,7 @@ contextIsolation: true
 nodeIntegration: false
 ```
 
-The preload must not expose Node or Electron objects to the page. The renderer must continue to observe `window.require`, `window.process`, and `window.vibest` as undefined.
+The preload must not expose Node or Electron objects to the page. The renderer must continue to observe `window.require`, `window.process`, and `window.pie` as undefined.
 
 ## Verification
 

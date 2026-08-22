@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef } from "@vibest/contract";
-import type { ClaudeCodeUIMessageChunk } from "@vibest/contract/claude-code";
+import type { SessionRef } from "@pie/contract";
 import { Deferred, Effect, Exit, Fiber, Queue, Ref, Scope } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -14,7 +13,7 @@ import type {
   UserInput,
 } from "../../src/harness/adapter";
 import { AgentOperationError } from "../../src/harness/errors";
-import type { SessionEnvelopeDraft, SessionEvent } from "../../src/harness/events/framework";
+import type { SessionEnvelopeDraft } from "../../src/harness/events/framework";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
 import { makeHarnessAgentRegistry } from "../../src/harness/registry";
 import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
@@ -22,7 +21,6 @@ import { NodePlatformLayer } from "../platform";
 
 const refFor = (sessionId: string): SessionRef => ({
   projectId: "project-1",
-  harnessAgentId: "claude-code",
   sessionId: `server-${sessionId}`,
 });
 
@@ -41,8 +39,8 @@ const makeFixture = Effect.gen(function* () {
         32,
       );
       const closed = yield* Ref.make(false);
-      const emit = (body: ClaudeCodeUIMessageChunk | SessionEvent) =>
-        Queue.offer(events, { harnessAgentId: "claude-code", sessionId, body }).pipe(Effect.asVoid);
+      const emit = (body: SessionEnvelopeDraft["body"]) =>
+        Queue.offer(events, { sessionId, body }).pipe(Effect.asVoid);
       const close = Ref.getAndSet(closed, true).pipe(
         Effect.flatMap((alreadyClosed) =>
           alreadyClosed
@@ -77,7 +75,6 @@ const makeFixture = Effect.gen(function* () {
 
       return {
         sessionId,
-        harnessAgentId: "claude-code",
         events: streamFromQueueOne(events),
         prompt: (_input: UserInput) =>
           Effect.gen(function* () {
@@ -106,8 +103,7 @@ const makeFixture = Effect.gen(function* () {
     });
 
   const adapter = {
-    id: "claude-code",
-    descriptor: { id: "claude-code", name: "Claude Code" },
+    descriptor: { name: "Pi" },
     checkAvailability: Effect.succeed({ available: true }),
     permissionModes: [],
     open: () => makeRuntime("created-session"),
@@ -119,7 +115,7 @@ const makeFixture = Effect.gen(function* () {
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   } satisfies HarnessAgentAdapter;
 
-  const registry = makeHarnessAgentRegistry([adapter]);
+  const registry = makeHarnessAgentRegistry(adapter);
   const bus = yield* makeEventBus();
   const manager = yield* makeHarnessAgentSessionManager(registry, bus).pipe(
     Effect.provide(NodePlatformLayer),
@@ -146,7 +142,7 @@ it.effect("drains the native stream into the session and tears down on close", (
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    const session = yield* fixture.manager.open("claude-code", { cwd: "/tmp" }, {}, ref);
+    const session = yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
 
     const receipt = yield* session.prompt({ parts: [{ type: "text", text: "hello" }] });
     // The manager's drain folds the emitted turn into the session: 3 events, seq 3.
@@ -175,7 +171,7 @@ it.effect("drains the native stream into the session and tears down on close", (
 it.effect("single-flights ensure in owner scope when the first waiter cancels", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
-    const input = { sessionId: "resumed-session", harnessAgentId: "claude-code" } as const;
+    const input = { sessionId: "resumed-session" } as const;
     const ref = refFor("resumed");
     const first = yield* Effect.forkChild(fixture.manager.ensureRuntime(input, ref));
     const second = yield* Effect.forkChild(fixture.manager.ensureRuntime(input, ref));
@@ -202,7 +198,7 @@ it.effect("waits for an in-flight close before reopening the same session id", (
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    const session = yield* fixture.manager.open("claude-code", { cwd: "/tmp" }, {}, ref);
+    const session = yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
     yield* Ref.set(fixture.holdClose, true);
     const close = yield* Effect.forkChild(fixture.manager.close(ref));
     yield* Effect.eventually(
@@ -214,10 +210,7 @@ it.effect("waits for an in-flight close before reopening the same session id", (
       ),
     );
     const resume = yield* Effect.forkChild(
-      fixture.manager.ensureRuntime(
-        { sessionId: session.sessionId, harnessAgentId: "claude-code" },
-        ref,
-      ),
+      fixture.manager.ensureRuntime({ sessionId: session.sessionId }, ref),
     );
 
     yield* Effect.yieldNow;
@@ -243,7 +236,7 @@ it.effect("waits for an in-flight close before reopening the same session id", (
 it.effect("closes a session that is still being resumed", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
-    const input = { sessionId: "resumed-session", harnessAgentId: "claude-code" } as const;
+    const input = { sessionId: "resumed-session" } as const;
     const ref = refFor("resumed");
     const resume = yield* Effect.forkChild(fixture.manager.ensureRuntime(input, ref));
     yield* Effect.eventually(
@@ -269,7 +262,7 @@ it.effect("shares one idempotent close operation", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    yield* fixture.manager.open("claude-code", { cwd: "/tmp" }, {}, ref);
+    yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
     const first = yield* Effect.forkChild(fixture.manager.close(ref));
     const second = yield* Effect.forkChild(fixture.manager.close(ref));
 
@@ -283,7 +276,7 @@ it.effect("a crash releases the runtime but keeps the session queryable", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
     const ref = refFor("created");
-    yield* fixture.manager.open("claude-code", { cwd: "/tmp" }, {}, ref);
+    yield* fixture.manager.open({ cwd: "/tmp" }, {}, ref);
 
     yield* Deferred.succeed(fixture.crashGate, undefined);
     // The crash closes the native runtime (onCrash) …

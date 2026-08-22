@@ -1,6 +1,6 @@
+import type { SessionSummary } from "@pie/contract";
+import { SidebarMenuButton, SidebarMenuItem } from "@pie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
-import type { SessionSummary } from "@vibest/contract";
-import { SidebarMenuButton, SidebarMenuItem } from "@vibest/ui/components/sidebar";
 
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";
 
@@ -24,7 +24,7 @@ export function ProjectSessionRow({
           navigate({
             to: "/session/$sessionId",
             params: { sessionId: session.sessionId },
-            search: { projectId: session.projectId, harness: session.harnessAgentId },
+            search: { projectId: session.projectId },
           })
         }
       >

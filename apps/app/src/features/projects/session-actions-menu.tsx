@@ -1,8 +1,8 @@
+import type { SessionSummary } from "@pie/contract";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@pie/ui/components/menu";
+import { SidebarMenuAction } from "@pie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import type { SessionSummary } from "@vibest/contract";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@vibest/ui/components/menu";
-import { SidebarMenuAction } from "@vibest/ui/components/sidebar";
 import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,7 +28,6 @@ export function SessionActionsMenu({
       orpcQueryUtils.session.archive.call({
         ref: {
           projectId: session.projectId,
-          harnessAgentId: session.harnessAgentId,
           sessionId: session.sessionId,
         },
         archived,

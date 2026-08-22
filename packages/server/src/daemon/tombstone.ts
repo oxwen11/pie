@@ -3,7 +3,7 @@ import { Clock, Effect, FileSystem, type PlatformError } from "effect";
 import { daemonTombstonePath } from "./paths";
 
 /**
- * Whether the stop tombstone is present — `$VIBEST_DAEMON_DIR/daemon.stopped`,
+ * Whether the stop tombstone is present — `$PIE_DAEMON_DIR/daemon.stopped`,
  * written by an explicit `stopDaemon` so automatic supervision (the desktop's
  * respawn loop) does not resurrect a daemon the user deliberately stopped. An
  * explicit start clears it. Its mere existence is the signal; the timestamp is

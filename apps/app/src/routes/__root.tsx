@@ -1,3 +1,4 @@
+import type { SessionRef } from "@pie/contract";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
@@ -5,7 +6,6 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import type { SessionRef } from "@vibest/contract";
 import { useCallback } from "react";
 
 import {
@@ -39,13 +39,6 @@ export interface RouterAppContext {
 contentPanel.registerAll([filesPanel, filePanel, terminalPanel, diffPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
-  // Fetch the harness list once, right after the client connects and before
-  // any route renders. Every consumer (e.g. the permission-mode picker) then
-  // reads the held result by id.
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(
-      context.orpcQueryUtils.harness.list.queryOptions({ input: {} }),
-    ),
   component: RootLayout,
 });
 

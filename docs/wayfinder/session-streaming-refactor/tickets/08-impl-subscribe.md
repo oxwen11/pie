@@ -16,7 +16,7 @@ blocked-by: [01-contract-types.md, 07-impl-create-resume.md]
 - 状态机换 `idle/running/requires_action/crashed`（requires_action 由 pendingRequests 驱动）。
 - `subscribe`/`getSnapshot` 新契约上线（snapshot 含 cursor + activeTurn.chunks，供客户端 seq 对齐与重放）。
 
-**harness 事件模型迁移（07 调研暴露，本 ticket 承接）**：harness 19 个文件依赖已删的 `SessionEnvelope`/`SessionEvent`/UIMessageChunk-in-envelope 模型、`runtime/rpc.ts` value 级重导已删契约名 → 整个 `@vibest/harness/runtime` 当前加载不了。本 ticket 把 harness 事件/envelope 模型迁到新 `ServerEvent`/`SessionScopedEventDraft`，localize harness 自己的 create/resume 输入类型（不再从 contract 取已删名字），并迁移 `event-manifest.ts` → `SessionScopedEventTypes`/`CollectionEventTypes`（同步改写 `test/event-manifest.test.ts`）。
+**harness 事件模型迁移（07 调研暴露，本 ticket 承接）**：harness 19 个文件依赖已删的 `SessionEnvelope`/`SessionEvent`/UIMessageChunk-in-envelope 模型、`runtime/rpc.ts` value 级重导已删契约名 → 整个 `@pie/harness/runtime` 当前加载不了。本 ticket 把 harness 事件/envelope 模型迁到新 `ServerEvent`/`SessionScopedEventDraft`，localize harness 自己的 create/resume 输入类型（不再从 contract 取已删名字），并迁移 `event-manifest.ts` → `SessionScopedEventTypes`/`CollectionEventTypes`（同步改写 `test/event-manifest.test.ts`）。
 
 **从 ticket 07 归并的 RPC 接线**（07 已交付 port 后的服务端编排层）：
 

@@ -8,7 +8,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionScopedEvent,
   SessionScopedEventBody,
-} from "@vibest/contract";
+} from "@pie/contract";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { describe, expect, it } from "vitest";
 
@@ -18,7 +18,6 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 
 const ref = {
   projectId: "project-1",
-  harnessAgentId: "claude-code",
   sessionId: "session-1",
 } as const;
 
@@ -121,7 +120,6 @@ const assistantText = (message: UIMessage): string =>
 const toolRequest: AgentRequest = {
   type: "tool",
   id: "request-1",
-  harnessAgentId: "claude-code",
   toolName: "Bash",
   input: { command: "pwd" },
   actions: [{ id: "allow", label: "Allow", behavior: "allow" }],
@@ -565,7 +563,6 @@ describe("Chat agent requests", () => {
     const emptyPlan: AgentRequest = {
       type: "plan",
       id: "empty-plan",
-      harnessAgentId: "claude-code",
       plan: "",
       native: null,
     };

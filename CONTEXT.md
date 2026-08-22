@@ -1,6 +1,6 @@
-# vibest
+# pie
 
-Glossary of project-specific terms. vibest integrates AI coding agents into the browser; this file names the concepts that recur across the codebase.
+Glossary of project-specific terms. pie integrates the Pi coding agent into the browser; this file names the concepts that recur across the codebase.
 
 ## Session Domain
 
@@ -13,7 +13,7 @@ The composite identity `{ projectId, harnessAgentId, sessionId }` that every ses
 _Avoid_: bare sessionId as a wire identity or client-state key
 
 **Harness session id**:
-The agent-native session identity (Claude session UUID, Codex thread ID) held in the session's metadata. Internal plumbing for resume/history — never exposed as wire identity.
+The agent-native session identity held in the session's metadata. Internal plumbing for resume/history — never exposed as wire identity.
 _Avoid_: native id
 
 **Attach**:
@@ -39,7 +39,7 @@ _Avoid_: SessionService (its dissolved predecessor in `session/service.ts`)
 The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `adapter.open`/`adapter.resume` — adapters may assume single-flight per session id, which the session's own acquisition ticket guarantees. A ref with nothing live reads as idle at cursor 0 rather than failing, so a client can attach, snapshot and subscribe without starting anything.
 
 **HarnessAgentAdapter / HarnessAgentRuntime** (`harness/adapter.ts`):
-The per-harness door (descriptor, availability, probes, open/resume factory, cold reads) and the live execution resource it produces (prompt/events/config/close) — a pi child, a Claude SDK handle, a Codex thread. The per-agent `XxxAgent` façades under `harness/<agent>/` are private protocol plumbing below the adapter, not shared abstractions.
+The per-harness door (descriptor, availability, probes, open/resume factory, cold reads) and the live execution resource it produces (prompt/events/config/close) — a pi child process. The per-agent `PiAgent` façade under `harness/pi/` is private protocol plumbing below the adapter, not a shared abstraction.
 _Avoid_: HarnessAgentSession for the runtime (it is the in-memory session; see below)
 
 **Private modules** (no Context tags, never wired directly):
@@ -71,7 +71,7 @@ The host: one app-wide instance (`apps/app/src/content-panel.ts`) owning the reg
 _Avoid_: panel manager, panel store
 
 **Panel type**:
-The string a definition registers under (`terminal`, `file`, …). Registration is open: `HarnessAgentIdSchema`-style whitelists have no counterpart here, and an unregistered type in persisted state is skipped, not dropped.
+The string a definition registers under (`terminal`, `file`, …). Registration is open: an unregistered type in persisted state is skipped, not dropped.
 _Avoid_: panel kind, panel variant
 
 **PanelDefinition**:

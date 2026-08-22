@@ -1,6 +1,6 @@
-import { Action, Actions } from "@vibest/ui/ai-elements/actions";
-import { Message, MessageContent } from "@vibest/ui/ai-elements/message";
-import { Response } from "@vibest/ui/ai-elements/response";
+import { Action, Actions } from "@pie/ui/ai-elements/actions";
+import { Message, MessageContent } from "@pie/ui/ai-elements/message";
+import { Response } from "@pie/ui/ai-elements/response";
 import { isToolUIPart, type UIMessage } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";

@@ -11,8 +11,8 @@ import {
   AutocompleteItem,
   AutocompleteList,
   AutocompleteSeparator,
-} from "@vibest/ui/components/autocomplete";
-import { cn } from "@vibest/ui/lib/utils";
+} from "@pie/ui/components/autocomplete";
+import { cn } from "@pie/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 import type * as React from "react";
 

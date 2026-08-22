@@ -1,7 +1,7 @@
 "use client";
 
 import { Fieldset as FieldsetPrimitive } from "@base-ui/react/fieldset";
-import { cn } from "@vibest/ui/lib/utils";
+import { cn } from "@pie/ui/lib/utils";
 import type React from "react";
 
 export function Fieldset({

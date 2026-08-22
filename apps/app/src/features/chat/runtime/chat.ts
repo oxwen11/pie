@@ -1,5 +1,4 @@
 import type {
-  HarnessAgentId,
   PermissionMode,
   PromptPart,
   ReasoningEffort,
@@ -8,7 +7,7 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { generateId, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -74,11 +73,6 @@ type TurnFold = {
 // active turn's retained buffer; live events are increments on top, gated by
 // `seq > cursor` so the overlap around an attach never double-folds.
 export class Chat {
-  // A Chat is bound to one harness for its whole life (a session's harness
-  // never changes), so tool rendering dispatches on it. Only claude-code and
-  // codex have dedicated renderers; any other harness falls back to the
-  // generic tool card.
-  readonly harnessAgentId: HarnessAgentId;
   readonly store: StoreApi<ChatStoreState>;
   readonly #state: ChatState;
   readonly #transport: ChatSessionTransport;
@@ -114,8 +108,7 @@ export class Chat {
   // over it.
   #terminated = false;
 
-  constructor({ sessionRef, transport, onTerminated }: ChatInit) {
-    this.harnessAgentId = sessionRef.harnessAgentId;
+  constructor({ sessionRef: _sessionRef, transport, onTerminated }: ChatInit) {
     this.#state = new ChatState();
     this.store = this.#state.store;
     this.#transport = transport;

@@ -4,9 +4,9 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
-import { useControllableState } from "@vibest/ui/hooks/use-controllable-state";
-import { cn } from "@vibest/ui/lib/utils";
+} from "@pie/ui/components/collapsible";
+import { useControllableState } from "@pie/ui/hooks/use-controllable-state";
+import { cn } from "@pie/ui/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";

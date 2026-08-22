@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/client";
-import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@vibest/contract";
+import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { OrpcChatSessionTransport, type ChatTransportClient } from "./chat-transport";
@@ -7,7 +7,6 @@ import type { ChatTransportEvent } from "./chat-transport-port";
 
 const ref = {
   projectId: "project-1",
-  harnessAgentId: "claude-code",
   sessionId: "session-1",
 } as const;
 

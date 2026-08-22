@@ -4,17 +4,15 @@ import type {
   SubscribeStreamEvent,
   SubscriptionClosedReason,
   SubscriptionScope,
-} from "@vibest/contract";
-import { isSessionScopedEvent } from "@vibest/contract";
+} from "@pie/contract";
+import { isSessionScopedEvent } from "@pie/contract";
 import { Context, Effect, Layer, Queue, Ref, Scope, Stream, SynchronizedRef } from "effect";
 import type * as Cause from "effect/Cause";
 
 const DEFAULT_SUBSCRIBER_CAPACITY = 256;
 
 const refEquals = (a: SessionRef, b: SessionRef): boolean =>
-  a.projectId === b.projectId &&
-  a.harnessAgentId === b.harnessAgentId &&
-  a.sessionId === b.sessionId;
+  a.projectId === b.projectId && a.sessionId === b.sessionId;
 
 /** Session scope sees only its own scoped events; global is the firehose. */
 const matches = (scope: SubscriptionScope, event: ServerEvent): boolean =>

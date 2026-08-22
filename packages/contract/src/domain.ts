@@ -4,20 +4,12 @@ import { Schema } from "effect";
 export const toStandardSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
   Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema));
 
-export const HarnessAgentIdSchema = Schema.Literals(["claude-code", "codex", "pi"]);
-export type HarnessAgentId = typeof HarnessAgentIdSchema.Type;
-// Derived from the schema rather than written out a second time: clients that
-// need the ids as data (narrowing a URL param, say) would otherwise keep their
-// own copy, and a fourth harness would silently miss it.
-export const HARNESS_AGENT_IDS: ReadonlyArray<HarnessAgentId> = HarnessAgentIdSchema.literals;
-
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
 export const SessionRefSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
-  harnessAgentId: HarnessAgentIdSchema,
   // Server-generated, opaque to clients, and globally unique for reverse lookup.
   // Session operations still use the complete ref rather than this field alone.
   sessionId: Schema.NonEmptyString,
@@ -61,7 +53,6 @@ export const AgentRequestSchema = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("tool"),
     id: Schema.String,
-    harnessAgentId: HarnessAgentIdSchema,
     toolName: Schema.String,
     input: Schema.Record(Schema.String, Schema.Unknown),
     actions: Schema.Array(AgentRequestActionSchema),
@@ -72,14 +63,12 @@ export const AgentRequestSchema = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("question"),
     id: Schema.String,
-    harnessAgentId: HarnessAgentIdSchema,
     questions: Schema.Array(AgentRequestQuestionSchema),
     native: Schema.Unknown,
   }),
   Schema.Struct({
     type: Schema.Literal("plan"),
     id: Schema.String,
-    harnessAgentId: HarnessAgentIdSchema,
     plan: Schema.String,
     native: Schema.Unknown,
   }),
@@ -360,7 +349,7 @@ export type ActivePromptSnapshot = {
 // Session settings (docs/design/harness-concept-ownership.md)
 //
 // Two channels, split by who owns the value's meaning:
-// - Normalized: vibest defines a closed union, adapters declare the subset they
+// - Normalized: pie defines a closed union, adapters declare the subset they
 //   support and map members to their native system privately. Labels, icons and
 //   ordering live in the client — the words are ours.
 // - Opaque: the harness/provider defines an open set we merely relay. Labels
@@ -411,10 +400,9 @@ export const ModelInfoSchema = Schema.Struct({
 });
 export type ModelInfo = typeof ModelInfoSchema.Type;
 
-// A source of models. Today every harness doubles as exactly one built-in
-// provider (`id === harnessAgentId`); user-configured providers join the same
-// shape later. Models never leave their provider — flattening loses the half
-// of the composite key that makes `modelId` meaningful.
+// A source of models. User-configured providers join this shape later. Models
+// never leave their provider — flattening loses the half of the composite key
+// that makes `modelId` meaningful.
 // No default marker on purpose: a catalog's "default" flag is the provider's
 // suggestion, not what an unconfigured session actually runs (the harness's
 // own user config decides that, and it is not probeable). The default is
@@ -425,52 +413,6 @@ export const ProviderInfoSchema = Schema.Struct({
   models: Schema.Array(ModelInfoSchema),
 });
 export type ProviderInfo = typeof ProviderInfoSchema.Type;
-
-// A model is addressed by the flat pair `providerId` + `modelId`, always
-// travelling together: `modelId` is only unique within its provider, so one
-// without the other is meaningless. `providerId` is a routing key like a
-// sessionId — the client groups and echoes it but never branches on its value.
-
-// One entry of `harness.list`: a harness the server hosts, whether it's usable
-// right now (`available` + optional `reason`), and the normalized settings it
-// declares. `permissionModes` is the subset of our vocabulary this harness can
-// honour — empty means it has no permission protocol at all (pi) and the UI
-// renders no control. `defaultPermissionMode` differs per harness on purpose:
-// codex's "full" also drops its sandbox, so it defaults lower than claude-code.
-export const HarnessAgentInfoSchema = Schema.Struct({
-  id: HarnessAgentIdSchema,
-  name: Schema.String,
-  available: Schema.Boolean,
-  reason: Schema.optionalKey(Schema.String),
-  permissionModes: Schema.Array(PermissionModeSchema),
-  defaultPermissionMode: Schema.optionalKey(PermissionModeSchema),
-});
-export type HarnessAgentInfo = typeof HarnessAgentInfoSchema.Type;
-
-export const HarnessListOutputSchema = Schema.Struct({
-  harnessAgents: Schema.Array(HarnessAgentInfoSchema),
-});
-export type HarnessListOutput = typeof HarnessListOutputSchema.Type;
-
-// Addressed by directory, not by projectId: the harness layer has never known
-// what a project is (see `session/port.ts` — "the port speaks ... a resolved
-// `cwd` only"), and the directory is what the answer actually depends on. It
-// also makes the cache key right for free: two projects registered at the same
-// path share one probe instead of spawning twice for the same answer.
-export const HarnessProbeInputSchema = Schema.Struct({
-  harnessAgentId: HarnessAgentIdSchema,
-  cwd: Schema.String,
-});
-export type HarnessProbeInput = typeof HarnessProbeInputSchema.Type;
-
-// What probing one harness in one directory yielded. Empty `providers` means
-// the harness has no model catalogue at all (pi). A failed probe is an error,
-// never an empty result — an expired login must stay distinguishable from
-// "this harness has no model picker".
-export const HarnessProbeOutputSchema = Schema.Struct({
-  providers: Schema.Array(ProviderInfoSchema),
-});
-export type HarnessProbeOutput = typeof HarnessProbeOutputSchema.Type;
 
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
@@ -600,11 +542,6 @@ export const BrowseResultSchema = Schema.Struct({
 // the RPC boundary rejects.
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
-  harnessAgentId: HarnessAgentIdSchema,
-  providerId: Schema.optionalKey(Schema.String),
-  modelId: Schema.optionalKey(Schema.String),
-  reasoningEffort: Schema.optionalKey(ReasoningEffortSchema),
-  permissionMode: Schema.optionalKey(PermissionModeSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 
@@ -616,7 +553,6 @@ export type ListSessionsInput = typeof ListSessionsInputSchema.Type;
 
 export type SessionSummary = {
   readonly projectId: string;
-  readonly harnessAgentId: HarnessAgentId;
   readonly sessionId: string;
   readonly title?: string;
   readonly archived: boolean;
@@ -658,9 +594,8 @@ export type ArchiveSessionInput = typeof ArchiveSessionInputSchema.Type;
 export const RefInputSchema = Schema.Struct({ ref: SessionRefSchema });
 export type RefInput = typeof RefInputSchema.Type;
 
-// The server sessionId is a globally-unique uuid, so projectId + harnessAgentId
-// are recoverable from it alone. Clients that only hold a sessionId (a
-// bookmarked/reloaded URL) resolve the full SessionRef through this.
+// The server sessionId is globally unique. Clients that only hold a sessionId
+// (a bookmarked/reloaded URL) resolve the full SessionRef through this.
 export const ResolveRefInputSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isUUID()),
 });

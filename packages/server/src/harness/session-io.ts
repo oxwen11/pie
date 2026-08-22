@@ -1,9 +1,4 @@
-import {
-  HarnessAgentIdSchema,
-  InspectorTargetSchema,
-  PermissionModeSchema,
-  ReasoningEffortSchema,
-} from "@vibest/contract";
+import { InspectorTargetSchema, PermissionModeSchema, ReasoningEffortSchema } from "@pie/contract";
 import { Schema } from "effect";
 
 /**
@@ -17,10 +12,7 @@ import { Schema } from "effect";
  * The session-scoped config knobs. Not part of opening a native session: a
  * session records them and seeds them onto every runtime it acquires, through
  * the same setters the UI drives mid-session, so a create-time choice and a
- * later one reach a runtime by one path. `model` is the provider-local model id
- * — the server unpacked and validated the providerId/modelId pair before the
- * harness layer ever sees it, and `permissionMode` is vibest's own vocabulary,
- * checked against this harness's declared subset at the RPC boundary.
+ * later one reach a runtime by one path.
  */
 export const SessionConfigSchema = Schema.Struct({
   model: Schema.optionalKey(Schema.String),
@@ -43,14 +35,12 @@ export type ResumeSessionInput = typeof ResumeSessionInputSchema.Type;
 
 export const ResumeManagedSessionInputSchema = Schema.Struct({
   sessionId: Schema.String,
-  harnessAgentId: HarnessAgentIdSchema,
   cwd: Schema.optionalKey(Schema.String),
 });
 export type ResumeManagedSessionInput = typeof ResumeManagedSessionInputSchema.Type;
 
 export const CreateManagedSessionResultSchema = Schema.Struct({
   sessionId: Schema.String,
-  harnessAgentId: HarnessAgentIdSchema,
 });
 export type CreateManagedSessionResult = typeof CreateManagedSessionResultSchema.Type;
 

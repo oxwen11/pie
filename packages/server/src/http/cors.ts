@@ -3,11 +3,11 @@
  * renderer's fixed scheme and any loopback web client are always trusted, so a
  * CLI-started daemon accepts the desktop with no per-launch origin negotiation
  * (and no restart-to-widen-CORS dance). Extra origins — e.g. a future hosted
- * web app reaching into a local daemon — come from `VIBEST_CORS_ORIGINS`.
+ * web app reaching into a local daemon — come from `PIE_CORS_ORIGINS`.
  */
 
 /** The desktop renderer's custom-scheme origin (see desktop app-protocol.ts). */
-const DESKTOP_ORIGIN = "vibest://app";
+const DESKTOP_ORIGIN = "pie://app";
 
 /** `http(s)://localhost | 127.0.0.1 | [::1]` on any port — the loopback web clients. */
 const LOOPBACK_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):\d+$/;
@@ -19,8 +19,8 @@ function hostnameOf(host: string): string {
 
 /**
  * The two configured trust extensions, named so call sites cannot swap them:
- * `extraOrigins` (`VIBEST_CORS_ORIGINS`) allowlists exact Origin values, while
- * `allowedHosts` (`VIBEST_ALLOWED_HOSTS`) trusts a reverse proxy's Host — and,
+ * `extraOrigins` (`PIE_CORS_ORIGINS`) allowlists exact Origin values, while
+ * `allowedHosts` (`PIE_ALLOWED_HOSTS`) trusts a reverse proxy's Host — and,
  * through {@link isAllowedOrigin}, the origins it serves.
  */
 export type OriginPolicy = {
@@ -37,7 +37,7 @@ export type OriginPolicy = {
  * `allowedHosts` extends trust to origins served *by* a trusted reverse proxy:
  * a page loaded from an allowlisted Host connects back with an Origin naming
  * that same hostname, so any origin whose hostname is allowlisted is accepted
- * regardless of scheme or port — otherwise `VIBEST_ALLOWED_HOSTS` would render
+ * regardless of scheme or port — otherwise `PIE_ALLOWED_HOSTS` would render
  * the page but leave its WebSocket unable to connect.
  */
 export function isAllowedOrigin(origin: string, policy: OriginPolicy = {}): boolean {
@@ -65,7 +65,7 @@ export function isAllowedOrigin(origin: string, policy: OriginPolicy = {}): bool
  * `extra` lists additional trusted hostnames — a reverse proxy the user runs
  * in front of the daemon (e.g. `tailscale serve` forwarding a tailnet MagicDNS
  * name) preserves its public Host, which is indistinguishable from a rebound
- * one without an explicit allowlist (`VIBEST_ALLOWED_HOSTS`).
+ * one without an explicit allowlist (`PIE_ALLOWED_HOSTS`).
  */
 export function isLoopbackHost(host: string | undefined, extra: readonly string[] = []): boolean {
   if (host === undefined) return true;

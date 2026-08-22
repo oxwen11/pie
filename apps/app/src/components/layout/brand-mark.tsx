@@ -1,7 +1,7 @@
-import { cn } from "@vibest/ui/lib/utils";
+import { cn } from "@pie/ui/lib/utils";
 import type { ReactElement } from "react";
 
-import vibestMarkUrl from "@/assets/vibest-mark.svg?url";
+import pieMarkUrl from "@/assets/pie-mark.svg?url";
 
 // Fills the sidebar row macOS gives to native traffic lights (see
 // app-sidebar.tsx). `size-4` + `gap-2` + `text-sm` are the sidebar menu
@@ -16,11 +16,11 @@ export function BrandMark({ className }: { className?: string }): ReactElement {
         // Quoted, and not optional: dev serves this as a data URI whose own
         // single quotes are illegal inside a bare `url()`, so the browser drops
         // the whole declaration and the mark renders as a filled square.
-        style={{ WebkitMaskImage: `url("${vibestMarkUrl}")`, maskImage: `url("${vibestMarkUrl}")` }}
+        style={{ WebkitMaskImage: `url("${pieMarkUrl}")`, maskImage: `url("${pieMarkUrl}")` }}
       />
       {/* The product name as the desktop build spells it (electron-builder's
           `productName`), not the lowercase package id. */}
-      <span className="text-sm font-medium tracking-tight">Vibest</span>
+      <span className="text-sm font-medium tracking-tight">Pie</span>
     </div>
   );
 }

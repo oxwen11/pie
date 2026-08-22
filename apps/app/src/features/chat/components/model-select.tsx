@@ -1,11 +1,11 @@
-import type { ProviderInfo } from "@vibest/contract";
+import type { ProviderInfo } from "@pie/contract";
 import {
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
-} from "@vibest/ui/ai-elements/prompt-input";
+} from "@pie/ui/ai-elements/prompt-input";
 
 // Presentational model picker: value/onChange driven so it composes both inside
 // a session (ChatModelSelect binds it to ChatSession context) and on the draft

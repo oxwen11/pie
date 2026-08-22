@@ -1,4 +1,4 @@
-import { Button } from "@vibest/ui/components/button";
+import { Button } from "@pie/ui/components/button";
 
 import {
   buildToolResponse,

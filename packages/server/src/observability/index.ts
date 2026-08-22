@@ -33,7 +33,7 @@ export function layer() {
 
 /**
  * Replaces Effect's default stdout logger with a no-op. Tests that do not
- * write `$VIBEST_HOME/logs` still must not leak `Effect.log*` to stdout.
+ * write `$PIE_HOME/logs` still must not leak `Effect.log*` to stdout.
  * `layer()` uses `mergeWithExisting: false`, so providing it replaces this.
  */
 export const discard = Logger.layer([Logger.make(() => {})], { mergeWithExisting: false });

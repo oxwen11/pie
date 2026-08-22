@@ -2,7 +2,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
+} from "@pie/ui/components/collapsible";
 import { isToolUIPart, type UIMessage } from "ai";
 import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useMemo } from "react";

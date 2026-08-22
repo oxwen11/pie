@@ -28,7 +28,6 @@ const makeLayer = (home: string) =>
 const meta = (sessionId: string, projectId: string, harnessSessionId: string): Session => ({
   sessionId,
   projectId,
-  harnessAgentId: "claude-code",
   harnessSessionId,
   createdAt: "2026-07-16T00:00:00.000Z",
 });
@@ -36,7 +35,7 @@ const meta = (sessionId: string, projectId: string, harnessSessionId: string): S
 describe("SessionRepository", () => {
   let home: string;
   beforeEach(async () => {
-    home = await fs.mkdtemp(path.join(os.tmpdir(), "vibest-sess-"));
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-sess-"));
   });
   afterEach(async () => {
     await fs.rm(home, { recursive: true, force: true });

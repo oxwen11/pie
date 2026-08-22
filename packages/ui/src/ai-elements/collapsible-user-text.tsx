@@ -1,4 +1,4 @@
-import { cn } from "@vibest/ui/lib/utils";
+import { cn } from "@pie/ui/lib/utils";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 // Long user messages clamp to 9 lines with a fade-out mask and an expand

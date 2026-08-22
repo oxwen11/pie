@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@vibest/ui/components/avatar";
-import { cn } from "@vibest/ui/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@pie/ui/components/avatar";
+import { cn } from "@pie/ui/lib/utils";
 import type { UIMessage } from "ai";
 import type { ComponentProps, HTMLAttributes } from "react";
 

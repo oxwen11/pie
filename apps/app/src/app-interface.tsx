@@ -15,7 +15,7 @@ import type { ServerConnection } from "./server-connection";
 
 declare global {
   interface ImportMetaEnv {
-    readonly VIBEST_RUN_IN_AGENT: boolean;
+    readonly PIE_RUN_IN_AGENT: boolean;
   }
 }
 
@@ -27,7 +27,7 @@ declare global {
 // `/core` is the entry that doesn't auto-init, so it takes `telemetry: false` —
 // the default init fires a version check at react-grab.com, which the Electron
 // renderer's CSP blocks with a console error.
-if (import.meta.env.DEV && !import.meta.env.VIBEST_RUN_IN_AGENT) {
+if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
 }
 
@@ -38,7 +38,7 @@ if (import.meta.env.DEV && !import.meta.env.VIBEST_RUN_IN_AGENT) {
 // https://react-scan.com.
 // Its own version check has no opt-out and is patched out instead — see
 // `patches/react-scan@0.5.7.patch`.
-if (import.meta.env.DEV && !import.meta.env.VIBEST_RUN_IN_AGENT) {
+if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 

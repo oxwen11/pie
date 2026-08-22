@@ -8,9 +8,9 @@ import { makeRpcTestHarness } from "./rpc-harness";
 
 describe("fs router", () => {
   it("reads files and indexes a confined workspace", async () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
-    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-workspace-"));
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-outside-"));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pie-workspace-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "pie-outside-"));
     fs.mkdirSync(path.join(cwd, "src"));
     fs.mkdirSync(path.join(cwd, "node_modules", "pkg"), { recursive: true });
     fs.writeFileSync(path.join(cwd, "README.md"), "# Hello");
@@ -63,8 +63,8 @@ describe("fs router", () => {
   });
 
   it("browses sorted subdirectories with parent, including dotfolders only when requested", async () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-browse-"));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-"));
     fs.mkdirSync(path.join(dir, "beta"));
     fs.mkdirSync(path.join(dir, "alpha"));
     fs.mkdirSync(path.join(dir, ".hidden"));

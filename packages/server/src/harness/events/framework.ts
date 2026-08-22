@@ -1,15 +1,9 @@
-import {
-  AgentRequestSchema,
-  HarnessAgentIdSchema,
-  TokenUsageSchema,
-  TurnErrorSchema,
-} from "@vibest/contract";
-import type { HarnessAgentId } from "@vibest/contract";
+import { AgentRequestSchema, TokenUsageSchema, TurnErrorSchema } from "@pie/contract";
 import type { UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
 /**
- * Harness-internal event vocabulary. The public `@vibest/contract` wire model is
+ * Harness-internal event vocabulary. The public `@pie/contract` wire model is
  * a flat tagged union (`SessionScopedEvent` keyed by `SessionRef`); this module
  * keeps the harness's own ergonomic `defineEvent`/`SessionEnvelope` shape, keyed
  * by the agent-native `sessionId`. `HarnessAgentSession` translates these
@@ -69,7 +63,7 @@ export const SessionCrashed = defineEvent({
 });
 export const SessionCreated = defineEvent({
   type: "session.created",
-  schema: { sessionId: Schema.String, harnessAgentId: HarnessAgentIdSchema },
+  schema: { sessionId: Schema.String },
 });
 export const SessionUpdated = defineEvent({
   type: "session.updated",
@@ -132,7 +126,6 @@ export type GlobalEvent = EventValue<(typeof GlobalEventDefs)[number]>;
 
 export type SessionEnvelopeBody = UIMessageChunk | SessionEvent;
 export type SessionEnvelope = {
-  readonly harnessAgentId: HarnessAgentId;
   readonly sessionId: string;
   readonly seq: number;
   readonly body: SessionEnvelopeBody;

@@ -1,8 +1,8 @@
 {
-  "name": "@vibest/contract",
+  "name": "@pie/contract",
   "version": "0.0.1",
   "private": true,
-  "description": "RPC contract for Vibe Coding Devtools",
+  "description": "RPC contract for Pie",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -10,11 +10,7 @@
     "./harness": "./src/harness.ts",
     "./project": "./src/project.ts",
     "./session": "./src/session.ts",
-    "./session-events": "./src/session-events.ts",
-    "./claude-code": "./src/claude-code/index.ts",
-    "./codex": "./src/codex/index.ts",
-    "./codex/protocol": "./src/codex/protocol/index.ts",
-    "./codex/protocol/v2": "./src/codex/protocol/v2/index.ts"
+    "./session-events": "./src/session-events.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -23,7 +19,6 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@orpc/contract": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
@@ -31,7 +26,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
-    "@vibest/typescript": "workspace:*",
+    "@pie/typescript": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

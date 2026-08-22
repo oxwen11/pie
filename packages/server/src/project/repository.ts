@@ -1,5 +1,5 @@
-import { ProjectSchema } from "@vibest/contract";
-import { type JsonDocument, makeJsonDocument } from "@vibest/effect-json-store";
+import { ProjectSchema } from "@pie/contract";
+import { type JsonDocument, makeJsonDocument } from "@pie/effect-json-store";
 import { Context, Effect, FileSystem, Layer, Option, Ref, Schema, Semaphore } from "effect";
 
 import { Paths } from "../config/paths";
@@ -9,7 +9,7 @@ import type { Project } from "../types";
 const ProjectsSchema = Schema.Array(ProjectSchema);
 
 /**
- * Data access for `$VIBEST_HOME/storage/projects.json` — plain read/write of
+ * Data access for `$PIE_HOME/storage/projects.json` — plain read/write of
  * `Project[]`, no business rules (those live in ProjectService).
  *
  * The document opens lazily on first use and is cached once open. A corrupt

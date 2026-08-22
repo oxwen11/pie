@@ -10,29 +10,29 @@ import { PROJECT_ID, seedProject } from "./fixtures.js";
 
 /**
  * Browser-mode multi-client session sync. Unlike the Electron spec, this
- * drives `vibest serve` (the daemon's foreground form) plus two ordinary
+ * drives `pie serve` (the daemon's foreground form) plus two ordinary
  * browser pages on the same session — the shape multi-client sync exists for.
  *
- * The harness is the fake Claude executable, so scenarios are limited to what
+ * The harness is the fake Pi executable, so scenarios are limited to what
  * it can produce: instant single-message turns, no tool calls, and no on-disk
  * transcript. The last one matters: a client attaching after a turn ended
  * cannot backfill it from history (the real fix for that is a history read),
  * so every assertion below is about turns a client either observed live or
  * recovered from the runtime snapshot.
  *
- * Prerequisite: the SPA must be built (`turbo run build --filter=@vibest/app`)
+ * Prerequisite: the SPA must be built (`turbo run build --filter=@pie/app`)
  * — serve has no dev branch and serves `apps/app/dist` statically.
  */
 
 const repoRoot = path.join(import.meta.dirname, "../../../..");
 const appDist = path.join(repoRoot, "apps/app/dist");
-const fakeClaude = path.join(repoRoot, "tools/testing/fake-claude.mjs");
+const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
 
-const FAKE_REPLY = "E2E fake Claude reply";
+const FAKE_REPLY = "E2E fake Pi reply";
 
 test.skip(
   !fs.existsSync(path.join(appDist, "index.html")),
-  "apps/app/dist is missing — build the SPA first (turbo run build --filter=@vibest/app)",
+  "apps/app/dist is missing — build the SPA first (turbo run build --filter=@pie/app)",
 );
 
 let server: childProcess.ChildProcessWithoutNullStreams | undefined;
@@ -40,21 +40,21 @@ let baseUrl = "";
 
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
 test.beforeAll(async ({}, testInfo) => {
-  const home = testInfo.outputPath("vibest-home");
+  const home = testInfo.outputPath("pie-home");
   seedProject(home, testInfo.outputPath("workspace"));
 
   server = childProcess.spawn(
     path.join(repoRoot, "node_modules/.bin/tsx"),
-    [path.join(repoRoot, "packages/vibest/src/node/cli.ts"), "serve"],
+    [path.join(repoRoot, "packages/pie/src/node/cli.ts"), "serve"],
     {
       env: {
         ...process.env,
-        VIBEST_PORT: "0",
-        VIBEST_HOME: home,
-        VIBEST_E2E: "1",
-        VIBEST_E2E_CLAUDE_EXECUTABLE: fakeClaude,
-        VIBEST_E2E_CLAUDE_LOG: testInfo.outputPath("fake-claude.jsonl"),
-        VIBEST_E2E_CLAUDE_RESPONSE: FAKE_REPLY,
+        PIE_PORT: "0",
+        PIE_HOME: home,
+        PIE_E2E: "1",
+        PIE_E2E_PI_EXECUTABLE: fakePi,
+        PIE_E2E_PI_LOG: testInfo.outputPath("fake-pi.jsonl"),
+        PIE_E2E_PI_RESPONSE: FAKE_REPLY,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -63,12 +63,12 @@ test.beforeAll(async ({}, testInfo) => {
   baseUrl = await new Promise<string>((resolve, reject) => {
     let output = "";
     const timeout = setTimeout(
-      () => reject(new Error(`vibest serve never became ready:\n${output}`)),
+      () => reject(new Error(`pie serve never became ready:\n${output}`)),
       30_000,
     );
     const scan = (chunk: Buffer) => {
       output += chunk.toString();
-      const ready = output.match(/vibest:ready\s*({.+})/);
+      const ready = output.match(/pie:ready\s*({.+})/);
       if (ready?.[1]) {
         clearTimeout(timeout);
         const { port } = JSON.parse(ready[1]) as { port: number };
@@ -79,7 +79,7 @@ test.beforeAll(async ({}, testInfo) => {
     server?.stderr.on("data", scan);
     server?.once("exit", (code) => {
       clearTimeout(timeout);
-      reject(new Error(`vibest serve exited with ${code}:\n${output}`));
+      reject(new Error(`pie serve exited with ${code}:\n${output}`));
     });
   });
 });
@@ -104,7 +104,7 @@ const createSession = async (browser: Browser, firstPrompt: string): Promise<Pag
   const page = await context.newPage();
   // Draft config lives in the URL, so the project and harness are picked
   // deterministically instead of driving two dropdowns.
-  await page.goto(`${baseUrl}/draft?projectId=${PROJECT_ID}&harness=claude-code`);
+  await page.goto(`${baseUrl}/draft?projectId=${PROJECT_ID}&harness=pi`);
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
   await send(page, firstPrompt);
   await page.waitForURL(/\/session\//, { timeout: 20_000 });

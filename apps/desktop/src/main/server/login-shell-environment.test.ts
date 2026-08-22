@@ -7,7 +7,7 @@ function fenced(environment: NodeJS.ProcessEnv, noise = "") {
   const entries = Object.entries(environment)
     .map(([key, value]) => `${key}=${value ?? ""}`)
     .join("\0");
-  return `${noise}\0__vibest_env_start__\0${entries}\0__vibest_env_end__\0`;
+  return `${noise}\0__pie_env_start__\0${entries}\0__pie_env_end__\0`;
 }
 
 function resolve(
@@ -60,20 +60,20 @@ describe("resolveLoginShellEnvironment", () => {
     ]);
   });
 
-  it("keeps launch-time VIBEST_* variables over login-shell exports", async () => {
+  it("keeps launch-time PIE_* variables over login-shell exports", async () => {
     const command = vi.fn<RunCommand>(() =>
-      Effect.succeed(fenced({ PATH: "/opt/homebrew/bin", VIBEST_HOME: "/Users/test/.vibest" })),
+      Effect.succeed(fenced({ PATH: "/opt/homebrew/bin", PIE_HOME: "/Users/test/.pie" })),
     );
 
     await expect(
       resolve(command, {
         platform: "darwin",
         shell: "/bin/zsh",
-        baseEnv: { PATH: "/usr/bin", VIBEST_HOME: "/tmp/switched-home" },
+        baseEnv: { PATH: "/usr/bin", PIE_HOME: "/tmp/switched-home" },
       }),
     ).resolves.toEqual({
       PATH: "/opt/homebrew/bin",
-      VIBEST_HOME: "/tmp/switched-home",
+      PIE_HOME: "/tmp/switched-home",
     });
   });
 

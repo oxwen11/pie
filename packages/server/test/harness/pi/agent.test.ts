@@ -151,7 +151,6 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       assert.equal(request._tag, "Some");
       if (request._tag !== "Some") return;
       assert.deepEqual(request.value, {
-        harnessAgentId: "pi",
         type: "question",
         id: "ui1",
         questions: [

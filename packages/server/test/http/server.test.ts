@@ -76,17 +76,17 @@ describe("createServer auth", () => {
 
 describe("createServer CORS", () => {
   it("answers a preflight from an allowlisted origin", async () => {
-    const base = await start({ authToken: TOKEN, corsOrigins: ["vibest://app"] });
+    const base = await start({ authToken: TOKEN, corsOrigins: ["pie://app"] });
     const response = await fetch(`${base}/api/ws-ticket`, {
       method: "OPTIONS",
-      headers: { origin: "vibest://app" },
+      headers: { origin: "pie://app" },
     });
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe("vibest://app");
+    expect(response.headers.get("access-control-allow-origin")).toBe("pie://app");
   });
 
   it("refuses a preflight from an unknown origin", async () => {
-    const base = await start({ authToken: TOKEN, corsOrigins: ["vibest://app"] });
+    const base = await start({ authToken: TOKEN, corsOrigins: ["pie://app"] });
     const response = await fetch(`${base}/api/ws-ticket`, {
       method: "OPTIONS",
       headers: { origin: "https://evil.example" },
@@ -122,7 +122,7 @@ describe("createServer WebSocket ticket", () => {
     options?: WebSocket.ClientOptions,
   ): Promise<number> {
     const url = `${base.replace("http://", "ws://")}${path}${query}`;
-    const socket = new WebSocket(url, "vibest", options);
+    const socket = new WebSocket(url, "pie", options);
     return await new Promise<number>((resolve) => {
       socket.on("open", () => {
         socket.close();

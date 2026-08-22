@@ -1,7 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
-import { MAX_SESSION_TITLE_CHARS, type SessionSummary } from "@vibest/contract";
-import { Button } from "@vibest/ui/components/button";
+import { MAX_SESSION_TITLE_CHARS, type SessionSummary } from "@pie/contract";
+import { Button } from "@pie/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -10,9 +8,11 @@ import {
   DialogHeader,
   DialogPopup,
   DialogTitle,
-} from "@vibest/ui/components/dialog";
-import { Input } from "@vibest/ui/components/input";
-import { Label } from "@vibest/ui/components/label";
+} from "@pie/ui/components/dialog";
+import { Input } from "@pie/ui/components/input";
+import { Label } from "@pie/ui/components/label";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -51,7 +51,6 @@ export function RenameSessionDialog({
       orpcQueryUtils.session.rename.call({
         ref: {
           projectId: session.projectId,
-          harnessAgentId: session.harnessAgentId,
           sessionId: session.sessionId,
         },
         title: variables.title,
@@ -59,7 +58,6 @@ export function RenameSessionDialog({
     onSuccess: (_result, variables) => {
       const ref = {
         projectId: session.projectId,
-        harnessAgentId: session.harnessAgentId,
         sessionId: session.sessionId,
       };
       reconcileSessionRenameSuccess(

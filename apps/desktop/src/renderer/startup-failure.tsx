@@ -9,7 +9,7 @@ export function StartupFailure({ error }: FallbackProps): ReactElement {
   return (
     <main className="grid min-h-svh place-items-center p-8 font-sans">
       <div className="max-w-lg text-center">
-        <h1 className="text-xl font-medium">Vibest could not start</h1>
+        <h1 className="text-xl font-medium">Pie could not start</h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{message}</p>
       </div>
     </main>

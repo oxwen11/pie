@@ -5,7 +5,7 @@ import { Context, Layer } from "effect";
 
 /**
  * Resolved filesystem locations the runtime persists to. Injected as a service
- * so tests can point it at a temp dir instead of `~/.vibest`.
+ * so tests can point it at a temp dir instead of `~/.pie`.
  *
  * `projects.json` lives under `storage/` (a data collection).
  */
@@ -16,7 +16,7 @@ export class Paths extends Context.Service<
     readonly projectsFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
-    /** `$VIBEST_HOME/logs` — process log and daemon stdio. */
+    /** `$PIE_HOME/logs` — process log and daemon stdio. */
     readonly logsDir: string;
   }
 >()("Paths") {}
@@ -25,7 +25,7 @@ export class Paths extends Context.Service<
 export const LOGS_DIRECTORY_MODE = 0o700;
 export const LOG_FILE_MODE = 0o600;
 
-export const VIBEST_LOG_FILE = "vibest.log";
+export const PIE_LOG_FILE = "pie.log";
 export const DAEMON_STDIO_LOG_FILE = "daemon-stdio.log";
 
 const resolve = (home: string) => ({
@@ -37,7 +37,7 @@ const resolve = (home: string) => ({
 
 /**
  * An unset variable and one set to the empty string mean the same thing here.
- * Without this, `VIBEST_DAEMON_DIR=""` resolves every lifecycle file to a bare
+ * Without this, `PIE_DAEMON_DIR=""` resolves every lifecycle file to a bare
  * relative path under whatever cwd the process happens to have — `stop` and
  * `status` would silently read the wrong daemon instead of failing.
  */
@@ -45,8 +45,8 @@ const explicitPath = (value: string | undefined): string | undefined =>
   value === undefined || value.trim() === "" ? undefined : value;
 
 /**
- * `$VIBEST_HOME`, falling back to `~/.vibest-dev` under
- * `NODE_ENV=development` and `~/.vibest` otherwise — the single home every
+ * `$PIE_HOME`, falling back to `~/.pie-dev` under
+ * `NODE_ENV=development` and `~/.pie` otherwise — the single home every
  * client (server Paths, CLI, desktop, daemon launcher) resolves through, so
  * Project and Session storage can never drift on a second definition.
  * The dev split keeps `pnpm dev` / `electron-vite dev` sessions from sharing
@@ -57,19 +57,19 @@ const explicitPath = (value: string | undefined): string | undefined =>
  * because callers lack a runtime — every one of them is inside an `Effect.gen`
  * today — but because there is nothing here to suspend.
  */
-export function resolveVibestHome(env: NodeJS.ProcessEnv = process.env): string {
+export function resolvePieHome(env: NodeJS.ProcessEnv = process.env): string {
   return (
-    explicitPath(env.VIBEST_HOME) ??
-    path.join(os.homedir(), env.NODE_ENV === "development" ? ".vibest-dev" : ".vibest")
+    explicitPath(env.PIE_HOME) ??
+    path.join(os.homedir(), env.NODE_ENV === "development" ? ".pie-dev" : ".pie")
   );
 }
 
 /** The two directories a daemon front door needs, resolved together. */
 export type DaemonLocation = {
-  /** `$VIBEST_HOME` — Projects and Sessions. Handed to the daemon process. */
+  /** `$PIE_HOME` — Projects and Sessions. Handed to the daemon process. */
   readonly home: string;
-  /** `$VIBEST_DAEMON_DIR` — `daemon.pid`, `.lock`, `.stopped`. Lifecycle state
-   * only; the daemon's logs live under `$VIBEST_HOME/logs`. */
+  /** `$PIE_DAEMON_DIR` — `daemon.pid`, `.lock`, `.stopped`. Lifecycle state
+   * only; the daemon's logs live under `$PIE_HOME/logs`. */
   readonly daemonDir: string;
 };
 
@@ -79,17 +79,17 @@ export type DaemonLocation = {
  * itself: `stop` must find what `start` wrote, and the desktop must find what
  * the CLI started, which only holds while there is one pairing rule.
  *
- * An explicit `$VIBEST_DAEMON_DIR` lets multiple daemon processes use separate
+ * An explicit `$PIE_DAEMON_DIR` lets multiple daemon processes use separate
  * lifecycle state while keeping their server data under the same
- * `$VIBEST_HOME`; unset, it is `$VIBEST_HOME/daemon` (`~/.vibest/daemon` in
+ * `$PIE_HOME`; unset, it is `$PIE_HOME/daemon` (`~/.pie/daemon` in
  * production). This is the one place that default is spelled — the
  * single-instance invariant is keyed on the daemon directory, so a second
  * definition would be a second daemon. `daemon/paths.ts` names files inside a
  * directory it is handed and never re-derives the directory itself.
  */
 export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): DaemonLocation {
-  const home = resolveVibestHome(env);
-  return { home, daemonDir: explicitPath(env.VIBEST_DAEMON_DIR) ?? path.join(home, "daemon") };
+  const home = resolvePieHome(env);
+  return { home, daemonDir: explicitPath(env.PIE_DAEMON_DIR) ?? path.join(home, "daemon") };
 }
 
 /** `resolveDaemonLocation().daemonDir`, for callers that need only the directory. */
@@ -97,10 +97,10 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
   return resolveDaemonLocation(env).daemonDir;
 }
 
-/** `$VIBEST_HOME/logs` — the one directory every server process writes logs to. */
+/** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
 
-export const vibestLogPath = (logsDir: string): string => path.join(logsDir, VIBEST_LOG_FILE);
+export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 
 export const daemonStdioLogPath = (logsDir: string): string =>
   path.join(logsDir, DAEMON_STDIO_LOG_FILE);
@@ -108,10 +108,10 @@ export const daemonStdioLogPath = (logsDir: string): string =>
 /** Point the runtime at an explicit home directory (used in tests). */
 export const layerPaths = (home: string): Layer.Layer<Paths> => Layer.succeed(Paths, resolve(home));
 
-/** Default: `$VIBEST_HOME`, falling back to `~/.vibest-dev` (dev) / `~/.vibest`. */
+/** Default: `$PIE_HOME`, falling back to `~/.pie-dev` (dev) / `~/.pie`. */
 export const PathsLayer: Layer.Layer<Paths> = Layer.sync(
   Paths,
   // Resolved when the layer is built, not when this module is imported — the
-  // daemon sets `VIBEST_HOME` in the child's environment.
-  () => resolve(resolveVibestHome()),
+  // daemon sets `PIE_HOME` in the child's environment.
+  () => resolve(resolvePieHome()),
 );

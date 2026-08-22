@@ -1,5 +1,5 @@
-import { CodeBlock } from "@vibest/ui/ai-elements/code-block";
-import { Tool, ToolContent, ToolHeader } from "@vibest/ui/ai-elements/tool";
+import { CodeBlock } from "@pie/ui/ai-elements/code-block";
+import { Tool, ToolContent, ToolHeader } from "@pie/ui/ai-elements/tool";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import { WrenchIcon } from "lucide-react";
 

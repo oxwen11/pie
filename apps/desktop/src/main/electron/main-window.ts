@@ -38,7 +38,7 @@ export function makeMainWindow(
   return Effect.gen(function* () {
     let mainWindow: BrowserWindow | undefined;
     let disconnectRenderer: (() => Promise<void>) | undefined;
-    const isE2E = process.env["VIBEST_E2E"] === "1";
+    const isE2E = process.env["PIE_E2E"] === "1";
 
     const disconnectCurrentRenderer = (): void => {
       const disconnect = disconnectRenderer;

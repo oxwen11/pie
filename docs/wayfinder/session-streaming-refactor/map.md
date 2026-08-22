@@ -25,7 +25,7 @@ labels: [wayfinder:map]
    `CONTEXT.md` 的 _Avoid_ 清单。自增仍在 fold 处，且与 publish 同持一个信号量，
    否则两个 fiber 可能先发 n+1 再发 n，客户端的 `seq ≤ cursor` 守卫会永久丢掉 n。
 5. **慢消费者**：订阅者有界队列满 → 发终止性 `closed(slow_consumer)` 踢掉，删除现有 gap 折叠 / `degraded` / `REPLAY_CAPACITY` 机制；active-turn buffer 不设上限，只记 count/bytes 指标，turn 结束释放。
-6. **create**：入参 `{projectId, harnessAgentId, ...}` → 出参 `SessionRef {projectId, harnessAgentId, sessionId}`；sessionId 由 server 生成，adapter 原生 ID 降级为元数据字段 `harnessSessionId`；元数据文件 `~/.vibest/storage/sessions/<projectId>/<sessionId>.json` 原子写；adapter 只见 cwd 不见 projectId；任一步失败不留半初始化状态。
+6. **create**：入参 `{projectId, harnessAgentId, ...}` → 出参 `SessionRef {projectId, harnessAgentId, sessionId}`；sessionId 由 server 生成，adapter 原生 ID 降级为元数据字段 `harnessSessionId`；元数据文件 `~/.pie/storage/sessions/<projectId>/<sessionId>.json` 原子写；adapter 只见 cwd 不见 projectId；任一步失败不留半初始化状态。
 7. **恢复三路径**：刷新（无 cursor，全量重建）/ 短暂断线（带 cursor 续传，turn 变更先用历史收敛旧 projection）/ 服务重启（`SESSION_NOT_ACTIVE` → resume → 走刷新路径），客户端收敛为单个 reconcile 入口。
    **勘误（2026-08-04）**：第三条的服务端一半已被 `fix/lazy-harness-agent-runtime`
    取代。`getStatus`/`getSnapshot` 现在是全函数——本进程没碰过的持久化会话读作

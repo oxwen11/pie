@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -14,7 +14,6 @@ import { type HarnessAgentSessionShape, makeHarnessAgentSession } from "../../sr
 
 const ref: SessionRef = {
   projectId: "project-1",
-  harnessAgentId: "claude-code",
   sessionId: "session-1",
 };
 
@@ -47,10 +46,7 @@ const runtimeFrom = (
   options: { readonly closes?: Ref.Ref<number>; readonly models?: Ref.Ref<Array<string>> } = {},
 ): HarnessAgentRuntime => ({
   sessionId: nativeId,
-  harnessAgentId: "claude-code",
-  events: streamFromQueueOne(queue).pipe(
-    Stream.map((body) => ({ harnessAgentId: "claude-code" as const, sessionId: nativeId, body })),
-  ),
+  events: streamFromQueueOne(queue).pipe(Stream.map((body) => ({ sessionId: nativeId, body }))),
   prompt: () => Effect.succeed({ turnId: "turn-1" }),
   setModel: (model) =>
     options.models ? Ref.update(options.models, (seen) => [...seen, model]) : Effect.void,
@@ -220,9 +216,7 @@ it.effect("a failed acquisition holds nothing and lets a later one retry", () =>
     Effect.gen(function* () {
       const session = yield* SessionService;
       const failed = yield* Effect.exit(
-        session.ensureRuntime(
-          Effect.fail(new AgentUnavailable({ harnessAgentId: "claude-code", reason: "not today" })),
-        ),
+        session.ensureRuntime(Effect.fail(new AgentUnavailable({ reason: "not today" }))),
       );
       assert.equal(failed._tag, "Failure");
       // Still observable, still holding nothing …

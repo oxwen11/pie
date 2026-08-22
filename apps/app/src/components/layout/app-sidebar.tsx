@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import {
   Sidebar,
   SidebarContent,
@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar,
-} from "@vibest/ui/components/sidebar";
+} from "@pie/ui/components/sidebar";
 import { Blocks, Search, SquarePen } from "lucide-react";
 import { useState } from "react";
 

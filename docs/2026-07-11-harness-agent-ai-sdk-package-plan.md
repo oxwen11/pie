@@ -10,11 +10,11 @@
 
 **Prerequisite:** the monorepo must be on `ai` v7 first — run `docs/2026-07-11-ai-sdk-v7-upgrade-plan.md` before this plan. Every AI-SDK symbol this plan uses is identical in v7; the only v7 breakage (provider `tool()` shape) is handled by that upgrade plan, not here.
 
-**Design source:** `docs/2026-07-11-harness-agent-adapter-ai-sdk-design.md` (§2 layering, §3 ai-sdk abstraction). This plan implements the `@vibest/ai-sdk-harness-agents` half of §2, minus the rename.
+**Design source:** `docs/2026-07-11-harness-agent-adapter-ai-sdk-design.md` (§2 layering, §3 ai-sdk abstraction). This plan implements the `@pie/ai-sdk-harness-agents` half of §2, minus the rename.
 
 ## Global Constraints
 
-- **Additive only, no rename:** work inside the existing `packages/ai-sdk-agents` package. Do **NOT** rename it to `ai-sdk-harness-agents`, and do **NOT** edit any consumer (`packages/server-rpc`, `packages/ui`, `packages/vibest`, `packages/vibest-devtools-client`, `packages/agents`). The rename + consumer migration + old-export cleanup are a separate later plan.
+- **Additive only, no rename:** work inside the existing `packages/ai-sdk-agents` package. Do **NOT** rename it to `ai-sdk-harness-agents`, and do **NOT** edit any consumer (`packages/server-rpc`, `packages/ui`, `packages/pie`, `packages/pie-devtools-client`, `packages/agents`). The rename + consumer migration + old-export cleanup are a separate later plan.
 - **Zod import path is `zod/v4`** (matches all existing files in this package) — never bare `zod`.
 - **Event naming invariant:** every `defineEvent` `type` is `namespace.action`, all-lowercase, `.`-separated, and its last segment is one of the reserved past-tense verbs: `created`, `updated`, `deleted`, `renamed`, `started`, `ended`, `asked`, `replied`, `rejected`, `crashed`, `failed`, `exited`, `connected`, `disconnected`. Every event `type` therefore contains at least one `.`. AI-SDK chunk `type`s never contain a `.`.
 - **No `kind`, no `scope`, no `droppable`, no event-sourcing.** Routing is `isSessionEvent`; delivery/seq/snapshot belong to the server slice (out of scope here).
@@ -1196,7 +1196,7 @@ git commit -m "feat(ai-sdk-agents): export the two-plane ai-sdk abstraction"
 
 ## Out of Scope (follow-up plans)
 
-- **Package rename** `ai-sdk-agents` → `ai-sdk-harness-agents` + migrating consumers (`ui`, `vibest`, `vibest-devtools-client`, `server-rpc`, `agents`) + removing the old `packages/agents`. Deferred because it touches `server-rpc` and other consumers.
+- **Package rename** `ai-sdk-agents` → `ai-sdk-harness-agents` + migrating consumers (`ui`, `pie`, `pie-devtools-client`, `server-rpc`, `agents`) + removing the old `packages/agents`. Deferred because it touches `server-rpc` and other consumers.
 - **`packages/server/src/agent/` Effect slice** (adapter / session / SessionLifecycle / EventBus seq+snapshot / registry / session-service) — its own plan; consumes this package.
 - **Codex adapter** (app-server, codex transform/to-session-event, repository) — replaces the placeholder codex UIMessage types.
 - **§7 micro-decisions** (verb-table extensions, versioning, `session.request.rejected` vs `replied` semantics) — resolve when the server slice needs them.

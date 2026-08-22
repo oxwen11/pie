@@ -3,13 +3,13 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { readRecord, stopDaemon } from "@vibest/server/daemon";
+import { readRecord, stopDaemon } from "@pie/server/daemon";
 import { Effect, FileSystem } from "effect";
 
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
 
-// A minimal daemon body: binds VIBEST_PORT and answers /api/health, which is
+// A minimal daemon body: binds PIE_PORT and answers /api/health, which is
 // all the launcher's readiness and the spawner's liveness poll observe.
 const FAKE_SERVER = `
 import http from "node:http";
@@ -18,7 +18,7 @@ const server = http.createServer((req, res) => {
   res.statusCode = 404;
   res.end();
 });
-server.listen(Number(process.env.VIBEST_PORT ?? 0), "127.0.0.1");
+server.listen(Number(process.env.PIE_PORT ?? 0), "127.0.0.1");
 `;
 
 // The launcher's file state runs on the platform services; the real ones here,
@@ -29,20 +29,20 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
   "DaemonServerProcess",
   (it) => {
     /**
-     * A temp `$VIBEST_HOME` holding the fake server's entry point. Finalizers
+     * A temp `$PIE_HOME` holding the fake server's entry point. Finalizers
      * run LIFO, so the daemon is stopped before the directory holding its
      * record goes away — on the failure path too.
      */
     const workspace = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const home = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-daemon-desktop-" });
+      const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-desktop-" });
       const daemonDir = path.join(home, "isolated-daemon");
       const entry = path.join(home, "fake-server.mjs");
       yield* fs.writeFileString(entry, FAKE_SERVER);
       yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(daemonDir)));
       const config: ServerProcessConfig = {
         entry,
-        environment: { ...process.env, VIBEST_HOME: home, VIBEST_DAEMON_DIR: daemonDir },
+        environment: { ...process.env, PIE_HOME: home, PIE_DAEMON_DIR: daemonDir },
       };
       return { daemonDir, config };
     });

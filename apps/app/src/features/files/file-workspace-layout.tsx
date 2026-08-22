@@ -1,6 +1,6 @@
-import { Button } from "@vibest/ui/components/button";
-import { Sheet, SheetHeader, SheetPopup, SheetTitle } from "@vibest/ui/components/sheet";
-import { useIsMobile } from "@vibest/ui/hooks/use-media-query";
+import { Button } from "@pie/ui/components/button";
+import { Sheet, SheetHeader, SheetPopup, SheetTitle } from "@pie/ui/components/sheet";
+import { useIsMobile } from "@pie/ui/hooks/use-media-query";
 import { FilesIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";

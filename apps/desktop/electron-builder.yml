@@ -1,5 +1,5 @@
-appId: com.vibest.desktop
-productName: Vibest
+appId: com.pie.desktop
+productName: Pie
 directories:
   buildResources: build
   output: release
@@ -13,7 +13,7 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
   # The Claude Agent SDK's platform packages each hold a ~230 MB native `claude`
   # binary. We do not ship it: the server execs the user's own Claude Code
-  # install instead, so they can update it independently of vibest.
+  # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
 asarUnpack:
   - resources/**

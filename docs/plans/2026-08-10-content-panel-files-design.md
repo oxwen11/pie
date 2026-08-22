@@ -6,7 +6,7 @@ Approved design for the first implementation of read-only workspace file browsin
 
 The work lives in:
 
-- Worktree: `/Users/dinq/Code/vibest-dev/feat-content-panel-file-explorer`
+- Worktree: `/Users/dinq/Code/pie-dev/feat-content-panel-file-explorer`
 - Branch: `feat/content-panel-file-explorer`
 
 All current and subsequent changes remain uncommitted until implementation and verification are complete and the user explicitly approves a commit.
@@ -161,7 +161,7 @@ Those properties are unsuitable for a faithful disk-oriented Files view.
 
 ## Pierre Tree Configuration
 
-Keep Pierre-specific behavior inside a Vibest-owned File Tree Adapter so beta API knowledge does not spread across feature code.
+Keep Pierre-specific behavior inside a Pie-owned File Tree Adapter so beta API knowledge does not spread across feature code.
 
 Follow the tree package's documented large-tree practices:
 
@@ -179,7 +179,7 @@ Additional rules:
 - Prefer prepared input over repeatedly parsing raw paths during render.
 - Use `preparePresortedFileTreeInput` only when the server's final ordering is guaranteed to match Pierre's required canonical ordering.
 - Otherwise prepare the raw path list once in the adapter.
-- Use Pierre's default sort behavior instead of introducing a Vibest comparator.
+- Use Pierre's default sort behavior instead of introducing a Pie comparator.
 - Use Pierre's built-in virtualization.
 - Do not override `itemHeight`, `overscan`, density, or virtualization-window behavior in the first implementation.
 - Do not enable tree search, drag-and-drop, renaming, or context menus.
@@ -230,7 +230,7 @@ The known residual risk of path-based `realpath`/`stat`/`read` checks is documen
 
 ## File Preview
 
-Keep Pierre-specific behavior inside a Vibest-owned File Preview Adapter.
+Keep Pierre-specific behavior inside a Pie-owned File Preview Adapter.
 
 ### Text Files
 
@@ -299,8 +299,8 @@ Manual Refresh:
 The first implementation deliberately does not add:
 
 - filesystem watchers;
-- proactive tree invalidation after Vibest writes a file;
-- proactive file-content invalidation after Vibest writes a file.
+- proactive tree invalidation after Pie writes a file;
+- proactive file-content invalidation after Pie writes a file.
 
 ## Loading and Error States
 
@@ -332,7 +332,7 @@ Expected modules:
 - Session Workspace Query — resolves `sessionId` to the workspace `cwd` without conflating project-query errors with a missing workspace.
 - Workspace Filesystem module — enforces workspace confinement and implements scan/read classification.
 
-The adapters should be deep modules: callers provide Vibest domain values and do not need to learn Pierre option shapes or lifecycle constraints.
+The adapters should be deep modules: callers provide Pie domain values and do not need to learn Pierre option shapes or lifecycle constraints.
 
 ## Responsive and Accessibility Requirements
 

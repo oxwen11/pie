@@ -1,7 +1,7 @@
-import type { PermissionMode } from "@vibest/contract";
+import type { PermissionMode } from "@pie/contract";
 
 /**
- * The single place that knows how to present vibest's permission vocabulary.
+ * The single place that knows how to present pie's permission vocabulary.
  * The words are ours (harness-concept-ownership §3.1), so labels, descriptions,
  * ordering and the danger tone live client-side — the server only ever says
  * which members a harness supports.

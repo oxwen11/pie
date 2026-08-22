@@ -13,13 +13,13 @@ These differ from what the library names suggest.
   through a side-effect import — `import "@orpc/experimental-effect/extensions/effect"`
   is what puts `.effect()` on procedures; delete it and the router stops compiling.
   Effect `Stream` → oRPC event iterator has one seam: `packages/server/src/rpc/stream.ts`.
-- **`@vibest/contract` uses Effect Schema, not zod**, bridged through a local
+- **`@pie/contract` uses Effect Schema, not zod**, bridged through a local
   `toStandardSchema`. Chunk/message-shaped outputs deliberately use `type<T>()`
   and are not validated on the wire.
 - **`packages/ui` sits on Base UI, not Radix** — compose with `render={<Button/>}`,
   not `asChild`.
 - **TypeScript is 7.x, the native compiler.** `noEmit` everywhere; packages export
-  `./src/*.ts` directly and only `server` and `vibest` build. `lib` is `es2022`,
+  `./src/*.ts` directly and only `server` and `pie` build. `lib` is `es2022`,
   so `toSorted`/`toSpliced` don't typecheck — write `Array.from(list).sort()`.
   `noUncheckedIndexedAccess` is on, so indexed access yields `T | undefined`.
 
@@ -82,7 +82,7 @@ exactly one `Path.Path`, in `http/ui.ts`, and it is not ours —
   of the effect and into an `await`.
 - **Per-test isolation is `Layer.build` inside the body,** not a second
   `layer(...)`: `layer(...)` memoizes per block, so anything stateful (a temp
-  `$VIBEST_HOME`, an EventBus) would leak between tests. Put the platform in
+  `$PIE_HOME`, an EventBus) would leak between tests. Put the platform in
   `layer(NodePlatformLayer)`, then build the service graph per test —
   `Context.get(yield* Layer.build(...), Tag)`. `it.effect` bodies are scoped, so
   `fs.makeTempDirectoryScoped` and `Effect.addFinalizer` replace

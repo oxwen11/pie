@@ -4,7 +4,7 @@ import { corsHeaders, isAllowedOrigin, isLoopbackHost } from "../../src/http/cor
 
 describe("isAllowedOrigin", () => {
   it("always trusts the desktop scheme, so a CLI-started daemon accepts the desktop", () => {
-    expect(isAllowedOrigin("vibest://app")).toBe(true);
+    expect(isAllowedOrigin("pie://app")).toBe(true);
   });
 
   it("trusts loopback web clients on any port", () => {
@@ -19,10 +19,10 @@ describe("isAllowedOrigin", () => {
   });
 
   it("accepts extra configured origins (e.g. a hosted web app)", () => {
-    expect(
-      isAllowedOrigin("https://app.vibest.dev", { extraOrigins: ["https://app.vibest.dev"] }),
-    ).toBe(true);
-    expect(isAllowedOrigin("https://app.vibest.dev")).toBe(false);
+    expect(isAllowedOrigin("https://app.pie.dev", { extraOrigins: ["https://app.pie.dev"] })).toBe(
+      true,
+    );
+    expect(isAllowedOrigin("https://app.pie.dev")).toBe(false);
   });
 
   it("trusts an origin whose hostname is an allowed Host — the page a trusted proxy serves must be able to connect back", () => {
@@ -72,20 +72,18 @@ describe("isLoopbackHost", () => {
 
 describe("corsHeaders", () => {
   it("echoes an allowlisted origin rather than a wildcard", () => {
-    expect(corsHeaders("vibest://app")?.["access-control-allow-origin"]).toBe("vibest://app");
+    expect(corsHeaders("pie://app")?.["access-control-allow-origin"]).toBe("pie://app");
     expect(corsHeaders("http://localhost:5173")?.["access-control-allow-origin"]).toBe(
       "http://localhost:5173",
     );
   });
 
   it("permits the Authorization header, which the renderer sends on every RPC call", () => {
-    expect(corsHeaders("vibest://app")?.["access-control-allow-headers"]).toContain(
-      "authorization",
-    );
+    expect(corsHeaders("pie://app")?.["access-control-allow-headers"]).toContain("authorization");
   });
 
   it("varies on origin, so a shared cache cannot serve one origin's response to another", () => {
-    expect(corsHeaders("vibest://app")?.vary).toBe("origin");
+    expect(corsHeaders("pie://app")?.vary).toBe("origin");
   });
 
   it("denies an origin outside the policy", () => {

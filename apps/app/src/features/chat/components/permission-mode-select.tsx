@@ -1,11 +1,11 @@
-import type { PermissionMode } from "@vibest/contract";
+import type { PermissionMode } from "@pie/contract";
 import {
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
-} from "@vibest/ui/ai-elements/prompt-input";
+} from "@pie/ui/ai-elements/prompt-input";
 
 import { PERMISSION_MODES } from "@/features/chat/harness/permission-modes";
 
@@ -13,7 +13,7 @@ import { PERMISSION_MODES } from "@/features/chat/harness/permission-modes";
 // both inside a session (ChatPermissionModeSelect binds it to ChatSession
 // context) and on the draft surface (URL search params, no session yet).
 //
-// The modes are vibest's own vocabulary, so everything shown here — label,
+// The modes are pie's own vocabulary, so everything shown here — label,
 // description, the danger tone on `full` — comes from the client-side table,
 // never from the wire. The server only says which members this harness
 // supports; an empty subset means it has no permission protocol at all (pi) —

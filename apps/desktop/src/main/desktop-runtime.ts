@@ -10,7 +10,7 @@ import { makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
-import { devUserDataPath, devWorktreeSlug, vibestTempPath } from "./lib/utils";
+import { devUserDataPath, devWorktreeSlug, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
 
@@ -38,15 +38,15 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
-  const isE2E = process.env["VIBEST_E2E"] === "1";
+  const isE2E = process.env["PIE_E2E"] === "1";
   if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
 
   // Opt-in CDP remote debugging (agent-browser); isolated userData avoids the
   // single-instance lock.
-  const remoteDebugPort = process.env["VIBEST_REMOTE_DEBUG_PORT"];
+  const remoteDebugPort = process.env["PIE_REMOTE_DEBUG_PORT"];
   if (remoteDebugPort) {
     app.commandLine.appendSwitch("remote-debugging-port", remoteDebugPort);
-    app.setPath("userData", vibestTempPath(`remote-debugging-${remoteDebugPort}`));
+    app.setPath("userData", pieTempPath(`remote-debugging-${remoteDebugPort}`));
   } else if (is.dev && !isE2E) {
     // Give dev its own userData so its single-instance lock is independent of an
     // installed build (which on macOS keeps holding the lock after its window
@@ -86,7 +86,7 @@ export function startDesktopRuntime(): void {
   const startPrimaryInstance = async (): Promise<void> => {
     await app.whenReady();
 
-    electronApp.setAppUserModelId("com.vibest.desktop");
+    electronApp.setAppUserModelId("com.pie.desktop");
     app.on("browser-window-created", (_, window) => {
       optimizer.watchWindowShortcuts(window);
     });
@@ -97,7 +97,7 @@ export function startDesktopRuntime(): void {
     try {
       const startup = await runtime.runPromise(Effect.result(runtime.contextEffect));
       if (Result.isFailure(startup)) {
-        dialog.showErrorBox("Vibest could not start", formatStartupFailure(startup.failure));
+        dialog.showErrorBox("Pie could not start", formatStartupFailure(startup.failure));
         await disposeAndQuit();
         return;
       }
@@ -110,7 +110,7 @@ export function startDesktopRuntime(): void {
     } catch (error) {
       // Typed startup failures are handled above; this only catches defects.
       dialog.showErrorBox(
-        "Vibest could not start",
+        "Pie could not start",
         error instanceof Error ? error.message : String(error),
       );
       await disposeAndQuit();

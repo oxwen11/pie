@@ -6,8 +6,8 @@ const LAUNCHCTL_TIMEOUT_MS = 2_000;
 
 // Shell startup files may print arbitrary banner noise, so the NUL-delimited
 // environment is fenced before parsing.
-const OPEN = "__vibest_env_start__";
-const CLOSE = "__vibest_env_end__";
+const OPEN = "__pie_env_start__";
+const CLOSE = "__pie_env_end__";
 const LAUNCHCTL_KEYS = [
   "PATH",
   "HTTP_PROXY",
@@ -84,8 +84,8 @@ function environmentFromLaunchctl(run: RunCommand) {
 /**
  * Shell values win over the inherited base — a Dock launch has an
  * impoverished environment and the login shell is the richer source — except
- * for `VIBEST_*` keys: those set on the launching process are explicit
- * instructions to this app (e.g. `VIBEST_HOME=/tmp/x` selects the storage
+ * for `PIE_*` keys: those set on the launching process are explicit
+ * instructions to this app (e.g. `PIE_HOME=/tmp/x` selects the storage
  * home) and must not be clobbered by an export in shell startup files.
  */
 function mergeShellEnvironment(
@@ -94,7 +94,7 @@ function mergeShellEnvironment(
 ): NodeJS.ProcessEnv {
   const merged = { ...base, ...shell };
   for (const [key, value] of Object.entries(base)) {
-    if (key.startsWith("VIBEST_") && value !== undefined) merged[key] = value;
+    if (key.startsWith("PIE_") && value !== undefined) merged[key] = value;
   }
   return merged;
 }

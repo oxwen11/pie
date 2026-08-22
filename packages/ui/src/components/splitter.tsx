@@ -1,7 +1,7 @@
 "use client";
 
 import { Splitter as SplitterPrimitive } from "@ark-ui/react/splitter";
-import { cn } from "@vibest/ui/lib/utils";
+import { cn } from "@pie/ui/lib/utils";
 
 function Splitter({ className, ...props }: SplitterPrimitive.RootProps) {
   return <SplitterPrimitive.Root className={cn("flex w-full", className)} {...props} />;

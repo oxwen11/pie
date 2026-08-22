@@ -1,12 +1,12 @@
 import { ORPCError } from "@orpc/client";
-import type { VibestClient } from "@vibest/client";
+import type { PieClient } from "@pie/client";
 import type {
   PermissionMode,
   PromptPart,
   ReasoningEffort,
   SessionRef,
   SubscribeStreamEvent,
-} from "@vibest/contract";
+} from "@pie/contract";
 import type { UIMessage } from "ai";
 
 import { exponentialBackoffMs } from "@/lib/utils";
@@ -19,10 +19,10 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 // reset by every successful attach.
 const defaultRetryDelayMs = exponentialBackoffMs(500, 10_000);
 
-type VibestSessionClient = VibestClient["session"];
+type PieSessionClient = PieClient["session"];
 
 type SessionClient = Pick<
-  VibestSessionClient,
+  PieSessionClient,
   | "prompt"
   | "respondToAgentRequest"
   | "setReasoningEffort"
@@ -32,7 +32,7 @@ type SessionClient = Pick<
   | "getMessages"
 > & {
   subscribe: (
-    ...args: Parameters<VibestSessionClient["subscribe"]>
+    ...args: Parameters<PieSessionClient["subscribe"]>
   ) => Promise<AsyncIterable<SubscribeStreamEvent>>;
 };
 

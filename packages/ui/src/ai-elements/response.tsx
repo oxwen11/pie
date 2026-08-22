@@ -1,7 +1,7 @@
 "use client";
 
-import { CodeBlock, CodeBlockCopyButton } from "@vibest/ui/ai-elements/code-block";
-import { cn } from "@vibest/ui/lib/utils";
+import { CodeBlock, CodeBlockCopyButton } from "@pie/ui/ai-elements/code-block";
+import { cn } from "@pie/ui/lib/utils";
 import {
   cloneElement,
   type ComponentProps,

@@ -35,7 +35,7 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, vibest]
+    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
     steps:
       # fetch-depth: 0 gives React Doctor the full git history it needs to find the merge base with the target branch. Without it a shallow checkout has no merge base, so PR runs can't compare against the base and fall back to reporting every issue in the changed files (pre-existing ones included) instead of only the ones the PR introduced.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +71,7 @@ jobs:
           node-version: ${{ steps.project-node.outputs.version }}
           blocking: error
           scope: full
-          # Everything except @vibest/ui. Its base components are vendored
+          # Everything except @pie/ui. Its base components are vendored
           # wholesale from the coss registry via `shadcn add @coss/ui --overwrite`
           # and local edits are discarded on the next refresh (docs/adr/0001), so
           # diagnostics raised there are un-actionable here — the fix belongs
@@ -81,4 +81,4 @@ jobs:
           # be covered. It lives in the workflow rather than a root
           # doctor.config.json because config is inherited by subdirectories, and
           # a root `projects` field makes the per-project `pnpm doctor` run fail.
-          project: "@vibest/app,desktop"
+          project: "@pie/app,desktop"

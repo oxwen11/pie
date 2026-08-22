@@ -1,6 +1,6 @@
+import type { Project } from "@pie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useMatch, useRouteContext } from "@tanstack/react-router";
-import type { Project } from "@vibest/contract";
 import { useCallback } from "react";
 
 /** Resolve the active session's project to its workspace path without coupling this feature to projects UI. */

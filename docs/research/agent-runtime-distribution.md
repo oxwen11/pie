@@ -401,12 +401,12 @@ Electron's embedded Node does not automatically provide `npm` or `npx`. An appli
 
 ---
 
-## Recommended Vibest architecture
+## Recommended Pie architecture
 
 Avoid making global Node/npm installation a prerequisite. Use a small built-in host plus versioned managed runtimes:
 
 ```text
-Vibest.app
+Pie.app
 ├── Electron and its embedded Node runtime
 ├── bundled Claude SDK core
 └── app-data/runtimes/
@@ -418,7 +418,7 @@ Vibest.app
 
 ### Claude
 
-- Bundle the SDK core with Vibest.
+- Bundle the SDK core with Pie.
 - Either bundle the platform Claude binary or download it on first enablement.
 - Pass the managed path through `pathToClaudeCodeExecutable`.
 - Pin SDK core and binary to the same exact version.
@@ -453,4 +453,4 @@ A single runtime manager should own:
 - proxy support,
 - diagnostics and repair.
 
-This approach gives Vibest an initial package closer to Paseo's size while preserving an onboarding experience closer to Craft and the official Codex Desktop app.
+This approach gives Pie an initial package closer to Paseo's size while preserving an onboarding experience closer to Craft and the official Codex Desktop app.

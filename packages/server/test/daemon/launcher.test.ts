@@ -35,7 +35,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
   "resolveOrSpawnDaemon",
   (it) => {
     /**
-     * A temp `$VIBEST_HOME` and the pair a front door would resolve for it —
+     * A temp `$PIE_HOME` and the pair a front door would resolve for it —
      * through the real resolver, so these tests never restate where the default
      * daemon directory is (`test/paths.test.ts` owns that). Bound to the test's
      * scope, and finalizers run LIFO, so the daemon is stopped before the
@@ -44,8 +44,8 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
      */
     const tempHome = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const home = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-daemon-" });
-      const location = resolveDaemonLocation({ VIBEST_HOME: home });
+      const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-" });
+      const location = resolveDaemonLocation({ PIE_HOME: home });
       yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(location.daemonDir)));
       return location;
     });
@@ -98,14 +98,14 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           readyTimeoutMs: 15_000,
         });
         assert.equal((yield* readRecord(daemonDir))?.pid, spawned.pid);
-        // Nothing leaks into the default directory, nor into `$VIBEST_HOME`.
+        // Nothing leaks into the default directory, nor into `$PIE_HOME`.
         assert.equal(yield* readRecord(defaultDir), undefined);
         for (const file of ["daemon.pid", "daemon.lock", "daemon.stopped"]) {
           assert.equal(yield* fs.exists(path.join(home, file)), false);
           assert.equal(yield* fs.exists(path.join(defaultDir, file)), false);
         }
         // Logging is deliberately NOT isolated per daemon directory: one
-        // `$VIBEST_HOME` means one place to read, and every line carries the
+        // `$PIE_HOME` means one place to read, and every line carries the
         // `pid` that wrote it.
         assert.ok(yield* fs.exists(path.join(home, "logs", "daemon-stdio.log")));
 

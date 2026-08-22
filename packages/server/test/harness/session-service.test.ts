@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { isSessionScopedEvent, type SessionRef } from "@vibest/contract";
+import { isSessionScopedEvent, type SessionRef } from "@pie/contract";
 import type { UIMessage } from "ai";
 import {
   Crypto,
@@ -62,7 +62,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 describe("HarnessAgentSessionService", () => {
   let home: string;
   beforeEach(async () => {
-    home = await fs.mkdtemp(path.join(os.tmpdir(), "vibest-svc-"));
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-svc-"));
   });
   afterEach(async () => {
     await fs.rm(home, { recursive: true, force: true });
@@ -93,14 +93,12 @@ describe("HarnessAgentSessionService", () => {
             if (opts.turn === undefined) return Stream.empty;
             const drafts = [
               {
-                harnessAgentId: "claude-code" as const,
                 sessionId,
                 body: { type: "session.turn.started" as const, sessionId, turnId: "turn-1" },
               },
               ...(opts.turn === "finished"
                 ? [
                     {
-                      harnessAgentId: "claude-code" as const,
                       sessionId,
                       body: {
                         type: "session.turn.ended" as const,
@@ -119,7 +117,6 @@ describe("HarnessAgentSessionService", () => {
           // exercise the orchestration without any live projection state.
           const makeSession = (sessionId: string): HarnessAgentRuntime => ({
             sessionId,
-            harnessAgentId: "claude-code",
             events: turnEvents(sessionId),
             prompt: opts.promptFails
               ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
@@ -146,8 +143,7 @@ describe("HarnessAgentSessionService", () => {
             ),
           });
           const adapter = {
-            id: "claude-code",
-            descriptor: { id: "claude-code", name: "Claude Code" },
+            descriptor: { name: "Pi" },
             checkAvailability: Effect.sync(() =>
               opts.unavailable !== undefined
                 ? { available: false, reason: opts.unavailable }
@@ -176,7 +172,7 @@ describe("HarnessAgentSessionService", () => {
               : {}),
             getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
           } satisfies HarnessAgentAdapter;
-          const registry = makeHarnessAgentRegistry([adapter]);
+          const registry = makeHarnessAgentRegistry(adapter);
           const crypto = yield* Crypto.Crypto;
           const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
             Effect.gen(function* () {
@@ -202,30 +198,27 @@ describe("HarnessAgentSessionService", () => {
   it("create passes the cwd through, generates a uuid sessionId, persists metadata", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         return { ref, stored, spy: fixture.spy };
       }),
     );
 
     expect(result.ref.projectId).toBe("proj-a");
-    expect(result.ref.harnessAgentId).toBe("claude-code");
     expect(result.ref.sessionId).toMatch(UUID_RE);
     // The harness saw the router-resolved cwd, never a projectId.
-    expect(result.spy.open).toEqual([{ cwd: "/tmp/vibest-app" }]);
+    expect(result.spy.open).toEqual([{ cwd: "/tmp/pie-app" }]);
     // Metadata stores the native id, keyed by the server sessionId (filename).
     expect(result.stored.harnessSessionId).toBe("native-1");
     expect(result.stored.projectId).toBe("proj-a");
-    expect(result.stored.cwd).toBe("/tmp/vibest-app");
+    expect(result.stored.cwd).toBe("/tmp/pie-app");
     expect(result.stored.archived).toBe(false);
   });
 
   it("create surfaces AgentUnavailable and writes no metadata", async () => {
     const result = await run({ unavailable: "not installed" }, (fixture) =>
       Effect.gen(function* () {
-        const err = yield* Effect.flip(
-          fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app"),
-        );
+        const err = yield* Effect.flip(fixture.service.create("proj-a", "/tmp/pie-app"));
         const listed = yield* fixture.repo.list("proj-a");
         return { err, listed };
       }),
@@ -237,19 +230,19 @@ describe("HarnessAgentSessionService", () => {
   it("prepare backfills the cwd and starts nothing", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
         // A record from before we stored cwd — the case the backfill exists for.
         const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         const { cwd: _dropped, ...withoutCwd } = stored;
         yield* fixture.repo.write(withoutCwd);
 
-        yield* fixture.service.prepare(ref, "/tmp/vibest-app");
+        yield* fixture.service.prepare(ref, "/tmp/pie-app");
         const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         return { cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
       }),
     );
-    expect(result.cwd).toBe("/tmp/vibest-app");
+    expect(result.cwd).toBe("/tmp/pie-app");
     // Opening a session page costs no process — the whole point of `prepare`.
     expect(result.resume).toEqual([]);
     expect(result.open).toHaveLength(1);
@@ -258,31 +251,16 @@ describe("HarnessAgentSessionService", () => {
   it("prepare fails with SessionNotFound for an unknown session", async () => {
     const err = await run({}, (fixture) =>
       Effect.flip(
-        fixture.service.prepare(
-          { projectId: "proj-a", harnessAgentId: "claude-code", sessionId: "missing" },
-          "/tmp/vibest-app",
-        ),
+        fixture.service.prepare({ projectId: "proj-a", sessionId: "missing" }, "/tmp/pie-app"),
       ),
     );
     expect(err._tag).toBe("SessionNotFound");
   });
 
-  it("prepare fails with SessionRefMismatch when the ref's agent disagrees with metadata", async () => {
-    const err = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
-        return yield* Effect.flip(
-          fixture.service.prepare({ ...ref, harnessAgentId: "codex" }, "/tmp/vibest-app"),
-        );
-      }),
-    );
-    expect(err._tag).toBe("SessionRefMismatch");
-  });
-
   it("close translates the ref to the native id", async () => {
     const closeSpy = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
         return fixture.spy.close;
       }),
@@ -293,7 +271,7 @@ describe("HarnessAgentSessionService", () => {
   it("delete closes the native session and removes its metadata", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.delete(ref);
         const listed = yield* fixture.service.list("proj-a", false);
         return { listed, closeSpy: fixture.spy.close };
@@ -306,8 +284,8 @@ describe("HarnessAgentSessionService", () => {
   it("list returns one summary per session, keyed by server sessionId", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const a = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
-        const b = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const a = yield* fixture.service.create("proj-a", "/tmp/pie-app");
+        const b = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const listed = yield* fixture.service.list("proj-a", false);
         return { a, b, listed };
       }),
@@ -324,7 +302,7 @@ describe("HarnessAgentSessionService", () => {
   it("archives and restores a session, publishing each changed state", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "global" });
@@ -365,14 +343,14 @@ describe("HarnessAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
-        const messages = yield* fixture.service.getMessages(ref, "/tmp/vibest-app");
+        const messages = yield* fixture.service.getMessages(ref, "/tmp/pie-app");
         return { messages, resume: fixture.spy.resume };
       }),
     );
     // ensure resumed by native id with the router-resolved cwd before reading.
-    expect(result.resume).toEqual([{ sessionId: "native-1", cwd: "/tmp/vibest-app" }]);
+    expect(result.resume).toEqual([{ sessionId: "native-1", cwd: "/tmp/pie-app" }]);
     expect(result.messages).toEqual(history);
   });
 
@@ -402,7 +380,7 @@ describe("HarnessAgentSessionService", () => {
   it("archives a running session and closes its live instance", async () => {
     const result = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
         yield* fixture.service.archive(ref, true);
         const active = yield* fixture.service.list("proj-a", false);
@@ -420,9 +398,9 @@ describe("HarnessAgentSessionService", () => {
   it("getMessages trims the last user segment while a turn is in flight", async () => {
     const messages = await run({ history: fourTurnHistory, turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
-        return yield* fixture.service.getMessages(ref, "/tmp/vibest-app");
+        return yield* fixture.service.getMessages(ref, "/tmp/pie-app");
       }),
     );
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1"]);
@@ -431,9 +409,9 @@ describe("HarnessAgentSessionService", () => {
   it("getMessages does not trim for a finished turn's retained buffer", async () => {
     const messages = await run({ history: fourTurnHistory, turn: "finished" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && turn.complete);
-        return yield* fixture.service.getMessages(ref, "/tmp/vibest-app");
+        return yield* fixture.service.getMessages(ref, "/tmp/pie-app");
       }),
     );
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "u2", "a2"]);
@@ -443,9 +421,9 @@ describe("HarnessAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ coldHistory: history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
-        const messages = yield* fixture.service.getMessages(ref, "/tmp/vibest-app");
+        const messages = yield* fixture.service.getMessages(ref, "/tmp/pie-app");
         return { messages, resume: fixture.spy.resume };
       }),
     );
@@ -457,8 +435,8 @@ describe("HarnessAgentSessionService", () => {
   it("getMessages fails CapabilityUnsupported when the harness has no history read", async () => {
     const err = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
-        return yield* Effect.flip(fixture.service.getMessages(ref, "/tmp/vibest-app"));
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
+        return yield* Effect.flip(fixture.service.getMessages(ref, "/tmp/pie-app"));
       }),
     );
     expect(err._tag).toBe("CapabilityUnsupported");
@@ -467,7 +445,7 @@ describe("HarnessAgentSessionService", () => {
   it("interrupt succeeds with nothing running instead of starting an agent", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
         yield* fixture.service.interrupt(ref);
         return fixture.spy.resume;
@@ -481,7 +459,7 @@ describe("HarnessAgentSessionService", () => {
   it("respondToAgentRequest reports the request as gone with nothing running", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
         const err = yield* Effect.flip(
           fixture.service.respondToAgentRequest(ref, "req-1", {
@@ -503,14 +481,14 @@ describe("HarnessAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ coldHistory: history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const restarted = yield* fixture.restart;
 
-        yield* restarted.service.prepare(ref, "/tmp/vibest-app");
+        yield* restarted.service.prepare(ref, "/tmp/pie-app");
         const status = yield* restarted.service.getStatus(ref);
         const snapshot = yield* restarted.service.getSnapshot(ref);
         const listed = yield* restarted.service.list("proj-a", false);
-        const messages = yield* restarted.service.getMessages(ref, "/tmp/vibest-app");
+        const messages = yield* restarted.service.getMessages(ref, "/tmp/pie-app");
         return { ref, status, snapshot, listed, messages, spy: fixture.spy };
       }),
     );
@@ -535,9 +513,9 @@ describe("HarnessAgentSessionService", () => {
   it("the first prompt after a restart starts exactly one agent", async () => {
     const result = await run({ turn: "finished" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const restarted = yield* fixture.restart;
-        yield* restarted.service.prepare(ref, "/tmp/vibest-app");
+        yield* restarted.service.prepare(ref, "/tmp/pie-app");
 
         yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
         yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "again" }] });
@@ -545,13 +523,13 @@ describe("HarnessAgentSessionService", () => {
       }),
     );
     // Two prompts, one resume: the session keeps the runtime it acquired.
-    expect(result).toEqual([{ sessionId: "native-1", cwd: "/tmp/vibest-app" }]);
+    expect(result).toEqual([{ sessionId: "native-1", cwd: "/tmp/pie-app" }]);
   });
 
   it("titles a session from its first prompt, collapsing whitespace", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.prompt({
           ref,
           parts: [{ type: "text", text: "  Fix the  login  bug " }],
@@ -566,7 +544,7 @@ describe("HarnessAgentSessionService", () => {
   it("publishes session.updated with the collapsed title on the first prompt", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         // Subscribe after create so only the prompt's event is in flight; the
         // queue buffers it until take(1) pulls it — no forked drain, no race.
         return yield* Effect.scoped(
@@ -620,7 +598,7 @@ describe("HarnessAgentSessionService", () => {
   it("broadcasts session.prompt.submitted echoing the client messageId", async () => {
     const event = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
       }),
     );
@@ -636,7 +614,7 @@ describe("HarnessAgentSessionService", () => {
   it("retains the accepted prompt in the runtime snapshot for mid-turn joiners", async () => {
     const snapshot = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
         return yield* fixture.service.getSnapshot(ref);
       }),
@@ -653,7 +631,7 @@ describe("HarnessAgentSessionService", () => {
   it("compensates a harness-rejected prompt: rejected event follows, no retained phantom", async () => {
     const result = await run({ turn: "open", promptFails: true }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
@@ -699,7 +677,7 @@ describe("HarnessAgentSessionService", () => {
   it("mints a messageId when the prompt carries none", async () => {
     const event = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* takePromptSubmitted(fixture, ref, {});
       }),
     );
@@ -710,7 +688,7 @@ describe("HarnessAgentSessionService", () => {
   it("keeps the first prompt's title; later prompts don't rename", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "first" }] });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "second" }] });
         return yield* fixture.service.list("proj-a", false);
@@ -722,7 +700,7 @@ describe("HarnessAgentSessionService", () => {
   it("lists a session with no title until its first prompt", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* fixture.service.list("proj-a", false);
       }),
     );
@@ -730,7 +708,7 @@ describe("HarnessAgentSessionService", () => {
     expect(listed[0]?.title).toBeUndefined();
   });
 
-  // The lifecycle log is what a periodic read of `$VIBEST_HOME/logs` is for:
+  // The lifecycle log is what a periodic read of `$PIE_HOME/logs` is for:
   // read on its own it says what was worked on, when, and where. It has to hold
   // together across the whole span of a session, so it is asserted as a
   // sequence rather than one line at a time.
@@ -738,7 +716,7 @@ describe("HarnessAgentSessionService", () => {
     const records: Array<LogRecord> = [];
     await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.archive(ref, true);
         yield* fixture.service.delete(ref);
       }).pipe(
@@ -762,7 +740,7 @@ describe("HarnessAgentSessionService", () => {
     expect(records.every((record) => record.level === "INFO")).toBe(true);
 
     const created = records[0];
-    expect(created?.annotations.cwd).toBe("/tmp/vibest-app");
+    expect(created?.annotations.cwd).toBe("/tmp/pie-app");
     expect(created?.annotations.harnessSessionId).toBe("native-1");
     expect(created?.annotations.projectId).toBe("proj-a");
     // Every line carries the id, so one session's whole life greps out of a
@@ -780,7 +758,7 @@ describe("HarnessAgentSessionService", () => {
   it("puts the session's identity on what the layers below it log", async () => {
     const records: Array<LogRecord> = [];
     await run({}, (fixture) =>
-      fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app").pipe(
+      fixture.service.create("proj-a", "/tmp/pie-app").pipe(
         Effect.provide(
           Layer.merge(
             Logger.layer([
@@ -797,7 +775,6 @@ describe("HarnessAgentSessionService", () => {
     const adapterLine = records.find((record) => record.message === "adapter opening");
     expect(adapterLine).toBeDefined();
     expect(adapterLine?.annotations.projectId).toBe("proj-a");
-    expect(adapterLine?.annotations.harnessAgentId).toBe("claude-code");
     expect(adapterLine?.annotations.sessionId).toMatch(UUID_RE);
   });
 
@@ -806,7 +783,7 @@ describe("HarnessAgentSessionService", () => {
   it("rename persists the title across a restart", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.rename(ref, "Login bug");
         const listed = yield* fixture.service.list("proj-a", false);
         const restarted = yield* fixture.restart;
@@ -820,7 +797,7 @@ describe("HarnessAgentSessionService", () => {
   it("publishes session.renamed per change, and nothing for a no-op rename", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "global" });
@@ -847,7 +824,7 @@ describe("HarnessAgentSessionService", () => {
   it("keeps a hand-chosen title through the first prompt", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.rename(ref, "Login bug");
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "first" }] });
         return yield* fixture.service.list("proj-a", false);
@@ -859,7 +836,7 @@ describe("HarnessAgentSessionService", () => {
   it("preserves rename and archive changes made concurrently", async () => {
     const stored = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* Effect.all(
           [fixture.service.rename(ref, "Login bug"), fixture.service.archive(ref, true)],
           { concurrency: "unbounded" },
@@ -874,7 +851,7 @@ describe("HarnessAgentSessionService", () => {
   it("keeps the manual title when rename races the first prompt stamp", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* Effect.all(
           [
             fixture.service.prompt({ ref, parts: [{ type: "text", text: "automatic title" }] }),
@@ -908,8 +885,8 @@ describe("HarnessAgentSessionService", () => {
       },
       (fixture) =>
         Effect.gen(function* () {
-          const slow = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
-          const other = yield* fixture.service.create("proj-a", "claude-code", "/tmp/vibest-app");
+          const slow = yield* fixture.service.create("proj-a", "/tmp/pie-app");
+          const other = yield* fixture.service.create("proj-a", "/tmp/pie-app");
           const archiving = yield* Effect.forkChild(fixture.service.archive(slow, true));
           yield* Effect.promise(() => closeStarted);
           yield* fixture.service.rename(other, "Still responsive");

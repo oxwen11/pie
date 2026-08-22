@@ -1,11 +1,10 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { sameSessionRef, sessionRefKey } from "./session-ref";
 
 const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "11111111-1111-4111-8111-111111111111",
-  harnessAgentId: "pi",
   sessionId: "shared-session-id",
   ...overrides,
 });
@@ -16,7 +15,7 @@ describe("SessionRef identity", () => {
     expect(sameSessionRef(ref(), ref({ projectId: "22222222-2222-4222-8222-222222222222" }))).toBe(
       false,
     );
-    expect(sameSessionRef(ref(), ref({ harnessAgentId: "codex" }))).toBe(false);
+    expect(sameSessionRef(ref(), ref({ sessionId: "other-session" }))).toBe(false);
     expect(sameSessionRef(ref(), null)).toBe(false);
   });
 

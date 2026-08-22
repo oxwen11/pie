@@ -10,11 +10,5 @@
   "experimentalTailwindcss": {
     "functions": ["cn", "clsx", "cva", "tw"]
   },
-  "ignorePatterns": [
-    "**/routeTree.gen.ts",
-    ".conductor",
-    "**/dist/**",
-    "**/node_modules/**",
-    "packages/contract/src/codex/protocol/**"
-  ]
+  "ignorePatterns": ["**/routeTree.gen.ts", ".conductor", "**/dist/**", "**/node_modules/**"]
 }

@@ -4,7 +4,7 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
   SessionStatus,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";
@@ -110,11 +110,7 @@ const seedConfig = (
     if (config.permissionMode) {
       yield* runtime
         .setPermissionMode(config.permissionMode)
-        .pipe(
-          Effect.mapError(
-            (cause) => new AgentOpenError({ harnessAgentId: runtime.harnessAgentId, cause }),
-          ),
-        );
+        .pipe(Effect.mapError((cause) => new AgentOpenError({ cause })));
     }
     if (config.model) {
       yield* runtime

@@ -1,6 +1,5 @@
 export type SessionSummary = {
   sessionId: string;
-  harnessAgentId: import("@vibest/contract").HarnessAgentId;
   title?: string;
   archived: boolean;
   createdAt: string;

@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { sessionRefKey } from "@/lib/session-ref";
@@ -21,7 +21,6 @@ const file = definePanelFamily({
 
 const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "11111111-1111-4111-8111-111111111111",
-  harnessAgentId: "pi",
   sessionId: "session-1",
   ...overrides,
 });
@@ -41,7 +40,7 @@ const storageHolding = (bySessionKey: unknown): Storage => {
   const value = JSON.stringify({ state: { bySessionKey } });
   return {
     length: 1,
-    getItem: (key) => (key === "vibest:content-panel" ? value : null),
+    getItem: (key) => (key === "pie:content-panel" ? value : null),
     setItem: () => {},
     removeItem: () => {},
     clear: () => {},

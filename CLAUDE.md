@@ -1,8 +1,8 @@
-# vibest
+# pie
 
-In-browser tooling for AI coding agents: a web chat UI over local agents
-(Claude Code, Codex, pi), served by a local Node daemon and also shipped as an
-Electron app. pnpm + Turborepo, TypeScript everywhere.
+In-browser tooling for the Pi coding agent: a web chat UI over local `pi`,
+served by a local Node daemon and also shipped as an Electron app. pnpm +
+Turborepo, TypeScript everywhere.
 
 ## Commands
 
@@ -12,7 +12,7 @@ skips the upstream tsdown build.
 
 |                                               |                                                      |
 | --------------------------------------------- | ---------------------------------------------------- |
-| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@vibest/server`  |
+| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@pie/server`     |
 | `pnpm check`                                  | lint:check + format:check + typecheck — **no tests** |
 | `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
 

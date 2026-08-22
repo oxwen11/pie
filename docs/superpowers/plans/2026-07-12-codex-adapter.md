@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A working Codex adapter in `@vibest/harness` — generated protocol types, typed tools/data-parts, JSON-RPC app-server client, session manager, transform + lifecycle mapping — wired through `@vibest/contract` and `packages/server` RPC routes. Web UI wiring is explicitly OUT of scope.
+**Goal:** A working Codex adapter in `@pie/harness` — generated protocol types, typed tools/data-parts, JSON-RPC app-server client, session manager, transform + lifecycle mapping — wired through `@pie/contract` and `packages/server` RPC routes. Web UI wiring is explicitly OUT of scope.
 
-**Architecture:** Port of the reference implementation at `/Users/dinq/Work/neo-projects/neo-monorepo/packages/server/src/features/agent/providers/codex/` (read those files before each task — they are the source), adapted to vibest's shapes: definitions live in `harness/src/codex/` beside `claude-code/`, sessions follow vibest's `Session`-manager + `Pushable` + `AsyncGenerator` pattern (`packages/harness/src/claude-code/agent.ts`), approvals map onto vibest's provider-agnostic `AgentRequest`/`AgentResponse` (`packages/harness/src/types/request.ts`), and the RPC layer follows `packages/server/src/rpc/claude-code.ts` (oRPC + Effect `Context.Service`).
+**Architecture:** Port of the reference implementation at `/Users/dinq/Work/neo-projects/neo-monorepo/packages/server/src/features/agent/providers/codex/` (read those files before each task — they are the source), adapted to pie's shapes: definitions live in `harness/src/codex/` beside `claude-code/`, sessions follow pie's `Session`-manager + `Pushable` + `AsyncGenerator` pattern (`packages/harness/src/claude-code/agent.ts`), approvals map onto pie's provider-agnostic `AgentRequest`/`AgentResponse` (`packages/harness/src/types/request.ts`), and the RPC layer follows `packages/server/src/rpc/claude-code.ts` (oRPC + Effect `Context.Service`).
 
 **Tech Stack:** codex-cli ≥ 0.142.5 (`codex app-server`, ts-rs `generate-ts` bindings), TypeScript 7 (tsgo), zod 4, ai v7, oRPC + `@orpc/experimental-effect`, Effect 4 beta (server only), vitest via `vp`.
 
@@ -12,7 +12,7 @@
 
 - Reference (read-only): neo files under `/Users/dinq/Work/neo-projects/neo-monorepo/packages/server/src/features/agent/providers/codex/` and `/Users/dinq/Work/neo-projects/neo-monorepo/packages/contract/src/agent/codex/`.
 - Depends on the claude-code plan (`2026-07-12-claude-code-sdk-typed-tools.md`) being merged first — it establishes `z.custom` conventions and the data-parts pattern.
-- Keep vibest's existing exported names: `CodexMetadata`, `CodexDataTypes`, `CodexTools`, `CodexUIMessage` (in `packages/harness/src/codex/ui-message.ts`, currently placeholders).
+- Keep pie's existing exported names: `CodexMetadata`, `CodexDataTypes`, `CodexTools`, `CodexUIMessage` (in `packages/harness/src/codex/ui-message.ts`, currently placeholders).
 - Generated protocol code is committed, never hand-edited, excluded from lint/format.
 - ONE `codex app-server` child per `CodexAgent`; sessions are threads inside it, demultiplexed by `threadId`.
 - Run all commands from repo root; `vp check` and `vp test run` green at every commit. No Claude-related annotations in commit messages.
@@ -75,7 +75,7 @@ git commit -m "feat(harness): vendor generated codex app-server protocol types"
 
 ### Task 2: Codex tools + UIMessage types
 
-Port neo `packages/contract/src/agent/codex/tools.ts` and `ui-message.ts` into harness, renamed to vibest conventions.
+Port neo `packages/contract/src/agent/codex/tools.ts` and `ui-message.ts` into harness, renamed to pie conventions.
 
 **Files:**
 
@@ -239,7 +239,7 @@ describe("codex tools project ThreadItem arms", () => {
 
 - [ ] **Step 5: Typecheck + commit**
 
-Run: `pnpm --filter @vibest/harness typecheck`
+Run: `pnpm --filter @pie/harness typecheck`
 Expected: PASS.
 
 ```bash
@@ -313,7 +313,7 @@ describe("CodexAppServer", () => {
     const server = new CodexAppServer({ executablePath: makeFake(), handlers });
     servers.push(server);
     server.start();
-    await server.initialize({ name: "vibest", title: "Vibest", version: "0.0.0" });
+    await server.initialize({ name: "pie", title: "Pie", version: "0.0.0" });
     return server;
   }
 
@@ -347,7 +347,7 @@ describe("CodexAppServer", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `pnpm --filter @vibest/harness test test/codex/app-server.test.ts`
+Run: `pnpm --filter @pie/harness test test/codex/app-server.test.ts`
 Expected: FAIL — module `../../src/codex/app-server` not found.
 
 - [ ] **Step 3: Port app-server.ts**
@@ -379,7 +379,7 @@ Everything else (spawn, JSONL framing, pending map, zombie net `process.once("ex
 
 - [ ] **Step 4: Run tests, then commit**
 
-Run: `pnpm --filter @vibest/harness test test/codex/app-server.test.ts`
+Run: `pnpm --filter @pie/harness test test/codex/app-server.test.ts`
 Expected: PASS.
 
 ```bash
@@ -391,7 +391,7 @@ git commit -m "feat(harness): codex app-server JSON-RPC client"
 
 ### Task 4: Codex transform + toSessionEvent
 
-Port neo `codex/transform.ts` (typed to vibest's `CodexUIMessageChunk`) and write vibest's `toSessionEvent` against the dotted `SessionEvent` vocabulary (`packages/harness/src/events/session.ts`), mirroring `claude-code/to-session-event.ts`'s `(message, view: LifecycleView)` signature.
+Port neo `codex/transform.ts` (typed to pie's `CodexUIMessageChunk`) and write pie's `toSessionEvent` against the dotted `SessionEvent` vocabulary (`packages/harness/src/events/session.ts`), mirroring `claude-code/to-session-event.ts`'s `(message, view: LifecycleView)` signature.
 
 **Files:**
 
@@ -553,7 +553,7 @@ describe("codex toSessionEvent", () => {
 
 - [ ] **Step 3: Run to verify failure**
 
-Run: `pnpm --filter @vibest/harness test test/codex`
+Run: `pnpm --filter @pie/harness test test/codex`
 Expected: FAIL — modules not found.
 
 - [ ] **Step 4: Write transform.ts**
@@ -561,7 +561,7 @@ Expected: FAIL — modules not found.
 Copy neo's `codex/transform.ts` with these adaptations, keeping ALL of the open-block/no-delta-fallback logic verbatim:
 
 1. Imports: `CodexUIMessageChunk` from `./ui-message`, protocol types from the verified `./protocol/...` path.
-2. Rename `createCodexUIMessageChunkTransform` → `createCodexTransform` and convert the `(notification, enqueue)` callback shape to vibest's generator shape:
+2. Rename `createCodexUIMessageChunkTransform` → `createCodexTransform` and convert the `(notification, enqueue)` callback shape to pie's generator shape:
 
 ```ts
 export function createCodexTransform(): (
@@ -641,7 +641,7 @@ export function toSessionEvent(
 
 - [ ] **Step 6: Run tests + commit**
 
-Run: `pnpm --filter @vibest/harness test test/codex && pnpm --filter @vibest/harness typecheck`
+Run: `pnpm --filter @pie/harness test test/codex && pnpm --filter @pie/harness typecheck`
 Expected: PASS.
 
 ```bash
@@ -653,7 +653,7 @@ git commit -m "feat(harness): codex notification transform and session-event map
 
 ### Task 5: Approval/question mapping onto AgentRequest
 
-Port neo `codex/request.ts` onto vibest's simpler `AgentRequest`/`AgentResponse` (`packages/harness/src/types/request.ts` — actions are `{id, label}` only; tool responses are `{behavior: "allow" | "deny", message?, native?}`).
+Port neo `codex/request.ts` onto pie's simpler `AgentRequest`/`AgentResponse` (`packages/harness/src/types/request.ts` — actions are `{id, label}` only; tool responses are `{behavior: "allow" | "deny", message?, native?}`).
 
 **Files:**
 
@@ -731,9 +731,9 @@ describe("codex request mapping", () => {
 
 Port neo's file with these adaptations (keep the `APPROVAL_METHODS` table, the `Extract<ServerRequest, …>` types, and `declineResult`/`emptyUserInputResponse` verbatim):
 
-1. `AgentRequest`/`AgentResponse` come from `../types/request`; the request objects carry `harnessAgentId: "codex"` (vibest's field) instead of neo's `agentProviderId`.
-2. vibest actions have no `behavior`/`grant` fields — use exactly `[{ id: "accept", label: "Allow" }, { id: "decline", label: "Deny" }]` and drop neo's grant-amendment actions (the `native` field still carries the raw params for a future richer UI).
-3. Decision derivation (vibest's response has no `selectedActionId`):
+1. `AgentRequest`/`AgentResponse` come from `../types/request`; the request objects carry `harnessAgentId: "codex"` (pie's field) instead of neo's `agentProviderId`.
+2. pie actions have no `behavior`/`grant` fields — use exactly `[{ id: "accept", label: "Allow" }, { id: "decline", label: "Deny" }]` and drop neo's grant-amendment actions (the `native` field still carries the raw params for a future richer UI).
+3. Decision derivation (pie's response has no `selectedActionId`):
 
 ```ts
 function deriveDecision(response: AgentResponse): "accept" | "decline" {
@@ -748,11 +748,11 @@ export function mapApprovalResponse(response: AgentResponse, source: ApprovalSou
 }
 ```
 
-4. Question mapping: vibest's `AgentRequestQuestion` is `{id, question, options?: {label, description?}[]}` — drop neo's `header`/`kind`/`allowOther` fields; `mapUserInputResponse` appends `other` to `values` (as in the test above). Use `v7 as uuid` from `uuid` (already a harness dependency) for request ids, not `node:crypto`.
+4. Question mapping: pie's `AgentRequestQuestion` is `{id, question, options?: {label, description?}[]}` — drop neo's `header`/`kind`/`allowOther` fields; `mapUserInputResponse` appends `other` to `values` (as in the test above). Use `v7 as uuid` from `uuid` (already a harness dependency) for request ids, not `node:crypto`.
 
 - [ ] **Step 3: Run tests + commit**
 
-Run: `pnpm --filter @vibest/harness test test/codex/request.test.ts`
+Run: `pnpm --filter @pie/harness test test/codex/request.test.ts`
 Expected: PASS.
 
 ```bash
@@ -764,7 +764,7 @@ git commit -m "feat(harness): map codex approvals/questions onto AgentRequest"
 
 ### Task 6: CodexAgent session manager
 
-The vibest-native piece (no direct neo counterpart — neo splits this across provider.ts/session.ts with an event hub vibest doesn't have). Mirrors `claude-code/agent.ts`'s shape: a `Session` manager with `create/prompt/abort/interrupt/respondPermission`, `Pushable`-backed streams, `AsyncGenerator` prompt.
+The pie-native piece (no direct neo counterpart — neo splits this across provider.ts/session.ts with an event hub pie doesn't have). Mirrors `claude-code/agent.ts`'s shape: a `Session` manager with `create/prompt/abort/interrupt/respondPermission`, `Pushable`-backed streams, `AsyncGenerator` prompt.
 
 **Files:**
 
@@ -856,7 +856,7 @@ describe("CodexAgent", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `pnpm --filter @vibest/harness test test/codex/agent.test.ts`
+Run: `pnpm --filter @pie/harness test test/codex/agent.test.ts`
 Expected: FAIL — `CodexAgent` not found.
 
 - [ ] **Step 3: Write agent.ts**
@@ -883,7 +883,7 @@ import type { CodexUIMessageChunk } from "./ui-message";
 
 // clientInfo.name identifies the integration to OpenAI's Compliance Logs — a
 // stable identifier, never a per-run value.
-const CLIENT_INFO = { name: "vibest", title: "Vibest", version: "0.0.0" };
+const CLIENT_INFO = { name: "pie", title: "Pie", version: "0.0.0" };
 
 interface SessionState {
   threadId: string;
@@ -1125,7 +1125,7 @@ Add to `packages/harness/package.json` exports:
 
 - [ ] **Step 5: Run tests + commit**
 
-Run: `pnpm --filter @vibest/harness test && pnpm --filter @vibest/harness typecheck`
+Run: `pnpm --filter @pie/harness test && pnpm --filter @pie/harness typecheck`
 Expected: PASS (all codex tests + existing suites).
 
 ```bash
@@ -1159,8 +1159,8 @@ Mirror `packages/contract/src/claude-code.ts` and `packages/server/src/rpc/claud
 
 ```ts
 import { oc, type } from "@orpc/contract";
-import type { AgentRequest, AgentResponse } from "@vibest/harness";
-import type { CodexUIMessageChunk } from "@vibest/harness/codex";
+import type { AgentRequest, AgentResponse } from "@pie/harness";
+import type { CodexUIMessageChunk } from "@pie/harness/codex";
 import { z } from "zod";
 
 export const codexContract = {
@@ -1184,7 +1184,7 @@ export const codexContract = {
 };
 ```
 
-(Verify `AgentRequest`/`AgentResponse` are exported from `@vibest/harness` root — check `packages/harness/src/index.ts`; if not, add `export type { AgentRequest, AgentResponse } from "./types/request";` there.)
+(Verify `AgentRequest`/`AgentResponse` are exported from `@pie/harness` root — check `packages/harness/src/index.ts`; if not, add `export type { AgentRequest, AgentResponse } from "./types/request";` there.)
 
 Add to `packages/contract/src/index.ts`:
 
@@ -1204,8 +1204,8 @@ export { codexContract };
 import "@orpc/experimental-effect/extensions/effect";
 
 import { implement } from "@orpc/server";
-import { codexContract } from "@vibest/contract/codex";
-import { CodexAgent } from "@vibest/harness/codex";
+import { codexContract } from "@pie/contract/codex";
+import { CodexAgent } from "@pie/harness/codex";
 import { Context, Effect, Layer } from "effect";
 
 export class Codex extends Context.Service<Codex, CodexAgent>()("Codex") {}
@@ -1310,7 +1310,7 @@ describe.skipIf(process.env.CODEX_SMOKE !== "1")("codex live smoke", () => {
 
 - [ ] **Step 2: Run the smoke locally**
 
-Run: `CODEX_SMOKE=1 pnpm --filter @vibest/harness test test/codex/agent.smoke.test.ts`
+Run: `CODEX_SMOKE=1 pnpm --filter @pie/harness test test/codex/agent.smoke.test.ts`
 Expected: PASS (codex-cli 0.142.5 is installed and logged in on this machine). If auth is missing, record as skipped — do not fake it.
 
 - [ ] **Step 3: Final gates + handoff**

@@ -52,7 +52,7 @@ const makeRuntime = (
     const activeTurn = yield* Ref.make<string | undefined>(undefined);
 
     const emit = (body: PiUIMessageChunk | SessionEvent) =>
-      Queue.offer(events, { harnessAgentId: "pi", sessionId, body }).pipe(
+      Queue.offer(events, { sessionId, body }).pipe(
         Effect.flatMap((accepted) =>
           accepted
             ? Ref.update(cursor, (current) => current + 1)
@@ -134,7 +134,6 @@ const makeRuntime = (
 
     return {
       sessionId,
-      harnessAgentId: "pi",
       events: streamFromQueueOne(events),
       prompt: (input) =>
         Effect.gen(function* () {
@@ -233,8 +232,7 @@ export const makePiAdapter = (
   agent: PiAgent,
   options: { readonly executablePath?: string } = {},
 ): HarnessAgentAdapter => ({
-  id: "pi",
-  descriptor: { id: "pi", name: "Pi" },
+  descriptor: { name: "Pi" },
   // Pi has neither a permission protocol nor a model catalogue — declaring
   // nothing (empty subset, no probe) is what makes the UI render no config
   // controls for it.
@@ -246,15 +244,13 @@ export const makePiAdapter = (
   ),
   open: (input) =>
     agent.session.create({ cwd: input.cwd }).pipe(
-      Effect.mapError((cause) => new AgentOpenError({ harnessAgentId: "pi", cause })),
+      Effect.mapError((cause) => new AgentOpenError({ cause })),
       Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
     ),
   resume: (input) =>
     agent.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
       Effect.mapError((cause) =>
-        cause instanceof SessionNotResumable
-          ? cause
-          : new AgentOpenError({ harnessAgentId: "pi", cause }),
+        cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
       ),
       Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
     ),

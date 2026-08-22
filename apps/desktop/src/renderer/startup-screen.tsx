@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import vibestLogoUrl from "../../resources/v.svg?url";
+import pieLogoUrl from "../../resources/v.svg?url";
 
 import "./startup-screen.css";
 
@@ -8,17 +8,17 @@ export function StartupScreen(): ReactElement {
   return (
     <main
       className="bg-background fixed inset-0 z-40 grid place-items-center"
-      aria-label="Starting Vibest"
+      aria-label="Starting Pie"
     >
       <div
-        className="vibest-startup-logo"
+        className="pie-startup-logo"
         style={{
-          WebkitMaskImage: `url("${vibestLogoUrl}")`,
-          maskImage: `url("${vibestLogoUrl}")`,
+          WebkitMaskImage: `url("${pieLogoUrl}")`,
+          maskImage: `url("${pieLogoUrl}")`,
         }}
         aria-hidden="true"
       >
-        <span className="vibest-startup-logo-shimmer" />
+        <span className="pie-startup-logo-shimmer" />
       </div>
     </main>
   );

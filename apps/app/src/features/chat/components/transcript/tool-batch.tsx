@@ -1,10 +1,10 @@
-import { Shimmer } from "@vibest/ui/ai-elements/shimmer";
+import { Shimmer } from "@pie/ui/ai-elements/shimmer";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
-import { cn } from "@vibest/ui/lib/utils";
+} from "@pie/ui/components/collapsible";
+import { cn } from "@pie/ui/lib/utils";
 import type { ToolUIPart, UIMessage } from "ai";
 import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";

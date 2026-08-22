@@ -1,4 +1,4 @@
-import { Button } from "@vibest/ui/components/button";
+import { Button } from "@pie/ui/components/button";
 import {
   Empty,
   EmptyContent,
@@ -6,7 +6,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@vibest/ui/components/empty";
+} from "@pie/ui/components/empty";
 import { FileCodeIcon, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 

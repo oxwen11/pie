@@ -1,6 +1,6 @@
+import type { SessionRef, SessionSummary } from "@pie/contract";
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { SessionRef, SessionSummary } from "@vibest/contract";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -30,7 +30,6 @@ const session = (
   archived = false,
 ): SessionSummary => ({
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId,
   ...(title === undefined ? {} : { title }),
   archived,
@@ -43,7 +42,6 @@ let host: HTMLDivElement | undefined;
 
 const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "project-1",
-  harnessAgentId: "pi",
   sessionId,
   ...overrides,
 });

@@ -2,15 +2,15 @@
 
 `contract ← server ← cli|desktop` and `contract ← client ← app ← desktop`.
 
-| dir                 | name                         | role                                                                                                                                                                                                                                                              |
-| ------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/contract` | `@vibest/contract`           | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Also the browser-safe agent UI surface: `@vibest/contract/{claude-code,codex}` tool schemas + UI-message types and `codex/protocol` (ts-rs types). Leaf; nothing may point back at it. |
-| `packages/server`   | `@vibest/server`             | All runtime: domain services, session runtime, harness transforms + adapters, oRPC router, HTTP/WS, daemon.                                                                                                                                                       |
-| `packages/client`   | `@vibest/client`             | ~60-LOC factory for a typed oRPC WebSocket client.                                                                                                                                                                                                                |
-| `packages/ui`       | `@vibest/ui`                 | React components. Subpath-only exports, no barrel.                                                                                                                                                                                                                |
-| `apps/app`          | `@vibest/app`                | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.                                                                                                                                                       |
-| `apps/desktop`      | `desktop` (unscoped)         | Electron shell supervising a forked server over MessagePort oRPC.                                                                                                                                                                                                 |
-| `packages/vibest`   | `@vibest/cli` (bin `vibest`) | Thin CLI over `@vibest/server/{daemon,http}`.                                                                                                                                                                                                                     |
+| dir                 | name                   | role                                                                                                                                                                                                                                                           |
+| ------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/contract` | `@pie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Also the browser-safe agent UI surface: `@pie/contract/{claude-code,codex}` tool schemas + UI-message types and `codex/protocol` (ts-rs types). Leaf; nothing may point back at it. |
+| `packages/server`   | `@pie/server`          | All runtime: domain services, session runtime, harness transforms + adapters, oRPC router, HTTP/WS, daemon.                                                                                                                                                    |
+| `packages/client`   | `@pie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                                                                                                                                                                             |
+| `packages/ui`       | `@pie/ui`              | React components. Subpath-only exports, no barrel.                                                                                                                                                                                                             |
+| `apps/app`          | `@pie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.                                                                                                                                                    |
+| `apps/desktop`      | `desktop` (unscoped)   | Electron shell supervising a forked server over MessagePort oRPC.                                                                                                                                                                                              |
+| `packages/pie`      | `@pie/cli` (bin `pie`) | Thin CLI over `@pie/server/{daemon,http}`.                                                                                                                                                                                                                     |
 
 ## Boundaries
 
@@ -53,12 +53,12 @@ app-server generate-ts`) and is in the lint/format ignore lists. Don't hand-edit
   `src/preload/`). Read it before touching `apps/desktop/src`.
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
-  persistent roots: `resolveVibestHome` for Projects and Sessions,
+  persistent roots: `resolvePieHome` for Projects and Sessions,
   `resolveDaemonDirectory` for lifecycle state, and `logsDirectory` for
-  `$VIBEST_HOME/logs`. The daemon directory holds only `daemon.pid`, `.lock`, and
+  `$PIE_HOME/logs`. The daemon directory holds only `daemon.pid`, `.lock`, and
   `.stopped`. `Paths` includes `logsDir`; directory `0700` and files `0600` are
   part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
-  The process-owned observability Layer appends to `logsDir/vibest.log` and
+  The process-owned observability Layer appends to `logsDir/pie.log` and
   requires FileSystem, Crypto, and Paths — bound at `runServe` / `NodeServices.layer`.
   Do not seal a platform layer inside the observability module, and do not name
   the log directory a second time. The RPC `ManagedRuntime` must `provideMerge`

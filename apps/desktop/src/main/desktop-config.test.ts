@@ -6,12 +6,12 @@ describe("buildDesktopConfig", () => {
   it("resolves the packaged server entry under resourcesPath", () => {
     const config = buildDesktopConfig({
       isPackaged: true,
-      resourcesPath: "/Applications/Vibest.app/Contents/Resources",
+      resourcesPath: "/Applications/Pie.app/Contents/Resources",
       devUrl: undefined,
     });
 
     expect(config.serverEntry).toBe(
-      "/Applications/Vibest.app/Contents/Resources/app.asar/node_modules/@vibest/server/dist/server.mjs",
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@pie/server/dist/server.mjs",
     );
   });
 

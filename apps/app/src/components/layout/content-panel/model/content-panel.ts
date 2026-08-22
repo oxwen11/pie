@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
@@ -82,7 +82,7 @@ export interface ContentPanelOptions {
   readonly storage?: Storage;
 }
 
-const STORAGE_NAME = "vibest:content-panel";
+const STORAGE_NAME = "pie:content-panel";
 
 const EMPTY_SESSION: SessionPanels = { presentation: "hidden", activeId: null, panels: [] };
 /** Shared so an empty strip is `Object.is`-stable without costing a cache entry. */

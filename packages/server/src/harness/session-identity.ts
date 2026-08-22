@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { Effect } from "effect";
 
 /**
@@ -31,7 +31,6 @@ export const inSession =
     const identity = {
       sessionId: ref.sessionId,
       projectId: ref.projectId,
-      harnessAgentId: ref.harnessAgentId,
     };
     return effect.pipe(Effect.annotateLogs(identity), Effect.annotateSpans(identity));
   };

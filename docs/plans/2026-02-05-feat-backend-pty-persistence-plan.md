@@ -14,7 +14,7 @@ Implement backend PTY state persistence using `@xterm/headless` and `@xterm/addo
 
 ## Problem Statement
 
-Currently, the vibest desktop app maintains terminal state on the frontend via continuous streaming. While this works when tabs are hidden via CSS, there are gaps:
+Currently, the pie desktop app maintains terminal state on the frontend via continuous streaming. While this works when tabs are hidden via CSS, there are gaps:
 
 1. **No recovery mechanism** - If frontend misses data (subscription interruption), state is lost
 2. **No mode tracking** - Terminal modes (bracketed paste, application cursor, etc.) aren't tracked

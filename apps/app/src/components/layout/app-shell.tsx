@@ -1,4 +1,4 @@
-import { SidebarProvider, useSidebar } from "@vibest/ui/components/sidebar";
+import { SidebarProvider, useSidebar } from "@pie/ui/components/sidebar";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
