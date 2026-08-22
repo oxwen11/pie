@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import pieLogoUrl from "../../resources/v.svg?url";
+import pieLogoUrl from "../../resources/pie.svg?url";
 
 import "./startup-screen.css";
 
