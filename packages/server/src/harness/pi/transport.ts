@@ -15,8 +15,10 @@ const DEFAULT_FORCE_KILL_AFTER = "2 seconds";
 
 export type PiTransportFailure = PiTransportError | PiRpcError | AgentProcessExited;
 
+import type { PiExecutable } from "./resolve-executable";
+
 export interface PiTransportOptions {
-  readonly executablePath?: string;
+  readonly executable?: PiExecutable;
   /** Pi resolves its per-project session directory from the child's cwd. */
   readonly cwd?: string;
   /** Passed as `--session-id` — pi loads the session, creating it if missing. */
@@ -72,11 +74,13 @@ export const makePiTransport = (
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
+    const executable = options.executable ?? { command: "pi", prefixArgs: [] };
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
-          options.executablePath ?? "pi",
+          executable.command,
           [
+            ...executable.prefixArgs,
             "--mode",
             "rpc",
             ...(options.sessionId ? ["--session-id", options.sessionId] : []),

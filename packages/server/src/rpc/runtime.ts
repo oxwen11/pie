@@ -15,6 +15,7 @@ import {
 } from "../harness";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
 import { PiAdapter } from "../harness/pi-adapter";
+import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 
 export class Pi extends Context.Service<Pi, PiAgent>()("Pi") {}
@@ -28,10 +29,8 @@ const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeC
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
-const piAgentOptions =
-  process.env.PIE_E2E === "1" && process.env.PIE_E2E_PI_EXECUTABLE
-    ? { executablePath: process.env.PIE_E2E_PI_EXECUTABLE }
-    : {};
+const piExecutable = resolvePiExecutable();
+const piAgentOptions = { executable: piExecutable };
 
 export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent(piAgentOptions)).pipe(
   Layer.provide(NodeProcessLayer),

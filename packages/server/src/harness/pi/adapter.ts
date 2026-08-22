@@ -16,10 +16,11 @@ import {
   TurnAlreadyRunning,
 } from "../errors";
 import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
-import { findExecutable } from "../executable";
 import { streamFromQueueOne } from "../queue-stream";
 import type { PiAgent } from "./agent";
 import { entriesToUIMessages } from "./history";
+import { checkPiAvailability } from "./resolve-executable";
+import type { PiExecutable } from "./resolve-executable";
 import type { PiUIMessageChunk } from "./ui-message";
 
 const EVENT_QUEUE_CAPACITY = 1024;
@@ -225,14 +226,10 @@ const makeRuntime = (
 
 export const makePiAdapter = (
   agent: PiAgent,
-  options: { readonly executablePath?: string } = {},
+  options: { readonly executable?: PiExecutable } = {},
 ): HarnessAgentAdapter => ({
   descriptor: { name: "Pi" },
-  checkAvailability: findExecutable(options.executablePath ?? "pi").pipe(
-    Effect.map((found) =>
-      found ? { available: true } : { available: false, reason: "Pi was not found on PATH." },
-    ),
-  ),
+  checkAvailability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
   open: (input) =>
     agent.session.create({ cwd: input.cwd }).pipe(
       Effect.mapError((cause) => new AgentOpenError({ cause })),

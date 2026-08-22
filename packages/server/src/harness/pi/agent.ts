@@ -14,6 +14,7 @@ import {
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
+import type { PiExecutable } from "./resolve-executable";
 import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
@@ -71,7 +72,7 @@ type SessionState = {
 };
 
 export interface PiAgentOptions {
-  readonly executablePath?: string;
+  readonly executable?: PiExecutable;
   readonly args?: ReadonlyArray<string>;
 }
 
@@ -587,7 +588,7 @@ export const makePiAgent = (
   makePiAgentWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
-        ...(options.executablePath ? { executablePath: options.executablePath } : {}),
+        ...(options.executable ? { executable: options.executable } : {}),
         ...(options.args ? { args: options.args } : {}),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : {}),

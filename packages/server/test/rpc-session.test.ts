@@ -58,15 +58,15 @@ async function setup() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const executablePath = makeFake();
-  const piLayer = Layer.effect(Pi, makePiAgent({ executablePath })).pipe(
+  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
+  const piLayer = Layer.effect(Pi, makePiAgent({ executable: piExecutable })).pipe(
     Layer.provide(NodeServices.layer),
   );
   const piAdapterLayer = Layer.effect(
     PiAdapter,
     Effect.gen(function* () {
       const pi = yield* Pi;
-      return makePiAdapter(pi, { executablePath });
+      return makePiAdapter(pi, { executable: piExecutable });
     }),
   ).pipe(Layer.provide(piLayer));
 
