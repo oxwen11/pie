@@ -88,6 +88,8 @@ export interface PiAgent {
   readonly session: {
     readonly create: (config: {
       readonly cwd: string;
+      readonly provider?: string;
+      readonly modelId?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
     readonly resume: (config: {
       readonly sessionId: string;
@@ -319,12 +321,17 @@ export const makePiAgentWithDependencies = <R>(
     const openSession = (
       sessionId: string,
       cwd?: string,
+      spawnArgs?: ReadonlyArray<string>,
     ): Effect.Effect<{ readonly sessionId: string }, PiTransportFailure> =>
       Effect.gen(function* () {
         const scope = yield* Scope.fork(ownerScope, "sequential");
         return yield* Effect.gen(function* () {
           const transport = yield* dependencies
-            .makeTransport({ sessionId, ...(cwd ? { cwd } : {}) })
+            .makeTransport({
+              sessionId,
+              ...(cwd ? { cwd } : {}),
+              ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : {}),
+            })
             .pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(buildContext));
 
           // Readiness handshake: pi's CLI front-end resolves the session (and
@@ -409,7 +416,13 @@ export const makePiAgentWithDependencies = <R>(
 
     return {
       session: {
-        create: (config) => openSession(uuid(), config.cwd),
+        create: (config) => {
+          const spawnArgs =
+            config.provider && config.modelId
+              ? ["--provider", config.provider, "--model", config.modelId]
+              : undefined;
+          return openSession(uuid(), config.cwd, spawnArgs);
+        },
         resume: (config) => openSession(config.sessionId, config.cwd),
         prompt: (input) =>
           Effect.gen(function* () {

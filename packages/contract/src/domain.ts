@@ -456,12 +456,13 @@ export const SetAgentModelInputSchema = Schema.Struct({
 export type SetAgentModelInput = typeof SetAgentModelInputSchema.Type;
 
 export const ListAgentModelsInputSchema = Schema.Struct({
-  projectId: Schema.String.check(Schema.isUUID()),
+  projectId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
 });
 export type ListAgentModelsInput = typeof ListAgentModelsInputSchema.Type;
 
 export const ListAgentModelsOutputSchema = Schema.Struct({
   models: Schema.Array(AgentModelSchema),
+  defaultModel: Schema.optionalKey(AgentModelSchema),
 });
 export type ListAgentModelsOutput = typeof ListAgentModelsOutputSchema.Type;
 
@@ -506,6 +507,8 @@ export const BrowseResultSchema = Schema.Struct({
 
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
+  provider: Schema.optionalKey(Schema.NonEmptyString),
+  modelId: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

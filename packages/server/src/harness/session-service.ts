@@ -67,6 +67,7 @@ export type HarnessAgentSessionServiceShape = {
   readonly create: (
     projectId: string,
     cwd: string,
+    model?: { readonly provider: string; readonly modelId: string },
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -266,34 +267,42 @@ export const makeHarnessAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd) =>
+    create: (projectId, cwd, model) =>
       newSessionId.pipe(
         Effect.flatMap((sessionId) => {
           const ref: SessionRef = { projectId, sessionId };
-          return manager.open({ cwd }, ref).pipe(
-            Effect.flatMap((session) => {
-              const metadata: Session = {
-                sessionId,
-                projectId,
-                agentSessionId: session.sessionId,
-                createdAt: new Date().toISOString(),
+          return manager
+            .open(
+              {
                 cwd,
-                archived: false,
-              };
-              return repo.write(metadata).pipe(
-                Effect.tapError(() => manager.close(ref)),
-                Effect.andThen(bus.publish({ ref, type: "session.created" })),
-                Effect.andThen(
-                  logLifecycle("session.created", "session created", {
-                    cwd,
-                    agentSessionId: session.sessionId,
-                  }),
-                ),
-                Effect.as(ref),
-              );
-            }),
-            inSession(ref),
-          );
+                ...(model ? { provider: model.provider, modelId: model.modelId } : {}),
+              },
+              ref,
+            )
+            .pipe(
+              Effect.flatMap((session) => {
+                const metadata: Session = {
+                  sessionId,
+                  projectId,
+                  agentSessionId: session.sessionId,
+                  createdAt: new Date().toISOString(),
+                  cwd,
+                  archived: false,
+                };
+                return repo.write(metadata).pipe(
+                  Effect.tapError(() => manager.close(ref)),
+                  Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                  Effect.andThen(
+                    logLifecycle("session.created", "session created", {
+                      cwd,
+                      agentSessionId: session.sessionId,
+                    }),
+                  ),
+                  Effect.as(ref),
+                );
+              }),
+              inSession(ref),
+            );
         }),
       ),
 

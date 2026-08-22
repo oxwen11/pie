@@ -9,6 +9,8 @@ import { Schema } from "effect";
 export const CreateSessionInputSchema = Schema.Struct({
   cwd: Schema.String,
   sessionId: Schema.optionalKey(Schema.String),
+  provider: Schema.optionalKey(Schema.String),
+  modelId: Schema.optionalKey(Schema.String),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

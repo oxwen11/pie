@@ -244,10 +244,16 @@ export const makePiAdapter = (
   descriptor: { name: "Pi" },
   checkAvailability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
   open: (input) =>
-    agent.session.create({ cwd: input.cwd }).pipe(
-      Effect.mapError((cause) => new AgentOpenError({ cause })),
-      Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
-    ),
+    agent.session
+      .create({
+        cwd: input.cwd,
+        ...(input.provider ? { provider: input.provider } : {}),
+        ...(input.modelId ? { modelId: input.modelId } : {}),
+      })
+      .pipe(
+        Effect.mapError((cause) => new AgentOpenError({ cause })),
+        Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
+      ),
   resume: (input) =>
     agent.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
       Effect.mapError((cause) =>

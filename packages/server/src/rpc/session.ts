@@ -24,8 +24,12 @@ export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* HarnessAgentSessionService;
+    const model =
+      input.provider && input.modelId
+        ? { provider: input.provider, modelId: input.modelId }
+        : undefined;
     return yield* projects.findById(input.projectId).pipe(
-      Effect.flatMap((project) => sessions.create(input.projectId, project.path)),
+      Effect.flatMap((project) => sessions.create(input.projectId, project.path, model)),
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
