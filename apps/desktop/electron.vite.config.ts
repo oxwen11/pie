@@ -32,7 +32,7 @@ const DEV_CSP_PATCHES: ReadonlyArray<readonly [string, string]> = [
 /** `apply: "serve"` keeps the built index.html byte-identical to the source. */
 function devOverlayCsp(): Plugin {
   return {
-    name: "vibest:dev-overlay-csp",
+    name: "pie:dev-overlay-csp",
     apply: "serve",
     transformIndexHtml(html) {
       return DEV_CSP_PATCHES.reduce((patched, [anchor, replacement]) => {
@@ -54,14 +54,14 @@ export default defineConfig({
     build: {
       outDir: "dist/main",
       // electron-vite externalizes every production dependency by default, but
-      // `@vibest/server/daemon` resolves to TypeScript source and so must be
+      // `@pie/server/daemon` resolves to TypeScript source and so must be
       // compiled into the main bundle. Left external, the packaged app imports
       // it at runtime from inside the asar's node_modules, where Node refuses
       // to strip types (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING).
       // Unpackaged runs get away with it only because pnpm's symlink puts the
       // real file outside node_modules.
       externalizeDeps: {
-        exclude: ["@vibest/server"],
+        exclude: ["@pie/server"],
       },
     },
   },
@@ -84,7 +84,7 @@ export default defineConfig({
       bundledDev: true,
     },
     define: {
-      "import.meta.env.VIBEST_RUN_IN_AGENT": JSON.stringify(RUNNING_IN_AGENT),
+      "import.meta.env.PIE_RUN_IN_AGENT": JSON.stringify(RUNNING_IN_AGENT),
     },
     resolve: {
       alias: { "@": url.fileURLToPath(new URL("../app/src/", import.meta.url)) },

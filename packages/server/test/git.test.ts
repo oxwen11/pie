@@ -12,7 +12,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
   /** A repo with one commit on `main`, removed when the test's scope closes. */
   const repo = Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-git-" });
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "pie-git-" });
     yield* fs.writeFileString(path.join(dir, "a.txt"), "hi");
     yield* Effect.promise(async () => {
       const git = simpleGit(dir);

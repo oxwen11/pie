@@ -34,7 +34,7 @@ A real problem in the registry output is either this repo's documented exception
 ## Verify before handing off
 
 ```bash
-pnpm --filter @vibest/ui typecheck
+pnpm --filter @pie/ui typecheck
 pnpm --filter web typecheck
 oxlint packages/ui/src
 pnpm --filter web build

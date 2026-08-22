@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@vibest/ui/components/button";
-import { ScrollArea, ScrollBar } from "@vibest/ui/components/scroll-area";
-import { cn } from "@vibest/ui/lib/utils";
+import { Button } from "@pie/ui/components/button";
+import { ScrollArea, ScrollBar } from "@pie/ui/components/scroll-area";
+import { cn } from "@pie/ui/lib/utils";
 import type { ComponentProps } from "react";
 
 export type SuggestionsProps = ComponentProps<typeof ScrollArea>;

@@ -6,15 +6,15 @@
  */
 
 /** Identifies an agent backend adapter. */
-export type HarnessAgentId = "claude-code" | "codex" | "pi";
+export type HarnessAgentId = "pi";
 
-export const HARNESS_AGENT_IDS: ReadonlyArray<HarnessAgentId> = ["claude-code", "codex", "pi"];
+export const HARNESS_AGENT_IDS: ReadonlyArray<HarnessAgentId> = ["pi"];
 
 export const isHarnessAgentId = (value: string): value is HarnessAgentId =>
   (HARNESS_AGENT_IDS as ReadonlyArray<string>).includes(value);
 
 /** A project is a workspace path the runtime can open sessions against. */
-export type { Project } from "@vibest/contract";
+export type { Project } from "@pie/contract";
 
 /**
  * Server-owned recovery record for one session, persisted at
@@ -22,7 +22,7 @@ export type { Project } from "@vibest/contract";
  * envelope that owns the version — this record does not carry one. The filename
  * mirrors `sessionId`, which is also stored in the body so a loaded record is
  * self-contained; `harnessSessionId` is the agent-native id (claude session
- * uuid / codex thread id) the server translates to when calling the harness.
+ * id) the server translates to when calling the harness.
  *
  * Display data is self-owned — `list` reads this record and never queries the
  * backend session index. Identity + `cwd` + `createdAt` are written at create;

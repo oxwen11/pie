@@ -1,7 +1,7 @@
-import { Button } from "@vibest/ui/components/button";
-import { Checkbox } from "@vibest/ui/components/checkbox";
-import { Label } from "@vibest/ui/components/label";
-import { Radio, RadioGroup } from "@vibest/ui/components/radio-group";
+import { Button } from "@pie/ui/components/button";
+import { Checkbox } from "@pie/ui/components/checkbox";
+import { Label } from "@pie/ui/components/label";
+import { Radio, RadioGroup } from "@pie/ui/components/radio-group";
 import { useState } from "react";
 
 import type {

@@ -2,7 +2,7 @@
 
 > 日期：2026-07-15
 > 状态：Reviewed — 已按 Claude Fable 架构审查修订
-> 范围：`packages/harness` Agent runtime、`packages/server/src/rpc` 接入层，以及负责创建和关闭 server runtime 的 `packages/vibest`、Electron backend 和 CLI shutdown 路径
+> 范围：`packages/harness` Agent runtime、`packages/server/src/rpc` 接入层，以及负责创建和关闭 server runtime 的 `packages/pie`、Electron backend 和 CLI shutdown 路径
 > 相关文档：
 >
 > - [`2026-07-08-harness-agent-design.md`](./2026-07-08-harness-agent-design.md)
@@ -115,11 +115,11 @@ Promise / AsyncGenerator Agent class
 - 新 Effect 测试使用 `@effect/vitest` 和显式 drain/barrier，而不是固定 sleep 或手工 runtime runner；
 - `Schema.decodeUnknownEffect` 等编译器应提升到模块级，避免在热路径重复编译。
 
-本设计不照搬 T3 Code 的三点：T3 大量使用 unbounded Queue/PubSub；Codex 是每 session 一个 app-server；active session ownership 分散在 adapter map、ProviderService 和持久化目录。Vibest 继续使用有界订阅、共享 lazy Codex transport 和唯一 active-session owner。
+本设计不照搬 T3 Code 的三点：T3 大量使用 unbounded Queue/PubSub；Codex 是每 session 一个 app-server；active session ownership 分散在 adapter map、ProviderService 和持久化目录。Pie 继续使用有界订阅、共享 lazy Codex transport 和唯一 active-session owner。
 
 ## 5. 包和导出边界
 
-当前 `@vibest/harness/claude-code` 同时导出浏览器需要的 tool/UI 类型和 Node-only Agent class。建议将共享定义与 runtime 导出分离。
+当前 `@pie/harness/claude-code` 同时导出浏览器需要的 tool/UI 类型和 Node-only Agent class。建议将共享定义与 runtime 导出分离。
 
 ```text
 packages/harness/src/
@@ -861,7 +861,7 @@ export const toStandardSchema = <S extends Schema.ConstraintDecoder<unknown>>(sc
 export const HarnessAgentIdStandardSchema = toStandardSchema(HarnessAgentIdSchema);
 ```
 
-`packages/contract` 不依赖 harness 或 server；它持有共享 wire DTO、Effect Schema 和 `toStandardSchema`。`packages/harness` 依赖 contract，并仅为旧 import path 提供兼容性 re-export。浏览器运行时使用纯 `@vibest/contract/session-events` 子路径读取事件 guard，避免把 Effect Schema runtime 打入 app bundle。
+`packages/contract` 不依赖 harness 或 server；它持有共享 wire DTO、Effect Schema 和 `toStandardSchema`。`packages/harness` 依赖 contract，并仅为旧 import path 提供兼容性 re-export。浏览器运行时使用纯 `@pie/contract/session-events` 子路径读取事件 guard，避免把 Effect Schema runtime 打入 app bundle。
 
 禁止在 Zod 和 Effect Schema 之间手工互转 AST 或维护两份同义 schema。
 
@@ -1018,7 +1018,7 @@ createServer()
 改造范围明确包括：
 
 - `packages/server/src/rpc/handlers.ts`；
-- `packages/vibest/src/node/server.ts`；
+- `packages/pie/src/node/server.ts`；
 - dev WebSocket handler `teardown`；
 - Electron backend shutdown；
 - CLI SIGINT/SIGTERM shutdown。
@@ -1170,7 +1170,7 @@ createServer()
 3. 删除 server 中仅包装普通对象的 `ClaudeCode` / `Codex` service；
 4. 建立“先订阅、后 prompt”的统一 Session RPC；
 5. `createRpcRuntime` 改为显式异步 factory；
-6. dispose 接入 `packages/vibest`、dev WS、Electron backend 和 CLI shutdown；
+6. dispose 接入 `packages/pie`、dev WS、Electron backend 和 CLI shutdown；
 7. 增加 server integration tests。
 
 ### Phase 6：客户端统一订阅和兼容清理
@@ -1216,12 +1216,12 @@ createServer()
 17. 以下命令全部通过：
 
 ```bash
-pnpm --filter @vibest/harness test
-pnpm --filter @vibest/harness typecheck
-pnpm --filter @vibest/server test
-pnpm --filter @vibest/server typecheck
-pnpm --filter @vibest/contract typecheck
-pnpm --filter @vibest/app typecheck
+pnpm --filter @pie/harness test
+pnpm --filter @pie/harness typecheck
+pnpm --filter @pie/server test
+pnpm --filter @pie/server typecheck
+pnpm --filter @pie/contract typecheck
+pnpm --filter @pie/app typecheck
 ```
 
 ## 17. 实施优先级

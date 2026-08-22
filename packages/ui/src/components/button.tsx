@@ -2,8 +2,8 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { Spinner } from "@vibest/ui/components/spinner";
-import { cn } from "@vibest/ui/lib/utils";
+import { Spinner } from "@pie/ui/components/spinner";
+import { cn } from "@pie/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 

@@ -10,9 +10,9 @@ import { runServe, serveFlags } from "./serve";
 
 // The forkable server entry (`dist/server.mjs`). The desktop supervisor and the
 // local daemon launcher spawn this args-free with config in the environment; it
-// runs the same foreground `serve` body the `vibest serve` CLI command does.
-const server = Command.make("vibest-server", serveFlags, runServe).pipe(
-  Command.withDescription("Vibest server"),
+// runs the same foreground `serve` body the `pie serve` CLI command does.
+const server = Command.make("pie-server", serveFlags, runServe).pipe(
+  Command.withDescription("Pie server"),
 );
 
 Command.run(server, { version: pkg.version }).pipe(

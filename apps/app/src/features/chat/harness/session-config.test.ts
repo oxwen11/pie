@@ -1,4 +1,4 @@
-import type { HarnessAgentId, HarnessAgentInfo, ModelInfo, ProviderInfo } from "@vibest/contract";
+import type { HarnessAgentId, HarnessAgentInfo, ModelInfo, ProviderInfo } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { orderPermissionModes } from "./permission-modes";
@@ -10,22 +10,17 @@ import {
   resolvePermissionMode,
 } from "./session-config";
 
-const claudeCode: HarnessAgentInfo = {
-  id: "claude-code",
-  name: "Claude Code",
+const piHarness: HarnessAgentInfo = {
+  id: "pi",
+  name: "Pi",
   available: true,
-  permissionModes: ["plan", "full"],
-  defaultPermissionMode: "full",
+  permissionModes: [],
 };
 
-// The other half, probed per directory rather than declared once. Models live
-// inside their provider — the built-in provider carries the harness's id.
-const claudeProviders: ReadonlyArray<ProviderInfo> = [
+const probeProviders: ReadonlyArray<ProviderInfo> = [
   {
-    id: "claude-code",
+    id: "pi",
     models: [
-      // "Default (recommended)" is an ordinary pickable entry whose meaning is
-      // "let the CLI decide" — not a preselection marker.
       { id: "default", label: "Default (recommended)" },
       { id: "sonnet", label: "Sonnet" },
     ],
@@ -34,34 +29,26 @@ const claudeProviders: ReadonlyArray<ProviderInfo> = [
 
 describe("resolveModel", () => {
   it("keeps a pick the catalog offers", () => {
-    expect(resolveModel(claudeProviders, "claude-code", "sonnet")).toEqual({
-      providerId: "claude-code",
+    expect(resolveModel(probeProviders, "pi", "sonnet")).toEqual({
+      providerId: "pi",
       modelId: "sonnet",
     });
   });
 
   it("resolves to nothing when the user picked nothing", () => {
-    // No fabricated default: the wire omits the field, so the session runs on
-    // the harness's own configured default — which is not probeable.
-    expect(resolveModel(claudeProviders, undefined, undefined)).toBeUndefined();
+    expect(resolveModel(probeProviders, undefined, undefined)).toBeUndefined();
   });
 
   it("drops a pick the probe doesn't vouch for", () => {
-    // The shape of "switched harness with a stale model in the URL": never
-    // display or submit a pair that isn't in this harness's providers.
-    expect(resolveModel(claudeProviders, "codex", "gpt-5.6-sol")).toBeUndefined();
+    expect(resolveModel(probeProviders, "pi", "gpt-5.6-sol")).toBeUndefined();
   });
 
   it("treats the modelId as provider-scoped, not global", () => {
-    // Same modelId under the wrong provider must not resolve — the pair is a
-    // composite key, and half a match is no match.
-    expect(resolveModel(claudeProviders, "codex", "sonnet")).toBeUndefined();
+    expect(resolveModel(probeProviders, "other", "sonnet")).toBeUndefined();
   });
 
   it("ignores a URL-supplied pick until the probe can vouch for it", () => {
-    // Passing it through unchecked would send `session.create` a pair this
-    // directory may not resolve at all; omitting it means "harness default".
-    expect(resolveModel([], "claude-code", "sonnet")).toBeUndefined();
+    expect(resolveModel([], "pi", "sonnet")).toBeUndefined();
   });
 });
 
@@ -73,11 +60,11 @@ describe("reasoningEffort cascades from the selected model", () => {
     defaultReasoningEffort: "medium",
   };
   const mini: ModelInfo = { id: "gpt-5.6-mini", label: "GPT-5.6 Mini" };
-  const codexProviders: ReadonlyArray<ProviderInfo> = [{ id: "codex", models: [sol, mini] }];
+  const providers: ReadonlyArray<ProviderInfo> = [{ id: "pi", models: [sol, mini] }];
 
   it("reads the candidates off the resolved model", () => {
-    const model = resolveModel(codexProviders, "codex", "gpt-5.6-sol");
-    const modelInfo = findModelInfo(codexProviders, model?.providerId, model?.modelId);
+    const model = resolveModel(providers, "pi", "gpt-5.6-sol");
+    const modelInfo = findModelInfo(providers, model?.providerId, model?.modelId);
 
     expect(modelInfo?.reasoningEfforts).toEqual(["low", "medium", "high"]);
     expect(resolveReasoningEffort(modelInfo, undefined)).toBe("medium");
@@ -88,9 +75,7 @@ describe("reasoningEffort cascades from the selected model", () => {
   });
 
   it("drops the reasoningEffort when the selected model has no reasoningEffort switch", () => {
-    // Changing models must never carry a reasoningEffort onto a model that doesn't
-    // offer it — the control disappears and create/set omit the field.
-    const modelInfo = findModelInfo(codexProviders, "codex", "gpt-5.6-mini");
+    const modelInfo = findModelInfo(providers, "pi", "gpt-5.6-mini");
 
     expect(modelInfo?.reasoningEfforts).toBeUndefined();
     expect(resolveReasoningEffort(modelInfo, "high")).toBeUndefined();
@@ -107,38 +92,24 @@ describe("reasoningEffort cascades from the selected model", () => {
 
 describe("findModelInfo", () => {
   it("requires both halves of the pair to match", () => {
-    expect(findModelInfo(claudeProviders, "claude-code", "sonnet")?.id).toBe("sonnet");
-    expect(findModelInfo(claudeProviders, "codex", "sonnet")).toBeUndefined();
-    expect(findModelInfo(claudeProviders, "claude-code", undefined)).toBeUndefined();
-    expect(findModelInfo(claudeProviders, undefined, "sonnet")).toBeUndefined();
+    expect(findModelInfo(probeProviders, "pi", "sonnet")?.id).toBe("sonnet");
+    expect(findModelInfo(probeProviders, "other", "sonnet")).toBeUndefined();
+    expect(findModelInfo(probeProviders, "pi", undefined)).toBeUndefined();
+    expect(findModelInfo(probeProviders, undefined, "sonnet")).toBeUndefined();
   });
 });
 
 describe("resolvePermissionMode", () => {
-  it("preselects the harness's declared default", () => {
-    expect(resolvePermissionMode(claudeCode, undefined)).toBe("full");
-  });
-
-  it("honours an explicit pick within the declared subset", () => {
-    expect(resolvePermissionMode(claudeCode, "plan")).toBe("plan");
-  });
-
-  it("drops a pick outside the declared subset", () => {
-    expect(resolvePermissionMode(claudeCode, "ask")).toBe("full");
-  });
-
-  it("resolves to nothing for a harness that declares nothing", () => {
-    const pi: HarnessAgentInfo = { id: "pi", name: "Pi", available: true, permissionModes: [] };
-    expect(resolvePermissionMode(pi, "full")).toBeUndefined();
+  it("resolves to nothing for pi, which declares no permission protocol", () => {
+    expect(resolvePermissionMode(piHarness, undefined)).toBeUndefined();
+    expect(resolvePermissionMode(piHarness, "full")).toBeUndefined();
   });
 
   it("resolves to nothing while the list has not landed", () => {
     expect(resolvePermissionMode(undefined, "full")).toBeUndefined();
   });
 
-  it("orders the subset canonically for display, not as the harness declared it", () => {
-    // The subset arrives unordered from the wire; presentation order is
-    // client-owned and always the same across harnesses.
+  it("orders permission modes canonically for display", () => {
     expect(orderPermissionModes(["full", "plan"])).toEqual(["plan", "full"]);
   });
 });
@@ -150,33 +121,14 @@ const harness = (id: HarnessAgentId, available: boolean): HarnessAgentInfo => ({
   permissionModes: [],
 });
 
-it("starts a draft on the preferred harness when it is installed", () => {
-  expect(
-    pickDefaultHarnessAgentId(
-      [harness("claude-code", true), harness("codex", true)],
-      "claude-code",
-    ),
-  ).toBe("claude-code");
+it("starts a draft on pi when it is installed", () => {
+  expect(pickDefaultHarnessAgentId([harness("pi", true)], "pi")).toBe("pi");
 });
 
-it("falls through to the first available harness when the preferred one is missing", () => {
-  expect(
-    pickDefaultHarnessAgentId(
-      [harness("claude-code", false), harness("codex", true)],
-      "claude-code",
-    ),
-  ).toBe("codex");
+it("keeps pi as the preferred harness when it is missing from the list", () => {
+  expect(pickDefaultHarnessAgentId([], "pi")).toBe("pi");
 });
 
-it("keeps the preferred harness while the list has not landed", () => {
-  expect(pickDefaultHarnessAgentId([], "claude-code")).toBe("claude-code");
-});
-
-it("keeps the preferred harness when nothing at all is installed", () => {
-  expect(
-    pickDefaultHarnessAgentId(
-      [harness("claude-code", false), harness("codex", false)],
-      "claude-code",
-    ),
-  ).toBe("claude-code");
+it("keeps pi when nothing is installed", () => {
+  expect(pickDefaultHarnessAgentId([harness("pi", false)], "pi")).toBe("pi");
 });

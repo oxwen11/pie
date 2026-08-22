@@ -1,16 +1,12 @@
-import { useNavigate } from "@tanstack/react-router";
-import type { Project, SessionRef, SessionSummary } from "@vibest/contract";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
+import type { Project, SessionRef, SessionSummary } from "@pie/contract";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@pie/ui/components/collapsible";
 import {
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-} from "@vibest/ui/components/sidebar";
+} from "@pie/ui/components/sidebar";
+import { useNavigate } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { ProjectSessionRow } from "@/features/projects/project-session-row";

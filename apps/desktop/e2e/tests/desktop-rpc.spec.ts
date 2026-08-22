@@ -22,7 +22,7 @@ function findServerPid(parentPid: number): number | undefined {
     if (!match) continue;
     const [, pid, ppid, command] = match;
     // Must track apps/desktop/src/main/desktop-config.ts's serverEntry: the
-    // child is the built @vibest/server, not the CLI it used to be.
+    // child is the built @pie/server, not the CLI it used to be.
     if (Number(ppid) === parentPid && command.includes("packages/server/dist/server.mjs")) {
       return Number(pid);
     }
@@ -86,9 +86,9 @@ async function waitForDifferentServer(parentPid: number, previousPid: number): P
  * left the splash — that requires the ready handshake to have completed.
  */
 async function waitForConnectedUi(window: Page): Promise<void> {
-  // The splash carries "Starting Vibest" as an aria-label, not text content,
+  // The splash carries "Starting Pie" as an aria-label, not text content,
   // and unmounts permanently once the renderer connects.
-  await expect(window.getByRole("main", { name: "Starting Vibest" })).toBeHidden({
+  await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
     timeout: 30_000,
   });
 }
@@ -106,9 +106,9 @@ test("renders in the background without taking focus and connects to the server"
   electronApp,
   window,
 }) => {
-  await expect(window).toHaveTitle("Vibest");
+  await expect(window).toHaveTitle("Pie");
   await expect(window.locator("#root")).toBeVisible();
-  await expect(window.getByText("Vibest could not start")).toHaveCount(0);
+  await expect(window.getByText("Pie could not start")).toHaveCount(0);
   await expect(
     electronApp.evaluate(({ BrowserWindow }) => {
       const browserWindow = BrowserWindow.getAllWindows()[0];
@@ -126,26 +126,26 @@ test("renders in the background without taking focus and connects to the server"
     window.evaluate(() => {
       // Runs in the renderer, where `window` is the DOM window, not the Page.
       const globals = window as unknown as Window & {
-        vibest?: unknown;
+        pie?: unknown;
         require?: unknown;
         process?: unknown;
       };
       return {
-        vibest: typeof globals.vibest,
+        pie: typeof globals.pie,
         require: typeof globals.require,
         process: typeof globals.process,
       };
     }),
-  ).resolves.toEqual({ vibest: "undefined", require: "undefined", process: "undefined" });
+  ).resolves.toEqual({ pie: "undefined", require: "undefined", process: "undefined" });
 });
 
 test("gives a reloaded renderer document a new MessagePort", async ({ electronApp, window }) => {
   const pid = await waitForServer(appPid(electronApp));
 
   await window.reload();
-  await expect(window).toHaveTitle("Vibest");
+  await expect(window).toHaveTitle("Pie");
   await expect(window.locator("#root")).toBeVisible();
-  await expect(window.getByText("Vibest could not start")).toHaveCount(0);
+  await expect(window.getByText("Pie could not start")).toHaveCount(0);
   expect(serverPid(appPid(electronApp))).toBe(pid);
 });
 
@@ -179,9 +179,9 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
   // Own userData so its single-instance lock can't collide with a real `dev`.
   const userData = path.join(testInfo.outputPath(), "user-data");
   fs.mkdirSync(userData, { recursive: true });
-  // Own server storage so the developer's real ~/.vibest never leaks in.
-  const vibestHome = path.join(testInfo.outputPath(), "vibest-home");
-  fs.mkdirSync(vibestHome, { recursive: true });
+  // Own server storage so the developer's real ~/.pie never leaks in.
+  const pieHome = path.join(testInfo.outputPath(), "pie-home");
+  fs.mkdirSync(pieHome, { recursive: true });
 
   const app = await electron.launch({
     args: [
@@ -192,23 +192,23 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
       ...process.env,
       NODE_ENV: "development",
       ELECTRON_RENDERER_URL: origin,
-      VIBEST_E2E: "1",
-      VIBEST_HOME: vibestHome,
+      PIE_E2E: "1",
+      PIE_HOME: pieHome,
     },
   });
 
   try {
     const window = await app.firstWindow({ timeout: 30_000 });
-    await expect(window).toHaveTitle("Vibest");
-    await expect(window.getByText("Vibest could not start")).toHaveCount(0);
+    await expect(window).toHaveTitle("Pie");
+    await expect(window.getByText("Pie could not start")).toHaveCount(0);
   } finally {
     await app.close();
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
-    // This test builds its own $VIBEST_HOME instead of using the fixture, so
+    // This test builds its own $PIE_HOME instead of using the fixture, so
     // it also owns stopping the per-test daemon.
-    await stopDaemonFor(vibestHome);
+    await stopDaemonFor(pieHome);
   }
 });
 
@@ -256,18 +256,18 @@ test("reports a server crash and recovers on the pinned connection", async ({
 
   const restartedPid = serverPid(appPid(electronApp));
   expect(restartedPid).not.toBe(initialPid);
-  await expect(window.getByText("Vibest could not start")).toHaveCount(0);
+  await expect(window.getByText("Pie could not start")).toHaveCount(0);
 });
 
 test("leaves the daemon running through Electron shutdown", async ({ electronApp, window }) => {
-  await expect(window).toHaveTitle("Vibest");
+  await expect(window).toHaveTitle("Pie");
   const pid = await waitForServer(appPid(electronApp));
 
   await electronApp.close();
 
-  // The server is the shared vibest daemon the app attached to (or spawned) —
+  // The server is the shared pie daemon the app attached to (or spawned) —
   // it deliberately outlives Electron so the CLI and the next app launch
-  // converge on the same backend. `vibest daemon stop` is how it ends (the
+  // converge on the same backend. `pie daemon stop` is how it ends (the
   // fixture teardown does the equivalent for the per-test daemon).
   await new Promise((resolve) => setTimeout(resolve, 2_000));
   expect(processExists(pid)).toBe(true);

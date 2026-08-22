@@ -1,5 +1,5 @@
-import { useSidebar } from "@vibest/ui/components/sidebar";
-import { cn } from "@vibest/ui/lib/utils";
+import { useSidebar } from "@pie/ui/components/sidebar";
+import { cn } from "@pie/ui/lib/utils";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef } from "react";
 import {
   Group,
@@ -14,7 +14,7 @@ import {
 
 /** Resizable sidebar | chat | content-panel columns. */
 
-const SHELL_LAYOUT_ID = "vibest:shell-layout";
+const SHELL_LAYOUT_ID = "pie:shell-layout";
 const SIDEBAR_DEFAULT_SIZE = "16rem";
 
 const PANEL_IDS = {

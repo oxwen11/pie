@@ -17,17 +17,9 @@ import {
   HarnessProbeLayer,
   makeHarnessAgentRegistry,
 } from "../harness";
-import {
-  makeClaudeCodeAdapter,
-  makeClaudeCodeAgent,
-  type ClaudeCodeAgent,
-} from "../harness/claude-code";
-import { makeCodexAdapter, makeCodexAgent, type CodexAgent } from "../harness/codex";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 
-export class ClaudeCode extends Context.Service<ClaudeCode, ClaudeCodeAgent>()("ClaudeCode") {}
-export class Codex extends Context.Service<Codex, CodexAgent>()("Codex") {}
 export class Pi extends Context.Service<Pi, PiAgent>()("Pi") {}
 
 /**
@@ -39,26 +31,21 @@ const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeC
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
-export const ClaudeCodeLayer: Layer.Layer<ClaudeCode> = Layer.effect(
-  ClaudeCode,
-  makeClaudeCodeAgent(),
-).pipe(Layer.provide(PlatformLayer));
+const piAgentOptions =
+  process.env.PIE_E2E === "1" && process.env.PIE_E2E_PI_EXECUTABLE
+    ? { executablePath: process.env.PIE_E2E_PI_EXECUTABLE }
+    : {};
 
-export const CodexLayer: Layer.Layer<Codex> = Layer.effect(Codex, makeCodexAgent()).pipe(
+export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent(piAgentOptions)).pipe(
   Layer.provide(NodeProcessLayer),
 );
 
-export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent()).pipe(
-  Layer.provide(NodeProcessLayer),
-);
-
-const ProvidersLayer = Layer.mergeAll(ClaudeCodeLayer, CodexLayer, PiLayer);
+const ProvidersLayer = PiLayer;
 
 /**
  * Which CLI is installed, and whether it is new enough, is fixed for the life
  * of the process — but `harness.list` is awaited before first paint and every
- * `session.create` asks again, and claude-code's check spawns `claude
- * --version` (~45ms) each time. Cache it here, at the one place that builds the
+ * `session.create` asks again. Cache it here, at the one place that builds the
  * registry, so the answer costs one spawn per server rather than one per call.
  *
  * The trade is that a CLI installed while the server is running is not noticed
@@ -85,13 +72,8 @@ export const cacheAvailability = (
 const RegistryLayer = Layer.effect(
   HarnessAgentRegistry,
   Effect.gen(function* () {
-    const claudeCode = yield* ClaudeCode;
-    const codex = yield* Codex;
     const pi = yield* Pi;
-    const adapters = yield* Effect.forEach(
-      [makeClaudeCodeAdapter(claudeCode), makeCodexAdapter(codex), makePiAdapter(pi)],
-      cacheAvailability,
-    );
+    const adapters = yield* Effect.forEach([makePiAdapter(pi, piAgentOptions)], cacheAvailability);
     return makeHarnessAgentRegistry(adapters);
   }),
 ).pipe(Layer.provide(ProvidersLayer), Layer.provide(PlatformLayer));

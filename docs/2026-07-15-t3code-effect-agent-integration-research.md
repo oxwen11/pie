@@ -3,7 +3,7 @@
 **Date:** 2026-07-15
 **Source revision:** [`pingdotgg/t3code@3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31`](https://github.com/pingdotgg/t3code/tree/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31)
 **Source date:** 2026-07-14
-**Question:** How does T3 Code use Effect to integrate coding-agent runtimes, and which patterns should Vibest adopt or avoid in its Effect-native harness migration?
+**Question:** How does T3 Code use Effect to integrate coding-agent runtimes, and which patterns should Pie adopt or avoid in its Effect-native harness migration?
 
 ## Executive Summary
 
@@ -46,7 +46,7 @@ Persisted orchestration projection
 Effect RPC / HTTP / WebSocket server
 ```
 
-The strongest confirmations for Vibest's current design are:
+The strongest confirmations for Pie's current design are:
 
 1. Agent-facing methods should return `Effect`; event output should be `Stream`.
 2. Claude's Promise/AsyncIterable SDK should be isolated at the edge using Queue, Stream, Deferred, and a captured Effect Context.
@@ -59,9 +59,9 @@ The strongest confirmations for Vibest's current design are:
 
 T3 Code should not be copied blindly in three areas:
 
-1. It uses many unbounded Queue/PubSub structures. Vibest's bounded EventBus and terminal-gap design is safer for browser subscribers.
-2. Codex uses one app-server process per session, while Vibest currently shares a lazy app-server transport. Changing topology during the migration would increase compatibility risk.
-3. Session ownership is split between provider-local maps, ProviderService, and a persisted directory. Vibest's planned deep SessionService should keep one authoritative active-session owner.
+1. It uses many unbounded Queue/PubSub structures. Pie's bounded EventBus and terminal-gap design is safer for browser subscribers.
+2. Codex uses one app-server process per session, while Pie currently shares a lazy app-server transport. Changing topology during the migration would increase compatibility risk.
+3. Session ownership is split between provider-local maps, ProviderService, and a persisted directory. Pie's planned deep SessionService should keep one authoritative active-session owner.
 
 ## 1. Contract and Schema Architecture
 
@@ -81,11 +81,11 @@ Notable choices:
 - RPC payload, success, error, and stream item schemas all come from Effect Schema.
 - Tagged errors in protocol packages use `Schema.TaggedErrorClass`.
 
-### Relevance to Vibest
+### Relevance to Pie
 
-This strongly supports making Effect Schema the source of truth for new harness DTOs and errors. Vibest still needs its Standard Schema adapter because it is retaining oRPC and AI SDK instead of adopting Effect RPC immediately.
+This strongly supports making Effect Schema the source of truth for new harness DTOs and errors. Pie still needs its Standard Schema adapter because it is retaining oRPC and AI SDK instead of adopting Effect RPC immediately.
 
-T3 Code's `raw.payload: Schema.Unknown` is useful for diagnostics but is not a good default browser contract for Vibest. Vibest should retain native data server-side and expose normalized JSON-safe DTOs, with an explicitly scoped compatibility escape hatch for old Claude capability RPCs.
+T3 Code's `raw.payload: Schema.Unknown` is useful for diagnostics but is not a good default browser contract for Pie. Pie should retain native data server-side and expose normalized JSON-safe DTOs, with an explicitly scoped compatibility escape hatch for old Claude capability RPCs.
 
 ### Additional performance practice
 
@@ -95,7 +95,7 @@ Source:
 
 - [`oxlint-plugin-t3code/rules/no-inline-schema-compile.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/oxlint-plugin-t3code/rules/no-inline-schema-compile.ts)
 
-Vibest should adopt this as a coding rule in the migration plan even if it does not add a custom Oxlint plugin immediately.
+Pie should adopt this as a coding rule in the migration plan even if it does not add a custom Oxlint plugin immediately.
 
 ## 2. Provider Driver and Adapter Boundaries
 
@@ -105,7 +105,7 @@ Source:
 
 - [`apps/server/src/provider/ProviderDriver.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/ProviderDriver.ts#L1-L167)
 
-Its adapter contract is close to Vibest's proposed Agent adapter:
+Its adapter contract is close to Pie's proposed Agent adapter:
 
 ```ts
 interface ProviderAdapterShape<TError> {
@@ -129,9 +129,9 @@ Sources:
 - [`apps/server/src/provider/Drivers/CodexDriver.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Drivers/CodexDriver.ts)
 - [`apps/server/src/provider/Drivers/ClaudeDriver.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Drivers/ClaudeDriver.ts)
 
-### Relevance to Vibest
+### Relevance to Pie
 
-Vibest should keep `HarnessAgentAdapter` as a plain interface/value selected by `HarnessAgentRegistry`. There is no need for one Context tag per provider. A Context service is useful for the registry and deep SessionService because those are singleton ownership modules.
+Pie should keep `HarnessAgentAdapter` as a plain interface/value selected by `HarnessAgentRegistry`. There is no need for one Context tag per provider. A Context service is useful for the registry and deep SessionService because those are singleton ownership modules.
 
 ## 3. Scope Ownership and Provider Instance Registry
 
@@ -149,15 +149,15 @@ Important details:
 - Registry shutdown closes all instance scopes.
 - The registry captures both its parent Scope and driver dependency Context so later hot-reload calls do not accidentally inherit an RPC caller's Scope.
 
-### Relevance to Vibest
+### Relevance to Pie
 
-This validates Vibest's explicit child-Scope ownership and the requirement that delayed operations capture their long-lived owner Context/Scope at construction time.
+This validates Pie's explicit child-Scope ownership and the requirement that delayed operations capture their long-lived owner Context/Scope at construction time.
 
-T3 Code owns scopes at provider-instance level and again inside adapters at session level. Vibest's initial migration can be simpler: SessionService owns active session child scopes; Codex transport has a transport child scope; adapters should not expose an independent session manager.
+T3 Code owns scopes at provider-instance level and again inside adapters at session level. Pie's initial migration can be simpler: SessionService owns active session child scopes; Codex transport has a transport child scope; adapters should not expose an independent session manager.
 
 ## 4. Claude Agent SDK Integration
 
-T3 Code's Claude adapter is the closest implementation reference for Vibest.
+T3 Code's Claude adapter is the closest implementation reference for Pie.
 
 Source:
 
@@ -171,7 +171,7 @@ Relevant source:
 
 - [`ClaudeAdapter.ts#L3070-L3110`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/ClaudeAdapter.ts#L3070-L3110)
 
-This is the same bridge proposed for Vibest:
+This is the same bridge proposed for Pie:
 
 ```text
 Effect Queue<UserInput>
@@ -225,7 +225,7 @@ Relevant source:
 
 - [`ClaudeAdapter.ts#L3600-L3740`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/ClaudeAdapter.ts#L3600-L3740)
 
-This directly validates Vibest's revised `PromptReceipt { turnId, cursor }` and requirement to preserve per-turn model selection.
+This directly validates Pie's revised `PromptReceipt { turnId, cursor }` and requirement to preserve per-turn model selection.
 
 ### 4.6 Shutdown
 
@@ -246,13 +246,13 @@ Relevant source:
 - [`ClaudeAdapter.ts#L2940-L3030`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/ClaudeAdapter.ts#L2940-L3030)
 - [`ClaudeAdapter.ts#L3820-L3850`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/ClaudeAdapter.ts#L3820-L3850)
 
-### Differences from Vibest's target
+### Differences from Pie's target
 
 - T3 uses unbounded prompt and event queues.
 - T3 keeps a mutable session Map inside the adapter.
 - Its Claude adapter is very large and combines SDK integration, lifecycle, event normalization, snapshots, tool classification, and diagnostics.
 
-Vibest should reuse the boundary patterns but keep the SDK adapter thinner and move active-session ownership/projection to SessionService.
+Pie should reuse the boundary patterns but keep the SDK adapter thinner and move active-session ownership/projection to SessionService.
 
 ## 5. Codex App-Server Integration
 
@@ -292,7 +292,7 @@ Relevant source:
 
 - [`protocol.ts#L151-L430`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/packages/effect-codex-app-server/src/protocol.ts#L151-L430)
 
-This validates most of Vibest's proposed CodexTransport internals.
+This validates most of Pie's proposed CodexTransport internals.
 
 ### 5.3 Effect process integration
 
@@ -303,7 +303,7 @@ Relevant source:
 - [`apps/server/src/provider/Layers/CodexSessionRuntime.ts#L695-L755`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/CodexSessionRuntime.ts#L695-L755)
 - [`packages/effect-codex-app-server/src/_internal/stdio.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/packages/effect-codex-app-server/src/_internal/stdio.ts)
 
-Vibest's installed Effect v4 beta.97 still exposes these APIs, and [`@effect/platform-node@4.0.0-beta.97`](https://www.npmjs.com/package/@effect/platform-node/v/4.0.0-beta.97) is published. This should be evaluated before implementing a manual `Effect.acquireRelease(spawn, kill)` wrapper.
+Pie's installed Effect v4 beta.97 still exposes these APIs, and [`@effect/platform-node@4.0.0-beta.97`](https://www.npmjs.com/package/@effect/platform-node/v/4.0.0-beta.97) is published. This should be evaluated before implementing a manual `Effect.acquireRelease(spawn, kill)` wrapper.
 
 ### 5.4 Session process topology
 
@@ -322,13 +322,13 @@ Consequences:
 - There is no shared transport generation state.
 - Multiple sessions consume more processes and memory.
 
-Vibest currently shares one Codex app-server and has an explicit compatibility requirement to preserve current behavior. The migration should retain the shared lazy transport unless a separate measured change intentionally adopts per-session processes.
+Pie currently shares one Codex app-server and has an explicit compatibility requirement to preserve current behavior. The migration should retain the shared lazy transport unless a separate measured change intentionally adopts per-session processes.
 
 ### 5.5 Restart semantics
 
-T3 does not transparently restart a crashed active Codex session. Process exit emits a session exit/error event; future recovery calls create a new session runtime and process. This is simpler than Vibest's generation-safe shared transport holder.
+T3 does not transparently restart a crashed active Codex session. Process exit emits a session exit/error event; future recovery calls create a new session runtime and process. This is simpler than Pie's generation-safe shared transport holder.
 
-Vibest's restart requirement is stronger and still needs the planned `Idle | Starting | Running` holder with a build fiber owned by the adapter Scope.
+Pie's restart requirement is stronger and still needs the planned `Idle | Starting | Running` holder with a build fiber owned by the adapter Scope.
 
 ## 6. ACP Integration as a Second Protocol Reference
 
@@ -353,7 +353,7 @@ Relevant source:
 
 - [`AcpSessionRuntime.ts#L647-L760`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/acp/AcpSessionRuntime.ts#L647-L760)
 
-Caution: ACP's first startup caller still executes the startup Effect directly. Vibest's reviewed design is safer because the shared build is always forked into the long-lived owner Scope, so caller cancellation cannot interrupt construction for other waiters.
+Caution: ACP's first startup caller still executes the startup Effect directly. Pie's reviewed design is safer because the shared build is always forked into the long-lived owner Scope, so caller cancellation cannot interrupt construction for other waiters.
 
 ## 7. Session Routing, Recovery, and Persistence
 
@@ -384,11 +384,11 @@ Source:
 
 - [`apps/server/src/provider/Layers/ProviderService.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/Layers/ProviderService.ts)
 
-### Relevance to Vibest
+### Relevance to Pie
 
-This supports Vibest's revised decision to pass `harnessAgentId` explicitly on cold resume rather than parse current Claude/Codex native ids. Longer term, Vibest should persist `{ sessionId, harnessAgentId, resumeCursor }` as one routing record.
+This supports Pie's revised decision to pass `harnessAgentId` explicitly on cold resume rather than parse current Claude/Codex native ids. Longer term, Pie should persist `{ sessionId, harnessAgentId, resumeCursor }` as one routing record.
 
-T3's active-session ownership is more distributed than Vibest's target: adapters own Maps, ProviderService tracks subscribed adapters, and ProviderSessionDirectory persists bindings. Vibest should keep only persistence outside SessionService; active instances and construction single-flight should remain private to SessionService.
+T3's active-session ownership is more distributed than Pie's target: adapters own Maps, ProviderService tracks subscribed adapters, and ProviderSessionDirectory persists bindings. Pie should keep only persistence outside SessionService; active instances and construction single-flight should remain private to SessionService.
 
 ## 8. Canonical Event Ingestion and Snapshot Recovery
 
@@ -405,7 +405,7 @@ Sources:
 - [`apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts#L1630-L1720`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts#L1630-L1720)
 - [`packages/shared/src/DrainableWorker.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/packages/shared/src/DrainableWorker.ts)
 
-### Relevance to Vibest
+### Relevance to Pie
 
 T3 validates separating:
 
@@ -414,9 +414,9 @@ T3 validates separating:
 3. state projection;
 4. snapshot query.
 
-Vibest's SessionService event pump + active-turn projection is a smaller in-memory version of this architecture. It is appropriate for the current migration and can later feed persistence.
+Pie's SessionService event pump + active-turn projection is a smaller in-memory version of this architecture. It is appropriate for the current migration and can later feed persistence.
 
-T3 does not provide a model to copy for bounded browser delivery: its adapter queues, runtime PubSub, protocol queues, and drainable worker are generally unbounded. Vibest should keep its bounded subscriber queues and terminal-gap recovery contract.
+T3 does not provide a model to copy for bounded browser delivery: its adapter queues, runtime PubSub, protocol queues, and drainable worker are generally unbounded. Pie should keep its bounded subscriber queues and terminal-gap recovery contract.
 
 ## 9. Root Runtime and Server Ownership
 
@@ -429,9 +429,9 @@ Sources:
 
 This means process signals and root program completion close the root Scope and run all child finalizers. There is no module-global ManagedRuntime serving as an accidental process singleton.
 
-### Relevance to Vibest
+### Relevance to Pie
 
-Vibest's oRPC/Express integration makes a full server rewrite inappropriate during this migration. The equivalent incremental pattern is:
+Pie's oRPC/Express integration makes a full server rewrite inappropriate during this migration. The equivalent incremental pattern is:
 
 - async `createRpcRuntime()`;
 - one explicit owner per HTTP server;
@@ -461,11 +461,11 @@ Sources:
 - [`apps/server/src/provider/acp/AcpSessionRuntime.ts#L697-L704`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/provider/acp/AcpSessionRuntime.ts#L697-L704)
 - [`apps/server/src/orchestration/Layers/RuntimeReceiptBus.ts`](https://github.com/pingdotgg/t3code/blob/3513fa04fbf12c1d4fa2b8d07cfc7f0905714d31/apps/server/src/orchestration/Layers/RuntimeReceiptBus.ts)
 
-### Relevance to Vibest
+### Relevance to Pie
 
 Add `@effect/vitest@4.0.0-beta.97` and use `it.effect` / `it.layer` for new runtime tests. Existing Vitest tests can remain during migration, but new Effect modules should not add manual runtime runners unless the test explicitly verifies a Promise boundary.
 
-## 11. Recommended Changes to the Vibest Plan
+## 11. Recommended Changes to the Pie Plan
 
 ### Adopt now
 
@@ -478,7 +478,7 @@ Add `@effect/vitest@4.0.0-beta.97` and use `it.effect` / `it.layer` for new runt
 7. **Persist explicit agent routing metadata instead of deriving it from native session ids.**
 8. **Keep protocol transport, provider session runtime, event normalization, and session orchestration as separate modules.**
 
-### Keep the current Vibest design instead of copying T3
+### Keep the current Pie design instead of copying T3
 
 1. **Keep bounded EventBus subscriber queues and terminal gaps.**
 2. **Keep one authoritative active-session map in SessionService.**
@@ -496,8 +496,8 @@ Add `@effect/vitest@4.0.0-beta.97` and use `it.effect` / `it.layer` for new runt
 
 ## 12. Final Assessment
 
-T3 Code substantially validates the direction of Vibest's Effect-native harness design, especially for Claude's SDK bridge, scoped resource ownership, Effect Schema contracts, plain adapter values, typed errors, and deterministic testing.
+T3 Code substantially validates the direction of Pie's Effect-native harness design, especially for Claude's SDK bridge, scoped resource ownership, Effect Schema contracts, plain adapter values, typed errors, and deterministic testing.
 
-The main architectural difference is ownership depth. T3 Code has evolved into several overlapping ownership layers because it supports many providers, multiple configured instances, hot reload, persistence, and event-sourced orchestration. Vibest should borrow the boundary techniques without reproducing that complexity prematurely.
+The main architectural difference is ownership depth. T3 Code has evolved into several overlapping ownership layers because it supports many providers, multiple configured instances, hot reload, persistence, and event-sourced orchestration. Pie should borrow the boundary techniques without reproducing that complexity prematurely.
 
 The highest-value concrete adjustment is to evaluate Effect's own ChildProcessSpawner before implementing Codex transport over raw Node callbacks. The second is to adopt `@effect/vitest` plus explicit drain/barrier synchronization from the first migration task. The current deep SessionService, shared-build cancellation isolation, bounded EventBus, and Standard Schema seam should remain unchanged.

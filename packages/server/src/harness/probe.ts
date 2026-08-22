@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import type { HarnessAgentId, HarnessProbeInput, HarnessProbeOutput } from "@vibest/contract";
+import type { HarnessAgentId, HarnessProbeInput, HarnessProbeOutput } from "@pie/contract";
 import { Cache, Context, Data, Effect, Exit, Layer } from "effect";
 
 import { CapabilityProbeFailed } from "./errors";

@@ -19,7 +19,7 @@ layer(NodeServices.layer)("daemon record", (it) => {
   // `it.effect` bodies are scoped, so the temp directory is removed when the
   // test ends however it ends — no afterEach.
   const tempDaemonDir = FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "vibest-daemon-" })),
+    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "pie-daemon-" })),
   );
 
   it.effect("round-trips through daemon.pid", () =>

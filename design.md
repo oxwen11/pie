@@ -1,16 +1,16 @@
 ---
-name: vibest-interface-guidelines
-description: "Design, build, or substantially improve a vibest surface. Use for the app shell, session and project navigation, the chat transcript, per-harness tool renderings, the composer and its pickers, permission and plan requests, dialogs, empty and error states, and any new feature that ships pixels in apps/app, apps/desktop's renderer, or packages/ui."
+name: pie-interface-guidelines
+description: "Design, build, or substantially improve a pie surface. Use for the app shell, session and project navigation, the chat transcript, per-harness tool renderings, the composer and its pickers, permission and plan requests, dialogs, empty and error states, and any new feature that ships pixels in apps/app, apps/desktop's renderer, or packages/ui."
 ---
 
-# Design interfaces like vibest
+# Design interfaces like pie
 
-Act as an excellent vibest designer, information architect, interaction
+Act as an excellent pie designer, information architect, interaction
 designer, and design engineer. Turn the available material into a surface that
 belongs to this product. Shape the information and the interface together; do
 not merely restyle a stream of events or assemble generic components around it.
 
-## vibest product context
+## pie product context
 
 Treat these as first-party operator surfaces. Help a developer supervising a
 coding agent in a repository they own understand what the agent read, what it is
@@ -27,7 +27,7 @@ to see or decide, the strongest evidence the runtime actually reports, what is
 irreversible, and what changes their interpretation of it.
 
 Treat this as a product surface even when it is conversational. Communicate
-unmistakable vibest authorship without resembling a consumer chat app, a generic
+unmistakable pie authorship without resembling a consumer chat app, a generic
 SaaS dashboard, or a marketing page.
 
 ## Use this priority order
@@ -42,7 +42,7 @@ When requirements compete, protect them in this order:
    contract in `docs/adr/0001`.
 3. Make the current turn, the pending request, and the operator's next decision
    immediately clear.
-4. Establish unmistakable vibest authorship through the shell, the Inter and
+4. Establish unmistakable pie authorship through the shell, the Inter and
    Geist Mono pairing, the neutral token system, and restraint.
 5. Choose a composition specific to this material; avoid both generic model
    defaults and a fixed chat template.
@@ -82,9 +82,9 @@ pattern belongs once a second feature needs it.
 Import through subpaths only; there is no barrel:
 
 ```ts
-import { Button } from "@vibest/ui/components/button";
-import { Tool, ToolContent, ToolHeader } from "@vibest/ui/ai-elements/tool";
-import { cn } from "@vibest/ui/lib/utils";
+import { Button } from "@pie/ui/components/button";
+import { Tool, ToolContent, ToolHeader } from "@pie/ui/ai-elements/tool";
+import { cn } from "@pie/ui/lib/utils";
 ```
 
 `packages/ui` sits on Base UI, not Radix: compose with `render={<Button />}`,
@@ -194,7 +194,7 @@ placement, and make supporting content quieter. When the material feels thin,
 improve its selection and explanation; leave unsupported gaps honest. Never fill
 a gap with panels, borders, icons, color fields, or effects.
 
-### Authoritative vibest visual system
+### Authoritative pie visual system
 
 Treat this section as the design authority for these surfaces. Use
 `packages/ui/src/globals.css` for exact tokens and the vendored components for
@@ -203,7 +203,7 @@ primitive is appropriate. Do not introduce a parallel visual system.
 
 #### Authorship shell
 
-Every completed surface has the same vibest shell: an inset sidebar on the left,
+Every completed surface has the same pie shell: an inset sidebar on the left,
 a bordered card panel on the right with a `h-10` header, and one fixed sidebar
 toggle whose only moving property is `left`. Route content fills the card below
 the header and owns its own scrolling; the document never scrolls.
@@ -408,7 +408,7 @@ reflow at a narrow width.
 
 Review in this order:
 
-1. **First read:** is vibest authorship immediate? Would the operator remember
+1. **First read:** is pie authorship immediate? Would the operator remember
    what the agent is doing rather than only which app this is?
 2. **Composition:** is there one dominant object? Does each element advance the
    operator's job? Is any empty space accidental?
@@ -461,7 +461,7 @@ Do not ship any of these recognizable defaults:
   representation was chosen, or what the code does internally.
 
 Do not compensate for avoiding these defaults by producing a sterile anti-design
-template. vibest restraint is precise hierarchy, excellent typography, honest
+template. pie restraint is precise hierarchy, excellent typography, honest
 state, tight alignment, and deliberate density. It is not merely grey text,
 thin rules, and empty margins.
 
@@ -469,7 +469,7 @@ thin rules, and empty margins.
 
 Use semantic HTML and only the primitives the material earns.
 
-The base components (`@vibest/ui/components/*`) are:
+The base components (`@pie/ui/components/*`) are:
 
 `accordion`, `alert`, `alert-dialog`, `autocomplete`, `avatar`, `badge`,
 `breadcrumb`, `button`, `calendar`, `card`, `carousel`, `checkbox`,
@@ -481,7 +481,7 @@ The base components (`@vibest/ui/components/*`) are:
 `spinner`, `splitter`, `switch`, `table`, `tabs`, `textarea`, `toast`, `toggle`,
 `toggle-group`, `toolbar`, `tooltip`, `tiptap/*`.
 
-The composite components (`@vibest/ui/ai-elements/*`) are:
+The composite components (`@pie/ui/ai-elements/*`) are:
 
 `actions`, `branch`, `code-block`, `collapsible-user-text`, `image`,
 `inline-citation`, `loader`, `message`, `prompt-input`, `reasoning`, `response`,
@@ -559,4 +559,4 @@ contrast. No visible theme switcher is part of this system today: nothing sets
 the `dark` class, so keep authoring both sets and do not add a switcher as a side
 effect of another feature.
 
-The target is vibest judgment, not vibest decoration.
+The target is pie judgment, not pie decoration.

@@ -1,8 +1,8 @@
 "use client";
 
 import { NumberField as NumberFieldPrimitive } from "@base-ui/react/number-field";
-import { Label } from "@vibest/ui/components/label";
-import { cn } from "@vibest/ui/lib/utils";
+import { Label } from "@pie/ui/components/label";
+import { cn } from "@pie/ui/lib/utils";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import * as React from "react";
 

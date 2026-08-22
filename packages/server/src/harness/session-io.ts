@@ -3,7 +3,7 @@ import {
   InspectorTargetSchema,
   PermissionModeSchema,
   ReasoningEffortSchema,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { Schema } from "effect";
 
 /**
@@ -19,7 +19,7 @@ import { Schema } from "effect";
  * the same setters the UI drives mid-session, so a create-time choice and a
  * later one reach a runtime by one path. `model` is the provider-local model id
  * — the server unpacked and validated the providerId/modelId pair before the
- * harness layer ever sees it, and `permissionMode` is vibest's own vocabulary,
+ * harness layer ever sees it, and `permissionMode` is pie's own vocabulary,
  * checked against this harness's declared subset at the RPC boundary.
  */
 export const SessionConfigSchema = Schema.Struct({

@@ -82,7 +82,7 @@ const nodeImportStyle = {
 };
 
 export default {
-  meta: { name: "vibest" },
+  meta: { name: "pie" },
   rules: {
     "node-import-style": nodeImportStyle,
   },

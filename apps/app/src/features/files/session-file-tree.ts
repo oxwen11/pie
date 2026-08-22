@@ -1,5 +1,5 @@
+import type { WorkspaceTreeEntry } from "@pie/contract/fs";
 import { FileTree, prepareFileTreeInput } from "@pierre/trees";
-import type { WorkspaceTreeEntry } from "@vibest/contract/fs";
 
 export interface SessionFileTree {
   readonly model: FileTree;

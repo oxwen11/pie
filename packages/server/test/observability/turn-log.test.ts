@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { Context, Effect, Layer, Logger } from "effect";
 
 import { EventBus, EventBusLayer } from "../../src/events";
@@ -10,7 +10,7 @@ import { structured, type LogRecord } from "../log-record";
 
 const ref: SessionRef = {
   projectId: "project-1",
-  harnessAgentId: "claude-code",
+  harnessAgentId: "pi",
   sessionId: "session-1",
 };
 

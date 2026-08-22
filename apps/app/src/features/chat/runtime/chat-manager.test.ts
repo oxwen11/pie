@@ -1,4 +1,4 @@
-import type { PermissionMode, ReasoningEffort, SessionRef } from "@vibest/contract";
+import type { PermissionMode, ReasoningEffort, SessionRef } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import type { AgentResponse } from "./agent-requests";
@@ -7,7 +7,7 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 
 const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "project-1",
-  harnessAgentId: "claude-code",
+  harnessAgentId: "pi",
   sessionId,
   ...overrides,
 });

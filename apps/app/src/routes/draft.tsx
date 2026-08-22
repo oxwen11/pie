@@ -1,20 +1,18 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import type { ListSessionsOutput, SessionSummary } from "@vibest/contract";
+import type { ListSessionsOutput, SessionSummary } from "@pie/contract";
 import {
   HARNESS_AGENT_IDS,
   PermissionModeSchema,
   type HarnessAgentId,
   type PermissionMode,
-} from "@vibest/contract";
+} from "@pie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
-} from "@vibest/ui/ai-elements/prompt-input";
-import { Button } from "@vibest/ui/components/button";
-import { Card, CardFrame, CardFrameHeader } from "@vibest/ui/components/card";
+} from "@pie/ui/ai-elements/prompt-input";
+import { Button } from "@pie/ui/components/button";
+import { Card, CardFrame, CardFrameHeader } from "@pie/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -22,7 +20,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@vibest/ui/components/empty";
+} from "@pie/ui/components/empty";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -58,7 +58,7 @@ import { useProject, useProjects } from "@/features/projects/use-projects";
 // answer, so it is a product decision and lives here. It is a preference, not a
 // guarantee — see pickDefaultHarnessAgentId for what happens when it isn't
 // installed.
-const PREFERRED_HARNESS_AGENT_ID: HarnessAgentId = "claude-code";
+const PREFERRED_HARNESS_AGENT_ID: HarnessAgentId = "pi";
 
 /**
  * The draft config lives in the URL, and only what the user explicitly picked

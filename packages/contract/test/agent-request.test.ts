@@ -1,4 +1,4 @@
-import { AgentRequestSchema, AgentResponseSchema } from "@vibest/contract";
+import { AgentRequestSchema, AgentResponseSchema } from "@pie/contract";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -10,7 +10,7 @@ describe("AgentRequest", () => {
     const req = {
       type: "tool",
       id: "r1",
-      harnessAgentId: "claude-code",
+      harnessAgentId: "pi",
       toolName: "Bash",
       input: { command: "ls" },
       actions: [{ id: "allow", label: "Allow", behavior: "allow" }],

@@ -31,7 +31,7 @@ const resolveStaticDir = (): Effect.Effect<string | undefined, never, FileSystem
     const candidates = [
       "./client/", // packaged: dist/client next to dist/cli.js
       "../../../../apps/app/dist/", // monorepo, from src/node
-      "../../../apps/app/dist/", // monorepo, from packages/vibest/dist
+      "../../../apps/app/dist/", // monorepo, from packages/pie/dist
     ];
     for (const candidate of candidates) {
       const dir = path.resolve(fromModuleUrl(candidate));
@@ -61,7 +61,7 @@ export const createUIHandler = (): Effect.Effect<
     const staticDir = yield* resolveStaticDir();
     if (!staticDir) {
       return Effect.succeed(
-        HttpServerResponse.text("Web UI not built. Run the @vibest/app build first.", {
+        HttpServerResponse.text("Web UI not built. Run the @pie/app build first.", {
           status: 503,
         }),
       );

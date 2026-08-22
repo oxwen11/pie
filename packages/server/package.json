@@ -1,5 +1,5 @@
 {
-  "name": "@vibest/server",
+  "name": "@pie/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -24,13 +24,12 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@earendil-works/pi-coding-agent": "0.80.10",
     "@effect/platform-node": "catalog:effect",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
-    "@vibest/contract": "workspace:*",
-    "@vibest/effect-json-store": "workspace:*",
+    "@pie/contract": "workspace:*",
+    "@pie/effect-json-store": "workspace:*",
     "ai": "catalog:",
     "effect": "catalog:effect",
     "simple-git": "catalog:",
@@ -40,7 +39,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
-    "@types/ws": "catalog:",
-    "@vibest/typescript": "workspace:*"
+    "@pie/typescript": "workspace:*",
+    "@types/ws": "catalog:"
   }
 }

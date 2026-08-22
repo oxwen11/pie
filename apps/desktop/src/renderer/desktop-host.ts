@@ -1,5 +1,5 @@
 import { consumeEventIterator } from "@orpc/client";
-import type { ServerStatusFeed, Platform } from "@vibest/app";
+import type { ServerStatusFeed, Platform } from "@pie/app";
 
 import type { ServerConnection, DesktopBootstrap } from "../shared/desktop-rpc";
 import type { DesktopClient } from "./desktop-client";

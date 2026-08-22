@@ -7,7 +7,7 @@
   `effect`, or `@effect/*` does nothing. Several pins are caret-free because a
   caret breaks the runtime. The reasons are commented inline; read them before
   changing versions. `packages/server` pins the Claude SDK as a literal while
-  `packages/vibest` uses `catalog:` — bump both together.
+  `packages/pie` uses `catalog:` — bump both together.
 - **Lint:** `lint:check` runs `--deny-warnings`, so the whole `suspicious`
   category fails CI while only warning locally. oxfmt reorders imports.
 - **Commits rewrite files:** pre-commit runs lint-staged (`oxlint --fix` + `oxfmt`)

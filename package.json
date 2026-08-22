@@ -1,5 +1,5 @@
 {
-  "name": "vibest",
+  "name": "pie",
   "private": true,
   "scripts": {
     "dev": "turbo run dev",

@@ -1,19 +1,19 @@
 ---
 name: verify
-description: "Build/launch/drive recipe for verifying vibest web changes at runtime (two processes: vite dev + the server)"
+description: "Build/launch/drive recipe for verifying pie web changes at runtime (two processes: vite dev + the server)"
 ---
 
-# Verifying vibest at runtime
+# Verifying pie at runtime
 
 ## Build + launch
 
-Dev is **two processes**: Vite serves the app, the vibest server serves the API,
+Dev is **two processes**: Vite serves the app, the pie server serves the API,
 and Vite proxies `/api` + `/ws/rpc` across so the browser stays same-origin.
 
 ```bash
 # The API server (run_in_background) — no prebuild needed:
 # workspace packages export src/*.ts directly and tsx resolves them.
-cd packages/vibest && pnpm dev            # foreground `serve` on VIBEST_PORT=4180
+cd packages/pie && pnpm dev            # foreground `serve` on PIE_PORT=4180
 
 # The app (run_in_background), in a second call:
 cd apps/app && pnpm dev                   # vite on 4190 (strict), proxying to 4180
@@ -27,7 +27,7 @@ root runs both through turbo.
 Health check: `curl http://127.0.0.1:4180/api/health` → `ok`, and
 `curl http://localhost:4190/api/health` → `ok` proves the proxy.
 
-To move the API off 4180, export `VIBEST_PORT` for **both** processes —
+To move the API off 4180, export `PIE_PORT` for **both** processes —
 `vite.config.ts` reads the same variable to pick its proxy target. Don't point
 it at **4000**: that is the daemon's port, which the desktop app spawns and
 guards with an auth token, so the app would load and then fail to connect
@@ -42,7 +42,7 @@ Gotchas:
 
 - Toolchain is pnpm + Turborepo: `pnpm run check` = oxlint + oxfmt + turbo
   typecheck; `pnpm run format` to fix formatting. Typecheck one package with
-  `turbo run typecheck --filter=@vibest/app`.
+  `turbo run typecheck --filter=@pie/app`.
 - **TanStack Router's `routeTree.gen.ts` regenerates only when the Vite router
   plugin runs** — on app load through the Vite dev server, NOT on typecheck.
   After adding/renaming/deleting route files, hit the app root once

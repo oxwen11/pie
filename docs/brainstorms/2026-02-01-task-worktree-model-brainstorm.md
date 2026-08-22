@@ -153,7 +153,7 @@ Centralized storage at `~/Library/Application Support/homer/store.json`
 ### Sidebar Structure
 
 ```
-▼ vibest (Repository)
+▼ pie (Repository)
   ● Fix payment flow (Task)     ← Click to open corresponding Worktree
   ● Add export feature (Task)
   ○ Refactor user module (paused) ← Status differentiated by labels
@@ -169,7 +169,7 @@ Centralized storage at `~/Library/Application Support/homer/store.json`
 ### Future Extension (Task 1:N Worktree)
 
 ```
-▼ vibest
+▼ pie
   ▼ Fix payment flow            ← Expand to show multiple Worktrees
     ├ tokyo (Approach A)
     └ osaka (Approach B)

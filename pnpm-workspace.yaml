@@ -7,7 +7,6 @@ onlyBuiltDependencies:
   - esbuild
   - "@swc/core"
 catalog:
-  "@anthropic-ai/claude-agent-sdk": 0.3.233
   "@tanstack/react-query": ^5.101.4
   "@tanstack/react-router": ^1.170.29
   "@tanstack/router-plugin": ^1.168.32

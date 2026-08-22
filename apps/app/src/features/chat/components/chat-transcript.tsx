@@ -1,5 +1,5 @@
-import { Loader } from "@vibest/ui/ai-elements/loader";
-import { Shimmer } from "@vibest/ui/ai-elements/shimmer";
+import { Loader } from "@pie/ui/ai-elements/loader";
+import { Shimmer } from "@pie/ui/ai-elements/shimmer";
 import { useStore } from "zustand";
 
 import {

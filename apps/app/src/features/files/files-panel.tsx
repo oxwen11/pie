@@ -1,12 +1,12 @@
-import { Button } from "@vibest/ui/components/button";
+import { Button } from "@pie/ui/components/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyMedia,
   EmptyTitle,
-} from "@vibest/ui/components/empty";
-import { Spinner } from "@vibest/ui/components/spinner";
+} from "@pie/ui/components/empty";
+import { Spinner } from "@pie/ui/components/spinner";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 

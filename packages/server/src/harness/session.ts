@@ -4,7 +4,7 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
   SessionStatus,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";

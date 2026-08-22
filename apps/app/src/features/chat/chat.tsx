@@ -1,5 +1,5 @@
-import type { SessionRef } from "@vibest/contract";
-import { cn } from "@vibest/ui/lib/utils";
+import type { SessionRef } from "@pie/contract";
+import { cn } from "@pie/ui/lib/utils";
 
 import { ChatHarnessIcon } from "@/features/chat/components/chat-harness-icon";
 import { ChatInputComposer } from "@/features/chat/components/chat-input-composer";

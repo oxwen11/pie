@@ -6,8 +6,8 @@ import type {
   ModelInfo,
   ReasoningEffort,
   SessionCapabilities,
-} from "@vibest/contract";
-import { InspectorTargetSchema, SessionCapabilitiesSchema } from "@vibest/contract";
+} from "@pie/contract";
+import { InspectorTargetSchema, SessionCapabilitiesSchema } from "@pie/contract";
 import type { UIMessage } from "ai";
 import { Effect, type FileSystem, type Scope, type Stream } from "effect";
 
@@ -106,7 +106,7 @@ export interface HarnessAgentRuntime {
   readonly setReasoningEffort: (
     reasoningEffort: ReasoningEffort,
   ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
-  // `mode` is vibest's own vocabulary; the adapter maps it to its native
+  // `mode` is pie's own vocabulary; the adapter maps it to its native
   // system. A mode outside the adapter's declared subset is rejected at the
   // RPC boundary, so by the time it lands here it is a member the adapter
   // claimed to support.
@@ -148,7 +148,7 @@ export interface HarnessAgentAdapter {
    */
   readonly checkAvailability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
   /**
-   * The subset of vibest's permission vocabulary this harness can honour, and
+   * The subset of pie's permission vocabulary this harness can honour, and
    * which member to preselect. Plain values, not effects: they follow from the
    * adapter's own mapping table, so declaring them can never fail and never
    * costs a process. Empty means the harness has no permission protocol (pi).

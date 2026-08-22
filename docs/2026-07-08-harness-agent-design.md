@@ -4,28 +4,28 @@
 
 > 范围：覆盖 harness agent 运行时的核心能力域——`session`（会话生命周期与交互，核心模块）、`harness`（可用 agent adapter 信息）、`skill`（skills 安装与管理，暂不细化）、`provider`（模型/provider 配置，含自定义 provider）、`mcp`（MCP server 配置，暂不细化）、`fs`（文件读取/检索，只读）、`git`（只读 git 信息）、`project`（项目管理）、`pty`（伪终端会话管理，暂不细化）；不含任务看板、agent 执行器注册表、模型市场（可发现/浏览的第三方 provider 目录，跟"配置已有 provider"是两回事，见 §4.8）、通用应用配置等其他领域——"置顶会话""折叠分组""主题色"这类是纯 UI 本地状态，都不属于这套 headless runtime 该管的范围。
 >
-> 定位：vibest monorepo 内新增的一个 server 子包（`@vibest/server`），承载这套 harness agent 运行时模块，作为 vibest 内部的服务端模块交付，不作为对外发布的 SDK——服务端实现全部采用 Effect v4（`effect@^4`）：service 用 `Context` Tag + `Layer` 定义与装配、异步与错误用 `Effect<A, E, R>` 的类型化错误（`Data.TaggedError`）、资源生命周期用 `Scope`/finalizer、事件流用 `Stream`。客户端（vibest 自己的前端）和服务端之间用 **oRPC v2** 通信（不是 REST）：走 oRPC 的 WebSocket 适配器（`@orpc/server/websocket` 的 `RPCHandler`），在单条 WS 连接上多路复用地跑类型安全的 procedure 调用 + event iterator 事件流；oRPC procedure 用官方的 `@orpc/experimental-effect` 集成直接写成 Effect（`.effect(function* …)`），把 §5 的 Effect service 注入进 handler。鉴权对齐 OpenCode 的模式——默认不鉴权，可选 `Authorization: Basic`。
+> 定位：pie monorepo 内新增的一个 server 子包（`@pie/server`），承载这套 harness agent 运行时模块，作为 pie 内部的服务端模块交付，不作为对外发布的 SDK——服务端实现全部采用 Effect v4（`effect@^4`）：service 用 `Context` Tag + `Layer` 定义与装配、异步与错误用 `Effect<A, E, R>` 的类型化错误（`Data.TaggedError`）、资源生命周期用 `Scope`/finalizer、事件流用 `Stream`。客户端（pie 自己的前端）和服务端之间用 **oRPC v2** 通信（不是 REST）：走 oRPC 的 WebSocket 适配器（`@orpc/server/websocket` 的 `RPCHandler`），在单条 WS 连接上多路复用地跑类型安全的 procedure 调用 + event iterator 事件流；oRPC procedure 用官方的 `@orpc/experimental-effect` 集成直接写成 Effect（`.effect(function* …)`），把 §5 的 Effect service 注入进 handler。鉴权对齐 OpenCode 的模式——默认不鉴权，可选 `Authorization: Basic`。
 
 ## 1. 目标与范围
 
-目标是设计一套通用的 Harness Agent Client-Server 架构：服务端托管 agent harness 的运行时（session 生命周期 + fs/git/project 能力），客户端通过一条 WS 连接远程驱动它。服务端运行时落在 vibest 新增的 `packages/server`（`@vibest/server`）子包里，客户端访问层落在另一个新增的 `packages/client`（`@vibest/client`）子包里（见 §2）；两者都作为 vibest 内部子包交付，不作为对外发布的 SDK。
+目标是设计一套通用的 Harness Agent Client-Server 架构：服务端托管 agent harness 的运行时（session 生命周期 + fs/git/project 能力），客户端通过一条 WS 连接远程驱动它。服务端运行时落在 pie 新增的 `packages/server`（`@pie/server`）子包里，客户端访问层落在另一个新增的 `packages/client`（`@pie/client`）子包里（见 §2）；两者都作为 pie 内部子包交付，不作为对外发布的 SDK。
 
 - 鉴权默认关闭；设置密码环境变量后要求 `Authorization: Basic <base64(user:pass)>`（在 WS 握手阶段校验）。
 
 ## 2. 子包结构
 
-在 vibest monorepo 里新增两个子包承载这套 harness agent 运行时——`packages/server`（`@vibest/server`）放服务端运行时，`packages/client`（`@vibest/client`）放客户端访问层；由 vibest 自己的前端（web / side panel / devtools-client）通过一条 WS 连接消费。两者都是 vibest 内部子包，先不拆成对外发布的 SDK。
+在 pie monorepo 里新增两个子包承载这套 harness agent 运行时——`packages/server`（`@pie/server`）放服务端运行时，`packages/client`（`@pie/client`）放客户端访问层；由 pie 自己的前端（web / side panel / devtools-client）通过一条 WS 连接消费。两者都是 pie 内部子包，先不拆成对外发布的 SDK。
 
-- **服务端运行时**：`packages/server`（`@vibest/server`）子包——session 生命周期 + fs/git/project 等能力，实现成一个 oRPC router、经 WS `RPCHandler` 暴露，本文档的主要设计对象（§4–§8）。
-- **客户端访问**：`packages/client`（`@vibest/client`）子包——在 oRPC 客户端（`@orpc/client` + WebSocket link）上薄封装建连、事件订阅、断线重连（见 §3）；类型直接复用 `@vibest/server` 的 oRPC router 类型（`RouterClient`），独立于 `@vibest/server`，不放在服务端子包里，先不单独发布成 SDK。
-- **React 状态层**：作为 vibest 内部模块（见 §9），依赖 `@vibest/client`，先不单独发布成 SDK 包。
+- **服务端运行时**：`packages/server`（`@pie/server`）子包——session 生命周期 + fs/git/project 等能力，实现成一个 oRPC router、经 WS `RPCHandler` 暴露，本文档的主要设计对象（§4–§8）。
+- **客户端访问**：`packages/client`（`@pie/client`）子包——在 oRPC 客户端（`@orpc/client` + WebSocket link）上薄封装建连、事件订阅、断线重连（见 §3）；类型直接复用 `@pie/server` 的 oRPC router 类型（`RouterClient`），独立于 `@pie/server`，不放在服务端子包里，先不单独发布成 SDK。
+- **React 状态层**：作为 pie 内部模块（见 §9），依赖 `@pie/client`，先不单独发布成 SDK 包。
 
 ## 3. 使用方式
 
 核心用法——建连、挑一个可用的 harness agent、创建会话、发消息、订阅事件；完整方法列表见 §4。
 
 ```typescript
-import { createHarnessClient } from "@vibest/client";
+import { createHarnessClient } from "@pie/client";
 
 const client = createHarnessClient({
   url: "ws://127.0.0.1:7001",
@@ -193,9 +193,9 @@ for await (const event of client.session.subscribe()) {
 | —                             | `SessionLifecycle`                  | 每个活跃会话一个实例，保证"一个 turn 有始有终、一个 `agent_request` 恰好被处理一次、结束后不再发事件"这几条不变量；只有一份共用实现、不跨后端多态，不需要接口                                                                                                                                                                                                                                                          |
 | `ISkillRepository`            | 各后端各自实现（未单独命名）        | 每个后端自己的 skills 安装/启动/列举实现，对应 `skill` 模块；实际内容统一装在 `~/.agents/skills/<name>/` 下，每个后端通过软链接接入自己期望的目录，见 §5.3；安装来源、和 session 的关系还没设计（见 §8）                                                                                                                                                                                                               |
 | `IMcpConfigWriter`            | 各后端各自实现（未单独命名）        | 每个后端自己把 `ResolvedMcpServerConfig` 翻译成原生格式、写进自己配置文件的实现（`enable`/`disable`），对应 `mcp` 模块；跟 `ISessionRepository`/`ISkillRepository` 一样是"每个后端自己懂自己的格式"，`McpService` 不关心具体怎么写，只负责编排，见 §5.3                                                                                                                                                                |
-| `IProjectRepository`          | `ProjectRepository`                 | `$VIBEST_HOME/storage/projects.json` 的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                         |
-| `IProviderRepository`         | `ProviderRepository`                | `$VIBEST_HOME/config.json` 里 `provider` 字段的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                 |
-| `IMcpRepository`              | `McpRepository`                     | `$VIBEST_HOME/config.json` 里 `mcp` 字段的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                      |
+| `IProjectRepository`          | `ProjectRepository`                 | `$PIE_HOME/storage/projects.json` 的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                            |
+| `IProviderRepository`         | `ProviderRepository`                | `$PIE_HOME/config.json` 里 `provider` 字段的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                    |
+| `IMcpRepository`              | `McpRepository`                     | `$PIE_HOME/config.json` 里 `mcp` 字段的读写接口（原子写，见 §5.3），只做数据存取，不做业务规则                                                                                                                                                                                                                                                                                                                         |
 | —                             | `ResolvedMcpServerConfig`           | 解析后的 MCP server 连接参数（stdio：command/args/env；或 remote：url + 凭证），`enable` 时由 `McpService` 产出，用来生成写进目标 harness agent 原生配置文件的具体内容；纯数据形状，不需要接口                                                                                                                                                                                                                         |
 | `IPtyManager`                 | `PtyManager`                        | 持有 `ptyId → 具体 pty 进程句柄` 的内存索引，提供 `register`/`get`/`remove`；纯内存态、不持久化（见 §5.3）；跟 `HarnessAgentSessionManager` 同一个模式                                                                                                                                                                                                                                                                 |
 
@@ -219,19 +219,19 @@ for await (const event of client.session.subscribe()) {
 
 ### 5.3 数据存储
 
-存储格式和文件读写只属于 `ProjectRepository`/`ProviderRepository`/`McpRepository`（§5.1）——`ProjectService`/`ModelProviderService`/`McpService` 不直接碰文件，只调用各自 Repository 的存取方法，业务规则（路径去重、凭证解析等）留在 Service 层。`$VIBEST_HOME` 未设置时默认 `~/.vibest`——默认目录名用 vibest 自己的，不复用参考实现的目录，避免两边同时装在一台机器上互相踩到对方的数据。
+存储格式和文件读写只属于 `ProjectRepository`/`ProviderRepository`/`McpRepository`（§5.1）——`ProjectService`/`ModelProviderService`/`McpService` 不直接碰文件，只调用各自 Repository 的存取方法，业务规则（路径去重、凭证解析等）留在 Service 层。`$PIE_HOME` 未设置时默认 `~/.pie`——默认目录名用 pie 自己的，不复用参考实现的目录，避免两边同时装在一台机器上互相踩到对方的数据。
 
-| 文件                                          | 归属 Repository      | 格式                                                                                                                                                                                                                                                                                    |
-| --------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `$VIBEST_HOME/storage/projects.json`          | `ProjectRepository`  | 单文件 JSON，整体读写，只存 `Project[]`——不像参考实现那样把 `archivedSessions`/`pinnedSessions`/`closedProjectAccordions` 等也塞进同一个文件；这些字段要么已经挪到别处（`archived` 归 `session` 模块自己管，见 §4.6），要么本来就不该持久化（`pinned`/折叠分组是纯 UI 本地状态，见 §1） |
-| `$VIBEST_HOME/config.json`（`provider` 字段） | `ProviderRepository` | provider 属于"配置"性质的数据，不单独开一个文件，跟参考实现一样放进一份整体配置文件里的 `provider` 字段——内置 provider 的覆盖项、自定义 provider、凭证（`apiKey` 等）都在这个字段里，不单独拆分（凭证同文件存放，见 §8 关于文件权限的待办）                                             |
-| `$VIBEST_HOME/config.json`（`mcp` 字段）      | `McpRepository`      | mcp server 配置，跟 `provider` 同理归进这份整体配置文件，不单开文件；remote 类型的凭证也同文件存放，见 §8 关于文件权限的待办                                                                                                                                                            |
+| 文件                                       | 归属 Repository      | 格式                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$PIE_HOME/storage/projects.json`          | `ProjectRepository`  | 单文件 JSON，整体读写，只存 `Project[]`——不像参考实现那样把 `archivedSessions`/`pinnedSessions`/`closedProjectAccordions` 等也塞进同一个文件；这些字段要么已经挪到别处（`archived` 归 `session` 模块自己管，见 §4.6），要么本来就不该持久化（`pinned`/折叠分组是纯 UI 本地状态，见 §1） |
+| `$PIE_HOME/config.json`（`provider` 字段） | `ProviderRepository` | provider 属于"配置"性质的数据，不单独开一个文件，跟参考实现一样放进一份整体配置文件里的 `provider` 字段——内置 provider 的覆盖项、自定义 provider、凭证（`apiKey` 等）都在这个字段里，不单独拆分（凭证同文件存放，见 §8 关于文件权限的待办）                                             |
+| `$PIE_HOME/config.json`（`mcp` 字段）      | `McpRepository`      | mcp server 配置，跟 `provider` 同理归进这份整体配置文件，不单开文件；remote 类型的凭证也同文件存放，见 §8 关于文件权限的待办                                                                                                                                                            |
 
-`projects.json` 在 `storage/` 子目录下，`config.json` 直接放在 `$VIBEST_HOME` 根下，不跟着进 `storage/`——两者语义不同：前者是一份数据集合，后者是单份整体配置，这也是参考实现里 `config.json` 本来的位置。两个文件都采用"写临时文件 + 原子 rename"的更新方式（参考实现同样如此），避免进程崩溃导致文件写到一半、内容损坏。`config.json` 目前只放 `provider`/`mcp` 这两个字段，没有引入其他通用应用配置（见 §1 的范围排除）。
+`projects.json` 在 `storage/` 子目录下，`config.json` 直接放在 `$PIE_HOME` 根下，不跟着进 `storage/`——两者语义不同：前者是一份数据集合，后者是单份整体配置，这也是参考实现里 `config.json` 本来的位置。两个文件都采用"写临时文件 + 原子 rename"的更新方式（参考实现同样如此），避免进程崩溃导致文件写到一半、内容损坏。`config.json` 目前只放 `provider`/`mcp` 这两个字段，没有引入其他通用应用配置（见 §1 的范围排除）。
 
 会话历史不在这套约定里——`SessionRepository` 只是个接口，实际存储完全由每个 harness agent 后端自己管，我们的 runtime 不碰、也不设计它的格式。参考实现里 claude-code 是 `~/.claude/projects/<project>/<sessionId>.jsonl`（每个 session 一个文件，一行一条记录），codex 是 `~/.codex/sessions/` 下的 rollout jsonl + 一个 `codex.db` SQLite 索引，而且服务端从不直接读写这些文件，只通过 codex app-server 的 RPC（`thread/list`/`thread/read` 等）间接访问；两边都是各自 CLI 的黑盒。
 
-`skill` 内容统一装在 `~/.agents/skills/<name>/` 下——不在 `$VIBEST_HOME` 下，因为这是 agent 生态共享的东西，不是这套 runtime 私有的数据。每个 harness agent 后端需要用到某个 skill 时，在自己期望的目录下建一个软链接指向它（比如 claude-code 的 `.claude/skills/<name>`、codex 的 `.codex/skills/<name>`），避免每个后端各自拷贝一份内容。`skill.install` 具体怎么把内容下载/复制进 `~/.agents/skills`、软链接是全局建一次还是每个 project 各建一份，这些还没设计（见 §8）。
+`skill` 内容统一装在 `~/.agents/skills/<name>/` 下——不在 `$PIE_HOME` 下，因为这是 agent 生态共享的东西，不是这套 runtime 私有的数据。每个 harness agent 后端需要用到某个 skill 时，在自己期望的目录下建一个软链接指向它（比如 claude-code 的 `.claude/skills/<name>`、codex 的 `.codex/skills/<name>`），避免每个后端各自拷贝一份内容。`skill.install` 具体怎么把内容下载/复制进 `~/.agents/skills`、软链接是全局建一次还是每个 project 各建一份，这些还没设计（见 §8）。
 
 `pty` 会话不持久化——纯内存状态，进程重启即丢失；参考实现里也没有 PTY 持久化，这符合"伪终端天然是易失的"这个直觉。
 
@@ -454,9 +454,9 @@ export const HarnessAgentServerLayer = Layer.mergeAll(
 ## 8. 待办事项
 
 - `sessionId` 用 `${harnessAgentId}:${uuid}` 前缀编码来解决冷操作路由（见 §5.4）——这是目前给出的具体方案，还没有验证这个格式会不会跟某个后端自己的原生会话 ID 格式冲突，也没考虑要不要对客户端暴露这个内部编码细节（比如要不要在协议层面当它是不透明字符串处理）。
-- `$VIBEST_HOME/config.json` 里的凭证（`provider`/`mcp` 两个字段都可能有）目前跟其余配置存在同一个文件、没有做文件权限收紧（比如 `chmod 600`）——参考实现里同样没做，但这套 runtime 要不要主动补上这个小的安全加固，还没决定。
+- `$PIE_HOME/config.json` 里的凭证（`provider`/`mcp` 两个字段都可能有）目前跟其余配置存在同一个文件、没有做文件权限收紧（比如 `chmod 600`）——参考实现里同样没做，但这套 runtime 要不要主动补上这个小的安全加固，还没决定。
 - `EventBus` 的背压阈值（相当于"缓冲队列上限"）、ping 间隔、gap 之后客户端具体怎么补状态，这几个数值/流程还没敲定，需要确认。
-- Effect v4 的 service 构造器 API 在 beta 期间（`ServiceMap` ↔ `Context`）反复改过名，本文档 §5.4/§6 用 `Context.Tag` + `Layer` 只是示意——`@vibest/server` 落地时以最终 release 的确切 service/Layer 构造器为准，需要确认。
+- Effect v4 的 service 构造器 API 在 beta 期间（`ServiceMap` ↔ `Context`）反复改过名，本文档 §5.4/§6 用 `Context.Tag` + `Layer` 只是示意——`@pie/server` 落地时以最终 release 的确切 service/Layer 构造器为准，需要确认。
 - 传输层用 oRPC v2 的 WS `RPCHandler`（`@orpc/server/websocket`）+ `@orpc/client` 的 WS link；官方 Effect 集成 `@orpc/experimental-effect` 目前是 experimental/beta（要配 `effect@beta`），API 可能变、还得跟 §5.4/§6 用的 Effect v4 版本对齐，落地时需要 pin 版本并验证。
 - §4.3 的 `seq`/`gap`/断线重连补快照是我们自己在 event iterator 之上叠的一层语义——需要确认它跟 oRPC event iterator 自带的生命周期（`.return`/signal 取消、重连）怎么配合，以及事件扇出（多订阅广播）要不要直接用 oRPC 的 Publisher helper 而不是自己写 `EventBus`。
 - 类型定义手动同步的维护成本——后续要不要收敛成一个共享的轻量 types 包，现在先不做。
@@ -477,9 +477,9 @@ export const HarnessAgentServerLayer = Layer.mergeAll(
 - `pty` 模块目前只有方法名占位——`pty.update` 具体覆盖哪些操作（resize、写输入、还是别的）没有设计；pty 的输出流怎么推送给客户端（复用 §4.3 events 通道还是别的机制）没有设计（`PtyManager` 已经确定持有真实的子进程句柄而不是纯索引引用，`IPtyService` 依赖 `IEventBus` 也已经在 §6 装配根里定下来了，这两点不再是待定项，只是具体的推送机制还没设计）；`PtyManager` 持有的 shell 子进程由 `PtyManagerLayer` 的 `Layer.scoped` finalizer 在根 `Scope` 关闭时统一 kill（见 §6），但客户端断线后的按需清理、超时策略这类 pty 进程生命周期管理还没设计。
 - `mcp` 模块目前只有方法名占位（`mcp.server.create`/`list`/`enable/disable`）——stdio（command/args/env）和 remote（url + 凭证）两种 MCP server 配置形态怎么用一个 schema 统一表达没有设计；`mcp.server.update`/`mcp.server.remove`/列出某个 server 暴露的工具（类似 `provider.listModels`）先不设计。`enable` 把 `ResolvedMcpServerConfig` 翻译成每个后端原生格式（claude-code 的 `.mcp.json`、codex 的 `config.toml`）这份能力已经定为每个 adapter 自己实现（`IMcpConfigWriter`，见 §5.1/§5.4），但每个后端具体怎么翻译还没设计；配置文件是项目级（比如 claude-code 的 `.mcp.json` 通常放在项目根目录）还是用户级，`enable` 要不要传 `workspacePath`，这条待办跟 `skill` 那条"软链接全局建一次还是每个 project 各建一份"是同一类问题，没有一起解决；`enable` 要不要实际连接做健康检查/超时处理也没考虑。
 
-## 9. React 状态管理层（vibest 内部模块）
+## 9. React 状态管理层（pie 内部模块）
 
-vibest 前端消费这套运行时的 React 状态层——依赖 §3 的 `@vibest/client`（oRPC 客户端的薄封装），不直接碰 WS/oRPC，先作为 vibest 内部模块存在（具体落在哪个前端包待定），不单独发布成 SDK。目的：把"建连、订阅事件、断线重连补快照"这套 §3 里手写的样板逻辑封装掉，业务代码只用 hook 读状态、调用几个 action，不用自己维护订阅循环和 reducer——即"根据状态渲染 UI"。
+pie 前端消费这套运行时的 React 状态层——依赖 §3 的 `@pie/client`（oRPC 客户端的薄封装），不直接碰 WS/oRPC，先作为 pie 内部模块存在（具体落在哪个前端包待定），不单独发布成 SDK。目的：把"建连、订阅事件、断线重连补快照"这套 §3 里手写的样板逻辑封装掉，业务代码只用 hook 读状态、调用几个 action，不用自己维护订阅循环和 reducer——即"根据状态渲染 UI"。
 
 内部用 [zustand](https://github.com/pmndrs/zustand) 维护一份全局 store（一个 React 应用一份，不是每个组件一份），大致结构：
 

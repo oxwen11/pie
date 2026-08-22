@@ -8,7 +8,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionStatus,
   SessionSummary,
-} from "@vibest/contract";
+} from "@pie/contract";
 import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 

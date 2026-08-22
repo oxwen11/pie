@@ -1,6 +1,6 @@
 # Server 架构 Agent 部分设计
 
-> 本文是内部设计稿的脱敏副本，作为 `docs/wayfinder/session-streaming-refactor/` 重构的源设计留档。命名已对齐 vibest（server / `$VIBEST_HOME`）；vibest 的实际取舍（保留 oRPC 而非 JSON-RPC、主动 getSnapshot、两维订阅、仅 session 事件带 seq 等）以 wayfinder map 的既定约束为准。
+> 本文是内部设计稿的脱敏副本，作为 `docs/wayfinder/session-streaming-refactor/` 重构的源设计留档。命名已对齐 pie（server / `$PIE_HOME`）；pie 的实际取舍（保留 oRPC 而非 JSON-RPC、主动 getSnapshot、两维订阅、仅 session 事件带 seq 等）以 wayfinder map 的既定约束为准。
 >
 > 状态：v1 设计稿，等待实现验证。
 >
@@ -102,10 +102,10 @@ await subscription.unsubscribe();
 
 ### 3.1 核心存储目录
 
-`$VIBEST_HOME` 缺省为 `~/.vibest`。Server 自己维护三个核心存储位置：
+`$PIE_HOME` 缺省为 `~/.pie`。Server 自己维护三个核心存储位置：
 
 ```text
-$VIBEST_HOME/
+$PIE_HOME/
 ├── storage/
 │   ├── projects.json
 │   └── sessions/
@@ -114,11 +114,11 @@ $VIBEST_HOME/
 └── models.json
 ```
 
-| 路径                                                         | 真相源内容                                                       |
-| ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `$VIBEST_HOME/storage/projects.json`                         | Project 列表；唯一的 `projectId -> cwd` 映射                     |
-| `$VIBEST_HOME/storage/sessions/<projectId>/<sessionId>.json` | 单个 Session 的元数据；保存原生会话映射和恢复所需的 Session 配置 |
-| `$VIBEST_HOME/models.json`                                   | Provider、模型目录和凭证环境变量引用                             |
+| 路径                                                      | 真相源内容                                                       |
+| --------------------------------------------------------- | ---------------------------------------------------------------- |
+| `$PIE_HOME/storage/projects.json`                         | Project 列表；唯一的 `projectId -> cwd` 映射                     |
+| `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` | 单个 Session 的元数据；保存原生会话映射和恢复所需的 Session 配置 |
+| `$PIE_HOME/models.json`                                   | Provider、模型目录和凭证环境变量引用                             |
 
 ```typescript
 type ProjectsFile = {
@@ -129,7 +129,7 @@ type ProjectsFile = {
 
 #### Session 元数据目录
 
-`$VIBEST_HOME/storage/sessions/<projectId>/` 是一个 Project 下的 **Session 元数据目录**。目录中的每个 `<sessionId>.json` 对应一个 Server Session。
+`$PIE_HOME/storage/sessions/<projectId>/` 是一个 Project 下的 **Session 元数据目录**。目录中的每个 `<sessionId>.json` 对应一个 Server Session。
 
 例如：
 
@@ -240,13 +240,13 @@ Project 创建流程：
 
 三类数据分别由不同组件负责：
 
-| 数据                                         | 真相源                               |
-| -------------------------------------------- | ------------------------------------ |
-| 会话历史消息、标题                           | Agent 原生存储                       |
-| projectId 到 cwd                             | `$VIBEST_HOME/storage/projects.json` |
-| Server sessionId、原生 ID、Session 配置      | Session 元数据文件                   |
-| 活跃状态、唯一的 active turn、挂起请求       | 服务端内存                           |
-| 当前 turn 的 `UIMessageChunk` 缓冲和订阅队列 | 服务端内存                           |
+| 数据                                         | 真相源                            |
+| -------------------------------------------- | --------------------------------- |
+| 会话历史消息、标题                           | Agent 原生存储                    |
+| projectId 到 cwd                             | `$PIE_HOME/storage/projects.json` |
+| Server sessionId、原生 ID、Session 配置      | Session 元数据文件                |
+| 活跃状态、唯一的 active turn、挂起请求       | 服务端内存                        |
+| 当前 turn 的 `UIMessageChunk` 缓冲和订阅队列 | 服务端内存                        |
 
 服务端重启后：
 
@@ -258,11 +258,11 @@ Project 创建流程：
 
 ### 4.1 JSON-RPC 2.0 over WebSocket
 
-Server 的 wire protocol 使用 [JSON-RPC 2.0](https://www.jsonrpc.org/specification) 单消息格式，WebSocket 只负责双向传输。连接协商的 WebSocket subprotocol 是 `vibest.server.v1`。
+Server 的 wire protocol 使用 [JSON-RPC 2.0](https://www.jsonrpc.org/specification) 单消息格式，WebSocket 只负责双向传输。连接协商的 WebSocket subprotocol 是 `pie.server.v1`。
 
 传输规则：
 
-- 客户端必须在 upgrade 时提供 `Sec-WebSocket-Protocol: vibest.server.v1`；服务端未协商到该版本时拒绝建立连接。
+- 客户端必须在 upgrade 时提供 `Sec-WebSocket-Protocol: pie.server.v1`；服务端未协商到该版本时拒绝建立连接。
 - 每条完整的 WebSocket text message 包含一个 UTF-8 JSON-RPC 对象。
 - v1 不接受 binary message，也不接受 JSON-RPC batch；收到数组时返回 `-32600 Invalid Request`。
 - request id 接受字符串或 JavaScript safe integer；Server client 统一生成字符串。id 在单条连接内必须保持唯一，直到对应 response 返回。
@@ -631,7 +631,7 @@ type SessionConfig = {
 
 共享不变量：
 
-- `projectId` 必须能在 `$VIBEST_HOME/storage/projects.json` 中找到唯一 Project。
+- `projectId` 必须能在 `$PIE_HOME/storage/projects.json` 中找到唯一 Project。
 - `sessionId` 是 Server 生成的项目内不透明 ID，不是 Agent 原生 ID。
 - `SessionConfig` 的 providerId 与 modelId 必须成对出现；只出现一个返回 `INVALID_ARGUMENT`。
 - providerId/modelId 缺省表示没有显式模型路由，使用 Agent 原生默认值。
@@ -2260,7 +2260,7 @@ Driver 职责：
 
 ### 10.1 契约
 
-- WebSocket 成功协商 `vibest.server.v1` subprotocol。
+- WebSocket 成功协商 `pie.server.v1` subprotocol。
 - 所有 request、response、error 和 notification 都符合 JSON-RPC 2.0 envelope。
 - parse error、invalid request、method not found、invalid params 使用标准 JSON-RPC 错误码。
 - batch、binary message、null/非 safe-integer id 和数组 params 被拒绝。
@@ -2399,7 +2399,7 @@ Adapter 必须满足：
 
 ```text
 SessionRef.projectId
-  -> $VIBEST_HOME/storage/projects.json
+  -> $PIE_HOME/storage/projects.json
   -> Project { id, cwd }
   -> WorkspaceGuard 校验 cwd
   -> Agent adapter 原生 cwd 参数
@@ -2415,14 +2415,14 @@ SessionRef.projectId
 
 ### 13.2 存储归属
 
-| 数据                                                                | 存储位置                                                     |
-| ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| ProjectId、name、cwd                                                | `$VIBEST_HOME/storage/projects.json`                         |
-| sessionId、harnessAgentId、harnessSessionId、config                 | `$VIBEST_HOME/storage/sessions/<projectId>/<sessionId>.json` |
-| Provider 和模型配置                                                 | `$VIBEST_HOME/models.json`                                   |
-| 已提交对话历史和标题                                                | Agent 原生存储                                               |
-| 状态、pending requests、唯一 active turn 及其 UIMessageChunk buffer | Session runtime 内存                                         |
-| connection-local subscriptionId 和每订阅者 live queue               | 订阅运行时内存                                               |
+| 数据                                                                | 存储位置                                                  |
+| ------------------------------------------------------------------- | --------------------------------------------------------- |
+| ProjectId、name、cwd                                                | `$PIE_HOME/storage/projects.json`                         |
+| sessionId、harnessAgentId、harnessSessionId、config                 | `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` |
+| Provider 和模型配置                                                 | `$PIE_HOME/models.json`                                   |
+| 已提交对话历史和标题                                                | Agent 原生存储                                            |
+| 状态、pending requests、唯一 active turn 及其 UIMessageChunk buffer | Session runtime 内存                                      |
+| connection-local subscriptionId 和每订阅者 live queue               | 订阅运行时内存                                            |
 
 Session 元数据文件的最小形状：
 

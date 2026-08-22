@@ -1,4 +1,4 @@
-import type { HarnessAgentId } from "@vibest/contract";
+import type { HarnessAgentId } from "@pie/contract";
 import { Context, Effect, Layer } from "effect";
 
 import type { AgentDescriptor, HarnessAgentAdapter } from "./adapter";

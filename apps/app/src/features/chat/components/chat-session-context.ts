@@ -1,9 +1,4 @@
-import type {
-  HarnessAgentId,
-  PermissionMode,
-  ProviderInfo,
-  ReasoningEffort,
-} from "@vibest/contract";
+import type { HarnessAgentId, PermissionMode, ProviderInfo, ReasoningEffort } from "@pie/contract";
 import { createContext, useContext } from "react";
 import type { StoreApi } from "zustand/vanilla";
 

@@ -37,22 +37,19 @@ describe("resolveAssetPath", () => {
 
 describe("createAppRequestHandler", () => {
   it("serves a renderer asset without an RPC dispatch path", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-renderer-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-renderer-"));
     const asset = path.join(root, "asset.js");
     fs.writeFileSync(asset, "asset");
     const fetch = vi.fn<FetchAsset>(async () => new Response("asset"));
 
-    const response = await createAppRequestHandler(
-      root,
-      fetch,
-    )(new Request("vibest://app/asset.js"));
+    const response = await createAppRequestHandler(root, fetch)(new Request("pie://app/asset.js"));
 
     expect(await response.text()).toBe("asset");
     expect(fetch).toHaveBeenCalledWith(url.pathToFileURL(asset).toString());
   });
 
   it("falls back to the SPA entry for an unknown renderer path", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-renderer-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-renderer-"));
     const entry = path.join(root, "index.html");
     fs.writeFileSync(entry, "app");
     const fetch = vi.fn<FetchAsset>(async () => new Response("app"));
@@ -60,7 +57,7 @@ describe("createAppRequestHandler", () => {
     const response = await createAppRequestHandler(
       root,
       fetch,
-    )(new Request("vibest://app/chat/session"));
+    )(new Request("pie://app/chat/session"));
 
     expect(await response.text()).toBe("app");
     expect(fetch).toHaveBeenCalledWith(url.pathToFileURL(entry).toString());
@@ -71,7 +68,7 @@ describe("createAppRequestHandler", () => {
     const response = await createAppRequestHandler(
       ROOT,
       fetch,
-    )(new Request("vibest://other/asset.js"));
+    )(new Request("pie://other/asset.js"));
 
     expect(response.status).toBe(404);
     expect(fetch).not.toHaveBeenCalled();

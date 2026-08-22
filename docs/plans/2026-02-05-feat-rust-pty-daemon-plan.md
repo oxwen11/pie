@@ -106,7 +106,7 @@ Electron 崩溃 → 所有 PTY 死亡 → vim/htop 状态丢失
 │  │  }                                                          │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                              │                                   │
-│                 Unix Socket (/tmp/vibest-pty.sock)              │
+│                 Unix Socket (/tmp/pie-pty.sock)              │
 │                              │                                   │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │  Protocol Handler (JSON-RPC style)                         │ │
@@ -197,7 +197,7 @@ Read Path (PTY → Client):
   - 环形缓冲区，超过限制自动丢弃旧数据
 
 磁盘持久化 (可选，App 重启恢复):
-  ~/.config/vibest/pty-daemon/
+  ~/.config/pie/pty-daemon/
   ├── sessions.json           # Session 元数据
   └── scrollback/
       ├── {session_id}.bin    # 原始 scrollback 数据
@@ -414,7 +414,7 @@ pub fn encode_output(session_id: u32, data: &Bytes) -> Bytes {
 ### 安全考量
 
 1. **Socket 权限**
-   - 路径: `/tmp/vibest-pty-{uid}.sock`
+   - 路径: `/tmp/pie-pty-{uid}.sock`
    - 权限: 0600 (仅用户可访问)
 
 2. **Session 隔离**
@@ -432,7 +432,7 @@ use nix::unistd::{getuid, Uid};
 
 fn create_secure_socket_dir() -> Result<PathBuf, SecurityError> {
     let uid = getuid();
-    let dir_path = PathBuf::from(format!("/tmp/vibest-pty-{}", uid));
+    let dir_path = PathBuf::from(format!("/tmp/pie-pty-{}", uid));
 
     if dir_path.exists() || dir_path.symlink_metadata().is_ok() {
         let metadata = fs::symlink_metadata(&dir_path)?;
@@ -946,12 +946,12 @@ Electron 启动
 ### 文件路径
 
 ```
-/tmp/vibest-pty-{uid}/
-├── vibest-pty.sock    # Unix socket
-├── vibest-pty.pid     # PID 文件
-└── vibest-pty.log     # 日志文件 (可选)
+/tmp/pie-pty-{uid}/
+├── pie-pty.sock    # Unix socket
+├── pie-pty.pid     # PID 文件
+└── pie-pty.log     # 日志文件 (可选)
 
-~/.config/vibest/pty-daemon/
+~/.config/pie/pty-daemon/
 ├── sessions.json      # Session 元数据持久化
 └── scrollback/        # Scrollback 数据
 ```
@@ -1042,7 +1042,7 @@ impl ShutdownCoordinator {
 ### Socket 安全
 
 ```
-路径: /tmp/vibest-pty-{uid}/vibest-pty.sock
+路径: /tmp/pie-pty-{uid}/pie-pty.sock
 目录权限: 0700 (drwx------)
 Socket 权限: 0600 (srw-------)
 
@@ -1254,7 +1254,7 @@ cargo build --release
 ./target/release/pty-daemon
 
 # 测试 (使用 socat)
-echo '{"type":"List"}' | socat - UNIX-CONNECT:/tmp/vibest-pty-$(id -u)/vibest-pty.sock
+echo '{"type":"List"}' | socat - UNIX-CONNECT:/tmp/pie-pty-$(id -u)/pie-pty.sock
 
 # 运行基准测试
 cargo bench

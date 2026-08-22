@@ -5,7 +5,7 @@ import url from "node:url";
 import { Data, Effect, Scope } from "effect";
 import { net, protocol } from "electron";
 
-export const SCHEME = "vibest";
+export const SCHEME = "pie";
 export const HOST = "app";
 export const APP_ORIGIN = `${SCHEME}://${HOST}`;
 
@@ -70,7 +70,7 @@ export function registerAppProtocol(
       try: () => protocol.handle(SCHEME, createAppRequestHandler(rendererRoot)),
       catch: (cause) =>
         new ProtocolRegistrationError({
-          message: "Unable to register the vibest protocol",
+          message: "Unable to register the pie protocol",
           cause,
         }),
     }),

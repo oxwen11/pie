@@ -1,4 +1,4 @@
-import { PlatformProvider, ServerStatusOverlay } from "@vibest/app";
+import { PlatformProvider, ServerStatusOverlay } from "@pie/app";
 import { Suspense, use, type ReactElement } from "react";
 
 import type { DesktopHost } from "./desktop-host";

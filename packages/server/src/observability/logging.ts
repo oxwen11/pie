@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Formatter, Logger, type LogLevel } from "effect";
 
-import { LOG_FILE_MODE, LOGS_DIRECTORY_MODE, vibestLogPath } from "../config/paths";
+import { LOG_FILE_MODE, LOGS_DIRECTORY_MODE, pieLogPath } from "../config/paths";
 
 function formatter(id: string) {
   return Logger.map(Logger.formatStructured, (output) => {
@@ -70,7 +70,7 @@ function stderrLogger(id: string) {
 }
 
 export function minimumLogLevel(): LogLevel.LogLevel {
-  const value = process.env.VIBEST_LOG_LEVEL?.toUpperCase();
+  const value = process.env.PIE_LOG_LEVEL?.toUpperCase();
   const levels = {
     DEBUG: "Debug",
     INFO: "Info",
@@ -81,6 +81,6 @@ export function minimumLogLevel(): LogLevel.LogLevel {
 }
 
 export function loggers(logsDir: string, id: string) {
-  const logger = fileLogger(vibestLogPath(logsDir), id);
-  return process.env.VIBEST_PRINT_LOGS === "1" ? [logger, stderrLogger(id)] : [logger];
+  const logger = fileLogger(pieLogPath(logsDir), id);
+  return process.env.PIE_PRINT_LOGS === "1" ? [logger, stderrLogger(id)] : [logger];
 }

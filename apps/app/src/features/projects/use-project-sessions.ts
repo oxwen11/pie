@@ -1,6 +1,6 @@
+import type { SessionRef, SessionSummary } from "@pie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import type { SessionRef, SessionSummary } from "@vibest/contract";
 import { useCallback } from "react";
 
 import { sameSessionRef } from "@/lib/session-ref";

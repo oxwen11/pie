@@ -1,4 +1,4 @@
-import type { HarnessAgentId } from "@vibest/contract";
+import type { HarnessAgentId } from "@pie/contract";
 import { createContext, useContext } from "react";
 
 export interface TranscriptRenderContextValue {

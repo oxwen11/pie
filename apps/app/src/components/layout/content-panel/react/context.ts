@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { createContext, use } from "react";
 
 import type { ContentPanel } from "../model/content-panel";

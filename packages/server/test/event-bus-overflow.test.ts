@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef, SessionScopedEvent } from "@vibest/contract";
+import type { SessionRef, SessionScopedEvent } from "@pie/contract";
 import { Effect, Stream } from "effect";
 
 import { makeEventBus } from "../src/events";
 
-const ref: SessionRef = { projectId: "p1", harnessAgentId: "claude-code", sessionId: "s1" };
+const ref: SessionRef = { projectId: "p1", harnessAgentId: "pi", sessionId: "s1" };
 
 const started = (seq: number): SessionScopedEvent => ({
   seq,

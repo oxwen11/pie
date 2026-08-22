@@ -1,4 +1,4 @@
-import type { PermissionMode, ProviderInfo, ReasoningEffort, SessionRef } from "@vibest/contract";
+import type { PermissionMode, ProviderInfo, ReasoningEffort, SessionRef } from "@pie/contract";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 

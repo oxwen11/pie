@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { layer as testLayer } from "@effect/vitest";
 import { Crypto, Effect, FileSystem, Layer, PlatformError } from "effect";
 
-import { layerPaths, logsDirectory, vibestLogPath } from "../../src/config/paths";
+import { layerPaths, logsDirectory, pieLogPath } from "../../src/config/paths";
 import * as Observability from "../../src/observability";
 import { NodePlatformLayer } from "../platform";
 
@@ -30,11 +30,11 @@ testLayer(NodePlatformLayer, { excludeTestServices: true })("observability loggi
       );
 
       const logs = yield* fs.stat(logsDir);
-      const file = yield* fs.stat(vibestLogPath(logsDir));
+      const file = yield* fs.stat(pieLogPath(logsDir));
       assert.equal((Number(logs.mode) & 0o777).toString(8), "700");
       assert.equal((Number(file.mode) & 0o777).toString(8), "600");
 
-      const content = yield* fs.readFileString(vibestLogPath(logsDir));
+      const content = yield* fs.readFileString(pieLogPath(logsDir));
       const lines = content.trim().split("\n");
       assert.equal(lines.length, 1);
       assert.match(lines[0] ?? "", /^timestamp=\S+ level=INFO run=[a-f0-9]{8} /);
@@ -61,7 +61,7 @@ testLayer(NodePlatformLayer, { excludeTestServices: true })("observability loggi
         Effect.scoped,
       );
 
-      const content = yield* fs.readFileString(vibestLogPath(logsDirectory(home)));
+      const content = yield* fs.readFileString(pieLogPath(logsDirectory(home)));
       assert.match(content, /run=deadbeef /);
     }),
   );
@@ -105,7 +105,7 @@ testLayer(NodePlatformLayer, { excludeTestServices: true })("observability loggi
 
       yield* Effect.all([write, write], { concurrency: "unbounded" });
 
-      const content = yield* fs.readFileString(vibestLogPath(logsDirectory(home)));
+      const content = yield* fs.readFileString(pieLogPath(logsDirectory(home)));
       const lines = content.trim().split("\n");
       assert.equal(lines.length, 100);
 

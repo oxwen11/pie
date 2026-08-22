@@ -3,13 +3,13 @@ import {
   HarnessAgentIdSchema,
   TokenUsageSchema,
   TurnErrorSchema,
-} from "@vibest/contract";
-import type { HarnessAgentId } from "@vibest/contract";
+} from "@pie/contract";
+import type { HarnessAgentId } from "@pie/contract";
 import type { UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
 /**
- * Harness-internal event vocabulary. The public `@vibest/contract` wire model is
+ * Harness-internal event vocabulary. The public `@pie/contract` wire model is
  * a flat tagged union (`SessionScopedEvent` keyed by `SessionRef`); this module
  * keeps the harness's own ergonomic `defineEvent`/`SessionEnvelope` shape, keyed
  * by the agent-native `sessionId`. `HarnessAgentSession` translates these

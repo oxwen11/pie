@@ -8,7 +8,7 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { generateId, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 

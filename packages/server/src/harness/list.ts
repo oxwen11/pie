@@ -1,11 +1,11 @@
-import type { HarnessAgentInfo, HarnessListOutput } from "@vibest/contract";
+import type { HarnessAgentInfo, HarnessListOutput } from "@pie/contract";
 import { Context, Effect, FileSystem, Layer } from "effect";
 
 import { HarnessAgentRegistry, type HarnessAgentRegistryShape } from "./registry";
 
 /**
  * Declaring every harness the server hosts: what it is, whether it can run
- * right now, and which members of vibest's permission vocabulary it honours.
+ * right now, and which members of pie's permission vocabulary it honours.
  *
  * All of it is declared: the permission subset is a literal in the adapter and
  * availability is a filesystem question, so this cannot fail.

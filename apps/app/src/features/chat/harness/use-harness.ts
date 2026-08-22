@@ -1,11 +1,11 @@
-import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import type {
   HarnessAgentId,
   HarnessAgentInfo,
   HarnessListOutput,
   HarnessProbeOutput,
-} from "@vibest/contract";
+} from "@pie/contract";
+import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 // `harness.list` is a single connection-level exchange (see the root route's

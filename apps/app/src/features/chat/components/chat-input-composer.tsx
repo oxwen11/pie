@@ -3,7 +3,7 @@ import {
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
-} from "@vibest/ui/ai-elements/prompt-input";
+} from "@pie/ui/ai-elements/prompt-input";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 

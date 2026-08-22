@@ -10,7 +10,7 @@ OpenCode v2 自己就是 harness,transcript 是它自己的数据,所以它必�
 事务里折叠出 `session_message` 读模型(`packages/core/src/event.ts:237-353`)。它那条
 无缝回放流 `/api/session/:id/event?after=<seq>` 的全部保证,来自"可按 seq 范围查库"。
 
-vibest 的 transcript 权威在 harness 手里:claude 的 `~/.claude/projects/**.jsonl`、
+pie 的 transcript 权威在 harness 手里:claude 的 `~/.claude/projects/**.jsonl`、
 pi 的 entry tree、codex 的 `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`。我们不需要
 造耐久层,**我们需要的是把这个已经存在的地板接全、接稳**。这也意味着 server 重启的
 状态损失是有界的:内存投影没了,客户端重连后从原生历史重新水合。
@@ -131,7 +131,7 @@ per-session 串行由 `run-coordinator` 保证。两端同时发,谁也不丢、
 
 ### P1-2 turn 失败后的历史对账
 
-**现状**(今天实测到的):pi 在代理网络下偶发 `Connection error.`,vibest 这一层
+**现状**(今天实测到的):pi 在代理网络下偶发 `Connection error.`,pie 这一层
 的 turn 以失败结束,但 pi 内部重试成功并把回复写进了自己的 entry tree。结果是
 **发送端看到失败、旁观端看到成功回复**,两边分叉;刷新页面后收敛一致
 (说明地板是对的,分叉只在发送端的活视图里)。
@@ -230,7 +230,7 @@ review 中定下三条原则并当场重构:**快照同步状态、事件同步�
 
 ## 4. 机制对照
 
-| 维度           | OpenCode v2                      | vibest 现状                              | 本报告后                  |
+| 维度           | OpenCode v2                      | pie 现状                                 | 本报告后                  |
 | -------------- | -------------------------------- | ---------------------------------------- | ------------------------- |
 | 传输           | SSE 全局 firehose                | oRPC 单 WS,global + per-session 双 scope | 不变                      |
 | delta 持久化   | 不持久化(live-only)              | 不持久化(内存缓冲)                       | 缓冲加界 + truncated 降级 |

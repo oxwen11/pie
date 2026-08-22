@@ -1,8 +1,8 @@
-import type { ReasoningEffort } from "@vibest/contract";
+import type { ReasoningEffort } from "@pie/contract";
 
 /**
  * Display knowledge for the reasoning-reasoningEffort union. Like permission modes,
- * reasoningEffort names are vibest's vocabulary — adapters translate native levels into
+ * reasoningEffort names are pie's vocabulary — adapters translate native levels into
  * it — so their labels and ordering are client-owned. Which members a given
  * model offers comes from that model's probed traits (`ModelInfo.reasoningEfforts`).
  */

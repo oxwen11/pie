@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 
 /** Stable client-side key for the complete session identity. */
 export const sessionRefKey = (ref: SessionRef): string =>

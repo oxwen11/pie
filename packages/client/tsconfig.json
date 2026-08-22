@@ -1,5 +1,5 @@
 {
-  "extends": "@vibest/typescript/base.json",
+  "extends": "@pie/typescript/base.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler"

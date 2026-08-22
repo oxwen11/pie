@@ -1,4 +1,4 @@
-import { cn } from "@vibest/ui/lib/utils";
+import { cn } from "@pie/ui/lib/utils";
 import type { HTMLAttributes } from "react";
 
 type LoaderIconProps = {

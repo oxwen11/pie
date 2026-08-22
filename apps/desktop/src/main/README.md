@@ -23,4 +23,4 @@ index.ts
 
 Most capability modules are `Context.Service` Tags with a plain-parameter factory function alongside them; `desktop-runtime.ts` wires their `Live` Layers into one graph instead of threading constructor parameters by hand. See "Tag and Layer ownership" in `apps/desktop/AGENTS.md` for which module owns a Tag's `Live` Layer and when a capability stays a plain factory instead.
 
-The production renderer is served from `vibest://app`. The custom protocol is used only for application assets; Renderer/Main RPC travels over MessagePort. See `apps/desktop/AGENTS.md` for dependency and implementation rules.
+The production renderer is served from `pie://app`. The custom protocol is used only for application assets; Renderer/Main RPC travels over MessagePort. See `apps/desktop/AGENTS.md` for dependency and implementation rules.

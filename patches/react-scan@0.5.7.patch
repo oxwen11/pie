@@ -7,7 +7,7 @@ index 7514416b798e173501c586fb8dbc8ad19234f3a5..7e61c467b462a6556ec802d7b05a9cd3
  var import_package = require("react-grab/package.json");
  var didRunVersionCheck = false;
 -var checkReactGrabVersion = () => {
-+var checkReactGrabVersion = () => { return; // vibest: no react-grab.com version check (renderer CSP allows no external hosts)
++var checkReactGrabVersion = () => { return; // pie: no react-grab.com version check (renderer CSP allows no external hosts)
    if (didRunVersionCheck) return;
    didRunVersionCheck = true;
    if (typeof window === "undefined") return;
@@ -20,7 +20,7 @@ index 0c8d6cb1b06d1e9d034c8e59691638088fbee2b6..ad4a35ef728f7e67c1bdf4455e6dc211
  import { version as REACT_GRAB_VERSION } from "react-grab/package.json";
  var didRunVersionCheck = false;
 -var checkReactGrabVersion = () => {
-+var checkReactGrabVersion = () => { return; // vibest: no react-grab.com version check (renderer CSP allows no external hosts)
++var checkReactGrabVersion = () => { return; // pie: no react-grab.com version check (renderer CSP allows no external hosts)
    if (didRunVersionCheck) return;
    didRunVersionCheck = true;
    if (typeof window === "undefined") return;

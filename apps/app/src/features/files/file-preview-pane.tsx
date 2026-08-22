@@ -1,8 +1,8 @@
 import { ORPCError } from "@orpc/client";
+import { Button } from "@pie/ui/components/button";
+import { Spinner } from "@pie/ui/components/spinner";
+import { cn } from "@pie/ui/lib/utils";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { Button } from "@vibest/ui/components/button";
-import { Spinner } from "@vibest/ui/components/spinner";
-import { cn } from "@vibest/ui/lib/utils";
 import { RefreshCwIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
 

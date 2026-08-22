@@ -1,6 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
 import { implement } from "@orpc/server";
-import { harnessContract } from "@vibest/contract/harness";
+import { harnessContract } from "@pie/contract/harness";
 
 import { HarnessListService, HarnessProbeService } from "../harness";
 import type { RpcContext } from "./context";

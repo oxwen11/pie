@@ -1,7 +1,5 @@
-import { HarnessAgentIdSchema } from "@vibest/contract";
+import { HarnessAgentIdSchema } from "@pie/contract";
 import { Schema } from "effect";
-
-export { ClaudeSdkError } from "./claude-code/errors";
 
 // A cause's one-line story, for error messages that would otherwise swallow
 // it. These messages end up in daemon logs and RPC INTERNAL responses — a
@@ -131,29 +129,6 @@ export class AgentOperationError extends Schema.TaggedError<AgentOperationError>
   }
 }
 
-export class CodexTransportError extends Schema.TaggedError<CodexTransportError>()(
-  "CodexTransportError",
-  {
-    operation: Schema.String,
-    cause: Schema.Defect(),
-  },
-) {
-  override get message() {
-    return `Codex transport operation '${this.operation}' failed: ${causeSummary(this.cause)}`;
-  }
-}
-
-export class CodexRpcError extends Schema.TaggedError<CodexRpcError>()("CodexRpcError", {
-  method: Schema.String,
-  code: Schema.Number,
-  errorMessage: Schema.String,
-  data: Schema.optionalKey(Schema.Unknown),
-}) {
-  override get message() {
-    return `Codex RPC '${this.method}' failed (${this.code}): ${this.errorMessage}`;
-  }
-}
-
 export class PiTransportError extends Schema.TaggedError<PiTransportError>()("PiTransportError", {
   operation: Schema.String,
   cause: Schema.Defect(),
@@ -206,7 +181,7 @@ export class AgentProtocolError extends Schema.TaggedError<AgentProtocolError>()
   }
 }
 
-// The requested permission mode is a member of vibest's vocabulary, but not of
+// The requested permission mode is a member of pie's vocabulary, but not of
 // this harness's declared subset — a client bug by definition (the subset is
 // closed and fully known to the client), so it maps to INVALID_ARGUMENT at the
 // RPC boundary rather than being silently ignored or half-applied.

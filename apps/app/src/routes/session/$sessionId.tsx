@@ -1,5 +1,5 @@
+import { HARNESS_AGENT_IDS, type HarnessAgentId, type SessionRef } from "@pie/contract";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { HARNESS_AGENT_IDS, type HarnessAgentId, type SessionRef } from "@vibest/contract";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";

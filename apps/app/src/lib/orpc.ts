@@ -1,14 +1,14 @@
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { createPieClient, type PieClient } from "@pie/client";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { createVibestClient, type VibestClient } from "@vibest/client";
 import { toast } from "sonner";
 
 import type { ServerConnection } from "@/server-connection";
 
 export type AppClients = {
-  orpcClient: VibestClient;
+  orpcClient: PieClient;
   queryClient: QueryClient;
-  orpcQueryUtils: ReturnType<typeof createTanstackQueryUtils<VibestClient>>;
+  orpcQueryUtils: ReturnType<typeof createTanstackQueryUtils<PieClient>>;
 };
 
 function createQueryClient(): QueryClient {
@@ -34,7 +34,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
   const queryClient = createQueryClient();
 
   if (!server) {
-    const orpcClient = createVibestClient();
+    const orpcClient = createPieClient();
     return {
       orpcClient,
       queryClient,
@@ -43,7 +43,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
   }
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
-  const orpcClient = createVibestClient({
+  const orpcClient = createPieClient({
     url: `${wsBaseUrl}/ws/rpc`,
     getTicket: async () => {
       const response = await globalThis.fetch(`${httpBaseUrl}/api/ws-ticket`, {

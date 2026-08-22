@@ -1,5 +1,5 @@
-import { Button } from "@vibest/ui/components/button";
-import { Spinner } from "@vibest/ui/components/spinner";
+import { Button } from "@pie/ui/components/button";
+import { Spinner } from "@pie/ui/components/spinner";
 import { type ReactElement, useSyncExternalStore } from "react";
 
 import { usePlatform } from "./platform-context";
@@ -43,7 +43,7 @@ export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): React
           <div>
             <p className="text-foreground text-base font-medium">The local server stopped</p>
             <p className="text-muted-foreground mt-1 text-sm">
-              Vibest couldn&rsquo;t keep its server running. Retry, or quit and reopen the app.
+              Pie couldn&rsquo;t keep its server running. Retry, or quit and reopen the app.
             </p>
           </div>
           <div className="flex gap-2">

@@ -1,11 +1,11 @@
-import type { ReasoningEffort } from "@vibest/contract";
+import type { ReasoningEffort } from "@pie/contract";
 import {
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
-} from "@vibest/ui/ai-elements/prompt-input";
+} from "@pie/ui/ai-elements/prompt-input";
 
 import {
   REASONING_EFFORT_LABELS,
@@ -16,7 +16,7 @@ import {
 // selected model's probed traits — not from the harness — so the caller passes
 // them in; an empty list means the current model has no reasoningEffort switch and no
 // control is rendered. Labels and ordering are client-owned: reasoningEffort names are
-// vibest's vocabulary, like permission modes.
+// pie's vocabulary, like permission modes.
 export function ReasoningEffortSelect({
   reasoningEfforts,
   value,

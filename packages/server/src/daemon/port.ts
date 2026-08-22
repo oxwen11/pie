@@ -20,7 +20,7 @@ export const reservePort = (preferred: number): Effect.Effect<number, DaemonLaun
     try: () => tryListen(preferred).catch(() => tryListen(0)),
     catch: (cause) =>
       new DaemonLaunchError({
-        message: `Unable to reserve a port for the vibest daemon: ${String(cause)}`,
+        message: `Unable to reserve a port for the pie daemon: ${String(cause)}`,
         cause,
       }),
   });

@@ -1,3 +1,4 @@
+import type { SessionRef } from "@pie/contract";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
@@ -5,7 +6,6 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import type { SessionRef } from "@vibest/contract";
 import { useCallback } from "react";
 
 import {

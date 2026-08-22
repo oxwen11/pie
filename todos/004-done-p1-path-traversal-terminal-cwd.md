@@ -63,7 +63,7 @@ create(worktreeId: string, cwd: string): TerminalInstance {
 }
 ```
 
-### Option B: Validate against vibest workspace root
+### Option B: Validate against pie workspace root
 
 - **Pros:** Allows subdirectories within workspace
 - **Cons:** Less restrictive than Option A

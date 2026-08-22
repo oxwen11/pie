@@ -172,7 +172,7 @@ Because both sides read the identical persisted `uuid`, the ids match, and after
 
 ### If we wanted to avoid the transcript's fragility
 
-An alternative is a **daemon-owned deterministic id** persisted in the daemon's own session metadata (`~/.vibest/storage/sessions/...`), e.g. record `{turnIndex → firstAssistantUuid}` or mint `sha(sessionId, turnIndex)` at turn start and store it. This decouples the committed id from transcript rewrites, but then `getMessages` must map transcript turns back to those recorded ids — reintroducing the same segmentation problem and adding a second source of truth to keep in sync. Recommendation: start with the first-assistant-`uuid` rule; escalate to daemon-owned ids only if compaction/supersede churn proves damaging in practice.
+An alternative is a **daemon-owned deterministic id** persisted in the daemon's own session metadata (`~/.pie/storage/sessions/...`), e.g. record `{turnIndex → firstAssistantUuid}` or mint `sha(sessionId, turnIndex)` at turn start and store it. This decouples the committed id from transcript rewrites, but then `getMessages` must map transcript turns back to those recorded ids — reintroducing the same segmentation problem and adding a second source of truth to keep in sync. Recommendation: start with the first-assistant-`uuid` rule; escalate to daemon-owned ids only if compaction/supersede churn proves damaging in practice.
 
 ---
 

@@ -5,7 +5,7 @@ import type {
   PermissionMode,
   ProviderInfo,
   ReasoningEffort,
-} from "@vibest/contract";
+} from "@pie/contract";
 
 /**
  * Which harness a fresh draft starts on.

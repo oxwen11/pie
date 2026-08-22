@@ -30,7 +30,7 @@ the segment's first assistant entry (assistant messages) or the user entry id
   UIMessage per agent run (`agent_start` → `agent_settled`) and does not split
   on pi's internal `turn_end`/`turn_start` (correctly — see Consequences).
   Since the 2026-08-02 amendment it _does_ split on a delivered steer's
-  `message_start role=user`. The vibest pi adapter
+  `message_start role=user`. The pie pi adapter
   (`packages/server/src/harness/pi/agent.ts:421`) issues `steer` when a prompt
   arrives while a turn is active, so this occurs in production today.
   (`docs/wayfinder/session-streaming-refactor/map.md` still lists steer as

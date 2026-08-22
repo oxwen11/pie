@@ -4,7 +4,7 @@ import { Schema } from "effect";
 export const toStandardSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
   Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema));
 
-export const HarnessAgentIdSchema = Schema.Literals(["claude-code", "codex", "pi"]);
+export const HarnessAgentIdSchema = Schema.Literals(["pi"]);
 export type HarnessAgentId = typeof HarnessAgentIdSchema.Type;
 // Derived from the schema rather than written out a second time: clients that
 // need the ids as data (narrowing a URL param, say) would otherwise keep their
@@ -360,7 +360,7 @@ export type ActivePromptSnapshot = {
 // Session settings (docs/design/harness-concept-ownership.md)
 //
 // Two channels, split by who owns the value's meaning:
-// - Normalized: vibest defines a closed union, adapters declare the subset they
+// - Normalized: pie defines a closed union, adapters declare the subset they
 //   support and map members to their native system privately. Labels, icons and
 //   ordering live in the client — the words are ours.
 // - Opaque: the harness/provider defines an open set we merely relay. Labels

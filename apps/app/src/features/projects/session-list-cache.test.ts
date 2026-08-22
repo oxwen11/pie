@@ -1,5 +1,5 @@
+import type { ListSessionsOutput, SessionRef, ServerEvent } from "@pie/contract";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
-import type { ListSessionsOutput, SessionRef, ServerEvent } from "@vibest/contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {

@@ -16,8 +16,8 @@ const DEFAULT_PORT = 4000;
  * flag) so it stays out of the process list.
  */
 function takeAuthToken(): string | undefined {
-  const token = process.env.VIBEST_AUTH_TOKEN;
-  delete process.env.VIBEST_AUTH_TOKEN;
+  const token = process.env.PIE_AUTH_TOKEN;
+  delete process.env.PIE_AUTH_TOKEN;
   return token;
 }
 
@@ -29,7 +29,7 @@ function listFromEnv(name: string): string[] {
 }
 
 function portFromEnv(): number {
-  const raw = process.env.VIBEST_PORT;
+  const raw = process.env.PIE_PORT;
   if (raw === undefined) return process.env.NODE_ENV === "development" ? 0 : DEFAULT_PORT;
   const port = Number.parseInt(raw, 10);
   return Number.isInteger(port) && port >= 0 ? port : DEFAULT_PORT;
@@ -37,7 +37,7 @@ function portFromEnv(): number {
 
 export const serveFlags = {
   port: Flag.integer("port").pipe(
-    Flag.withDescription("Port to listen on (overrides VIBEST_PORT)"),
+    Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
     Flag.optional,
   ),
   corsOrigin: Flag.string("cors-origin").pipe(
@@ -60,7 +60,7 @@ type ServeInput = {
 
 /**
  * Resolve the effective port and CORS origins from parsed flags, falling back
- * to `VIBEST_*` env and finally the defaults — precedence flag > env > default.
+ * to `PIE_*` env and finally the defaults — precedence flag > env > default.
  * Pure so the precedence can be tested without booting a server.
  */
 export function resolveServeConfig(input: ServeInput): {
@@ -70,10 +70,9 @@ export function resolveServeConfig(input: ServeInput): {
 } {
   return {
     port: Option.getOrElse(input.port, portFromEnv),
-    corsOrigins:
-      input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("VIBEST_CORS_ORIGINS"),
+    corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),
     allowedHosts:
-      input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("VIBEST_ALLOWED_HOSTS"),
+      input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("PIE_ALLOWED_HOSTS"),
   };
 }
 
@@ -155,9 +154,9 @@ const serveWith = (input: ServeInput) =>
 
     // Machine-readable first, for the desktop supervisor; human-readable
     // second. Both go to stdout; observability writes to the local log file and
-    // only mirrors to stderr when `VIBEST_PRINT_LOGS=1`.
+    // only mirrors to stderr when `PIE_PRINT_LOGS=1`.
     console.log(formatReadyLine({ port }));
-    console.log(`vibest listening on http://127.0.0.1:${port}`);
+    console.log(`pie listening on http://127.0.0.1:${port}`);
 
     yield* Effect.logInfo("server listening").pipe(
       Effect.annotateLogs({ event: "server.listening", port }),
@@ -167,5 +166,5 @@ const serveWith = (input: ServeInput) =>
   });
 
 export const serve = Command.make("serve", serveFlags, runServe).pipe(
-  Command.withDescription("Start the vibest local server"),
+  Command.withDescription("Start the pie local server"),
 );

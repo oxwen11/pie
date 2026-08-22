@@ -8,8 +8,8 @@ import { makeRpcTestHarness } from "./rpc-harness";
 
 describe("project router", () => {
   it("creates a project named after the folder, dedupes by path, and lists it", async () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
-    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-project-"));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-project-"));
     const h = await makeRpcTestHarness(home);
     try {
       const created = await h.client.project.create({ path: workspace });

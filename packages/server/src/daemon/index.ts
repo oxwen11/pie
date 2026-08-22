@@ -2,7 +2,7 @@ export {
   type DaemonLocation,
   resolveDaemonDirectory,
   resolveDaemonLocation,
-  resolveVibestHome,
+  resolvePieHome,
 } from "../config/paths";
 export { DaemonLaunchError, DaemonStoppedError } from "./errors";
 export {

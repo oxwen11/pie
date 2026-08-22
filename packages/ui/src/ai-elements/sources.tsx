@@ -4,8 +4,8 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
-import { cn } from "@vibest/ui/lib/utils";
+} from "@pie/ui/components/collapsible";
+import { cn } from "@pie/ui/lib/utils";
 import { BookIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 

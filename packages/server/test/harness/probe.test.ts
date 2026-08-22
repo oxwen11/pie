@@ -33,15 +33,15 @@ it.effect("probes the directory it was asked about, grouped under the built-in p
   Effect.gen(function* () {
     const seen = yield* Ref.make<ReadonlyArray<string>>([]);
     const probe = yield* makeHarnessProbe(
-      makeHarnessAgentRegistry([adapter({ id: "claude-code", probeModels: recordingProbe(seen) })]),
+      makeHarnessAgentRegistry([adapter({ id: "pi", probeModels: recordingProbe(seen) })]),
     );
 
-    const result = yield* probe.probe({ harnessAgentId: "claude-code", cwd: "/work/app" });
+    const result = yield* probe.probe({ harnessAgentId: "pi", cwd: "/work/app" });
 
     assert.deepEqual(yield* Ref.get(seen), ["/work/app"]);
     // Models never leave their provider: the built-in provider carries the
     // harness's own id, which is the other half of every providerId/modelId pair.
-    assert.equal(result.providers[0]?.id, "claude-code");
+    assert.equal(result.providers[0]?.id, "pi");
     assert.equal(result.providers[0]?.models[0]?.id, "sonnet");
   }),
 );
@@ -50,9 +50,9 @@ it.effect("gives concurrent callers one probe, not one each", () =>
   Effect.gen(function* () {
     const seen = yield* Ref.make<ReadonlyArray<string>>([]);
     const probe = yield* makeHarnessProbe(
-      makeHarnessAgentRegistry([adapter({ id: "claude-code", probeModels: recordingProbe(seen) })]),
+      makeHarnessAgentRegistry([adapter({ id: "pi", probeModels: recordingProbe(seen) })]),
     );
-    const ask = probe.probe({ harnessAgentId: "claude-code", cwd: "/work/app" });
+    const ask = probe.probe({ harnessAgentId: "pi", cwd: "/work/app" });
 
     // Two tabs on the same directory, arriving before the first probe settles.
     const [first, second] = yield* Effect.all([ask, ask], { concurrency: "unbounded" });
@@ -67,13 +67,13 @@ it.effect("treats two directories as two probes, and does not serialise them", (
   Effect.gen(function* () {
     const seen = yield* Ref.make<ReadonlyArray<string>>([]);
     const probe = yield* makeHarnessProbe(
-      makeHarnessAgentRegistry([adapter({ id: "claude-code", probeModels: recordingProbe(seen) })]),
+      makeHarnessAgentRegistry([adapter({ id: "pi", probeModels: recordingProbe(seen) })]),
     );
 
     yield* Effect.all(
       [
-        probe.probe({ harnessAgentId: "claude-code", cwd: "/work/a" }),
-        probe.probe({ harnessAgentId: "claude-code", cwd: "/work/b" }),
+        probe.probe({ harnessAgentId: "pi", cwd: "/work/a" }),
+        probe.probe({ harnessAgentId: "pi", cwd: "/work/b" }),
       ],
       { concurrency: "unbounded" },
     );
@@ -88,12 +88,12 @@ it.effect("normalises the directory, so one answer serves its aliases", () =>
   Effect.gen(function* () {
     const seen = yield* Ref.make<ReadonlyArray<string>>([]);
     const probe = yield* makeHarnessProbe(
-      makeHarnessAgentRegistry([adapter({ id: "claude-code", probeModels: recordingProbe(seen) })]),
+      makeHarnessAgentRegistry([adapter({ id: "pi", probeModels: recordingProbe(seen) })]),
     );
 
-    yield* probe.probe({ harnessAgentId: "claude-code", cwd: "/work/app" });
-    yield* probe.probe({ harnessAgentId: "claude-code", cwd: "/work/app/" });
-    yield* probe.probe({ harnessAgentId: "claude-code", cwd: "/work/nested/../app" });
+    yield* probe.probe({ harnessAgentId: "pi", cwd: "/work/app" });
+    yield* probe.probe({ harnessAgentId: "pi", cwd: "/work/app/" });
+    yield* probe.probe({ harnessAgentId: "pi", cwd: "/work/nested/../app" });
 
     assert.equal((yield* Ref.get(seen)).length, 1);
   }),
@@ -108,15 +108,13 @@ it.effect("caches a success but retries a failure", () =>
         Effect.flatMap((n) =>
           n > 1
             ? Effect.succeed([{ id: "sonnet" }])
-            : Effect.fail(
-                new CapabilityProbeFailed({ harnessAgentId: "claude-code", cause: "boom" }),
-              ),
+            : Effect.fail(new CapabilityProbeFailed({ harnessAgentId: "pi", cause: "boom" })),
         ),
       );
     const probe = yield* makeHarnessProbe(
-      makeHarnessAgentRegistry([adapter({ id: "claude-code", probeModels: flaky })]),
+      makeHarnessAgentRegistry([adapter({ id: "pi", probeModels: flaky })]),
     );
-    const ask = probe.probe({ harnessAgentId: "claude-code", cwd: "/work/app" });
+    const ask = probe.probe({ harnessAgentId: "pi", cwd: "/work/app" });
 
     // A cached failure would pin "no models" for the whole TTL, so the user
     // would have to wait it out after logging back in.

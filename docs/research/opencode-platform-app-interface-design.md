@@ -8,7 +8,7 @@ This note examines how OpenCode composes its shared app into Web and Electron, s
 - what `PlatformProvider`, `AppBaseProviders`, and `AppInterface` each own;
 - where server connection data, query clients, and SDK clients live;
 - how Desktop waits for and recovers from local-server startup;
-- which parts are useful for Vibest and which parts conflict with Vibest's non-blocking startup requirements.
+- which parts are useful for Pie and which parts conflict with Pie's non-blocking startup requirements.
 
 Source snapshot: OpenCode `dev` at commit [`17544802c38a4d35834275526ccf38be1cdcfbf4`](https://github.com/anomalyco/opencode/tree/17544802c38a4d35834275526ccf38be1cdcfbf4), package version `1.18.2`.
 
@@ -29,7 +29,7 @@ AppInterface
 
 Its active server is **not stored in `Platform`**. Web and Desktop construct `ServerConnection` values and pass them to `AppInterface` through `defaultServer`, `servers`, and related props. Query clients and SDK clients are created inside the app, including per-server SDK/query state.
 
-OpenCode avoids an “App mounted before the local-server address exists” state by waiting. Desktop Main starts the sidecar, waits for readiness and health, and only then restores windows. The renderer also gates `AppInterface` behind an asynchronous `awaitInitialization()` resource and displays a splash while required resources are pending. This is not the same as Vibest's desired non-blocking model.
+OpenCode avoids an “App mounted before the local-server address exists” state by waiting. Desktop Main starts the sidecar, waits for readiness and health, and only then restores windows. The renderer also gates `AppInterface` behind an asynchronous `awaitInitialization()` resource and displays a splash while required resources are pending. This is not the same as Pie's desired non-blocking model.
 
 OpenCode's shared app is not platform-agnostic in the strict sense: `Platform` is a `"web" | "desktop"` discriminated union, and app code branches on `platform.platform` and `platform.os` in many places.
 
@@ -313,7 +313,7 @@ Sources:
 - [`packages/app/src/context/server-sdk.tsx#L106-L249`](https://github.com/anomalyco/opencode/blob/17544802c38a4d35834275526ccf38be1cdcfbf4/packages/app/src/context/server-sdk.tsx#L106-L249)
 - [`packages/app/src/context/server-sync.tsx#L440-L458`](https://github.com/anomalyco/opencode/blob/17544802c38a4d35834275526ccf38be1cdcfbf4/packages/app/src/context/server-sync.tsx#L440-L458)
 
-The built-in sidecar itself is not supervised by an automatic respawn loop in Desktop Main. Its exit is logged. The Desktop `Platform.restart` implementation kills the sidecar and relaunches the whole app. OpenCode's recovery model is therefore different from Vibest's supervised same-port server restart.
+The built-in sidecar itself is not supervised by an automatic respawn loop in Desktop Main. Its exit is logged. The Desktop `Platform.restart` implementation kills the sidecar and relaunches the whole app. OpenCode's recovery model is therefore different from Pie's supervised same-port server restart.
 
 Sources:
 
@@ -333,7 +333,7 @@ Sources:
 
 Waiting does not remove the need to communicate connection data; it only means OpenCode communicates a resolved `ServerConnection` before constructing SDK clients.
 
-## 11. Direct answers for Vibest
+## 11. Direct answers for Pie
 
 ### Does OpenCode put server connection data in Platform?
 
@@ -355,7 +355,7 @@ No. Its Platform type and many consumers explicitly know `"desktop"` and desktop
 
 No. Desktop owns a separate renderer entry and bundles shared app source using the app's Vite plugin. This is source-level composition.
 
-## 12. Implications for Vibest
+## 12. Implications for Pie
 
 The useful part to copy is the separation of seams:
 
@@ -373,11 +373,11 @@ App implementation
 The parts not to copy are:
 
 - delaying BrowserWindow creation until server health is known;
-- making shared app code branch on a Desktop discriminator when Vibest wants stricter host independence;
+- making shared app code branch on a Desktop discriminator when Pie wants stricter host independence;
 - treating whole-app relaunch as the normal local-server recovery path;
 - exposing the broad Electron bridge or OpenCode's broad app package surface merely for parity.
 
-For Vibest's current custom renderer origin and dynamic loopback server, some connection information must still cross from Electron Main to the renderer. The design choice is where that seam lives, not whether the information exists. Vibest can copy OpenCode's resolved-server input without copying its delayed BrowserWindow:
+For Pie's current custom renderer origin and dynamic loopback server, some connection information must still cross from Electron Main to the renderer. The design choice is where that seam lives, not whether the information exists. Pie can copy OpenCode's resolved-server input without copying its delayed BrowserWindow:
 
 ```tsx
 <PlatformProvider value={platform}>

@@ -130,10 +130,10 @@ export function FilePreviewAdapter({
         const shadowRoot = node.shadowRoot;
         if (shadowRoot === null) return;
 
-        for (const previous of shadowRoot.querySelectorAll("[data-vibest-target-line]")) {
+        for (const previous of shadowRoot.querySelectorAll("[data-pie-target-line]")) {
           previous.removeAttribute("aria-current");
           previous.removeAttribute("aria-label");
-          previous.removeAttribute("data-vibest-target-line");
+          previous.removeAttribute("data-pie-target-line");
         }
         if (validTargetLine === undefined || scrollTargetKey === null) return;
 
@@ -142,7 +142,7 @@ export function FilePreviewAdapter({
             `[data-line][data-line-index="${validTargetLine - 1}"]`,
           );
           if (!(row instanceof HTMLElement)) return;
-          row.dataset.vibestTargetLine = "true";
+          row.dataset.pieTargetLine = "true";
           row.setAttribute("aria-current", "location");
           row.setAttribute("aria-label", `Target line ${validTargetLine}`);
           if (lastScrolledTarget.current === scrollTargetKey) return;

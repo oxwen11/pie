@@ -3,7 +3,7 @@
  * to, so it must tell its parent which port it actually got. One prefixed JSON
  * line on stdout, so a supervisor can pick it out of ordinary logging.
  */
-export const READY_PREFIX = "vibest:ready ";
+export const READY_PREFIX = "pie:ready ";
 
 export type ReadyInfo = {
   port: number;

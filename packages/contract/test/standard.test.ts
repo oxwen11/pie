@@ -1,5 +1,5 @@
 import { eventIterator, oc } from "@orpc/contract";
-import { toStandardSchema } from "@vibest/contract";
+import { toStandardSchema } from "@pie/contract";
 import { tool } from "ai";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";

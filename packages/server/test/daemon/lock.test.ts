@@ -9,7 +9,7 @@ import { releaseLock, tryAcquireLock } from "../../src/daemon/lock";
 
 layer(NodeServices.layer)("daemon lock", (it) => {
   const tempDaemonDir = FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "vibest-daemon-lock-" })),
+    Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "pie-daemon-lock-" })),
   );
 
   it.effect("serializes launchers through the daemon directory lock", () =>

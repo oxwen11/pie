@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 
 /**
  * The panel vocabulary. Zero React on purpose: everything here is data or a

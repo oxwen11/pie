@@ -18,65 +18,64 @@ import {
   HarnessProbeLayer,
   makeHarnessAgentRegistry,
 } from "../src/harness";
-import { makeCodexAdapter, makeCodexAgent } from "../src/harness/codex";
+import { makePiAdapter, makePiAgent } from "../src/harness/pi";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { Codex } from "../src/rpc/runtime";
+import { Pi } from "../src/rpc/runtime";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
+const sidIndex = process.argv.indexOf("--session-id");
+const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
+process.stdout.write("pi startup banner (not json)\\n");
+send({ type: "extension_ui_request", id: "st", method: "setStatus", statusKey: "k", statusText: "v" });
+const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
+const upd = (ev) => send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
+const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
-  if (msg.method === "initialize") send({ id: msg.id, result: {} });
-  if (msg.method === "thread/start") send({ id: msg.id, result: { thread: { id: "th_1" } } });
-  if (msg.method === "thread/read") send({ id: msg.id, result: { thread: { id: "th_1", name: "Fake thread", preview: "hi", updatedAt: 1700000000 } } });
-  if (msg.method === "turn/start") {
-    send({ id: msg.id, result: { turn: { id: "turn_1" } } });
-    send({ method: "turn/started", params: { threadId: "th_1", turn: { id: "turn_1" } } });
-    send({ method: "item/started", params: { threadId: "th_1", item: { type: "agentMessage", id: "i1", text: "" } } });
-    send({ method: "item/agentMessage/delta", params: { threadId: "th_1", itemId: "i1", delta: "pong" } });
-    send({ method: "item/completed", params: { threadId: "th_1", item: { type: "agentMessage", id: "i1", text: "pong" } } });
-    send({ method: "turn/completed", params: { threadId: "th_1", turn: { id: "turn_1", status: "completed" } } });
-  }
-  if (msg.method === "turn/interrupt" || msg.method === "thread/unsubscribe") send({ id: msg.id, result: null });
+  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
+  if (msg.type !== "prompt") return;
+  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ type: "agent_start" });
+  upd({ type: "start" });
+  upd({ type: "text_start", contentIndex: 0 });
+  upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
+  upd({ type: "text_end", contentIndex: 0, content: "pong" });
+  send({ type: "message_end", message: assistant() });
+  settle();
 });
 `;
 
 function makeFake(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-codex-"));
-  const file = path.join(dir, "fake-codex.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-rpc-"));
+  const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE);
   fs.chmodSync(file, 0o755);
   return file;
 }
 
 async function setup() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-ws-"));
-  // Paths plus the platform services the repositories' JSON store runs on.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  // The fake path goes to the adapter too: `session.create` gates on
-  // checkAvailability, which is a PATH lookup — without the override the test
-  // silently depends on a real codex install.
   const executablePath = makeFake();
-  const codexLayer = Layer.effect(Codex, makeCodexAgent({ executablePath })).pipe(
+  const piLayer = Layer.effect(Pi, makePiAgent({ executablePath })).pipe(
     Layer.provide(NodeServices.layer),
   );
   const registryLayer = Layer.effect(
     HarnessAgentRegistry,
     Effect.gen(function* () {
-      const codex = yield* Codex;
-      return makeHarnessAgentRegistry([makeCodexAdapter(codex, { executablePath })]);
+      const pi = yield* Pi;
+      return makeHarnessAgentRegistry([makePiAdapter(pi, { executablePath })]);
     }),
-  ).pipe(Layer.provide(codexLayer));
+  ).pipe(Layer.provide(piLayer));
 
-  // EventBusLayer is one reference so publish (manager/service) and subscribe
-  // (RPC) share the single bus instance.
   const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
     Layer.provide(
       HarnessAgentSessionManagerLayer.pipe(
@@ -107,8 +106,6 @@ async function setup() {
     Observability.discard,
   );
   const runtime = ManagedRuntime.make(appLayer);
-  // Layer construction does file I/O now (the project document loads eagerly),
-  // so the context must be built asynchronously.
   const context: RpcContext = {
     "effect/context": await runtime.runPromise(runtime.contextEffect),
   };
@@ -123,17 +120,17 @@ describe("session router", () => {
       const project = await client.project.create({ path: workspace });
       const ref = await client.session.create({
         projectId: project.id,
-        harnessAgentId: "codex",
+        harnessAgentId: "pi",
       });
       expect(ref.projectId).toBe(project.id);
-      expect(ref.harnessAgentId).toBe("codex");
+      expect(ref.harnessAgentId).toBe("pi");
 
       const events = await client.session.subscribe({ scope: { kind: "session", ref } });
       const receipt = await client.session.prompt({
         ref,
         parts: [{ type: "text", text: "ping" }],
       });
-      expect(receipt).toMatchObject({ turnId: "turn_1" });
+      expect(receipt.turnId).toBeDefined();
 
       const chunks: { type: string }[] = [];
       for await (const item of events) {
@@ -157,12 +154,9 @@ describe("session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "codex" });
+      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
       await client.session.close({ ref });
 
-      // What a browser does when it reopens the page after a server restart.
-      // None of it used to be answerable without a live runtime, so the client
-      // retried forever.
       const prepared = await client.session.prepare({ ref });
       const status = await client.session.getStatus({ ref });
       const snapshot = await client.session.getSnapshot({ ref });
@@ -180,10 +174,8 @@ describe("session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "codex" });
+      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
 
-      // Active session: list carries the live phase from the running runtime.
-      // Omitted `archived` defaults to the active-session listing.
       const active = await client.session.list({ projectId: project.id });
       expect(active).toHaveLength(1);
       expect(active[0]?.sessionId).toBe(ref.sessionId);
@@ -204,13 +196,11 @@ describe("session router", () => {
       expect(restored[0]?.archived).toBe(false);
       expect(await client.session.list({ projectId: project.id, archived: true })).toEqual([]);
 
-      // Closed but not deleted: metadata stays, the runtime is gone → no status.
       await client.session.close({ ref });
       const idle = await client.session.list({ projectId: project.id, archived: false });
       expect(idle).toHaveLength(1);
       expect(idle[0]?.status).toBeUndefined();
 
-      // Delete: metadata removed → the session leaves the listing entirely.
       await client.session.delete({ ref });
       const empty = await client.session.list({ projectId: project.id, archived: false });
       expect(empty).toHaveLength(0);
@@ -219,18 +209,12 @@ describe("session router", () => {
     }
   });
 
-  // The renaming client can repaint its own row optimistically; this is the
-  // path it cannot cover — a second client learning the new title without
-  // being told to go re-read the list. The firehose carries the title itself,
-  // which is what lets the fold patch in place instead of invalidating.
   it("announces a rename on the global firehose, carrying the new title", async () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "codex" });
+      const ref = await client.session.create({ projectId: project.id, harnessAgentId: "pi" });
 
-      // Subscribed before the rename: the live stream has no replay, so an
-      // event this observer misses is an event it never learns about.
       const observer = await client.session.subscribe({ scope: { kind: "global" } });
       await client.session.rename({ ref, title: "Login bug" });
 

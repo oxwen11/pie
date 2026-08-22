@@ -1,12 +1,12 @@
-import type { HarnessAgentId } from "@vibest/contract";
+import type { HarnessAgentId } from "@pie/contract";
 import {
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
-} from "@vibest/ui/ai-elements/prompt-input";
-import { Button } from "@vibest/ui/components/button";
+} from "@pie/ui/ai-elements/prompt-input";
+import { Button } from "@pie/ui/components/button";
 import { ChevronDownIcon } from "lucide-react";
 
 import { useHarnessAgents } from "@/features/chat/harness/use-harness";

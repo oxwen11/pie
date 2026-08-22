@@ -7,7 +7,7 @@ import * as Observability from "../src/observability";
 /**
  * The real Node platform services, mirroring what `rpc/runtime.ts` provides,
  * plus `Observability.discard` so `Effect.log*` does not leak to stdout.
- * Tests that write `$VIBEST_HOME/logs` provide `Observability.layer()`, which
+ * Tests that write `$PIE_HOME/logs` provide `Observability.layer()`, which
  * replaces this logger.
  */
 export const NodePlatformLayer: Layer.Layer<FileSystem.FileSystem | Crypto.Crypto> = Layer.mergeAll(

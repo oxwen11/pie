@@ -12,8 +12,8 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
   (it) => {
     const workspace = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-fs-" });
-      const outside = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-out-" });
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-fs-" });
+      const outside = yield* fs.makeTempDirectoryScoped({ prefix: "pie-out-" });
 
       yield* fs.writeFileString(path.join(cwd, "a.txt"), "hello\nworld");
       yield* fs.makeDirectory(path.join(cwd, "sub"), { recursive: true });
@@ -120,7 +120,7 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
     it.effect("keeps excluded-looking files and symlinks as visible leaves", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
-        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-excluded-leaves-" });
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-excluded-leaves-" });
         yield* fs.writeFileString(path.join(cwd, "node_modules"), "not a directory");
         yield* fs.writeFileString(path.join(cwd, "target.txt"), "target");
         yield* fs.symlink(path.join(cwd, "target.txt"), path.join(cwd, ".git"));
@@ -156,7 +156,7 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
     it.effect("hides a git worktree metadata file", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
-        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-worktree-" });
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-worktree-" });
         yield* fs.writeFileString(path.join(cwd, ".git"), "gitdir: ../metadata");
         yield* fs.writeFileString(path.join(cwd, "visible.ts"), "export {};");
 

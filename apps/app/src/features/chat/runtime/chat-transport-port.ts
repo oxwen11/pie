@@ -5,7 +5,7 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
-} from "@vibest/contract";
+} from "@pie/contract";
 import type { UIMessage } from "ai";
 
 import type { AgentResponse } from "./agent-requests";
@@ -15,7 +15,7 @@ import type { AgentResponse } from "./agent-requests";
 // (OrpcChatSessionTransport) implements it and is injected at the composition
 // root, so nothing in the core knows about oRPC or the WebSocket client.
 //
-// The vocabulary is the server's own (`@vibest/contract`): the transport adds
+// The vocabulary is the server's own (`@pie/contract`): the transport adds
 // no event language of its own. Its sole synthetic variant is "attached" —
 // the one occurrence the server has no event for, because for the server a
 // snapshot is a query, not something that happens.

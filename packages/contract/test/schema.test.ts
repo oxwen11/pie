@@ -21,7 +21,7 @@ import {
 } from "../src/domain";
 
 const UUID = "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61";
-const ref = { projectId: UUID, harnessAgentId: "claude-code", sessionId: "s1" };
+const ref = { projectId: UUID, harnessAgentId: "pi", sessionId: "s1" };
 
 const accepts = <A>(schema: Schema.ConstraintDecoder<A>, value: unknown): boolean =>
   Exit.isSuccess(Schema.decodeUnknownExit(schema)(value));
@@ -151,7 +151,7 @@ describe("server error map", () => {
 
 describe("HarnessListOutput", () => {
   const listing = (entry: Record<string, unknown>) => ({
-    harnessAgents: [{ id: "codex", name: "Codex", available: true, ...entry }],
+    harnessAgents: [{ id: "pi", name: "Pi", available: true, ...entry }],
   });
 
   it("carries the permission subset as our closed vocabulary, with its default", () => {
@@ -179,7 +179,7 @@ describe("HarnessListOutput", () => {
   it("requires the subset — the field is an answer, not an option", () => {
     expect(
       accepts(HarnessListOutputSchema, {
-        harnessAgents: [{ id: "codex", name: "Codex", available: false }],
+        harnessAgents: [{ id: "pi", name: "Pi", available: false }],
       }),
     ).toBe(false);
   });
@@ -192,7 +192,7 @@ describe("HarnessProbeOutput", () => {
     expect(
       accepts(
         HarnessProbeOutputSchema,
-        output([{ id: "codex", models: [{ id: "gpt-5.6-sol", label: "GPT 5.6 Sol" }] }]),
+        output([{ id: "pi", models: [{ id: "gpt-5.6-sol", label: "GPT 5.6 Sol" }] }]),
       ),
     ).toBe(true);
   });
@@ -207,7 +207,7 @@ describe("HarnessProbeOutput", () => {
         HarnessProbeOutputSchema,
         output([
           {
-            id: "codex",
+            id: "pi",
             models: [
               {
                 id: "gpt-5.6-sol",
@@ -226,21 +226,19 @@ describe("HarnessProbeOutput", () => {
     expect(
       accepts(
         HarnessProbeOutputSchema,
-        output([{ id: "codex", models: [{ id: "m", reasoningEfforts: ["turbo"] }] }]),
+        output([{ id: "pi", models: [{ id: "m", reasoningEfforts: ["turbo"] }] }]),
       ),
     ).toBe(false);
   });
 
   it("rejects a model without an id", () => {
     expect(
-      accepts(HarnessProbeOutputSchema, output([{ id: "codex", models: [{ label: "Sonnet" }] }])),
+      accepts(HarnessProbeOutputSchema, output([{ id: "pi", models: [{ label: "Sonnet" }] }])),
     ).toBe(false);
   });
 
   it("addresses a probe by directory, not by project", () => {
-    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "codex", cwd: "/work/app" })).toBe(
-      true,
-    );
-    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "codex" })).toBe(false);
+    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "pi", cwd: "/work/app" })).toBe(true);
+    expect(accepts(HarnessProbeInputSchema, { harnessAgentId: "pi" })).toBe(false);
   });
 });

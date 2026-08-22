@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { sessionRefKey } from "@/lib/session-ref";
@@ -41,7 +41,7 @@ const storageHolding = (bySessionKey: unknown): Storage => {
   const value = JSON.stringify({ state: { bySessionKey } });
   return {
     length: 1,
-    getItem: (key) => (key === "vibest:content-panel" ? value : null),
+    getItem: (key) => (key === "pie:content-panel" ? value : null),
     setItem: () => {},
     removeItem: () => {},
     clear: () => {},

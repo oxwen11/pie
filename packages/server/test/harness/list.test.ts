@@ -36,15 +36,15 @@ const adapter = (over: {
 
 it.effect("declares each harness's availability and permission subset", () =>
   Effect.gen(function* () {
-    const registry = makeHarnessAgentRegistry([adapter({ id: "claude-code" })]);
+    const registry = makeHarnessAgentRegistry([adapter({ id: "pi" })]);
 
     const { harnessAgents } = yield* makeHarnessList(registry).list.pipe(
       Effect.provide(NodePlatformLayer),
     );
 
     assert.deepEqual(harnessAgents[0], {
-      id: "claude-code",
-      name: "claude-code",
+      id: "pi",
+      name: "pi",
       available: true,
       permissionModes: ["ask"],
       defaultPermissionMode: "ask",
@@ -55,7 +55,7 @@ it.effect("declares each harness's availability and permission subset", () =>
 it.effect("keeps declaring settings for a harness whose CLI is missing", () =>
   Effect.gen(function* () {
     const registry = makeHarnessAgentRegistry([
-      adapter({ id: "codex", available: false, reason: "Codex was not found on PATH." }),
+      adapter({ id: "pi", available: false, reason: "Pi was not found on PATH." }),
     ]);
 
     const { harnessAgents } = yield* makeHarnessList(registry).list.pipe(
@@ -65,18 +65,14 @@ it.effect("keeps declaring settings for a harness whose CLI is missing", () =>
     // The picker greys it out and shows the reason — but what it *would* be
     // able to do has nothing to do with whether it is installed right now.
     assert.equal(harnessAgents[0]?.available, false);
-    assert.equal(harnessAgents[0]?.reason, "Codex was not found on PATH.");
+    assert.equal(harnessAgents[0]?.reason, "Pi was not found on PATH.");
     assert.equal(harnessAgents[0]?.defaultPermissionMode, "ask");
   }),
 );
 
-it.effect("reports every registered harness, in registration order", () =>
+it.effect("reports the registered pi harness", () =>
   Effect.gen(function* () {
-    const registry = makeHarnessAgentRegistry([
-      adapter({ id: "claude-code" }),
-      adapter({ id: "codex", available: false }),
-      adapter({ id: "pi" }),
-    ]);
+    const registry = makeHarnessAgentRegistry([adapter({ id: "pi" })]);
 
     const { harnessAgents } = yield* makeHarnessList(registry).list.pipe(
       Effect.provide(NodePlatformLayer),
@@ -84,7 +80,7 @@ it.effect("reports every registered harness, in registration order", () =>
 
     assert.deepEqual(
       harnessAgents.map((harnessAgent) => harnessAgent.id),
-      ["claude-code", "codex", "pi"],
+      ["pi"],
     );
   }),
 );
@@ -95,7 +91,7 @@ it.effect("a registry get that misses a listed id dies with the id in the defect
     // `get` cannot resolve. Listing must die naming the id — never drop the
     // harness silently or surface the miss as a recoverable failure.
     const broken: HarnessAgentRegistryShape = {
-      list: Effect.succeed([{ id: "claude-code", name: "claude-code" }]),
+      list: Effect.succeed([{ id: "pi", name: "pi" }]),
       get: (harnessAgentId) => Effect.fail(new HarnessAgentNotFound({ harnessAgentId })),
     };
 
@@ -106,6 +102,6 @@ it.effect("a registry get that misses a listed id dies with the id in the defect
     assert.equal(Exit.isFailure(exit) && Cause.hasDies(exit.cause), true);
     assert.equal(Exit.isFailure(exit) && Cause.hasFails(exit.cause), false);
     const defect = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
-    assert.ok(defect instanceof Error && defect.message.includes("claude-code"));
+    assert.ok(defect instanceof Error && defect.message.includes("pi"));
   }),
 );

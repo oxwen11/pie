@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
-      "dependsOn": ["@vibest/server#build"],
+      "dependsOn": ["@pie/server#build"],
       "passThroughEnv": ["*"]
     },
     "build:unpack": {

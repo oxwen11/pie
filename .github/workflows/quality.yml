@@ -26,7 +26,7 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, vibest]
+    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,7 +36,7 @@ jobs:
       # actions/cache tarballs on every run. See .github/scripts/bootstrap-ci-runner.sh.
       - name: Prepare persistent CI caches
         run: |
-          cache_root="${RUNNER_WORKSPACE}/../.vibest-ci-cache"
+          cache_root="${RUNNER_WORKSPACE}/../.pie-ci-cache"
           mkdir -p "${cache_root}/pnpm-store" "${cache_root}/turbo"
           {
             echo "PNPM_STORE_DIR=${cache_root}/pnpm-store"

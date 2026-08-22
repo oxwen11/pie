@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { implement } from "@orpc/server";
-import { fsContract } from "@vibest/contract/fs";
+import { fsContract } from "@pie/contract/fs";
 import { Effect } from "effect";
 import { FileSystem } from "effect/FileSystem";
 

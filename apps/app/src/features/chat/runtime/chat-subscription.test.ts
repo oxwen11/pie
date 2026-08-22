@@ -1,4 +1,4 @@
-import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@vibest/contract";
+import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { RecoveringSubscription } from "./chat-subscription";
@@ -6,7 +6,7 @@ import { RecoveringSubscription } from "./chat-subscription";
 const snapshot: SessionRuntimeSnapshot = {
   ref: {
     projectId: "project-1",
-    harnessAgentId: "claude-code",
+    harnessAgentId: "pi",
     sessionId: "session-1",
   },
   status: { phase: "idle" },

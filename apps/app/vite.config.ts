@@ -8,7 +8,7 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "vite";
 
 /**
- * The dev server the browser talks to. The vibest server no longer embeds Vite,
+ * The dev server the browser talks to. The pie server no longer embeds Vite,
  * so this proxies the two prefixes it owns — which also keeps the app
  * same-origin with the RPC, the way it is when the server serves the built
  * bundle. Add a prefix here whenever the server grows one.
@@ -20,7 +20,7 @@ import { defineConfig } from "vite";
  * electron-vite renderer. 4180/4190 are claimed by no common dev tool. Open
  * 4190: 4180 serves the last *built* bundle, so it works but shows stale UI.
  */
-const SERVER_PORT = Number(process.env.VIBEST_PORT ?? 4180);
+const SERVER_PORT = Number(process.env.PIE_PORT ?? 4180);
 const serverTarget = `http://127.0.0.1:${SERVER_PORT}`;
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
 
@@ -29,7 +29,7 @@ export default defineConfig({
     bundledDev: true,
   },
   define: {
-    "import.meta.env.VIBEST_RUN_IN_AGENT": JSON.stringify(RUNNING_IN_AGENT),
+    "import.meta.env.PIE_RUN_IN_AGENT": JSON.stringify(RUNNING_IN_AGENT),
   },
   server: {
     // Strict, so a taken port fails the boot instead of silently drifting to
@@ -39,11 +39,11 @@ export default defineConfig({
     strictPort: true,
     // Vite rejects any Host it doesn't recognise, which is every name a tunnel
     // puts in front of it (tailnet MagicDNS, ngrok, …). Opt in per run —
-    // `VIBEST_ALLOWED_HOSTS=<host>[,<host>] pnpm dev` — so the default stays
+    // `PIE_ALLOWED_HOSTS=<host>[,<host>] pnpm dev` — so the default stays
     // localhost-only and nobody widens it by accident. The daemon's own
     // WebSocket guard is separate and allowlists loopback origins only, so a
-    // tunnelled run also needs `VIBEST_CORS_ORIGINS=<origin>` (see http/cors.ts).
-    allowedHosts: process.env.VIBEST_ALLOWED_HOSTS?.split(",").filter(Boolean),
+    // tunnelled run also needs `PIE_CORS_ORIGINS=<origin>` (see http/cors.ts).
+    allowedHosts: process.env.PIE_ALLOWED_HOSTS?.split(",").filter(Boolean),
     proxy: {
       "/api": { target: serverTarget, changeOrigin: true },
       "/ws/rpc": { target: serverTarget, changeOrigin: true, ws: true },

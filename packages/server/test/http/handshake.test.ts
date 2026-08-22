@@ -13,7 +13,7 @@ describe("ready line", () => {
   });
 
   it("ignores an unrelated log line", () => {
-    expect(parseReadyLine("vibest listening on http://127.0.0.1:4000")).toBeNull();
+    expect(parseReadyLine("pie listening on http://127.0.0.1:4000")).toBeNull();
   });
 
   it("ignores a prefixed line with unparseable JSON", () => {

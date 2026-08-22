@@ -1,4 +1,4 @@
-import { type JsonStoreLoadError, makeJsonCollection } from "@vibest/effect-json-store";
+import { type JsonStoreLoadError, makeJsonCollection } from "@pie/effect-json-store";
 import { Effect, Option, Schema } from "effect";
 
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
@@ -12,7 +12,7 @@ import type { Session } from "../types";
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  harnessAgentId: Schema.Literals(["claude-code", "codex", "pi"]),
+  harnessAgentId: Schema.Literals(["pi"]),
   harnessSessionId: Schema.String,
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),

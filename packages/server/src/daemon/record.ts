@@ -1,10 +1,10 @@
-import { writeFileAtomic } from "@vibest/effect-json-store";
+import { writeFileAtomic } from "@pie/effect-json-store";
 import { Effect, FileSystem, type PlatformError } from "effect";
 
 import { daemonRecordPath } from "./paths";
 
 /**
- * The discovery record the launcher writes to `$VIBEST_DAEMON_DIR/daemon.pid` —
+ * The discovery record the launcher writes to `$PIE_DAEMON_DIR/daemon.pid` —
  * the local mirror of the SSH remote's `ssh-launch/<stateKey>/{pid,port,token}`.
  * It is the single-instance marker: staleness is decided by "is the pid alive",
  * never a lock the server holds. The server itself never reads or writes it.

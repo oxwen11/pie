@@ -19,7 +19,7 @@
 
 1. Electron main 中的 backend 子进程、重启、状态、超时和释放由 Effect 管理。
 2. Renderer/Main 通信完全移除 Electron IPC。
-3. Renderer/Main 使用 oRPC Fetch transport，通过现有 `vibest://app` custom protocol 通信。
+3. Renderer/Main 使用 oRPC Fetch transport，通过现有 `pie://app` custom protocol 通信。
 4. oRPC procedure 内部使用 Effect service、Layer、Scope、Stream 和 typed error。
 5. 保留 Renderer 到 CLI backend 的现有 loopback HTTP/WebSocket oRPC 通信。
 6. 不把 React Renderer 改造成 Effect 应用。
@@ -30,14 +30,14 @@
 Renderer
   │
   ├── Desktop Shell RPC
-  │     vibest://app/api/desktop-rpc
+  │     pie://app/api/desktop-rpc
   │     Renderer ↔ Electron Main
   │     bootstrap / backend status / retry / quit
   │
   └── Backend RPC
         http://127.0.0.1:<port>/api/rpc
         ws://127.0.0.1:<port>/ws/rpc
-        Renderer ↔ @vibest/cli child process
+        Renderer ↔ @pie/cli child process
         Claude Code / Codex / domain operations
 ```
 
@@ -129,7 +129,7 @@ Effect：service、Layer、Scope、Stream、state、concurrency、typed error
 - `ipcMain`；
 - `ipcRenderer`；
 - `contextBridge`；
-- `window.vibest`；
+- `window.pie`；
 - preload build；
 - `apps/desktop/src/preload/`；
 - `apps/desktop/src/shared/bridge.ts`。
@@ -141,7 +141,7 @@ Effect：service、Layer、Scope、Stream、state、concurrency、typed error
 首选 endpoint：
 
 ```text
-vibest://app/api/desktop-rpc
+pie://app/api/desktop-rpc
 ```
 
 优点：
@@ -167,8 +167,8 @@ Renderer 仍然通过 bootstrap 得到：
 
 然后继续使用：
 
-- `createVibestClient`；
-- `createVibestWsClient`；
+- `createPieClient`；
+- `createPieWsClient`；
 - backend bearer token；
 - WebSocket single-use ticket。
 
@@ -190,7 +190,7 @@ Desktop Shell RPC 不能代理 backend HTTP/WebSocket，也不能把两个 route
        │ oRPC Fetch
        ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ vibest://app protocol                                        │
+│ pie://app protocol                                        │
 │                                                              │
 │  /api/desktop-rpc/* ──► Desktop RPC FetchHandler             │
 │  other paths          ──► renderer asset / SPA fallback      │
@@ -221,7 +221,7 @@ Desktop Shell RPC 不能代理 backend HTTP/WebSocket，也不能把两个 route
        │
        ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ @vibest/cli child process                                    │
+│ @pie/cli child process                                    │
 │                                                              │
 │  ClaudeCode | Codex backend RPC                              │
 └──────────────────────────────────────────────────────────────┘
@@ -338,9 +338,9 @@ ChildProcess.make(process.execPath, [entry], {
     ...process.env,
     ...(shellPath ? { PATH: shellPath } : {}),
     ELECTRON_RUN_AS_NODE: "1",
-    VIBEST_AUTH_TOKEN: token,
-    VIBEST_PORT: String(port),
-    VIBEST_CORS_ORIGINS: corsOrigins.join(","),
+    PIE_AUTH_TOKEN: token,
+    PIE_PORT: String(port),
+    PIE_CORS_ORIGINS: corsOrigins.join(","),
   },
 });
 ```
@@ -555,7 +555,7 @@ export class WindowManager extends Context.Service<
 - BrowserWindow options；
 - `ready-to-show`；
 - `closed`；
-- dev URL / `vibest://app/`；
+- dev URL / `pie://app/`；
 - external link；
 - main-frame navigation allowlist；
 - runtime dispose 时 destroy window。
@@ -564,7 +564,7 @@ export class WindowManager extends Context.Service<
 
 ## 7.6 `AppProtocol`
 
-**Purpose:** 在一个 `protocol.handle("vibest")` 中完成 Desktop RPC 和 renderer asset dispatch。
+**Purpose:** 在一个 `protocol.handle("pie")` 中完成 Desktop RPC 和 renderer asset dispatch。
 
 它是 scoped module：
 
@@ -783,7 +783,7 @@ Abort 不按 error 记录；每个 status poll 最长持有 20 秒。
 }
 ```
 
-最终 transport 使用 bounded long-polling，因此不注册 `stream: true`；`corsEnabled: true` 用于 dev renderer 从 HTTP origin 调用 `vibest://app`。
+最终 transport 使用 bounded long-polling，因此不注册 `stream: true`；`corsEnabled: true` 用于 dev renderer 从 HTTP origin 调用 `pie://app`。
 
 ## 9.2 Dispatch order
 
@@ -809,22 +809,22 @@ Desktop RPC unknown path 不能落入 SPA fallback。
 production：
 
 ```text
-renderer origin = vibest://app
-RPC origin      = vibest://app
+renderer origin = pie://app
+RPC origin      = pie://app
 ```
 
 dev：
 
 ```text
 renderer origin = http://localhost:<vite-port>
-RPC origin      = vibest://app
+RPC origin      = pie://app
 ```
 
 要求：
 
 - 只允许 `ELECTRON_RENDERER_URL` 的 exact origin；
 - 使用 oRPC `CORSHandlerPlugin` 处理 preflight；
-- CSP `connect-src` 加入 `vibest:`；
+- CSP `connect-src` 加入 `pie:`；
 - 保留 oRPC 默认 CSRF guard，除非真实集成测试证明不兼容；
 - 不使用 `*`。
 
@@ -852,7 +852,7 @@ apps/desktop/src/renderer/desktop-client.ts
 
 ```ts
 const link = new RPCLink({
-  origin: "vibest://app",
+  origin: "pie://app",
   url: "/api/desktop-rpc",
 });
 ```
@@ -861,7 +861,7 @@ const link = new RPCLink({
 
 ## 10.2 Async bootstrap
 
-当前 Renderer 同步读取 `window.vibest`。改为：
+当前 Renderer 同步读取 `window.pie`。改为：
 
 ```text
 create desktop client
@@ -1142,7 +1142,7 @@ apps/desktop/src/shared/bridge.ts
 packages/contract/**
 packages/client/**
 packages/server/src/rpc/**
-packages/vibest/src/node/**
+packages/pie/src/node/**
 ```
 
 如果实现需要修改这些 backend packages，应先重新确认 module seam；Desktop Shell RPC 默认不应泄漏到 backend packages。
@@ -1259,7 +1259,7 @@ pnpm check
 额外检查：
 
 ```bash
-rg "ipcMain|ipcRenderer|contextBridge|window\.vibest" apps/desktop
+rg "ipcMain|ipcRenderer|contextBridge|window\.pie" apps/desktop
 ```
 
 预期无结果。
@@ -1368,7 +1368,7 @@ apps/desktop/src/main/protocol.ts or isolated spike fixture
 | Integration                                 | Depends on | Real verification               |
 | ------------------------------------------- | ---------- | ------------------------------- |
 | `LoginShellPath → NodeChildProcessSpawner`  | Phase 1    | real shell/fake executable      |
-| `BackendProcess → @vibest/cli entry`        | Phase 3    | fake CLI ready protocol         |
+| `BackendProcess → @pie/cli entry`           | Phase 3    | fake CLI ready protocol         |
 | `BackendSupervisor → BackendProcess`        | Phase 4    | Layer integration + TestClock   |
 | `DesktopMainLayer → BackendSupervisor`      | Phase 5    | startup wait + dispose kill     |
 | `DesktopRpcContext → DesktopMainLayer`      | Phase 6    | router client with real context |
@@ -1420,11 +1420,11 @@ Renderer 不引入 Effect Runtime。oRPC client 保持 Promise interface，并�
 - ready handshake 无手写 settle Promise/timer；
 - restart delay 可 interruption；
 - status source of truth 是 `SubscriptionRef`；
-- Renderer/Main 使用 `vibest://app/api/desktop-rpc`；
+- Renderer/Main 使用 `pie://app/api/desktop-rpc`；
 - desktop bootstrap 在 React mount 前完成；
 - bootstrap 提供 current status/revision，long poll 可 abort、可 reconnect；
 - Retry 和 Quit 是 typed oRPC procedures；
-- `ipcMain`、`ipcRenderer`、`contextBridge`、`window.vibest` 全部删除；
+- `ipcMain`、`ipcRenderer`、`contextBridge`、`window.pie` 全部删除；
 - preload build 和 preload files 删除；
 - BrowserWindow 仍保持 sandbox、context isolation、no Node integration；
 - backend token 和 pinned port 语义不变；

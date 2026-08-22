@@ -12,11 +12,11 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@vibest/ui/components",
-    "utils": "@vibest/ui/lib/utils",
-    "ui": "@vibest/ui/components",
-    "lib": "@vibest/ui/lib",
-    "hooks": "@vibest/ui/hooks"
+    "components": "@pie/ui/components",
+    "utils": "@pie/ui/lib/utils",
+    "ui": "@pie/ui/components",
+    "lib": "@pie/ui/lib",
+    "hooks": "@pie/ui/hooks"
   },
   "registries": {
     "@shipbase": "https://ui.shipbase.xyz/r/react/{name}.json",

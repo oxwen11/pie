@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for the vibest self-hosted CI runner (rn-vibest-01).
+# One-time setup for the pie self-hosted CI runner (rn-pie-01).
 #
 # Creates persistent pnpm / Turborepo cache directories beside the Actions
 # _work tree so jobs skip actions/cache tarball round-trips. Optionally installs
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 RUNNER_ROOT="${1:-/opt/actions-runner}"
-CACHE_ROOT="${RUNNER_ROOT}/_work/.vibest-ci-cache"
+CACHE_ROOT="${RUNNER_ROOT}/_work/.pie-ci-cache"
 RUNNER_USER="$(stat -c '%U' "${RUNNER_ROOT}/bin/Runner.Listener")"
 
 mkdir -p "${CACHE_ROOT}/pnpm-store" "${CACHE_ROOT}/turbo"
@@ -23,9 +23,9 @@ if ! command -v mise >/dev/null; then
 fi
 
 # Warm toolchain when the repo is already checked out on the runner.
-REPO_DIR="${RUNNER_ROOT}/_work/vibest/vibest"
+REPO_DIR="${RUNNER_ROOT}/_work/pie/pie"
 if [[ ! -f "${REPO_DIR}/mise.toml" ]]; then
-  REPO_DIR="$(find "${RUNNER_ROOT}/_work" -path '*/vibest/mise.toml' -print -quit 2>/dev/null || true)"
+  REPO_DIR="$(find "${RUNNER_ROOT}/_work" -path '*/pie/mise.toml' -print -quit 2>/dev/null || true)"
   REPO_DIR="${REPO_DIR%/mise.toml}"
 fi
 if [[ -n "${REPO_DIR}" && -f "${REPO_DIR}/mise.toml" ]]; then

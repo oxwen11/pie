@@ -7,7 +7,7 @@ import path from "node:path";
  *
  * All three are *state*, not output. The daemon's stdout/stderr used to be a
  * fourth file here; it now sits with the process log under
- * `$VIBEST_HOME/logs`, so there is one place to look when something needs
+ * `$PIE_HOME/logs`, so there is one place to look when something needs
  * investigating.
  */
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { Toast } from "@base-ui/react/toast";
-import { buttonVariants } from "@vibest/ui/components/button";
-import { cn } from "@vibest/ui/lib/utils";
+import { buttonVariants } from "@pie/ui/components/button";
+import { cn } from "@pie/ui/lib/utils";
 import {
   CircleAlertIcon,
   CircleCheckIcon,

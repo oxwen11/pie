@@ -1,4 +1,4 @@
-import type { AgentRequest, AgentRequestAction, AgentResponse } from "@vibest/contract";
+import type { AgentRequest, AgentRequestAction, AgentResponse } from "@pie/contract";
 
 export type {
   AgentGrant,
@@ -8,7 +8,7 @@ export type {
   AgentResponse,
   AgentResponseAnswer,
   PlanApprovalMode,
-} from "@vibest/contract";
+} from "@pie/contract";
 
 export type AgentRequestType = AgentRequest["type"];
 

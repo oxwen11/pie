@@ -24,7 +24,7 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
       resourcesPath,
       "app.asar",
       "node_modules",
-      "@vibest",
+      "@pie",
       "server",
       "dist",
       "server.mjs",

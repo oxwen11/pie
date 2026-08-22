@@ -3,7 +3,7 @@
 // the full runtime. Exits on SIGTERM (no handler) like the real foreground server.
 import http from "node:http";
 
-const port = Number(process.env.VIBEST_PORT ?? 0);
+const port = Number(process.env.PIE_PORT ?? 0);
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {
@@ -16,5 +16,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, "127.0.0.1", () => {
   const address = server.address();
-  console.log(`vibest:ready {"port":${address.port}}`);
+  console.log(`pie:ready {"port":${address.port}}`);
 });

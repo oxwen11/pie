@@ -4,7 +4,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionScopedEventBody,
   SessionStatus,
-} from "@vibest/contract";
+} from "@pie/contract";
 import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect";
 
 import { EventBus, type EventBusShape } from "../events/event-bus";

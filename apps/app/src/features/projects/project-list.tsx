@@ -1,15 +1,11 @@
-import type { SessionRef } from "@vibest/contract";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@vibest/ui/components/collapsible";
+import type { SessionRef } from "@pie/contract";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@pie/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
-} from "@vibest/ui/components/sidebar";
+} from "@pie/ui/components/sidebar";
 import { ChevronRight, FolderPlus } from "lucide-react";
 
 import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group";

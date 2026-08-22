@@ -1,8 +1,8 @@
 {
-  "name": "@vibest/client",
+  "name": "@pie/client",
   "version": "0.0.1",
   "private": true,
-  "description": "WebSocket RPC client for the Vibest server",
+  "description": "WebSocket RPC client for the Pie server",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -15,9 +15,9 @@
   "dependencies": {
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
-    "@vibest/contract": "workspace:*"
+    "@pie/contract": "workspace:*"
   },
   "devDependencies": {
-    "@vibest/typescript": "workspace:*"
+    "@pie/typescript": "workspace:*"
   }
 }

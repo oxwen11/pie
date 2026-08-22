@@ -1,4 +1,4 @@
-# @vibest/ui
+# @pie/ui
 
 ## 0.0.1
 

@@ -1,7 +1,7 @@
 # Desktop Embedding Research: How OSS AI Coding/Chat Tools Wrap a Web Frontend in a Native Shell
 
 This doc surveys how comparable open-source projects embed a browser-based UI inside a native
-desktop app shell, as prior art for a possible vibest desktop wrapper around `apps/web` +
+desktop app shell, as prior art for a possible pie desktop wrapper around `apps/web` +
 `packages/cli`. Every claim below is cited to a specific source file (permalinked to a commit SHA
 or fetched directly via the GitHub API) or an official page that was actually fetched and read.
 
@@ -22,10 +22,10 @@ mishearing/confusion). Its README describes it as "a minimal web GUI for coding 
 Codex, Claude, Cursor, and OpenCode, more coming soon)," and it ships a desktop app via GitHub
 Releases, `winget` (Windows), and Homebrew (macOS)
 ([github.com/pingdotgg/t3code](https://github.com/pingdotgg/t3code)). This is a direct architectural
-peer of vibest: `apps/server/package.json` depends on `@anthropic-ai/claude-agent-sdk` and
+peer of pie: `apps/server/package.json` depends on `@anthropic-ai/claude-agent-sdk` and
 `@opencode-ai/sdk` directly
 ([apps/server/package.json](https://github.com/pingdotgg/t3code/blob/main/apps/server/package.json)),
-i.e. it is, like vibest, a Claude-Agent-SDK-powered coding-agent server paired with a web UI and a
+i.e. it is, like pie, a Claude-Agent-SDK-powered coding-agent server paired with a web UI and a
 desktop shell. This doc now covers **opencode and t3code** as the two primary projects. The earlier
 Ollama/Jan.ai research is kept as a short appendix at the end since it remains independently useful
 prior art (a third, non-Electron/non-Tauri pattern, and a Tauri-sidecar pattern), but it is no
@@ -70,7 +70,7 @@ standard: true, supportFetchAPI: true } }])`) and serves files straight off disk
 `process.env.ELECTRON_RENDERER_URL` in dev, i.e. the Vite dev server).
 [packages/desktop/src/main/windows.ts](https://github.com/anomalyco/opencode/blob/e71fbb6d48512c2376faab4cbeb21d63fadb929c/packages/desktop/src/main/windows.ts)
 
-The **API/agent server** (the actual opencode server — equivalent to vibest's `packages/cli`) is a
+The **API/agent server** (the actual opencode server — equivalent to pie's `packages/cli`) is a
 **separate local HTTP+SSE server bound to `127.0.0.1` on a randomly assigned free port**, protected
 by HTTP Basic Auth with a random per-launch password (`randomUUID()`), which the renderer receives
 over IPC and then talks to directly via `fetch`/EventSource. Loopback-only binding is reinforced by
@@ -98,7 +98,7 @@ server so it can run under Node.
 **HTTP + Server-Sent Events**, via the project's own Effect-based HTTP API framework. The event
 stream handler (`server.event` → `event.subscribe`) returns `text/event-stream` with a 15-second
 heartbeat and an Effect `Stream` pipeline encoding events as SSE frames — architecturally very
-close to vibest's own `eventIteratorToStream` pattern in `packages/server-rpc`.
+close to pie's own `eventIteratorToStream` pattern in `packages/server-rpc`.
 [packages/server/src/handlers/event.ts](https://github.com/anomalyco/opencode/blob/e71fbb6d48512c2376faab4cbeb21d63fadb929c/packages/server/src/handlers/event.ts)
 IPC (Electron's `ipcMain`/`ipcRenderer`) is used only for desktop-shell concerns — window/menu
 control, deep links, auto-updater state, native file/store access — not for the actual chat/agent
@@ -377,16 +377,16 @@ is in Rust, confirmed above).
   `http://127.0.0.1:*` and `ws://127.0.0.1:*` explicitly) — a reminder that Tauri's default CSP
   posture doesn't allow arbitrary local-network calls out of the box; it's an explicit opt-in.
 
-## Recommendation for vibest
+## Recommendation for pie
 
-**t3code is the closest structural peer vibest has**: same shape (a Claude-Agent-SDK-powered
+**t3code is the closest structural peer pie has**: same shape (a Claude-Agent-SDK-powered
 Node/Effect server serving a built web UI plus a JSON/HTTP API), same monorepo-with-a-desktop-app
 goal, and it has already shipped a working Electron wrapper around exactly this problem. opencode
 is the second-closest peer and independently valuable because its own team already ran the
 Tauri-vs-Electron experiment and wrote up why they left Tauri. Both point at Electron, and both
 avoid `loadURL('http://localhost:PORT')` for the UI shell itself in favor of a custom protocol —
 but they solve the "protocol vs. dynamic backend port" problem differently, and that difference is
-the concrete decision vibest needs to make.
+the concrete decision pie needs to make.
 
 **Concrete recommended pattern**: Electron, with `packages/cli`'s Express server spawned as a real
 child process from the main process (`child_process.spawn` from `app.whenReady()`, or Electron's
@@ -398,15 +398,15 @@ invoked). The server binds to `127.0.0.1` on an OS-assigned free port. Rather th
 `BrowserWindow.loadURL` at that dynamic `http://127.0.0.1:<port>` directly (which ties the UI's own
 origin to a port that changes every launch and disappears if the server restarts), register a
 **custom privileged protocol** with `protocol.registerSchemesAsPrivileged` +
-`protocol.handle('vibest', ...)` and, following t3code's `ElectronProtocol.ts` design, make the
+`protocol.handle('pie', ...)` and, following t3code's `ElectronProtocol.ts` design, make the
 handler a **reverse proxy** (`Electron.net.fetch` against the real `http://127.0.0.1:<port>`
-origin) rather than opencode's file-serving approach. This is the better fit for vibest specifically
+origin) rather than opencode's file-serving approach. This is the better fit for pie specifically
 because `packages/cli` already serves both the static `apps/web` build _and_ the `@orpc` RPC/SSE
-API from the same Express instance — proxying the whole origin through `vibest://app/` keeps that
+API from the same Express instance — proxying the whole origin through `pie://app/` keeps that
 single-server design completely intact, whereas opencode's split (static files via file-serving
 protocol, API via a _separate_ HTTP+SSE server reached over IPC-delivered credentials) would require
-peeling vibest's static-serving and RPC concerns apart for no real benefit. The renderer's
-`@orpc/client` then just calls same-origin `vibest://app/rpc` (whatever path `packages/cli` already
+peeling pie's static-serving and RPC concerns apart for no real benefit. The renderer's
+`@orpc/client` then just calls same-origin `pie://app/rpc` (whatever path `packages/cli` already
 mounts oRPC under) instead of `http://localhost:PORT`, so `apps/web`'s RPC client code needs
 near-zero change — only the base URL becomes protocol-relative. `BrowserWindow` should use
 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, matching both opencode's and
@@ -419,8 +419,8 @@ t3code's config.
 WebKit/WebView2/WKWebView rendering-consistency risk that opencode's own migration blog explicitly
 moved away from, and that neither of the two closest peers (opencode, t3code) chose, and (b) adds a
 new build target and packaging step `packages/cli` doesn't have today. Given both of the projects
-architecturally closest to vibest independently converged on Electron with a spawned/forked Node
+architecturally closest to pie independently converged on Electron with a spawned/forked Node
 child process and a custom protocol in front of it, that combination — not Tauri — is the
-lower-risk, more directly reusable starting point for vibest; a Tauri sidecar remains a reasonable
+lower-risk, more directly reusable starting point for pie; a Tauri sidecar remains a reasonable
 fallback if install size becomes a hard constraint later, using Jan's `externalBin` pattern as the
 template.

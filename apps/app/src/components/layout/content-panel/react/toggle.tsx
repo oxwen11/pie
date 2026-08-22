@@ -1,5 +1,5 @@
-import { Button } from "@vibest/ui/components/button";
-import { cn } from "@vibest/ui/lib/utils";
+import { Button } from "@pie/ui/components/button";
+import { cn } from "@pie/ui/lib/utils";
 import { PanelRightIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 

@@ -33,12 +33,12 @@ export type DaemonHandle = {
 
 export type ResolveDaemonOptions = {
   /**
-   * `$VIBEST_HOME` — persistent Project and Session data. Only passed on to the
+   * `$PIE_HOME` — persistent Project and Session data. Only passed on to the
    * spawned daemon; no lifecycle file is derived from it.
    */
   readonly home: string;
   /**
-   * `$VIBEST_DAEMON_DIR` — where the four lifecycle files live and what the
+   * `$PIE_DAEMON_DIR` — where the four lifecycle files live and what the
    * single-instance invariant is keyed on. Required; front doors get it from
    * `resolveDaemonLocation` (`config/paths.ts`), which explains why there is no
    * default here.
@@ -55,7 +55,7 @@ export type ResolveDaemonOptions = {
   /**
    * Base environment for the spawned daemon (default `process.env`). The
    * desktop passes its resolved login-shell environment plus
-   * `ELECTRON_RUN_AS_NODE`; the launcher's own `VIBEST_*` entries win.
+   * `ELECTRON_RUN_AS_NODE`; the launcher's own `PIE_*` entries win.
    */
   readonly environment?: NodeJS.ProcessEnv;
   /**
@@ -107,7 +107,7 @@ export const resolveOrSpawnDaemon = (
       return yield* Effect.fail(
         new DaemonStoppedError({
           message:
-            "vibest daemon was stopped explicitly; not auto-respawning (run `vibest daemon start` to start it again)",
+            "pie daemon was stopped explicitly; not auto-respawning (run `pie daemon start` to start it again)",
         }),
       );
     }
@@ -212,7 +212,7 @@ const spawnLocked = (
         Effect.mapError(
           (cause) =>
             new DaemonLaunchError({
-              message: `Unable to acquire the vibest daemon launch lock: ${cause.message}`,
+              message: `Unable to acquire the pie daemon launch lock: ${cause.message}`,
               cause,
             }),
         ),
@@ -236,7 +236,7 @@ const spawnLocked = (
       return yield* spawnDaemon(options).pipe(Effect.ensuring(releaseLock(daemonDir)));
     }
     return yield* Effect.fail(
-      new DaemonLaunchError({ message: "Could not acquire the vibest daemon launch lock" }),
+      new DaemonLaunchError({ message: "Could not acquire the pie daemon launch lock" }),
     );
   });
 
@@ -274,7 +274,7 @@ const spawnDaemon = (
       try: () => spawnDetached(options, port, token),
       catch: (cause) =>
         new DaemonLaunchError({
-          message: `Unable to spawn the vibest daemon: ${String(cause)}`,
+          message: `Unable to spawn the pie daemon: ${String(cause)}`,
           cause,
         }),
     });
@@ -296,7 +296,7 @@ const spawnDaemon = (
       Effect.mapError(
         (cause) =>
           new DaemonLaunchError({
-            message: `Unable to record the vibest daemon: ${cause.message}`,
+            message: `Unable to record the pie daemon: ${cause.message}`,
             cause,
           }),
       ),
@@ -309,7 +309,7 @@ const spawnDaemon = (
       yield* removeRecord(options.daemonDir);
       return yield* Effect.fail(
         new DaemonLaunchError({
-          message: `vibest daemon did not become healthy within ${timeoutMs}ms; see ${logsDirectory(options.home)}`,
+          message: `pie daemon did not become healthy within ${timeoutMs}ms; see ${logsDirectory(options.home)}`,
         }),
       );
     }
@@ -348,7 +348,7 @@ function openStdioLog(home: string): number {
  * redirected to a log fd — the exact opposite of a supervised
  * `ChildProcessSpawner` child (piped stdio, killed when its scope closes).
  * The daemon must outlive this launcher, so this stays raw `node:child_process`
- * — the local `nohup vibest serve > log`.
+ * — the local `nohup pie serve > log`.
  */
 function spawnDetached(options: ResolveDaemonOptions, port: number, token: string): number {
   const { home, daemonDir } = options;
@@ -364,18 +364,18 @@ function spawnDetached(options: ResolveDaemonOptions, port: number, token: strin
       stdio: ["ignore", logFd, logFd],
       env: {
         // Extra CORS origins (if any) ride the inherited environment's
-        // VIBEST_CORS_ORIGINS — the launcher no longer computes a per-launch
+        // PIE_CORS_ORIGINS — the launcher no longer computes a per-launch
         // set, since the daemon's policy is otherwise static.
         ...inherited,
-        VIBEST_HOME: home,
-        VIBEST_DAEMON_DIR: daemonDir,
-        VIBEST_PORT: String(port),
-        VIBEST_AUTH_TOKEN: token,
+        PIE_HOME: home,
+        PIE_DAEMON_DIR: daemonDir,
+        PIE_PORT: String(port),
+        PIE_AUTH_TOKEN: token,
       },
     });
     child.unref();
 
-    if (child.pid === undefined) throw new Error("Failed to spawn vibest daemon (no pid)");
+    if (child.pid === undefined) throw new Error("Failed to spawn pie daemon (no pid)");
     return child.pid;
   } finally {
     fs.closeSync(logFd);

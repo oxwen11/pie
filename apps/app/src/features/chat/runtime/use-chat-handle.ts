@@ -1,4 +1,4 @@
-import type { SessionRef } from "@vibest/contract";
+import type { SessionRef } from "@pie/contract";
 import { useMemo } from "react";
 
 import type { Chat } from "./chat";
