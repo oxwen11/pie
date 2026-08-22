@@ -7,7 +7,7 @@ export function useSessionModels(ref: SessionRef) {
   const queryClient = useQueryClient();
 
   const modelsQuery = useQuery({
-    ...orpcQueryUtils.session.listModels.queryOptions({ input: { ref } }),
+    ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: ref.projectId } }),
   });
   const stateQuery = useQuery({
     ...orpcQueryUtils.session.getModelState.queryOptions({ input: { ref } }),

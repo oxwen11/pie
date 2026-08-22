@@ -5,7 +5,6 @@ import {
   ArchiveSessionInputSchema,
   CreateSessionInputSchema,
   serverErrors,
-  ListAgentModelsOutputSchema,
   ListSessionsInputSchema,
   type ListSessionsOutput,
   PromptInputSchema,
@@ -66,10 +65,7 @@ export const sessionContract = {
     .output(toStandardSchema(SessionStatusSchema)),
   getSnapshot: base.input(toStandardSchema(RefInputSchema)).output(type<SessionRuntimeSnapshot>()),
 
-  // agent model (Pi RPC — live child required)
-  listModels: base
-    .input(toStandardSchema(RefInputSchema))
-    .output(toStandardSchema(ListAgentModelsOutputSchema)),
+  // session model state (Pi RPC — live child required)
   getModelState: base
     .input(toStandardSchema(RefInputSchema))
     .output(toStandardSchema(AgentModelStateSchema)),

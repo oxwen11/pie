@@ -206,21 +206,6 @@ export const sessionRouter = orpc.router({
     return yield* sessions.getSnapshot(input.ref);
   }),
 
-  listModels: orpc.listModels.effect(function* ({ input, errors }) {
-    const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
-    return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) => sessions.listModels(input.ref, project.path)),
-      Effect.map((models) => ({ models })),
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
-  }),
   getModelState: orpc.getModelState.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* HarnessAgentSessionService;

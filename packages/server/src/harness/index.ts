@@ -16,3 +16,4 @@ export * from "./session-manager";
 // The session and repository modules are private collaborators, of the manager
 // and the service respectively; neither is exported.
 export * from "./session-service";
+export * from "./agent-service";

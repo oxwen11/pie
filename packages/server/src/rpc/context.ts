@@ -3,7 +3,7 @@ import type { FileSystem } from "effect/FileSystem";
 
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
-import type { HarnessAgentSessionService } from "../harness";
+import type { HarnessAgentService, HarnessAgentSessionService } from "../harness";
 import type { PiAdapter } from "../harness/pi-adapter";
 import type { ProjectService } from "../project";
 
@@ -13,6 +13,7 @@ export type RpcContext = WithEffectContext<
   | FileSystem
   | PiAdapter
   | HarnessAgentSessionService
+  | HarnessAgentService
   | ProjectService
   | FileSystemService
 >;

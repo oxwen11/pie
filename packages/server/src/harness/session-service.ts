@@ -1,5 +1,4 @@
 import type {
-  AgentModel,
   AgentModelState,
   AgentResponse,
   PromptInput,
@@ -30,20 +29,15 @@ import type {
 } from "./adapter";
 import type { HarnessAgentAdapter } from "./adapter";
 import type {
+  AgentOperationError,
   CreateSessionError,
   HarnessSessionNotFound,
   ResumeSessionError,
   SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import {
-  AgentOperationError,
-  AgentRequestUnavailable,
-  CapabilityUnsupported,
-  SessionNotResumable,
-} from "./errors";
+import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
 import { PiAdapter } from "./pi-adapter";
-import { listAvailablePiModels } from "./pi/list-available-models";
 import { inSession } from "./session-identity";
 import type { HarnessAgentSessionManagerShape } from "./session-manager";
 import { HarnessAgentSessionManager } from "./session-manager";
@@ -141,13 +135,6 @@ export type HarnessAgentSessionServiceShape = {
     | HarnessSessionNotFound
     | CapabilityUnsupported
     | AgentOperationError
-  >;
-  readonly listModels: (
-    ref: SessionRef,
-    cwd: string,
-  ) => Effect.Effect<
-    ReadonlyArray<AgentModel>,
-    SessionNotFound | StoreReadError | AgentOperationError
   >;
   readonly getModelState: (
     ref: SessionRef,
@@ -492,22 +479,6 @@ export const makeHarnessAgentSessionService = (deps: {
       readMetadata(ref).pipe(
         Effect.andThen(manager.get(ref)),
         Effect.flatMap((runtime) => runtime.getCapabilities),
-        inSession(ref),
-      ),
-
-    listModels: (ref, cwd) =>
-      readMetadata(ref).pipe(
-        Effect.flatMap(() =>
-          Effect.tryPromise({
-            try: () => listAvailablePiModels(cwd),
-            catch: (cause) =>
-              new AgentOperationError({
-                sessionId: ref.sessionId,
-                operation: "list-models",
-                cause,
-              }),
-          }),
-        ),
         inSession(ref),
       ),
 

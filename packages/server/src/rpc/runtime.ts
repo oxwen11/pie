@@ -11,6 +11,7 @@ import { FileSystemServiceLayer } from "../fs";
 import {
   type HarnessAgentAdapter,
   HarnessAgentSessionManagerLayer,
+  HarnessAgentServiceLayer,
   HarnessAgentSessionServiceLayer,
 } from "../harness";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
@@ -82,8 +83,11 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
+const HarnessAgentServiceProvided = HarnessAgentServiceLayer;
+
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
+  HarnessAgentServiceProvided,
   HarnessSessionServiceProvided,
   ProjectServiceProvided,
   PiAdapterProvided,

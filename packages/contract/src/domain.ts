@@ -455,6 +455,11 @@ export const SetAgentModelInputSchema = Schema.Struct({
 });
 export type SetAgentModelInput = typeof SetAgentModelInputSchema.Type;
 
+export const ListAgentModelsInputSchema = Schema.Struct({
+  projectId: Schema.String.check(Schema.isUUID()),
+});
+export type ListAgentModelsInput = typeof ListAgentModelsInputSchema.Type;
+
 export const ListAgentModelsOutputSchema = Schema.Struct({
   models: Schema.Array(AgentModelSchema),
 });

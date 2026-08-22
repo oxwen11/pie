@@ -10,7 +10,11 @@ import { describe, expect, it } from "vitest";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
-import { HarnessAgentSessionManagerLayer, HarnessAgentSessionServiceLayer } from "../src/harness";
+import {
+  HarnessAgentServiceLayer,
+  HarnessAgentSessionManagerLayer,
+  HarnessAgentSessionServiceLayer,
+} from "../src/harness";
 import { makePiAdapter, makePiAgent } from "../src/harness/pi";
 import { PiAdapter } from "../src/harness/pi-adapter";
 import * as Observability from "../src/observability";
@@ -90,6 +94,7 @@ async function setup() {
 
   const appLayer = Layer.mergeAll(
     EventBusLayer,
+    HarnessAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
     piAdapterLayer,
