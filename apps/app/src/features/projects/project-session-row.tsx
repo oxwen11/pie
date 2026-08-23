@@ -29,10 +29,8 @@ export function ProjectSessionRow({
           })
         }
       >
-        <span className="truncate">{session.title ?? "New chat"}</span>
-        {/* Busy elsewhere too: status is server-derived, so a turn any client
-            is running shows here. */}
         <SessionStatusIndicator phase={session.status?.phase} />
+        <span className="truncate">{session.title ?? "New chat"}</span>
       </SidebarMenuButton>
       <SessionActionsMenu isActive={isActive} session={session} />
     </SidebarMenuItem>
