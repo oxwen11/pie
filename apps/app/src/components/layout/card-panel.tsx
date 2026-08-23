@@ -44,7 +44,13 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
         {ownsToggle ? (
           <>
             {ownsWebSidebarChrome && showsSidebarBrandMark ? <BrandMark /> : null}
-            <SidebarTrigger className={cn(isMobile && "-ms-0.5", "[-webkit-app-region:no-drag]")} />
+            <SidebarTrigger
+              className={cn(
+                isMobile && "-ms-0.5",
+                ownsWebSidebarChrome && "-ms-px -translate-y-px",
+                "[-webkit-app-region:no-drag]",
+              )}
+            />
           </>
         ) : null}
         <div className={SHELL_TITLEBAR_LABEL_CLASS}>
