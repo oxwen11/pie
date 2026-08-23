@@ -156,7 +156,7 @@ export const makePiAgentWithDependencies = <R>(
         }),
       );
 
-    /** Remove the session from the registry; false when another path got there first. */
+    /** Remove the session from the table; false when another path got there first. */
     const unregister = (session: SessionState) =>
       Ref.modify(sessions, (current) => {
         if (current.get(session.sessionId) !== session) return [false, current] as const;

@@ -81,9 +81,9 @@ export class Chat {
   // their chunks are skipped and the turn is recovered from the history read
   // once it ends.
   readonly #recoverTurnIds = new Set<string>();
-  // Turns whose stream carried an error chunk: the harness may retry
-  // internally and still complete, with the retried tail persisted but never
-  // streamed — reconcile from history at turn end regardless of outcome.
+  // Turns whose stream carried an error chunk: Pi may retry internally and still
+  // complete, with the retried tail persisted but never streamed — reconcile
+  // from history at turn end regardless of outcome.
   readonly #erroredTurnIds = new Set<string>();
   #cursor = 0;
   #historyLoaded = false;
@@ -144,7 +144,7 @@ export class Chat {
         // must not erase a newer prompt RPC failure.
         if (this.#pushUserMessage(event.messageId, event.parts)) this.#state.error = undefined;
         break;
-      // The harness rejected a prompt whose submitted event already broadcast:
+      // The server rejected a prompt whose submitted event already broadcast:
       // drop the phantom user message (the sender's optimistic copy included).
       case "session.prompt.rejected":
         this.#state.messages = this.#state.messages.filter(

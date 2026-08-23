@@ -7,7 +7,7 @@ import type { AgentRequest } from "./agent-requests";
 // transcript means "not read yet" rather than "nothing was ever said"; only
 // once the floor lands does an empty transcript mean the session really is
 // empty. "unavailable" covers both ways the read can come back with nothing to
-// lay down — the harness has no history read, or the read failed — which are
+// lay down — Pi has no history read, or the read failed — which are
 // the same fact to a reader: the transcript starts here, the agent's own
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
