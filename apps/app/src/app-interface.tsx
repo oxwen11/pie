@@ -54,7 +54,7 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
-    () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient, ref)),
+    () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),
   );
 
   return (

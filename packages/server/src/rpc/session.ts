@@ -12,11 +12,12 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
-// Thin transport binding: the router's own work is resolving a projectId to a
-// workspace path (the one thing the session service must never do itself) and
-// mapping typed effect errors onto the contract's declared codes — clients
-// branch on the code, never on the message. Everything else is a one-liner
-// onto the HarnessAgentSessionService façade. Unmapped errors (store I/O)
+// Nested under `agent` (`agent.session.*`). Thin transport binding: the
+// router's own work is resolving a projectId to a workspace path (the one
+// thing the session service must never do itself) and mapping typed effect
+// errors onto the contract's declared codes — clients branch on the code,
+// never on the message. Everything else is a one-liner onto the
+// HarnessAgentSessionService façade. Unmapped errors (store I/O)
 // intentionally surface as INTERNAL. Only `subscribe` reaches the EventBus
 // directly — it is the event plane, distinct from the session control plane.
 export const sessionRouter = orpc.router({

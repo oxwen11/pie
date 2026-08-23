@@ -8,6 +8,7 @@ import { Effect } from "effect";
 import { HarnessAgentService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { sessionRouter } from "./session";
 
 const orpc = implement(agentContract).$context<RpcContext>();
 
@@ -34,6 +35,7 @@ export const agentRouter = orpc.router({
       }),
     );
   }),
+  session: sessionRouter,
 });
 
 export type AgentRouter = typeof agentRouter;

@@ -31,7 +31,8 @@
   `HarnessAgentSession` (`session.ts`) optionally owns a runtime: observing a
   session costs no process until a prompt or history read acquires one. The RPC
   router contributes only `projectId → workspace path` (via `ProjectService`)
-  and error-code mapping. Adapters see `cwd`, never `projectId`.
+  and error-code mapping; session procedures live under `agent.session`.
+  Adapters see `cwd`, never `projectId`.
 - **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiLayer`
   constructs `PiAgent`, `PiAdapter` wraps it with `cacheAvailability` (one
   `--version` probe per server lifetime), then the session manager and service
