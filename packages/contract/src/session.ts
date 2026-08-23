@@ -25,10 +25,6 @@ import {
 
 const base = oc.errors(serverErrors);
 
-/**
- * Snapshot, messages, list, and the subscribe stream use `type<>()` — they
- * embed UIMessage/UIMessageChunk and are validated structurally on the server.
- */
 export const sessionContract = {
   create: base
     .input(toStandardSchema(CreateSessionInputSchema))
