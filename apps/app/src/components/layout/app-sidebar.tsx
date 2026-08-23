@@ -16,9 +16,13 @@ import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import {
+  desktopSidebarBrandInsetClass,
+  SHELL_TITLEBAR_HEADER_CLASS,
+} from "@/components/layout/shell-chrome";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
+import { usePlatform } from "@/platform-context";
 import { useHostLayout } from "@/use-host-layout";
 
 export function AppSidebar({
@@ -29,13 +33,18 @@ export function AppSidebar({
   readonly onNewChat: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
-  const { showsInlineSidebarToggle, showsSidebarBrandMark, usesFixedSidebarToggle } =
-    useHostLayout();
+  const platform = usePlatform();
+  const {
+    showsDesktopTitlebarHeader,
+    showsInlineSidebarToggle,
+    showsSidebarBrandMark,
+  } = useHostLayout();
   const { isMobile, state } = useSidebar();
-  // Desktop chrome (toggle ± BrandMark) is viewport-fixed; web keeps an inline header.
-  const showsSidebarHeader =
-    !usesFixedSidebarToggle &&
+  const showsWebHeader =
+    !showsDesktopTitlebarHeader &&
     (showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle));
+  const showsSidebarHeader =
+    showsWebHeader || (showsDesktopTitlebarHeader && !isMobile && state === "expanded");
 
   return (
     <Sidebar
@@ -45,11 +54,23 @@ export function AppSidebar({
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
       {showsSidebarHeader ? (
-        <SidebarHeader className={cn(SHELL_TITLEBAR_HEADER_CLASS, "[-webkit-app-region:drag]")}>
-          {showsSidebarBrandMark && <BrandMark />}
-          {!isMobile && state === "expanded" && showsInlineSidebarToggle && (
-            <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
+        <SidebarHeader
+          className={cn(
+            SHELL_TITLEBAR_HEADER_CLASS,
+            showsDesktopTitlebarHeader ? "px-0" : undefined,
+            "[-webkit-app-region:drag]",
           )}
+        >
+          {showsSidebarBrandMark ? (
+            <BrandMark
+              className={cn(
+                showsDesktopTitlebarHeader && desktopSidebarBrandInsetClass(platform),
+              )}
+            />
+          ) : null}
+          {showsWebHeader && !isMobile && state === "expanded" && showsInlineSidebarToggle ? (
+            <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
+          ) : null}
         </SidebarHeader>
       ) : null}
 

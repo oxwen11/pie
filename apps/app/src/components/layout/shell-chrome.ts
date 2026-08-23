@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import type { Platform } from "@/platform";
 import { isDesktopMacosHost, isDesktopHost } from "@/platform-host";
 
@@ -26,17 +28,9 @@ const CHROME_GAP_PX = 8;
 /** `SidebarTrigger` is `size-7`. */
 const TOGGLE_SIZE_PX = 28;
 
-/** `BrandMark` icon + gap + “Pie” label (see `brand-mark.tsx`). */
-const DESKTOP_BRAND_MARK_WIDTH_PX = 48;
-
 /** Fixed chrome row — lines up with sidebar/card `h-10` headers under `md:py-1.5`. */
 export const SHELL_TITLEBAR_TOP_CLASS = "top-1.5" as const;
 export const SHELL_TITLEBAR_ROW_CLASS = "flex h-10 items-center" as const;
-
-/** Desktop win/linux pins BrandMark beside the fixed toggle. */
-export function showsBrandInFixedChrome(platform: Platform): boolean {
-  return isDesktopHost(platform) && !isDesktopMacosHost(platform);
-}
 
 /** Inline-start offset for the fixed desktop toggle inside the titlebar row. */
 export function desktopToggleInsetClass(platform: Platform): string {
@@ -46,19 +40,35 @@ export function desktopToggleInsetClass(platform: Platform): string {
 const desktopToggleLeftPx = (platform: Platform): number =>
   isDesktopMacosHost(platform) ? MACOS_TOGGLE_LEFT_PX : SHELL_GUTTER_PX;
 
-const desktopFixedChromeEndPx = (platform: Platform): number => {
-  let end = desktopToggleLeftPx(platform) + TOGGLE_SIZE_PX;
-  if (showsBrandInFixedChrome(platform)) {
-    end += CHROME_GAP_PX + DESKTOP_BRAND_MARK_WIDTH_PX;
-  }
-  return end;
-};
+/** Viewport offset where sidebar brand content starts (after the fixed toggle). */
+export function shellTitlebarContentLeftPx(platform: Platform): number {
+  return desktopToggleLeftPx(platform) + TOGGLE_SIZE_PX + CHROME_GAP_PX;
+}
 
 /** Card header inset when the sidebar is collapsed under fixed desktop chrome. */
 export const desktopCollapsedCardInsetClass = (platform: Platform): string => {
-  const insetPx = desktopFixedChromeEndPx(platform) + CHROME_GAP_PX;
+  const insetPx = shellTitlebarContentLeftPx(platform);
   return `ps-[${insetPx}px]`;
 };
+
+/** Sidebar brand inset inside the panel gutter (desktop expanded only). */
+export function desktopSidebarBrandInsetClass(platform: Platform): string {
+  const insetPx = shellTitlebarContentLeftPx(platform) - SHELL_GUTTER_PX;
+  return `ms-[${insetPx}px]`;
+};
+
+/** CSS vars for shell titlebar geometry (desktop hosts only). */
+export function shellProviderStyle(platform: Platform): CSSProperties {
+  if (!isDesktopHost(platform)) return {};
+
+  return {
+    "--shell-controls-left": `${desktopToggleLeftPx(platform)}px`,
+    "--shell-titlebar-control-gap": `${CHROME_GAP_PX}px`,
+    "--shell-titlebar-control-size": `${TOGGLE_SIZE_PX}px`,
+    "--shell-titlebar-content-left":
+      "calc(var(--shell-controls-left) + var(--shell-titlebar-control-size) + var(--shell-titlebar-control-gap))",
+  } as CSSProperties;
+}
 
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =

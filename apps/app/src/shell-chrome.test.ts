@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { Platform } from "./platform";
 import {
   desktopCollapsedCardInsetClass,
+  desktopSidebarBrandInsetClass,
   desktopToggleInsetClass,
   MACOS_TOGGLE_LEFT_PX,
-  showsBrandInFixedChrome,
+  shellTitlebarContentLeftPx,
 } from "./components/layout/shell-chrome";
 
 describe("shell-chrome", () => {
@@ -15,16 +16,17 @@ describe("shell-chrome", () => {
   it("places the macOS toggle immediately after traffic lights", () => {
     expect(MACOS_TOGGLE_LEFT_PX).toBe(78);
     expect(desktopToggleInsetClass(desktopMacos)).toBe("ms-[78px]");
-    expect(showsBrandInFixedChrome(desktopMacos)).toBe(false);
+    expect(shellTitlebarContentLeftPx(desktopMacos)).toBe(114);
   });
 
-  it("pins BrandMark beside the toggle on desktop win/linux", () => {
+  it("offsets sidebar brand past the fixed toggle on desktop win/linux", () => {
     expect(desktopToggleInsetClass(desktopLinux)).toBe("ms-1.5");
-    expect(showsBrandInFixedChrome(desktopLinux)).toBe(true);
+    expect(shellTitlebarContentLeftPx(desktopLinux)).toBe(42);
+    expect(desktopSidebarBrandInsetClass(desktopLinux)).toBe("ms-[36px]");
   });
 
-  it("reserves collapsed card-header space for fixed chrome", () => {
+  it("reserves collapsed card-header space for the fixed toggle only", () => {
     expect(desktopCollapsedCardInsetClass(desktopMacos)).toBe("ps-[114px]");
-    expect(desktopCollapsedCardInsetClass(desktopLinux)).toBe("ps-[98px]");
+    expect(desktopCollapsedCardInsetClass(desktopLinux)).toBe("ps-[42px]");
   });
 });

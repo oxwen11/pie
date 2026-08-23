@@ -3,7 +3,9 @@ import { createContext, type ReactNode, use, useCallback, useMemo } from "react"
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
+import { shellProviderStyle } from "@/components/layout/shell-chrome";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
+import { usePlatform } from "@/platform-context";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -77,6 +79,8 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const platform = usePlatform();
+
   return (
     // The provider is shell-owned: it supplies responsive/sidebar state and is
     // also the viewport wrapper. The app-region rule drags desktop windows;
@@ -84,6 +88,7 @@ export function AppShell({ children }: AppShellProps) {
     <SidebarProvider
       className="bg-sidebar h-svh overflow-hidden [-webkit-app-region:drag]"
       defaultOpen={readSidebarCookie()}
+      style={shellProviderStyle(platform)}
     >
       <ShellSidebarToggle />
       {children}

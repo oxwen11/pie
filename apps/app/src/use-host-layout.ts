@@ -11,6 +11,7 @@ export function useHostLayout(): {
   readonly isDesktop: boolean;
   readonly isDesktopMacos: boolean;
   readonly isWeb: boolean;
+  readonly showsDesktopTitlebarHeader: boolean;
   readonly showsSidebarBrandMark: boolean;
   readonly showsInlineSidebarToggle: boolean;
   readonly usesFixedSidebarToggle: boolean;
@@ -24,8 +25,9 @@ export function useHostLayout(): {
     isDesktop,
     isDesktopMacos,
     isWeb: isWebHost(platform),
-    // Web and desktop win/linux keep BrandMark; desktop macOS yields the row to
-    // native traffic lights plus the fixed shell toggle.
+    // Desktop keeps a titlebar header row when expanded so content clears the
+    // viewport-fixed toggle; brand only on web and desktop win/linux.
+    showsDesktopTitlebarHeader: isDesktop,
     showsSidebarBrandMark: !isDesktopMacos,
     // Web only — desktop pins the toggle to the viewport left edge.
     showsInlineSidebarToggle: isWebHost(platform),
