@@ -26,8 +26,7 @@ import {
 const base = oc.errors(serverErrors);
 
 /**
- * SessionRef-based session contract, nested under `agent` on the wire
- * (`agent.session.*`; docs/wayfinder/session-streaming-refactor).
+ * SessionRef-based session contract (docs/wayfinder/session-streaming-refactor).
  * Complex outputs that embed UIMessage/UIMessageChunk (snapshot, messages,
  * list, the subscribe stream) are declared with `type<>()` and validated
  * structurally on the server rather than by a wire schema.
