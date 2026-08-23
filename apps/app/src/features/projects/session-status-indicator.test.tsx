@@ -30,7 +30,7 @@ afterEach(() => {
 describe("SessionStatusIndicator", () => {
   it("shows a pulsing green dot while running", () => {
     const node = renderIndicator("running");
-    const dot = node.querySelector("span");
+    const dot = node.querySelector("span > span");
     expect(dot?.className).toContain("animate-pulse");
     expect(dot?.className).toContain("bg-emerald-500");
     expect(dot?.title).toBe("A turn is running in this session");
@@ -38,20 +38,25 @@ describe("SessionStatusIndicator", () => {
 
   it("shows an amber dot while waiting for user action", () => {
     const node = renderIndicator("requires_action");
-    const dot = node.querySelector("span");
+    const dot = node.querySelector("span > span");
     expect(dot?.className).toContain("bg-warning");
     expect(dot?.title).toBe("Waiting for your action");
   });
 
   it("shows a red dot when the session crashed", () => {
     const node = renderIndicator("crashed");
-    const dot = node.querySelector("span");
+    const dot = node.querySelector("span > span");
     expect(dot?.className).toContain("bg-destructive");
     expect(dot?.title).toBe("Session crashed");
   });
 
-  it("shows nothing for idle or missing status", () => {
-    expect(renderIndicator("idle").querySelector("span")).toBeNull();
-    expect(renderIndicator(undefined).querySelector("span")).toBeNull();
+  it("reserves a fixed slot for idle or missing status", () => {
+    for (const phase of ["idle", undefined] as const) {
+      const node = renderIndicator(phase);
+      const slot = node.querySelector("span");
+      expect(slot?.className).toContain("size-2");
+      expect(slot?.className).toContain("me-2");
+      expect(slot?.querySelector("span")).toBeNull();
+    }
   });
 });
