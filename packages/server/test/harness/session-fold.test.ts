@@ -17,6 +17,22 @@ const event = (seq: number, body: SessionScopedEventBody): SessionScopedEvent =>
 });
 
 describe("session prompt projection", () => {
+  it("preserves the live phase when recovery acknowledgement races a turn start", () => {
+    let state = foldSessionEvent(
+      initialSessionState,
+      event(1, { type: "session.turn.started", turnId: "turn-1" }),
+    );
+    state = foldSessionEvent(
+      state,
+      event(2, { type: "session.recovery.acknowledged", recoveryId: "recovery-1" }),
+    );
+
+    expect(toSnapshot(ref, "stream-1", state).status).toEqual({
+      phase: "running",
+      activeTurnId: "turn-1",
+    });
+  });
+
   it("reveals the accepted running prompt when a newer candidate is rejected", () => {
     let state = foldSessionEvent(
       initialSessionState,
@@ -97,7 +113,7 @@ describe("session prompt projection", () => {
       event(5, { type: "session.prompt.accepted", messageId: "steer-a", turnId: "turn-1" }),
     );
 
-    expect(toSnapshot(ref, state).acceptedPrompts).toEqual([
+    expect(toSnapshot(ref, "stream-1", state).acceptedPrompts).toEqual([
       {
         messageId: "steer-a",
         parts: [{ type: "text", text: "A" }],
@@ -116,7 +132,7 @@ describe("session prompt projection", () => {
       state,
       event(6, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed" }),
     );
-    expect(toSnapshot(ref, state)).toMatchObject({
+    expect(toSnapshot(ref, "stream-1", state)).toMatchObject({
       acceptedPrompt: null,
       acceptedPrompts: [],
     });
