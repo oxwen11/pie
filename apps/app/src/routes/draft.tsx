@@ -15,7 +15,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,6 +31,10 @@ import { useChatInputController } from "@/features/chat/components/input/use-cha
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
+import {
+  DraftWorkspaceSelect,
+  type DraftWorkspaceMode,
+} from "@/features/projects/draft-workspace-select";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useProject, useProjects } from "@/features/projects/use-projects";
@@ -63,9 +67,18 @@ function DraftRoute() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<DraftWorkspaceMode>("project");
+  const [worktreeBranch, setWorktreeBranch] = useState("");
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
+  const gitStatus = useQuery({
+    ...orpcQueryUtils.git.status.queryOptions({
+      input: selected === null ? skipToken : { cwd: selected.path },
+    }),
+    retry: false,
+  });
+  const gitAvailable = gitStatus.isSuccess;
   const modelsQuery = useAgentModels(selected?.id);
   const defaultModel = modelsQuery.data?.defaultModel;
 
@@ -82,28 +95,36 @@ function DraftRoute() {
     });
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
+  useEffect(() => {
+    if (gitAvailable) return;
+    setWorkspaceMode("project");
+    setWorktreeBranch("");
+  }, [gitAvailable, selected?.id]);
+
   const startSession = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!selected) throw new Error("No project selected");
-      const ref = await orpcQueryUtils.agent.session.create.call({
+      const branch = worktreeBranch.trim();
+      const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
+        ...(workspaceMode === "worktree" ? { worktree: branch.length > 0 ? { branch } : {} } : {}),
       });
-      void manager.chatFor(ref).prompt(text);
-      return ref;
+      void manager.chatFor(created.ref).prompt(text);
+      return created;
     },
-    onSuccess: (ref, { text }) => {
+    onSuccess: (created, { text }) => {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
-        input: { projectId: ref.projectId, archived: false },
+        input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
-        if (prev?.some((session) => session.sessionId === ref.sessionId)) return prev;
+        if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
         const optimistic: SessionSummary = {
-          projectId: ref.projectId,
-          sessionId: ref.sessionId,
+          projectId: created.ref.projectId,
+          sessionId: created.ref.sessionId,
           title: text,
           archived: false,
           createdAt: new Date().toISOString(),
@@ -114,8 +135,8 @@ function DraftRoute() {
 
       navigate({
         to: "/session/$sessionId",
-        params: { sessionId: ref.sessionId },
-        search: { projectId: ref.projectId },
+        params: { sessionId: created.ref.sessionId },
+        search: { projectId: created.ref.projectId },
       });
     },
     onError: (error) => {
@@ -193,7 +214,7 @@ function DraftRoute() {
   return (
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
-        <CardFrameHeader className="py-2">
+        <CardFrameHeader className="flex items-center justify-between gap-3 py-2">
           <ProjectSelect
             onChange={(next) =>
               navigate({
@@ -204,6 +225,14 @@ function DraftRoute() {
             }
             projects={projects.data}
             value={selected?.id ?? null}
+          />
+          <DraftWorkspaceSelect
+            branch={worktreeBranch}
+            disabled={startSession.isPending || selected === null}
+            gitAvailable={gitAvailable}
+            mode={workspaceMode}
+            onBranchChange={setWorktreeBranch}
+            onModeChange={setWorkspaceMode}
           />
         </CardFrameHeader>
         <Card

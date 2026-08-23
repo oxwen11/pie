@@ -243,15 +243,35 @@ describe("PiAgentSessionService", () => {
         const { cwd: _dropped, ...withoutCwd } = stored;
         yield* fixture.repo.write(withoutCwd);
 
-        yield* fixture.service.prepare(ref, "/tmp/pie-app");
+        const workspace = yield* fixture.service.prepare(ref, "/tmp/pie-app");
         const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-        return { cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
+        return { workspace, cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
       }),
     );
+    expect(result.workspace).toEqual({ cwd: "/tmp/pie-app" });
     expect(result.cwd).toBe("/tmp/pie-app");
     // Opening a session page costs no process — the whole point of `prepare`.
     expect(result.resume).toEqual([]);
     expect(result.open).toHaveLength(1);
+  });
+
+  it("prepare keeps an existing worktree cwd instead of replacing it with the project path", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create(
+          "proj-a",
+          "/tmp/pie-worktree",
+          undefined,
+          "pie/test",
+        );
+        yield* fixture.service.close(ref);
+        const workspace = yield* fixture.service.prepare(ref, "/tmp/pie-app");
+        const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        return { workspace, cwd: after.cwd };
+      }),
+    );
+    expect(result.workspace).toEqual({ cwd: "/tmp/pie-worktree", gitBranch: "pie/test" });
+    expect(result.cwd).toBe("/tmp/pie-worktree");
   });
 
   it("prepare fails with SessionNotFound for an unknown session", async () => {

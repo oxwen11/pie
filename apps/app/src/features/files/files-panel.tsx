@@ -6,7 +6,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { Spinner } from "@getpie/ui/components/spinner";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
@@ -33,7 +32,7 @@ export const filesPanel = definePanel({
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
   const workspace = useSessionWorkspace(instance.sessionRef.projectId);
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
+  const cwd = workspace?.path;
   const tree = useWorkspaceTree(cwd);
   const openFile = useCallback(
     (path: string) => {
@@ -43,23 +42,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     [instance, panel],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <WorkspaceState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </WorkspaceState>
-    );
-  }
-
-  if (!workspace.data || panel === null) {
+  if (!workspace || panel === null) {
     return (
       <WorkspaceState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -72,8 +55,8 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
       onOpenFile={openFile}
       sessionId={panel.sessionKey}
       tree={tree}
-      workspaceName={workspace.data.name}
-      workspacePath={workspace.data.path}
+      workspaceName={workspace.name}
+      workspacePath={workspace.path}
     />
   );
 
@@ -85,7 +68,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
         </FileState>
       }
       tree={treePane}
-      treeLabel={workspace.data.name}
+      treeLabel={workspace.name}
     />
   );
 }

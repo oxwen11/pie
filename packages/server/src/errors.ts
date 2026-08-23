@@ -31,6 +31,23 @@ export class GitRefNotFound extends Data.TaggedError("GitRefNotFound")<{
   readonly ref: string;
 }> {}
 
+/** A git branch name failed validation before worktree creation. */
+export class GitInvalidBranchName extends Data.TaggedError("GitInvalidBranchName")<{
+  readonly branch: string;
+}> {}
+
+/** The requested branch already exists in the repository. */
+export class GitBranchExists extends Data.TaggedError("GitBranchExists")<{
+  readonly cwd: string;
+  readonly branch: string;
+}> {}
+
+/** The worktree path is already occupied. */
+export class GitWorktreePathExists extends Data.TaggedError("GitWorktreePathExists")<{
+  readonly cwd: string;
+  readonly path: string;
+}> {}
+
 export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly projectId: string;
   readonly sessionId: string;

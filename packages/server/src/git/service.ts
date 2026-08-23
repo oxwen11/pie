@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import path from "node:path";
 
 import type {
@@ -15,9 +16,12 @@ import { Context, Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
 import {
+  GitBranchExists,
   GitError,
+  GitInvalidBranchName,
   GitNotRepository,
   GitRefNotFound,
+  GitWorktreePathExists,
   WorkspaceBinaryFile,
   WorkspaceFileNotFound,
   WorkspaceFileTooLarge,
@@ -28,6 +32,16 @@ import {
 } from "../errors";
 import { FileSystemService } from "../fs";
 import { parseNameStatus, parseNulPaths } from "./name-status";
+import {
+  generateWorktreeBranchName,
+  isValidBranchName,
+  worktreeDirectoryForBranch,
+} from "./worktree";
+
+export type GitWorktreeCreateResult = {
+  readonly path: string;
+  readonly branch: string;
+};
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const NUL_BYTE = 0;
@@ -97,6 +111,12 @@ type GitFailure =
   | GitNotRepository
   | GitError;
 
+type GitWorktreeFailure =
+  | GitFailure
+  | GitInvalidBranchName
+  | GitBranchExists
+  | GitWorktreePathExists;
+
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
 type GitDiffFailure =
@@ -127,6 +147,11 @@ export class GitService extends Context.Service<
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
     readonly review: (query: GitReviewQuery) => Effect.Effect<GitReview, GitReviewFailure>;
     readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
+    readonly worktreeCreate: (
+      cwd: string,
+      input?: { readonly branch?: string },
+    ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    readonly worktreeRemove: (path: string) => Effect.Effect<void, GitFailure>;
   }
 >()("GitService") {}
 
@@ -469,6 +494,55 @@ export const GitServiceLayer: Layer.Layer<
             newContents,
             binary: false,
           };
+        }),
+
+      worktreeCreate: (cwd, input) =>
+        Effect.gen(function* () {
+          const realRoot = yield* resolveRoot(cwd);
+          const repoRoot = yield* resolveRepoRoot(realRoot);
+          const branch =
+            input?.branch ?? generateWorktreeBranchName(crypto.randomUUID().slice(0, 8));
+          if (!isValidBranchName(branch)) {
+            return yield* Effect.fail(new GitInvalidBranchName({ branch }));
+          }
+          const worktreePath = worktreeDirectoryForBranch(repoRoot, branch);
+          if (!contains(repoRoot, worktreePath)) {
+            return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+          }
+          const exists = yield* fs
+            .exists(worktreePath)
+            .pipe(Effect.mapError(readError(worktreePath)));
+          if (exists) {
+            return yield* Effect.fail(
+              new GitWorktreePathExists({ cwd: realRoot, path: worktreePath }),
+            );
+          }
+          const refs = yield* listRefs(realRoot);
+          if (refs.all.includes(branch)) {
+            return yield* Effect.fail(new GitBranchExists({ cwd: realRoot, branch }));
+          }
+          yield* Effect.tryPromise({
+            try: () =>
+              simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]),
+            catch: gitError(realRoot),
+          });
+          return { path: worktreePath, branch };
+        }),
+
+      worktreeRemove: (worktreePath) =>
+        Effect.gen(function* () {
+          if (!path.isAbsolute(worktreePath)) {
+            return yield* new WorkspacePathEscape({ cwd: worktreePath, path: "." });
+          }
+          const realPath = yield* fs.realPath(worktreePath).pipe(Effect.mapError(readError(".")));
+          const repoRoot = yield* resolveRepoRoot(realPath);
+          if (!contains(repoRoot, realPath)) {
+            return yield* new WorkspacePathEscape({ cwd: repoRoot, path: worktreePath });
+          }
+          yield* Effect.tryPromise({
+            try: () => simpleGit(repoRoot).raw(["worktree", "remove", "--force", realPath]),
+            catch: gitError(realPath),
+          });
         }),
     };
   }),

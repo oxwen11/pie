@@ -6,6 +6,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionStatus,
   SessionSummary,
+  SessionWorkspace,
 } from "@getpie/contract";
 import type { SessionCapabilities } from "@getpie/contract";
 import type { UIMessage } from "ai";
@@ -60,19 +61,32 @@ const toUserInput = (
       : Effect.succeed(part),
   ).pipe(Effect.map((userParts) => ({ parts: userParts })));
 
+const resolveWorkspaceCwd = (metadata: Session, projectPath: string): string =>
+  metadata.cwd ?? projectPath;
+
+const toSessionWorkspace = (metadata: Session, projectPath: string): SessionWorkspace => ({
+  cwd: resolveWorkspaceCwd(metadata, projectPath),
+  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
+});
+
 export type PiAgentSessionServiceShape = {
   readonly create: (
     projectId: string,
     cwd: string,
     model?: { readonly provider: string; readonly modelId: string },
+    gitBranch?: string,
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
-    cwd: string,
+    projectPath: string,
   ) => Effect.Effect<
-    void,
+    SessionWorkspace,
     SessionNotFound | StoreReadError | StoreWriteError | SessionNotResumable | AgentOperationError
   >;
+  readonly workspaceFor: (
+    ref: SessionRef,
+    projectPath: string,
+  ) => Effect.Effect<SessionWorkspace, SessionNotFound | StoreReadError>;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
     ref: SessionRef,
@@ -264,7 +278,7 @@ export const makePiAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd, model) =>
+    create: (projectId, cwd, model, gitBranch) =>
       newSessionId.pipe(
         Effect.flatMap((sessionId) => {
           const ref: SessionRef = { projectId, sessionId };
@@ -284,6 +298,7 @@ export const makePiAgentSessionService = (deps: {
                   agentSessionId: session.sessionId,
                   createdAt: new Date().toISOString(),
                   cwd,
+                  ...(gitBranch !== undefined ? { gitBranch } : {}),
                   archived: false,
                 };
                 return repo.write(metadata).pipe(
@@ -303,23 +318,35 @@ export const makePiAgentSessionService = (deps: {
         }),
       ),
 
-    prepare: (ref, cwd) =>
+    prepare: (ref, projectPath) =>
       withMetadataMutation(
         ref,
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) => {
-            if (metadata.cwd === cwd) return Effect.succeed(metadata);
-            const updated = { ...metadata, cwd };
+            if (metadata.cwd !== undefined) return Effect.succeed(metadata);
+            const updated = { ...metadata, cwd: projectPath };
             return repo.write(updated).pipe(Effect.as(updated));
           }),
         ),
       ).pipe(
-        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, cwd)),
-        Effect.flatMap((info) =>
-          info._tag === "missing"
-            ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-            : Effect.void,
-        ),
+        Effect.flatMap((metadata) => {
+          const workspaceCwd = resolveWorkspaceCwd(metadata, projectPath);
+          return pi
+            .getSessionInfo(metadata.agentSessionId, workspaceCwd)
+            .pipe(
+              Effect.flatMap((info) =>
+                info._tag === "missing"
+                  ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
+                  : Effect.succeed(toSessionWorkspace(metadata, projectPath)),
+              ),
+            );
+        }),
+        inSession(ref),
+      ),
+
+    workspaceFor: (ref, projectPath) =>
+      readMetadata(ref).pipe(
+        Effect.map((metadata) => toSessionWorkspace(metadata, projectPath)),
         inSession(ref),
       ),
 

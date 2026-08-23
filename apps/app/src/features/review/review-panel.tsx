@@ -51,7 +51,7 @@ export const reviewPanel = definePanel({
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
   const workspace = useSessionWorkspace(instance.sessionRef.projectId);
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
+  const cwd = workspace?.path;
   const mode = instance.payload.mode ?? "uncommitted";
   const branch = useGitBranch(cwd);
   const other =
@@ -102,23 +102,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [review.data],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <ReviewState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </ReviewState>
-    );
-  }
-
-  if (!workspace.data || cwd === undefined || panel === null) {
+  if (!workspace || cwd === undefined || panel === null) {
     return (
       <ReviewState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -171,11 +155,11 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           onSelectFile={selectFile}
           sessionId={panel.sessionKey}
           tree={tree}
-          workspaceName={workspace.data.name}
-          workspacePath={workspace.data.path}
+          workspaceName={workspace.name}
+          workspacePath={workspace.path}
         />
       }
-      filesLabel={workspace.data.name}
+      filesLabel={workspace.name}
       preview={
         <ReviewDiffPane
           diffs={diffs}

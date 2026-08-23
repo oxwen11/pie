@@ -119,10 +119,12 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({
+      const created = await client.agent.session.create({
         projectId: project.id,
       });
+      const { ref } = created;
       expect(ref.projectId).toBe(project.id);
+      expect(created.workspace.cwd).toBe(workspace);
 
       const events = await client.agent.session.subscribe({ scope: { kind: "session", ref } });
       const receipt = await client.agent.session.prompt({
@@ -153,14 +155,14 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
       await client.agent.session.close({ ref });
 
       const prepared = await client.agent.session.prepare({ ref });
       const status = await client.agent.session.getStatus({ ref });
       const snapshot = await client.agent.session.getSnapshot({ ref });
 
-      expect(prepared).toEqual(ref);
+      expect(prepared).toEqual({ ref, workspace: { cwd: workspace } });
       expect(status).toEqual({ phase: "idle" });
       expect(snapshot.cursor).toBe(0);
       expect(snapshot.activeTurn).toBeNull();
@@ -173,7 +175,7 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
 
       const active = await client.agent.session.list({ projectId: project.id });
       expect(active).toHaveLength(1);
@@ -216,7 +218,7 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
 
       const observer = await client.agent.session.subscribe({ scope: { kind: "global" } });
       await client.agent.session.rename({ ref, title: "Login bug" });
@@ -230,6 +232,36 @@ describe("agent.session router", () => {
         }
       }
       expect(announced).toBe("Login bug");
+    } finally {
+      await dispose();
+    }
+  });
+
+  it("creates a session in a new git worktree when requested", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const { simpleGit } = await import("simple-git");
+      const git = simpleGit(workspace);
+      await git.init(["-b", "main"]);
+      await git.addConfig("user.email", "test@example.com");
+      await git.addConfig("user.name", "Test");
+      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+      await git.add(".");
+      await git.commit("init");
+
+      const project = await client.project.create({ path: workspace });
+      const created = await client.agent.session.create({
+        projectId: project.id,
+        worktree: { branch: "pie/rpc-test" },
+      });
+
+      expect(created.workspace.gitBranch).toBe("pie/rpc-test");
+      expect(created.workspace.cwd).not.toBe(workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const prepared = await client.agent.session.prepare({ ref: created.ref });
+      expect(prepared.workspace.cwd).toBe(created.workspace.cwd);
+      await client.agent.session.close({ ref: created.ref });
     } finally {
       await dispose();
     }

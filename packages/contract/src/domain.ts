@@ -505,12 +505,35 @@ export const BrowseResultSchema = Schema.Struct({
 
 // Session-scoped config is owned by Pi — there are no session config RPCs.
 
+/** When present, the server creates a new git worktree before opening the session. */
+export const CreateWorktreeInputSchema = Schema.Struct({
+  branch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
+
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
+  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
+
+/** Absolute directory Pi runs in for one session. */
+export const SessionWorkspaceSchema = Schema.Struct({
+  cwd: Schema.String,
+  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type SessionWorkspace = typeof SessionWorkspaceSchema.Type;
+
+export const CreateSessionOutputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  workspace: SessionWorkspaceSchema,
+});
+export type CreateSessionOutput = typeof CreateSessionOutputSchema.Type;
+
+export const PrepareSessionOutputSchema = CreateSessionOutputSchema;
+export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
 
 export const ListSessionsInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),

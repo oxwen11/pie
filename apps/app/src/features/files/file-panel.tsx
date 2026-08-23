@@ -1,4 +1,3 @@
-import { Spinner } from "@getpie/ui/components/spinner";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FileCodeIcon } from "lucide-react";
@@ -61,7 +60,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
   );
   const workspace = useSessionWorkspace(instance.sessionRef.projectId);
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
+  const cwd = workspace?.path;
   const tree = useWorkspaceTree(cwd);
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const file = useQuery({
@@ -76,23 +75,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     [panel],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <FileState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </FileState>
-    );
-  }
-
-  if (!workspace.data || panel === null || cwd === undefined) {
+  if (!workspace || panel === null || cwd === undefined) {
     return (
       <FileState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -121,8 +104,8 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
       refreshing={refreshing}
       sessionId={panel.sessionKey}
       tree={tree}
-      workspaceName={workspace.data.name}
-      workspacePath={workspace.data.path}
+      workspaceName={workspace.name}
+      workspacePath={workspace.path}
     />
   );
 

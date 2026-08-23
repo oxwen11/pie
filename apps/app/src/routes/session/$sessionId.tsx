@@ -1,9 +1,8 @@
-import type { SessionRef } from "@getpie/contract";
+import type { PrepareSessionOutput } from "@getpie/contract";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
-import { useProject } from "@/features/projects/use-projects";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -18,11 +17,11 @@ export const Route = createFileRoute("/session/$sessionId")({
     return projectId !== undefined ? { projectId } : {};
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({ context, params, deps }) => {
+  loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
     const { session } = context.orpcQueryUtils.agent;
 
     if (deps.projectId !== undefined) {
-      const hinted: SessionRef = {
+      const hinted = {
         projectId: deps.projectId,
         sessionId: params.sessionId,
       };
@@ -40,20 +39,19 @@ export const Route = createFileRoute("/session/$sessionId")({
         toast.error(`Session ${params.sessionId} could not be found.`);
         throw redirect({ to: "/draft" });
       });
-    await session.prepare.call({ ref }).catch((error: unknown) => {
+    return session.prepare.call({ ref }).catch((error: unknown) => {
       console.error("Failed to prepare session", error);
       toast.error(
         `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,
       );
+      throw error;
     });
-    return ref;
   },
   component: Component,
 });
 
 function Component() {
-  const sessionRef = Route.useLoaderData();
-  const cwd = useProject(sessionRef.projectId)?.path;
+  const { ref: sessionRef, workspace } = Route.useLoaderData();
 
-  return <Chat cwd={cwd} sessionRef={sessionRef} />;
+  return <Chat cwd={workspace.cwd} sessionRef={sessionRef} />;
 }

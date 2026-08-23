@@ -22,9 +22,11 @@ export interface Session {
   readonly agentSessionId: string;
   readonly createdAt: string;
   /**
-   * Working directory. Our input at `create` (currently the project path).
+   * Working directory. Our input at `create` (the project path or a worktree).
    */
   readonly cwd?: string;
+  /** Branch checked out in `cwd` when the session was created in a worktree. */
+  readonly gitBranch?: string;
   /** Display title, set from the session's first prompt. */
   readonly title?: string;
   /** Whether the session is hidden from the project's primary session list. */

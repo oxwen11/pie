@@ -4,6 +4,7 @@ import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import { EventBus } from "../events";
+import { GitService } from "../git";
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
@@ -12,19 +13,78 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
+const sessionWorkspace = (
+  ref: { readonly projectId: string; readonly sessionId: string },
+  projectPath: string,
+) =>
+  Effect.gen(function* () {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.workspaceFor(ref, projectPath);
+  });
+
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
+    const git = yield* GitService;
     const model =
       input.provider && input.modelId
         ? { provider: input.provider, modelId: input.modelId }
         : undefined;
+
     return yield* projects.findById(input.projectId).pipe(
-      Effect.flatMap((project) => sessions.create(input.projectId, project.path, model)),
+      Effect.flatMap((project) =>
+        Effect.gen(function* () {
+          let sessionCwd = project.path;
+          let gitBranch: string | undefined;
+          let createdWorktreePath: string | undefined;
+
+          if (input.worktree !== undefined) {
+            const worktree = yield* git.worktreeCreate(project.path, input.worktree).pipe(
+              Effect.tap((result) => {
+                createdWorktreePath = result.path;
+                return Effect.void;
+              }),
+            );
+            sessionCwd = worktree.path;
+            gitBranch = worktree.branch;
+          }
+
+          const ref = yield* sessions
+            .create(input.projectId, sessionCwd, model, gitBranch)
+            .pipe(
+              Effect.tapError(() =>
+                createdWorktreePath === undefined
+                  ? Effect.void
+                  : git.worktreeRemove(createdWorktreePath).pipe(Effect.ignore),
+              ),
+            );
+
+          return {
+            ref,
+            workspace: {
+              cwd: sessionCwd,
+              ...(gitBranch === undefined ? {} : { gitBranch }),
+            },
+          };
+        }),
+      ),
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        GitNotRepository: () =>
+          Effect.fail(errors.UNSUPPORTED({ message: "project is not a git repository" })),
+        GitInvalidBranchName: (e) =>
+          Effect.fail(errors.UNSUPPORTED({ message: `invalid branch name: ${e.branch}` })),
+        GitBranchExists: (e) =>
+          Effect.fail(errors.CONFLICT({ message: `branch already exists: ${e.branch}` })),
+        GitWorktreePathExists: (e) =>
+          Effect.fail(errors.CONFLICT({ message: `worktree path already exists: ${e.path}` })),
+        WorkspacePathEscape: () =>
+          Effect.fail(errors.UNSUPPORTED({ message: "worktree path escapes the repository" })),
+        WorkspaceNotDirectory: () =>
+          Effect.fail(errors.UNSUPPORTED({ message: "project path is not a directory" })),
+        GitError: () => Effect.fail(errors.INTERNAL({ message: "git worktree creation failed" })),
         AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -35,8 +95,14 @@ export const sessionRouter = orpc.router({
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) => sessions.prepare(input.ref, project.path)),
-      Effect.as(input.ref),
+      Effect.flatMap((project) =>
+        sessions.prepare(input.ref, project.path).pipe(
+          Effect.map((workspace) => ({
+            ref: input.ref,
+            workspace,
+          })),
+        ),
+      ),
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
@@ -99,7 +165,11 @@ export const sessionRouter = orpc.router({
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) => sessions.getMessages(input.ref, project.path)),
+      Effect.flatMap((project) =>
+        sessionWorkspace(input.ref, project.path).pipe(
+          Effect.flatMap((workspace) => sessions.getMessages(input.ref, workspace.cwd)),
+        ),
+      ),
       Effect.map((messages) => ({ messages })),
       Effect.catchTags({
         ProjectNotFound: (e) =>
@@ -193,7 +263,11 @@ export const sessionRouter = orpc.router({
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) => sessions.getModelState(input.ref, project.path)),
+      Effect.flatMap((project) =>
+        sessionWorkspace(input.ref, project.path).pipe(
+          Effect.flatMap((workspace) => sessions.getModelState(input.ref, workspace.cwd)),
+        ),
+      ),
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
@@ -216,10 +290,14 @@ export const sessionRouter = orpc.router({
     const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
       Effect.flatMap((project) =>
-        sessions.setModel(input.ref, project.path, {
-          provider: input.provider,
-          modelId: input.modelId,
-        }),
+        sessionWorkspace(input.ref, project.path).pipe(
+          Effect.flatMap((workspace) =>
+            sessions.setModel(input.ref, workspace.cwd, {
+              provider: input.provider,
+              modelId: input.modelId,
+            }),
+          ),
+        ),
       ),
       Effect.catchTags({
         ProjectNotFound: (e) =>

@@ -228,6 +228,22 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
+  it.effect("creates a worktree on a new branch under .pie/worktrees", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const git = yield* GitService;
+      const created = yield* git.worktreeCreate(dir, { branch: "pie/feature-a" });
+      assert.equal(created.branch, "pie/feature-a");
+      assert.match(created.path, /[\\/]\.pie[\\/]worktrees[\\/]pie-feature-a$/);
+
+      const branch = yield* git.branch(created.path);
+      assert.equal(branch.current, "pie/feature-a");
+
+      const status = yield* git.status(dir);
+      assert.equal(status.branch, "main");
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
   it.effect("rejects a relative cwd and a non-repository", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
