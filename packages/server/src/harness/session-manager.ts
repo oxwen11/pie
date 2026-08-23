@@ -9,7 +9,6 @@ import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import {
   AgentOpenError,
-  AgentUnavailable,
   type CreateSessionError,
   HarnessSessionNotFound,
   type ResumeSessionError,
@@ -29,9 +28,9 @@ import type { ResumeManagedSessionInput } from "./session-io";
  * keep the table, and turn "native session id + cwd" into the `acquire` a
  * the `acquire` a session runs when it decides it needs a runtime.
  *
- * It remains the single caller of `adapter.open` / `adapter.resume`: every
- * acquisition goes through one session's lifecycle lock, so an adapter is
- * never asked to open the same session twice concurrently. That invariant is
+ * It remains the single caller of `pi.create` / `pi.resume`: every
+ * acquisition goes through one session's lifecycle lock, so Pi is never asked
+ * to create the same session twice concurrently. That invariant is
  * load-bearing for pi, whose `openSession` blind-writes its own table.
  *
  * Vocabulary: everything here is addressed by {@link SessionRef}, which is
@@ -111,8 +110,8 @@ export class PiAgentSessionManager extends Context.Service<
  * A live session, or the fact that one is on its way out. Both live in the
  * same table so "does this ref have a session" is a single atomic question:
  * anything that wants to write waits behind an in-flight close instead of
- * racing it, which is what keeps `adapter.open` / `adapter.resume`
- * single-caller per session even while one is being torn down.
+ * racing it, which is what keeps `pi.create` / `pi.resume` single-caller per
+ * session even while one is being torn down.
  */
 type SessionEntry =
   | { readonly _tag: "Live"; readonly session: PiAgentSessionShape }
@@ -193,46 +192,30 @@ export const makePiAgentSessionManager = (
         }),
       );
 
-    const checkAvailable = () =>
-      Effect.succeed(pi).pipe(
-        Effect.tap((availPi) =>
-          availPi.availability.pipe(
-            Effect.flatMap((availability) =>
-              availability.available
-                ? Effect.void
-                : Effect.fail(
-                    new AgentUnavailable({
-                      reason: availability.reason ?? "Unavailable",
-                    }),
-                  ),
-            ),
-            Effect.provideService(FileSystem.FileSystem, fileSystem),
-          ),
-        ),
-      );
+    const withFileSystem = <A, E, R>(
+      effect: Effect.Effect<A, E, R | FileSystem.FileSystem>,
+    ): Effect.Effect<A, E, R> =>
+      effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
 
     /**
-     * The heaviest thing this server does: `open`/`resume` is where an agent
+     * The heaviest thing this server does: `create`/`resume` is where an agent
      * CLI is actually spawned or an SDK handle established. It is also the
      * likeliest to fail — a CLI that is not installed, an expired login, a cwd
      * that vanished — and the failure reaches the user as a session that "does
      * nothing".
      *
-     * The native span correlates logs emitted during each acquisition. Which
-     * session and Pi come from the caller's `inSession`; the Pi session id is
-     * attached after the adapter answers because it does not exist before
-     * then.
+     * Availability is checked inside the Pi facade; the native span correlates
+     * logs emitted during each acquisition. The Pi session id is attached after
+     * the facade answers because it does not exist before then.
      */
-    const acquireOpen = (input: CreateSessionInput): AcquireRuntime =>
-      checkAvailable().pipe(
-        Effect.flatMap((availPi) => availPi.open(input)),
+    const acquireCreate = (input: CreateSessionInput): AcquireRuntime =>
+      withFileSystem(pi.create(input)).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
-        Effect.withSpan("pi.open"),
+        Effect.withSpan("pi.create"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
-      checkAvailable().pipe(
-        Effect.flatMap((availPi) => availPi.resume({ sessionId: input.sessionId, cwd: input.cwd })),
+      withFileSystem(pi.resume({ sessionId: input.sessionId, cwd: input.cwd })).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.resume"),
       );
@@ -298,7 +281,7 @@ export const makePiAgentSessionManager = (
 
     return {
       open: (input, ref) =>
-        acquireVia(ref, acquireOpen(input)).pipe(
+        acquireVia(ref, acquireCreate(input)).pipe(
           // `AcquireRuntime` carries the resume union; the two members only a
           // resume can raise are unreachable here, so a sighting is an adapter
           // misbehaving and folds into AgentOpenError.

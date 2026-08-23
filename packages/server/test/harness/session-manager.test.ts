@@ -98,7 +98,7 @@ const makeFixture = Effect.gen(function* () {
 
   const pi = {
     availability: Effect.succeed({ available: true }),
-    open: () => makeRuntime("created-session"),
+    create: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
       Ref.update(resumeCalls, (current) => current + 1).pipe(
         Effect.andThen(Deferred.await(resumeGate)),

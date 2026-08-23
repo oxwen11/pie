@@ -274,7 +274,7 @@ export const makePiAgentRuntime = (
     } satisfies PiAgentRuntime;
   });
 
-export const openPiAgentRuntime = (
+export const createPiAgentRuntime = (
   process: PiProcess,
   input: CreateSessionInput,
 ): Effect.Effect<PiAgentRuntime, AgentOpenError, Scope.Scope> =>

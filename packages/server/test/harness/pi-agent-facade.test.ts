@@ -9,8 +9,8 @@ it("declaring the Pi facade never touches the process", () => {
   expect(() => makePiAgent(stub<PiProcess>())).not.toThrow();
 });
 
-it("Pi facade exposes open and resume", () => {
+it("Pi facade exposes create and resume", () => {
   const pi: PiAgentShape = makePiAgent(stub<PiProcess>());
-  expect(typeof pi.open).toBe("function");
+  expect(typeof pi.create).toBe("function");
   expect(typeof pi.resume).toBe("function");
 });

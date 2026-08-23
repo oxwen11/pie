@@ -299,10 +299,10 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("Pi facade open exposes prompt output on the PiAgentRuntime event stream", () =>
+  it.effect("Pi facade create exposes prompt output on the PiAgentRuntime event stream", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAgent(agent).open({ cwd: "/tmp" });
+      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -341,7 +341,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
   it.effect("reports a child crash while the adapter session is idle", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAgent(agent).open({ cwd: "/tmp" });
+      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

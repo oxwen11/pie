@@ -8,7 +8,7 @@ import type { PiAgentShape } from "../../src/harness/pi/facade";
 import { cacheAvailability } from "../../src/rpc/runtime";
 
 const unusedPi = {
-  open: () => Effect.die("unused"),
+  create: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
   getSessionInfo: () => Effect.die("unused"),
 } satisfies Omit<PiAgentShape, "availability">;

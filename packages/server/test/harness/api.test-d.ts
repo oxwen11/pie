@@ -1,4 +1,4 @@
-import type { Effect, Scope, Stream } from "effect";
+import type { Effect, FileSystem, Scope, Stream } from "effect";
 import { expectTypeOf, test } from "vitest";
 
 import type {
@@ -13,12 +13,12 @@ import type {
   TurnAlreadyRunning,
 } from "../../src/harness";
 
-test("Pi facade open is scoped and effect native", () => {
-  expectTypeOf<PiAgentShape["open"]>().returns.toEqualTypeOf<
+test("Pi facade create is scoped and effect native", () => {
+  expectTypeOf<PiAgentShape["create"]>().returns.toEqualTypeOf<
     Effect.Effect<
       PiAgentRuntime,
       AgentUnavailable | ExecutableNotFound | AgentOpenError,
-      Scope.Scope
+      Scope.Scope | FileSystem.FileSystem
     >
   >();
 });

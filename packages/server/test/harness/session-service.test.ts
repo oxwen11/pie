@@ -18,7 +18,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
-import { TurnAlreadyRunning } from "../../src/harness/errors";
+import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
 import type { PiAgentShape } from "../../src/harness/pi/facade";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
@@ -136,29 +136,44 @@ describe("PiAgentSessionService", () => {
               ),
             ),
           });
+          const availability = Effect.sync(() =>
+            opts.unavailable !== undefined
+              ? { available: false as const, reason: opts.unavailable }
+              : { available: true as const },
+          );
+          const whenAvailable = <A, E, R>(body: Effect.Effect<A, E, R>) =>
+            Effect.gen(function* () {
+              const result = yield* availability;
+              if (!result.available) {
+                return yield* Effect.fail(
+                  new AgentUnavailable({ reason: result.reason ?? "Unavailable" }),
+                );
+              }
+              return yield* body;
+            });
           const pi = {
-            availability: Effect.sync(() =>
-              opts.unavailable !== undefined
-                ? { available: false, reason: opts.unavailable }
-                : { available: true },
-            ),
-            open: ({ cwd }) =>
-              // An adapter sees `cwd` and never a `SessionRef` — this line is
-              // the probe for whether the identity reaches it anyway.
-              Effect.logDebug("adapter opening").pipe(
-                Effect.andThen(
-                  Effect.sync(() => {
-                    spy.open.push({ cwd });
-                    opened += 1;
-                    return makeSession(`native-${opened}`);
-                  }),
+            availability,
+            create: ({ cwd }) =>
+              // Pi sees `cwd` and never a `SessionRef` — this line is the probe
+              // for whether the identity reaches it anyway.
+              whenAvailable(
+                Effect.logDebug("pi creating").pipe(
+                  Effect.andThen(
+                    Effect.sync(() => {
+                      spy.open.push({ cwd });
+                      opened += 1;
+                      return makeSession(`native-${opened}`);
+                    }),
+                  ),
                 ),
               ),
             resume: ({ sessionId, cwd }) =>
-              Effect.sync(() => {
-                spy.resume.push({ sessionId, cwd });
-                return makeSession(sessionId);
-              }),
+              whenAvailable(
+                Effect.sync(() => {
+                  spy.resume.push({ sessionId, cwd });
+                  return makeSession(sessionId);
+                }),
+              ),
             ...(opts.coldHistory !== undefined
               ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
               : {}),
@@ -721,7 +736,7 @@ describe("PiAgentSessionService", () => {
       ),
     );
 
-    // Only lifecycle events are logs. The native `harness.open` span correlates
+    // Only lifecycle events are logs. The native `pi.create` span correlates
     // logs inside it but does not synthesize its own completion record.
     expect(records.map((record) => record.annotations.event)).toEqual([
       "session.created",
@@ -763,7 +778,7 @@ describe("PiAgentSessionService", () => {
       ),
     );
 
-    const adapterLine = records.find((record) => record.message === "adapter opening");
+    const adapterLine = records.find((record) => record.message === "pi creating");
     expect(adapterLine).toBeDefined();
     expect(adapterLine?.annotations.projectId).toBe("proj-a");
     expect(adapterLine?.annotations.sessionId).toMatch(UUID_RE);
