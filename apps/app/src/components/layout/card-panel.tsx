@@ -1,3 +1,5 @@
+import type { BadgeProps } from "@getpie/ui/components/badge";
+import { Badge } from "@getpie/ui/components/badge";
 import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
@@ -8,9 +10,17 @@ export interface CardPanelProps {
   readonly hasTrafficLights: boolean;
   readonly heading: string;
   readonly supportingText?: string;
+  readonly statusLabel?: string;
+  readonly statusVariant?: BadgeProps["variant"];
 }
 
-export function CardPanel({ hasTrafficLights, heading, supportingText }: CardPanelProps) {
+export function CardPanel({
+  hasTrafficLights,
+  heading,
+  supportingText,
+  statusLabel,
+  statusVariant,
+}: CardPanelProps) {
   const { state, isMobile } = useSidebar();
   const collapsedDesktop = !isMobile && state === "collapsed";
   const ownsToggle = isMobile || collapsedDesktop;
@@ -32,6 +42,11 @@ export function CardPanel({ hasTrafficLights, heading, supportingText }: CardPan
           <span className="min-w-0 truncate font-medium" title={heading}>
             {heading}
           </span>
+          {statusLabel !== undefined && (
+            <Badge className="shrink-0" size="sm" variant={statusVariant ?? "secondary"}>
+              {statusLabel}
+            </Badge>
+          )}
           {supportingText !== undefined && (
             <span
               className="text-muted-foreground max-w-[50%] min-w-0 truncate"
