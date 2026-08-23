@@ -73,9 +73,9 @@ type TurnFold = {
 export class Chat {
   readonly store: StoreApi<ChatStoreState>;
   readonly #state: ChatState;
-  readonly #transport: ChatSessionTransport;
+  #transport: ChatSessionTransport;
   readonly #onTerminated: (() => void) | undefined;
-  readonly #unsubscribe: () => void;
+  #unsubscribe: (() => void) | null = null;
   readonly #turnFolds = new Map<string, TurnFold>();
   // Turns whose live rendering was abandoned (buffer truncated, replay gap):
   // their chunks are skipped and the turn is recovered from the history read
@@ -116,6 +116,24 @@ export class Chat {
     this.store = this.#state.store;
     this.#transport = transport;
     this.#onTerminated = onTerminated;
+    this.#subscribe(transport);
+  }
+
+  /** Whether a live transport subscription is active. */
+  get subscribed(): boolean {
+    return this.#unsubscribe !== null;
+  }
+
+  // Swap in a fresh transport after idle eviction. The store and cursor stay
+  // put; the next "attached" snapshot reconciles against them.
+  reattach(transport: ChatSessionTransport): void {
+    if (this.#terminated) return;
+    this.dispose();
+    this.#transport = transport;
+    this.#subscribe(transport);
+  }
+
+  #subscribe(transport: ChatSessionTransport): void {
     this.#unsubscribe = transport.subscribe((event) => {
       if (event.type === "attached") this.#hydrate(event.snapshot);
       else if (event.type === "closed") this.#terminate(event.reason);
@@ -576,7 +594,10 @@ export class Chat {
   };
 
   dispose = (): void => {
-    this.#unsubscribe();
+    if (this.#unsubscribe) {
+      this.#unsubscribe();
+      this.#unsubscribe = null;
+    }
     for (const fold of this.#turnFolds.values()) fold.close();
     this.#turnFolds.clear();
   };
