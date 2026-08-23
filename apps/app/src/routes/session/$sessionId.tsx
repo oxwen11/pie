@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 

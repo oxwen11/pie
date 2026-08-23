@@ -39,7 +39,7 @@ Terminal Output → XTerm Render → addon-web-links detects URL
 ### Dependencies
 
 ```bash
-pnpm add @xterm/addon-web-links --filter @pie/desktop
+pnpm add @xterm/addon-web-links --filter @getpie/desktop
 ```
 
 ### File Changes

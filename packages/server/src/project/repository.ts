@@ -1,5 +1,5 @@
-import { ProjectSchema } from "@pie/contract";
-import { type JsonDocument, makeJsonDocument } from "@pie/effect-json-store";
+import { ProjectSchema } from "@getpie/contract";
+import { type JsonDocument, makeJsonDocument } from "@getpie/effect-json-store";
 import { Context, Effect, FileSystem, Layer, Option, Ref, Schema, Semaphore } from "effect";
 
 import { Paths } from "../config/paths";

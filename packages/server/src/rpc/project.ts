@@ -1,6 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
+import { projectContract } from "@getpie/contract/project";
 import { implement } from "@orpc/server";
-import { projectContract } from "@pie/contract/project";
 
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";

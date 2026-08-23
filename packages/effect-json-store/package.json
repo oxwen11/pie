@@ -1,5 +1,5 @@
 {
-  "name": "@pie/effect-json-store",
+  "name": "@getpie/effect-json-store",
   "version": "0.0.1",
   "private": true,
   "description": "Effect-native JSON file store with schema validation and integer-versioned migrations",
@@ -19,7 +19,7 @@
   "devDependencies": {
     "@effect/platform-node": "catalog:effect",
     "@effect/vitest": "catalog:effect",
-    "@pie/typescript": "workspace:*"
+    "@getpie/typescript": "workspace:*"
   },
   "engines": {
     "node": ">=24 <25"

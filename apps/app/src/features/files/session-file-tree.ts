@@ -1,4 +1,4 @@
-import type { WorkspaceTreeEntry } from "@pie/contract/fs";
+import type { WorkspaceTreeEntry } from "@getpie/contract/fs";
 import { FileTree, prepareFileTreeInput } from "@pierre/trees";
 
 export interface SessionFileTree {

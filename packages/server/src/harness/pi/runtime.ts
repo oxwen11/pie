@@ -1,5 +1,5 @@
-import type { AgentResponse, AgentModelState, SessionCapabilities } from "@pie/contract";
-import { SessionCapabilitiesSchema } from "@pie/contract";
+import type { AgentResponse, AgentModelState, SessionCapabilities } from "@getpie/contract";
+import { SessionCapabilitiesSchema } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";

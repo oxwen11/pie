@@ -1,10 +1,10 @@
-import { Shimmer } from "@pie/ui/ai-elements/shimmer";
+import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@pie/ui/components/collapsible";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/collapsible";
+import { cn } from "@getpie/ui/lib/utils";
 import type { ToolUIPart, UIMessage } from "ai";
 import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";

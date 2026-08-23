@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { isSessionScopedEvent, type SessionRef } from "@pie/contract";
+import { isSessionScopedEvent, type SessionRef } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import {
   Crypto,

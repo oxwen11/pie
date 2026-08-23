@@ -6,7 +6,7 @@
  */
 
 /** A project is a workspace path the runtime can open sessions against. */
-export type { Project } from "@pie/contract";
+export type { Project } from "@getpie/contract";
 
 /**
  * Server-owned recovery record for one session, persisted at

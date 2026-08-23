@@ -8,8 +8,8 @@
 
 给 pie 的 harness agent 做两层抽象，使 **claude-code** 与 **codex**（以及未来的其它后端）能在同一套接口后面工作：
 
-1. **ai-sdk 抽象**（`@pie/ai-sdk-harness-agents`）：把任意后端的原生消息流，归一化成 Vercel AI SDK 的 `UIMessage` 渲染流 + 一套跨后端统一的生命周期事件词表。负责"harness agents → ai-sdk 的抽象定义与转换"。
-2. **harness agent 抽象**（`@pie/server` 的 `agent/` 域切片）：Effect 化的 adapter/session 运行时，驱动后端进程、持活跃会话、把原生流喂给 ai-sdk 层做归一化、经事件枢纽扇出。
+1. **ai-sdk 抽象**（`@getpie/ai-sdk-harness-agents`）：把任意后端的原生消息流，归一化成 Vercel AI SDK 的 `UIMessage` 渲染流 + 一套跨后端统一的生命周期事件词表。负责"harness agents → ai-sdk 的抽象定义与转换"。
+2. **harness agent 抽象**（`@getpie/server` 的 `agent/` 域切片）：Effect 化的 adapter/session 运行时，驱动后端进程、持活跃会话、把原生流喂给 ai-sdk 层做归一化、经事件枢纽扇出。
 
 **范围内**：两平面类型定义、两后端的 transform、adapter/session/repository 接口、会话生命周期不变量、事件枢纽的 seq/快照、Effect 装配。
 **范围外**：oRPC 传输层、fs/git/project/provider/mcp/pty/skill 等其它模块（父文档已覆盖）、模型选择（父文档 §8：会话用哪个 model 由 adapter 自己决定）、前端 React 状态层（父文档 §9）。
@@ -20,15 +20,15 @@
 
 收敛成**两个包**，依赖单向向下（`server → ai-sdk-harness-agents`），后者**无运行时依赖**——各后端 SDK（`@anthropic-ai/claude-agent-sdk`、codex 协议）只做 `import type`，不进 bundle：
 
-| 包                               | 角色                                                                                                                                     | Effect?      | 依赖                                                                                                                                           | 谁消费                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `@pie/ai-sdk-harness-agents`     | ai-sdk 抽象：两平面类型定义 + per-backend 转换 + tools + 冷读折叠                                                                        | ❌ 纯 TS     | `ai`、`zod`、`@anthropic-ai/claude-agent-sdk`（**type-only**：transform/to-session-event 吃 `SDKMessage`）、codex 后端补其 app-server 协议类型 | `server`（归一化）**和前端**（渲染 tool 卡片、类型、`toUIMessage`） |
-| `@pie/server`（`agent/` 域切片） | harness agent 抽象+实现：adapter/session/repository（Effect）+ SessionLifecycle + registry + session-manager + EventBus + SessionService | ✅ Effect v4 | Effect、`ai-sdk-harness-agents`、各后端 SDK/app-server                                                                                         | 只有 `server` 自己                                                  |
+| 包                                  | 角色                                                                                                                                     | Effect?      | 依赖                                                                                                                                           | 谁消费                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@getpie/ai-sdk-harness-agents`     | ai-sdk 抽象：两平面类型定义 + per-backend 转换 + tools + 冷读折叠                                                                        | ❌ 纯 TS     | `ai`、`zod`、`@anthropic-ai/claude-agent-sdk`（**type-only**：transform/to-session-event 吃 `SDKMessage`）、codex 后端补其 app-server 协议类型 | `server`（归一化）**和前端**（渲染 tool 卡片、类型、`toUIMessage`） |
+| `@getpie/server`（`agent/` 域切片） | harness agent 抽象+实现：adapter/session/repository（Effect）+ SessionLifecycle + registry + session-manager + EventBus + SessionService | ✅ Effect v4 | Effect、`ai-sdk-harness-agents`、各后端 SDK/app-server                                                                                         | 只有 `server` 自己                                                  |
 
 **为什么是这两个包，而不是三个**（"消费者测试"）：
 
-- `@pie/ai-sdk-harness-agents` 独立成包有意义——它被**两个**消费者用：`server` 在 adapter 里做归一化，**前端**（`packages/ui`、`pie-devtools-client`）渲染工具卡片、消费 `SessionEnvelope` 类型、冷读 `toUIMessage`。前端不能为了拿这些类型/转换而把整个 Effect server + 子进程依赖拖进浏览器包。这跟参考实现把纯类型放独立 `@neo/contract`、让 renderer 不依赖 daemon 是同一个理由。它 Effect-free、依赖极轻。
-- **不再有独立的 `@pie/agents`**——adapter 天生要持子进程（codex app-server）、要 `Scope`/finalizer 管生命周期，本身就是 Effect 的活；它只会被 `server` 一个消费者用。拆成"Effect-free 接口 + server 包装"纯属徒增间接层。因此现有 `packages/agents` 撤销，逻辑并进 `server/src/agent/adapters/`。
+- `@getpie/ai-sdk-harness-agents` 独立成包有意义——它被**两个**消费者用：`server` 在 adapter 里做归一化，**前端**（`packages/ui`、`pie-devtools-client`）渲染工具卡片、消费 `SessionEnvelope` 类型、冷读 `toUIMessage`。前端不能为了拿这些类型/转换而把整个 Effect server + 子进程依赖拖进浏览器包。这跟参考实现把纯类型放独立 `@neo/contract`、让 renderer 不依赖 daemon 是同一个理由。它 Effect-free、依赖极轻。
+- **不再有独立的 `@getpie/agents`**——adapter 天生要持子进程（codex app-server）、要 `Scope`/finalizer 管生命周期，本身就是 Effect 的活；它只会被 `server` 一个消费者用。拆成"Effect-free 接口 + server 包装"纯属徒增间接层。因此现有 `packages/agents` 撤销，逻辑并进 `server/src/agent/adapters/`。
 
 > 命名统一：本稿把参考实现的 **Provider** 概念改称 **Adapter**（`HarnessAgentAdapter`、目录 `adapters/`），因为它就是"把某后端适配到统一接口"的适配器。**"provider" 一词在本稿只保留给模型/凭证 Provider**（父文档的 provider 域、`ProviderConfig`、`provider.updated` 事件），两者别混。
 
@@ -70,7 +70,7 @@ packages/server/src/agent/                 # Effect;只有 server 消费
   # EventBus 复用已存在的 packages/server/src/events/event-bus.ts,agent 切片消费它
 ```
 
-## 3. ai-sdk 抽象（`@pie/ai-sdk-harness-agents`）
+## 3. ai-sdk 抽象（`@getpie/ai-sdk-harness-agents`）
 
 ### 3.1 信封与两平面（无 `kind` 标签，靠 `type` 自判别）
 
@@ -293,7 +293,7 @@ codex 侧对称：`codex/transform.ts` 把 app-server 的 `turn/*` 通知 → `C
 
 **可丢性 = 渲染面的 `*-delta` chunk**（`!isSessionEvent(body) && body.type.endsWith("-delta")`）：这类增量帧丢了由快照重放补齐（§4.4），是唯一 droppable 的一类；控制事件与非 delta 的渲染帧都要折进快照、不丢。**恢复不做续传/事件溯源**：重连=会话重拉快照、集合重拉列表（父文档 §4.3），事件是通知而非真相源。
 
-## 4. harness agent 抽象（`@pie/server` 的 `agent/`）
+## 4. harness agent 抽象（`@getpie/server` 的 `agent/`）
 
 ### 4.1 Effect-typed 运行时接口（`agent/types.ts`）
 
@@ -312,7 +312,7 @@ import type {
   UserInput,
   CreateSessionConfig,
   AvailabilityResult,
-} from "@pie/ai-sdk-harness-agents";
+} from "@getpie/ai-sdk-harness-agents";
 import type { SessionNotFound, HarnessAgentUnavailable } from "./errors";
 
 // session 往这里吐 draft（无 seq）;EventBus 盖 seq 后扇出。adapter 不认识 EventBus——
@@ -423,7 +423,7 @@ codex app-server 的常驻子进程生命周期完全交给 `Layer.scoped` + `Ef
 
 不一次性推翻,分步切:
 
-1. **建 `@pie/ai-sdk-harness-agents`**：把 `packages/ai-sdk-agents/src/claude-code/{tools,schema,utils/to-ui-message}` 迁入，新增 `types/*`、`claude-code/{transform,to-session-event}`、`codex/*`。旧 `packages/ai-sdk-agents` 删除（或先保留 re-export 垫片，一版后删）。
+1. **建 `@getpie/ai-sdk-harness-agents`**：把 `packages/ai-sdk-agents/src/claude-code/{tools,schema,utils/to-ui-message}` 迁入，新增 `types/*`、`claude-code/{transform,to-session-event}`、`codex/*`。旧 `packages/ai-sdk-agents` 删除（或先保留 re-export 垫片，一版后删）。
 2. **建 `server/src/agent/`**：把 `packages/agents/src/claude-code/agent.ts` 的 `query` 循环 + `canUseTool` + `Pushable` 迁入 `adapters/claude-code/session.ts`（Effect 化）；补 `types.ts`/`errors.ts`/`registry.ts`/`session-manager.ts`/`session-lifecycle.ts`/`session-service.ts`。`packages/agents` 删除。
 3. **切 `server-rpc`**：现有 `routes/claude-code.ts` 直接引 `ClaudeCodeAgent`——改成引父文档 §4.2 的 `session.*` oRPC 契约、委托给 `HarnessAgentSessionService`。可先加一层适配把旧 `claudeCodeContract` 映射到新 service，前端不动；再逐步把前端切到 `SessionEnvelope` 两平面事件流。
 4. **codex adapter** 留待后续独立 PR（app-server + transform + session-repository）。

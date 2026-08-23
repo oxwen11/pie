@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import type { AgentResponse } from "./agent-requests";

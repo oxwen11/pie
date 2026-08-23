@@ -1,4 +1,4 @@
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 
 import {
   buildToolResponse,

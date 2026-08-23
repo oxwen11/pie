@@ -119,7 +119,7 @@ Promise / AsyncGenerator Agent class
 
 ## 5. 包和导出边界
 
-当前 `@pie/harness/claude-code` 同时导出浏览器需要的 tool/UI 类型和 Node-only Agent class。建议将共享定义与 runtime 导出分离。
+当前 `@getpie/harness/claude-code` 同时导出浏览器需要的 tool/UI 类型和 Node-only Agent class。建议将共享定义与 runtime 导出分离。
 
 ```text
 packages/harness/src/
@@ -861,7 +861,7 @@ export const toStandardSchema = <S extends Schema.ConstraintDecoder<unknown>>(sc
 export const HarnessAgentIdStandardSchema = toStandardSchema(HarnessAgentIdSchema);
 ```
 
-`packages/contract` 不依赖 harness 或 server；它持有共享 wire DTO、Effect Schema 和 `toStandardSchema`。`packages/harness` 依赖 contract，并仅为旧 import path 提供兼容性 re-export。浏览器运行时使用纯 `@pie/contract/session-events` 子路径读取事件 guard，避免把 Effect Schema runtime 打入 app bundle。
+`packages/contract` 不依赖 harness 或 server；它持有共享 wire DTO、Effect Schema 和 `toStandardSchema`。`packages/harness` 依赖 contract，并仅为旧 import path 提供兼容性 re-export。浏览器运行时使用纯 `@getpie/contract/session-events` 子路径读取事件 guard，避免把 Effect Schema runtime 打入 app bundle。
 
 禁止在 Zod 和 Effect Schema 之间手工互转 AST 或维护两份同义 schema。
 
@@ -1216,12 +1216,12 @@ createServer()
 17. 以下命令全部通过：
 
 ```bash
-pnpm --filter @pie/harness test
-pnpm --filter @pie/harness typecheck
-pnpm --filter @pie/server test
-pnpm --filter @pie/server typecheck
-pnpm --filter @pie/contract typecheck
-pnpm --filter @pie/app typecheck
+pnpm --filter @getpie/harness test
+pnpm --filter @getpie/harness typecheck
+pnpm --filter @getpie/server test
+pnpm --filter @getpie/server typecheck
+pnpm --filter @getpie/contract typecheck
+pnpm --filter @getpie/app typecheck
 ```
 
 ## 17. 实施优先级

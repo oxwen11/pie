@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
-      "dependsOn": ["@pie/server#build"],
+      "dependsOn": ["@getpie/server#build"],
       "passThroughEnv": ["*"]
     },
     "build:unpack": {

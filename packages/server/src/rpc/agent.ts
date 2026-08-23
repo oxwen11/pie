@@ -1,8 +1,8 @@
 import "@orpc/experimental-effect/extensions/effect";
 import os from "node:os";
 
+import { agentContract } from "@getpie/contract/agent";
 import { implement } from "@orpc/server";
-import { agentContract } from "@pie/contract/agent";
 import { Effect } from "effect";
 
 import { PiAgentService } from "../harness";

@@ -1,7 +1,7 @@
 "use client";
 
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type React from "react";
 

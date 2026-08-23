@@ -1,13 +1,13 @@
-import { ORPCError } from "@orpc/client";
-import type { GitReviewFile } from "@pie/contract/git";
+import type { GitReviewFile } from "@getpie/contract/git";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyMedia,
   EmptyTitle,
-} from "@pie/ui/components/empty";
-import { Spinner } from "@pie/ui/components/spinner";
+} from "@getpie/ui/components/empty";
+import { Spinner } from "@getpie/ui/components/spinner";
+import { ORPCError } from "@orpc/client";
 import { FilesIcon, TriangleAlertIcon } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
 

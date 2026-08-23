@@ -1,3 +1,4 @@
+import type { GitFileDiff } from "@getpie/contract/git";
 import { parseDiffFromFile } from "@pierre/diffs";
 import {
   CodeView,
@@ -5,7 +6,6 @@ import {
   type CodeViewItem,
   type CodeViewReactOptions,
 } from "@pierre/diffs/react";
-import type { GitFileDiff } from "@pie/contract/git";
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 const DIFF_UNSAFE_CSS = `

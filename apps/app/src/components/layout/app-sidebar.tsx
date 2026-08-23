@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar,
-} from "@pie/ui/components/sidebar";
+} from "@getpie/ui/components/sidebar";
 import { SquarePen } from "lucide-react";
 import { useState } from "react";
 

@@ -27,7 +27,7 @@ blocked-by: [01-contract-types.md, 02-storage-metadata.md, 06-landing-sequence.m
 
 2026-07-17 落地（**option A：端口边界**，用户选定）。
 
-调研发现：契约重写删掉的 `SessionEnvelope`/`SessionEvent` 事件模型被 harness **19 个文件**深度依赖，且 `runtime/rpc.ts` value 级重导已删名字 → 整个 `@pie/harness/runtime` 运行时加载不了。这套事件模型正是 ticket 08 要重写的东西，所以「create/resume 经真实 harness 端到端」与 08 在 harness 层纠缠。据此按 option A 划边界：**07 交付服务端编排层（隔着 port 用 fake 测），真实 port→harness 适配与 RPC 接线归并进 08。**
+调研发现：契约重写删掉的 `SessionEnvelope`/`SessionEvent` 事件模型被 harness **19 个文件**深度依赖，且 `runtime/rpc.ts` value 级重导已删名字 → 整个 `@getpie/harness/runtime` 运行时加载不了。这套事件模型正是 ticket 08 要重写的东西，所以「create/resume 经真实 harness 端到端」与 08 在 harness 层纠缠。据此按 option A 划边界：**07 交付服务端编排层（隔着 port 用 fake 测），真实 port→harness 适配与 RPC 接线归并进 08。**
 
 已交付（commits `997c6be`、`46e322b`）：
 

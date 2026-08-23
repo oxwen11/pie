@@ -10,7 +10,7 @@
 
 **Prerequisite:** the monorepo must be on `ai` v7 first — run `docs/2026-07-11-ai-sdk-v7-upgrade-plan.md` before this plan. Every AI-SDK symbol this plan uses is identical in v7; the only v7 breakage (provider `tool()` shape) is handled by that upgrade plan, not here.
 
-**Design source:** `docs/2026-07-11-harness-agent-adapter-ai-sdk-design.md` (§2 layering, §3 ai-sdk abstraction). This plan implements the `@pie/ai-sdk-harness-agents` half of §2, minus the rename.
+**Design source:** `docs/2026-07-11-harness-agent-adapter-ai-sdk-design.md` (§2 layering, §3 ai-sdk abstraction). This plan implements the `@getpie/ai-sdk-harness-agents` half of §2, minus the rename.
 
 ## Global Constraints
 

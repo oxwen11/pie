@@ -1,12 +1,12 @@
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyMedia,
   EmptyTitle,
-} from "@pie/ui/components/empty";
-import { Spinner } from "@pie/ui/components/spinner";
+} from "@getpie/ui/components/empty";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 

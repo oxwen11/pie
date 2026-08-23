@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useStore } from "zustand";
 

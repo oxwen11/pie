@@ -1,4 +1,4 @@
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type * as React from "react";
 
 export function Kbd({ className, ...props }: React.ComponentProps<"kbd">): React.ReactElement {

@@ -1,4 +1,4 @@
-import type { WorkspaceTreeEntry } from "@pie/contract/fs";
+import type { WorkspaceTreeEntry } from "@getpie/contract/fs";
 import { FileTree as PierreFileTree } from "@pierre/trees/react";
 import {
   type CSSProperties,

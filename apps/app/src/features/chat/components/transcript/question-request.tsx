@@ -1,7 +1,7 @@
-import { Button } from "@pie/ui/components/button";
-import { Checkbox } from "@pie/ui/components/checkbox";
-import { Label } from "@pie/ui/components/label";
-import { Radio, RadioGroup } from "@pie/ui/components/radio-group";
+import { Button } from "@getpie/ui/components/button";
+import { Checkbox } from "@getpie/ui/components/checkbox";
+import { Label } from "@getpie/ui/components/label";
+import { Radio, RadioGroup } from "@getpie/ui/components/radio-group";
 import { useState } from "react";
 
 import type {

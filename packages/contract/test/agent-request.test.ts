@@ -1,4 +1,4 @@
-import { AgentRequestSchema, AgentResponseSchema } from "@pie/contract";
+import { AgentRequestSchema, AgentResponseSchema } from "@getpie/contract";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 

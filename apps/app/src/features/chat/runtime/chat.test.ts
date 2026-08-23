@@ -6,7 +6,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionScopedEvent,
   SessionScopedEventBody,
-} from "@pie/contract";
+} from "@getpie/contract";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { describe, expect, it } from "vitest";
 

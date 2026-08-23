@@ -1,4 +1,4 @@
-import type { GitReviewFile, GitReviewFileStatus, GitReviewMode } from "@pie/contract/git";
+import type { GitReviewFile, GitReviewFileStatus, GitReviewMode } from "@getpie/contract/git";
 
 export const REVIEW_STATUS_LABEL: Record<GitReviewFileStatus, string> = {
   modified: "Modified",

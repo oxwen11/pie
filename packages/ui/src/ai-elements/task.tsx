@@ -4,8 +4,8 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@pie/ui/components/collapsible";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/collapsible";
+import { cn } from "@getpie/ui/lib/utils";
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 

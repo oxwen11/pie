@@ -1,6 +1,6 @@
+import type { GitFileDiff } from "@getpie/contract/git";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
-import type { GitFileDiff } from "@pie/contract/git";
-import { Spinner } from "@pie/ui/components/spinner";
 import { FileDiffIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
 

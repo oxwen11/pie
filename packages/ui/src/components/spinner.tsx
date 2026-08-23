@@ -1,4 +1,4 @@
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import { Loader2Icon } from "lucide-react";
 import type React from "react";
 

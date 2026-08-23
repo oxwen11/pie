@@ -1,5 +1,5 @@
 import { createAgentSessionServices } from "@earendil-works/pi-coding-agent";
-import type { AgentModel } from "@pie/contract";
+import type { AgentModel } from "@getpie/contract";
 
 import { toAgentModel } from "./model-mapping";
 import { resolveDefaultPiModel } from "./resolve-default-model";

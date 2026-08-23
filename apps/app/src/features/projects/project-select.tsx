@@ -1,11 +1,11 @@
-import type { Project } from "@pie/contract";
+import type { Project } from "@getpie/contract";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@pie/ui/components/select";
+} from "@getpie/ui/components/select";
 
 // Project picker for the draft surface. There is no default: a new session must
 // name its project explicitly, so `null` is a real state the composer blocks on.

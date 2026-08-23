@@ -1,6 +1,6 @@
-import type { SessionSummary } from "@pie/contract";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@pie/ui/components/menu";
-import { SidebarMenuAction } from "@pie/ui/components/sidebar";
+import type { SessionSummary } from "@getpie/contract";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/menu";
+import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";

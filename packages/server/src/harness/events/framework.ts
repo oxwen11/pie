@@ -1,9 +1,9 @@
-import { AgentRequestSchema, TokenUsageSchema, TurnErrorSchema } from "@pie/contract";
+import { AgentRequestSchema, TokenUsageSchema, TurnErrorSchema } from "@getpie/contract";
 import type { UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
 /**
- * Harness-internal event vocabulary. The public `@pie/contract` wire model is
+ * Harness-internal event vocabulary. The public `@getpie/contract` wire model is
  * a flat tagged union (`SessionScopedEvent` keyed by `SessionRef`); this module
  * keeps the harness's own ergonomic `defineEvent`/`SessionEnvelope` shape, keyed
  * by the agent-native `sessionId`. `HarnessAgentSession` translates these

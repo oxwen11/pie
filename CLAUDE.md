@@ -12,7 +12,7 @@ skips the upstream tsdown build.
 
 |                                               |                                                      |
 | --------------------------------------------- | ---------------------------------------------------- |
-| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@pie/server`     |
+| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@getpie/server`  |
 | `pnpm check`                                  | lint:check + format:check + typecheck — **no tests** |
 | `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
 

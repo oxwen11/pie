@@ -1,4 +1,4 @@
-import { type JsonStoreLoadError, makeJsonCollection } from "@pie/effect-json-store";
+import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Effect, Option, Schema } from "effect";
 
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";

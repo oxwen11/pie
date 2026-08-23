@@ -6,7 +6,7 @@
 >
 > 相关 ADR：`docs/adr/0003-pi-history-role-segmentation.md`（分段规则与 steer 差异）。
 >
-> 2026-07-30 适配 #153「dissolve @pie/harness into contract + server」：纯转换层
+> 2026-07-30 适配 #153「dissolve @getpie/harness into contract + server」：纯转换层
 > 不再是独立包，落点改为 `packages/server/src/harness/pi/`；`ai` 已是 server 直接依赖。
 >
 > **勘误（2026-08-04，`fix/lazy-harness-agent-runtime`）**：§9 里两条否决结论已被
@@ -96,10 +96,10 @@ managed session 背后就是那个 pi 进程。PiAgent（`harness/pi/agent.ts`�
 
 ### 3.1 依赖关系图
 
-**包依赖**（#153 之后 `@pie/harness` 已不存在；本设计**不新增任何包依赖**）：
+**包依赖**（#153 之后 `@getpie/harness` 已不存在；本设计**不新增任何包依赖**）：
 
 ```
-      @pie/contract  ◄────────  @pie/server
+      @getpie/contract  ◄────────  @getpie/server
       叶子：谁都不得反向依赖它        全部运行时 + 全部转换（#153 併入）
       deps: ai · effect ·           deps: contract · ai ·
             @orpc/contract                @earendil-works/pi-coding-agent

@@ -1,6 +1,6 @@
+import type { GitReviewFile, GitReviewMode } from "@getpie/contract/git";
 import { skipToken, useQueries } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import type { GitReviewFile, GitReviewMode } from "@pie/contract/git";
 
 export function useGitDiffs(
   cwd: string | undefined,

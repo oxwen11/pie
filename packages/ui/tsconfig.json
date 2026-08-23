@@ -1,12 +1,12 @@
 {
-  "extends": "@pie/typescript/react-library.json",
+  "extends": "@getpie/typescript/react-library.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "declaration": true,
     "paths": {
-      "@pie/ui/*": ["./src/*"]
+      "@getpie/ui/*": ["./src/*"]
     }
   },
   "include": ["src"]

@@ -1,7 +1,7 @@
 "use client";
 
 import { Field as FieldPrimitive } from "@base-ui/react/field";
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type React from "react";
 
 export function Field({ className, ...props }: FieldPrimitive.Root.Props): React.ReactElement {

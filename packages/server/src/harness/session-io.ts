@@ -1,4 +1,4 @@
-import { InspectorTargetSchema } from "@pie/contract";
+import { InspectorTargetSchema } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**

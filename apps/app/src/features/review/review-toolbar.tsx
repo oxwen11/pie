@@ -1,5 +1,5 @@
-import type { GitBranch, GitReviewMode } from "@pie/contract/git";
-import { Button } from "@pie/ui/components/button";
+import type { GitBranch, GitReviewMode } from "@getpie/contract/git";
+import { Button } from "@getpie/ui/components/button";
 import {
   Select,
   SelectContent,
@@ -8,8 +8,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@pie/ui/components/select";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/select";
+import { cn } from "@getpie/ui/lib/utils";
 import { ChevronDownIcon, RefreshCwIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 

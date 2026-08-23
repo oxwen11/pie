@@ -11,9 +11,9 @@ domain (`PiAgent`, `PiAgentSessionManager`, `PiAgentSessionService`) and
 
 ## Summary
 
-Package boundaries are largely healthy: no `@pie/app` → `@pie/server` imports in
-production SPA code, no `@pie/ui` barrel imports, desktop renderer uses root
-`@pie/app` exports only, and `EventBusLayer` is a single const in
+Package boundaries are largely healthy: no `@getpie/app` → `@getpie/server` imports in
+production SPA code, no `@getpie/ui` barrel imports, desktop renderer uses root
+`@getpie/app` exports only, and `EventBusLayer` is a single const in
 `packages/server/src/rpc/runtime.ts` (no `Layer.fresh` in production). Persistent
 paths stay in `packages/server/src/config/paths.ts`; HTTP concerns stay under
 `packages/server/src/http/`.
@@ -30,22 +30,22 @@ Highest-impact debt clusters in three areas:
 
 ## Open remediation (pie)
 
-| ID | Severity | Topic | Notes |
-| -- | -------- | ----- | ----- |
-| pie-audit-1 | P2 | Tiptap UI in vendored `components/` tree | Move to `ai-elements/` or feature wrappers before next coss refresh |
-| pie-audit-2 | P2 | Loading patch in vendored `button.tsx` | Same — `loading` prop + Spinner are owned code in registry tree |
-| pie-audit-3 | P3 | Local `frame` / `kbd` in vendored tree | Same |
-| pie-audit-4 | P2 | `localStorage` at `content-panel` module init | Private browsing can throw at import; guard or construct at app mount |
-| pie-audit-5 | P2 | Files feature reads route identity via `useMatch` | Derive `projectId` from panel `sessionRef` at composition root |
-| pie-audit-6 | P2 | Automated feature / package boundary lint | Cross-feature imports, `useMatch` in features, `@pie/server` in `apps/app` |
-| pie-audit-7 | P2 | Placeholder panels in layout instead of features | `terminal`, `browser`, mock `diff` still under `content-panel/panels/` |
-| pie-audit-8 | P3 | Move `Conversation` composite toward `@pie/ui` or feature | Chat-only composite in `apps/app/src/components/` |
-| pie-audit-9 | P3 | Split content-panel definition ownership | Panel types should colocate with their features |
-| pie-audit-10 | P2 | Composition-root behavioural tests | Pin one `EventBusLayer` + one session-manager build; reject `Layer.fresh` splits |
-| pie-audit-11 | P2 | EventBus tests memoize `layer()` | Prefer `Layer.fresh` in tests that need isolation, or integration through runtime |
-| pie-audit-12 | P3 | `harness/index.ts` exports too wide | Narrow public surface to Pi session roles; keep `session.ts` private |
-| pie-audit-13 | P3 | `makeEventBus` exported publicly | Composition root should own bus construction |
-| pie-audit-14 | P3 | `sessionId` prop vs `sessionKey` in files tree | `FileTreeAdapter` receives `sessionRefKey`, not a bare UUID |
+| ID           | Severity | Topic                                                        | Notes                                                                             |
+| ------------ | -------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| pie-audit-1  | P2       | Tiptap UI in vendored `components/` tree                     | Move to `ai-elements/` or feature wrappers before next coss refresh               |
+| pie-audit-2  | P2       | Loading patch in vendored `button.tsx`                       | Same — `loading` prop + Spinner are owned code in registry tree                   |
+| pie-audit-3  | P3       | Local `frame` / `kbd` in vendored tree                       | Same                                                                              |
+| pie-audit-4  | P2       | `localStorage` at `content-panel` module init                | Private browsing can throw at import; guard or construct at app mount             |
+| pie-audit-5  | P2       | Files feature reads route identity via `useMatch`            | Derive `projectId` from panel `sessionRef` at composition root                    |
+| pie-audit-6  | P2       | Automated feature / package boundary lint                    | Cross-feature imports, `useMatch` in features, `@getpie/server` in `apps/app`     |
+| pie-audit-7  | P2       | Placeholder panels in layout instead of features             | `terminal`, `browser`, mock `diff` still under `content-panel/panels/`            |
+| pie-audit-8  | P3       | Move `Conversation` composite toward `@getpie/ui` or feature | Chat-only composite in `apps/app/src/components/`                                 |
+| pie-audit-9  | P3       | Split content-panel definition ownership                     | Panel types should colocate with their features                                   |
+| pie-audit-10 | P2       | Composition-root behavioural tests                           | Pin one `EventBusLayer` + one session-manager build; reject `Layer.fresh` splits  |
+| pie-audit-11 | P2       | EventBus tests memoize `layer()`                             | Prefer `Layer.fresh` in tests that need isolation, or integration through runtime |
+| pie-audit-12 | P3       | `harness/index.ts` exports too wide                          | Narrow public surface to Pi session roles; keep `session.ts` private              |
+| pie-audit-13 | P3       | `makeEventBus` exported publicly                             | Composition root should own bus construction                                      |
+| pie-audit-14 | P3       | `sessionId` prop vs `sessionKey` in files tree               | `FileTreeAdapter` receives `sessionRefKey`, not a bare UUID                       |
 
 **Addressed in open PR [#9](https://github.com/oxwen11/pie/pull/9):** pie-audit-4, pie-audit-5, pie-audit-6 (subset).
 
@@ -105,7 +105,7 @@ a composite key, not a bare UUID (pie-audit-14).
 ### 5. Desktop daemon imports (intentional)
 
 `apps/desktop/src/main/server/daemon-server-process.ts` imports
-`@pie/server/daemon` for PID files and stop semantics. This is Main-process server
+`@getpie/server/daemon` for PID files and stop semantics. This is Main-process server
 supervision, not renderer leakage — consistent with `apps/desktop/AGENTS.md`
 (server platform adapters at the composition root).
 
@@ -119,7 +119,7 @@ supervision, not renderer leakage — consistent with `apps/desktop/AGENTS.md`
   audit time.
 - **Query keys:** cache writers use `queryOptions(...).queryKey`; `.key()` only
   for invalidation.
-- **Desktop renderer:** root `@pie/app` exports only; `ipcRenderer` confined
+- **Desktop renderer:** root `@getpie/app` exports only; `ipcRenderer` confined
   to preload.
 
 ## Recommended priority

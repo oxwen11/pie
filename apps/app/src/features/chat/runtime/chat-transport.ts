@@ -1,6 +1,6 @@
+import type { PieClient } from "@getpie/client";
+import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
-import type { PieClient } from "@pie/client";
-import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@pie/contract";
 import type { UIMessage } from "ai";
 
 import { exponentialBackoffMs } from "@/lib/utils";
