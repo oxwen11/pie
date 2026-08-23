@@ -13,7 +13,7 @@ export * from "./session-io";
 export * from "./session-manager";
 export * from "./session-service";
 export * from "./agent-service";
-export { PiAgent, type PiAgentShape, cachePiAgentAvailability } from "./pi/facade";
+export { PiAgent, type PiAgentShape, cachePiAgentAvailability } from "./pi/agent";
 export { type PiAgentRuntime } from "./pi/runtime";
 export type { AvailabilityResult, SessionInfoResult, AgentSessionInfo } from "./pi/types";
 export type {

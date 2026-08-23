@@ -13,7 +13,7 @@ import type {
   TurnAlreadyRunning,
 } from "../../src/harness";
 
-test("Pi facade create is scoped and effect native", () => {
+test("PiAgent create is scoped and effect native", () => {
   expectTypeOf<PiAgentShape["create"]>().returns.toEqualTypeOf<
     Effect.Effect<
       PiAgentRuntime,

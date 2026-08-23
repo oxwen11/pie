@@ -10,7 +10,7 @@ import {
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/facade";
+import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";

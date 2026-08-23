@@ -35,10 +35,10 @@ The session domain (`packages/server/src/harness/`) has four public roles — Pi
 The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself.
 
 **PiAgentSessionManager** (`harness/session-manager.ts`):
-The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.open`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.
+The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.create`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.
 
-**PiAgent** (`harness/pi/facade.ts`):
-Effect Context service: availability check, open/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
+**PiAgent** (`harness/pi/agent.ts`):
+Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.

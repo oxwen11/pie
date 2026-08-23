@@ -30,8 +30,8 @@ import type {
   TurnAlreadyRunning,
 } from "./errors";
 import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
-import type { PiAgentShape } from "./pi/facade";
-import { PiAgent } from "./pi/facade";
+import type { PiAgentShape } from "./pi/agent";
+import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";

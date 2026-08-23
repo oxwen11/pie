@@ -4,7 +4,7 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { describe, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber } from "effect";
 
-import type { PiAgentShape } from "../../src/harness/pi/facade";
+import type { PiAgentShape } from "../../src/harness/pi/agent";
 import { cacheAvailability } from "../../src/rpc/runtime";
 
 const unusedPi = {

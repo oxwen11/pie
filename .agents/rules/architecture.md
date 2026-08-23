@@ -18,12 +18,12 @@
   session. There is no harness registry, no `harnessAgentId`, and no agent
   selection on the wire. `SessionRef` is `{ projectId, sessionId }`.
 - **`packages/server/src/harness/`** holds the session domain and the Pi
-  driver under `harness/pi/` (`process.ts`, `runtime.ts`, `facade.ts`,
+  implementation under `harness/pi/` (`process.ts`, `runtime.ts`, `agent.ts`,
   `transport.ts`, …). The folder name is legacy; the code is Pi-only.
 - **The session domain has four public roles** (no registry): `PiAgent`
-  (Effect Context — open/resume/cold reads at the composition root),
+  (Effect Context — create/resume/cold reads at the composition root),
   `PiAgentRuntime` (live child handle), `PiAgentSessionManager` (sole owner of
-  live state — one session per ref; the only caller of `PiAgent.open`/`resume`),
+  live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
   and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
   translation, metadata persistence, wire vocabulary validation, collection
   events). `session.ts`, `session-fold.ts` and `session-repository.ts` are

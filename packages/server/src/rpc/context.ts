@@ -4,7 +4,7 @@ import type { FileSystem } from "effect/FileSystem";
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
 import type { PiAgentService, PiAgentSessionService } from "../harness";
-import type { PiAgent } from "../harness/pi/facade";
+import type { PiAgent } from "../harness/pi/agent";
 import type { ProjectService } from "../project";
 
 /** Services every RPC procedure may `yield*`. */

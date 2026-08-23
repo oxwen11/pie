@@ -1,4 +1,4 @@
-export * from "./facade";
+export * from "./agent";
 export * from "./process";
 export * from "./runtime";
 export * from "./resolve-executable";

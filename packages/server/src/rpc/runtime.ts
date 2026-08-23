@@ -13,7 +13,7 @@ import {
   PiAgentServiceLayer,
   PiAgentSessionServiceLayer,
 } from "../harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/facade";
+import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";

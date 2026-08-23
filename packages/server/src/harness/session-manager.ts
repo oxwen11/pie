@@ -14,8 +14,8 @@ import {
   type ResumeSessionError,
   SessionNotResumable,
 } from "./errors";
-import type { PiAgentShape } from "./pi/facade";
-import { PiAgent } from "./pi/facade";
+import type { PiAgentShape } from "./pi/agent";
+import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
 import { type AcquireRuntime, type PiAgentSessionShape, makePiAgentSession } from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
@@ -204,9 +204,9 @@ export const makePiAgentSessionManager = (
      * that vanished — and the failure reaches the user as a session that "does
      * nothing".
      *
-     * Availability is checked inside the Pi facade; the native span correlates
+     * Availability is checked inside PiAgent; the native span correlates
      * logs emitted during each acquisition. The Pi session id is attached after
-     * the facade answers because it does not exist before then.
+     * PiAgent answers because it does not exist before then.
      */
     const acquireCreate = (input: CreateSessionInput): AcquireRuntime =>
       withFileSystem(pi.create(input)).pipe(

@@ -8,7 +8,7 @@ import type * as Cause from "effect/Cause";
 import { makeEventBus } from "../../src/events/event-bus";
 import { AgentOperationError } from "../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../src/harness/events/framework";
-import type { PiAgentShape } from "../../src/harness/pi/facade";
+import type { PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";

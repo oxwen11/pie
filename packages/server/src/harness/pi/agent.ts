@@ -15,7 +15,7 @@ import type { PiExecutable } from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime, type PiAgentRuntime } from "./runtime";
 import type { AvailabilityResult, SessionInfoResult } from "./types";
 
-/** Pi facade injected at the composition root — create, resume, and cold reads. */
+/** Injected PiAgent service — create, resume, and cold reads at the composition root. */
 export type PiAgentShape = {
   readonly availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
   readonly create: (

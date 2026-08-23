@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
-import type { PiAgentShape } from "../../src/harness/pi/facade";
+import type { PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
 import { makePiAgentSessionManager } from "../../src/harness/session-manager";

@@ -7,7 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Stream } from "effect";
 
-import { makePiAgent } from "../../../src/harness/pi/facade";
+import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
 
 const FAKE = `#!/usr/bin/env node
@@ -299,7 +299,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("Pi facade create exposes prompt output on the PiAgentRuntime event stream", () =>
+  it.effect("PiAgent create exposes prompt output on the PiAgentRuntime event stream", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
