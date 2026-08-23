@@ -17,7 +17,7 @@ import { useState } from "react";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
-import { usePlatform } from "@/platform-context";
+import { useHostLayout } from "@/use-host-layout";
 
 export function AppSidebar({
   isSessionActive,
@@ -27,8 +27,10 @@ export function AppSidebar({
   readonly onNewChat: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
-  const { os } = usePlatform();
+  const { showsInlineSidebarToggle, showsSidebarBrandMark } = useHostLayout();
   const { isMobile, state } = useSidebar();
+  const showsSidebarHeader =
+    showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle);
 
   return (
     <Sidebar
@@ -37,12 +39,14 @@ export function AppSidebar({
       collapsible={isMobile ? "offcanvas" : "none"}
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
-      <SidebarHeader className="h-10 flex-row items-center px-4 [-webkit-app-region:drag]">
-        {os !== "macos" && <BrandMark />}
-        {!isMobile && state === "expanded" && os !== "macos" && (
-          <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
-        )}
-      </SidebarHeader>
+      {showsSidebarHeader ? (
+        <SidebarHeader className="h-10 flex-row items-center px-4 [-webkit-app-region:drag]">
+          {showsSidebarBrandMark && <BrandMark />}
+          {!isMobile && state === "expanded" && showsInlineSidebarToggle && (
+            <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
+          )}
+        </SidebarHeader>
+      ) : null}
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
         <SidebarGroup>
