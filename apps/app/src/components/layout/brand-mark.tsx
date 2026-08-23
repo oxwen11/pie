@@ -3,8 +3,8 @@ import type { ReactElement } from "react";
 
 import pieMarkUrl from "@/assets/pie-mark.svg?url";
 
-// Web and desktop win/linux: fills the sidebar header row. Desktop macOS
-// omits this row — native traffic lights and the fixed shell toggle own it.
+// Web: sidebar header row. Desktop win/linux: fixed titlebar chrome beside the
+// toggle. Desktop macOS omits this — native traffic lights own the row.
 export function BrandMark({ className }: { className?: string }): ReactElement {
   return (
     <div className={cn("flex h-7 items-center gap-2 select-none", className)}>

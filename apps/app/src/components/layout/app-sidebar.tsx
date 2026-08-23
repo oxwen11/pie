@@ -16,7 +16,7 @@ import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { DESKTOP_SIDEBAR_BRAND_INSET_CLASS, SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { useHostLayout } from "@/use-host-layout";
@@ -32,8 +32,10 @@ export function AppSidebar({
   const { showsInlineSidebarToggle, showsSidebarBrandMark, usesFixedSidebarToggle } =
     useHostLayout();
   const { isMobile, state } = useSidebar();
+  // Desktop chrome (toggle ± BrandMark) is viewport-fixed; web keeps an inline header.
   const showsSidebarHeader =
-    showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle);
+    !usesFixedSidebarToggle &&
+    (showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle));
 
   return (
     <Sidebar
@@ -43,13 +45,7 @@ export function AppSidebar({
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
       {showsSidebarHeader ? (
-        <SidebarHeader
-          className={cn(
-            SHELL_TITLEBAR_HEADER_CLASS,
-            "[-webkit-app-region:drag]",
-            usesFixedSidebarToggle && DESKTOP_SIDEBAR_BRAND_INSET_CLASS,
-          )}
-        >
+        <SidebarHeader className={cn(SHELL_TITLEBAR_HEADER_CLASS, "[-webkit-app-region:drag]")}>
           {showsSidebarBrandMark && <BrandMark />}
           {!isMobile && state === "expanded" && showsInlineSidebarToggle && (
             <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
