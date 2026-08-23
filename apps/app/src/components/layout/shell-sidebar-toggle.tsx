@@ -2,11 +2,15 @@ import { SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import type { ReactElement } from "react";
 
-import { desktopToggleLeftClass } from "@/components/layout/shell-chrome";
+import {
+  desktopToggleInsetClass,
+  SHELL_TITLEBAR_ROW_CLASS,
+  SHELL_TITLEBAR_TOP_CLASS,
+} from "@/components/layout/shell-chrome";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost } from "@/platform-host";
 
-/** Desktop: viewport-fixed toggle hugging the left chrome (traffic lights on macOS). */
+/** Desktop: viewport-fixed toggle in the shared titlebar row (centered with BrandMark). */
 export function ShellSidebarToggle(): ReactElement | null {
   const { isMobile } = useSidebar();
   const platform = usePlatform();
@@ -14,11 +18,19 @@ export function ShellSidebarToggle(): ReactElement | null {
   if (isMobile || !isDesktopHost(platform)) return null;
 
   return (
-    <SidebarTrigger
+    <div
       className={cn(
-        "fixed top-1.5 z-50 [-webkit-app-region:no-drag]",
-        desktopToggleLeftClass(platform),
+        "pointer-events-none fixed inset-x-0 z-50 [-webkit-app-region:drag]",
+        SHELL_TITLEBAR_TOP_CLASS,
+        SHELL_TITLEBAR_ROW_CLASS,
       )}
-    />
+    >
+      <SidebarTrigger
+        className={cn(
+          "pointer-events-auto [-webkit-app-region:no-drag]",
+          desktopToggleInsetClass(platform),
+        )}
+      />
+    </div>
   );
 }

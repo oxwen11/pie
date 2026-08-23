@@ -2,7 +2,7 @@ import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
-import { desktopTitlebarChromeInsetClass } from "@/components/layout/shell-chrome";
+import { desktopTitlebarChromeInsetClass, SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 import { useHostLayout } from "@/use-host-layout";
 import { usePlatform } from "@/platform-context";
@@ -23,7 +23,8 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
     <SidebarInset className="flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5">
       <header
         className={cn(
-          "flex h-10 shrink-0 items-center gap-2 px-4 shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
+          SHELL_TITLEBAR_HEADER_CLASS,
+          "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
           collapsedDesktop && usesFixedSidebarToggle && desktopTitlebarChromeInsetClass(platform),
         )}
       >

@@ -16,7 +16,7 @@ import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { DESKTOP_SIDEBAR_BRAND_INSET_CLASS } from "@/components/layout/shell-chrome";
+import { DESKTOP_SIDEBAR_BRAND_INSET_CLASS, SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { useHostLayout } from "@/use-host-layout";
@@ -45,7 +45,8 @@ export function AppSidebar({
       {showsSidebarHeader ? (
         <SidebarHeader
           className={cn(
-            "h-10 flex-row items-center px-4 [-webkit-app-region:drag]",
+            SHELL_TITLEBAR_HEADER_CLASS,
+            "[-webkit-app-region:drag]",
             usesFixedSidebarToggle && DESKTOP_SIDEBAR_BRAND_INSET_CLASS,
           )}
         >
