@@ -10,6 +10,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { computeBatchTrigger, type BatchTriggerLabel } from "./compute-batch-trigger";
+import { ReasoningPart } from "./reasoning-part";
 import { ToolPart } from "./tool-part";
 import type { BucketKey } from "./tool/bucket";
 import type { IndexedBatchPart } from "./use-tool-batches";
@@ -59,9 +60,7 @@ function buildTriggerPhrase(label: BatchTriggerLabel): string {
 
 // Collapsible accordion for a run of consecutive tool/reasoning parts.
 // shouldShimmer is computed by the parent from `isTrailing && isStreaming` —
-// the batch stays agnostic of either signal alone. Reasoning parts stay in the
-// batch data flow but never render — the trigger shimmer is the only thinking
-// indicator we surface.
+// the batch stays agnostic of either signal alone.
 export function ToolBatch({
   message,
   parts,
@@ -73,13 +72,17 @@ export function ToolBatch({
   shouldShimmer?: boolean;
   className?: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(shouldShimmer);
   const batchParts = useMemo(() => parts.map((p) => p.part), [parts]);
   const label = useMemo(() => computeBatchTrigger(batchParts), [batchParts]);
   const phrase = useMemo(() => buildTriggerPhrase(label), [label]);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("w-full", className)}>
+    <Collapsible
+      open={shouldShimmer || isOpen}
+      onOpenChange={setIsOpen}
+      className={cn("w-full", className)}
+    >
       <CollapsibleTrigger
         className={cn(
           "text-muted-foreground hover:text-foreground -mx-1 flex w-full items-center gap-2 rounded-md px-1 text-sm transition-colors duration-150",
@@ -100,8 +103,16 @@ export function ToolBatch({
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-2 pt-2">
-        {parts.map(({ part }) => {
-          if (part.type === "reasoning") return null;
+        {parts.map(({ part, index }) => {
+          if (part.type === "reasoning") {
+            return (
+              <ReasoningPart
+                key={part.id ?? `reasoning-${index}`}
+                part={part}
+                isMessageStreaming={shouldShimmer}
+              />
+            );
+          }
           const toolPart = part as ToolUIPart;
           return <ToolPart key={toolPart.toolCallId} message={message} part={toolPart} />;
         })}
