@@ -318,7 +318,7 @@ describe("Chat history floor state", () => {
   // Both ways a read comes back with no floor — capability absent, read threw —
   // land on the same state: the transcript says so instead of showing a blank
   // that would read as "nothing was ever said".
-  it("marks the history unavailable when the harness has no read", async () => {
+  it("marks the history unavailable when Pi has no history read", async () => {
     const { chat, transport, attach } = makeChat();
     transport.history = null;
     await attach({});
@@ -377,7 +377,7 @@ describe("Chat prompting", () => {
     expect(messages[0]!.id).toBe("other-1");
   });
 
-  it("drops the phantom message when the harness rejects a broadcast prompt", async () => {
+  it("drops the phantom message when the server rejects a broadcast prompt", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     await chat.prompt("loser");
@@ -389,7 +389,7 @@ describe("Chat prompting", () => {
       phase: "idle",
     });
     expect(chat.store.getState().messages).toHaveLength(1);
-    // The harness rejected the prompt (turn already running): the compensating
+    // The server rejected the prompt (turn already running): the compensating
     // event removes the user bubble everywhere, optimistic copy included.
     live(2, { type: "session.prompt.rejected", messageId, reason: "turn running", phase: "idle" });
     expect(chat.store.getState().messages).toEqual([]);

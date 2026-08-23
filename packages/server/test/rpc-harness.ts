@@ -6,38 +6,40 @@ import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
 import {
-  HarnessAgentServiceLayer,
-  HarnessAgentSessionManagerLayer,
-  HarnessAgentSessionServiceLayer,
+  PiAgentServiceLayer,
+  PiAgentSessionManagerLayer,
+  PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { makePiAdapter, makePiAgent } from "../src/harness/pi";
-import { PiAdapter } from "../src/harness/pi-adapter";
+import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
+import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { Pi } from "../src/rpc/runtime";
+import { PiProcessTag } from "../src/rpc/runtime";
 
 export async function makeRpcTestHarness(home: string) {
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
-  const piLayer = Layer.effect(Pi, makePiAgent()).pipe(Layer.provide(NodeServices.layer));
-  const piAdapterLayer = Layer.effect(
-    PiAdapter,
+  const piProcessLayer = Layer.effect(PiProcessTag, makePiProcess()).pipe(
+    Layer.provide(NodeServices.layer),
+  );
+  const piAgentLayer = Layer.effect(
+    PiAgent,
     Effect.gen(function* () {
-      const pi = yield* Pi;
-      return makePiAdapter(pi);
+      const process = yield* PiProcessTag;
+      return yield* cachePiAgentAvailability(makePiAgent(process));
     }),
-  ).pipe(Layer.provide(piLayer));
+  ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
-  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
+  const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
-      HarnessAgentSessionManagerLayer.pipe(
-        Layer.provide(piAdapterLayer),
+      PiAgentSessionManagerLayer.pipe(
+        Layer.provide(piAgentLayer),
         Layer.provide(EventBusLayer),
         Layer.provide(NodeServices.layer),
       ),
     ),
-    Layer.provide(piAdapterLayer),
+    Layer.provide(piAgentLayer),
     Layer.provide(EventBusLayer),
     Layer.provide(pathsLayer),
     Layer.provide(NodeServices.layer),
@@ -49,10 +51,11 @@ export async function makeRpcTestHarness(home: string) {
 
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    HarnessAgentServiceLayer,
+    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
-    piAdapterLayer,
+    piAgentLayer,
+    piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,

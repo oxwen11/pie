@@ -6,23 +6,22 @@ import { Context, Effect, Layer } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  type HarnessAgentSessionRepositoryShape,
-  makeHarnessAgentSessionRepository,
+  type PiAgentSessionRepositoryShape,
+  makePiAgentSessionRepository,
 } from "../../src/harness/session-repository";
 import type { Session } from "../../src/types";
 import { NodePlatformLayer } from "../platform";
 
 // The repository is a private collaborator of the session service (no Context
 // tag in production); the test wraps the factory in a local tag for wiring.
-class SessionRepository extends Context.Service<
-  SessionRepository,
-  HarnessAgentSessionRepositoryShape
->()("test/SessionRepository") {}
+class SessionRepository extends Context.Service<SessionRepository, PiAgentSessionRepositoryShape>()(
+  "test/SessionRepository",
+) {}
 
 const makeLayer = (home: string) =>
   Layer.effect(
     SessionRepository,
-    makeHarnessAgentSessionRepository(path.join(home, "storage", "sessions")),
+    makePiAgentSessionRepository(path.join(home, "storage", "sessions")),
   ).pipe(Layer.provide(NodePlatformLayer));
 
 const meta = (sessionId: string, projectId: string, agentSessionId: string): Session => ({

@@ -9,7 +9,7 @@ describe("isSessionEvent", () => {
       "session.turn.ended",
       "session.request.asked",
       "project.updated",
-      "server.connected",
+      "session.crashed",
     ]) {
       expect(isSessionEvent({ type } as never)).toBe(true);
     }

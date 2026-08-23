@@ -1,4 +1,4 @@
-import type { Effect, Scope, Stream } from "effect";
+import type { Effect, FileSystem, Scope, Stream } from "effect";
 import { expectTypeOf, test } from "vitest";
 
 import type {
@@ -6,27 +6,27 @@ import type {
   AgentOperationError,
   AgentUnavailable,
   ExecutableNotFound,
-  HarnessAgentAdapter,
-  HarnessAgentRuntime,
+  PiAgentShape,
+  PiAgentRuntime,
   PromptReceipt,
   SessionClosed,
   TurnAlreadyRunning,
 } from "../../src/harness";
 
-test("adapter acquisition is scoped and effect native", () => {
-  expectTypeOf<HarnessAgentAdapter["open"]>().returns.toEqualTypeOf<
+test("PiAgent create is scoped and effect native", () => {
+  expectTypeOf<PiAgentShape["create"]>().returns.toEqualTypeOf<
     Effect.Effect<
-      HarnessAgentRuntime,
+      PiAgentRuntime,
       AgentUnavailable | ExecutableNotFound | AgentOpenError,
-      Scope.Scope
+      Scope.Scope | FileSystem.FileSystem
     >
   >();
 });
 
 test("session operations expose Effect and Stream only", () => {
-  expectTypeOf<HarnessAgentRuntime["events"]>().toMatchTypeOf<Stream.Stream<unknown, unknown>>();
-  expectTypeOf<ReturnType<HarnessAgentRuntime["prompt"]>>().toEqualTypeOf<
+  expectTypeOf<PiAgentRuntime["events"]>().toMatchTypeOf<Stream.Stream<unknown, unknown>>();
+  expectTypeOf<ReturnType<PiAgentRuntime["prompt"]>>().toEqualTypeOf<
     Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>
   >();
-  expectTypeOf<HarnessAgentRuntime["close"]>().toEqualTypeOf<Effect.Effect<void>>();
+  expectTypeOf<PiAgentRuntime["close"]>().toEqualTypeOf<Effect.Effect<void>>();
 });

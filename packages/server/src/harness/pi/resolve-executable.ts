@@ -49,7 +49,7 @@ export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExe
   return { command: "pi", prefixArgs: [] };
 }
 
-/** What `checkAvailability` should stat or PATH-search. */
+/** What `availability` should stat or PATH-search. */
 export function piAvailabilityTarget(executable: PiExecutable): string {
   return executable.prefixArgs[0] ?? executable.command;
 }

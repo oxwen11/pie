@@ -6,14 +6,19 @@ export {
   type SessionEvent,
 } from "./events/framework";
 export * from "./event-manifest";
-export * from "./adapter";
 export * from "./errors";
 export * from "./executable";
 export * from "./queue-stream";
-export * from "./pi-adapter";
 export * from "./session-io";
 export * from "./session-manager";
-// The session and repository modules are private collaborators, of the manager
-// and the service respectively; neither is exported.
 export * from "./session-service";
 export * from "./agent-service";
+export { PiAgent, type PiAgentShape, cachePiAgentAvailability } from "./pi/agent";
+export { type PiAgentRuntime } from "./pi/runtime";
+export type { AvailabilityResult, SessionInfoResult, AgentSessionInfo } from "./pi/types";
+export type {
+  PromptReceipt,
+  UserInput,
+  CreateSessionInput,
+  ResumeSessionInput,
+} from "./session-io";

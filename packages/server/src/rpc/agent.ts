@@ -5,7 +5,7 @@ import { implement } from "@orpc/server";
 import { agentContract } from "@pie/contract/agent";
 import { Effect } from "effect";
 
-import { HarnessAgentService } from "../harness";
+import { PiAgentService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { sessionRouter } from "./session";
@@ -14,7 +14,7 @@ const orpc = implement(agentContract).$context<RpcContext>();
 
 export const agentRouter = orpc.router({
   listModels: orpc.listModels.effect(function* ({ input, errors }) {
-    const agent = yield* HarnessAgentService;
+    const agent = yield* PiAgentService;
     const cwd = input.projectId
       ? yield* ProjectService.pipe(
           Effect.flatMap((projects) =>

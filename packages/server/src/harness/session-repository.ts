@@ -34,10 +34,10 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
  * Data access for `storage/sessions/<projectId>/<sessionId>.json`. The filename
  * mirrors {@link Session.sessionId}, which the body also carries. No business
  * rules — orchestration (id generation, projectId resolution) lives in
- * {@link HarnessAgentSessionService}, whose internal collaborator this is; it
+ * {@link PiAgentSessionService}, whose internal collaborator this is; it
  * has no Context tag of its own.
  */
-export type HarnessAgentSessionRepositoryShape = {
+export type PiAgentSessionRepositoryShape = {
   /** All session metadata under a project; empty if the project dir is absent. */
   readonly list: (projectId: string) => Effect.Effect<ReadonlyArray<Session>, StoreReadError>;
   readonly read: (
@@ -65,7 +65,7 @@ export type HarnessAgentSessionRepositoryShape = {
 const isSafeId = (id: string): boolean =>
   id.length > 0 && !/[/\\]/.test(id) && id !== "." && id !== "..";
 
-export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
+export const makePiAgentSessionRepository = (sessionsDir: string) =>
   Effect.gen(function* () {
     const sessions = yield* makeJsonCollection({
       dir: sessionsDir,
@@ -123,5 +123,5 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
         !isSafeId(projectId) || !isSafeId(sessionId)
           ? Effect.void
           : sessions.remove(entryId(projectId, sessionId)).pipe(Effect.mapError(asWriteError)),
-    } satisfies HarnessAgentSessionRepositoryShape;
+    } satisfies PiAgentSessionRepositoryShape;
   });

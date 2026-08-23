@@ -7,6 +7,7 @@ import type {
   SessionStatus,
   SessionSummary,
 } from "@pie/contract";
+import type { SessionCapabilities } from "@pie/contract";
 import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
@@ -21,14 +22,6 @@ import {
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import type { Session } from "../types";
 import type {
-  PromptReceipt,
-  SessionCapabilities,
-  SessionInfoResult,
-  UserInput,
-  HarnessAgentRuntime,
-} from "./adapter";
-import type { HarnessAgentAdapter } from "./adapter";
-import type {
   AgentOperationError,
   CreateSessionError,
   HarnessSessionNotFound,
@@ -37,13 +30,17 @@ import type {
   TurnAlreadyRunning,
 } from "./errors";
 import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
-import { PiAdapter } from "./pi-adapter";
+import type { PiAgentShape } from "./pi/agent";
+import { PiAgent } from "./pi/agent";
+import type { PiAgentRuntime } from "./pi/runtime";
+import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
-import type { HarnessAgentSessionManagerShape } from "./session-manager";
-import { HarnessAgentSessionManager } from "./session-manager";
+import type { PromptReceipt, UserInput } from "./session-io";
+import type { PiAgentSessionManagerShape } from "./session-manager";
+import { PiAgentSessionManager } from "./session-manager";
 import {
-  type HarnessAgentSessionRepositoryShape,
-  makeHarnessAgentSessionRepository,
+  type PiAgentSessionRepositoryShape,
+  makePiAgentSessionRepository,
 } from "./session-repository";
 
 const MAX_TITLE_CHARS = 60;
@@ -63,7 +60,7 @@ const toUserInput = (
       : Effect.succeed(part),
   ).pipe(Effect.map((userParts) => ({ parts: userParts })));
 
-export type HarnessAgentSessionServiceShape = {
+export type PiAgentSessionServiceShape = {
   readonly create: (
     projectId: string,
     cwd: string,
@@ -172,19 +169,19 @@ export type HarnessAgentSessionServiceShape = {
   ) => Effect.Effect<SessionRef, StoreReadError | SessionRefNotFound>;
 };
 
-export class HarnessAgentSessionService extends Context.Service<
-  HarnessAgentSessionService,
-  HarnessAgentSessionServiceShape
->()("HarnessAgentSessionService") {}
+export class PiAgentSessionService extends Context.Service<
+  PiAgentSessionService,
+  PiAgentSessionServiceShape
+>()("PiAgentSessionService") {}
 
-export const makeHarnessAgentSessionService = (deps: {
-  readonly manager: HarnessAgentSessionManagerShape;
-  readonly adapter: HarnessAgentAdapter;
-  readonly repo: HarnessAgentSessionRepositoryShape;
+export const makePiAgentSessionService = (deps: {
+  readonly manager: PiAgentSessionManagerShape;
+  readonly pi: PiAgentShape;
+  readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly newSessionId: Effect.Effect<string>;
-}): HarnessAgentSessionServiceShape => {
-  const { manager, adapter, repo, bus, newSessionId } = deps;
+}): PiAgentSessionServiceShape => {
+  const { manager, pi, repo, bus, newSessionId } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -207,7 +204,7 @@ export const makeHarnessAgentSessionService = (deps: {
     ReadonlyArray<UIMessage>,
     ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError
   > => {
-    const cold = adapter.getMessages;
+    const cold = pi.getMessages;
     if (cold) return cold(agentSessionId, cwd);
     return manager
       .ensureRuntime({ sessionId: agentSessionId, cwd }, ref)
@@ -238,7 +235,7 @@ export const makeHarnessAgentSessionService = (deps: {
     agentSessionId: string,
     cwd: string,
     run: (
-      runtime: HarnessAgentRuntime,
+      runtime: PiAgentRuntime,
     ) => Effect.Effect<A, CapabilityUnsupported | SessionClosed | AgentOperationError | E>,
   ): Effect.Effect<
     A,
@@ -317,7 +314,7 @@ export const makeHarnessAgentSessionService = (deps: {
           }),
         ),
       ).pipe(
-        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, cwd)),
+        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, cwd)),
         Effect.flatMap((info) =>
           info._tag === "missing"
             ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
@@ -520,7 +517,7 @@ export const makeHarnessAgentSessionService = (deps: {
 
     getSessionInfo: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
+        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
         inSession(ref),
       ),
 
@@ -536,25 +533,25 @@ export const makeHarnessAgentSessionService = (deps: {
           }),
         ),
       ),
-  } satisfies HarnessAgentSessionServiceShape;
+  } satisfies PiAgentSessionServiceShape;
 };
 
-export const HarnessAgentSessionServiceLayer: Layer.Layer<
-  HarnessAgentSessionService,
+export const PiAgentSessionServiceLayer: Layer.Layer<
+  PiAgentSessionService,
   never,
-  HarnessAgentSessionManager | PiAdapter | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
+  PiAgentSessionManager | PiAgent | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
 > = Layer.effect(
-  HarnessAgentSessionService,
+  PiAgentSessionService,
   Effect.gen(function* () {
-    const manager = yield* HarnessAgentSessionManager;
-    const adapter = yield* PiAdapter;
+    const manager = yield* PiAgentSessionManager;
+    const pi = yield* PiAgent;
     const bus = yield* EventBus;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
-    const repo = yield* makeHarnessAgentSessionRepository(paths.sessionsDir);
-    return makeHarnessAgentSessionService({
+    const repo = yield* makePiAgentSessionRepository(paths.sessionsDir);
+    return makePiAgentSessionService({
       manager,
-      adapter,
+      pi,
       repo,
       bus,
       newSessionId: crypto.randomUUIDv4.pipe(

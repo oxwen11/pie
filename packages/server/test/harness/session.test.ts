@@ -7,10 +7,10 @@ import type * as Cause from "effect/Cause";
 
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
-import type { HarnessAgentRuntime } from "../../src/harness/adapter";
 import { AgentUnavailable } from "../../src/harness/errors";
+import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
-import { type HarnessAgentSessionShape, makeHarnessAgentSession } from "../../src/harness/session";
+import { type PiAgentSessionShape, makePiAgentSession } from "../../src/harness/session";
 
 const ref: SessionRef = {
   projectId: "project-1",
@@ -19,7 +19,7 @@ const ref: SessionRef = {
 
 // A session is a private collaborator of the manager (no Context tag in
 // production); the test wraps the factory in a local tag for wiring.
-class SessionService extends Context.Service<SessionService, HarnessAgentSessionShape>()(
+class SessionService extends Context.Service<SessionService, PiAgentSessionShape>()(
   "test/SessionService",
 ) {}
 
@@ -27,7 +27,7 @@ const SessionServiceLayer = Layer.effect(
   SessionService,
   Effect.gen(function* () {
     const bus = yield* EventBus;
-    return yield* makeHarnessAgentSession(ref, bus);
+    return yield* makePiAgentSession(ref, bus);
   }),
 );
 
@@ -44,7 +44,7 @@ type EventQueue = Effect.Success<typeof makeQueue>;
 const runtimeFrom = (
   queue: EventQueue,
   options: { readonly closes?: Ref.Ref<number> } = {},
-): HarnessAgentRuntime => ({
+): PiAgentRuntime => ({
   sessionId: nativeId,
   events: streamFromQueueOne(queue).pipe(Stream.map((body) => ({ sessionId: nativeId, body }))),
   prompt: () => Effect.succeed({ turnId: "turn-1" }),
@@ -63,7 +63,7 @@ const layer = SessionServiceLayer.pipe(Layer.provide(EventBusLayer));
 const run = <A, E>(program: Effect.Effect<A, E, SessionService>) =>
   program.pipe(Effect.provide(layer));
 
-const awaitCursor = (session: HarnessAgentSessionShape, at: number) =>
+const awaitCursor = (session: PiAgentSessionShape, at: number) =>
   Effect.eventually(
     session.snapshot.pipe(
       Effect.filterOrFail(
@@ -73,7 +73,7 @@ const awaitCursor = (session: HarnessAgentSessionShape, at: number) =>
     ),
   );
 
-const awaitPhase = (session: HarnessAgentSessionShape, phase: string) =>
+const awaitPhase = (session: PiAgentSessionShape, phase: string) =>
   Effect.eventually(
     session.status.pipe(
       Effect.filterOrFail(

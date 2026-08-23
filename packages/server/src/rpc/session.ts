@@ -4,7 +4,7 @@ import { sessionContract } from "@pie/contract/session";
 import { Effect } from "effect";
 
 import { EventBus } from "../events";
-import { HarnessAgentSessionService } from "../harness";
+import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { openScopedSubscription } from "./session-stream";
@@ -15,7 +15,7 @@ const orpc = implement(sessionContract).$context<RpcContext>();
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     const model =
       input.provider && input.modelId
         ? { provider: input.provider, modelId: input.modelId }
@@ -33,7 +33,7 @@ export const sessionRouter = orpc.router({
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
       Effect.flatMap((project) => sessions.prepare(input.ref, project.path)),
       Effect.as(input.ref),
@@ -48,7 +48,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.close(input.ref).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -59,7 +59,7 @@ export const sessionRouter = orpc.router({
 
   list: orpc.list.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.projectId).pipe(
       Effect.andThen(sessions.list(input.projectId, input.archived ?? false)),
       Effect.catchTags({
@@ -69,7 +69,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   rename: orpc.rename.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.rename(input.ref, input.title).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -78,7 +78,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   archive: orpc.archive.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.archive(input.ref, input.archived).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -87,7 +87,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   delete: orpc.delete.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.delete(input.ref).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -97,7 +97,7 @@ export const sessionRouter = orpc.router({
   }),
   getMessages: orpc.getMessages.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
       Effect.flatMap((project) => sessions.getMessages(input.ref, project.path)),
       Effect.map((messages) => ({ messages })),
@@ -119,7 +119,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   resolveRef: orpc.resolveRef.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* sessions.resolveRef(input.sessionId).pipe(
       Effect.catchTags({
         SessionRefNotFound: (e) =>
@@ -129,7 +129,7 @@ export const sessionRouter = orpc.router({
   }),
 
   prompt: orpc.prompt.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* sessions.prompt(input).pipe(
       Effect.catchTags({
         // Metadata gone → NOT_FOUND; native session not open → SESSION_NOT_ACTIVE.
@@ -156,7 +156,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.interrupt(input.ref).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -168,7 +168,7 @@ export const sessionRouter = orpc.router({
     );
   }),
   respondToAgentRequest: orpc.respondToAgentRequest.effect(function* ({ input, errors }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     yield* sessions.respondToAgentRequest(input.ref, input.requestId, input.response).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -181,17 +181,17 @@ export const sessionRouter = orpc.router({
   }),
   // Untouched persisted sessions read idle — not SESSION_NOT_ACTIVE.
   getStatus: orpc.getStatus.effect(function* ({ input }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* sessions.getStatus(input.ref);
   }),
   getSnapshot: orpc.getSnapshot.effect(function* ({ input }) {
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* sessions.getSnapshot(input.ref);
   }),
 
   getModelState: orpc.getModelState.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
       Effect.flatMap((project) => sessions.getModelState(input.ref, project.path)),
       Effect.catchTags({
@@ -213,7 +213,7 @@ export const sessionRouter = orpc.router({
   }),
   setModel: orpc.setModel.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* HarnessAgentSessionService;
+    const sessions = yield* PiAgentSessionService;
     return yield* projects.findById(input.ref.projectId).pipe(
       Effect.flatMap((project) =>
         sessions.setModel(input.ref, project.path, {
