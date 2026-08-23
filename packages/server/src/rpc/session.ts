@@ -1,4 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
+import crypto from "node:crypto";
+
 import { sessionContract } from "@getpie/contract/session";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
@@ -39,19 +41,27 @@ export const sessionRouter = orpc.router({
           let gitBranch: string | undefined;
           let createdWorktreePath: string | undefined;
 
+          let sessionId: string | undefined;
+
           if (input.worktree !== undefined) {
-            const worktree = yield* git.worktreeCreate(project.path, input.worktree).pipe(
-              Effect.tap((result) => {
-                createdWorktreePath = result.path;
-                return Effect.void;
-              }),
-            );
+            sessionId = crypto.randomUUID();
+            const worktree = yield* git
+              .worktreeCreate(project.path, {
+                worktreeId: sessionId,
+                ...(input.worktree.branch !== undefined ? { branch: input.worktree.branch } : {}),
+              })
+              .pipe(
+                Effect.tap((result) => {
+                  createdWorktreePath = result.path;
+                  return Effect.void;
+                }),
+              );
             sessionCwd = worktree.path;
             gitBranch = worktree.branch;
           }
 
           const ref = yield* sessions
-            .create(input.projectId, sessionCwd, model, gitBranch)
+            .create(input.projectId, sessionCwd, model, gitBranch, sessionId)
             .pipe(
               Effect.tapError(() =>
                 createdWorktreePath === undefined
@@ -81,7 +91,9 @@ export const sessionRouter = orpc.router({
         GitWorktreePathExists: (e) =>
           Effect.fail(errors.CONFLICT({ message: `worktree path already exists: ${e.path}` })),
         WorkspacePathEscape: () =>
-          Effect.fail(errors.UNSUPPORTED({ message: "worktree path escapes the repository" })),
+          Effect.fail(
+            errors.UNSUPPORTED({ message: "worktree path escapes managed worktree directory" }),
+          ),
         WorkspaceNotDirectory: () =>
           Effect.fail(errors.UNSUPPORTED({ message: "project path is not a directory" })),
         GitError: () => Effect.fail(errors.INTERNAL({ message: "git worktree creation failed" })),

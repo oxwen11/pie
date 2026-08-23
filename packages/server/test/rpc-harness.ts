@@ -57,7 +57,11 @@ export async function makeRpcTestHarness(home: string) {
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
-    GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(NodeServices.layer)),
+    GitServiceLayer.pipe(
+      Layer.provide(FileSystemServiceLayer),
+      Layer.provide(pathsLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     NodeServices.layer,
     Observability.discard,
   );

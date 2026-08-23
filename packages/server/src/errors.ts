@@ -36,6 +36,11 @@ export class GitInvalidBranchName extends Data.TaggedError("GitInvalidBranchName
   readonly branch: string;
 }> {}
 
+/** A worktree directory id failed validation before worktree creation. */
+export class GitInvalidWorktreeId extends Data.TaggedError("GitInvalidWorktreeId")<{
+  readonly worktreeId: string;
+}> {}
+
 /** The requested branch already exists in the repository. */
 export class GitBranchExists extends Data.TaggedError("GitBranchExists")<{
   readonly cwd: string;

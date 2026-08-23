@@ -3,6 +3,7 @@ export { GitService, GitServiceLayer, type GitWorktreeCreateResult } from "./ser
 export {
   generateWorktreeBranchName,
   isValidBranchName,
-  sanitizeBranchForPath,
-  worktreeDirectoryForBranch,
+  isValidWorktreeId,
+  repoWorktreeGroupKey,
+  worktreeDirectory,
 } from "./worktree";

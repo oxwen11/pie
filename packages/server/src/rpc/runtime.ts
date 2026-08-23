@@ -71,7 +71,11 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
-  GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(PlatformLayer)),
+  GitServiceLayer.pipe(
+    Layer.provide(FileSystemServiceLayer),
+    Layer.provide(PathsLayer),
+    Layer.provide(PlatformLayer),
+  ),
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

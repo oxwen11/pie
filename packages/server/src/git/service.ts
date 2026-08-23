@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import path from "node:path";
 
 import type {
@@ -15,10 +14,12 @@ import type {
 import { Context, Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
+import { Paths } from "../config/paths";
 import {
   GitBranchExists,
   GitError,
   GitInvalidBranchName,
+  GitInvalidWorktreeId,
   GitNotRepository,
   GitRefNotFound,
   GitWorktreePathExists,
@@ -35,7 +36,8 @@ import { parseNameStatus, parseNulPaths } from "./name-status";
 import {
   generateWorktreeBranchName,
   isValidBranchName,
-  worktreeDirectoryForBranch,
+  isValidWorktreeId,
+  worktreeDirectory,
 } from "./worktree";
 
 export type GitWorktreeCreateResult = {
@@ -114,6 +116,7 @@ type GitFailure =
 type GitWorktreeFailure =
   | GitFailure
   | GitInvalidBranchName
+  | GitInvalidWorktreeId
   | GitBranchExists
   | GitWorktreePathExists;
 
@@ -149,7 +152,7 @@ export class GitService extends Context.Service<
     readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
     readonly worktreeCreate: (
       cwd: string,
-      input?: { readonly branch?: string },
+      input: { readonly worktreeId: string; readonly branch?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly worktreeRemove: (path: string) => Effect.Effect<void, GitFailure>;
   }
@@ -158,12 +161,13 @@ export class GitService extends Context.Service<
 export const GitServiceLayer: Layer.Layer<
   GitService,
   never,
-  FileSystem.FileSystem | FileSystemService
+  FileSystem.FileSystem | FileSystemService | Paths
 > = Layer.effect(
   GitService,
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
+    const paths = yield* Paths;
 
     const readError = (relativePath: string) => (cause: unknown) =>
       new WorkspaceReadError({ path: relativePath, cause });
@@ -500,13 +504,16 @@ export const GitServiceLayer: Layer.Layer<
         Effect.gen(function* () {
           const realRoot = yield* resolveRoot(cwd);
           const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch =
-            input?.branch ?? generateWorktreeBranchName(crypto.randomUUID().slice(0, 8));
+          const worktreeId = input.worktreeId;
+          if (!isValidWorktreeId(worktreeId)) {
+            return yield* Effect.fail(new GitInvalidWorktreeId({ worktreeId }));
+          }
+          const branch = input.branch ?? generateWorktreeBranchName(worktreeId.slice(0, 8));
           if (!isValidBranchName(branch)) {
             return yield* Effect.fail(new GitInvalidBranchName({ branch }));
           }
-          const worktreePath = worktreeDirectoryForBranch(repoRoot, branch);
-          if (!contains(repoRoot, worktreePath)) {
+          const worktreePath = worktreeDirectory(paths.home, repoRoot, worktreeId);
+          if (!contains(paths.worktreesDir, worktreePath)) {
             return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
           }
           const exists = yield* fs
@@ -521,6 +528,9 @@ export const GitServiceLayer: Layer.Layer<
           if (refs.all.includes(branch)) {
             return yield* Effect.fail(new GitBranchExists({ cwd: realRoot, branch }));
           }
+          yield* fs
+            .makeDirectory(path.dirname(worktreePath), { recursive: true })
+            .pipe(Effect.mapError(readError(worktreePath)));
           yield* Effect.tryPromise({
             try: () =>
               simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]),
@@ -535,10 +545,10 @@ export const GitServiceLayer: Layer.Layer<
             return yield* new WorkspacePathEscape({ cwd: worktreePath, path: "." });
           }
           const realPath = yield* fs.realPath(worktreePath).pipe(Effect.mapError(readError(".")));
-          const repoRoot = yield* resolveRepoRoot(realPath);
-          if (!contains(repoRoot, realPath)) {
-            return yield* new WorkspacePathEscape({ cwd: repoRoot, path: worktreePath });
+          if (!contains(paths.worktreesDir, realPath)) {
+            return yield* new WorkspacePathEscape({ cwd: paths.worktreesDir, path: worktreePath });
           }
+          const repoRoot = yield* resolveRepoRoot(realPath);
           yield* Effect.tryPromise({
             try: () => simpleGit(repoRoot).raw(["worktree", "remove", "--force", realPath]),
             catch: gitError(realPath),

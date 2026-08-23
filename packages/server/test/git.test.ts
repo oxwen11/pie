@@ -1,22 +1,29 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
+import { layerPaths } from "../src/config/paths";
 import { FileSystemServiceLayer } from "../src/fs";
 import { GitService, GitServiceLayer } from "../src/git";
 import { NodePlatformLayer } from "./platform";
 
-const GitLayer = GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer));
+const pieHome = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-git-"));
+const GitLayer = GitServiceLayer.pipe(
+  Layer.provide(FileSystemServiceLayer),
+  Layer.provide(layerPaths(pieHome)),
+);
 
 layer(NodePlatformLayer)("GitService", (it) => {
   /** A repo with one commit on `main`, removed when the test's scope closes. */
   const repo = Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "pie-git-" });
-    yield* fs.writeFileString(path.join(dir, "a.txt"), "hi\n");
+    const fileSystem = yield* FileSystem.FileSystem;
+    const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-git-" });
+    yield* fileSystem.writeFileString(path.join(dir, "a.txt"), "hi\n");
     yield* Effect.promise(async () => {
       const git = simpleGit(dir);
       await git.raw(["init", "-b", "main"]);
@@ -38,9 +45,9 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
   it.effect("reports working-tree status with untracked files", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
+      const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* repo;
-      yield* fs.writeFileString(path.join(dir, "untracked.txt"), "x");
+      yield* fileSystem.writeFileString(path.join(dir, "untracked.txt"), "x");
 
       const git = yield* GitService;
       const status = yield* git.status(dir);
@@ -80,10 +87,10 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
   it.effect("defaults review to uncommitted work against HEAD", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
+      const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* repo;
-      yield* fs.writeFileString(path.join(dir, "a.txt"), "hello\n");
-      yield* fs.writeFileString(path.join(dir, "added.txt"), "new\n");
+      yield* fileSystem.writeFileString(path.join(dir, "a.txt"), "hello\n");
+      yield* fileSystem.writeFileString(path.join(dir, "added.txt"), "new\n");
 
       const git = yield* GitService;
       const review = yield* git.review({ cwd: dir });
@@ -111,19 +118,19 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
   it.effect("committed mode diffs HEAD against merge-base and ignores the worktree", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
+      const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* repo;
       yield* Effect.promise(async () => {
         const git = simpleGit(dir);
         await git.checkoutLocalBranch("feature");
       });
-      yield* fs.writeFileString(path.join(dir, "feature.txt"), "branch\n");
+      yield* fileSystem.writeFileString(path.join(dir, "feature.txt"), "branch\n");
       yield* Effect.promise(async () => {
         const git = simpleGit(dir);
         await git.add("feature.txt");
         await git.commit("feature work");
       });
-      yield* fs.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
+      yield* fileSystem.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
 
       const git = yield* GitService;
       const review = yield* git.review({ cwd: dir, mode: "committed" });
@@ -143,21 +150,21 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
   it.effect("branch mode includes uncommitted files against a local or remote ref", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
+      const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* repo;
       yield* Effect.promise(async () => {
         const git = simpleGit(dir);
         await git.checkoutLocalBranch("feature");
       });
-      yield* fs.writeFileString(path.join(dir, "feature.txt"), "branch\n");
+      yield* fileSystem.writeFileString(path.join(dir, "feature.txt"), "branch\n");
       yield* Effect.promise(async () => {
         const git = simpleGit(dir);
         await git.add("feature.txt");
         await git.commit("feature work");
         await git.checkout("main");
       });
-      yield* fs.writeFileString(path.join(dir, "a.txt"), "main-line\n");
-      yield* fs.writeFileString(path.join(dir, "extra.txt"), "only on main\n");
+      yield* fileSystem.writeFileString(path.join(dir, "a.txt"), "main-line\n");
+      yield* fileSystem.writeFileString(path.join(dir, "extra.txt"), "only on main\n");
       yield* Effect.promise(async () => {
         const git = simpleGit(dir);
         await git.add(["a.txt", "extra.txt"]);
@@ -166,7 +173,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
         await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
         await git.checkout("feature");
       });
-      yield* fs.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
+      yield* fileSystem.writeFileString(path.join(dir, "wip.txt"), "uncommitted\n");
 
       const git = yield* GitService;
       const uncommitted = yield* git.review({ cwd: dir });
@@ -216,9 +223,9 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
   it.effect("diffs a deleted file against the review base", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
+      const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* repo;
-      yield* fs.remove(path.join(dir, "a.txt"));
+      yield* fileSystem.remove(path.join(dir, "a.txt"));
 
       const git = yield* GitService;
       const diff = yield* git.diff({ cwd: dir, path: "a.txt" });
@@ -228,26 +235,33 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("creates a worktree on a new branch under .pie/worktrees", () =>
+  it.effect("creates a worktree on a new branch under $PIE_HOME/worktrees", () =>
     Effect.gen(function* () {
       const dir = yield* repo;
       const git = yield* GitService;
-      const created = yield* git.worktreeCreate(dir, { branch: "pie/feature-a" });
+      const worktreeId = "session-worktree-test";
+      const created = yield* git.worktreeCreate(dir, {
+        worktreeId,
+        branch: "pie/feature-a",
+      });
       assert.equal(created.branch, "pie/feature-a");
-      assert.match(created.path, /[\\/]\.pie[\\/]worktrees[\\/]pie-feature-a$/);
+      assert.ok(created.path.startsWith(path.join(pieHome, "worktrees")));
+      assert.match(created.path, new RegExp(`[\\\\/]${worktreeId}$`));
 
       const branch = yield* git.branch(created.path);
       assert.equal(branch.current, "pie/feature-a");
 
       const status = yield* git.status(dir);
       assert.equal(status.branch, "main");
+
+      yield* git.worktreeRemove(created.path);
     }).pipe(Effect.provide(GitLayer)),
   );
 
   it.effect("rejects a relative cwd and a non-repository", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "vibest-not-git-" });
+      const fileSystem = yield* FileSystem.FileSystem;
+      const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "vibest-not-git-" });
       const git = yield* GitService;
 
       const relative = yield* git.status("relative/workspace").pipe(Effect.flip);
