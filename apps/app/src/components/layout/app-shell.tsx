@@ -3,6 +3,7 @@ import { createContext, type ReactNode, use, useCallback, useMemo } from "react"
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
+import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -81,9 +82,10 @@ export function AppShell({ children }: AppShellProps) {
     // also the viewport wrapper. The app-region rule drags desktop windows;
     // h-svh keeps long transcripts scrolling inside the card, not the document.
     <SidebarProvider
-      className="bg-sidebar h-svh overflow-hidden [-webkit-app-region:drag]"
+      className="bg-sidebar relative h-svh overflow-hidden [-webkit-app-region:drag]"
       defaultOpen={readSidebarCookie()}
     >
+      <ShellSidebarToggle />
       {children}
     </SidebarProvider>
   );

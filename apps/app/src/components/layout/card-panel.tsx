@@ -2,6 +2,7 @@ import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
+import { MACOS_TITLEBAR_CHROME_INSET } from "@/components/layout/shell-sidebar-toggle";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 
 export interface CardPanelProps {
@@ -13,14 +14,14 @@ export interface CardPanelProps {
 export function CardPanel({ hasTrafficLights, heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
   const collapsedDesktop = !isMobile && state === "collapsed";
-  const ownsToggle = isMobile || collapsedDesktop;
+  const ownsToggle = isMobile || (collapsedDesktop && !hasTrafficLights);
 
   return (
     <SidebarInset className="flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5">
       <header
         className={cn(
           "flex h-10 shrink-0 items-center gap-2 px-4 shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
-          collapsedDesktop && hasTrafficLights && "ps-20",
+          collapsedDesktop && hasTrafficLights && MACOS_TITLEBAR_CHROME_INSET,
         )}
       >
         {ownsToggle && (

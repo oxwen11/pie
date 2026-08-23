@@ -39,7 +39,7 @@ export function AppSidebar({
     >
       <SidebarHeader className="h-10 flex-row items-center px-4 [-webkit-app-region:drag]">
         {os !== "macos" && <BrandMark />}
-        {!isMobile && state === "expanded" && (
+        {!isMobile && state === "expanded" && os !== "macos" && (
           <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
         )}
       </SidebarHeader>
