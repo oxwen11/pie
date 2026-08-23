@@ -63,7 +63,8 @@ export function RenameSessionDialog({
       reconcileSessionRenameSuccess(
         queryClient,
         (projectId, archived) =>
-          orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } }).queryKey,
+          orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } })
+            .queryKey,
         ref,
         variables.previousTitle,
         variables.title,
