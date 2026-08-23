@@ -1,12 +1,16 @@
 # Architecture audit — 2026-08-23
 
-Scheduled review of the vibest monorepo against `.agents/rules/architecture.md`,
-`stack.md`, `frontend-state.md`, `ui-components.md`, and `apps/desktop/AGENTS.md`.
+Scheduled review of the **pie** monorepo (forked from vibest, Pi-only harness)
+against `.agents/rules/architecture.md`, `stack.md`, `frontend-state.md`,
+`ui-components.md`, and `apps/desktop/AGENTS.md`.
+
+Upstream vibest issues are linked for traceability; pie-specific follow-ups
+should be filed in `oxwen11/pie`.
 
 ## Summary
 
-Package boundaries are largely healthy: no `@vibest/app` → server imports, no
-`@vibest/ui` barrel imports, desktop layering is clean, and `EventBusLayer` is a
+Package boundaries are largely healthy: no `@pie/app` → server imports, no
+`@pie/ui` barrel imports, desktop layering is clean, and `EventBusLayer` is a
 single const in `packages/server/src/rpc/runtime.ts` (no `Layer.fresh` in
 production). Persistent paths stay in `packages/server/src/config/paths.ts`; HTTP
 concerns stay under `packages/server/src/http/`.
