@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import path from "node:path";
 
 const BRANCH_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/;
@@ -14,11 +13,17 @@ export const isValidWorktreeId = (worktreeId: string): boolean =>
 const sanitizePathSegment = (value: string): string =>
   value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "repo";
 
-/** Stable directory name grouping worktrees for one repository under `$PIE_HOME/worktrees/`. */
+/**
+ * Readable directory name for one repository under `$PIE_HOME/worktrees/`.
+ * Uses the resolved absolute path (`/home/user/dev/pie` → `home-user-dev-pie`).
+ */
 export const repoWorktreeGroupKey = (repoRoot: string): string => {
-  const base = sanitizePathSegment(path.basename(repoRoot));
-  const hash = crypto.createHash("sha256").update(repoRoot).digest("hex").slice(0, 8);
-  return `${base}-${hash}`;
+  const segments = path
+    .resolve(repoRoot)
+    .split(path.sep)
+    .filter((segment) => segment.length > 0);
+  const slug = segments.map(sanitizePathSegment).join("-");
+  return slug.length > 0 ? slug : "repo";
 };
 
 /** Worktree checkout path — keyed by session/worktree id, not branch name. */
