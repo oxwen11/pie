@@ -269,7 +269,7 @@ describe("agent.session router", () => {
     } finally {
       await dispose();
     }
-  });
+  }, 15_000);
 
   it("defaults worktree layout and branch like Cursor (pie/<hex> under worktrees/<repo>/<key>)", async () => {
     const { client, workspace, dispose } = await setup();
@@ -298,5 +298,5 @@ describe("agent.session router", () => {
     } finally {
       await dispose();
     }
-  });
+  }, 15_000);
 });

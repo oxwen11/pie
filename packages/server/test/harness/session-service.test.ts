@@ -274,6 +274,26 @@ describe("PiAgentSessionService", () => {
     expect(result.cwd).toBe("/tmp/pie-worktree");
   });
 
+  it("getMessages reads history through the persisted worktree cwd", async () => {
+    const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+    const result = await run({ coldHistory: history }, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create(
+          "proj-a",
+          "/tmp/pie-worktree",
+          undefined,
+          "pie/test",
+        );
+        yield* fixture.service.close(ref);
+        const workspace = yield* fixture.service.workspaceFor(ref, "/tmp/pie-app");
+        const messages = yield* fixture.service.getMessages(ref, workspace.cwd);
+        return { workspace, messages };
+      }),
+    );
+    expect(result.workspace).toEqual({ cwd: "/tmp/pie-worktree", gitBranch: "pie/test" });
+    expect(result.messages).toEqual(history);
+  });
+
   it("prepare fails with SessionNotFound for an unknown session", async () => {
     const err = await run({}, (fixture) =>
       Effect.flip(

@@ -24,7 +24,7 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
 
 **Workspace path**:
-The validated absolute directory handed to Pi when opening or resuming a session; always derived from `Project.path`, never accepted directly from session API callers.
+The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `create` time — usually `Project.path`, or a git worktree path when the client requested `worktree` on `session.create`. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. RPC handlers resolve `metadata.cwd ?? project.path` before calling Pi (messages, model state, git panels). Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire.
 _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
