@@ -3,7 +3,7 @@ import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sideba
 import { useNavigate } from "@tanstack/react-router";
 
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";
-import { sessionStatusIndicator } from "@/features/projects/session-status-indicator";
+import { SessionStatusIndicator } from "@/features/projects/session-status-indicator";
 
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
@@ -16,7 +16,6 @@ export function ProjectSessionRow({
   readonly session: SessionSummary;
 }) {
   const navigate = useNavigate();
-  const statusIndicator = sessionStatusIndicator(session.status?.phase);
 
   return (
     <SidebarMenuItem>
@@ -33,9 +32,7 @@ export function ProjectSessionRow({
         <span className="truncate">{session.title ?? "New chat"}</span>
         {/* Busy elsewhere too: status is server-derived, so a turn any client
             is running shows here. */}
-        {statusIndicator ? (
-          <span className={statusIndicator.className} title={statusIndicator.title} />
-        ) : null}
+        <SessionStatusIndicator phase={session.status?.phase} />
       </SidebarMenuButton>
       <SessionActionsMenu isActive={isActive} session={session} />
     </SidebarMenuItem>
