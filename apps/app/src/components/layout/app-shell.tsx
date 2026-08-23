@@ -82,7 +82,7 @@ export function AppShell({ children }: AppShellProps) {
     // also the viewport wrapper. The app-region rule drags desktop windows;
     // h-svh keeps long transcripts scrolling inside the card, not the document.
     <SidebarProvider
-      className="bg-sidebar relative h-svh overflow-hidden [-webkit-app-region:drag]"
+      className="bg-sidebar h-svh overflow-hidden [-webkit-app-region:drag]"
       defaultOpen={readSidebarCookie()}
     >
       <ShellSidebarToggle />

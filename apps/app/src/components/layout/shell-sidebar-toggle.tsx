@@ -20,7 +20,7 @@ export function ShellSidebarToggle(): ReactElement | null {
   return (
     <SidebarTrigger
       className={cn(
-        "absolute start-20 top-1.5 z-50 [-webkit-app-region:no-drag]",
+        "fixed start-20 top-1.5 z-50 [-webkit-app-region:no-drag]",
       )}
     />
   );
