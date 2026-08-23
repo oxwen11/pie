@@ -3,75 +3,52 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { Context, Effect, type FileSystem, Layer } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import {
-  type HarnessAgentAdapter,
-  HarnessAgentSessionManagerLayer,
-  HarnessAgentServiceLayer,
-  HarnessAgentSessionServiceLayer,
+  PiAgentSessionManagerLayer,
+  PiAgentServiceLayer,
+  PiAgentSessionServiceLayer,
 } from "../harness";
-import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
-import { PiAdapter } from "../harness/pi-adapter";
+import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/facade";
+import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 
-export class Pi extends Context.Service<Pi, PiAgent>()("Pi") {}
+export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
-/**
- * The Node platform services. Every effect that touches disk, paths, or random
- * bytes bubbles these up its `R` channel; this is the one place they are
- * satisfied for the server runtime.
- */
 const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeCrypto.layer);
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
 const piExecutable = resolvePiExecutable();
-const piAgentOptions = { executable: piExecutable };
+const piProcessOptions = { executable: piExecutable };
 
-export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent(piAgentOptions)).pipe(
-  Layer.provide(NodeProcessLayer),
-);
+export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
+  PiProcessTag,
+  makePiProcess(piProcessOptions),
+).pipe(Layer.provide(NodeProcessLayer));
 
-const ProvidersLayer = PiLayer;
-
-/**
- * Whether Pi is installed is fixed for the life of the process — but every
- * `session.create` asks again. Cache it here so the answer costs one spawn per
- * server rather than one per call.
- */
-export const cacheAvailability = (
-  adapter: HarnessAgentAdapter,
-): Effect.Effect<HarnessAgentAdapter, never, FileSystem.FileSystem> =>
-  Effect.map(Effect.cached(adapter.checkAvailability), (cachedCheck) => ({
-    ...adapter,
-    checkAvailability: Effect.uninterruptible(cachedCheck),
-  }));
-
-const PiAdapterProvided = Layer.effect(
-  PiAdapter,
+const PiAgentProvided = Layer.effect(
+  PiAgent,
   Effect.gen(function* () {
-    const pi = yield* Pi;
-    const adapter = yield* cacheAvailability(makePiAdapter(pi, piAgentOptions));
-    return adapter;
+    const process = yield* PiProcessTag;
+    const pi = yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
+    return pi;
   }),
-).pipe(Layer.provide(ProvidersLayer), Layer.provide(PlatformLayer));
+).pipe(Layer.provide(PiProcessLayer), Layer.provide(PlatformLayer));
 
-// The session stack: the manager owns all live state (instances + projections,
-// publishing wire events onto the bus); the outward façade on top does the
-// identity translation, metadata persistence, and collection events.
-const HarnessSessionManagerProvided = HarnessAgentSessionManagerLayer.pipe(
-  Layer.provide(PiAdapterProvided),
+const PiAgentSessionManagerProvided = PiAgentSessionManagerLayer.pipe(
+  Layer.provide(PiAgentProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PlatformLayer),
 );
-const HarnessSessionServiceProvided = HarnessAgentSessionServiceLayer.pipe(
-  Layer.provide(HarnessSessionManagerProvided),
-  Layer.provide(PiAdapterProvided),
+const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
+  Layer.provide(PiAgentSessionManagerProvided),
+  Layer.provide(PiAgentProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
@@ -83,15 +60,19 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
-const HarnessAgentServiceProvided = HarnessAgentServiceLayer;
+const PiAgentServiceProvided = PiAgentServiceLayer;
 
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
-  HarnessAgentServiceProvided,
-  HarnessSessionServiceProvided,
+  PiAgentServiceProvided,
+  PiAgentSessionServiceProvided,
   ProjectServiceProvided,
-  PiAdapterProvided,
+  PiAgentProvided,
+  PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   PlatformLayer,
   NodeHttpPlatform.layer,
 );
+
+// Re-export for tests that cached availability on a shape.
+export const cacheAvailability = cachePiAgentAvailability;

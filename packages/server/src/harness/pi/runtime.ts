@@ -1,27 +1,38 @@
+import type { AgentResponse, AgentModelState, SessionCapabilities } from "@pie/contract";
+import { SessionCapabilitiesSchema } from "@pie/contract";
+import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
-import type {
-  HarnessAgentAdapter,
-  HarnessAgentRuntime,
-  SessionInfoResult,
-  UserInput,
-} from "../adapter";
 import {
   AgentOpenError,
   AgentOperationError,
   AgentRequestUnavailable,
+  type CapabilityUnsupported,
   SessionClosed,
   SessionNotResumable,
   TurnAlreadyRunning,
 } from "../errors";
 import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
 import { streamFromQueueOne } from "../queue-stream";
-import type { PiAgent } from "./agent";
+import type {
+  CreateSessionInput,
+  PromptReceipt,
+  ResumeSessionInput,
+  UserInput,
+} from "../session-io";
 import { entriesToUIMessages } from "./history";
-import { checkPiAvailability } from "./resolve-executable";
-import type { PiExecutable } from "./resolve-executable";
+import type { PiProcess } from "./process";
 import type { PiUIMessageChunk } from "./ui-message";
+
+export {
+  CreateSessionInput,
+  PromptReceipt,
+  ResumeSessionInput,
+  SessionCapabilities,
+  SessionCapabilitiesSchema,
+  UserInput,
+};
 
 const EVENT_QUEUE_CAPACITY = 1024;
 
@@ -39,10 +50,38 @@ const toPromptText = (input: UserInput): string =>
     )
     .join("\n");
 
-const makeRuntime = (
-  agent: PiAgent,
+/** Live Pi child for one agent session: events, prompt, interrupt, and close. */
+export type PiAgentRuntime = {
+  readonly sessionId: string;
+  readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
+  readonly prompt: (
+    input: UserInput,
+  ) => Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>;
+  readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
+  readonly respondToAgentRequest: (
+    requestId: string,
+    response: AgentResponse,
+  ) => Effect.Effect<void, AgentRequestUnavailable | AgentOperationError>;
+  readonly getCapabilities: Effect.Effect<
+    SessionCapabilities,
+    CapabilityUnsupported | AgentOperationError
+  >;
+  readonly getMessages?: Effect.Effect<
+    ReadonlyArray<UIMessage>,
+    SessionClosed | AgentOperationError
+  >;
+  readonly getModelState?: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly setModel?: (model: {
+    readonly provider: string;
+    readonly modelId: string;
+  }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly close: Effect.Effect<void>;
+};
+
+export const makePiAgentRuntime = (
+  process: PiProcess,
   sessionId: string,
-): Effect.Effect<HarnessAgentRuntime, never, Scope.Scope> =>
+): Effect.Effect<PiAgentRuntime, never, Scope.Scope> =>
   Effect.gen(function* () {
     const scope = yield* Scope.Scope;
     const events = yield* Queue.bounded<SessionEnvelopeDraft, Cause.Done | AgentOperationError>(
@@ -86,7 +125,7 @@ const makeRuntime = (
                 ),
                 Effect.catch(() => Effect.void),
                 Effect.andThen(
-                  agent.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
+                  process.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
                 ),
                 Effect.andThen(Queue.end(events)),
                 Effect.asVoid,
@@ -110,26 +149,28 @@ const makeRuntime = (
                   : Effect.void,
               ),
               Effect.catch(() => Effect.void),
-              Effect.andThen(agent.session.abort(sessionId).pipe(Effect.catch(() => Effect.void))),
+              Effect.andThen(
+                process.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
+              ),
               Effect.andThen(Queue.end(events)),
               Effect.asVoid,
             ),
       ),
     );
 
-    const interrupt: HarnessAgentRuntime["interrupt"] = Effect.gen(function* () {
+    const interrupt: PiAgentRuntime["interrupt"] = Effect.gen(function* () {
       if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-      yield* agent.session
+      yield* process.session
         .interrupt(sessionId)
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
     });
 
     yield* Scope.addFinalizer(scope, close);
-    yield* agent.session.awaitTermination(sessionId).pipe(
+    yield* process.session.awaitTermination(sessionId).pipe(
       Effect.catch((cause) => crash(cause)),
       Effect.forkIn(scope),
     );
-    yield* Stream.runForEach(agent.session.requestPermission(sessionId), (request) =>
+    yield* Stream.runForEach(process.session.requestPermission(sessionId), (request) =>
       emit({ type: "session.request.asked", sessionId, request }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
@@ -139,7 +180,7 @@ const makeRuntime = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-          const prompt = yield* agent.session
+          const prompt = yield* process.session
             .prompt({ sessionId, text: toPromptText(input) })
             .pipe(
               Effect.mapError((cause) =>
@@ -196,7 +237,7 @@ const makeRuntime = (
         }),
       interrupt,
       respondToAgentRequest: (requestId, response) =>
-        agent.session.respondPermission(sessionId, requestId, response).pipe(
+        process.session.respondPermission(sessionId, requestId, response).pipe(
           Effect.mapError((cause) =>
             cause instanceof AgentRequestUnavailable
               ? cause
@@ -207,59 +248,54 @@ const makeRuntime = (
       getCapabilities: Effect.succeed({
         supportsResume: true,
         supportsSteering: true,
-        // Pi has no native tool gating — tools run unguarded; agent requests
-        // only surface when a pi extension asks via ctx.ui.*.
         supportsPermissions: false,
       }),
-      // Native history read: the live child returns its whole entry tree and
-      // the fold rebuilds the current branch. SessionEntry never leaves here.
       getMessages: Effect.gen(function* () {
         if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-        const { entries, leafId } = yield* agent.session
+        const { entries, leafId } = yield* process.session
           .getEntries(sessionId)
           .pipe(Effect.mapError((cause) => operationError(sessionId, "get-messages", cause)));
         return entriesToUIMessages(entries, leafId, sessionId);
       }),
       getModelState: Effect.gen(function* () {
         if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-        return yield* agent.session
+        return yield* process.session
           .getModelState(sessionId)
           .pipe(Effect.mapError((cause) => operationError(sessionId, "get-model-state", cause)));
       }),
       setModel: (model) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
-          return yield* agent.session
+          return yield* process.session
             .setModel(sessionId, model)
             .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
         }),
       close,
-    } satisfies HarnessAgentRuntime;
+    } satisfies PiAgentRuntime;
   });
 
-export const makePiAdapter = (
-  agent: PiAgent,
-  options: { readonly executable?: PiExecutable } = {},
-): HarnessAgentAdapter => ({
-  descriptor: { name: "Pi" },
-  checkAvailability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
-  open: (input) =>
-    agent.session
-      .create({
-        cwd: input.cwd,
-        ...(input.provider ? { provider: input.provider } : {}),
-        ...(input.modelId ? { modelId: input.modelId } : {}),
-      })
-      .pipe(
-        Effect.mapError((cause) => new AgentOpenError({ cause })),
-        Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
-      ),
-  resume: (input) =>
-    agent.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
-      Effect.mapError((cause) =>
-        cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
-      ),
-      Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
+export const openPiAgentRuntime = (
+  process: PiProcess,
+  input: CreateSessionInput,
+): Effect.Effect<PiAgentRuntime, AgentOpenError, Scope.Scope> =>
+  process.session
+    .create({
+      cwd: input.cwd,
+      ...(input.provider ? { provider: input.provider } : {}),
+      ...(input.modelId ? { modelId: input.modelId } : {}),
+    })
+    .pipe(
+      Effect.mapError((cause) => new AgentOpenError({ cause })),
+      Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
+    );
+
+export const resumePiAgentRuntime = (
+  process: PiProcess,
+  input: ResumeSessionInput,
+): Effect.Effect<PiAgentRuntime, SessionNotResumable | AgentOpenError, Scope.Scope> =>
+  process.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
+    Effect.mapError((cause) =>
+      cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
     ),
-  getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-});
+    Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
+  );

@@ -72,19 +72,19 @@ type SessionState = {
   readonly transform: ReturnType<typeof createPiTransform>;
 };
 
-export interface PiAgentOptions {
+export interface PiProcessOptions {
   readonly executable?: PiExecutable;
   readonly args?: ReadonlyArray<string>;
 }
 
-export interface PiAgentDependencies<R> {
+export interface PiProcessDependencies<R> {
   readonly makeTransport: (config: {
     readonly sessionId: string;
     readonly cwd?: string;
   }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
 }
 
-export interface PiAgent {
+export interface PiProcess {
   readonly session: {
     readonly create: (config: {
       readonly cwd: string;
@@ -138,9 +138,9 @@ export interface PiAgent {
 }
 
 /** @internal */
-export const makePiAgentWithDependencies = <R>(
-  dependencies: PiAgentDependencies<R>,
-): Effect.Effect<PiAgent, never, R | Scope.Scope> =>
+export const makePiProcessWithDependencies = <R>(
+  dependencies: PiProcessDependencies<R>,
+): Effect.Effect<PiProcess, never, R | Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const buildContext = yield* Effect.context<R>();
@@ -618,13 +618,13 @@ export const makePiAgentWithDependencies = <R>(
             Effect.map(toAgentModel),
           ),
       },
-    } satisfies PiAgent;
+    } satisfies PiProcess;
   });
 
-export const makePiAgent = (
-  options: PiAgentOptions = {},
-): Effect.Effect<PiAgent, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
-  makePiAgentWithDependencies({
+export const makePiProcess = (
+  options: PiProcessOptions = {},
+): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
+  makePiProcessWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
         ...(options.executable ? { executable: options.executable } : {}),

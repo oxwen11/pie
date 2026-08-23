@@ -6,16 +6,14 @@ import { Deferred, Effect, Exit, Fiber, Queue, Ref, Scope } from "effect";
 import type * as Cause from "effect/Cause";
 
 import { makeEventBus } from "../../src/events/event-bus";
-import type {
-  HarnessAgentAdapter,
-  HarnessAgentRuntime,
-  SessionInfoResult,
-  UserInput,
-} from "../../src/harness/adapter";
 import { AgentOperationError } from "../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../src/harness/events/framework";
+import type { PiAgentShape } from "../../src/harness/pi/facade";
+import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
+import type { SessionInfoResult } from "../../src/harness/pi/types";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
-import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
+import type { UserInput } from "../../src/harness/session-io";
+import { makePiAgentSessionManager } from "../../src/harness/session-manager";
 import { NodePlatformLayer } from "../platform";
 
 const refFor = (sessionId: string): SessionRef => ({
@@ -31,7 +29,7 @@ const makeFixture = Effect.gen(function* () {
   const closeGate = yield* Deferred.make<void>();
   const crashGate = yield* Deferred.make<void>();
 
-  const makeRuntime = (sessionId: string): Effect.Effect<HarnessAgentRuntime, never, Scope.Scope> =>
+  const makeRuntime = (sessionId: string): Effect.Effect<PiAgentRuntime, never, Scope.Scope> =>
     Effect.gen(function* () {
       const scope = yield* Scope.Scope;
       const events = yield* Queue.bounded<SessionEnvelopeDraft, Cause.Done | AgentOperationError>(
@@ -95,11 +93,10 @@ const makeFixture = Effect.gen(function* () {
           supportsPermissions: false,
         }),
         close,
-      } satisfies HarnessAgentRuntime;
+      } satisfies PiAgentRuntime;
     });
 
-  const adapter = {
-    descriptor: { name: "Pi" },
+  const pi = {
     checkAvailability: Effect.succeed({ available: true }),
     open: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
@@ -108,12 +105,10 @@ const makeFixture = Effect.gen(function* () {
         Effect.andThen(makeRuntime(sessionId)),
       ),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-  } satisfies HarnessAgentAdapter;
+  } satisfies PiAgentShape;
 
   const bus = yield* makeEventBus();
-  const manager = yield* makeHarnessAgentSessionManager(adapter, bus).pipe(
-    Effect.provide(NodePlatformLayer),
-  );
+  const manager = yield* makePiAgentSessionManager(pi, bus).pipe(Effect.provide(NodePlatformLayer));
 
   return {
     manager,

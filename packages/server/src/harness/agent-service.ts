@@ -4,16 +4,15 @@ import { Context, Effect, Layer } from "effect";
 import { AgentOperationError } from "./errors";
 import { listAvailablePiModels } from "./pi/list-available-models";
 
-export type HarnessAgentServiceShape = {
+export type PiAgentServiceShape = {
   readonly listModels: (cwd: string) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
 };
 
-export class HarnessAgentService extends Context.Service<
-  HarnessAgentService,
-  HarnessAgentServiceShape
->()("HarnessAgentService") {}
+export class PiAgentService extends Context.Service<PiAgentService, PiAgentServiceShape>()(
+  "PiAgentService",
+) {}
 
-export const makeHarnessAgentService = (): HarnessAgentServiceShape => ({
+export const makePiAgentService = (): PiAgentServiceShape => ({
   listModels: (cwd) =>
     Effect.tryPromise({
       try: () => listAvailablePiModels(cwd),
@@ -26,7 +25,4 @@ export const makeHarnessAgentService = (): HarnessAgentServiceShape => ({
     }),
 });
 
-export const HarnessAgentServiceLayer = Layer.succeed(
-  HarnessAgentService,
-  makeHarnessAgentService(),
-);
+export const PiAgentServiceLayer = Layer.succeed(PiAgentService, makePiAgentService());

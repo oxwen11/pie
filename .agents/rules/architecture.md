@@ -18,24 +18,24 @@
   session. There is no harness registry, no `harnessAgentId`, and no agent
   selection on the wire. `SessionRef` is `{ projectId, sessionId }`.
 - **`packages/server/src/harness/`** holds the session domain and the Pi
-  driver under `harness/pi/` (`agent.ts`, `adapter.ts`, `transport.ts`, …).
-  The folder name is legacy; the code is Pi-only.
-- **The session domain has four public roles** (no registry): `PiAdapter`
-  (the Pi session driver, provided at the composition root), `HarnessAgentAdapter`
-  / `HarnessAgentRuntime` (interface + live child), `HarnessAgentSessionManager`
-  (sole owner of live state — one session per ref; the only caller of
-  `adapter.open`/`adapter.resume`), and `HarnessAgentSessionService` (outward
-  face: SessionRef ↔ `agentSessionId` translation, metadata persistence, wire
-  vocabulary validation, collection events). `session.ts`, `session-fold.ts`
-  and `session-repository.ts` are private collaborators — no Context tags.
-  `HarnessAgentSession` (`session.ts`) optionally owns a runtime: observing a
-  session costs no process until a prompt or history read acquires one. The RPC
-  router contributes only `projectId → workspace path` (via `ProjectService`)
-  and error-code mapping. Adapters see `cwd`, never `projectId`.
-- **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiLayer`
-  constructs `PiAgent`, `PiAdapter` wraps it with `cacheAvailability` (one
+  driver under `harness/pi/` (`process.ts`, `runtime.ts`, `facade.ts`,
+  `transport.ts`, …). The folder name is legacy; the code is Pi-only.
+- **The session domain has four public roles** (no registry): `PiAgent`
+  (Effect Context — open/resume/cold reads at the composition root),
+  `PiAgentRuntime` (live child handle), `PiAgentSessionManager` (sole owner of
+  live state — one session per ref; the only caller of `PiAgent.open`/`resume`),
+  and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
+  translation, metadata persistence, wire vocabulary validation, collection
+  events). `session.ts`, `session-fold.ts` and `session-repository.ts` are
+  private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
+  optionally owns a runtime: observing a session costs no process until a prompt
+  or history read acquires one. The RPC router contributes only `projectId →
+workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
+  never `projectId`.
+- **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiProcessLayer`
+  constructs `PiProcess`, `PiAgent` wraps it with `cachePiAgentAvailability` (one
   `--version` probe per server lifetime), then the session manager and service
-  layers consume `PiAdapter` directly.
+  layers consume `PiAgent` directly.
 - `EventBusLayer` must stay a single Layer reference across publish and
   subscribe wiring — Effect memoizes layers by reference, and a second
   reference (or `Layer.fresh`) silently splits the bus.

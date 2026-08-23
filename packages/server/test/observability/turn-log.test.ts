@@ -5,7 +5,7 @@ import type { SessionRef } from "@pie/contract";
 import { Context, Effect, Layer, Logger } from "effect";
 
 import { EventBus, EventBusLayer } from "../../src/events";
-import { makeHarnessAgentSession } from "../../src/harness/session";
+import { makePiAgentSession } from "../../src/harness/session";
 import { structured, type LogRecord } from "../log-record";
 
 const ref: SessionRef = {
@@ -30,7 +30,7 @@ layer(Layer.empty)("turn logging", (it) => {
   // the whole block.
   const session = Effect.gen(function* () {
     const bus = Context.get(yield* Layer.build(EventBusLayer), EventBus);
-    return yield* makeHarnessAgentSession(ref, bus);
+    return yield* makePiAgentSession(ref, bus);
   });
 
   it.effect("logs the two bookends and nothing in between", () =>

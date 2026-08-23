@@ -29,22 +29,22 @@ _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
 
-The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: PiAdapter knows how to get in, Manager knows who is alive, Runtime is the live child process, Service is the outward face. The `HarnessAgent` prefix on some types is a legacy namespace.
+The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: `PiAgent` knows how to get in, Manager knows who is alive, `PiAgentRuntime` is the live child, Service is the outward face.
 
-**HarnessAgentSessionService** (`harness/session-service.ts`):
+**PiAgentSessionService** (`harness/session-service.ts`):
 The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself.
 
-**HarnessAgentSessionManager** (`harness/session-manager.ts`):
-The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAdapter.open`/`resume` — adapters may assume single-flight per session id. A ref with nothing live reads as idle at cursor 0 rather than failing.
+**PiAgentSessionManager** (`harness/session-manager.ts`):
+The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.open`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.
 
-**PiAdapter** (`harness/pi-adapter.ts`):
-Context service holding the Pi session driver (`HarnessAgentAdapter`). Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
+**PiAgent** (`harness/pi/facade.ts`):
+Effect Context service: availability check, open/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
-**HarnessAgentAdapter / HarnessAgentRuntime** (`harness/adapter.ts`):
-The Pi door (descriptor, availability, open/resume factory) and the live execution resource (prompt/events/close) — a Pi RPC child. `PiAgent` under `harness/pi/` is private protocol plumbing below the adapter.
+**PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.
 
 **Private modules** (no Context tags, never wired directly):
-`harness/session.ts` — **HarnessAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
+`harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
 
 ## UI Components
 

@@ -11,17 +11,17 @@ import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
 import {
-  HarnessAgentServiceLayer,
-  HarnessAgentSessionManagerLayer,
-  HarnessAgentSessionServiceLayer,
+  PiAgentServiceLayer,
+  PiAgentSessionManagerLayer,
+  PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { makePiAdapter, makePiAgent } from "../src/harness/pi";
-import { PiAdapter } from "../src/harness/pi-adapter";
+import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/facade";
+import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { Pi } from "../src/rpc/runtime";
+import { PiProcessTag } from "../src/rpc/runtime";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -63,26 +63,27 @@ async function setup() {
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
   const piExecutable = { command: makeFake(), prefixArgs: [] as const };
-  const piLayer = Layer.effect(Pi, makePiAgent({ executable: piExecutable })).pipe(
-    Layer.provide(NodeServices.layer),
-  );
-  const piAdapterLayer = Layer.effect(
-    PiAdapter,
+  const piProcessLayer = Layer.effect(
+    PiProcessTag,
+    makePiProcess({ executable: piExecutable }),
+  ).pipe(Layer.provide(NodeServices.layer));
+  const piAgentLayer = Layer.effect(
+    PiAgent,
     Effect.gen(function* () {
-      const pi = yield* Pi;
-      return makePiAdapter(pi, { executable: piExecutable });
+      const process = yield* PiProcessTag;
+      return yield* cachePiAgentAvailability(makePiAgent(process, { executable: piExecutable }));
     }),
-  ).pipe(Layer.provide(piLayer));
+  ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
-  const harnessSessionLayer = HarnessAgentSessionServiceLayer.pipe(
+  const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
-      HarnessAgentSessionManagerLayer.pipe(
-        Layer.provide(piAdapterLayer),
+      PiAgentSessionManagerLayer.pipe(
+        Layer.provide(piAgentLayer),
         Layer.provide(EventBusLayer),
         Layer.provide(NodeServices.layer),
       ),
     ),
-    Layer.provide(piAdapterLayer),
+    Layer.provide(piAgentLayer),
     Layer.provide(EventBusLayer),
     Layer.provide(pathsLayer),
     Layer.provide(NodeServices.layer),
@@ -94,10 +95,11 @@ async function setup() {
 
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    HarnessAgentServiceLayer,
+    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
-    piAdapterLayer,
+    piAgentLayer,
+    piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,

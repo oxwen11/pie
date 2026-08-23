@@ -18,20 +18,18 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
-import type {
-  HarnessAgentAdapter,
-  HarnessAgentRuntime,
-  SessionInfoResult,
-} from "../../src/harness/adapter";
 import { TurnAlreadyRunning } from "../../src/harness/errors";
-import { makeHarnessAgentSessionManager } from "../../src/harness/session-manager";
+import type { PiAgentShape } from "../../src/harness/pi/facade";
+import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
+import type { SessionInfoResult } from "../../src/harness/pi/types";
+import { makePiAgentSessionManager } from "../../src/harness/session-manager";
 import {
-  type HarnessAgentSessionRepositoryShape,
-  makeHarnessAgentSessionRepository,
+  type PiAgentSessionRepositoryShape,
+  makePiAgentSessionRepository,
 } from "../../src/harness/session-repository";
 import {
-  type HarnessAgentSessionServiceShape,
-  makeHarnessAgentSessionService,
+  type PiAgentSessionServiceShape,
+  makePiAgentSessionService,
 } from "../../src/harness/session-service";
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
@@ -43,8 +41,8 @@ type Spy = {
 };
 
 type Fixture = {
-  readonly service: HarnessAgentSessionServiceShape;
-  readonly repo: HarnessAgentSessionRepositoryShape;
+  readonly service: PiAgentSessionServiceShape;
+  readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly spy: Spy;
   /**
@@ -58,7 +56,7 @@ type Fixture = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-describe("HarnessAgentSessionService", () => {
+describe("PiAgentSessionService", () => {
   let home: string;
   beforeEach(async () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-svc-"));
@@ -114,7 +112,7 @@ describe("HarnessAgentSessionService", () => {
           };
           // Sessions drain an empty native stream by default — enough to
           // exercise the orchestration without any live projection state.
-          const makeSession = (sessionId: string): HarnessAgentRuntime => ({
+          const makeSession = (sessionId: string): PiAgentRuntime => ({
             sessionId,
             events: turnEvents(sessionId),
             prompt: opts.promptFails
@@ -138,8 +136,7 @@ describe("HarnessAgentSessionService", () => {
               ),
             ),
           });
-          const adapter = {
-            descriptor: { name: "Pi" },
+          const pi = {
             checkAvailability: Effect.sync(() =>
               opts.unavailable !== undefined
                 ? { available: false, reason: opts.unavailable }
@@ -166,18 +163,18 @@ describe("HarnessAgentSessionService", () => {
               ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
               : {}),
             getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-          } satisfies HarnessAgentAdapter;
+          } satisfies PiAgentShape;
           const crypto = yield* Crypto.Crypto;
           const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
             Effect.gen(function* () {
               const bus = yield* makeEventBus();
-              const manager = yield* makeHarnessAgentSessionManager(adapter, bus);
-              const repo = yield* makeHarnessAgentSessionRepository(
+              const manager = yield* makePiAgentSessionManager(pi, bus);
+              const repo = yield* makePiAgentSessionRepository(
                 path.join(home, "storage", "sessions"),
               );
-              const service = makeHarnessAgentSessionService({
+              const service = makePiAgentSessionService({
                 manager,
-                adapter,
+                pi,
                 repo,
                 bus,
                 newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),

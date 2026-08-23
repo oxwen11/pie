@@ -7,8 +7,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Stream } from "effect";
 
-import { makePiAdapter } from "../../../src/harness/pi/adapter";
-import { makePiAgent } from "../../../src/harness/pi/agent";
+import { makePiAgent } from "../../../src/harness/pi/facade";
+import { makePiProcess } from "../../../src/harness/pi/process";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -99,7 +99,7 @@ function makeFake(): string {
 layer(NodeServices.layer)("PiAgent", (it) => {
   it.effect("creates a session and streams a full turn", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       assert.match(sessionId, /^[0-9a-f]{8}-[0-9a-f-]{27}$/);
 
@@ -116,7 +116,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("resume keeps the caller-provided session id", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.resume({
         sessionId: "custom-id",
         cwd: "/tmp",
@@ -128,7 +128,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("fails to open when pi cannot resolve the session", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const error = yield* agent.session
         .resume({ sessionId: "missing-session", cwd: "/tmp" })
         .pipe(Effect.flip);
@@ -138,7 +138,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("streams tool executions as typed tool chunks", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const prompt = yield* agent.session.prompt({ sessionId, text: "tool" });
       const chunks = yield* Stream.runCollect(prompt.output);
@@ -152,7 +152,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("round-trips a blocking extension UI request through respondPermission", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const requestFiber = yield* Stream.runHead(agent.session.requestPermission(sessionId)).pipe(
         Effect.forkChild,
@@ -202,7 +202,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("steers an active turn instead of starting a new one", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const first = yield* agent.session.prompt({ sessionId, text: "hold" });
       assert.equal(first.started, true);
@@ -219,7 +219,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("interrupt aborts the run and the turn still finishes", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const prompt = yield* agent.session.prompt({ sessionId, text: "hold" });
       const collected = yield* Effect.forkChild(Stream.runCollect(prompt.output));
@@ -233,7 +233,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("a failed prompt command leaves the session promptable", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const error = yield* agent.session.prompt({ sessionId, text: "fail" }).pipe(Effect.flip);
       assert.equal(error._tag, "PiRpcError");
@@ -247,7 +247,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("a child crash evicts only that session and surfaces an error chunk", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const healthy = yield* agent.session.create({ cwd: "/tmp" });
       const doomed = yield* agent.session.create({ cwd: "/tmp" });
 
@@ -283,7 +283,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("reads and switches the active model via Pi RPC", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
 
       const initial = yield* agent.session.getModelState(sessionId);
@@ -299,10 +299,10 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("exposes prompt output through the unified adapter event stream", () =>
+  it.effect("Pi facade open exposes prompt output on the PiAgentRuntime event stream", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAdapter(agent).open({ cwd: "/tmp" });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const session = yield* makePiAgent(agent).open({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -340,8 +340,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("reports a child crash while the adapter session is idle", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiAgent({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAdapter(agent).open({ cwd: "/tmp" });
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const session = yield* makePiAgent(agent).open({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

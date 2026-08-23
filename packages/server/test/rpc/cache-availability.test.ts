@@ -4,15 +4,14 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { describe, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber } from "effect";
 
-import type { HarnessAgentAdapter } from "../../src/harness/adapter";
+import type { PiAgentShape } from "../../src/harness/pi/facade";
 import { cacheAvailability } from "../../src/rpc/runtime";
 
-const unusedAdapter = {
-  descriptor: { name: "Pi" },
+const unusedPi = {
   open: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
   getSessionInfo: () => Effect.die("unused"),
-} satisfies Omit<HarnessAgentAdapter, "checkAvailability">;
+} satisfies Omit<PiAgentShape, "checkAvailability">;
 
 describe("cacheAvailability", () => {
   layer(NodeFileSystem.layer)((it) => {
@@ -25,8 +24,8 @@ describe("cacheAvailability", () => {
         const started = yield* Deferred.make<void>();
         const gate = yield* Deferred.make<void>();
         let runs = 0;
-        const adapter: HarnessAgentAdapter = {
-          ...unusedAdapter,
+        const pi: PiAgentShape = {
+          ...unusedPi,
           checkAvailability: Effect.suspend(() => {
             runs += 1;
             return Deferred.succeed(started, undefined).pipe(
@@ -35,7 +34,7 @@ describe("cacheAvailability", () => {
             );
           }),
         };
-        const cached = yield* cacheAvailability(adapter);
+        const cached = yield* cacheAvailability(pi);
 
         const caller = yield* Effect.forkChild(cached.checkAvailability);
         yield* Deferred.await(started);
