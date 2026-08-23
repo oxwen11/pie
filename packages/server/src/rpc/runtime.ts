@@ -8,6 +8,7 @@ import { Context, Effect, Layer } from "effect";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
+import { GitServiceLayer } from "../git";
 import {
   PiAgentSessionManagerLayer,
   PiAgentServiceLayer,
@@ -70,6 +71,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
+  GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(PlatformLayer)),
   PlatformLayer,
   NodeHttpPlatform.layer,
 );
