@@ -327,6 +327,7 @@ export const makePiAgentSessionService = (deps: {
       resolveAgentSessionId(ref).pipe(
         Effect.andThen(manager.close(ref)),
         Effect.andThen(bus.closeSession(ref, "session_closed")),
+        Effect.andThen(bus.publish({ ref, type: "session.closed" })),
         Effect.andThen(logLifecycle("session.closed", "session closed")),
         inSession(ref),
       ),
