@@ -7,34 +7,30 @@ import type {
 import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect";
 
 import { EventBus, type EventBusShape } from "../events/event-bus";
-import type { CreateSessionInput, HarnessAgentRuntime } from "./adapter";
-import type { HarnessAgentAdapter } from "./adapter";
 import {
   AgentOpenError,
-  AgentUnavailable,
   type CreateSessionError,
   HarnessSessionNotFound,
   type ResumeSessionError,
   SessionNotResumable,
 } from "./errors";
-import { PiAdapter } from "./pi-adapter";
-import {
-  type AcquireRuntime,
-  type HarnessAgentSessionShape,
-  makeHarnessAgentSession,
-} from "./session";
+import type { PiAgentShape } from "./pi/agent";
+import { PiAgent } from "./pi/agent";
+import type { PiAgentRuntime } from "./pi/runtime";
+import { type AcquireRuntime, type PiAgentSessionShape, makePiAgentSession } from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
+import type { CreateSessionInput } from "./session-io";
 import type { ResumeManagedSessionInput } from "./session-io";
 
 /**
- * The sole owner of live session state: one {@link HarnessAgentSessionShape}
+ * The sole owner of live session state: one {@link PiAgentSessionShape}
  * per ref, each optionally holding a runtime. The manager's own job is narrow —
  * keep the table, and turn "native session id + cwd" into the `acquire` a
  * the `acquire` a session runs when it decides it needs a runtime.
  *
- * It remains the single caller of `adapter.open` / `adapter.resume`: every
- * acquisition goes through one session's lifecycle lock, so an adapter is
- * never asked to open the same session twice concurrently. That invariant is
+ * It remains the single caller of `pi.create` / `pi.resume`: every
+ * acquisition goes through one session's lifecycle lock, so Pi is never asked
+ * to create the same session twice concurrently. That invariant is
  * load-bearing for pi, whose `openSession` blind-writes its own table.
  *
  * Vocabulary: everything here is addressed by {@link SessionRef}, which is
@@ -43,7 +39,7 @@ import type { ResumeManagedSessionInput } from "./session-io";
  * adapters trade in; adapters never see the ref.
  */
 
-export type HarnessAgentSessionManagerShape = {
+export type PiAgentSessionManagerShape = {
   /**
    * Open a fresh native session via the adapter and take ownership of it. The
    * one eager path: a session that does not exist yet has no native id to
@@ -52,7 +48,7 @@ export type HarnessAgentSessionManagerShape = {
   readonly open: (
     input: CreateSessionInput,
     ref: SessionRef,
-  ) => Effect.Effect<HarnessAgentRuntime, CreateSessionError>;
+  ) => Effect.Effect<PiAgentRuntime, CreateSessionError>;
   /**
    * The session's runtime, resuming one via the adapter if it holds none.
    * Single-flight per session; a failure leaves the session observable and
@@ -62,16 +58,16 @@ export type HarnessAgentSessionManagerShape = {
   readonly ensureRuntime: (
     input: ResumeManagedSessionInput,
     ref: SessionRef,
-  ) => Effect.Effect<HarnessAgentRuntime, ResumeSessionError>;
+  ) => Effect.Effect<PiAgentRuntime, ResumeSessionError>;
   /**
    * The runtime a session already holds; fails when it holds none. Never
    * acquires — callers that merely want to talk to a running agent must not
    * start one.
    */
-  readonly get: (ref: SessionRef) => Effect.Effect<HarnessAgentRuntime, HarnessSessionNotFound>;
+  readonly get: (ref: SessionRef) => Effect.Effect<PiAgentRuntime, HarnessSessionNotFound>;
   /** The same lookup as {@link get}, for callers that have something else to do
    * when nothing is running rather than an error to raise. */
-  readonly peek: (ref: SessionRef) => Effect.Effect<HarnessAgentRuntime | undefined>;
+  readonly peek: (ref: SessionRef) => Effect.Effect<PiAgentRuntime | undefined>;
   /**
    * Close and forget a session — runtime and session state alike; idempotent.
    * This is the only path that discards a crashed session (a crash alone
@@ -105,35 +101,35 @@ export type HarnessAgentSessionManagerShape = {
   readonly emit: (ref: SessionRef, body: SessionScopedEventBody) => Effect.Effect<void>;
 };
 
-export class HarnessAgentSessionManager extends Context.Service<
-  HarnessAgentSessionManager,
-  HarnessAgentSessionManagerShape
->()("HarnessAgentSessionManager") {}
+export class PiAgentSessionManager extends Context.Service<
+  PiAgentSessionManager,
+  PiAgentSessionManagerShape
+>()("PiAgentSessionManager") {}
 
 /**
  * A live session, or the fact that one is on its way out. Both live in the
  * same table so "does this ref have a session" is a single atomic question:
  * anything that wants to write waits behind an in-flight close instead of
- * racing it, which is what keeps `adapter.open` / `adapter.resume`
- * single-caller per session even while one is being torn down.
+ * racing it, which is what keeps `pi.create` / `pi.resume` single-caller per
+ * session even while one is being torn down.
  */
 type SessionEntry =
-  | { readonly _tag: "Live"; readonly session: HarnessAgentSessionShape }
+  | { readonly _tag: "Live"; readonly session: PiAgentSessionShape }
   | { readonly _tag: "Closing"; readonly done: Deferred.Deferred<void> };
 
 type CloseStep =
   | {
       readonly _tag: "Release";
-      readonly session: HarnessAgentSessionShape;
+      readonly session: PiAgentSessionShape;
       readonly done: Deferred.Deferred<void>;
     }
   | { readonly _tag: "Await"; readonly done: Deferred.Deferred<void> }
   | { readonly _tag: "Done" };
 
-export const makeHarnessAgentSessionManager = (
-  adapter: HarnessAgentAdapter,
+export const makePiAgentSessionManager = (
+  pi: PiAgentShape,
   bus: EventBusShape,
-): Effect.Effect<HarnessAgentSessionManagerShape, never, Scope.Scope | FileSystem.FileSystem> =>
+): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope | FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     // An adapter's availability check reads the filesystem; bind it once here
@@ -147,7 +143,7 @@ export const makeHarnessAgentSessionManager = (
     /** The session for a ref, on the write paths that are allowed to create
      * one. A session is a few Refs, so losing the creation race and discarding
      * the loser costs nothing — cheaper than serializing every lookup. */
-    const sessionFor = (ref: SessionRef): Effect.Effect<HarnessAgentSessionShape> =>
+    const sessionFor = (ref: SessionRef): Effect.Effect<PiAgentSessionShape> =>
       Effect.suspend(() =>
         Ref.get(sessions).pipe(
           Effect.flatMap((current) => {
@@ -155,7 +151,7 @@ export const makeHarnessAgentSessionManager = (
             if (entry?._tag === "Live") return Effect.succeed(entry.session);
             if (entry?._tag === "Closing")
               return Deferred.await(entry.done).pipe(Effect.andThen(sessionFor(ref)));
-            return makeHarnessAgentSession(ref, bus).pipe(
+            return makePiAgentSession(ref, bus).pipe(
               Effect.provideService(Scope.Scope, ownerScope),
               Effect.flatMap((candidate) =>
                 Ref.modify(
@@ -163,7 +159,7 @@ export const makeHarnessAgentSessionManager = (
                   (
                     latest,
                   ): readonly [
-                    HarnessAgentSessionShape | undefined,
+                    PiAgentSessionShape | undefined,
                     ReadonlyMap<string, SessionEntry>,
                   ] => {
                     const raced = latest.get(ref.sessionId);
@@ -186,7 +182,7 @@ export const makeHarnessAgentSessionManager = (
      * its way out reads as absent — its state is about to stop existing. */
     const withSession = <A>(
       ref: SessionRef,
-      use: (session: HarnessAgentSessionShape) => Effect.Effect<A>,
+      use: (session: PiAgentSessionShape) => Effect.Effect<A>,
       absent: A,
     ): Effect.Effect<A> =>
       Ref.get(sessions).pipe(
@@ -196,48 +192,30 @@ export const makeHarnessAgentSessionManager = (
         }),
       );
 
-    const checkAvailable = () =>
-      Effect.succeed(adapter).pipe(
-        Effect.tap((availAdapter) =>
-          availAdapter.checkAvailability.pipe(
-            Effect.flatMap((availability) =>
-              availability.available
-                ? Effect.void
-                : Effect.fail(
-                    new AgentUnavailable({
-                      reason: availability.reason ?? "Unavailable",
-                    }),
-                  ),
-            ),
-            Effect.provideService(FileSystem.FileSystem, fileSystem),
-          ),
-        ),
-      );
+    const withFileSystem = <A, E, R>(
+      effect: Effect.Effect<A, E, R | FileSystem.FileSystem>,
+    ): Effect.Effect<A, E, R> =>
+      effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
 
     /**
-     * The heaviest thing this server does: `open`/`resume` is where an agent
+     * The heaviest thing this server does: `create`/`resume` is where an agent
      * CLI is actually spawned or an SDK handle established. It is also the
      * likeliest to fail — a CLI that is not installed, an expired login, a cwd
      * that vanished — and the failure reaches the user as a session that "does
      * nothing".
      *
-     * The native span correlates logs emitted during each acquisition. Which
-     * session and Pi come from the caller's `inSession`; the Pi session id is
-     * attached after the adapter answers because it does not exist before
-     * then.
+     * Availability is checked inside PiAgent; the native span correlates
+     * logs emitted during each acquisition. The Pi session id is attached after
+     * PiAgent answers because it does not exist before then.
      */
-    const acquireOpen = (input: CreateSessionInput): AcquireRuntime =>
-      checkAvailable().pipe(
-        Effect.flatMap((availAdapter) => availAdapter.open(input)),
+    const acquireCreate = (input: CreateSessionInput): AcquireRuntime =>
+      withFileSystem(pi.create(input)).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
-        Effect.withSpan("pi.open"),
+        Effect.withSpan("pi.create"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
-      checkAvailable().pipe(
-        Effect.flatMap((availAdapter) =>
-          availAdapter.resume({ sessionId: input.sessionId, cwd: input.cwd }),
-        ),
+      withFileSystem(pi.resume({ sessionId: input.sessionId, cwd: input.cwd })).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.resume"),
       );
@@ -248,18 +226,14 @@ export const makeHarnessAgentSessionManager = (
     const acquireVia = (
       ref: SessionRef,
       acquire: AcquireRuntime,
-    ): Effect.Effect<HarnessAgentRuntime, ResumeSessionError> =>
+    ): Effect.Effect<PiAgentRuntime, ResumeSessionError> =>
       sessionFor(ref).pipe(
         Effect.flatMap((session) => session.ensureRuntime(acquire)),
         Effect.flatMap((runtime) => (runtime ? Effect.succeed(runtime) : acquireVia(ref, acquire))),
       );
 
-    const peek = (ref: SessionRef): Effect.Effect<HarnessAgentRuntime | undefined> =>
-      withSession<HarnessAgentRuntime | undefined>(
-        ref,
-        (session) => session.peekRuntime,
-        undefined,
-      );
+    const peek = (ref: SessionRef): Effect.Effect<PiAgentRuntime | undefined> =>
+      withSession<PiAgentRuntime | undefined>(ref, (session) => session.peekRuntime, undefined);
 
     // The session stays in the table, marked closing, until its runtime is
     // gone: removing it first would let a concurrent write build a second
@@ -307,7 +281,7 @@ export const makeHarnessAgentSessionManager = (
 
     return {
       open: (input, ref) =>
-        acquireVia(ref, acquireOpen(input)).pipe(
+        acquireVia(ref, acquireCreate(input)).pipe(
           // `AcquireRuntime` carries the resume union; the two members only a
           // resume can raise are unreachable here, so a sighting is an adapter
           // misbehaving and folds into AgentOpenError.
@@ -335,14 +309,14 @@ export const makeHarnessAgentSessionManager = (
       liveStatus: (ref) =>
         withSession<SessionStatus | undefined>(ref, (session) => session.status, undefined),
       emit: (ref, body) => sessionFor(ref).pipe(Effect.flatMap((session) => session.emit(body))),
-    } satisfies HarnessAgentSessionManagerShape;
+    } satisfies PiAgentSessionManagerShape;
   });
 
-export const HarnessAgentSessionManagerLayer = Layer.effect(
-  HarnessAgentSessionManager,
+export const PiAgentSessionManagerLayer = Layer.effect(
+  PiAgentSessionManager,
   Effect.gen(function* () {
-    const adapter = yield* PiAdapter;
+    const pi = yield* PiAgent;
     const bus = yield* EventBus;
-    return yield* makeHarnessAgentSessionManager(adapter, bus);
+    return yield* makePiAgentSessionManager(pi, bus);
   }),
 );

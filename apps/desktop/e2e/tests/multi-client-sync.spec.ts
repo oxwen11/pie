@@ -102,9 +102,9 @@ const send = async (page: Page, text: string) => {
 const createSession = async (browser: Browser, firstPrompt: string): Promise<Page> => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  // Draft config lives in the URL, so the project and harness are picked
-  // deterministically instead of driving two dropdowns.
-  await page.goto(`${baseUrl}/draft?projectId=${PROJECT_ID}&harness=pi`);
+  // Draft config lives in the URL so the project is picked deterministically
+  // instead of driving a dropdown.
+  await page.goto(`${baseUrl}/draft?projectId=${PROJECT_ID}`);
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
   await send(page, firstPrompt);
   await page.waitForURL(/\/session\//, { timeout: 20_000 });

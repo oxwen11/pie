@@ -1,12 +1,5 @@
 export {
-  McpUpdated,
   ProjectUpdated,
-  ProviderUpdated,
-  PtyCreated,
-  PtyExited,
-  PtyUpdated,
-  ServerConnected,
-  ServerDisconnected,
   SessionCrashed,
   SessionCreated,
   SessionDeleted,

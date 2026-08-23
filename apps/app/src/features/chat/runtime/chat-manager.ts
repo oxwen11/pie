@@ -24,10 +24,8 @@ export class ChatManager implements ChatManagerApi {
 
   constructor(private readonly createTransport: ChatSessionTransportFactory) {}
 
-  // The harness is fixed at the first call for a session (a session's harness
-  // never changes); later calls return the existing Chat. The harness travels
-  // on the SessionRef, so cold-loaded session routes and the session-creating
-  // caller alike carry the real harness rather than a default.
+  // chatFor is get-or-create per SessionRef; later calls return the existing
+  // Chat for that ref.
   chatFor(sessionRef: SessionRef): Chat {
     const key = sessionRefKey(sessionRef);
     const existing = this.#chats.get(key);

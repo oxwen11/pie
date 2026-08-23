@@ -3,22 +3,16 @@ import path from "node:path";
 import { Effect, FileSystem } from "effect";
 
 /**
- * Locating the CLI a harness spawns. Claude Code has its own resolver (it
- * prefers the version-matched binary the SDK ships); the harnesses that just
- * exec a bare command off PATH — codex, pi — share this one.
+ * Locating a CLI executable on PATH before spawning it. Pi resolves its own
+ * binary via `resolvePiExecutable`; this helper is shared for cheap
+ * availability checks — a PATH lookup answers "can we spawn this command"
+ * without starting a process that was never going to succeed.
  *
- * It exists for availability: `negotiate` has to answer "is this harness usable
- * right now" before it spends anything probing capabilities, and a missing
- * binary is the common case on a machine where the user only installed one
- * agent. A PATH lookup answers that cheaply; spawning to find out would make
- * the app's first paint wait on a process that was never going to start.
- *
- * It searches PATH and nothing else, deliberately. The transports spawn the
- * bare command name (`spawn("codex")`), which the OS resolves through PATH
- * alone — so any directory this looked in beyond PATH would make it report a
- * harness available that then fails to spawn, turning an actionable "not found
- * on PATH" into an opaque ENOENT at session-create time. Whatever fixes PATH
- * for the spawn (the desktop's login-shell environment) fixes it for both.
+ * It searches PATH and nothing else, deliberately. Transports spawn the bare
+ * command name, which the OS resolves through PATH alone — so any directory
+ * this looked in beyond PATH would report available and then fail at spawn with
+ * ENOENT. Whatever fixes PATH for the spawn (the desktop's login-shell
+ * environment) fixes it for both.
  */
 
 /**

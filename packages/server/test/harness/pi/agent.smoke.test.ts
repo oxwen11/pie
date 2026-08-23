@@ -4,14 +4,14 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
-import { makePiAgent } from "../../../src/harness/pi/agent";
+import { makePiProcess } from "../../../src/harness/pi/process";
 
 layer(NodeServices.layer)("pi live smoke", (it) => {
   it.effect.skipIf(process.env.PI_SMOKE !== "1")(
     "runs one real turn",
     () =>
       Effect.gen(function* () {
-        const agent = yield* makePiAgent();
+        const agent = yield* makePiProcess();
         const { sessionId } = yield* agent.session.create({ cwd: process.cwd() });
         const prompt = yield* agent.session.prompt({
           sessionId,

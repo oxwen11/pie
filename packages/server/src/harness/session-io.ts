@@ -2,8 +2,8 @@ import { InspectorTargetSchema } from "@pie/contract";
 import { Schema } from "effect";
 
 /**
- * Pi session I/O types. The server owns `SessionRef` translation and hands the
- * adapter these narrow, native-keyed shapes.
+ * Pi session I/O types. The server owns `SessionRef` translation and hands Pi
+ * these narrow, native-keyed shapes.
  */
 
 export const CreateSessionInputSchema = Schema.Struct({

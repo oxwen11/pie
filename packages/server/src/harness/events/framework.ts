@@ -81,22 +81,6 @@ export const ProjectUpdated = defineEvent({
   type: "project.updated",
   schema: { projectId: Schema.String },
 });
-export const PtyCreated = defineEvent({ type: "pty.created", schema: { ptyId: Schema.String } });
-export const PtyUpdated = defineEvent({ type: "pty.updated", schema: { ptyId: Schema.String } });
-export const PtyExited = defineEvent({
-  type: "pty.exited",
-  schema: { ptyId: Schema.String, exitCode: Schema.optionalKey(Schema.Number) },
-});
-export const ProviderUpdated = defineEvent({
-  type: "provider.updated",
-  schema: { providerId: Schema.String },
-});
-export const McpUpdated = defineEvent({
-  type: "mcp.updated",
-  schema: { serverId: Schema.String },
-});
-export const ServerConnected = defineEvent({ type: "server.connected", schema: {} });
-export const ServerDisconnected = defineEvent({ type: "server.disconnected", schema: {} });
 
 export const SessionEventDefs = [
   SessionTurnStarted,
@@ -114,13 +98,6 @@ export const GlobalEventDefs = [
   SessionDeleted,
   SessionRenamed,
   ProjectUpdated,
-  PtyCreated,
-  PtyUpdated,
-  PtyExited,
-  ProviderUpdated,
-  McpUpdated,
-  ServerConnected,
-  ServerDisconnected,
 ] as const;
 export type GlobalEvent = EventValue<(typeof GlobalEventDefs)[number]>;
 

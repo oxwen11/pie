@@ -8,8 +8,8 @@ import type {
 import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";
-import type { HarnessAgentRuntime } from "./adapter";
 import { type ResumeSessionError } from "./errors";
+import type { PiAgentRuntime } from "./pi/runtime";
 import {
   foldSessionEvent,
   initialSessionState,
@@ -29,13 +29,13 @@ import { inSession } from "./session-identity";
  * {@link SessionScopedEvent}s (attaching the {@link SessionRef}), and publishes
  * onto the EventBus.
  *
- * It *optionally owns* a {@link HarnessAgentRuntime} — the live execution
+ * It *optionally owns* a {@link PiAgentRuntime} — the live execution
  * resource: a pi child, a Claude SDK handle, a Codex thread. Optional is the
  * whole point. A session exists as soon as anything writes to it and outlives
  * every runtime it ever holds, so observing one costs no process, and a
  * crashed runtime leaves a session that is still queryable and can start over.
  *
- * A private collaborator of {@link HarnessAgentSessionManager}: no Context tag.
+ * A private collaborator of {@link PiAgentSessionManager}: no Context tag.
  * It does not know how to open a native session — the manager hands it an
  * `acquire` — but it is the only thing that decides *when* one is opened, so
  * single-flighting lives here and adapters keep their single-caller invariant.
@@ -44,20 +44,20 @@ import { inSession } from "./session-identity";
 /** What it takes to produce a runtime: an adapter open/resume, already bound to
  * its inputs by the manager. The `Scope` is the runtime's, forked per
  * acquisition and closed when the runtime is released. */
-export type AcquireRuntime = Effect.Effect<HarnessAgentRuntime, ResumeSessionError, Scope.Scope>;
+export type AcquireRuntime = Effect.Effect<PiAgentRuntime, ResumeSessionError, Scope.Scope>;
 
 /** The runtime a session currently holds, its scope, and the fiber draining
  * its events. The token is what lets only this holding's own cleanup clear the
  * slot, so a dead runtime's crash handler can never evict its replacement. */
 type Held = {
   readonly token: object;
-  readonly runtime: HarnessAgentRuntime;
+  readonly runtime: PiAgentRuntime;
   readonly scope: Scope.Closeable;
   readonly fiber: Fiber.Fiber<void>;
 };
 
 /** The promise of a runtime that an acquisition is on its way to producing. */
-type Ticket = Deferred.Deferred<HarnessAgentRuntime, ResumeSessionError>;
+type Ticket = Deferred.Deferred<PiAgentRuntime, ResumeSessionError>;
 
 /**
  * Whether this session has a runtime, is getting one, or will never take
@@ -79,12 +79,12 @@ type Lifecycle = {
 };
 
 type AcquireDecision =
-  | { readonly _tag: "Held"; readonly runtime: HarnessAgentRuntime }
+  | { readonly _tag: "Held"; readonly runtime: PiAgentRuntime }
   | { readonly _tag: "Start"; readonly ticket: Ticket }
   | { readonly _tag: "Await"; readonly ticket: Ticket }
   | { readonly _tag: "Sealed" };
 
-export type HarnessAgentSessionShape = {
+export type PiAgentSessionShape = {
   readonly ref: SessionRef;
   /**
    * What this session is doing, always answerable. A session that has never
@@ -100,7 +100,7 @@ export type HarnessAgentSessionShape = {
    */
   readonly emit: (body: SessionScopedEventBody) => Effect.Effect<void>;
   /** The runtime this session holds, or `undefined`. Never acquires one. */
-  readonly peekRuntime: Effect.Effect<HarnessAgentRuntime | undefined>;
+  readonly peekRuntime: Effect.Effect<PiAgentRuntime | undefined>;
   /**
    * The session's runtime, acquiring one if it has none. Single-flight:
    * concurrent callers share one acquisition, so an adapter is never asked to
@@ -114,7 +114,7 @@ export type HarnessAgentSessionShape = {
    */
   readonly ensureRuntime: (
     acquire: AcquireRuntime,
-  ) => Effect.Effect<HarnessAgentRuntime | undefined, ResumeSessionError>;
+  ) => Effect.Effect<PiAgentRuntime | undefined, ResumeSessionError>;
   /**
    * Release the runtime and seal the session against taking another. The
    * observable state survives — the manager decides when to stop answering for
@@ -124,10 +124,10 @@ export type HarnessAgentSessionShape = {
   readonly releaseRuntime: Effect.Effect<void>;
 };
 
-export const makeHarnessAgentSession = (
+export const makePiAgentSession = (
   ref: SessionRef,
   bus: EventBusShape,
-): Effect.Effect<HarnessAgentSessionShape, never, Scope.Scope> =>
+): Effect.Effect<PiAgentSessionShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const state = yield* Ref.make(initialSessionState);
@@ -333,12 +333,12 @@ export const makeHarnessAgentSession = (
         yield* Deferred.succeed(registered, undefined);
       });
 
-    const ensureRuntime: HarnessAgentSessionShape["ensureRuntime"] = (acquire) =>
+    const ensureRuntime: PiAgentSessionShape["ensureRuntime"] = (acquire) =>
       Ref.modify(lifecycle, (current): readonly [AcquireDecision, Lifecycle] => {
         if (current.sealed) return [{ _tag: "Sealed" }, current];
         if (current.held) return [{ _tag: "Held", runtime: current.held.runtime }, current];
         if (current.acquiring) return [{ _tag: "Await", ticket: current.acquiring }, current];
-        const ticket = Deferred.makeUnsafe<HarnessAgentRuntime, ResumeSessionError>();
+        const ticket = Deferred.makeUnsafe<PiAgentRuntime, ResumeSessionError>();
         return [
           { _tag: "Start", ticket },
           { ...current, acquiring: ticket },
@@ -366,7 +366,7 @@ export const makeHarnessAgentSession = (
         }),
       );
 
-    const releaseRuntime: HarnessAgentSessionShape["releaseRuntime"] = Ref.modify(
+    const releaseRuntime: PiAgentSessionShape["releaseRuntime"] = Ref.modify(
       lifecycle,
       (current) =>
         [current, { held: undefined, acquiring: current.acquiring, sealed: true }] as const,
@@ -394,5 +394,5 @@ export const makeHarnessAgentSession = (
       peekRuntime: Ref.get(lifecycle).pipe(Effect.map((current) => current.held?.runtime)),
       ensureRuntime,
       releaseRuntime,
-    } satisfies HarnessAgentSessionShape;
+    } satisfies PiAgentSessionShape;
   });

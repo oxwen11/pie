@@ -63,10 +63,9 @@ export interface ChatSessionTransport {
     readonly parts: ReadonlyArray<PromptPart>;
   }): Promise<{ readonly turnId: string }>;
   /**
-   * The session's native history as final-form UIMessages, or `null` when this
-   * harness serves no history — capability absence is a normal outcome here,
-   * not an error. All three harnesses serve history today, so `null` is the
-   * degraded path, not the common one.
+   * The session's native history as final-form UIMessages, or `null` when Pi
+   * serves no history for this session — capability absence is a normal outcome
+   * here, not an error.
    */
   getMessages(): Promise<readonly UIMessage[] | null>;
   /**
