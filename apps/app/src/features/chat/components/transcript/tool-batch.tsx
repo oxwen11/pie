@@ -72,13 +72,17 @@ export function ToolBatch({
   shouldShimmer?: boolean;
   className?: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(shouldShimmer);
   const batchParts = useMemo(() => parts.map((p) => p.part), [parts]);
   const label = useMemo(() => computeBatchTrigger(batchParts), [batchParts]);
   const phrase = useMemo(() => buildTriggerPhrase(label), [label]);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("w-full", className)}>
+    <Collapsible
+      open={shouldShimmer || isOpen}
+      onOpenChange={setIsOpen}
+      className={cn("w-full", className)}
+    >
       <CollapsibleTrigger
         className={cn(
           "text-muted-foreground hover:text-foreground -mx-1 flex w-full items-center gap-2 rounded-md px-1 text-sm transition-colors duration-150",
@@ -101,7 +105,13 @@ export function ToolBatch({
       <CollapsibleContent className="flex flex-col gap-2 pt-2">
         {parts.map(({ part, index }) => {
           if (part.type === "reasoning") {
-            return <ReasoningPart key={part.id ?? `reasoning-${index}`} part={part} />;
+            return (
+              <ReasoningPart
+                key={part.id ?? `reasoning-${index}`}
+                part={part}
+                isMessageStreaming={shouldShimmer}
+              />
+            );
           }
           const toolPart = part as ToolUIPart;
           return <ToolPart key={toolPart.toolCallId} message={message} part={toolPart} />;

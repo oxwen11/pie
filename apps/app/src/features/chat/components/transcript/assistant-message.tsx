@@ -49,7 +49,13 @@ export function AssistantMessage({
           return <ToolPart key={part.toolCallId} message={message} part={part} />;
         }
         if (isReasoningUIPart(part)) {
-          return <ReasoningPart key={part.id ?? `reasoning-${index}`} part={part} />;
+          return (
+            <ReasoningPart
+              key={part.id ?? `reasoning-${index}`}
+              part={part}
+              isMessageStreaming={isStreaming}
+            />
+          );
         }
         if (part.type === "text") {
           const canShowActions =
