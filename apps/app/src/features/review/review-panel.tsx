@@ -49,7 +49,7 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const workspace = useSessionWorkspace();
+  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
   const panel = useContentPanel();
   const cwd = workspace.data?.path;
   const mode = instance.payload.mode ?? "uncommitted";

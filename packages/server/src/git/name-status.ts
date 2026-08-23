@@ -1,4 +1,4 @@
-import type { GitReviewFile, GitReviewFileStatus } from "@vibest/contract/git";
+import type { GitReviewFile, GitReviewFileStatus } from "@pie/contract/git";
 
 const statusFromLetter = (letter: string): GitReviewFileStatus => {
   if (letter === "A") return "added";

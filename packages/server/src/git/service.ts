@@ -10,7 +10,7 @@ import type {
   GitReviewQuery,
   GitStatus,
   GitStatusFile,
-} from "@vibest/contract/git";
+} from "@pie/contract/git";
 import { Context, Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 

@@ -1,6 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
 import { implement } from "@orpc/server";
-import { gitContract } from "@vibest/contract/git";
+import { gitContract } from "@pie/contract/git";
 import { Effect } from "effect";
 
 import { GitService } from "../git";
