@@ -3,6 +3,7 @@ import type { FileSystem } from "effect/FileSystem";
 
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
+import type { GitService } from "../git";
 import type { PiAgentService, PiAgentSessionService } from "../harness";
 import type { PiAgent } from "../harness/pi/agent";
 import type { ProjectService } from "../project";
@@ -16,4 +17,5 @@ export type RpcContext = WithEffectContext<
   | PiAgentService
   | ProjectService
   | FileSystemService
+  | GitService
 >;

@@ -5,6 +5,7 @@ import { Effect, Layer, ManagedRuntime } from "effect";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
+import { GitServiceLayer } from "../src/git";
 import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
@@ -48,7 +49,6 @@ export async function makeRpcTestHarness(home: string) {
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
   );
-
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -57,6 +57,10 @@ export async function makeRpcTestHarness(home: string) {
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    GitServiceLayer.pipe(
+      Layer.provide(FileSystemServiceLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     NodeServices.layer,
     Observability.discard,
   );
