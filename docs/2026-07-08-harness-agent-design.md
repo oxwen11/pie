@@ -4,28 +4,28 @@
 
 > 范围：覆盖 harness agent 运行时的核心能力域——`session`（会话生命周期与交互，核心模块）、`harness`（可用 agent adapter 信息）、`skill`（skills 安装与管理，暂不细化）、`provider`（模型/provider 配置，含自定义 provider）、`mcp`（MCP server 配置，暂不细化）、`fs`（文件读取/检索，只读）、`git`（只读 git 信息）、`project`（项目管理）、`pty`（伪终端会话管理，暂不细化）；不含任务看板、agent 执行器注册表、模型市场（可发现/浏览的第三方 provider 目录，跟"配置已有 provider"是两回事，见 §4.8）、通用应用配置等其他领域——"置顶会话""折叠分组""主题色"这类是纯 UI 本地状态，都不属于这套 headless runtime 该管的范围。
 >
-> 定位：pie monorepo 内新增的一个 server 子包（`@pie/server`），承载这套 harness agent 运行时模块，作为 pie 内部的服务端模块交付，不作为对外发布的 SDK——服务端实现全部采用 Effect v4（`effect@^4`）：service 用 `Context` Tag + `Layer` 定义与装配、异步与错误用 `Effect<A, E, R>` 的类型化错误（`Data.TaggedError`）、资源生命周期用 `Scope`/finalizer、事件流用 `Stream`。客户端（pie 自己的前端）和服务端之间用 **oRPC v2** 通信（不是 REST）：走 oRPC 的 WebSocket 适配器（`@orpc/server/websocket` 的 `RPCHandler`），在单条 WS 连接上多路复用地跑类型安全的 procedure 调用 + event iterator 事件流；oRPC procedure 用官方的 `@orpc/experimental-effect` 集成直接写成 Effect（`.effect(function* …)`），把 §5 的 Effect service 注入进 handler。鉴权对齐 OpenCode 的模式——默认不鉴权，可选 `Authorization: Basic`。
+> 定位：pie monorepo 内新增的一个 server 子包（`@getpie/server`），承载这套 harness agent 运行时模块，作为 pie 内部的服务端模块交付，不作为对外发布的 SDK——服务端实现全部采用 Effect v4（`effect@^4`）：service 用 `Context` Tag + `Layer` 定义与装配、异步与错误用 `Effect<A, E, R>` 的类型化错误（`Data.TaggedError`）、资源生命周期用 `Scope`/finalizer、事件流用 `Stream`。客户端（pie 自己的前端）和服务端之间用 **oRPC v2** 通信（不是 REST）：走 oRPC 的 WebSocket 适配器（`@orpc/server/websocket` 的 `RPCHandler`），在单条 WS 连接上多路复用地跑类型安全的 procedure 调用 + event iterator 事件流；oRPC procedure 用官方的 `@orpc/experimental-effect` 集成直接写成 Effect（`.effect(function* …)`），把 §5 的 Effect service 注入进 handler。鉴权对齐 OpenCode 的模式——默认不鉴权，可选 `Authorization: Basic`。
 
 ## 1. 目标与范围
 
-目标是设计一套通用的 Harness Agent Client-Server 架构：服务端托管 agent harness 的运行时（session 生命周期 + fs/git/project 能力），客户端通过一条 WS 连接远程驱动它。服务端运行时落在 pie 新增的 `packages/server`（`@pie/server`）子包里，客户端访问层落在另一个新增的 `packages/client`（`@pie/client`）子包里（见 §2）；两者都作为 pie 内部子包交付，不作为对外发布的 SDK。
+目标是设计一套通用的 Harness Agent Client-Server 架构：服务端托管 agent harness 的运行时（session 生命周期 + fs/git/project 能力），客户端通过一条 WS 连接远程驱动它。服务端运行时落在 pie 新增的 `packages/server`（`@getpie/server`）子包里，客户端访问层落在另一个新增的 `packages/client`（`@getpie/client`）子包里（见 §2）；两者都作为 pie 内部子包交付，不作为对外发布的 SDK。
 
 - 鉴权默认关闭；设置密码环境变量后要求 `Authorization: Basic <base64(user:pass)>`（在 WS 握手阶段校验）。
 
 ## 2. 子包结构
 
-在 pie monorepo 里新增两个子包承载这套 harness agent 运行时——`packages/server`（`@pie/server`）放服务端运行时，`packages/client`（`@pie/client`）放客户端访问层；由 pie 自己的前端（web / side panel / devtools-client）通过一条 WS 连接消费。两者都是 pie 内部子包，先不拆成对外发布的 SDK。
+在 pie monorepo 里新增两个子包承载这套 harness agent 运行时——`packages/server`（`@getpie/server`）放服务端运行时，`packages/client`（`@getpie/client`）放客户端访问层；由 pie 自己的前端（web / side panel / devtools-client）通过一条 WS 连接消费。两者都是 pie 内部子包，先不拆成对外发布的 SDK。
 
-- **服务端运行时**：`packages/server`（`@pie/server`）子包——session 生命周期 + fs/git/project 等能力，实现成一个 oRPC router、经 WS `RPCHandler` 暴露，本文档的主要设计对象（§4–§8）。
-- **客户端访问**：`packages/client`（`@pie/client`）子包——在 oRPC 客户端（`@orpc/client` + WebSocket link）上薄封装建连、事件订阅、断线重连（见 §3）；类型直接复用 `@pie/server` 的 oRPC router 类型（`RouterClient`），独立于 `@pie/server`，不放在服务端子包里，先不单独发布成 SDK。
-- **React 状态层**：作为 pie 内部模块（见 §9），依赖 `@pie/client`，先不单独发布成 SDK 包。
+- **服务端运行时**：`packages/server`（`@getpie/server`）子包——session 生命周期 + fs/git/project 等能力，实现成一个 oRPC router、经 WS `RPCHandler` 暴露，本文档的主要设计对象（§4–§8）。
+- **客户端访问**：`packages/client`（`@getpie/client`）子包——在 oRPC 客户端（`@orpc/client` + WebSocket link）上薄封装建连、事件订阅、断线重连（见 §3）；类型直接复用 `@getpie/server` 的 oRPC router 类型（`RouterClient`），独立于 `@getpie/server`，不放在服务端子包里，先不单独发布成 SDK。
+- **React 状态层**：作为 pie 内部模块（见 §9），依赖 `@getpie/client`，先不单独发布成 SDK 包。
 
 ## 3. 使用方式
 
 核心用法——建连、挑一个可用的 harness agent、创建会话、发消息、订阅事件；完整方法列表见 §4。
 
 ```typescript
-import { createHarnessClient } from "@pie/client";
+import { createHarnessClient } from "@getpie/client";
 
 const client = createHarnessClient({
   url: "ws://127.0.0.1:7001",
@@ -456,7 +456,7 @@ export const HarnessAgentServerLayer = Layer.mergeAll(
 - `sessionId` 用 `${harnessAgentId}:${uuid}` 前缀编码来解决冷操作路由（见 §5.4）——这是目前给出的具体方案，还没有验证这个格式会不会跟某个后端自己的原生会话 ID 格式冲突，也没考虑要不要对客户端暴露这个内部编码细节（比如要不要在协议层面当它是不透明字符串处理）。
 - `$PIE_HOME/config.json` 里的凭证（`provider`/`mcp` 两个字段都可能有）目前跟其余配置存在同一个文件、没有做文件权限收紧（比如 `chmod 600`）——参考实现里同样没做，但这套 runtime 要不要主动补上这个小的安全加固，还没决定。
 - `EventBus` 的背压阈值（相当于"缓冲队列上限"）、ping 间隔、gap 之后客户端具体怎么补状态，这几个数值/流程还没敲定，需要确认。
-- Effect v4 的 service 构造器 API 在 beta 期间（`ServiceMap` ↔ `Context`）反复改过名，本文档 §5.4/§6 用 `Context.Tag` + `Layer` 只是示意——`@pie/server` 落地时以最终 release 的确切 service/Layer 构造器为准，需要确认。
+- Effect v4 的 service 构造器 API 在 beta 期间（`ServiceMap` ↔ `Context`）反复改过名，本文档 §5.4/§6 用 `Context.Tag` + `Layer` 只是示意——`@getpie/server` 落地时以最终 release 的确切 service/Layer 构造器为准，需要确认。
 - 传输层用 oRPC v2 的 WS `RPCHandler`（`@orpc/server/websocket`）+ `@orpc/client` 的 WS link；官方 Effect 集成 `@orpc/experimental-effect` 目前是 experimental/beta（要配 `effect@beta`），API 可能变、还得跟 §5.4/§6 用的 Effect v4 版本对齐，落地时需要 pin 版本并验证。
 - §4.3 的 `seq`/`gap`/断线重连补快照是我们自己在 event iterator 之上叠的一层语义——需要确认它跟 oRPC event iterator 自带的生命周期（`.return`/signal 取消、重连）怎么配合，以及事件扇出（多订阅广播）要不要直接用 oRPC 的 Publisher helper 而不是自己写 `EventBus`。
 - 类型定义手动同步的维护成本——后续要不要收敛成一个共享的轻量 types 包，现在先不做。
@@ -479,7 +479,7 @@ export const HarnessAgentServerLayer = Layer.mergeAll(
 
 ## 9. React 状态管理层（pie 内部模块）
 
-pie 前端消费这套运行时的 React 状态层——依赖 §3 的 `@pie/client`（oRPC 客户端的薄封装），不直接碰 WS/oRPC，先作为 pie 内部模块存在（具体落在哪个前端包待定），不单独发布成 SDK。目的：把"建连、订阅事件、断线重连补快照"这套 §3 里手写的样板逻辑封装掉，业务代码只用 hook 读状态、调用几个 action，不用自己维护订阅循环和 reducer——即"根据状态渲染 UI"。
+pie 前端消费这套运行时的 React 状态层——依赖 §3 的 `@getpie/client`（oRPC 客户端的薄封装），不直接碰 WS/oRPC，先作为 pie 内部模块存在（具体落在哪个前端包待定），不单独发布成 SDK。目的：把"建连、订阅事件、断线重连补快照"这套 §3 里手写的样板逻辑封装掉，业务代码只用 hook 读状态、调用几个 action，不用自己维护订阅循环和 reducer——即"根据状态渲染 UI"。
 
 内部用 [zustand](https://github.com/pmndrs/zustand) 维护一份全局 store（一个 React 应用一份，不是每个组件一份），大致结构：
 

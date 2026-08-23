@@ -1,6 +1,6 @@
+import type { GitReviewMode } from "@getpie/contract/git";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
-import type { GitReviewMode } from "@pie/contract/git";
-import { Spinner } from "@pie/ui/components/spinner";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 

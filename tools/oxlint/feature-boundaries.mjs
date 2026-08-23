@@ -76,10 +76,11 @@ const appNoServerImport = {
       ImportDeclaration(node) {
         const source = node.source.value;
         if (typeof source !== "string") return;
-        if (source === "@pie/server" || source.startsWith("@pie/server/")) {
+        if (source === "@getpie/server" || source.startsWith("@getpie/server/")) {
           context.report({
             node: node.source,
-            message: "apps/app must not import @pie/server. Use @pie/client and @pie/contract instead.",
+            message:
+              "apps/app must not import @getpie/server. Use @getpie/client and @getpie/contract instead.",
           });
         }
       },

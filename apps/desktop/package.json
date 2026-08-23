@@ -1,5 +1,5 @@
 {
-  "name": "desktop",
+  "name": "@getpie/desktop",
   "version": "0.0.1",
   "private": true,
   "description": "Pie Desktop Application",
@@ -23,20 +23,20 @@
   "dependencies": {
     "@effect/platform-node": "catalog:effect",
     "@electron-toolkit/utils": "^4.0.0",
+    "@getpie/app": "workspace:*",
+    "@getpie/server": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
-    "@pie/app": "workspace:*",
-    "@pie/server": "workspace:*",
     "effect": "catalog:effect",
     "react-error-boundary": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@getpie/ui": "workspace:*",
     "@orpc/tanstack-query": "catalog:orpc",
-    "@pie/ui": "workspace:*",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/react-query": "catalog:",

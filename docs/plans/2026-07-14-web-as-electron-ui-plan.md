@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the existing chat web app (`apps/web`, renamed to `apps/app`) the Electron desktop UI, backed by the existing `@pie/cli` server spawned as a child process, and delete the obsolete worktree/task/terminal desktop app.
+**Goal:** Make the existing chat web app (`apps/web`, renamed to `apps/app`) the Electron desktop UI, backed by the existing `@getpie/cli` server spawned as a child process, and delete the obsolete worktree/task/terminal desktop app.
 
-**Architecture:** Electron's main process spawns `@pie/cli`'s built server using Electron's own Node runtime (`ELECTRON_RUN_AS_NODE=1`), on a loopback OS-assigned port, guarded by a per-launch bearer token. The renderer's HTML/JS/CSS are served **off disk** by a `pie://app` custom protocol (never a proxy); the renderer calls the backend at its real `http://127.0.0.1:<port>` origin, which the server permits via a CORS allowlist. WebSocket RPC connects directly to loopback, authenticated with a single-use ticket, because a custom protocol cannot proxy a WS upgrade and browsers cannot set headers on a WS handshake. Browser mode (`npx pie`) stays fully supported: host differences are expressed as a `Platform` discriminated union injected by each entry point, not sniffed at runtime.
+**Architecture:** Electron's main process spawns `@getpie/cli`'s built server using Electron's own Node runtime (`ELECTRON_RUN_AS_NODE=1`), on a loopback OS-assigned port, guarded by a per-launch bearer token. The renderer's HTML/JS/CSS are served **off disk** by a `pie://app` custom protocol (never a proxy); the renderer calls the backend at its real `http://127.0.0.1:<port>` origin, which the server permits via a CORS allowlist. WebSocket RPC connects directly to loopback, authenticated with a single-use ticket, because a custom protocol cannot proxy a WS upgrade and browsers cannot set headers on a WS handshake. Browser mode (`npx pie`) stays fully supported: host differences are expressed as a `Platform` discriminated union injected by each entry point, not sniffed at runtime.
 
 **Tech Stack:** Electron 41 + electron-vite + electron-builder; React 19 + Vite + TanStack Router/Query; oRPC 2.0.0-beta.16 (fetch + websocket links); Node `http` + `ws` + `sirv`; Vitest; Playwright (Electron).
 
@@ -24,7 +24,7 @@
 
 **Renamed:**
 
-- `apps/web/` → `apps/app/` (package `@pie/web` → `@pie/app`)
+- `apps/web/` → `apps/app/` (package `@getpie/web` → `@getpie/app`)
 
 **Created:**
 
@@ -36,7 +36,7 @@
 - `packages/pie/src/node/handshake.ts` — the stdout ready-line protocol, shared by the server and the desktop supervisor.
 - `packages/pie/vitest.config.ts` — test config for the above.
 - `apps/desktop/src/shared/bridge.ts` — the preload bridge's type (`DesktopBridge`).
-- `apps/desktop/src/main/backend.ts` — spawns/supervises the `@pie/cli` server child process.
+- `apps/desktop/src/main/backend.ts` — spawns/supervises the `@getpie/cli` server child process.
 - `apps/desktop/src/main/protocol.ts` — the `pie://app` static-file protocol handler with SPA fallback.
 - `apps/desktop/src/renderer/main.tsx` — the desktop entry point; constructs the desktop `Platform`.
 
@@ -56,7 +56,7 @@
 - `apps/desktop/electron.vite.config.ts`, `electron-builder.yml`, `package.json`, `tsconfig.*.json`.
 - `apps/desktop/e2e/tests/*` — rewritten against the chat UI.
 
-`packages/services` **stays in the tree, unreferenced.** Do not delete it; do remove `@pie/services` from `apps/desktop`'s dependencies, since nothing in the new desktop app imports it.
+`packages/services` **stays in the tree, unreferenced.** Do not delete it; do remove `@getpie/services` from `apps/desktop`'s dependencies, since nothing in the new desktop app imports it.
 
 ---
 
@@ -70,7 +70,7 @@
 
 **Interfaces:**
 
-- Produces: workspace package `@pie/app` at `apps/app`, replacing `@pie/web`.
+- Produces: workspace package `@getpie/app` at `apps/app`, replacing `@getpie/web`.
 
 - [ ] **Step 1: Move the directory with git**
 
@@ -83,7 +83,7 @@ git mv apps/web apps/app
 In `apps/app/package.json`, change the name field:
 
 ```json
-  "name": "@pie/app",
+  "name": "@getpie/app",
 ```
 
 - [ ] **Step 3: Update the server's path references**
@@ -132,13 +132,13 @@ Also update the 503 message in the same file:
 ```ts
 serveUI = (_req, res) => {
   res.statusCode = 503;
-  res.end("Web UI not built. Run the @pie/app build first.");
+  res.end("Web UI not built. Run the @getpie/app build first.");
 };
 ```
 
 - [ ] **Step 4: Verify no stale references remain**
 
-Run: `rg -n "apps/web|@pie/web" --glob '!node_modules' --glob '!pnpm-lock.yaml'`
+Run: `rg -n "apps/web|@getpie/web" --glob '!node_modules' --glob '!pnpm-lock.yaml'`
 Expected: no matches. (`pnpm-lock.yaml` will be regenerated in the next step.)
 
 - [ ] **Step 5: Reinstall and typecheck**
@@ -289,7 +289,7 @@ describe("createTicketStore", () => {
 
 - [ ] **Step 3: Run the test to verify it fails**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: FAIL — cannot resolve `./auth`.
 
 - [ ] **Step 4: Write the implementation**
@@ -356,7 +356,7 @@ export function tokensMatch(expected: string, actual: string | null): boolean {
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: PASS — 15 tests.
 
 - [ ] **Step 6: Commit**
@@ -429,7 +429,7 @@ describe("corsHeaders", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: FAIL — cannot resolve `./cors`.
 
 - [ ] **Step 3: Write the implementation**
@@ -463,7 +463,7 @@ export function corsHeaders(
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: PASS — 7 new tests, 22 total.
 
 - [ ] **Step 5: Commit**
@@ -640,7 +640,7 @@ describe("createServer WebSocket ticket", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: FAIL — `createServer` takes no arguments; `/api/ws-ticket` 404s.
 
 - [ ] **Step 3: Rewrite the server**
@@ -654,7 +654,7 @@ import { createServer as createHttpServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createNodeRPCHandler, createWsRPCHandler } from "@pie/server/rpc";
+import { createNodeRPCHandler, createWsRPCHandler } from "@getpie/server/rpc";
 import sirv from "sirv";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
@@ -795,7 +795,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
     if (!staticDir) {
       serveUI = (_req, res) => {
         res.statusCode = 503;
-        res.end("Web UI not built. Run the @pie/app build first.");
+        res.end("Web UI not built. Run the @getpie/app build first.");
       };
     } else {
       const assets = sirv(staticDir, {
@@ -843,7 +843,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: PASS — 11 new tests.
 
 - [ ] **Step 5: Commit**
@@ -871,7 +871,7 @@ git commit -m "feat(cli): enforce bearer auth, CORS, and ticketed WS upgrades"
   - `READY_PREFIX: string` (`"pie:ready "`)
   - `formatReadyLine(info: ReadyInfo): string`
   - `parseReadyLine(line: string): ReadyInfo | null` where `ReadyInfo = { port: number }`
-  - Package subpath export `@pie/cli/handshake` → `./src/node/handshake.ts` (imported by `apps/desktop`'s main process, which electron-vite bundles from TypeScript source).
+  - Package subpath export `@getpie/cli/handshake` → `./src/node/handshake.ts` (imported by `apps/desktop`'s main process, which electron-vite bundles from TypeScript source).
   - Env contract read by the CLI: `PIE_AUTH_TOKEN`, `PIE_CORS_ORIGINS` (comma-separated), `PIE_PORT` (default `4000`; `0` = OS-assigned).
 
 - [ ] **Step 1: Write the failing test**
@@ -909,7 +909,7 @@ describe("ready line", () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pnpm --filter @pie/cli test`
+Run: `pnpm --filter @getpie/cli test`
 Expected: FAIL — cannot resolve `./handshake`.
 
 - [ ] **Step 3: Write the handshake module**
@@ -1013,12 +1013,12 @@ In `packages/pie/package.json`, add an `exports` map immediately after the `bin`
 
 - [ ] **Step 6: Run the tests and typecheck**
 
-Run: `pnpm --filter @pie/cli test && pnpm --filter @pie/cli typecheck`
+Run: `pnpm --filter @getpie/cli test && pnpm --filter @getpie/cli typecheck`
 Expected: PASS — 5 new tests; typecheck clean.
 
 - [ ] **Step 7: Verify the ready line end to end**
 
-Run: `pnpm --filter @pie/cli build && PIE_PORT=0 node packages/pie/dist/cli.mjs`
+Run: `pnpm --filter @getpie/cli build && PIE_PORT=0 node packages/pie/dist/cli.mjs`
 Expected: first stdout line matches `pie:ready {"port":<some port>}` with a non-zero port; second line is the human-readable URL. Stop it with Ctrl-C.
 
 - [ ] **Step 8: Commit**
@@ -1157,7 +1157,7 @@ and to `devDependencies`:
 
 - [ ] **Step 3: Run the test to verify it fails**
 
-Run: `pnpm --filter @pie/client test`
+Run: `pnpm --filter @getpie/client test`
 Expected: FAIL — `createWsConnect` is not exported.
 
 - [ ] **Step 4: Write the implementation**
@@ -1169,7 +1169,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { RPCLink as WebSocketRPCLink } from "@orpc/client/websocket";
 import type { RouterContractClient } from "@orpc/contract";
-import type { Contract } from "@pie/contract";
+import type { Contract } from "@getpie/contract";
 
 /** A fully typed client for the Pie server, derived from the contract. */
 export type PieClient = RouterContractClient<Contract>;
@@ -1249,7 +1249,7 @@ export function createPieWsClient(options: CreatePieWsClientOptions = {}): PieCl
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `pnpm --filter @pie/client test && pnpm --filter @pie/client typecheck`
+Run: `pnpm --filter @getpie/client test && pnpm --filter @getpie/client typecheck`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -1323,7 +1323,7 @@ Replace the whole of `apps/app/src/lib/orpc.ts` with:
 ```ts
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { createPieClient, createPieWsClient, type PieClient } from "@pie/client";
+import { createPieClient, createPieWsClient, type PieClient } from "@getpie/client";
 import { toast } from "sonner";
 
 import type { Platform } from "@/platform";
@@ -1451,7 +1451,7 @@ In `apps/app/src/core/chat/chat-transport.ts`, replace the module-scope import o
 
 ```ts
 import { consumeEventIterator, eventIteratorToStream } from "@orpc/client";
-import type { ToolPermissionRequest } from "@pie/contract/claude-code";
+import type { ToolPermissionRequest } from "@getpie/contract/claude-code";
 import type { ChatTransport as AiChatTransport, UIMessage, UIMessageChunk } from "ai";
 
 import type { AppClients } from "@/lib/orpc";
@@ -1599,12 +1599,12 @@ createRoot(rootElement).render(createApp({ host: "web" }));
 
 - [ ] **Step 10: Typecheck**
 
-Run: `pnpm --filter @pie/app typecheck`
+Run: `pnpm --filter @getpie/app typecheck`
 Expected: PASS. If anything still imports `orpcClient`, `orpcWsClient`, `queryClient`, `orpc`, or `chatManager` from `@/lib/orpc` or `./chat-manager`, fix it to take the value from `AppClients` / the provider — those module-scope exports are gone.
 
 - [ ] **Step 11: Verify browser mode still works**
 
-Run: `pnpm --filter @pie/cli build && pnpm --filter @pie/app build && node packages/pie/dist/cli.mjs`
+Run: `pnpm --filter @getpie/cli build && pnpm --filter @getpie/app build && node packages/pie/dist/cli.mjs`
 Then open `http://127.0.0.1:4000` in a browser.
 Expected: the chat UI loads, with no console errors about RPC or WebSocket.
 Stop the server with Ctrl-C.
@@ -1630,7 +1630,7 @@ git commit -m "refactor(app): inject host capabilities via a Platform union"
 
 - Produces:
   - `appVitePlugins(): PluginOption[]` and `appAlias(): Record<string, string>` (`apps/app/vite.shared.ts`)
-  - Package subpath exports on `@pie/app`: `./app`, `./platform`, `./vite`, `./index.css`
+  - Package subpath exports on `@getpie/app`: `./app`, `./platform`, `./vite`, `./index.css`
 
 **Why:** the desktop renderer compiles `apps/app`'s source itself (it is _not_ a copy of `apps/app/dist`). For that to work, `apps/desktop`'s electron-vite renderer config must apply the same plugins — TanStack Router codegen, React, Tailwind — and the same `@` alias. Sharing one module keeps them from drifting. This mirrors opencode, whose `packages/desktop` imports `@opencode-ai/app/vite`.
 
@@ -1715,7 +1715,7 @@ In `apps/app/package.json`, add an `exports` map immediately after `"type": "mod
 
 - [ ] **Step 4: Verify the web build still works**
 
-Run: `pnpm --filter @pie/app build`
+Run: `pnpm --filter @getpie/app build`
 Expected: PASS — `apps/app/dist/index.html` exists.
 
 - [ ] **Step 5: Commit**
@@ -1835,12 +1835,12 @@ In `apps/desktop/package.json`, remove these entries from `dependencies`:
 and these from `devDependencies`:
 
 ```
-"@orpc/publisher", "@orpc/server", "@pierre/diffs", "@pie/services",
+"@orpc/publisher", "@orpc/server", "@pierre/diffs", "@getpie/services",
 "@xterm/addon-fit", "@xterm/addon-serialize", "@xterm/addon-webgl",
 "@xterm/headless", "@xterm/xterm"
 ```
 
-Leave `@orpc/client`, `@orpc/contract`, `@orpc/tanstack-query`, `@tanstack/react-query`, `@pie/ui`, React, Tailwind, electron, electron-builder, electron-vite, and Playwright in place — the new renderer needs them.
+Leave `@orpc/client`, `@orpc/contract`, `@orpc/tanstack-query`, `@tanstack/react-query`, `@getpie/ui`, React, Tailwind, electron, electron-builder, electron-vite, and Playwright in place — the new renderer needs them.
 
 - [ ] **Step 4: Remove the node-pty external from the build config**
 
@@ -1934,11 +1934,11 @@ git commit -m "refactor(desktop): remove worktree/task/terminal app, leaving the
 
 - Create: `apps/desktop/src/main/backend.ts`
 - Create: `apps/desktop/src/main/backend.test.ts`
-- Modify: `apps/desktop/package.json` (add `@pie/cli` dependency)
+- Modify: `apps/desktop/package.json` (add `@getpie/cli` dependency)
 
 **Interfaces:**
 
-- Consumes: `READY_PREFIX`, `parseReadyLine` from `@pie/cli/handshake` (Task 5); the env contract `PIE_AUTH_TOKEN` / `PIE_CORS_ORIGINS` / `PIE_PORT` (Task 5).
+- Consumes: `READY_PREFIX`, `parseReadyLine` from `@getpie/cli/handshake` (Task 5); the env contract `PIE_AUTH_TOKEN` / `PIE_CORS_ORIGINS` / `PIE_PORT` (Task 5).
 - Produces:
   - `startBackend(options: StartBackendOptions): Promise<Backend>` where
     ```ts
@@ -1959,7 +1959,7 @@ git commit -m "refactor(desktop): remove worktree/task/terminal app, leaving the
 In `apps/desktop/package.json`, add to `dependencies`:
 
 ```json
-    "@pie/cli": "workspace:*",
+    "@getpie/cli": "workspace:*",
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -2002,7 +2002,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
-import { parseReadyLine } from "@pie/cli/handshake";
+import { parseReadyLine } from "@getpie/cli/handshake";
 import { app } from "electron";
 
 const START_TIMEOUT_MS = 30_000;
@@ -2276,7 +2276,7 @@ git commit -m "feat(desktop): serve the renderer over a pie:// protocol"
 
 **Interfaces:**
 
-- Consumes: `startBackend` (Task 10); `registerAppScheme`, `registerAppProtocol`, `APP_ORIGIN` (Task 11); `createApp`, `Platform` from `@pie/app` (Tasks 7–8).
+- Consumes: `startBackend` (Task 10); `registerAppScheme`, `registerAppProtocol`, `APP_ORIGIN` (Task 11); `createApp`, `Platform` from `@getpie/app` (Tasks 7–8).
 - Produces:
   - `DesktopBridge` (`apps/desktop/src/shared/bridge.ts`) — `{ os: string; backend: BackendConnection }`
   - `window.pie: DesktopBridge` in the renderer
@@ -2345,11 +2345,11 @@ export {};
 Create `apps/desktop/src/renderer/main.tsx`:
 
 ```tsx
-import { createApp } from "@pie/app/app";
-import type { Platform } from "@pie/app/platform";
+import { createApp } from "@getpie/app/app";
+import type { Platform } from "@getpie/app/platform";
 import { createRoot } from "react-dom/client";
 
-import "@pie/app/index.css";
+import "@getpie/app/index.css";
 
 const bridge = window.pie;
 
@@ -2530,7 +2530,7 @@ app.on("before-quit", () => {
 Replace the whole of `apps/desktop/electron.vite.config.ts`:
 
 ```ts
-import { appAlias, appVitePlugins } from "@pie/app/vite";
+import { appAlias, appVitePlugins } from "@getpie/app/vite";
 import { defineConfig } from "electron-vite";
 
 export default defineConfig({
@@ -2577,13 +2577,13 @@ export default defineConfig({
 In `apps/desktop/package.json`, add to `dependencies`:
 
 ```json
-    "@pie/app": "workspace:*",
+    "@getpie/app": "workspace:*",
 ```
 
 and change the `dev` script, adding a `predev` before it. The backend is spawned from `packages/pie/dist`, so it must be built before Electron starts — the same reason opencode has a `predev`.
 
 ```json
-    "predev": "pnpm --filter @pie/cli build",
+    "predev": "pnpm --filter @getpie/cli build",
     "dev": "electron-vite dev",
 ```
 
@@ -2615,9 +2615,9 @@ git commit -m "feat(desktop): render the pie app against a spawned backend"
 
 **Interfaces:**
 
-- Consumes: `resolveServerEntry(isPackaged=true, resourcesPath)` (Task 10), now → `<resources>/app.asar/node_modules/@pie/cli/dist/cli.mjs`.
+- Consumes: `resolveServerEntry(isPackaged=true, resourcesPath)` (Task 10), now → `<resources>/app.asar/node_modules/@getpie/cli/dist/cli.mjs`.
 
-**Why not `extraResources`:** copying `packages/pie/dist` to `<resources>/server` puts `cli.mjs` on disk but leaves its imports (`@orpc/server`, `sirv`, `ws`, `ai`, the Claude Agent SDK) unresolvable — the bundle is not self-contained, and nothing supplies a `node_modules` next to the copy. Bundling those deps in is not an option either: the Claude Agent SDK locates its own manifest and native binary relative to its package directory. `@pie/cli` is already a production dependency of the desktop app, so electron-builder collects it _with its whole dependency tree_, correctly flattened out of pnpm's store, into the asar. Spawn it from there. Electron's Node reads asar paths transparently, including under `ELECTRON_RUN_AS_NODE`.
+**Why not `extraResources`:** copying `packages/pie/dist` to `<resources>/server` puts `cli.mjs` on disk but leaves its imports (`@orpc/server`, `sirv`, `ws`, `ai`, the Claude Agent SDK) unresolvable — the bundle is not self-contained, and nothing supplies a `node_modules` next to the copy. Bundling those deps in is not an option either: the Claude Agent SDK locates its own manifest and native binary relative to its package directory. `@getpie/cli` is already a production dependency of the desktop app, so electron-builder collects it _with its whole dependency tree_, correctly flattened out of pnpm's store, into the asar. Spawn it from there. Electron's Node reads asar paths transparently, including under `ELECTRON_RUN_AS_NODE`.
 
 - [ ] **Step 1: Point the packaged entry at the collected dependency**
 
@@ -2637,7 +2637,7 @@ In `apps/desktop/package.json`, change the build scripts so the server bundle ex
 
 ```json
     "build": "electron-vite build",
-    "prebuild": "pnpm --filter @pie/cli build",
+    "prebuild": "pnpm --filter @getpie/cli build",
     "build:unpack": "pnpm run build && electron-builder --dir",
     "build:mac": "pnpm run build && electron-builder --mac",
 ```
@@ -2649,7 +2649,7 @@ Expected: PASS.
 
 - [ ] **Step 4: Verify the server landed in the bundle**
 
-Check that `node_modules/@pie/cli/dist/cli.mjs` is listed inside `apps/desktop/release/mac-arm64/Pie.app/Contents/Resources/app.asar` (read the asar header, or run the entry directly with `ELECTRON_RUN_AS_NODE=1 PIE_PORT=0`, which should print a ready line).
+Check that `node_modules/@getpie/cli/dist/cli.mjs` is listed inside `apps/desktop/release/mac-arm64/Pie.app/Contents/Resources/app.asar` (read the asar header, or run the entry directly with `ELECTRON_RUN_AS_NODE=1 PIE_PORT=0`, which should print a ready line).
 Expected: present, and it boots. (On a non-macOS host, substitute the platform's output directory under `apps/desktop/release/`.)
 
 - [ ] **Step 5: Launch the packaged app**
@@ -2795,7 +2795,7 @@ git commit -m "test(desktop): cover protocol, backend handshake, and deep-link r
 - [ ] **Step 1: Clean install**
 
 Run: `pnpm install`
-Expected: PASS, no peer warnings that mention `@pie/web`.
+Expected: PASS, no peer warnings that mention `@getpie/web`.
 
 - [ ] **Step 2: Full check**
 

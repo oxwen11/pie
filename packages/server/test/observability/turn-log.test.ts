@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { Context, Effect, Layer, Logger } from "effect";
 
 import { EventBus, EventBusLayer } from "../../src/events";

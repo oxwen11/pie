@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Reference implementation (read-only): `/Users/dinq/Work/neo-projects/neo-monorepo` — patterns are ported, names are adapted to pie's existing exported names.
-- Keep pie's existing public names: registry `claudeCodeTools`, type `ClaudeCodeTools`, per-tool consts (`Bash`, `Read`, …) and `<Tool>UIToolInvocation` types. Definitions stay in `@pie/harness` (NOT moved to `@pie/contract`).
+- Keep pie's existing public names: registry `claudeCodeTools`, type `ClaudeCodeTools`, per-tool consts (`Bash`, `Read`, …) and `<Tool>UIToolInvocation` types. Definitions stay in `@getpie/harness` (NOT moved to `@getpie/contract`).
 - Tool output = `tool_use_result` ONLY on success (no `part.content` fallback); error branch uses flattened `part.content` as `errorText`. Decision confirmed in grilling session 2026-07-12.
 - Legacy tools `MultiEdit` / `SlashCommand` / `BashOutput` / `KillShell` keep their current hand-written zod schemas unchanged (they no longer occur on CLI ≥ 0.3.x wire; kept for typed UI components).
 - No cold-read history / tee-store this round; live streams only. No `turn-file-changes` data part. `ClaudeCodeMetadata` stays `unknown`.
@@ -55,7 +55,7 @@ Expected: exits 0; `git diff pnpm-lock.yaml` shows only specifier changes for `@
 
 - [ ] **Step 3: Verify the `/sdk-tools` subpath resolves under TS**
 
-Create a scratch check (do not commit): add `import type { BashInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";` plus `const _t: BashInput = { command: "ls" };` temporarily at the top of `packages/harness/src/claude-code/agent.ts`, run `pnpm --filter @pie/harness typecheck`, expect PASS, then revert the scratch edit.
+Create a scratch check (do not commit): add `import type { BashInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";` plus `const _t: BashInput = { command: "ls" };` temporarily at the top of `packages/harness/src/claude-code/agent.ts`, run `pnpm --filter @getpie/harness typecheck`, expect PASS, then revert the scratch edit.
 
 - [ ] **Step 4: Commit**
 
@@ -80,7 +80,7 @@ Replace the 18 per-tool files under `packages/harness/src/claude-code/tools/` wi
 **Interfaces:**
 
 - Produces: `claudeCodeTools` (registry object, 27 keys, `satisfies ToolSet`), `ClaudeCodeTools = InferUITools<typeof claudeCodeTools>`, per-tool consts and `<Name>UIToolInvocation` types for every registry entry.
-- Consumers (`packages/ui`, `packages/contract`, `apps/web`) keep importing the same names from `@pie/harness/claude-code` — no import churn outside harness.
+- Consumers (`packages/ui`, `packages/contract`, `apps/web`) keep importing the same names from `@getpie/harness/claude-code` — no import churn outside harness.
 
 - [ ] **Step 1: Write the type test first**
 
@@ -151,7 +151,7 @@ describe("SDK-typed tools: input/output ARE the sdk-tools types", () => {
 
 - [ ] **Step 2: Run the type test to verify it fails**
 
-Run: `pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness typecheck`
 Expected: FAIL — `In<"Agent">`, `In<"TaskOutput">` etc. don't exist yet (registry has no such keys).
 
 - [ ] **Step 3: Write `packages/harness/src/claude-code/tools.ts`**
@@ -384,7 +384,7 @@ import { claudeCodeTools } from "./tools";
 
 - [ ] **Step 5: Typecheck and run tests**
 
-Run: `pnpm --filter @pie/harness typecheck && pnpm --filter @pie/harness test`
+Run: `pnpm --filter @getpie/harness typecheck && pnpm --filter @getpie/harness test`
 Expected: typecheck PASS (Step 1's test-d now compiles). Runtime tests still PASS (transform untouched so far). `vp check` may flag downstream packages — those are fixed in Tasks 5–6; only harness must be green here.
 
 - [ ] **Step 6: Commit**
@@ -444,7 +444,7 @@ export type ClaudeCodeUIMessage = UIMessage<
 
 - [ ] **Step 2: Typecheck**
 
-Run: `pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness typecheck`
 Expected: PASS.
 
 - [ ] **Step 3: Commit**
@@ -583,7 +583,7 @@ describe("createTransform", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `pnpm --filter @pie/harness test`
+Run: `pnpm --filter @getpie/harness test`
 Expected: FAIL — `createTransform` is not exported.
 
 - [ ] **Step 3: Create render-policy.ts**
@@ -783,7 +783,7 @@ Read `packages/harness/test/claude-code/fold.test.ts`; wherever a fixture `user`
 
 - [ ] **Step 8: Run harness tests**
 
-Run: `pnpm --filter @pie/harness test && pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness test && pnpm --filter @getpie/harness typecheck`
 Expected: PASS.
 
 - [ ] **Step 9: Commit**
@@ -823,7 +823,7 @@ import type * as sdk from "@anthropic-ai/claude-agent-sdk";
 import type { InferUIMessageChunk, UIMessage } from "ai";
 
 import { oc, type } from "@orpc/contract";
-import type { ClaudeCodeUIMessage, ToolPermissionRequest } from "@pie/harness/claude-code";
+import type { ClaudeCodeUIMessage, ToolPermissionRequest } from "@getpie/harness/claude-code";
 import { z } from "zod";
 
 export type { ToolPermissionRequest };
@@ -864,7 +864,7 @@ export const claudeCodeContract = {
 };
 ```
 
-Before writing, read the current file end-to-end (`packages/contract/src/claude-code.ts`) and keep any procedure not listed above verbatim (e.g. a `respondPermission` output). `ClaudeCodeUIMessage` must be exported from `@pie/harness/claude-code` — it already is (`index.ts` line 77).
+Before writing, read the current file end-to-end (`packages/contract/src/claude-code.ts`) and keep any procedure not listed above verbatim (e.g. a `respondPermission` output). `ClaudeCodeUIMessage` must be exported from `@getpie/harness/claude-code` — it already is (`index.ts` line 77).
 
 - [ ] **Step 3: Align the web app's message type**
 
@@ -877,7 +877,7 @@ export type ClaudeCodeUIMessage = UIMessage<undefined, Record<string, never>, Cl
 Replace with a re-export of the harness type:
 
 ```ts
-export type { ClaudeCodeUIMessage } from "@pie/harness/claude-code";
+export type { ClaudeCodeUIMessage } from "@getpie/harness/claude-code";
 ```
 
 and adjust the imports in that file accordingly (drop unused `ClaudeCodeTools`/`UIMessage` type imports if now unused; the component's prop type stays `ClaudeCodeUIMessage`).

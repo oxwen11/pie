@@ -3,7 +3,7 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { readRecord, stopDaemon } from "@pie/server/daemon";
+import { readRecord, stopDaemon } from "@getpie/server/daemon";
 import { Effect, FileSystem } from "effect";
 
 import { makeDaemonServerProcess } from "./daemon-server-process";

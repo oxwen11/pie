@@ -1,4 +1,4 @@
-import { TokenUsageSchema, TurnErrorSchema } from "@pie/contract";
+import { TokenUsageSchema, TurnErrorSchema } from "@getpie/contract";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 

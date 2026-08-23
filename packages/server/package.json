@@ -1,5 +1,5 @@
 {
-  "name": "@pie/server",
+  "name": "@getpie/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -26,10 +26,10 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.80.10",
     "@effect/platform-node": "catalog:effect",
+    "@getpie/contract": "workspace:*",
+    "@getpie/effect-json-store": "workspace:*",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
-    "@pie/contract": "workspace:*",
-    "@pie/effect-json-store": "workspace:*",
     "ai": "catalog:",
     "effect": "catalog:effect",
     "simple-git": "catalog:",
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
-    "@pie/typescript": "workspace:*",
+    "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"
   }
 }

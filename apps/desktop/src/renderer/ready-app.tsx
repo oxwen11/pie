@@ -1,4 +1,4 @@
-import { AppInterface, type ServerConnection, type ServerStatusFeed } from "@pie/app";
+import { AppInterface, type ServerConnection, type ServerStatusFeed } from "@getpie/app";
 import { use, useEffect, useState, type ReactElement } from "react";
 
 import { startupAnimation } from "./startup-animation";

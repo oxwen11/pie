@@ -1,7 +1,7 @@
 "use client";
 
 import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible";
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type React from "react";
 
 export function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props): React.ReactElement {

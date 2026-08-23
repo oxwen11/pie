@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 

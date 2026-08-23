@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef, SessionScopedEvent } from "@pie/contract";
+import type { SessionRef, SessionScopedEvent } from "@getpie/contract";
 import { Effect, Stream } from "effect";
 
 import { makeEventBus } from "../src/events";

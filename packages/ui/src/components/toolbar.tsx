@@ -1,7 +1,7 @@
 "use client";
 
 import { Toolbar as ToolbarPrimitive } from "@base-ui/react/toolbar";
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type React from "react";
 
 export function Toolbar({ className, ...props }: ToolbarPrimitive.Root.Props): React.ReactElement {

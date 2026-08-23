@@ -1,5 +1,5 @@
-import { SidebarInset, SidebarTrigger, useSidebar } from "@pie/ui/components/sidebar";
-import { cn } from "@pie/ui/lib/utils";
+import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
+import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";

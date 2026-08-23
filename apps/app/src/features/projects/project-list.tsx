@@ -1,11 +1,15 @@
-import type { SessionRef } from "@pie/contract";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@pie/ui/components/collapsible";
+import type { SessionRef } from "@getpie/contract";
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@getpie/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
-} from "@pie/ui/components/sidebar";
+} from "@getpie/ui/components/sidebar";
 import { ChevronRight, FolderPlus } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";

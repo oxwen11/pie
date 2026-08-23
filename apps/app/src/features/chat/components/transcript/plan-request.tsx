@@ -1,7 +1,7 @@
-import { Button } from "@pie/ui/components/button";
-import { Label } from "@pie/ui/components/label";
-import { Radio, RadioGroup } from "@pie/ui/components/radio-group";
-import { Textarea } from "@pie/ui/components/textarea";
+import { Button } from "@getpie/ui/components/button";
+import { Label } from "@getpie/ui/components/label";
+import { Radio, RadioGroup } from "@getpie/ui/components/radio-group";
+import { Textarea } from "@getpie/ui/components/textarea";
 import { useState } from "react";
 
 import type {

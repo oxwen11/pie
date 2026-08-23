@@ -1,4 +1,4 @@
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type { ReactElement } from "react";
 
 import pieMarkUrl from "@/assets/pie-mark.svg?url";

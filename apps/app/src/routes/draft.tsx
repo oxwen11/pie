@@ -1,12 +1,12 @@
-import type { ListSessionsOutput, SessionSummary } from "@pie/contract";
+import type { ListSessionsOutput, SessionSummary } from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
-} from "@pie/ui/ai-elements/prompt-input";
-import { Button } from "@pie/ui/components/button";
-import { Card, CardFrame, CardFrameHeader } from "@pie/ui/components/card";
+} from "@getpie/ui/ai-elements/prompt-input";
+import { Button } from "@getpie/ui/components/button";
+import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -14,7 +14,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@pie/ui/components/empty";
+} from "@getpie/ui/components/empty";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";

@@ -1019,7 +1019,7 @@ EOF
 ```typescript
 // apps/desktop/src/renderer/src/components/terminal/terminal-tabs.tsx
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import { Plus, X } from "lucide-react";
 
 import type { TerminalInfo } from "../../../../shared/contract/terminal";
@@ -1247,7 +1247,7 @@ Edit `apps/desktop/src/renderer/src/App.tsx` - replace `DiffViewer` usage with `
 
 ```typescript
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import { FolderGit2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 

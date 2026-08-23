@@ -1,6 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
+import { sessionContract } from "@getpie/contract/session";
 import { implement } from "@orpc/server";
-import { sessionContract } from "@pie/contract/session";
 import { Effect } from "effect";
 
 import { EventBus } from "../events";

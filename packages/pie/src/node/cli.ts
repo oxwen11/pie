@@ -8,8 +8,8 @@ import {
   resolveOrSpawnDaemon,
   statusDaemon,
   stopDaemon,
-} from "@pie/server/daemon";
-import { resolveServeConfig, serve, serveFlags } from "@pie/server/http";
+} from "@getpie/server/daemon";
+import { resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
 import { Effect, Option } from "effect";
 import { Command } from "effect/unstable/cli";
 

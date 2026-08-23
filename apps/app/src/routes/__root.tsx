@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,

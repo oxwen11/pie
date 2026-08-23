@@ -5,7 +5,7 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
-} from "@pie/contract";
+} from "@getpie/contract";
 import { generateId, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 

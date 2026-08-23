@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { Deferred, Effect, Exit, Fiber, Queue, Ref, Scope } from "effect";
 import type * as Cause from "effect/Cause";
 

@@ -302,21 +302,21 @@ importers:
 
   apps/app:
     dependencies:
+      '@getpie/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
+      '@getpie/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@orpc/client':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
       '@orpc/tanstack-query':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)(@tanstack/query-core@5.101.4)
-      '@pie/client':
-        specifier: workspace:*
-        version: link:../../packages/client
-      '@pie/contract':
-        specifier: workspace:*
-        version: link:../../packages/contract
-      '@pie/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@pierre/diffs':
         specifier: 1.3.5
         version: 1.3.5(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -390,7 +390,7 @@ importers:
         specifier: 'catalog:'
         version: 5.0.15(@types/react@19.2.18)(immer@11.1.3)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       '@tailwindcss/vite':
@@ -429,6 +429,12 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@41.10.5(supports-color@10.2.2))
+      '@getpie/app':
+        specifier: workspace:*
+        version: link:../app
+      '@getpie/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       '@orpc/client':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
@@ -441,12 +447,6 @@ importers:
       '@orpc/server':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
-      '@pie/app':
-        specifier: workspace:*
-        version: link:../app
-      '@pie/server':
-        specifier: workspace:*
-        version: link:../../packages/server
       effect:
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110
@@ -460,12 +460,12 @@ importers:
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@24.13.3)
+      '@getpie/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@orpc/tanstack-query':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)(@tanstack/query-core@5.101.4)
-      '@pie/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -526,17 +526,17 @@ importers:
 
   packages/client:
     dependencies:
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@orpc/client':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
-      '@pie/contract':
-        specifier: workspace:*
-        version: link:../contract
     devDependencies:
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
 
@@ -558,7 +558,7 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(vitest@4.1.10)
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       typescript:
@@ -580,7 +580,7 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(vitest@4.1.10)
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
 
@@ -614,10 +614,10 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@pie/server':
+      '@getpie/server':
         specifier: workspace:*
         version: link:../server
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       '@types/ws':
@@ -632,18 +632,18 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@getpie/effect-json-store':
+        specifier: workspace:*
+        version: link:../effect-json-store
       '@orpc/experimental-effect':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)(effect@4.0.0-rc.110)
       '@orpc/server':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
-      '@pie/contract':
-        specifier: workspace:*
-        version: link:../contract
-      '@pie/effect-json-store':
-        specifier: workspace:*
-        version: link:../effect-json-store
       ai:
         specifier: 'catalog:'
         version: 7.0.66(zod@4.4.3)
@@ -666,7 +666,7 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(vitest@4.1.10)
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       '@types/ws':
@@ -709,7 +709,7 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)
     devDependencies:
-      '@pie/typescript':
+      '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       '@types/react':

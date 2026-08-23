@@ -3,7 +3,7 @@ import type {
   SessionRuntimeSnapshot,
   SessionScopedEventBody,
   SessionStatus,
-} from "@pie/contract";
+} from "@getpie/contract";
 import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect";
 
 import { EventBus, type EventBusShape } from "../events/event-bus";

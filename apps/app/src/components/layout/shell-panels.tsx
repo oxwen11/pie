@@ -1,5 +1,5 @@
-import { useSidebar } from "@pie/ui/components/sidebar";
-import { cn } from "@pie/ui/lib/utils";
+import { useSidebar } from "@getpie/ui/components/sidebar";
+import { cn } from "@getpie/ui/lib/utils";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef } from "react";
 import {
   Group,

@@ -1,4 +1,4 @@
-import { Spinner } from "@pie/ui/components/spinner";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FileCodeIcon } from "lucide-react";

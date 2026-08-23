@@ -26,7 +26,7 @@ Allowed production dependencies:
 - `rpc/**` may depend on the application interface, the shared contract, oRPC, and Effect core.
 - `electron/**` may depend on Electron, `desktop-config.ts`, other `electron/**` modules, and generic callbacks supplied by the composition root.
 - `preload/**` may depend only on Electron and transport constants from `shared/**`.
-- `renderer/**` may depend on browser APIs, the shared contract, oRPC client packages, React, and the root `@pie/app` composition interface. Compose `PlatformProvider` with `AppInterface`; do not reach into app subpaths or recreate its client/router/chat wiring in Desktop.
+- `renderer/**` may depend on browser APIs, the shared contract, oRPC client packages, React, and the root `@getpie/app` composition interface. Compose `PlatformProvider` with `AppInterface`; do not reach into app subpaths or recreate its client/router/chat wiring in Desktop.
 - Create the BrowserWindow and React startup shell immediately, but mount `AppInterface` only after `server.connection` resolves for the first time. Keep `ServerStatusOverlay` outside that Suspense boundary so initial failure still exposes Retry/Quit, while later restarts leave the mounted app and its clients intact.
 
 Forbidden dependencies:
@@ -94,7 +94,7 @@ ManagedRuntime.make(
 - Keep restart policy, path calculation, and other pure calculations as plain functions.
 - Keep `@effect/platform-node` imports on direct subpaths. Importing its barrel can eagerly load `NodeRedis` and break packaged startup when `ioredis` is absent.
 - Packaged GUI startup must recover the complete exported login-shell environment, not only `PATH`, so proxy and authentication variables reach the server and agent subprocesses.
-- `apps/desktop/turbo.json` must pass the complete environment through for `desktop#dev`; Turborepo strict mode otherwise removes undeclared proxy, authentication, and tool variables. Keep this exception scoped to Desktop development.
+- `apps/desktop/turbo.json` must pass the complete environment through for `@getpie/desktop#dev`; Turborepo strict mode otherwise removes undeclared proxy, authentication, and tool variables. Keep this exception scoped to Desktop development.
 - Never log, expose through RPC, or snapshot the resolved environment because it may contain credentials.
 
 ## Window and port lifecycle

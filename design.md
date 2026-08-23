@@ -82,9 +82,9 @@ pattern belongs once a second feature needs it.
 Import through subpaths only; there is no barrel:
 
 ```ts
-import { Button } from "@pie/ui/components/button";
-import { Tool, ToolContent, ToolHeader } from "@pie/ui/ai-elements/tool";
-import { cn } from "@pie/ui/lib/utils";
+import { Button } from "@getpie/ui/components/button";
+import { Tool, ToolContent, ToolHeader } from "@getpie/ui/ai-elements/tool";
+import { cn } from "@getpie/ui/lib/utils";
 ```
 
 `packages/ui` sits on Base UI, not Radix: compose with `render={<Button />}`,
@@ -469,7 +469,7 @@ thin rules, and empty margins.
 
 Use semantic HTML and only the primitives the material earns.
 
-The base components (`@pie/ui/components/*`) are:
+The base components (`@getpie/ui/components/*`) are:
 
 `accordion`, `alert`, `alert-dialog`, `autocomplete`, `avatar`, `badge`,
 `breadcrumb`, `button`, `calendar`, `card`, `carousel`, `checkbox`,
@@ -481,7 +481,7 @@ The base components (`@pie/ui/components/*`) are:
 `spinner`, `splitter`, `switch`, `table`, `tabs`, `textarea`, `toast`, `toggle`,
 `toggle-group`, `toolbar`, `tooltip`, `tiptap/*`.
 
-The composite components (`@pie/ui/ai-elements/*`) are:
+The composite components (`@getpie/ui/ai-elements/*`) are:
 
 `actions`, `branch`, `code-block`, `collapsible-user-text`, `image`,
 `inline-citation`, `loader`, `message`, `prompt-input`, `reasoning`, `response`,

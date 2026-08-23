@@ -1,5 +1,5 @@
 {
-  "name": "@pie/client",
+  "name": "@getpie/client",
   "version": "0.0.1",
   "private": true,
   "description": "WebSocket RPC client for the Pie server",
@@ -13,11 +13,11 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
+    "@getpie/contract": "workspace:*",
     "@orpc/client": "catalog:orpc",
-    "@orpc/contract": "catalog:orpc",
-    "@pie/contract": "workspace:*"
+    "@orpc/contract": "catalog:orpc"
   },
   "devDependencies": {
-    "@pie/typescript": "workspace:*"
+    "@getpie/typescript": "workspace:*"
   }
 }

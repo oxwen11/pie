@@ -1,6 +1,6 @@
+import type { WorkspaceTreeEntry } from "@getpie/contract/fs";
+import type { GitReviewFile } from "@getpie/contract/git";
 import { FileTree, prepareFileTreeInput } from "@pierre/trees";
-import type { WorkspaceTreeEntry } from "@pie/contract/fs";
-import type { GitReviewFile } from "@pie/contract/git";
 
 export interface ReviewFileTree {
   readonly model: FileTree;

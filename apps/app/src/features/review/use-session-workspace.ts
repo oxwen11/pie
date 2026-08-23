@@ -1,4 +1,4 @@
-import type { Project } from "@pie/contract";
+import type { Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";

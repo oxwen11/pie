@@ -1,4 +1,4 @@
-import type { ListAgentModelsInput } from "@pie/contract";
+import type { ListAgentModelsInput } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 

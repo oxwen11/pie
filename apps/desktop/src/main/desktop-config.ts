@@ -24,7 +24,7 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
       resourcesPath,
       "app.asar",
       "node_modules",
-      "@pie",
+      "@getpie",
       "server",
       "dist",
       "server.mjs",

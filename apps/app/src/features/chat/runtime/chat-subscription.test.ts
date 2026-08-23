@@ -1,4 +1,4 @@
-import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@pie/contract";
+import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import { RecoveringSubscription } from "./chat-subscription";

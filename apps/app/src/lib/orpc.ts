@@ -1,5 +1,5 @@
+import { createPieClient, type PieClient } from "@getpie/client";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import { createPieClient, type PieClient } from "@pie/client";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 

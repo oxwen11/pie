@@ -8,7 +8,7 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
   SessionStatus,
-} from "@pie/contract";
+} from "@getpie/contract";
 
 import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@pie/ui",
+  "name": "@getpie/ui",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -29,7 +29,7 @@
     "streamdown": "^2.5.0"
   },
   "devDependencies": {
-    "@pie/typescript": "workspace:*",
+    "@getpie/typescript": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@types/react-syntax-highlighter": "^15.5.13",

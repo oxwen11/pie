@@ -6,8 +6,8 @@ import type {
   SessionRuntimeSnapshot,
   SessionStatus,
   SessionSummary,
-} from "@pie/contract";
-import type { SessionCapabilities } from "@pie/contract";
+} from "@getpie/contract";
+import type { SessionCapabilities } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
