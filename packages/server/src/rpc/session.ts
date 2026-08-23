@@ -1,6 +1,4 @@
 import "@orpc/experimental-effect/extensions/effect";
-import crypto from "node:crypto";
-
 import { sessionContract } from "@getpie/contract/session";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
@@ -41,15 +39,12 @@ export const sessionRouter = orpc.router({
           let gitBranch: string | undefined;
           let createdWorktreePath: string | undefined;
 
-          let sessionId: string | undefined;
-
           if (input.worktree !== undefined) {
-            sessionId = crypto.randomUUID();
             const worktree = yield* git
-              .worktreeCreate(project.path, {
-                worktreeId: sessionId,
-                ...(input.worktree.branch !== undefined ? { branch: input.worktree.branch } : {}),
-              })
+              .worktreeCreate(
+                project.path,
+                input.worktree.branch !== undefined ? { branch: input.worktree.branch } : undefined,
+              )
               .pipe(
                 Effect.tap((result) => {
                   createdWorktreePath = result.path;
@@ -61,7 +56,7 @@ export const sessionRouter = orpc.router({
           }
 
           const ref = yield* sessions
-            .create(input.projectId, sessionCwd, model, gitBranch, sessionId)
+            .create(input.projectId, sessionCwd, model, gitBranch)
             .pipe(
               Effect.tapError(() =>
                 createdWorktreePath === undefined

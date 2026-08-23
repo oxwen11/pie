@@ -4,29 +4,34 @@ import { describe, expect, it } from "vitest";
 
 import {
   generateWorktreeBranchName,
-  isValidWorktreeId,
+  generateWorktreeBranchSuffix,
+  generateWorktreeKey,
+  isValidWorktreeKey,
   repoWorktreeGroupKey,
   worktreeDirectory,
 } from "../src/git/worktree";
 
 describe("worktree paths", () => {
-  it("groups worktrees by readable repository path under PIE_HOME", () => {
-    const pieHome = "/home/user/.pie";
-    const repoRoot = "/home/user/dev/pie";
-    const worktreeId = "550e8400-e29b-41d4-a716-446655440000";
+  it("matches Cursor-style layout under PIE_HOME", () => {
+    const pieHome = "/Users/dinq/.pie";
+    const repoRoot = "/Users/dinq/dev/pie";
+    const worktreeKey = "mv98";
 
-    expect(repoWorktreeGroupKey(repoRoot)).toBe("home-user-dev-pie");
-    expect(worktreeDirectory(pieHome, repoRoot, worktreeId)).toBe(
-      path.join(pieHome, "worktrees", "home-user-dev-pie", worktreeId),
+    expect(repoWorktreeGroupKey(repoRoot)).toBe("pie");
+    expect(worktreeDirectory(pieHome, repoRoot, worktreeKey)).toBe(
+      path.join(pieHome, "worktrees", "pie", worktreeKey),
     );
   });
 
-  it("accepts session ids as worktree directory names", () => {
-    expect(isValidWorktreeId("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
-    expect(isValidWorktreeId("../escape")).toBe(false);
+  it("generates short directory keys and pie/ branch names", () => {
+    expect(generateWorktreeKey()).toMatch(/^[a-z0-9]{4}$/);
+    expect(generateWorktreeBranchSuffix()).toMatch(/^[a-f0-9]{8}$/);
+    expect(generateWorktreeBranchName("a50b231d")).toBe("pie/a50b231d");
   });
 
-  it("defaults branch names from worktree ids", () => {
-    expect(generateWorktreeBranchName("550e8400")).toBe("pie/550e8400");
+  it("validates worktree directory keys", () => {
+    expect(isValidWorktreeKey("mv98")).toBe(true);
+    expect(isValidWorktreeKey("MV98")).toBe(false);
+    expect(isValidWorktreeKey("../x")).toBe(false);
   });
 });

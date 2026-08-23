@@ -270,4 +270,33 @@ describe("agent.session router", () => {
       await dispose();
     }
   });
+
+  it("defaults worktree layout and branch like Cursor (pie/<hex> under worktrees/<repo>/<key>)", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const { simpleGit } = await import("simple-git");
+      const git = simpleGit(workspace);
+      await git.init(["-b", "main"]);
+      await git.addConfig("user.email", "test@example.com");
+      await git.addConfig("user.name", "Test");
+      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+      await git.add(".");
+      await git.commit("init");
+
+      const project = await client.project.create({ path: workspace });
+      const created = await client.agent.session.create({
+        projectId: project.id,
+        worktree: {},
+      });
+
+      const repoName = path.basename(workspace);
+      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.cwd).toMatch(
+        new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
+      );
+      await client.agent.session.close({ ref: created.ref });
+    } finally {
+      await dispose();
+    }
+  });
 });

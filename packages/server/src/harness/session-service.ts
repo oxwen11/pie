@@ -75,7 +75,6 @@ export type PiAgentSessionServiceShape = {
     cwd: string,
     model?: { readonly provider: string; readonly modelId: string },
     gitBranch?: string,
-    sessionId?: string,
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -279,10 +278,10 @@ export const makePiAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd, model, gitBranch, sessionId) =>
-      (sessionId !== undefined ? Effect.succeed(sessionId) : newSessionId).pipe(
-        Effect.flatMap((resolvedSessionId) => {
-          const ref: SessionRef = { projectId, sessionId: resolvedSessionId };
+    create: (projectId, cwd, model, gitBranch) =>
+      newSessionId.pipe(
+        Effect.flatMap((sessionId) => {
+          const ref: SessionRef = { projectId, sessionId };
           return manager
             .open(
               {
@@ -294,7 +293,7 @@ export const makePiAgentSessionService = (deps: {
             .pipe(
               Effect.flatMap((session) => {
                 const metadata: Session = {
-                  sessionId: resolvedSessionId,
+                  sessionId,
                   projectId,
                   agentSessionId: session.sessionId,
                   createdAt: new Date().toISOString(),

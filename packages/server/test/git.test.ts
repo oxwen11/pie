@@ -239,14 +239,15 @@ layer(NodePlatformLayer)("GitService", (it) => {
     Effect.gen(function* () {
       const dir = yield* repo;
       const git = yield* GitService;
-      const worktreeId = "session-worktree-test";
+      const worktreeKey = "mv98";
       const created = yield* git.worktreeCreate(dir, {
-        worktreeId,
+        worktreeKey,
         branch: "pie/feature-a",
       });
       assert.equal(created.branch, "pie/feature-a");
+      assert.equal(created.worktreeKey, worktreeKey);
       assert.ok(created.path.startsWith(path.join(pieHome, "worktrees")));
-      assert.match(created.path, new RegExp(`[\\\\/]${worktreeId}$`));
+      assert.match(created.path, /[\\/]mv98$/);
 
       const branch = yield* git.branch(created.path);
       assert.equal(branch.current, "pie/feature-a");

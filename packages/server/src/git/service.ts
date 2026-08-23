@@ -19,7 +19,7 @@ import {
   GitBranchExists,
   GitError,
   GitInvalidBranchName,
-  GitInvalidWorktreeId,
+  GitInvalidWorktreeKey,
   GitNotRepository,
   GitRefNotFound,
   GitWorktreePathExists,
@@ -35,14 +35,18 @@ import { FileSystemService } from "../fs";
 import { parseNameStatus, parseNulPaths } from "./name-status";
 import {
   generateWorktreeBranchName,
+  generateWorktreeBranchSuffix,
+  generateWorktreeKey,
   isValidBranchName,
-  isValidWorktreeId,
+  isValidWorktreeKey,
+  repoWorktreeGroupKey,
   worktreeDirectory,
 } from "./worktree";
 
 export type GitWorktreeCreateResult = {
   readonly path: string;
   readonly branch: string;
+  readonly worktreeKey: string;
 };
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -116,7 +120,7 @@ type GitFailure =
 type GitWorktreeFailure =
   | GitFailure
   | GitInvalidBranchName
-  | GitInvalidWorktreeId
+  | GitInvalidWorktreeKey
   | GitBranchExists
   | GitWorktreePathExists;
 
@@ -152,7 +156,7 @@ export class GitService extends Context.Service<
     readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
     readonly worktreeCreate: (
       cwd: string,
-      input: { readonly worktreeId: string; readonly branch?: string },
+      input?: { readonly branch?: string; readonly worktreeKey?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly worktreeRemove: (path: string) => Effect.Effect<void, GitFailure>;
   }
@@ -504,39 +508,73 @@ export const GitServiceLayer: Layer.Layer<
         Effect.gen(function* () {
           const realRoot = yield* resolveRoot(cwd);
           const repoRoot = yield* resolveRepoRoot(realRoot);
-          const worktreeId = input.worktreeId;
-          if (!isValidWorktreeId(worktreeId)) {
-            return yield* Effect.fail(new GitInvalidWorktreeId({ worktreeId }));
+          const fixedWorktreeKey = input?.worktreeKey;
+          const fixedBranch = input?.branch;
+
+          const createOnce = (
+            worktreeKey: string,
+            branch: string,
+          ): Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure> =>
+            Effect.gen(function* () {
+              if (!isValidWorktreeKey(worktreeKey)) {
+                return yield* Effect.fail(new GitInvalidWorktreeKey({ worktreeKey }));
+              }
+              if (!isValidBranchName(branch)) {
+                return yield* Effect.fail(new GitInvalidBranchName({ branch }));
+              }
+              const worktreePath = worktreeDirectory(paths.home, repoRoot, worktreeKey);
+              if (!contains(paths.worktreesDir, worktreePath)) {
+                return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+              }
+              const exists = yield* fs
+                .exists(worktreePath)
+                .pipe(Effect.mapError(readError(worktreePath)));
+              if (exists) {
+                return yield* Effect.fail(
+                  new GitWorktreePathExists({ cwd: realRoot, path: worktreePath }),
+                );
+              }
+              const refs = yield* listRefs(realRoot);
+              if (refs.all.includes(branch)) {
+                return yield* Effect.fail(new GitBranchExists({ cwd: realRoot, branch }));
+              }
+              yield* fs
+                .makeDirectory(path.dirname(worktreePath), { recursive: true })
+                .pipe(Effect.mapError(readError(worktreePath)));
+              yield* Effect.tryPromise({
+                try: () =>
+                  simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]),
+                catch: gitError(realRoot),
+              });
+              return { path: worktreePath, branch, worktreeKey };
+            });
+
+          if (fixedWorktreeKey !== undefined || fixedBranch !== undefined) {
+            const worktreeKey = fixedWorktreeKey ?? generateWorktreeKey();
+            const branch =
+              fixedBranch ?? generateWorktreeBranchName(generateWorktreeBranchSuffix());
+            return yield* createOnce(worktreeKey, branch);
           }
-          const branch = input.branch ?? generateWorktreeBranchName(worktreeId.slice(0, 8));
-          if (!isValidBranchName(branch)) {
-            return yield* Effect.fail(new GitInvalidBranchName({ branch }));
-          }
-          const worktreePath = worktreeDirectory(paths.home, repoRoot, worktreeId);
-          if (!contains(paths.worktreesDir, worktreePath)) {
-            return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
-          }
-          const exists = yield* fs
-            .exists(worktreePath)
-            .pipe(Effect.mapError(readError(worktreePath)));
-          if (exists) {
-            return yield* Effect.fail(
-              new GitWorktreePathExists({ cwd: realRoot, path: worktreePath }),
+
+          for (let attempt = 0; attempt < 8; attempt++) {
+            const result = yield* createOnce(
+              generateWorktreeKey(),
+              generateWorktreeBranchName(generateWorktreeBranchSuffix()),
+            ).pipe(
+              Effect.catchTags({
+                GitWorktreePathExists: () => Effect.succeed(null),
+                GitBranchExists: () => Effect.succeed(null),
+              }),
             );
+            if (result !== null) return result;
           }
-          const refs = yield* listRefs(realRoot);
-          if (refs.all.includes(branch)) {
-            return yield* Effect.fail(new GitBranchExists({ cwd: realRoot, branch }));
-          }
-          yield* fs
-            .makeDirectory(path.dirname(worktreePath), { recursive: true })
-            .pipe(Effect.mapError(readError(worktreePath)));
-          yield* Effect.tryPromise({
-            try: () =>
-              simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]),
-            catch: gitError(realRoot),
-          });
-          return { path: worktreePath, branch };
+
+          return yield* Effect.fail(
+            new GitWorktreePathExists({
+              cwd: realRoot,
+              path: path.join(paths.worktreesDir, repoWorktreeGroupKey(repoRoot)),
+            }),
+          );
         }),
 
       worktreeRemove: (worktreePath) =>
