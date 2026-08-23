@@ -11,7 +11,7 @@ const unusedPi = {
   open: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
   getSessionInfo: () => Effect.die("unused"),
-} satisfies Omit<PiAgentShape, "checkAvailability">;
+} satisfies Omit<PiAgentShape, "availability">;
 
 describe("cacheAvailability", () => {
   layer(NodeFileSystem.layer)((it) => {
@@ -26,7 +26,7 @@ describe("cacheAvailability", () => {
         let runs = 0;
         const pi: PiAgentShape = {
           ...unusedPi,
-          checkAvailability: Effect.suspend(() => {
+          availability: Effect.suspend(() => {
             runs += 1;
             return Deferred.succeed(started, undefined).pipe(
               Effect.andThen(Deferred.await(gate)),
@@ -36,7 +36,7 @@ describe("cacheAvailability", () => {
         };
         const cached = yield* cacheAvailability(pi);
 
-        const caller = yield* Effect.forkChild(cached.checkAvailability);
+        const caller = yield* Effect.forkChild(cached.availability);
         yield* Deferred.await(started);
         // Interrupt while the check is in flight; the guard makes the fiber
         // ride out the interruption, so awaiting it needs the gate open.
@@ -44,7 +44,7 @@ describe("cacheAvailability", () => {
         yield* Deferred.succeed(gate, undefined);
         yield* Fiber.await(interruptor);
 
-        const result = yield* cached.checkAvailability;
+        const result = yield* cached.availability;
         assert.deepEqual(result, { available: true });
         // The healthy exit came from the cache, not a rerun.
         assert.equal(runs, 1);

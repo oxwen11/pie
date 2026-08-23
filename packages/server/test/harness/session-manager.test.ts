@@ -97,7 +97,7 @@ const makeFixture = Effect.gen(function* () {
     });
 
   const pi = {
-    checkAvailability: Effect.succeed({ available: true }),
+    availability: Effect.succeed({ available: true }),
     open: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
       Ref.update(resumeCalls, (current) => current + 1).pipe(

@@ -17,7 +17,7 @@ import type { AvailabilityResult, SessionInfoResult } from "./types";
 
 /** Pi facade injected at the composition root — open, resume, and cold reads. */
 export type PiAgentShape = {
-  readonly checkAvailability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
+  readonly availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
   readonly open: (
     input: CreateSessionInput,
   ) => Effect.Effect<
@@ -46,7 +46,7 @@ export const makePiAgent = (
   process: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
 ): PiAgentShape => ({
-  checkAvailability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
+  availability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
   open: (input) => openPiAgentRuntime(process, input),
   resume: (input) => resumePiAgentRuntime(process, input),
   getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
@@ -57,9 +57,9 @@ export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent")
 export const cachePiAgentAvailability = (
   pi: PiAgentShape,
 ): Effect.Effect<PiAgentShape, never, FileSystem.FileSystem> =>
-  Effect.map(Effect.cached(pi.checkAvailability), (cachedCheck) => ({
+  Effect.map(Effect.cached(pi.availability), (cachedCheck) => ({
     ...pi,
-    checkAvailability: Effect.uninterruptible(cachedCheck),
+    availability: Effect.uninterruptible(cachedCheck),
   }));
 
 export const PiAgentLayer = (pi: PiAgentShape): Layer.Layer<PiAgent> => Layer.succeed(PiAgent, pi);

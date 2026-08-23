@@ -137,7 +137,7 @@ describe("PiAgentSessionService", () => {
             ),
           });
           const pi = {
-            checkAvailability: Effect.sync(() =>
+            availability: Effect.sync(() =>
               opts.unavailable !== undefined
                 ? { available: false, reason: opts.unavailable }
                 : { available: true },

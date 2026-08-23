@@ -196,7 +196,7 @@ export const makePiAgentSessionManager = (
     const checkAvailable = () =>
       Effect.succeed(pi).pipe(
         Effect.tap((availPi) =>
-          availPi.checkAvailability.pipe(
+          availPi.availability.pipe(
             Effect.flatMap((availability) =>
               availability.available
                 ? Effect.void
