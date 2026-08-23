@@ -20,17 +20,13 @@ export function ShellSidebarToggle(): ReactElement | null {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-0 z-50 [-webkit-app-region:drag]",
+        "pointer-events-none fixed start-0 z-50",
         SHELL_TITLEBAR_TOP_CLASS,
         SHELL_TITLEBAR_ROW_CLASS,
+        desktopToggleInsetClass(platform),
       )}
     >
-      <SidebarTrigger
-        className={cn(
-          "pointer-events-auto [-webkit-app-region:no-drag]",
-          desktopToggleInsetClass(platform),
-        )}
-      />
+      <SidebarTrigger className="pointer-events-auto [-webkit-app-region:no-drag]" />
     </div>
   );
 }

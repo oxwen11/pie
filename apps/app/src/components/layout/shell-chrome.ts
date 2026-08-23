@@ -17,8 +17,8 @@ const MACOS_TRAFFIC_LIGHT_CLUSTER_PX = 52;
 
 const MACOS_TRAFFIC_LIGHTS_END_PX = MACOS_TRAFFIC_LIGHT_X_PX + MACOS_TRAFFIC_LIGHT_CLUSTER_PX;
 
-/** Tight gap between traffic lights and the sidebar toggle. */
-const MACOS_TOGGLE_GAP_PX = 4;
+/** Clears the native traffic-light hit area before the sidebar toggle. */
+const MACOS_TOGGLE_GAP_PX = 22;
 
 export const MACOS_TOGGLE_LEFT_PX = MACOS_TRAFFIC_LIGHTS_END_PX + MACOS_TOGGLE_GAP_PX;
 
@@ -55,7 +55,7 @@ export const desktopCollapsedCardInsetClass = (platform: Platform): string => {
 export function desktopSidebarBrandInsetClass(platform: Platform): string {
   const insetPx = shellTitlebarContentLeftPx(platform) - SHELL_GUTTER_PX;
   return `ms-[${insetPx}px]`;
-};
+}
 
 /** CSS vars for shell titlebar geometry (desktop hosts only). */
 export function shellProviderStyle(platform: Platform): CSSProperties {
