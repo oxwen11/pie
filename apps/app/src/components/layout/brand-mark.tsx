@@ -7,7 +7,7 @@ import pieMarkUrl from "@/assets/pie-mark.svg?url";
 // omits this row — native traffic lights and the fixed shell toggle own it.
 export function BrandMark({ className }: { className?: string }): ReactElement {
   return (
-    <div className={cn("flex items-center gap-2 select-none", className)}>
+    <div className={cn("flex h-7 items-center gap-2 select-none", className)}>
       <span
         aria-hidden="true"
         className="bg-foreground block size-4 shrink-0 [mask-size:contain] [mask-position:center] [mask-repeat:no-repeat] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"
