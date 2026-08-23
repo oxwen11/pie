@@ -2,26 +2,29 @@ import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
-import { MACOS_TITLEBAR_CHROME_INSET } from "@/components/layout/shell-sidebar-toggle";
+import { desktopTitlebarChromeInsetClass } from "@/components/layout/shell-chrome";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
+import { useHostLayout } from "@/use-host-layout";
+import { usePlatform } from "@/platform-context";
 
 export interface CardPanelProps {
-  readonly hasTrafficLights: boolean;
   readonly heading: string;
   readonly supportingText?: string;
 }
 
-export function CardPanel({ hasTrafficLights, heading, supportingText }: CardPanelProps) {
+export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
+  const platform = usePlatform();
+  const { usesFixedSidebarToggle } = useHostLayout();
   const collapsedDesktop = !isMobile && state === "collapsed";
-  const ownsToggle = isMobile || (collapsedDesktop && !hasTrafficLights);
+  const ownsToggle = isMobile || (collapsedDesktop && !usesFixedSidebarToggle);
 
   return (
     <SidebarInset className="flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5">
       <header
         className={cn(
           "flex h-10 shrink-0 items-center gap-2 px-4 shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
-          collapsedDesktop && hasTrafficLights && MACOS_TITLEBAR_CHROME_INSET,
+          collapsedDesktop && usesFixedSidebarToggle && desktopTitlebarChromeInsetClass(platform),
         )}
       >
         {ownsToggle && (

@@ -11,10 +11,12 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@getpie/ui/components/sidebar";
+import { cn } from "@getpie/ui/lib/utils";
 import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
+import { DESKTOP_SIDEBAR_BRAND_INSET_CLASS } from "@/components/layout/shell-chrome";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { useHostLayout } from "@/use-host-layout";
@@ -27,7 +29,8 @@ export function AppSidebar({
   readonly onNewChat: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
-  const { showsInlineSidebarToggle, showsSidebarBrandMark } = useHostLayout();
+  const { showsInlineSidebarToggle, showsSidebarBrandMark, usesFixedSidebarToggle } =
+    useHostLayout();
   const { isMobile, state } = useSidebar();
   const showsSidebarHeader =
     showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle);
@@ -40,7 +43,12 @@ export function AppSidebar({
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
       {showsSidebarHeader ? (
-        <SidebarHeader className="h-10 flex-row items-center px-4 [-webkit-app-region:drag]">
+        <SidebarHeader
+          className={cn(
+            "h-10 flex-row items-center px-4 [-webkit-app-region:drag]",
+            usesFixedSidebarToggle && DESKTOP_SIDEBAR_BRAND_INSET_CLASS,
+          )}
+        >
           {showsSidebarBrandMark && <BrandMark />}
           {!isMobile && state === "expanded" && showsInlineSidebarToggle && (
             <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />

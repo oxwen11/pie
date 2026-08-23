@@ -16,17 +16,19 @@ export function useHostLayout(): {
   readonly usesFixedSidebarToggle: boolean;
 } {
   const platform = usePlatform();
+  const isDesktop = isDesktopHost(platform);
   const isDesktopMacos = isDesktopMacosHost(platform);
 
   return {
     hasTrafficLights: isDesktopMacos,
-    isDesktop: isDesktopHost(platform),
+    isDesktop,
     isDesktopMacos,
     isWeb: isWebHost(platform),
-    // Web and desktop win/linux own the sidebar header; desktop macOS yields it to
-    // native traffic lights and the fixed shell toggle.
+    // Web and desktop win/linux keep BrandMark; desktop macOS yields the row to
+    // native traffic lights plus the fixed shell toggle.
     showsSidebarBrandMark: !isDesktopMacos,
-    showsInlineSidebarToggle: !isDesktopMacos,
-    usesFixedSidebarToggle: isDesktopMacos,
+    // Web only — desktop pins the toggle to the viewport left edge.
+    showsInlineSidebarToggle: isWebHost(platform),
+    usesFixedSidebarToggle: isDesktop,
   };
 }

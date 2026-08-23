@@ -28,7 +28,6 @@ import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
 import { sameSessionRef } from "@/lib/session-ref";
-import { useHostLayout } from "@/use-host-layout";
 
 export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
@@ -48,7 +47,6 @@ function RootLayout() {
   // (multi-tab / desktop), independent of which route is mounted.
   useSessionListSync();
   const navigate = useNavigate();
-  const { hasTrafficLights } = useHostLayout();
 
   // This is the shell's one route-identity seam: the content panel, active
   // sidebar row, and card heading all derive from the same authoritative ref.
@@ -96,7 +94,6 @@ function RootLayout() {
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
-              hasTrafficLights={hasTrafficLights}
               heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
               supportingText={project?.name}
             />
