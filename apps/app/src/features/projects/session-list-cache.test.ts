@@ -197,6 +197,25 @@ describe("applySessionListEvent", () => {
     expect(queryClient.getQueryState(listKeyFor(ref.projectId, false))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(listKeyFor(ref.projectId, true))?.isInvalidated).toBe(true);
   });
+
+  it("clears status on session.closed so idle does not linger after runtime teardown", () => {
+    const queryClient = seed([row({ status: { phase: "idle" } })]);
+    applySessionListEvent(queryClient, listKeyFor, { ref, type: "session.closed" });
+    expect(rows(queryClient)?.[0]?.status).toBeUndefined();
+  });
+
+  it("keeps the array identity when session.closed clears an already-absent status", () => {
+    const queryClient = seed([row()]);
+    const before = rows(queryClient);
+    applySessionListEvent(queryClient, listKeyFor, { ref, type: "session.closed" });
+    expect(rows(queryClient)).toBe(before);
+  });
+
+  it("drops running status on session.closed", () => {
+    const queryClient = seed([row({ status: { phase: "running" } })]);
+    applySessionListEvent(queryClient, listKeyFor, { ref, type: "session.closed" });
+    expect(rows(queryClient)?.[0]?.status).toBeUndefined();
+  });
 });
 
 describe("reconcileSessionRenameSuccess", () => {

@@ -62,6 +62,13 @@ const removeFromLists = (
   }
 };
 
+/** List summaries omit `status` when no runtime is live — not `{ phase: "idle" }`. */
+const clearRowStatus = (row: SessionRow): SessionRow => {
+  if (row.status === undefined) return row;
+  const { status: _, ...rest } = row;
+  return rest;
+};
+
 /**
  * Fold one firehose event into the `session.list` caches. Pure with respect to
  * React — the hook owns the subscription, this owns what an event means.
@@ -121,6 +128,9 @@ export const applySessionListEvent = (
     }
     case "session.deleted":
       removeFromLists(queryClient, listKeys, event.ref.sessionId);
+      break;
+    case "session.closed":
+      patchLists(queryClient, listKeys, event.ref.sessionId, clearRowStatus);
       break;
     case "session.created":
       // The creating tab already seeded this row optimistically; a title-less
