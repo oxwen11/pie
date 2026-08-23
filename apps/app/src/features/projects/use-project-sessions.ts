@@ -25,7 +25,7 @@ export function useProjectSessions(
 ) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   return useQuery({
-    ...orpcQueryUtils.session.list.queryOptions({ input: { projectId, archived } }),
+    ...orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } }),
     enabled,
     staleTime: 30_000,
     select: selectNewestFirst,
@@ -63,7 +63,7 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
     [projectId, sessionId],
   );
   const active = useQuery({
-    ...orpcQueryUtils.session.list.queryOptions({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: projectId ?? "", archived: false },
     }),
     enabled,
@@ -71,7 +71,7 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
     select,
   });
   const archived = useQuery({
-    ...orpcQueryUtils.session.list.queryOptions({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: projectId ?? "", archived: true },
     }),
     enabled: enabled && active.isSuccess && active.data === undefined,

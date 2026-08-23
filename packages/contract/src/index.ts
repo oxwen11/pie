@@ -8,7 +8,6 @@ export * from "./project";
 
 export const contract = {
   agent: agentContract,
-  session: sessionContract,
   project: projectContract,
   fs: fsContract,
 };

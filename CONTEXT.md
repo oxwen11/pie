@@ -17,8 +17,8 @@ The Pi-native session identity held in the session's metadata. Internal plumbing
 _Avoid_: harnessSessionId (removed — no migration), native id
 
 **Attach**:
-A client connecting to a session's live event stream — `session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
-_Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`session.prepare` starts nothing — only a prompt does)
+A client connecting to a session's live event stream — `agent.session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `agent.session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
+_Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`agent.session.prepare` starts nothing — only a prompt does)
 
 **Session metadata**:
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.

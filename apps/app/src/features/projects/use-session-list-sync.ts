@@ -8,7 +8,7 @@ import { applySessionListEvent } from "./session-list-cache";
 const RESUBSCRIBE_DELAY_MS = 1000;
 
 // The one always-on consumer of the global (firehose) subscription, called
-// once from the root layout. It keeps every open `session.list` cache
+// once from the root layout. It keeps every open `agent.session.list` cache
 // converged — across tabs and the desktop app, not just the tab that drove
 // the change — by folding each event through `applySessionListEvent`; chunks
 // and requests still belong to the per-session Chat transport.
@@ -26,12 +26,12 @@ export function useSessionListSync(): void {
     // carries `type: "query"`, which the bare `.key({ input })` omits, so cache
     // writes must use these or they land in phantom entries nothing renders.
     const listKeyFor = (projectId: string, archived: boolean) =>
-      orpcQueryUtils.session.list.queryOptions({ input: { projectId, archived } }).queryKey;
+      orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } }).queryKey;
 
     const run = async () => {
       while (!abort.signal.aborted) {
         try {
-          const stream = await orpcClient.session.subscribe(
+          const stream = await orpcClient.agent.session.subscribe(
             { scope: { kind: "global" } },
             { signal: abort.signal },
           );
@@ -46,7 +46,7 @@ export function useSessionListSync(): void {
         // The stream ended (server teardown / dropped connection): phase
         // transitions may have been missed, so the patched statuses can be
         // stale — refetch every list rather than trust them.
-        void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.session.list.key() });
+        void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() });
         // Back off, then re-subscribe. Resolves early on abort so unmount
         // doesn't wait out the delay.
         await sleep(RESUBSCRIBE_DELAY_MS, abort.signal);

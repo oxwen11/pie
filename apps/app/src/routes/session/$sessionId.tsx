@@ -19,7 +19,7 @@ export const Route = createFileRoute("/session/$sessionId")({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ context, params, deps }) => {
-    const { session } = context.orpcQueryUtils;
+    const { session } = context.orpcQueryUtils.agent;
 
     if (deps.projectId !== undefined) {
       const hinted: SessionRef = {

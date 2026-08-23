@@ -10,15 +10,15 @@ export function useSessionModels(ref: SessionRef) {
 
   const modelsQuery = useAgentModels(ref.projectId);
   const stateQuery = useQuery({
-    ...orpcQueryUtils.session.getModelState.queryOptions({ input: { ref } }),
+    ...orpcQueryUtils.agent.session.getModelState.queryOptions({ input: { ref } }),
   });
 
   const setModel = useMutation({
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>
-      orpcQueryUtils.session.setModel.call({ ref, provider, modelId }),
+      orpcQueryUtils.agent.session.setModel.call({ ref, provider, modelId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: orpcQueryUtils.session.getModelState.key({ input: { ref } }),
+        queryKey: orpcQueryUtils.agent.session.getModelState.key({ input: { ref } }),
       });
     },
   });

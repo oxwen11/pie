@@ -12,15 +12,7 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
-// Thin transport binding: the router's own work is resolving a projectId to a
-// workspace path (the one thing the session service must never do itself) and
-// mapping typed effect errors onto the contract's declared codes — clients
-// branch on the code, never on the message. Everything else is a one-liner
-// onto the PiAgentSessionService façade. Unmapped errors (store I/O)
-// intentionally surface as INTERNAL. Only `subscribe` reaches the EventBus
-// directly — it is the event plane, distinct from the session control plane.
 export const sessionRouter = orpc.router({
-  // lifecycle -----------------------------------------------------------------
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
@@ -39,9 +31,6 @@ export const sessionRouter = orpc.router({
       }),
     );
   }),
-  // Opening a session page: validate, backfill cwd, confirm the harness still
-  // has the native session. No process is started here — that is the whole
-  // point of the name.
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
@@ -68,7 +57,6 @@ export const sessionRouter = orpc.router({
     );
   }),
 
-  // history / index -----------------------------------------------------------
   list: orpc.list.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
@@ -140,14 +128,11 @@ export const sessionRouter = orpc.router({
     );
   }),
 
-  // active instance -----------------------------------------------------------
   prompt: orpc.prompt.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.prompt(input).pipe(
       Effect.catchTags({
-        // The repository's SessionNotFound means the metadata is gone →
-        // NOT_FOUND; the harness's HarnessSessionNotFound means the native
-        // session is not open → SESSION_NOT_ACTIVE.
+        // Metadata gone → NOT_FOUND; native session not open → SESSION_NOT_ACTIVE.
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
         HarnessSessionNotFound: (e) =>
@@ -156,8 +141,6 @@ export const sessionRouter = orpc.router({
           ),
         UnsupportedPromptPart: (e) =>
           Effect.fail(errors.UNSUPPORTED({ message: `unsupported prompt part: ${e.kind}` })),
-        // A prompt is what starts an agent, so it is also where starting one
-        // can fail. Same mapping the create path uses.
         AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -196,11 +179,7 @@ export const sessionRouter = orpc.router({
       }),
     );
   }),
-  // Total, and deliberately so: a persisted session this process has not
-  // touched reads as idle rather than SESSION_NOT_ACTIVE. A client reattaching
-  // after a server restart used to get that error on every snapshot and retry
-  // forever, because nothing on the observation path could ever make it go
-  // away.
+  // Untouched persisted sessions read idle — not SESSION_NOT_ACTIVE.
   getStatus: orpc.getStatus.effect(function* ({ input }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.getStatus(input.ref);
@@ -260,7 +239,6 @@ export const sessionRouter = orpc.router({
     );
   }),
 
-  // events --------------------------------------------------------------------
   subscribe: orpc.subscribe.effect(function* ({ input }) {
     const bus = yield* EventBus;
     const stream = yield* openScopedSubscription(bus, input.scope);

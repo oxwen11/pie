@@ -25,7 +25,7 @@ export function SessionActionsMenu({
 
   const setArchived = useMutation({
     mutationFn: (archived: boolean) =>
-      orpcQueryUtils.session.archive.call({
+      orpcQueryUtils.agent.session.archive.call({
         ref: {
           projectId: session.projectId,
           sessionId: session.sessionId,
@@ -34,7 +34,7 @@ export function SessionActionsMenu({
       }),
     onSuccess: (_, archived) => {
       const listKey = (isArchived: boolean) =>
-        orpcQueryUtils.session.list.queryOptions({
+        orpcQueryUtils.agent.session.list.queryOptions({
           input: { projectId: session.projectId, archived: isArchived },
         }).queryKey;
       const refreshLists = Promise.all([

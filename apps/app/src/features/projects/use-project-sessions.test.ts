@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: () => ({
-    orpcQueryUtils: { session: { list: { queryOptions: mocks.queryOptions } } },
+    orpcQueryUtils: { agent: { session: { list: { queryOptions: mocks.queryOptions } } } },
   }),
 }));
 

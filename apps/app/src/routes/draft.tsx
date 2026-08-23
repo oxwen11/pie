@@ -85,7 +85,7 @@ function DraftRoute() {
   const startSession = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!selected) throw new Error("No project selected");
-      const ref = await orpcQueryUtils.session.create.call({
+      const ref = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
@@ -95,7 +95,7 @@ function DraftRoute() {
       return ref;
     },
     onSuccess: (ref, { text }) => {
-      const listKey = orpcQueryUtils.session.list.queryOptions({
+      const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: ref.projectId, archived: false },
       }).queryKey;
 

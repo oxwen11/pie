@@ -78,7 +78,7 @@ for per-agent tool rendering.
   migrations. An incompatible shape may be discarded.
 - `useSessionListSync` is the only consumer of the global event firehose; session
   events (chunks, requests) belong to the per-session chat transport.
-- The live stream has no replay: subscribe before `session.prompt`, and recover
+- The live stream has no replay: subscribe before `agent.session.prompt`, and recover
   from a drop with `getSnapshot` + `seq > cursor`, not by replaying.
   `session.turn.started` is never re-sent — a turn present in the snapshot counts
   as started.

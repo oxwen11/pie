@@ -13,7 +13,7 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 // reset by every successful attach.
 const defaultRetryDelayMs = exponentialBackoffMs(500, 10_000);
 
-type PieSessionClient = PieClient["session"];
+type PieSessionClient = PieClient["agent"]["session"];
 
 type SessionClient = Pick<
   PieSessionClient,
