@@ -2,14 +2,15 @@ import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
+import { BrandMark } from "@/components/layout/brand-mark";
+import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 import {
   desktopCollapsedCardInsetClass,
   SHELL_TITLEBAR_HEADER_CLASS,
   SHELL_TITLEBAR_LABEL_CLASS,
 } from "@/components/layout/shell-chrome";
-import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
-import { useHostLayout } from "@/use-host-layout";
 import { usePlatform } from "@/platform-context";
+import { useHostLayout } from "@/use-host-layout";
 
 export interface CardPanelProps {
   readonly heading: string;
@@ -19,9 +20,10 @@ export interface CardPanelProps {
 export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
   const platform = usePlatform();
-  const { usesFixedSidebarToggle } = useHostLayout();
+  const { showsSidebarBrandMark, usesFixedSidebarToggle } = useHostLayout();
   const collapsedDesktop = !isMobile && state === "collapsed";
-  const ownsToggle = isMobile || (collapsedDesktop && !usesFixedSidebarToggle);
+  const ownsWebSidebarChrome = collapsedDesktop && !usesFixedSidebarToggle;
+  const ownsToggle = isMobile || ownsWebSidebarChrome;
 
   return (
     <SidebarInset
@@ -39,11 +41,12 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
           collapsedDesktop && usesFixedSidebarToggle && desktopCollapsedCardInsetClass(platform),
         )}
       >
-        {ownsToggle && (
-          <SidebarTrigger
-            className={cn(isMobile ? "-ms-0.5" : "-ms-2", "[-webkit-app-region:no-drag]")}
-          />
-        )}
+        {ownsToggle ? (
+          <>
+            {ownsWebSidebarChrome && showsSidebarBrandMark ? <BrandMark /> : null}
+            <SidebarTrigger className={cn(isMobile && "-ms-0.5", "[-webkit-app-region:no-drag]")} />
+          </>
+        ) : null}
         <div className={SHELL_TITLEBAR_LABEL_CLASS}>
           <span className="min-w-0 truncate font-medium" title={heading}>
             {heading}

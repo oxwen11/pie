@@ -34,11 +34,8 @@ export function AppSidebar({
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
-  const {
-    showsDesktopTitlebarHeader,
-    showsInlineSidebarToggle,
-    showsSidebarBrandMark,
-  } = useHostLayout();
+  const { showsDesktopTitlebarHeader, showsInlineSidebarToggle, showsSidebarBrandMark } =
+    useHostLayout();
   const { isMobile, state } = useSidebar();
   const showsWebHeader =
     !showsDesktopTitlebarHeader &&
@@ -63,13 +60,11 @@ export function AppSidebar({
         >
           {showsSidebarBrandMark ? (
             <BrandMark
-              className={cn(
-                showsDesktopTitlebarHeader && desktopSidebarBrandInsetClass(platform),
-              )}
+              className={cn(showsDesktopTitlebarHeader && desktopSidebarBrandInsetClass(platform))}
             />
           ) : null}
           {showsWebHeader && !isMobile && state === "expanded" && showsInlineSidebarToggle ? (
-            <SidebarTrigger className="ms-auto -me-2 [-webkit-app-region:no-drag]" />
+            <SidebarTrigger className="[-webkit-app-region:no-drag]" />
           ) : null}
         </SidebarHeader>
       ) : null}
