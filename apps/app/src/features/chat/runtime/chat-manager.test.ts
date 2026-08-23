@@ -1,4 +1,4 @@
-import type { PermissionMode, ReasoningEffort, SessionRef } from "@pie/contract";
+import type { SessionRef } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import type { AgentResponse } from "./agent-requests";
@@ -24,9 +24,6 @@ class FakeTransport implements ChatSessionTransport {
   prompt = async () => ({ turnId: "turn-receipt" });
   getMessages = async () => null;
   respondToAgentRequest = async (_requestId: string, _response: AgentResponse) => {};
-  setModel = async (_providerId: string, _modelId: string) => {};
-  setReasoningEffort = async (_effort: ReasoningEffort) => {};
-  setPermissionMode = async (_mode: PermissionMode) => {};
 }
 
 const makeManager = () => {

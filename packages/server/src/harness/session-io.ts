@@ -1,29 +1,16 @@
-import { InspectorTargetSchema, PermissionModeSchema, ReasoningEffortSchema } from "@pie/contract";
+import { InspectorTargetSchema } from "@pie/contract";
 import { Schema } from "effect";
 
 /**
- * Harness-local session I/O types. The contract's SessionRef rewrite removed the
- * agent-native lifecycle inputs (create/resume/prompt keyed by a flat native
- * `sessionId`); the server now owns the `SessionRef` translation and hands the
- * harness these narrow, native-keyed shapes.
+ * Pi session I/O types. The server owns `SessionRef` translation and hands the
+ * adapter these narrow, native-keyed shapes.
  */
-
-/**
- * The session-scoped config knobs. Not part of opening a native session: a
- * session records them and seeds them onto every runtime it acquires, through
- * the same setters the UI drives mid-session, so a create-time choice and a
- * later one reach a runtime by one path.
- */
-export const SessionConfigSchema = Schema.Struct({
-  model: Schema.optionalKey(Schema.String),
-  reasoningEffort: Schema.optionalKey(ReasoningEffortSchema),
-  permissionMode: Schema.optionalKey(PermissionModeSchema),
-});
-export type SessionConfig = typeof SessionConfigSchema.Type;
 
 export const CreateSessionInputSchema = Schema.Struct({
   cwd: Schema.String,
   sessionId: Schema.optionalKey(Schema.String),
+  provider: Schema.optionalKey(Schema.String),
+  modelId: Schema.optionalKey(Schema.String),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

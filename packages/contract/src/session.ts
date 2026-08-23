@@ -1,6 +1,7 @@
 import { eventIterator, oc, type } from "@orpc/contract";
 
 import {
+  AgentModelStateSchema,
   ArchiveSessionInputSchema,
   CreateSessionInputSchema,
   serverErrors,
@@ -12,13 +13,11 @@ import {
   RenameSessionInputSchema,
   ResolveRefInputSchema,
   RespondToAgentRequestInputSchema,
+  SetAgentModelInputSchema,
   type SessionMessages,
   SessionRefSchema,
   type SessionRuntimeSnapshot,
   SessionStatusSchema,
-  SetSessionReasoningEffortInputSchema,
-  SetSessionModelInputSchema,
-  SetSessionPermissionModeInputSchema,
   SubscribeInputSchema,
   type SubscribeStreamEvent,
   toStandardSchema,
@@ -60,15 +59,19 @@ export const sessionContract = {
     .input(toStandardSchema(PromptInputSchema))
     .output(toStandardSchema(PromptOutputSchema)),
   interrupt: base.input(toStandardSchema(RefInputSchema)),
-  // Session-scoped config, changed via dedicated calls — never on a prompt turn.
-  setModel: base.input(toStandardSchema(SetSessionModelInputSchema)),
-  setReasoningEffort: base.input(toStandardSchema(SetSessionReasoningEffortInputSchema)),
-  setPermissionMode: base.input(toStandardSchema(SetSessionPermissionModeInputSchema)),
   respondToAgentRequest: base.input(toStandardSchema(RespondToAgentRequestInputSchema)),
   getStatus: base
     .input(toStandardSchema(RefInputSchema))
     .output(toStandardSchema(SessionStatusSchema)),
   getSnapshot: base.input(toStandardSchema(RefInputSchema)).output(type<SessionRuntimeSnapshot>()),
+
+  // session model state (Pi RPC — live child required)
+  getModelState: base
+    .input(toStandardSchema(RefInputSchema))
+    .output(toStandardSchema(AgentModelStateSchema)),
+  setModel: base
+    .input(toStandardSchema(SetAgentModelInputSchema))
+    .output(toStandardSchema(AgentModelStateSchema)),
 
   // events (scope covers both single-session and global firehose)
   subscribe: base

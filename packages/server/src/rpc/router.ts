@@ -1,5 +1,6 @@
 import { os } from "@orpc/server";
 
+import { agentRouter } from "./agent";
 import type { RpcContext } from "./context";
 import { fsRouter } from "./fs";
 import { projectRouter } from "./project";
@@ -8,6 +9,7 @@ import { sessionRouter } from "./session";
 const orpc = os.$context<RpcContext>();
 
 export const router = orpc.router({
+  agent: agentRouter,
   session: sessionRouter,
   project: projectRouter,
   fs: fsRouter,

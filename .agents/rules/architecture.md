@@ -2,48 +2,43 @@
 
 `contract ← server ← cli|desktop` and `contract ← client ← app ← desktop`.
 
-| dir                 | name                   | role                                                                                                                                                                                                                                                           |
-| ------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/contract` | `@pie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Also the browser-safe agent UI surface: `@pie/contract/{claude-code,codex}` tool schemas + UI-message types and `codex/protocol` (ts-rs types). Leaf; nothing may point back at it. |
-| `packages/server`   | `@pie/server`          | All runtime: domain services, session runtime, harness transforms + adapters, oRPC router, HTTP/WS, daemon.                                                                                                                                                    |
-| `packages/client`   | `@pie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                                                                                                                                                                             |
-| `packages/ui`       | `@pie/ui`              | React components. Subpath-only exports, no barrel.                                                                                                                                                                                                             |
-| `apps/app`          | `@pie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.                                                                                                                                                    |
-| `apps/desktop`      | `desktop` (unscoped)   | Electron shell supervising a forked server over MessagePort oRPC.                                                                                                                                                                                              |
-| `packages/pie`      | `@pie/cli` (bin `pie`) | Thin CLI over `@pie/server/{daemon,http}`.                                                                                                                                                                                                                     |
+| dir                 | name                   | role                                                                                                           |
+| ------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `packages/contract` | `@pie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
+| `packages/server`   | `@pie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
+| `packages/client`   | `@pie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
+| `packages/ui`       | `@pie/ui`              | React components. Subpath-only exports, no barrel.                                                             |
+| `apps/app`          | `@pie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
+| `apps/desktop`      | `desktop` (unscoped)   | Electron shell supervising a forked server over MessagePort oRPC.                                              |
+| `packages/pie`      | `@pie/cli` (bin `pie`) | Thin CLI over `@pie/server/{daemon,http}`.                                                                     |
 
 ## Boundaries
 
-- **`packages/server/src/harness/<agent>/` holds each agent's whole Node side** —
-  pure transforms (`transform.ts`, `to-session-event.ts`, `request.ts`, …)
-  alongside the process/SDK drivers (`agent.ts`, `adapter.ts`, `transport.ts`).
-  The browser-shared half of each agent — tool schemas + UI-message types — lives
-  in `packages/contract/src/<agent>/` because the SPA renders against it; keep
-  those pure and diskless.
-- **The session domain lives in `packages/server/src/harness/` with exactly five
-  public roles**: `HarnessAgentRegistry` (who exists), `HarnessAgentAdapter` (how
-  to get in), `HarnessAgentSessionManager` (sole owner of live state — one
-  session per ref; the only caller of `adapter.open`/`adapter.resume`),
-  `HarnessAgentRuntime` (the live execution resource an adapter produces: a pi
-  child, a Claude SDK handle, a Codex thread), and `HarnessAgentSessionService`
-  (the outward face: SessionRef ↔ native-id translation, metadata persistence,
-  wire-vocabulary validation, collection events). `session.ts`,
-  `session-fold.ts` and `session-repository.ts` are private collaborators of the
-  manager and the service — no Context tags, don't wire them directly.
-  `HarnessAgentSession` (`session.ts`) is one session as this server sees it —
-  the owner of phase, seq/cursor, buffers and pending requests — and it
-  _optionally_ owns a runtime: observing a session costs no process, and a
-  runtime is acquired only by a prompt (or by a history read on a harness with
-  no cold `adapter.getMessages`). The RPC router contributes only
-  `projectId → workspace path`
-  (via `ProjectService`) and error-code mapping. Adapters see `cwd`, never
-  `projectId`; the manager receives a `SessionRef` but only carries it (event
-  stamping), never interprets it.
+- **Pi is the only agent.** The server talks to one Pi child process per live
+  session. There is no harness registry, no `harnessAgentId`, and no agent
+  selection on the wire. `SessionRef` is `{ projectId, sessionId }`.
+- **`packages/server/src/harness/`** holds the session domain and the Pi
+  driver under `harness/pi/` (`agent.ts`, `adapter.ts`, `transport.ts`, …).
+  The folder name is legacy; the code is Pi-only.
+- **The session domain has four public roles** (no registry): `PiAdapter`
+  (the Pi session driver, provided at the composition root), `HarnessAgentAdapter`
+  / `HarnessAgentRuntime` (interface + live child), `HarnessAgentSessionManager`
+  (sole owner of live state — one session per ref; the only caller of
+  `adapter.open`/`adapter.resume`), and `HarnessAgentSessionService` (outward
+  face: SessionRef ↔ `agentSessionId` translation, metadata persistence, wire
+  vocabulary validation, collection events). `session.ts`, `session-fold.ts`
+  and `session-repository.ts` are private collaborators — no Context tags.
+  `HarnessAgentSession` (`session.ts`) optionally owns a runtime: observing a
+  session costs no process until a prompt or history read acquires one. The RPC
+  router contributes only `projectId → workspace path` (via `ProjectService`)
+  and error-code mapping. Adapters see `cwd`, never `projectId`.
+- **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiLayer`
+  constructs `PiAgent`, `PiAdapter` wraps it with `cacheAvailability` (one
+  `--version` probe per server lifetime), then the session manager and service
+  layers consume `PiAdapter` directly.
 - `EventBusLayer` must stay a single Layer reference across publish and
   subscribe wiring — Effect memoizes layers by reference, and a second
   reference (or `Layer.fresh`) silently splits the bus.
-- `packages/contract/src/codex/protocol/**` is ts-rs–generated (`codex
-app-server generate-ts`) and is in the lint/format ignore lists. Don't hand-edit.
 - `packages/ui/src/components/*` is vendored from the coss registry and refreshed
   with `--overwrite`, so edits there get discarded. Fix in the `ai-elements/` or
   `claude-code/` wrappers, or upstream (`docs/adr/0001`). `carousel` and
@@ -69,12 +64,3 @@ app-server generate-ts`) and is in the lint/format ignore lists. Don't hand-edit
   directory, so every front door resolves it there and passes it down —
   `packages/server/src/daemon/paths.ts` names files inside a directory it is
   handed and deliberately has no default of its own.
-- `HarnessAgentIdSchema` in `packages/contract/src/domain.ts` is the whitelist:
-  `claude-code`, `codex`, `pi` and nothing else. A fourth harness needs a literal
-  there, a `packages/server/src/harness/<agent>/` transform, and its adapter added
-  to the `RegistryLayer` in `packages/server/src/rpc/runtime.ts` — all three, or it
-  is unreachable at runtime. `harness/registry.ts` is only the lookup table's
-  factory (`makeHarnessAgentRegistry(adapters)`) and names no harness; that
-  composition root is the single place the adapters are constructed, and it wraps
-  each in `cacheAvailability` so a `--version` probe costs one spawn per server
-  rather than one per call.

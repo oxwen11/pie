@@ -9,42 +9,42 @@ A working directory the user has registered with the server, identified by a ser
 _Avoid_: workspace, repo, cwd (for the Project field)
 
 **SessionRef**:
-The composite identity `{ projectId, harnessAgentId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.
-_Avoid_: bare sessionId as a wire identity or client-state key
+The composite identity `{ projectId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.
+_Avoid_: bare sessionId as a wire identity or client-state key; harnessAgentId (removed — Pi is implicit)
 
-**Harness session id**:
-The agent-native session identity held in the session's metadata. Internal plumbing for resume/history — never exposed as wire identity.
-_Avoid_: native id
+**Agent session id** (`agentSessionId`):
+The Pi-native session identity held in the session's metadata. Internal plumbing for resume/history — never exposed as wire identity. Persisted in `storage/sessions/<projectId>/<sessionId>.json`.
+_Avoid_: harnessSessionId (removed — no migration), native id
 
 **Attach**:
-A client connecting to a session's live event stream — `session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `session.prepare` (validate the ref, backfill cwd, ask the harness whether the native session is still there — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
+A client connecting to a session's live event stream — `session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
 _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`session.prepare` starts nothing — only a prompt does)
 
 **Session metadata**:
-The server-owned recovery record for a session: which Project, which harness agent, which harness session id, and whether the session is archived. Distinct from conversation history, which stays in the agent's native storage.
+The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
 
 **Workspace path**:
-The validated absolute directory handed to a harness agent when opening or resuming a session; always derived from `Project.path`, never accepted directly from session API callers.
+The validated absolute directory handed to Pi when opening or resuming a session; always derived from `Project.path`, never accepted directly from session API callers.
 _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
 
-The session domain (`packages/server/src/harness/`) has exactly five public roles. One-liner: Registry knows who exists, Adapter knows how to get in, Manager knows who is alive and what they're doing, Runtime is the live execution resource, Service is the outward face. The `HarnessAgent` prefix is a namespace — read names right-to-left: the last word says what it is, the prefix only says which domain it belongs to.
+The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: PiAdapter knows how to get in, Manager knows who is alive, Runtime is the live child process, Service is the outward face. The `HarnessAgent` prefix on some types is a legacy namespace.
 
 **HarnessAgentSessionService** (`harness/session-service.ts`):
-The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → harness session id, validates wire vocabulary (permission modes, prompt parts), publishes collection events. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself.
-_Avoid_: SessionService (its dissolved predecessor in `session/service.ts`)
+The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself.
 
 **HarnessAgentSessionManager** (`harness/session-manager.ts`):
-The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `adapter.open`/`adapter.resume` — adapters may assume single-flight per session id, which the session's own acquisition ticket guarantees. A ref with nothing live reads as idle at cursor 0 rather than failing, so a client can attach, snapshot and subscribe without starting anything.
+The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAdapter.open`/`resume` — adapters may assume single-flight per session id. A ref with nothing live reads as idle at cursor 0 rather than failing.
+
+**PiAdapter** (`harness/pi-adapter.ts`):
+Context service holding the Pi session driver (`HarnessAgentAdapter`). Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **HarnessAgentAdapter / HarnessAgentRuntime** (`harness/adapter.ts`):
-The per-harness door (descriptor, availability, probes, open/resume factory, cold reads) and the live execution resource it produces (prompt/events/config/close) — a pi child process. The per-agent `PiAgent` façade under `harness/pi/` is private protocol plumbing below the adapter, not a shared abstraction.
-_Avoid_: HarnessAgentSession for the runtime (it is the in-memory session; see below)
+The Pi door (descriptor, availability, open/resume factory) and the live execution resource (prompt/events/close) — a Pi RPC child. `PiAgent` under `harness/pi/` is private protocol plumbing below the adapter.
 
 **Private modules** (no Context tags, never wired directly):
-`harness/session.ts` — **HarnessAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. A crash releases the runtime but leaves the session queryable (phase "crashed") until an explicit `close`. `harness/session-fold.ts` — the pure state fold it applies (no Effect, no I/O). `harness/session-repository.ts` — the service's metadata store over `storage/sessions/`.
-_Avoid_: projection (the fold's output is the session's state), SessionRuntimeService, SessionManager
+`harness/session.ts` — **HarnessAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
 
 ## UI Components
 

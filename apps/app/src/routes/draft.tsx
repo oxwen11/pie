@@ -18,16 +18,18 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
+import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
+import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
@@ -35,6 +37,8 @@ import { useProject, useProjects } from "@/features/projects/use-projects";
 
 type DraftSearch = {
   readonly projectId?: string;
+  readonly provider?: string;
+  readonly modelId?: string;
 };
 
 const asText = (value: unknown): string | undefined =>
@@ -46,6 +50,8 @@ const optional = <K extends string, V extends string>(key: K, value: V | undefin
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
     ...optional("projectId", asText(search.projectId)),
+    ...optional("provider", asText(search.provider)),
+    ...optional("modelId", asText(search.modelId)),
   }),
   component: DraftRoute,
 });
@@ -60,12 +66,30 @@ function DraftRoute() {
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
+  const modelsQuery = useAgentModels(selected?.id);
+  const defaultModel = modelsQuery.data?.defaultModel;
+
+  useEffect(() => {
+    if (!defaultModel || search.provider || search.modelId) return;
+    void navigate({
+      to: "/draft",
+      search: (prev) => ({
+        ...prev,
+        provider: defaultModel.provider,
+        modelId: defaultModel.modelId,
+      }),
+      replace: true,
+    });
+  }, [defaultModel, navigate, search.modelId, search.provider]);
 
   const startSession = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!selected) throw new Error("No project selected");
       const ref = await orpcQueryUtils.session.create.call({
         projectId: selected.id,
+        ...(search.provider && search.modelId
+          ? { provider: search.provider, modelId: search.modelId }
+          : {}),
       });
       void manager.chatFor(ref).prompt(text);
       return ref;
@@ -174,7 +198,7 @@ function DraftRoute() {
             onChange={(next) =>
               navigate({
                 to: "/draft",
-                search: (prev) => ({ ...prev, projectId: next }),
+                search: { projectId: next },
                 replace: true,
               })
             }
@@ -195,7 +219,20 @@ function DraftRoute() {
           <ChatInputProvider controller={controller}>
             <ChatInput />
             <PromptInputToolbar>
-              <PromptInputTools />
+              <PromptInputTools>
+                <DraftModelSelect
+                  projectId={selected?.id}
+                  providerId={search.provider}
+                  modelId={search.modelId}
+                  onChange={(provider, modelId) =>
+                    navigate({
+                      to: "/draft",
+                      search: (prev) => ({ ...prev, provider, modelId }),
+                      replace: true,
+                    })
+                  }
+                />
+              </PromptInputTools>
               <PromptInputSubmit disabled={!hasContent || !selected || startSession.isPending} />
             </PromptInputToolbar>
           </ChatInputProvider>

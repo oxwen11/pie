@@ -4,21 +4,30 @@ import { Effect, Option, Schema } from "effect";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
-/**
- * Persistence schema for {@link Session}. Compatibility with the interface is
- * enforced structurally: `write` checks Session → schema Type, the readers
- * check schema Type → Session.
- */
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  harnessSessionId: Schema.String,
+  agentSessionId: Schema.String,
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
   historyAvailable: Schema.optionalKey(Schema.Boolean),
+});
+
+const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
+  sessionId: metadata.sessionId,
+  projectId: metadata.projectId,
+  agentSessionId: metadata.agentSessionId,
+  createdAt: metadata.createdAt,
+  ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
+  ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+  ...(metadata.archived !== undefined ? { archived: metadata.archived } : {}),
+  ...(metadata.updatedAt !== undefined ? { updatedAt: metadata.updatedAt } : {}),
+  ...(metadata.historyAvailable !== undefined
+    ? { historyAvailable: metadata.historyAvailable }
+    : {}),
 });
 
 /**
@@ -61,9 +70,6 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
     const sessions = yield* makeJsonCollection({
       dir: sessionsDir,
       schema: SessionSchema,
-      // Pre-envelope records are the bare body with the version inlined, from
-      // before the envelope existed to hold it; decoding drops that key.
-      legacy: { schema: SessionSchema, migrate: (session) => session },
     });
     const entryId = (projectId: string, sessionId: string) => `${projectId}/${sessionId}`;
     const asReadError = (error: JsonStoreLoadError) =>
@@ -73,8 +79,6 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
 
     return {
       list: (projectId) =>
-        // Scoped to the project's own subdirectory: a corrupt record in
-        // another project cannot fail this listing.
         isSafeId(projectId)
           ? sessions.list({ under: projectId }).pipe(
               Effect.map((entries) => entries.map((entry) => entry.data)),
@@ -95,7 +99,6 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
             ),
 
       findBySessionId: (sessionId) =>
-        // Scan filenames only (no entry bodies), then read the single match.
         !isSafeId(sessionId)
           ? Effect.fail(new SessionRefNotFound({ sessionId }))
           : Effect.gen(function* () {
@@ -103,7 +106,7 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
               const id = ids.find((candidate) => candidate.endsWith(`/${sessionId}`));
               const found =
                 id === undefined
-                  ? Option.none<Session>()
+                  ? Option.none<typeof SessionSchema.Type>()
                   : yield* sessions.get(id).pipe(Effect.mapError(asReadError));
               if (Option.isNone(found)) {
                 return yield* Effect.fail(new SessionRefNotFound({ sessionId }));
@@ -113,7 +116,7 @@ export const makeHarnessAgentSessionRepository = (sessionsDir: string) =>
 
       write: (metadata) =>
         sessions
-          .put(entryId(metadata.projectId, metadata.sessionId), metadata)
+          .put(entryId(metadata.projectId, metadata.sessionId), toStorage(metadata))
           .pipe(Effect.mapError(asWriteError)),
 
       remove: (projectId, sessionId) =>

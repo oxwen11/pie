@@ -8,30 +8,28 @@ import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect
 
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import type { CreateSessionInput, HarnessAgentRuntime } from "./adapter";
+import type { HarnessAgentAdapter } from "./adapter";
 import {
   AgentOpenError,
-  type AgentOperationError,
   AgentUnavailable,
   type CreateSessionError,
   HarnessSessionNotFound,
   type ResumeSessionError,
-  SessionClosed,
   SessionNotResumable,
 } from "./errors";
-import type { HarnessAgentRegistryShape } from "./registry";
-import { HarnessAgentRegistry } from "./registry";
+import { PiAdapter } from "./pi-adapter";
 import {
   type AcquireRuntime,
   type HarnessAgentSessionShape,
   makeHarnessAgentSession,
 } from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
-import type { ResumeManagedSessionInput, SessionConfig } from "./session-io";
+import type { ResumeManagedSessionInput } from "./session-io";
 
 /**
  * The sole owner of live session state: one {@link HarnessAgentSessionShape}
  * per ref, each optionally holding a runtime. The manager's own job is narrow —
- * keep the table, and turn "which harness, which native id, which cwd" into
+ * keep the table, and turn "native session id + cwd" into the `acquire` a
  * the `acquire` a session runs when it decides it needs a runtime.
  *
  * It remains the single caller of `adapter.open` / `adapter.resume`: every
@@ -49,13 +47,10 @@ export type HarnessAgentSessionManagerShape = {
   /**
    * Open a fresh native session via the adapter and take ownership of it. The
    * one eager path: a session that does not exist yet has no native id to
-   * resume by, so creating it *is* opening it. `config` becomes the session's
-   * config, so the create-time choice reaches this runtime and every later one
-   * by the same seeding path.
+   * resume by, so creating it *is* opening it.
    */
   readonly open: (
     input: CreateSessionInput,
-    config: SessionConfig,
     ref: SessionRef,
   ) => Effect.Effect<HarnessAgentRuntime, CreateSessionError>;
   /**
@@ -77,16 +72,6 @@ export type HarnessAgentSessionManagerShape = {
   /** The same lookup as {@link get}, for callers that have something else to do
    * when nothing is running rather than an error to raise. */
   readonly peek: (ref: SessionRef) => Effect.Effect<HarnessAgentRuntime | undefined>;
-  /**
-   * Record what a session's config should be, and push it to its runtime if one
-   * is live. A write, so it materializes the session: choosing a model for a
-   * session that isn't running is a legitimate thing to do, and every runtime
-   * the session acquires afterwards is seeded with the choice.
-   */
-  readonly setConfig: (
-    ref: SessionRef,
-    patch: SessionConfig,
-  ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
   /**
    * Close and forget a session — runtime and session state alike; idempotent.
    * This is the only path that discards a crashed session (a crash alone
@@ -146,7 +131,7 @@ type CloseStep =
   | { readonly _tag: "Done" };
 
 export const makeHarnessAgentSessionManager = (
-  registry: HarnessAgentRegistryShape,
+  adapter: HarnessAgentAdapter,
   bus: EventBusShape,
 ): Effect.Effect<HarnessAgentSessionManagerShape, never, Scope.Scope | FileSystem.FileSystem> =>
   Effect.gen(function* () {
@@ -212,9 +197,9 @@ export const makeHarnessAgentSessionManager = (
       );
 
     const checkAvailable = () =>
-      Effect.succeed(registry.adapter).pipe(
-        Effect.tap((adapter) =>
-          adapter.checkAvailability.pipe(
+      Effect.succeed(adapter).pipe(
+        Effect.tap((availAdapter) =>
+          availAdapter.checkAvailability.pipe(
             Effect.flatMap((availability) =>
               availability.available
                 ? Effect.void
@@ -237,22 +222,24 @@ export const makeHarnessAgentSessionManager = (
      * nothing".
      *
      * The native span correlates logs emitted during each acquisition. Which
-     * session and harness come from the caller's `inSession`; the harness's own
-     * id is attached after the adapter answers because it does not exist before
-     * then — it is what a `claude --resume` command would take.
+     * session and Pi come from the caller's `inSession`; the Pi session id is
+     * attached after the adapter answers because it does not exist before
+     * then.
      */
     const acquireOpen = (input: CreateSessionInput): AcquireRuntime =>
       checkAvailable().pipe(
-        Effect.flatMap((adapter) => adapter.open(input)),
-        Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
-        Effect.withSpan("harness.open"),
+        Effect.flatMap((availAdapter) => availAdapter.open(input)),
+        Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
+        Effect.withSpan("pi.open"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
       checkAvailable().pipe(
-        Effect.flatMap((adapter) => adapter.resume({ sessionId: input.sessionId, cwd: input.cwd })),
-        Effect.tap((runtime) => Effect.annotateCurrentSpan("harnessSessionId", runtime.sessionId)),
-        Effect.withSpan("harness.resume"),
+        Effect.flatMap((availAdapter) =>
+          availAdapter.resume({ sessionId: input.sessionId, cwd: input.cwd }),
+        ),
+        Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
+        Effect.withSpan("pi.resume"),
       );
 
     /** Acquire through a session, retrying against a fresh one when the session
@@ -319,28 +306,18 @@ export const makeHarnessAgentSessionManager = (
     );
 
     return {
-      open: (input, config, ref) =>
-        // The create-time choice becomes the session's config before anything
-        // is opened, so seeding on acquisition is the only path that applies
-        // it — including on every runtime the session takes after this one.
-        sessionFor(ref)
-          .pipe(
-            Effect.flatMap((session) => session.setConfig(config)),
-            // Nothing is running yet, so recording the choice cannot fail.
-            Effect.orDie,
-            Effect.andThen(acquireVia(ref, acquireOpen(input))),
-          )
-          .pipe(
-            // `AcquireRuntime` carries the resume union; the two members only a
-            // resume can raise are unreachable here, so a sighting is an adapter
-            // misbehaving and folds into AgentOpenError.
-            Effect.mapError(
-              (error): CreateSessionError =>
-                error instanceof SessionNotResumable || error instanceof HarnessSessionNotFound
-                  ? new AgentOpenError({ cause: error })
-                  : error,
-            ),
+      open: (input, ref) =>
+        acquireVia(ref, acquireOpen(input)).pipe(
+          // `AcquireRuntime` carries the resume union; the two members only a
+          // resume can raise are unreachable here, so a sighting is an adapter
+          // misbehaving and folds into AgentOpenError.
+          Effect.mapError(
+            (error): CreateSessionError =>
+              error instanceof SessionNotResumable || error instanceof HarnessSessionNotFound
+                ? new AgentOpenError({ cause: error })
+                : error,
           ),
+        ),
       ensureRuntime: (input, ref) => acquireVia(ref, acquireResume(input)),
       get: (ref) =>
         peek(ref).pipe(
@@ -351,8 +328,6 @@ export const makeHarnessAgentSessionManager = (
           ),
         ),
       peek,
-      setConfig: (ref, patch) =>
-        sessionFor(ref).pipe(Effect.flatMap((session) => session.setConfig(patch))),
       close,
       status: (ref) => withSession(ref, (session) => session.status, toStatus(initialSessionState)),
       snapshot: (ref) =>
@@ -366,8 +341,8 @@ export const makeHarnessAgentSessionManager = (
 export const HarnessAgentSessionManagerLayer = Layer.effect(
   HarnessAgentSessionManager,
   Effect.gen(function* () {
-    const registry = yield* HarnessAgentRegistry;
+    const adapter = yield* PiAdapter;
     const bus = yield* EventBus;
-    return yield* makeHarnessAgentSessionManager(registry, bus);
+    return yield* makeHarnessAgentSessionManager(adapter, bus);
   }),
 );

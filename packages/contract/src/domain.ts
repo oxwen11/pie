@@ -346,73 +346,8 @@ export type ActivePromptSnapshot = {
 };
 
 // ---------------------------------------------------------------------------
-// Session settings (docs/design/harness-concept-ownership.md)
-//
-// Two channels, split by who owns the value's meaning:
-// - Normalized: pie defines a closed union, adapters declare the subset they
-//   support and map members to their native system privately. Labels, icons and
-//   ordering live in the client — the words are ours.
-// - Opaque: the harness/provider defines an open set we merely relay. Labels
-//   must come from the source (only it knows the value), ids are atomic (never
-//   parsed or compared substring-wise outside the owning adapter).
+// Runtime snapshot
 // ---------------------------------------------------------------------------
-
-// Our permission vocabulary — the union of what we promise across harnesses,
-// not any single harness's list. `plan` and `read-only` coexist on purpose:
-// mapping codex's read-only sandbox onto `plan` would lie (codex produces no
-// plan and never triggers the plan-approval flow).
-export const PermissionModeSchema = Schema.Literals([
-  "plan",
-  "read-only",
-  "ask",
-  "acceptEdits",
-  "full",
-]);
-export type PermissionMode = typeof PermissionModeSchema.Type;
-
-// Normalized companion traits of a model (see ModelInfoSchema): the id is
-// opaque, but capabilities we must branch on are translated into our closed
-// sets by the adapter. Values the adapter doesn't recognise are dropped, so a
-// newer harness degrades to "one less control", never to a wrong render.
-export const ReasoningEffortSchema = Schema.Literals([
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-]);
-export type ReasoningEffort = typeof ReasoningEffortSchema.Type;
-
-export const InputModalitySchema = Schema.Literals(["text", "image"]);
-export type InputModality = typeof InputModalitySchema.Type;
-
-// A model as its provider reports it: opaque `id`/`label` (we don't know what
-// `sonnet` means — only its provider does), plus normalized traits. A missing
-// `reasoningEfforts` means this model has no reasoningEffort switch the session can drive; the
-// client renders no control. `modalities` absent means "assume text only".
-export const ModelInfoSchema = Schema.Struct({
-  id: Schema.String,
-  label: Schema.optionalKey(Schema.String),
-  reasoningEfforts: Schema.optionalKey(Schema.Array(ReasoningEffortSchema)),
-  defaultReasoningEffort: Schema.optionalKey(ReasoningEffortSchema),
-  modalities: Schema.optionalKey(Schema.Array(InputModalitySchema)),
-});
-export type ModelInfo = typeof ModelInfoSchema.Type;
-
-// A source of models. User-configured providers join this shape later. Models
-// never leave their provider — flattening loses the half of the composite key
-// that makes `modelId` meaningful.
-// No default marker on purpose: a catalog's "default" flag is the provider's
-// suggestion, not what an unconfigured session actually runs (the harness's
-// own user config decides that, and it is not probeable). The default is
-// expressed by absence — no pick on the wire means the harness decides.
-export const ProviderInfoSchema = Schema.Struct({
-  id: Schema.String,
-  label: Schema.optionalKey(Schema.String),
-  models: Schema.Array(ModelInfoSchema),
-});
-export type ProviderInfo = typeof ProviderInfoSchema.Type;
 
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
@@ -474,7 +409,7 @@ export const PromptOutputSchema = Schema.Struct({ turnId: Schema.String });
 export type PromptOutput = typeof PromptOutputSchema.Type;
 
 // ---------------------------------------------------------------------------
-// Session capabilities (unchanged; setModel/config remains out of scope)
+// Session capabilities
 // ---------------------------------------------------------------------------
 
 export const SessionCapabilitiesSchema = Schema.Struct({
@@ -494,6 +429,42 @@ export const SessionCapabilitiesSchema = Schema.Struct({
   supportsPermissions: Schema.Boolean,
 });
 export type SessionCapabilities = typeof SessionCapabilitiesSchema.Type;
+
+// ---------------------------------------------------------------------------
+// Agent model (owned by Pi; queried via the live RPC child)
+// ---------------------------------------------------------------------------
+
+export const AgentModelSchema = Schema.Struct({
+  provider: Schema.String,
+  modelId: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+});
+export type AgentModel = typeof AgentModelSchema.Type;
+
+export const AgentModelStateSchema = Schema.Struct({
+  provider: Schema.optionalKey(Schema.String),
+  modelId: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+});
+export type AgentModelState = typeof AgentModelStateSchema.Type;
+
+export const SetAgentModelInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  provider: Schema.NonEmptyString,
+  modelId: Schema.NonEmptyString,
+});
+export type SetAgentModelInput = typeof SetAgentModelInputSchema.Type;
+
+export const ListAgentModelsInputSchema = Schema.Struct({
+  projectId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
+});
+export type ListAgentModelsInput = typeof ListAgentModelsInputSchema.Type;
+
+export const ListAgentModelsOutputSchema = Schema.Struct({
+  models: Schema.Array(AgentModelSchema),
+  defaultModel: Schema.optionalKey(AgentModelSchema),
+});
+export type ListAgentModelsOutput = typeof ListAgentModelsOutputSchema.Type;
 
 // ---------------------------------------------------------------------------
 // Project
@@ -532,16 +503,12 @@ export const BrowseResultSchema = Schema.Struct({
 // Lifecycle method inputs / outputs
 // ---------------------------------------------------------------------------
 
-// Session-scoped config the user picks at create time and changes mid-session
-// via the dedicated setters — never carried on a prompt turn. The two channels
-// fail differently on purpose: `permissionMode` is our closed union (a bad
-// value is a client bug → INVALID_ARGUMENT), while the model pair and `reasoningEffort`
-// come from probed lists that go stale, so applying them is best-effort — a
-// miss falls back to the harness default and the session still opens.
-// `providerId`/`modelId` must be given together; a half pair is a client bug
-// the RPC boundary rejects.
+// Session-scoped config is owned by Pi — there are no session config RPCs.
+
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
+  provider: Schema.optionalKey(Schema.NonEmptyString),
+  modelId: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 
@@ -600,28 +567,6 @@ export const ResolveRefInputSchema = Schema.Struct({
   sessionId: Schema.String.check(Schema.isUUID()),
 });
 export type ResolveRefInput = typeof ResolveRefInputSchema.Type;
-
-// Session-scoped config setters. `setModel` resets the reasoningEffort to the new
-// model's default (the reasoningEffort domain cascades from the selected model), so a
-// client that wants a non-default reasoningEffort calls `setReasoningEffort` after.
-export const SetSessionModelInputSchema = Schema.Struct({
-  ref: SessionRefSchema,
-  providerId: Schema.String,
-  modelId: Schema.String,
-});
-export type SetSessionModelInput = typeof SetSessionModelInputSchema.Type;
-
-export const SetSessionReasoningEffortInputSchema = Schema.Struct({
-  ref: SessionRefSchema,
-  reasoningEffort: ReasoningEffortSchema,
-});
-export type SetSessionReasoningEffortInput = typeof SetSessionReasoningEffortInputSchema.Type;
-
-export const SetSessionPermissionModeInputSchema = Schema.Struct({
-  ref: SessionRefSchema,
-  permissionMode: PermissionModeSchema,
-});
-export type SetSessionPermissionModeInput = typeof SetSessionPermissionModeInputSchema.Type;
 
 export const RespondToAgentRequestInputSchema = Schema.Struct({
   ref: SessionRefSchema,

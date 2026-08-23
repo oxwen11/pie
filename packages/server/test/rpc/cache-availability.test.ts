@@ -9,7 +9,6 @@ import { cacheAvailability } from "../../src/rpc/runtime";
 
 const unusedAdapter = {
   descriptor: { name: "Pi" },
-  permissionModes: [],
   open: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
   getSessionInfo: () => Effect.die("unused"),

@@ -13,17 +13,16 @@ export type { Project } from "@pie/contract";
  * `storage/sessions/<projectId>/<sessionId>.json`, inside a `{version, data}`
  * envelope that owns the version — this record does not carry one. The filename
  * mirrors `sessionId`, which is also stored in the body so a loaded record is
- * self-contained; `harnessSessionId` is the agent-native id (pi session id)
- * the server translates to when calling the harness.
+ * self-contained; `agentSessionId` is the Pi-native session id the server
+ * translates to when opening or resuming the child process.
  */
 export interface Session {
   readonly sessionId: string;
   readonly projectId: string;
-  readonly harnessSessionId: string;
+  readonly agentSessionId: string;
   readonly createdAt: string;
   /**
    * Working directory. Our input at `create` (currently the project path).
-   * Optional for legacy records; callers fall back to the project path.
    */
   readonly cwd?: string;
   /** Display title, set from the session's first prompt. */

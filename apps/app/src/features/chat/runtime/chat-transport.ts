@@ -1,12 +1,6 @@
 import { ORPCError } from "@orpc/client";
 import type { PieClient } from "@pie/client";
-import type {
-  PermissionMode,
-  PromptPart,
-  ReasoningEffort,
-  SessionRef,
-  SubscribeStreamEvent,
-} from "@pie/contract";
+import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@pie/contract";
 import type { UIMessage } from "ai";
 
 import { exponentialBackoffMs } from "@/lib/utils";
@@ -23,13 +17,7 @@ type PieSessionClient = PieClient["session"];
 
 type SessionClient = Pick<
   PieSessionClient,
-  | "prompt"
-  | "respondToAgentRequest"
-  | "setReasoningEffort"
-  | "setModel"
-  | "setPermissionMode"
-  | "getSnapshot"
-  | "getMessages"
+  "prompt" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
 > & {
   subscribe: (
     ...args: Parameters<PieSessionClient["subscribe"]>
@@ -109,17 +97,5 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
       if (error instanceof ORPCError && error.code === "NOT_FOUND") return;
       throw error;
     }
-  };
-
-  setModel = async (providerId: string, modelId: string): Promise<void> => {
-    await this.client.session.setModel({ ref: this.#ref, providerId, modelId });
-  };
-
-  setReasoningEffort = async (reasoningEffort: ReasoningEffort): Promise<void> => {
-    await this.client.session.setReasoningEffort({ ref: this.#ref, reasoningEffort });
-  };
-
-  setPermissionMode = async (permissionMode: PermissionMode): Promise<void> => {
-    await this.client.session.setPermissionMode({ ref: this.#ref, permissionMode });
   };
 }

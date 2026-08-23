@@ -25,10 +25,10 @@ const makeLayer = (home: string) =>
     makeHarnessAgentSessionRepository(path.join(home, "storage", "sessions")),
   ).pipe(Layer.provide(NodePlatformLayer));
 
-const meta = (sessionId: string, projectId: string, harnessSessionId: string): Session => ({
+const meta = (sessionId: string, projectId: string, agentSessionId: string): Session => ({
   sessionId,
   projectId,
-  harnessSessionId,
+  agentSessionId,
   createdAt: "2026-07-16T00:00:00.000Z",
 });
 
@@ -53,7 +53,7 @@ describe("SessionRepository", () => {
       }),
     );
     expect(read.sessionId).toBe("sess-1");
-    expect(read.harnessSessionId).toBe("claude-uuid-1");
+    expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
   it("persists at storage/sessions/<projectId>/<sessionId>.json, sessionId in the body too", async () => {
@@ -70,31 +70,6 @@ describe("SessionRepository", () => {
     expect(raw.data.sessionId).toBe("sess-1");
     expect(raw.data.projectId).toBe("proj-a");
     // The envelope owns the version; the body must not carry a second copy.
-    expect(raw.data).not.toHaveProperty("version");
-  });
-
-  it("reads a pre-envelope record and adopts it into envelope form", async () => {
-    const file = path.join(home, "storage", "sessions", "proj-a", "sess-1.json");
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    // Pre-envelope records inline the version, from before the envelope
-    // existed to hold it — adoption lifts it out rather than keeping both.
-    await fs.writeFile(
-      file,
-      JSON.stringify({ version: 1, ...meta("sess-1", "proj-a", "claude-uuid-1") }),
-      "utf8",
-    );
-
-    const read = await run(
-      Effect.gen(function* () {
-        const repo = yield* SessionRepository;
-        return yield* repo.read("proj-a", "sess-1");
-      }),
-    );
-    expect(read.harnessSessionId).toBe("claude-uuid-1");
-
-    const raw = JSON.parse(await fs.readFile(file, "utf8"));
-    expect(raw.version).toBe(1);
-    expect(raw.data.sessionId).toBe("sess-1");
     expect(raw.data).not.toHaveProperty("version");
   });
 
@@ -157,7 +132,7 @@ describe("SessionRepository", () => {
     );
     expect(hit.projectId).toBe("proj-b");
     expect(hit.sessionId).toBe("sess-2");
-    expect(hit.harnessSessionId).toBe("u2");
+    expect(hit.agentSessionId).toBe("u2");
   });
 
   it("a corrupt record in another project does not break this project's list", async () => {

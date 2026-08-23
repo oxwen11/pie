@@ -1,4 +1,4 @@
-import type { AgentRequest, AgentResponse } from "@pie/contract";
+import type { AgentRequest, AgentResponse, AgentModelState } from "@pie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -12,8 +12,10 @@ import {
   TurnAlreadyRunning,
 } from "../errors";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
+import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
+import type { PiExecutable } from "./resolve-executable";
 import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
@@ -71,7 +73,7 @@ type SessionState = {
 };
 
 export interface PiAgentOptions {
-  readonly executablePath?: string;
+  readonly executable?: PiExecutable;
   readonly args?: ReadonlyArray<string>;
 }
 
@@ -86,6 +88,8 @@ export interface PiAgent {
   readonly session: {
     readonly create: (config: {
       readonly cwd: string;
+      readonly provider?: string;
+      readonly modelId?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
     readonly resume: (config: {
       readonly sessionId: string;
@@ -123,6 +127,13 @@ export interface PiAgent {
     ) => Effect.Effect<boolean, HarnessSessionNotFound | AgentRequestUnavailable>;
     readonly interrupt: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
     readonly abort: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
+    readonly getModelState: (
+      sessionId: string,
+    ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
+    readonly setModel: (
+      sessionId: string,
+      model: { readonly provider: string; readonly modelId: string },
+    ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
   };
 }
 
@@ -310,12 +321,17 @@ export const makePiAgentWithDependencies = <R>(
     const openSession = (
       sessionId: string,
       cwd?: string,
+      spawnArgs?: ReadonlyArray<string>,
     ): Effect.Effect<{ readonly sessionId: string }, PiTransportFailure> =>
       Effect.gen(function* () {
         const scope = yield* Scope.fork(ownerScope, "sequential");
         return yield* Effect.gen(function* () {
           const transport = yield* dependencies
-            .makeTransport({ sessionId, ...(cwd ? { cwd } : {}) })
+            .makeTransport({
+              sessionId,
+              ...(cwd ? { cwd } : {}),
+              ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : {}),
+            })
             .pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(buildContext));
 
           // Readiness handshake: pi's CLI front-end resolves the session (and
@@ -400,7 +416,13 @@ export const makePiAgentWithDependencies = <R>(
 
     return {
       session: {
-        create: (config) => openSession(uuid(), config.cwd),
+        create: (config) => {
+          const spawnArgs =
+            config.provider && config.modelId
+              ? ["--provider", config.provider, "--model", config.modelId]
+              : undefined;
+          return openSession(uuid(), config.cwd, spawnArgs);
+        },
         resume: (config) => openSession(config.sessionId, config.cwd),
         prompt: (input) =>
           Effect.gen(function* () {
@@ -577,6 +599,24 @@ export const makePiAgentWithDependencies = <R>(
           }),
         interrupt,
         abort,
+        getModelState: (sessionId) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command<RpcSessionState>({ type: "get_state" }),
+            ),
+            Effect.map(toAgentModelState),
+          ),
+        setModel: (sessionId, model) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command<PiModel>({
+                type: "set_model",
+                provider: model.provider,
+                modelId: model.modelId,
+              }),
+            ),
+            Effect.map(toAgentModel),
+          ),
       },
     } satisfies PiAgent;
   });
@@ -587,7 +627,7 @@ export const makePiAgent = (
   makePiAgentWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
-        ...(options.executablePath ? { executablePath: options.executablePath } : {}),
+        ...(options.executable ? { executable: options.executable } : {}),
         ...(options.args ? { args: options.args } : {}),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : {}),

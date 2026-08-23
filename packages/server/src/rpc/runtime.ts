@@ -10,12 +10,13 @@ import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import {
   type HarnessAgentAdapter,
-  HarnessAgentRegistry,
   HarnessAgentSessionManagerLayer,
+  HarnessAgentServiceLayer,
   HarnessAgentSessionServiceLayer,
-  makeHarnessAgentRegistry,
 } from "../harness";
 import { makePiAdapter, makePiAgent, type PiAgent } from "../harness/pi";
+import { PiAdapter } from "../harness/pi-adapter";
+import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 
 export class Pi extends Context.Service<Pi, PiAgent>()("Pi") {}
@@ -29,10 +30,8 @@ const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeC
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
-const piAgentOptions =
-  process.env.PIE_E2E === "1" && process.env.PIE_E2E_PI_EXECUTABLE
-    ? { executablePath: process.env.PIE_E2E_PI_EXECUTABLE }
-    : {};
+const piExecutable = resolvePiExecutable();
+const piAgentOptions = { executable: piExecutable };
 
 export const PiLayer: Layer.Layer<Pi> = Layer.effect(Pi, makePiAgent(piAgentOptions)).pipe(
   Layer.provide(NodeProcessLayer),
@@ -53,12 +52,12 @@ export const cacheAvailability = (
     checkAvailability: Effect.uninterruptible(cachedCheck),
   }));
 
-const RegistryLayer = Layer.effect(
-  HarnessAgentRegistry,
+const PiAdapterProvided = Layer.effect(
+  PiAdapter,
   Effect.gen(function* () {
     const pi = yield* Pi;
     const adapter = yield* cacheAvailability(makePiAdapter(pi, piAgentOptions));
-    return makeHarnessAgentRegistry(adapter);
+    return adapter;
   }),
 ).pipe(Layer.provide(ProvidersLayer), Layer.provide(PlatformLayer));
 
@@ -66,13 +65,13 @@ const RegistryLayer = Layer.effect(
 // publishing wire events onto the bus); the outward façade on top does the
 // identity translation, metadata persistence, and collection events.
 const HarnessSessionManagerProvided = HarnessAgentSessionManagerLayer.pipe(
-  Layer.provide(RegistryLayer),
+  Layer.provide(PiAdapterProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PlatformLayer),
 );
 const HarnessSessionServiceProvided = HarnessAgentSessionServiceLayer.pipe(
   Layer.provide(HarnessSessionManagerProvided),
-  Layer.provide(RegistryLayer),
+  Layer.provide(PiAdapterProvided),
   Layer.provide(EventBusLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
@@ -84,11 +83,14 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
+const HarnessAgentServiceProvided = HarnessAgentServiceLayer;
+
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
+  HarnessAgentServiceProvided,
   HarnessSessionServiceProvided,
   ProjectServiceProvided,
-  RegistryLayer,
+  PiAdapterProvided,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   PlatformLayer,
   NodeHttpPlatform.layer,

@@ -16,10 +16,11 @@ import {
   TurnAlreadyRunning,
 } from "../errors";
 import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
-import { findExecutable } from "../executable";
 import { streamFromQueueOne } from "../queue-stream";
 import type { PiAgent } from "./agent";
 import { entriesToUIMessages } from "./history";
+import { checkPiAvailability } from "./resolve-executable";
+import type { PiExecutable } from "./resolve-executable";
 import type { PiUIMessageChunk } from "./ui-message";
 
 const EVENT_QUEUE_CAPACITY = 1024;
@@ -193,11 +194,6 @@ const makeRuntime = (
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
-      // Pi has neither a model switch, an reasoningEffort switch, nor a permission
-      // protocol; accept the config calls and no-op rather than fail the caller.
-      setModel: () => Effect.void,
-      setReasoningEffort: () => Effect.void,
-      setPermissionMode: () => Effect.void,
       interrupt,
       respondToAgentRequest: (requestId, response) =>
         agent.session.respondPermission(sessionId, requestId, response).pipe(
@@ -224,29 +220,40 @@ const makeRuntime = (
           .pipe(Effect.mapError((cause) => operationError(sessionId, "get-messages", cause)));
         return entriesToUIMessages(entries, leafId, sessionId);
       }),
+      getModelState: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* agent.session
+          .getModelState(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "get-model-state", cause)));
+      }),
+      setModel: (model) =>
+        Effect.gen(function* () {
+          if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          return yield* agent.session
+            .setModel(sessionId, model)
+            .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
+        }),
       close,
     } satisfies HarnessAgentRuntime;
   });
 
 export const makePiAdapter = (
   agent: PiAgent,
-  options: { readonly executablePath?: string } = {},
+  options: { readonly executable?: PiExecutable } = {},
 ): HarnessAgentAdapter => ({
   descriptor: { name: "Pi" },
-  // Pi has neither a permission protocol nor a model catalogue — declaring
-  // nothing (empty subset, no probe) is what makes the UI render no config
-  // controls for it.
-  permissionModes: [],
-  checkAvailability: findExecutable(options.executablePath ?? "pi").pipe(
-    Effect.map((found) =>
-      found ? { available: true } : { available: false, reason: "Pi was not found on PATH." },
-    ),
-  ),
+  checkAvailability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
   open: (input) =>
-    agent.session.create({ cwd: input.cwd }).pipe(
-      Effect.mapError((cause) => new AgentOpenError({ cause })),
-      Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
-    ),
+    agent.session
+      .create({
+        cwd: input.cwd,
+        ...(input.provider ? { provider: input.provider } : {}),
+        ...(input.modelId ? { modelId: input.modelId } : {}),
+      })
+      .pipe(
+        Effect.mapError((cause) => new AgentOpenError({ cause })),
+        Effect.flatMap(({ sessionId }) => makeRuntime(agent, sessionId)),
+      ),
   resume: (input) =>
     agent.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
       Effect.mapError((cause) =>

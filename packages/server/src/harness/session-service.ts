@@ -1,8 +1,7 @@
 import type {
+  AgentModelState,
   AgentResponse,
-  PermissionMode,
   PromptInput,
-  ReasoningEffort,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
@@ -21,7 +20,14 @@ import {
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import type { Session } from "../types";
-import type { PromptReceipt, SessionCapabilities, SessionInfoResult, UserInput } from "./adapter";
+import type {
+  PromptReceipt,
+  SessionCapabilities,
+  SessionInfoResult,
+  UserInput,
+  HarnessAgentRuntime,
+} from "./adapter";
+import type { HarnessAgentAdapter } from "./adapter";
 import type {
   AgentOperationError,
   CreateSessionError,
@@ -30,16 +36,9 @@ import type {
   SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import {
-  AgentRequestUnavailable,
-  CapabilityUnsupported,
-  PermissionModeUnsupported,
-  SessionNotResumable,
-} from "./errors";
-import type { HarnessAgentRegistryShape } from "./registry";
-import { HarnessAgentRegistry } from "./registry";
+import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
+import { PiAdapter } from "./pi-adapter";
 import { inSession } from "./session-identity";
-import type { SessionConfig } from "./session-io";
 import type { HarnessAgentSessionManagerShape } from "./session-manager";
 import { HarnessAgentSessionManager } from "./session-manager";
 import {
@@ -68,7 +67,7 @@ export type HarnessAgentSessionServiceShape = {
   readonly create: (
     projectId: string,
     cwd: string,
-    config?: SessionConfig,
+    model?: { readonly provider: string; readonly modelId: string },
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -120,25 +119,6 @@ export type HarnessAgentSessionServiceShape = {
   readonly interrupt: (
     ref: SessionRef,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setModel: (
-    ref: SessionRef,
-    model: string,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setReasoningEffort: (
-    ref: SessionRef,
-    reasoningEffort: ReasoningEffort,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
-  readonly setPermissionMode: (
-    ref: SessionRef,
-    permissionMode: PermissionMode,
-  ) => Effect.Effect<
-    void,
-    | SessionNotFound
-    | StoreReadError
-    | PermissionModeUnsupported
-    | SessionClosed
-    | AgentOperationError
-  >;
   readonly respondToAgentRequest: (
     ref: SessionRef,
     requestId: string,
@@ -155,6 +135,31 @@ export type HarnessAgentSessionServiceShape = {
     | StoreReadError
     | HarnessSessionNotFound
     | CapabilityUnsupported
+    | AgentOperationError
+  >;
+  readonly getModelState: (
+    ref: SessionRef,
+    cwd: string,
+  ) => Effect.Effect<
+    AgentModelState,
+    | SessionNotFound
+    | StoreReadError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
+  readonly setModel: (
+    ref: SessionRef,
+    cwd: string,
+    model: { readonly provider: string; readonly modelId: string },
+  ) => Effect.Effect<
+    AgentModelState,
+    | SessionNotFound
+    | StoreReadError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
     | AgentOperationError
   >;
   readonly getSessionInfo: (
@@ -174,13 +179,12 @@ export class HarnessAgentSessionService extends Context.Service<
 
 export const makeHarnessAgentSessionService = (deps: {
   readonly manager: HarnessAgentSessionManagerShape;
-  readonly registry: HarnessAgentRegistryShape;
+  readonly adapter: HarnessAgentAdapter;
   readonly repo: HarnessAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly newSessionId: Effect.Effect<string>;
 }): HarnessAgentSessionServiceShape => {
-  const { manager, registry, repo, bus, newSessionId } = deps;
-  const adapter = registry.adapter;
+  const { manager, adapter, repo, bus, newSessionId } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -193,25 +197,20 @@ export const makeHarnessAgentSessionService = (deps: {
     return lock.withPermit(effect);
   };
 
-  const checkPermissionMode = (mode: PermissionMode | undefined) =>
-    mode === undefined
-      ? Effect.void
-      : adapter.permissionModes.includes(mode)
-        ? Effect.void
-        : Effect.fail(new PermissionModeUnsupported({ mode }));
+  const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
 
   const readHistory = (
     ref: SessionRef,
-    harnessSessionId: string,
+    agentSessionId: string,
     cwd: string,
   ): Effect.Effect<
     ReadonlyArray<UIMessage>,
     ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError
   > => {
     const cold = adapter.getMessages;
-    if (cold) return cold(harnessSessionId, cwd);
+    if (cold) return cold(agentSessionId, cwd);
     return manager
-      .ensureRuntime({ sessionId: harnessSessionId, cwd }, ref)
+      .ensureRuntime({ sessionId: agentSessionId, cwd }, ref)
       .pipe(
         Effect.flatMap(
           (
@@ -226,10 +225,25 @@ export const makeHarnessAgentSessionService = (deps: {
       );
   };
 
-  const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
+  const resolveAgentSessionId = (ref: SessionRef) =>
+    readMetadata(ref).pipe(Effect.map((metadata) => metadata.agentSessionId));
 
-  const resolveHarnessSessionId = (ref: SessionRef) =>
-    readMetadata(ref).pipe(Effect.map((metadata) => metadata.harnessSessionId));
+  const runtimeInput = (agentSessionId: string, cwd: string) => ({
+    sessionId: agentSessionId,
+    cwd,
+  });
+
+  const withLiveRuntime = <A, E>(
+    ref: SessionRef,
+    agentSessionId: string,
+    cwd: string,
+    run: (
+      runtime: HarnessAgentRuntime,
+    ) => Effect.Effect<A, CapabilityUnsupported | SessionClosed | AgentOperationError | E>,
+  ): Effect.Effect<
+    A,
+    ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError | E
+  > => manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
 
   const readAndStampTitleFromFirstPrompt = (ref: SessionRef, parts: PromptInput["parts"]) =>
     withMetadataMutation(
@@ -253,35 +267,42 @@ export const makeHarnessAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd, config) =>
-      checkPermissionMode(config?.permissionMode).pipe(
-        Effect.andThen(newSessionId),
+    create: (projectId, cwd, model) =>
+      newSessionId.pipe(
         Effect.flatMap((sessionId) => {
           const ref: SessionRef = { projectId, sessionId };
-          return manager.open({ cwd }, config ?? {}, ref).pipe(
-            Effect.flatMap((session) => {
-              const metadata: Session = {
-                sessionId,
-                projectId,
-                harnessSessionId: session.sessionId,
-                createdAt: new Date().toISOString(),
+          return manager
+            .open(
+              {
                 cwd,
-                archived: false,
-              };
-              return repo.write(metadata).pipe(
-                Effect.tapError(() => manager.close(ref)),
-                Effect.andThen(bus.publish({ ref, type: "session.created" })),
-                Effect.andThen(
-                  logLifecycle("session.created", "session created", {
-                    cwd,
-                    harnessSessionId: session.sessionId,
-                  }),
-                ),
-                Effect.as(ref),
-              );
-            }),
-            inSession(ref),
-          );
+                ...(model ? { provider: model.provider, modelId: model.modelId } : {}),
+              },
+              ref,
+            )
+            .pipe(
+              Effect.flatMap((session) => {
+                const metadata: Session = {
+                  sessionId,
+                  projectId,
+                  agentSessionId: session.sessionId,
+                  createdAt: new Date().toISOString(),
+                  cwd,
+                  archived: false,
+                };
+                return repo.write(metadata).pipe(
+                  Effect.tapError(() => manager.close(ref)),
+                  Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                  Effect.andThen(
+                    logLifecycle("session.created", "session created", {
+                      cwd,
+                      agentSessionId: session.sessionId,
+                    }),
+                  ),
+                  Effect.as(ref),
+                );
+              }),
+              inSession(ref),
+            );
         }),
       ),
 
@@ -296,7 +317,7 @@ export const makeHarnessAgentSessionService = (deps: {
           }),
         ),
       ).pipe(
-        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.harnessSessionId, cwd)),
+        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, cwd)),
         Effect.flatMap((info) =>
           info._tag === "missing"
             ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
@@ -306,7 +327,7 @@ export const makeHarnessAgentSessionService = (deps: {
       ),
 
     close: (ref) =>
-      resolveHarnessSessionId(ref).pipe(
+      resolveAgentSessionId(ref).pipe(
         Effect.andThen(manager.close(ref)),
         Effect.andThen(bus.closeSession(ref, "session_closed")),
         Effect.andThen(logLifecycle("session.closed", "session closed")),
@@ -350,15 +371,13 @@ export const makeHarnessAgentSessionService = (deps: {
               ? manager.close(ref).pipe(Effect.andThen(bus.closeSession(ref, "session_closed")))
               : Effect.void;
             const publish = changed
-              ? bus
-                  .publish({ ref, type: "session.archived", archived })
-                  .pipe(
-                    Effect.andThen(
-                      logLifecycle("session.archived", "session archive state changed", {
-                        archived,
-                      }),
-                    ),
-                  )
+              ? bus.publish({ ref, type: "session.archived", archived }).pipe(
+                  Effect.andThen(
+                    logLifecycle("session.archived", "session archive state changed", {
+                      archived,
+                    }),
+                  ),
+                )
               : Effect.void;
             return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
           }),
@@ -401,7 +420,7 @@ export const makeHarnessAgentSessionService = (deps: {
     getMessages: (ref, cwd) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          readHistory(ref, metadata.harnessSessionId, cwd).pipe(
+          readHistory(ref, metadata.agentSessionId, cwd).pipe(
             Effect.flatMap((messages) =>
               manager.status(ref).pipe(
                 Effect.map((status) => {
@@ -431,7 +450,7 @@ export const makeHarnessAgentSessionService = (deps: {
         });
         const runtime = yield* manager.ensureRuntime(
           {
-            sessionId: metadata.harnessSessionId,
+            sessionId: metadata.agentSessionId,
             ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
           },
           input.ref,
@@ -454,22 +473,6 @@ export const makeHarnessAgentSessionService = (deps: {
         inSession(ref),
       ),
 
-    setModel: (ref, model) =>
-      readMetadata(ref).pipe(Effect.andThen(manager.setConfig(ref, { model })), inSession(ref)),
-
-    setReasoningEffort: (ref, reasoningEffort) =>
-      readMetadata(ref).pipe(
-        Effect.andThen(manager.setConfig(ref, { reasoningEffort })),
-        inSession(ref),
-      ),
-
-    setPermissionMode: (ref, permissionMode) =>
-      readMetadata(ref).pipe(
-        Effect.andThen(checkPermissionMode(permissionMode)),
-        Effect.andThen(manager.setConfig(ref, { permissionMode })),
-        inSession(ref),
-      ),
-
     respondToAgentRequest: (ref, requestId, response) =>
       readMetadata(ref).pipe(
         Effect.andThen(manager.peek(ref)),
@@ -488,11 +491,36 @@ export const makeHarnessAgentSessionService = (deps: {
         inSession(ref),
       ),
 
-    getSessionInfo: (ref) =>
+    getModelState: (ref, cwd) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          adapter.getSessionInfo(metadata.harnessSessionId, metadata.cwd),
+          withLiveRuntime(
+            ref,
+            metadata.agentSessionId,
+            cwd,
+            (runtime) =>
+              runtime.getModelState ??
+              Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+          ),
         ),
+        inSession(ref),
+      ),
+
+    setModel: (ref, cwd, model) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) =>
+          withLiveRuntime(ref, metadata.agentSessionId, cwd, (runtime) =>
+            runtime.setModel
+              ? runtime.setModel(model)
+              : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+          ),
+        ),
+        inSession(ref),
+      ),
+
+    getSessionInfo: (ref) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) => adapter.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
         inSession(ref),
       ),
 
@@ -514,24 +542,19 @@ export const makeHarnessAgentSessionService = (deps: {
 export const HarnessAgentSessionServiceLayer: Layer.Layer<
   HarnessAgentSessionService,
   never,
-  | HarnessAgentSessionManager
-  | HarnessAgentRegistry
-  | EventBus
-  | Paths
-  | Crypto.Crypto
-  | FileSystem.FileSystem
+  HarnessAgentSessionManager | PiAdapter | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
 > = Layer.effect(
   HarnessAgentSessionService,
   Effect.gen(function* () {
     const manager = yield* HarnessAgentSessionManager;
-    const registry = yield* HarnessAgentRegistry;
+    const adapter = yield* PiAdapter;
     const bus = yield* EventBus;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makeHarnessAgentSessionRepository(paths.sessionsDir);
     return makeHarnessAgentSessionService({
       manager,
-      registry,
+      adapter,
       repo,
       bus,
       newSessionId: crypto.randomUUIDv4.pipe(
