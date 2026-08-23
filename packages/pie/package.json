@@ -1,5 +1,5 @@
 {
-  "name": "@pie/cli",
+  "name": "@getpie/cli",
   "version": "0.0.1",
   "bin": {
     "pie": "./dist/cli.mjs"
@@ -28,8 +28,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@pie/server": "workspace:*",
-    "@pie/typescript": "workspace:*",
+    "@getpie/server": "workspace:*",
+    "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"
   },
   "engines": {

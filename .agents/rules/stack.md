@@ -13,7 +13,7 @@ These differ from what the library names suggest.
   through a side-effect import — `import "@orpc/experimental-effect/extensions/effect"`
   is what puts `.effect()` on procedures; delete it and the router stops compiling.
   Effect `Stream` → oRPC event iterator has one seam: `packages/server/src/rpc/stream.ts`.
-- **`@pie/contract` uses Effect Schema, not zod**, bridged through a local
+- **`@getpie/contract` uses Effect Schema, not zod**, bridged through a local
   `toStandardSchema`. Chunk/message-shaped outputs deliberately use `type<T>()`
   and are not validated on the wire.
 - **`packages/ui` sits on Base UI, not Radix** — compose with `render={<Button/>}`,

@@ -39,7 +39,7 @@ date: 2026-02-01
 
 ### 1. Repo Tabs (顶部)
 
-- 使用 `@pie/ui` 的 `Tabs` 组件
+- 使用 `@getpie/ui` 的 `Tabs` 组件
 - 显示前 N 个 Repo（根据宽度自适应）
 - 超出的 Repo 放入 overflow Menu
 - 末尾 `[+]` 按钮添加/克隆仓库

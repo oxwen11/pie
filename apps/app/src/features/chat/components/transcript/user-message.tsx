@@ -1,5 +1,5 @@
-import { CollapsibleUserText } from "@pie/ui/ai-elements/collapsible-user-text";
-import { Message, MessageContent } from "@pie/ui/ai-elements/message";
+import { CollapsibleUserText } from "@getpie/ui/ai-elements/collapsible-user-text";
+import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import type { UIMessage } from "ai";
 
 export function UserMessage({ message }: { message: UIMessage }) {

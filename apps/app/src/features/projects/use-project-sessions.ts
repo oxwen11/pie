@@ -1,4 +1,4 @@
-import type { SessionRef, SessionSummary } from "@pie/contract";
+import type { SessionRef, SessionSummary } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";

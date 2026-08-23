@@ -11,7 +11,7 @@ describe("buildDesktopConfig", () => {
     });
 
     expect(config.serverEntry).toBe(
-      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@pie/server/dist/server.mjs",
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
     );
   });
 

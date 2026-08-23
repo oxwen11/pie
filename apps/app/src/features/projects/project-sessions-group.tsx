@@ -1,11 +1,15 @@
-import type { Project, SessionRef, SessionSummary } from "@pie/contract";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@pie/ui/components/collapsible";
+import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from "@getpie/ui/components/collapsible";
 import {
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-} from "@pie/ui/components/sidebar";
+} from "@getpie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 

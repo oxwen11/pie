@@ -1,5 +1,5 @@
-import type { SessionSummary } from "@pie/contract";
-import { SidebarMenuButton, SidebarMenuItem } from "@pie/ui/components/sidebar";
+import type { SessionSummary } from "@getpie/contract";
+import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
 
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";

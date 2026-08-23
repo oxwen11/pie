@@ -1,4 +1,4 @@
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
   EmptyContent,
@@ -6,7 +6,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@pie/ui/components/empty";
+} from "@getpie/ui/components/empty";
 import { FileCodeIcon, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 

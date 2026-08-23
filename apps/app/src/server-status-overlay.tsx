@@ -1,5 +1,5 @@
-import { Button } from "@pie/ui/components/button";
-import { Spinner } from "@pie/ui/components/spinner";
+import { Button } from "@getpie/ui/components/button";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { type ReactElement, useSyncExternalStore } from "react";
 
 import { usePlatform } from "./platform-context";

@@ -1,7 +1,7 @@
-import { Button } from "@pie/ui/components/button";
-import { Empty, EmptyContent, EmptyDescription } from "@pie/ui/components/empty";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@pie/ui/components/menu";
-import { cn } from "@pie/ui/lib/utils";
+import { Button } from "@getpie/ui/components/button";
+import { Empty, EmptyContent, EmptyDescription } from "@getpie/ui/components/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/menu";
+import { cn } from "@getpie/ui/lib/utils";
 import { Maximize2Icon, Minimize2Icon, PlusIcon, XIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, type ReactNode } from "react";
 

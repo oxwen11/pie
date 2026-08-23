@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A working Codex adapter in `@pie/harness` — generated protocol types, typed tools/data-parts, JSON-RPC app-server client, session manager, transform + lifecycle mapping — wired through `@pie/contract` and `packages/server` RPC routes. Web UI wiring is explicitly OUT of scope.
+**Goal:** A working Codex adapter in `@getpie/harness` — generated protocol types, typed tools/data-parts, JSON-RPC app-server client, session manager, transform + lifecycle mapping — wired through `@getpie/contract` and `packages/server` RPC routes. Web UI wiring is explicitly OUT of scope.
 
 **Architecture:** Port of the reference implementation at `/Users/dinq/Work/neo-projects/neo-monorepo/packages/server/src/features/agent/providers/codex/` (read those files before each task — they are the source), adapted to pie's shapes: definitions live in `harness/src/codex/` beside `claude-code/`, sessions follow pie's `Session`-manager + `Pushable` + `AsyncGenerator` pattern (`packages/harness/src/claude-code/agent.ts`), approvals map onto pie's provider-agnostic `AgentRequest`/`AgentResponse` (`packages/harness/src/types/request.ts`), and the RPC layer follows `packages/server/src/rpc/claude-code.ts` (oRPC + Effect `Context.Service`).
 
@@ -239,7 +239,7 @@ describe("codex tools project ThreadItem arms", () => {
 
 - [ ] **Step 5: Typecheck + commit**
 
-Run: `pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness typecheck`
 Expected: PASS.
 
 ```bash
@@ -347,7 +347,7 @@ describe("CodexAppServer", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `pnpm --filter @pie/harness test test/codex/app-server.test.ts`
+Run: `pnpm --filter @getpie/harness test test/codex/app-server.test.ts`
 Expected: FAIL — module `../../src/codex/app-server` not found.
 
 - [ ] **Step 3: Port app-server.ts**
@@ -379,7 +379,7 @@ Everything else (spawn, JSONL framing, pending map, zombie net `process.once("ex
 
 - [ ] **Step 4: Run tests, then commit**
 
-Run: `pnpm --filter @pie/harness test test/codex/app-server.test.ts`
+Run: `pnpm --filter @getpie/harness test test/codex/app-server.test.ts`
 Expected: PASS.
 
 ```bash
@@ -553,7 +553,7 @@ describe("codex toSessionEvent", () => {
 
 - [ ] **Step 3: Run to verify failure**
 
-Run: `pnpm --filter @pie/harness test test/codex`
+Run: `pnpm --filter @getpie/harness test test/codex`
 Expected: FAIL — modules not found.
 
 - [ ] **Step 4: Write transform.ts**
@@ -641,7 +641,7 @@ export function toSessionEvent(
 
 - [ ] **Step 6: Run tests + commit**
 
-Run: `pnpm --filter @pie/harness test test/codex && pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness test test/codex && pnpm --filter @getpie/harness typecheck`
 Expected: PASS.
 
 ```bash
@@ -752,7 +752,7 @@ export function mapApprovalResponse(response: AgentResponse, source: ApprovalSou
 
 - [ ] **Step 3: Run tests + commit**
 
-Run: `pnpm --filter @pie/harness test test/codex/request.test.ts`
+Run: `pnpm --filter @getpie/harness test test/codex/request.test.ts`
 Expected: PASS.
 
 ```bash
@@ -856,7 +856,7 @@ describe("CodexAgent", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `pnpm --filter @pie/harness test test/codex/agent.test.ts`
+Run: `pnpm --filter @getpie/harness test test/codex/agent.test.ts`
 Expected: FAIL — `CodexAgent` not found.
 
 - [ ] **Step 3: Write agent.ts**
@@ -1125,7 +1125,7 @@ Add to `packages/harness/package.json` exports:
 
 - [ ] **Step 5: Run tests + commit**
 
-Run: `pnpm --filter @pie/harness test && pnpm --filter @pie/harness typecheck`
+Run: `pnpm --filter @getpie/harness test && pnpm --filter @getpie/harness typecheck`
 Expected: PASS (all codex tests + existing suites).
 
 ```bash
@@ -1159,8 +1159,8 @@ Mirror `packages/contract/src/claude-code.ts` and `packages/server/src/rpc/claud
 
 ```ts
 import { oc, type } from "@orpc/contract";
-import type { AgentRequest, AgentResponse } from "@pie/harness";
-import type { CodexUIMessageChunk } from "@pie/harness/codex";
+import type { AgentRequest, AgentResponse } from "@getpie/harness";
+import type { CodexUIMessageChunk } from "@getpie/harness/codex";
 import { z } from "zod";
 
 export const codexContract = {
@@ -1184,7 +1184,7 @@ export const codexContract = {
 };
 ```
 
-(Verify `AgentRequest`/`AgentResponse` are exported from `@pie/harness` root — check `packages/harness/src/index.ts`; if not, add `export type { AgentRequest, AgentResponse } from "./types/request";` there.)
+(Verify `AgentRequest`/`AgentResponse` are exported from `@getpie/harness` root — check `packages/harness/src/index.ts`; if not, add `export type { AgentRequest, AgentResponse } from "./types/request";` there.)
 
 Add to `packages/contract/src/index.ts`:
 
@@ -1204,8 +1204,8 @@ export { codexContract };
 import "@orpc/experimental-effect/extensions/effect";
 
 import { implement } from "@orpc/server";
-import { codexContract } from "@pie/contract/codex";
-import { CodexAgent } from "@pie/harness/codex";
+import { codexContract } from "@getpie/contract/codex";
+import { CodexAgent } from "@getpie/harness/codex";
 import { Context, Effect, Layer } from "effect";
 
 export class Codex extends Context.Service<Codex, CodexAgent>()("Codex") {}
@@ -1310,7 +1310,7 @@ describe.skipIf(process.env.CODEX_SMOKE !== "1")("codex live smoke", () => {
 
 - [ ] **Step 2: Run the smoke locally**
 
-Run: `CODEX_SMOKE=1 pnpm --filter @pie/harness test test/codex/agent.smoke.test.ts`
+Run: `CODEX_SMOKE=1 pnpm --filter @getpie/harness test test/codex/agent.smoke.test.ts`
 Expected: PASS (codex-cli 0.142.5 is installed and logged in on this machine). If auth is missing, record as skipped — do not fake it.
 
 - [ ] **Step 3: Final gates + handoff**

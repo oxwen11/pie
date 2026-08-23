@@ -1,4 +1,4 @@
-import type { ListAgentModelsOutput } from "@pie/contract";
+import type { ListAgentModelsOutput } from "@getpie/contract";
 import { Context, Effect, Layer } from "effect";
 
 import { AgentOperationError } from "./errors";

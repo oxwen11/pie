@@ -2,7 +2,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@pie/ui/components/collapsible";
+} from "@getpie/ui/components/collapsible";
 import { isToolUIPart, type UIMessage } from "ai";
 import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useMemo } from "react";

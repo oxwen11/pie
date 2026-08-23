@@ -1,7 +1,7 @@
 "use client";
 
 import { Meter as MeterPrimitive } from "@base-ui/react/meter";
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type React from "react";
 
 export function Meter({

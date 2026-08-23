@@ -1,4 +1,4 @@
-import { cn } from "@pie/ui/lib/utils";
+import { cn } from "@getpie/ui/lib/utils";
 import type { Experimental_GeneratedImage } from "ai";
 
 export type ImageProps = Experimental_GeneratedImage & {

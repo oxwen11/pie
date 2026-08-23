@@ -22,7 +22,7 @@ function findServerPid(parentPid: number): number | undefined {
     if (!match) continue;
     const [, pid, ppid, command] = match;
     // Must track apps/desktop/src/main/desktop-config.ts's serverEntry: the
-    // child is the built @pie/server, not the CLI it used to be.
+    // child is the built @getpie/server, not the CLI it used to be.
     if (Number(ppid) === parentPid && command.includes("packages/server/dist/server.mjs")) {
       return Number(pid);
     }

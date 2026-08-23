@@ -37,7 +37,7 @@ Renderer
   └── Backend RPC
         http://127.0.0.1:<port>/api/rpc
         ws://127.0.0.1:<port>/ws/rpc
-        Renderer ↔ @pie/cli child process
+        Renderer ↔ @getpie/cli child process
         Claude Code / Codex / domain operations
 ```
 
@@ -221,7 +221,7 @@ Desktop Shell RPC 不能代理 backend HTTP/WebSocket，也不能把两个 route
        │
        ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ @pie/cli child process                                    │
+│ @getpie/cli child process                                    │
 │                                                              │
 │  ClaudeCode | Codex backend RPC                              │
 └──────────────────────────────────────────────────────────────┘
@@ -1368,7 +1368,7 @@ apps/desktop/src/main/protocol.ts or isolated spike fixture
 | Integration                                 | Depends on | Real verification               |
 | ------------------------------------------- | ---------- | ------------------------------- |
 | `LoginShellPath → NodeChildProcessSpawner`  | Phase 1    | real shell/fake executable      |
-| `BackendProcess → @pie/cli entry`           | Phase 3    | fake CLI ready protocol         |
+| `BackendProcess → @getpie/cli entry`        | Phase 3    | fake CLI ready protocol         |
 | `BackendSupervisor → BackendProcess`        | Phase 4    | Layer integration + TestClock   |
 | `DesktopMainLayer → BackendSupervisor`      | Phase 5    | startup wait + dispose kill     |
 | `DesktopRpcContext → DesktopMainLayer`      | Phase 6    | router client with real context |

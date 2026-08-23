@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { isSessionScopedEvent, type SessionRef } from "@pie/contract";
+import { isSessionScopedEvent, type SessionRef } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import {
   Crypto,
@@ -141,7 +141,7 @@ describe("PiAgentSessionService", () => {
               ? { available: false as const, reason: opts.unavailable }
               : { available: true as const },
           );
-          const whenAvailable = <A, E, R>(body: Effect.Effect<A, E, R>) =>
+          const whenAvailable = <BodyA, BodyE, BodyR>(body: Effect.Effect<BodyA, BodyE, BodyR>) =>
             Effect.gen(function* () {
               const result = yield* availability;
               if (!result.available) {

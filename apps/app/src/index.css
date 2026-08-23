@@ -1,7 +1,7 @@
-@import "@pie/ui/globals.css";
+@import "@getpie/ui/globals.css";
 @import "tw-shimmer";
 
-@source "../node_modules/@pie/ui";
+@source "../node_modules/@getpie/ui";
 
 /* Scan our own src explicitly: the desktop renderer's Vite root is
  * apps/desktop, so auto-detection alone misses app-only utilities. */
@@ -100,7 +100,7 @@
 
 /* Thin, theme-aware scrollbar for the chat transcript. Applied where the
    Conversation component is used, via its `scrollClassName` prop, so the
-   visual style lives in the app rather than in @pie/ui. */
+   visual style lives in the app rather than in @getpie/ui. */
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--foreground) 20%, transparent) transparent;

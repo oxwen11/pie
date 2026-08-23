@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
-import type { CollectionEvent, SessionRef, SessionScopedEvent } from "@pie/contract";
+import type { CollectionEvent, SessionRef, SessionScopedEvent } from "@getpie/contract";
 import { Effect, Fiber, Stream } from "effect";
 
 import { EventBus, EventBusLayer } from "../src/index";

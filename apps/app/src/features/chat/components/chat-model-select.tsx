@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 
 import { useSessionModels } from "@/features/chat/hooks/use-session-models";
 

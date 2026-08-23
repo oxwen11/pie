@@ -123,7 +123,7 @@ Tasks 3 and 4 can run in parallel only if their branches do not both modify shar
 
 Current implementation status:
 
-- Task 2 is in progress: Effect packages are pinned and `toStandardSchema`, oRPC/AI SDK interop, event-iterator coverage, `@effect/vitest`, ChildProcessSpawner, and app-build verification are implemented. Wire schemas now live in `@pie/contract`; harness depends on contract, never the reverse. A pure browser subpath keeps Effect out of the app bundle. The server CLI bundle is now 784.22 kB (181.17 kB gzip), up from 227.54 kB (55.74 kB gzip); packaging/externalization remains an explicit follow-up.
+- Task 2 is in progress: Effect packages are pinned and `toStandardSchema`, oRPC/AI SDK interop, event-iterator coverage, `@effect/vitest`, ChildProcessSpawner, and app-build verification are implemented. Wire schemas now live in `@getpie/contract`; harness depends on contract, never the reverse. A pure browser subpath keeps Effect out of the app bundle. The server CLI bundle is now 784.22 kB (181.17 kB gzip), up from 227.54 kB (55.74 kB gzip); packaging/externalization remains an explicit follow-up.
 - Task 3 is in progress: core IDs, request/response schemas, event schemas, tagged errors, runtime interfaces, and the pure SessionLifecycle are migrated. Removing migration-only `native: unknown` fields remains.
 - Task 4 is complete: the scoped ChildProcessSpawner JSONL transport, request correlation, typed protocol/process errors, bounded protocol queues, and live holder wiring are implemented. The temporary Promise façade was removed rather than retained.
 - Task 5 is complete: Codex implements the shared Effect-native adapter/session interface over the lazy, cancellation-safe, generation-safe transport holder.
@@ -165,9 +165,9 @@ Current implementation status:
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test
-pnpm --filter @pie/server test
-pnpm --filter @pie/cli test
+pnpm --filter @getpie/harness test
+pnpm --filter @getpie/server test
+pnpm --filter @getpie/cli test
 ```
 
 **Commit:**
@@ -238,17 +238,17 @@ schema["~standard"].jsonSchema.input;
 - [ ] Decide from the spike whether CodexTransport can use Effect process services exclusively; document any raw Node fallback.
 - [ ] Add one `@effect/vitest` Layer test proving scoped resource finalization without a manual runtime runner.
 - [ ] Define the concrete tagged errors and aggregate error aliases from design §12.
-- [ ] Export runtime types only from `@pie/harness/runtime`.
+- [ ] Export runtime types only from `@getpie/harness/runtime`.
 - [ ] Measure the app production bundle with one imported Effect-derived contract schema and record the delta in the task/PR notes.
 
 **Verification:**
 
 ```bash
 pnpm install
-pnpm --filter @pie/harness test
-pnpm --filter @pie/harness typecheck
-pnpm --filter @pie/contract typecheck
-pnpm --filter @pie/app build
+pnpm --filter @getpie/harness test
+pnpm --filter @getpie/harness typecheck
+pnpm --filter @getpie/contract typecheck
+pnpm --filter @getpie/app build
 ```
 
 **Commit:**
@@ -298,9 +298,9 @@ feat(harness): add effect runtime and standard schema foundation
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test
-pnpm --filter @pie/harness typecheck
-pnpm --filter @pie/contract typecheck
+pnpm --filter @getpie/harness test
+pnpm --filter @getpie/harness typecheck
+pnpm --filter @getpie/contract typecheck
 ```
 
 **Commit:**
@@ -367,8 +367,8 @@ interface CodexTransport {
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test -- codex/transport
-pnpm --filter @pie/harness typecheck
+pnpm --filter @getpie/harness test -- codex/transport
+pnpm --filter @getpie/harness typecheck
 ```
 
 **Commit:**
@@ -413,8 +413,8 @@ refactor(harness): make codex transport effect native
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test -- codex
-pnpm --filter @pie/harness typecheck
+pnpm --filter @getpie/harness test -- codex
+pnpm --filter @getpie/harness typecheck
 ```
 
 Required assertions:
@@ -469,8 +469,8 @@ refactor(harness): add lazy restartable codex adapter
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test -- claude-code
-pnpm --filter @pie/harness typecheck
+pnpm --filter @getpie/harness test -- claude-code
+pnpm --filter @getpie/harness typecheck
 ```
 
 **Commit:**
@@ -524,8 +524,8 @@ refactor(harness): make claude adapter effect native
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test -- runtime
-pnpm --filter @pie/harness typecheck
+pnpm --filter @getpie/harness test -- runtime
+pnpm --filter @getpie/harness typecheck
 ```
 
 Required race tests:
@@ -588,8 +588,8 @@ feat(harness): add scoped agent session service
 **Verification:**
 
 ```bash
-pnpm --filter @pie/server test -- events
-pnpm --filter @pie/server typecheck
+pnpm --filter @getpie/server test -- events
+pnpm --filter @getpie/server typecheck
 ```
 
 **Commit:**
@@ -624,16 +624,16 @@ feat(server): add bounded session event subscriptions
 - [x] Preserve Claude model and inspector parts.
 - [x] Keep provider-native SDK values inside adapters.
 - [x] Use Effect-derived Standard Schema views for session inputs and normalized outputs.
-- [x] Make `@pie/contract` own wire schemas; make harness depend on contract.
+- [x] Make `@getpie/contract` own wire schemas; make harness depend on contract.
 - [x] Add unified Codex-through-session RPC integration coverage.
 
 **Verification:**
 
 ```bash
-pnpm --filter @pie/contract typecheck
-pnpm --filter @pie/server test
-pnpm --filter @pie/server typecheck
-pnpm --filter @pie/app typecheck
+pnpm --filter @getpie/contract typecheck
+pnpm --filter @getpie/server test
+pnpm --filter @getpie/server typecheck
+pnpm --filter @getpie/app typecheck
 ```
 
 **Commit:**
@@ -680,9 +680,9 @@ refactor(server): route agent rpc through session service
 **Verification:**
 
 ```bash
-pnpm --filter @pie/server test
-pnpm --filter @pie/cli test
-pnpm --filter @pie/cli typecheck
+pnpm --filter @getpie/server test
+pnpm --filter @getpie/cli test
+pnpm --filter @getpie/cli typecheck
 pnpm --filter desktop typecheck
 ```
 
@@ -731,11 +731,11 @@ refactor(server): own effect runtime in server lifecycle
 **Verification:**
 
 ```bash
-pnpm --filter @pie/harness test
-pnpm --filter @pie/server test
-pnpm --filter @pie/client test
-pnpm --filter @pie/client typecheck
-pnpm --filter @pie/app typecheck
+pnpm --filter @getpie/harness test
+pnpm --filter @getpie/server test
+pnpm --filter @getpie/client test
+pnpm --filter @getpie/client typecheck
+pnpm --filter @getpie/app typecheck
 pnpm --filter desktop test
 ```
 

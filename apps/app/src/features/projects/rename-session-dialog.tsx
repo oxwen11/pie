@@ -1,5 +1,5 @@
-import { MAX_SESSION_TITLE_CHARS, type SessionSummary } from "@pie/contract";
-import { Button } from "@pie/ui/components/button";
+import { MAX_SESSION_TITLE_CHARS, type SessionSummary } from "@getpie/contract";
+import { Button } from "@getpie/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -8,9 +8,9 @@ import {
   DialogHeader,
   DialogPopup,
   DialogTitle,
-} from "@pie/ui/components/dialog";
-import { Input } from "@pie/ui/components/input";
-import { Label } from "@pie/ui/components/label";
+} from "@getpie/ui/components/dialog";
+import { Input } from "@getpie/ui/components/input";
+import { Label } from "@getpie/ui/components/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";

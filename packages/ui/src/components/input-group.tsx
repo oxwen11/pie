@@ -1,8 +1,8 @@
 "use client";
 
-import { Input, type InputProps } from "@pie/ui/components/input";
-import { Textarea, type TextareaProps } from "@pie/ui/components/textarea";
-import { cn } from "@pie/ui/lib/utils";
+import { Input, type InputProps } from "@getpie/ui/components/input";
+import { Textarea, type TextareaProps } from "@getpie/ui/components/textarea";
+import { cn } from "@getpie/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 

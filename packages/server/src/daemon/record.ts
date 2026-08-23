@@ -1,4 +1,4 @@
-import { writeFileAtomic } from "@pie/effect-json-store";
+import { writeFileAtomic } from "@getpie/effect-json-store";
 import { Effect, FileSystem, type PlatformError } from "effect";
 
 import { daemonRecordPath } from "./paths";

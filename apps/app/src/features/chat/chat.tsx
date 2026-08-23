@@ -1,5 +1,5 @@
-import type { SessionRef } from "@pie/contract";
-import { cn } from "@pie/ui/lib/utils";
+import type { SessionRef } from "@getpie/contract";
+import { cn } from "@getpie/ui/lib/utils";
 
 import { ChatInputComposer } from "@/features/chat/components/chat-input-composer";
 import { ChatModelSelect } from "@/features/chat/components/chat-model-select";

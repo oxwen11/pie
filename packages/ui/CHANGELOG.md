@@ -1,4 +1,4 @@
-# @pie/ui
+# @getpie/ui
 
 ## 0.0.1
 

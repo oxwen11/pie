@@ -5,8 +5,8 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@pie/ui/components/collapsible";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/collapsible";
+import { cn } from "@getpie/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";

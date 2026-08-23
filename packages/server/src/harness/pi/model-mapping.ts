@@ -1,4 +1,4 @@
-import type { AgentModel, AgentModelState } from "@pie/contract";
+import type { AgentModel, AgentModelState } from "@getpie/contract";
 
 import type { RpcSessionState } from "./protocol";
 

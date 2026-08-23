@@ -1,15 +1,15 @@
 "use client";
 
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@pie/ui/components/select";
-import { Textarea } from "@pie/ui/components/textarea";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/select";
+import { Textarea } from "@getpie/ui/components/textarea";
+import { cn } from "@getpie/ui/lib/utils";
 import type { ChatStatus } from "ai";
 import { ArrowUpIcon, SquareIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, KeyboardEventHandler } from "react";

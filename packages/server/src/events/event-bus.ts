@@ -4,8 +4,8 @@ import type {
   SubscribeStreamEvent,
   SubscriptionClosedReason,
   SubscriptionScope,
-} from "@pie/contract";
-import { isSessionScopedEvent } from "@pie/contract";
+} from "@getpie/contract";
+import { isSessionScopedEvent } from "@getpie/contract";
 import { Context, Effect, Layer, Queue, Ref, Scope, Stream, SynchronizedRef } from "effect";
 import type * as Cause from "effect/Cause";
 

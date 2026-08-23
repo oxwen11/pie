@@ -1,4 +1,4 @@
-import type { AgentRequest, AgentResponse, AgentModelState } from "@pie/contract";
+import type { AgentRequest, AgentResponse, AgentModelState } from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";

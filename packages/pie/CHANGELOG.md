@@ -1,4 +1,4 @@
-# @pie/cli
+# @getpie/cli
 
 ## 0.0.1
 
@@ -6,4 +6,4 @@
 
 - vibe coding cli & web ui
 - Updated dependencies
-  - @pie/web@0.0.1
+  - @getpie/web@0.0.1

@@ -1,7 +1,7 @@
+import type { Contract } from "@getpie/contract";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink as WebSocketRPCLink } from "@orpc/client/websocket";
 import type { RouterContractClient } from "@orpc/contract";
-import type { Contract } from "@pie/contract";
 
 /** A fully typed client for the Pie server, derived from the contract. */
 export type PieClient = RouterContractClient<Contract>;

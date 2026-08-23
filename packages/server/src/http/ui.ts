@@ -61,7 +61,7 @@ export const createUIHandler = (): Effect.Effect<
     const staticDir = yield* resolveStaticDir();
     if (!staticDir) {
       return Effect.succeed(
-        HttpServerResponse.text("Web UI not built. Run the @pie/app build first.", {
+        HttpServerResponse.text("Web UI not built. Run the @getpie/app build first.", {
           status: 503,
         }),
       );

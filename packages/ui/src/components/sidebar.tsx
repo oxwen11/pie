@@ -2,21 +2,21 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { Button } from "@pie/ui/components/button";
-import { Input } from "@pie/ui/components/input";
-import { ScrollArea } from "@pie/ui/components/scroll-area";
-import { Separator } from "@pie/ui/components/separator";
+import { Button } from "@getpie/ui/components/button";
+import { Input } from "@getpie/ui/components/input";
+import { ScrollArea } from "@getpie/ui/components/scroll-area";
+import { Separator } from "@getpie/ui/components/separator";
 import {
   Sheet,
   SheetDescription,
   SheetHeader,
   SheetPopup,
   SheetTitle,
-} from "@pie/ui/components/sheet";
-import { Skeleton } from "@pie/ui/components/skeleton";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@pie/ui/components/tooltip";
-import { useMediaQuery } from "@pie/ui/hooks/use-media-query";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/sheet";
+import { Skeleton } from "@getpie/ui/components/skeleton";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@getpie/ui/components/tooltip";
+import { useMediaQuery } from "@getpie/ui/hooks/use-media-query";
+import { cn } from "@getpie/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";

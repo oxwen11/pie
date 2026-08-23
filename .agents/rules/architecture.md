@@ -2,15 +2,15 @@
 
 `contract ← server ← cli|desktop` and `contract ← client ← app ← desktop`.
 
-| dir                 | name                   | role                                                                                                           |
-| ------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `packages/contract` | `@pie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
-| `packages/server`   | `@pie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
-| `packages/client`   | `@pie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
-| `packages/ui`       | `@pie/ui`              | React components. Subpath-only exports, no barrel.                                                             |
-| `apps/app`          | `@pie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
-| `apps/desktop`      | `desktop` (unscoped)   | Electron shell supervising a forked server over MessagePort oRPC.                                              |
-| `packages/pie`      | `@pie/cli` (bin `pie`) | Thin CLI over `@pie/server/{daemon,http}`.                                                                     |
+| dir                 | name                      | role                                                                                                           |
+| ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `packages/contract` | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
+| `packages/server`   | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
+| `packages/client`   | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
+| `packages/ui`       | `@getpie/ui`              | React components. Subpath-only exports, no barrel.                                                             |
+| `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
+| `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
+| `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
 
 ## Boundaries
 

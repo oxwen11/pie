@@ -1,5 +1,5 @@
-import { Loader } from "@pie/ui/ai-elements/loader";
-import { Shimmer } from "@pie/ui/ai-elements/shimmer";
+import { Loader } from "@getpie/ui/ai-elements/loader";
+import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
 import { useStore } from "zustand";
 
 import {

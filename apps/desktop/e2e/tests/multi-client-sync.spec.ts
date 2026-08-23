@@ -20,7 +20,7 @@ import { PROJECT_ID, seedProject } from "./fixtures.js";
  * so every assertion below is about turns a client either observed live or
  * recovered from the runtime snapshot.
  *
- * Prerequisite: the SPA must be built (`turbo run build --filter=@pie/app`)
+ * Prerequisite: the SPA must be built (`turbo run build --filter=@getpie/app`)
  * — serve has no dev branch and serves `apps/app/dist` statically.
  */
 
@@ -32,7 +32,7 @@ const FAKE_REPLY = "E2E fake Pi reply";
 
 test.skip(
   !fs.existsSync(path.join(appDist, "index.html")),
-  "apps/app/dist is missing — build the SPA first (turbo run build --filter=@pie/app)",
+  "apps/app/dist is missing — build the SPA first (turbo run build --filter=@getpie/app)",
 );
 
 let server: childProcess.ChildProcessWithoutNullStreams | undefined;

@@ -1,19 +1,19 @@
 "use client";
 
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@pie/ui/components/collapsible";
-import { Input } from "@pie/ui/components/input";
+} from "@getpie/ui/components/collapsible";
+import { Input } from "@getpie/ui/components/input";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@pie/ui/components/tooltip";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/tooltip";
+import { cn } from "@getpie/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, forwardRef, useContext, useState } from "react";

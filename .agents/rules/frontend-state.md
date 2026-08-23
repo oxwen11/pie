@@ -44,7 +44,7 @@ for per-agent tool rendering.
   display primitives and no shell component interprets routes or Project state.
 - **`components/` is for what no single feature owns** — the shell
   (`layout/`) and generic pieces (`loader.tsx`). Base and composite UI belongs
-  in `@pie/ui`, not here.
+  in `@getpie/ui`, not here.
 - **The root export (`index.ts`) is the desktop seam.** `AppInterface`,
   `PlatformProvider`, `ServerStatusOverlay` and the platform types live at
   `src/` top level because `apps/desktop` mounts them; they are not features and

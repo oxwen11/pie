@@ -1,11 +1,11 @@
-import type { AgentModel } from "@pie/contract";
+import type { AgentModel } from "@getpie/contract";
 import {
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputModelSelectItem,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
-} from "@pie/ui/ai-elements/prompt-input";
+} from "@getpie/ui/ai-elements/prompt-input";
 
 // Presentational model picker: value/onChange driven so it composes inside a
 // live session. Options come from Pi's `get_available_models` — never hardcoded.

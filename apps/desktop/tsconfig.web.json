@@ -4,7 +4,7 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    // The renderer compiles @pie/app from source, so this project sees that
+    // The renderer compiles @getpie/app from source, so this project sees that
     // source too: it needs the app's own `@` alias, and `vite/client` for the
     // side-effect CSS import.
     "types": ["vite/client"],

@@ -1,5 +1,5 @@
 {
-  "name": "@pie/contract",
+  "name": "@getpie/contract",
   "version": "0.0.1",
   "private": true,
   "description": "RPC contract for Pie",
@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./fs": "./src/fs.ts",
+    "./git": "./src/git.ts",
     "./project": "./src/project.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
@@ -26,7 +27,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
-    "@pie/typescript": "workspace:*",
+    "@getpie/typescript": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

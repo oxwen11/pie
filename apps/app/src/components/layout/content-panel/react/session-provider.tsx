@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { type ReactNode, useMemo } from "react";
 
 import type { ContentPanel } from "../model/content-panel";

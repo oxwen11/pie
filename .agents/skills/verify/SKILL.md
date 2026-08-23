@@ -42,7 +42,7 @@ Gotchas:
 
 - Toolchain is pnpm + Turborepo: `pnpm run check` = oxlint + oxfmt + turbo
   typecheck; `pnpm run format` to fix formatting. Typecheck one package with
-  `turbo run typecheck --filter=@pie/app`.
+  `turbo run typecheck --filter=@getpie/app`.
 - **TanStack Router's `routeTree.gen.ts` regenerates only when the Vite router
   plugin runs** — on app load through the Vite dev server, NOT on typecheck.
   After adding/renaming/deleting route files, hit the app root once

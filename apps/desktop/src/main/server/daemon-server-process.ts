@@ -5,7 +5,7 @@ import {
   pidAlive,
   resolveDaemonLocation,
   resolveOrSpawnDaemon,
-} from "@pie/server/daemon";
+} from "@getpie/server/daemon";
 import { Effect } from "effect";
 
 import { ServerSpawnError, type ServerProcessExit, type SpawnServer } from "./local-server";

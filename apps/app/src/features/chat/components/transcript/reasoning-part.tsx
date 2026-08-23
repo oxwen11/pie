@@ -1,4 +1,4 @@
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@pie/ui/ai-elements/reasoning";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@getpie/ui/ai-elements/reasoning";
 import type { ReasoningUIPart } from "ai";
 
 import { shouldRenderReasoningPart } from "./reasoning-part.logic";

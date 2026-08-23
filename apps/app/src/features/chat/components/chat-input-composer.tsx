@@ -3,7 +3,7 @@ import {
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
-} from "@pie/ui/ai-elements/prompt-input";
+} from "@getpie/ui/ai-elements/prompt-input";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 

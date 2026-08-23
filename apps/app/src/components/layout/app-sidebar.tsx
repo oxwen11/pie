@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
@@ -10,8 +10,8 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
   useSidebar,
-} from "@pie/ui/components/sidebar";
-import { Blocks, Search, SquarePen } from "lucide-react";
+} from "@getpie/ui/components/sidebar";
+import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -45,7 +45,6 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
-        {/* New chat is wired; the rest are placeholders. */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -53,18 +52,6 @@ export function AppSidebar({
                 <SidebarMenuButton onClick={onNewChat}>
                   <SquarePen />
                   <span>New chat</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Search />
-                  <span>Search</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Blocks />
-                  <span>Skills &amp; plugins</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

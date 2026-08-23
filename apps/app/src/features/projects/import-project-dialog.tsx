@@ -1,5 +1,5 @@
-import type { Project } from "@pie/contract";
-import { Button } from "@pie/ui/components/button";
+import type { Project } from "@getpie/contract";
+import { Button } from "@getpie/ui/components/button";
 import {
   Command,
   CommandDialog,
@@ -10,7 +10,7 @@ import {
   CommandItem,
   CommandList,
   CommandPanel,
-} from "@pie/ui/components/command";
+} from "@getpie/ui/components/command";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { CornerLeftUpIcon, FolderIcon } from "lucide-react";

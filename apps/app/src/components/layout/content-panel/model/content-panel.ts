@@ -1,4 +1,4 @@
-import type { SessionRef } from "@pie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 

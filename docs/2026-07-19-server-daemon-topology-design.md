@@ -15,12 +15,12 @@ Today "the server started by desktop" and "the server started by `pie` CLI"
 _look_ like the same thing because they share code, but they are two independent
 instances with different configs and no coordination:
 
-- **The runnable server lives in the wrong package.** `@pie/server` is only a
+- **The runnable server lives in the wrong package.** `@getpie/server` is only a
   domain/RPC library; the thing that binds a port — `createServer`, `listen`,
-  auth, CORS, tickets, static serving — lives in `@pie/cli`
+  auth, CORS, tickets, static serving — lives in `@getpie/cli`
   (`packages/pie/src/node/server.ts`). `apps/desktop` therefore depends on
-  `@pie/cli`, forks its `dist/cli.mjs`, and imports its private
-  `@pie/cli/handshake` protocol. The arrow points GUI → CLI, backwards.
+  `@getpie/cli`, forks its `dist/cli.mjs`, and imports its private
+  `@getpie/cli/handshake` protocol. The arrow points GUI → CLI, backwards.
 
 - **Shared-state split-brain (a real correctness bug).** Both instances read and
   write the same `$PIE_HOME` (`~/.pie`): `sessions/`, `projects.json`,
@@ -62,35 +62,35 @@ remote server" are the same shape.
 ```
                          one oRPC/WS handler + harness runtime per server
                          ┌───────────────────────────────────────────┐
-                         │            @pie/server (daemon)          │
+                         │            @getpie/server (daemon)          │
    local reach           │  lock on $PIE_DAEMON_DIR                 │   remote reach
  127.0.0.1:<port> ─────▶ │  writes discovery file (pid/addr/token)     │ ◀───── ssh -L
    discovery: daemon.pid│  auth token + CORS + WS ticket (existing)   │        (existing
                          └───────────────────────────────────────────┘         SSH design)
         ▲            ▲                                                       ▲
-   apps/desktop   @pie/cli                                          another machine's
+   apps/desktop   @getpie/cli                                          another machine's
    (attach-or-    (attach-or-spawn                                     `pie serve`,
     spawn)         + `pie daemon …` + `pie remote …`)            reused via ssh-launch
 ```
 
 ### Module boundaries (fixes the inversion)
 
-- **`@pie/server`** — the whole server. Keeps domain/RPC; gains the HTTP/WS
-  transport moved out of `@pie/cli` (`./http` subpath), plus the lifecycle
+- **`@getpie/server`** — the whole server. Keeps domain/RPC; gains the HTTP/WS
+  transport moved out of `@getpie/cli` (`./http` subpath), plus the lifecycle
   (single-instance lock + `daemon.pid` discovery). Builds a forkable
   `dist/server.mjs`. This is the "core" the recorded target architecture wants.
-- **`@pie/cli`** — a thin bin over `@pie/server/http`: `pie serve`
-  (unchanged entry — the SSH remote runner installs `@pie/cli@<version>` from
+- **`@getpie/cli`** — a thin bin over `@getpie/server/http`: `pie serve`
+  (unchanged entry — the SSH remote runner installs `@getpie/cli@<version>` from
   npm and runs `serve`, so this must keep working and stay self-contained; the
-  current tsdown bundle already inlines `@pie/server`, keep that), plus
+  current tsdown bundle already inlines `@getpie/server`, keep that), plus
   `pie daemon {start,stop,status}` and the existing `pie remote …`.
 - **`apps/desktop`** — an attach-or-spawn client with its supervisor. Drops the
-  `@pie/cli` dependency; depends on `@pie/server`. `parseReadyLine` moves to
-  `@pie/server/http`.
-- **`@pie/client`** — the shared transport, unchanged; every client (desktop,
+  `@getpie/cli` dependency; depends on `@getpie/server`. `parseReadyLine` moves to
+  `@getpie/server/http`.
+- **`@getpie/client`** — the shared transport, unchanged; every client (desktop,
   CLI, remote-over-tunnel) already goes through it.
 
-Result: a clean fan-out from `@pie/server`. No client → client edges. The
+Result: a clean fan-out from `@getpie/server`. No client → client edges. The
 desktop `SpawnServer` / `RunningServerProcess` interface becomes the single seam
 the SSH design already pointed at, so a remote "launch + tunnel" can later present
 as just another `RunningServerProcess` to the same supervisor.
@@ -120,11 +120,11 @@ front-door runs the same `resolveOrSpawnServer()`:
 
 1. Read `daemon.pid` → health-check `address`.
 2. Alive → **attach** (use its `address` + `token`).
-3. Absent/dead → **spawn** `@pie/server`'s `dist/server.mjs`, wait for ready,
+3. Absent/dead → **spawn** `@getpie/server`'s `dist/server.mjs`, wait for ready,
    attach.
 
 This removes the split-brain (one instance), the layering inversion (server in
-`@pie/server`), and the `:4000` collision crash (port comes from the file;
+`@getpie/server`), and the `:4000` collision crash (port comes from the file;
 default may stay `:4000` with a `→ :0` fallback). Keep the existing stdout
 `pie:ready {port}` handshake and add opencode's **two-signal readiness**
 (handshake _and_ an HTTP health poll), per the embedding comparison.
@@ -207,7 +207,7 @@ into a corner. It doesn't, provided the current work honors these invariants:
 - **Authenticate by token, not by origin or by "it came from loopback."** The
   server must treat a valid credential as the gate, independent of where the
   connection originated. It already half-does this: the WS ticket is decoupled from
-  headers, and `@pie/client` is URL-parameterized (the multi-environment work
+  headers, and `@getpie/client` is URL-parameterized (the multi-environment work
   already runs N connections to N base URLs). Keep it that way; do not let CORS
   allowlist or a loopback check _become_ the auth gate. A tunnel/relay socket must
   be indistinguishable to the handler from a local one — the same "authenticate the
@@ -244,17 +244,17 @@ _additional plane_, added when wanted, with no rework of the current work.
 
 ## Phased plan
 
-1. **✅ Landed — Extract the plain server into `@pie/server`.** Move
-   `server.ts / auth / cors / listen / handshake` from `@pie/cli` into
-   `@pie/server` (`./http`); add a tsdown build producing `dist/server.mjs`. This
+1. **✅ Landed — Extract the plain server into `@getpie/server`.** Move
+   `server.ts / auth / cors / listen / handshake` from `@getpie/cli` into
+   `@getpie/server` (`./http`); add a tsdown build producing `dist/server.mjs`. This
    stays a daemon-unaware foreground server (bind, serve, print the ready line). Keep
-   `@pie/cli` a thin, self-contained bin (`serve` still bundles `@pie/server`
+   `@getpie/cli` a thin, self-contained bin (`serve` still bundles `@getpie/server`
    so the npm-installed remote runner keeps working). `apps/desktop` forks the
-   `@pie/server` artifact and imports `parseReadyLine` from `@pie/server/handshake`;
-   drop the `@pie/cli` dependency. **Touches build outputs and the
+   `@getpie/server` artifact and imports `parseReadyLine` from `@getpie/server/handshake`;
+   drop the `@getpie/cli` dependency. **Touches build outputs and the
    electron-builder asar path — needs a packaged-build check.**
 2. **✅ Landed (CLI) — Add the daemon launcher (a layer above the server, not inside
-   it).** A shared `resolveOrSpawnDaemon` (`@pie/server/daemon`) that reads/writes
+   it).** A shared `resolveOrSpawnDaemon` (`@getpie/server/daemon`) that reads/writes
    `$PIE_DAEMON_DIR/daemon.pid` (default
    `$PIE_HOME/daemon/daemon.pid`), does the pid-alive + health-check reuse,
    spawns the foreground server detached (stdio streamed to

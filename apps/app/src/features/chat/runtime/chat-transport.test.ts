@@ -1,5 +1,5 @@
+import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
-import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@pie/contract";
 import { describe, expect, it } from "vitest";
 
 import { OrpcChatSessionTransport, type ChatTransportClient } from "./chat-transport";

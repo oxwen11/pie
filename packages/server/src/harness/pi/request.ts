@@ -3,7 +3,7 @@ import type {
   AgentRequestQuestion,
   AgentResponse,
   AgentResponseAnswer,
-} from "@pie/contract";
+} from "@getpie/contract";
 
 import type { PiUiRequest, RpcExtensionUIResponse } from "./protocol";
 

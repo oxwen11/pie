@@ -1,13 +1,13 @@
 "use client";
 
-import { Button } from "@pie/ui/components/button";
+import { Button } from "@getpie/ui/components/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@pie/ui/components/tooltip";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/tooltip";
+import { cn } from "@getpie/ui/lib/utils";
 import type { ComponentProps } from "react";
 
 export type ActionsProps = ComponentProps<"div">;

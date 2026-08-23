@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@pie/ui/components/button";
-import { cn } from "@pie/ui/lib/utils";
+import { Button } from "@getpie/ui/components/button";
+import { cn } from "@getpie/ui/lib/utils";
 import type { UIMessage } from "ai";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";

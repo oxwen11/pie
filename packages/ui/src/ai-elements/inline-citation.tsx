@@ -1,14 +1,14 @@
 "use client";
 
-import { Badge } from "@pie/ui/components/badge";
+import { Badge } from "@getpie/ui/components/badge";
 import {
   Carousel,
   type CarouselApi,
   CarouselContent,
   CarouselItem,
-} from "@pie/ui/components/carousel";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@pie/ui/components/preview-card";
-import { cn } from "@pie/ui/lib/utils";
+} from "@getpie/ui/components/carousel";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@getpie/ui/components/preview-card";
+import { cn } from "@getpie/ui/lib/utils";
 import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import {
   type ComponentProps,
