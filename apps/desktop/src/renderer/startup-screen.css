@@ -1,7 +1,7 @@
 .pie-startup-logo {
   position: relative;
   width: clamp(3.5rem, 6vw, 4.75rem);
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   color: var(--foreground);
   background: currentColor;
