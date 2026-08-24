@@ -3,12 +3,12 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { readRecord, stopDaemon } from "@getpie/server/daemon";
+import { pidAlive, readRecord, stopDaemon } from "@getpie/server/daemon";
 import * as Observability from "@getpie/server/observability";
-import { Deferred, Effect, FileSystem } from "effect";
+import { Effect, FileSystem } from "effect";
 
 import { makeDaemonServerProcess } from "./daemon-server-process";
-import { type ServerProcessConfig, type SpawnServer, makeLocalServer } from "./local-server";
+import type { ServerProcessConfig } from "./local-server";
 
 // A minimal daemon body: binds PIE_PORT and answers /api/health, which is
 // all the launcher's readiness and the spawner's liveness poll observe.
@@ -76,9 +76,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.deepEqual(endpoint, {
           port: Number(new URL(record.address).port),
           token: record.token,
-          pid: record.pid,
-          address: record.address,
-          reused: false,
         });
 
         const again = yield* Effect.scoped(
@@ -88,132 +85,59 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
             return yield* running.ready;
           }),
         );
-        assert.deepEqual(again, { ...endpoint, reused: true });
+        assert.deepEqual(again, endpoint);
         assert.equal((yield* readRecord(daemonDir))?.pid, record.pid);
       }),
     );
 
-    it.effect("resolves awaitExit when the daemon dies", () =>
+    it.effect("resolves awaitExit when the daemon dies and logs process_missing", () =>
       Effect.gen(function* () {
-        const { daemonDir, config } = yield* workspace;
+        const fs = yield* FileSystem.FileSystem;
+        const { daemonDir, config, home } = yield* workspace;
 
-        let expected:
-          | {
-              readonly pid: number;
-              readonly address: string;
-              readonly port: number;
-            }
-          | undefined;
         const exit = yield* Effect.scoped(
           Effect.gen(function* () {
             const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 50 });
             const running = yield* spawn(config, 0);
             yield* running.ready;
-            const record = yield* readRecord(daemonDir);
-            assert.ok(record);
-            expected = {
-              pid: record.pid,
-              address: record.address,
-              port: Number(new URL(record.address).port),
-            };
             yield* stopDaemon(daemonDir);
             return yield* running.awaitExit;
-          }),
+          }).pipe(Effect.provide(Observability.layerForHome(home))),
         );
 
-        assert.ok(expected);
-        assert.deepEqual(exit, {
-          exitCode: null,
-          reason: "process_missing",
-          ...expected,
-          consecutiveMisses: 1,
-        });
+        assert.deepEqual(exit, { exitCode: null });
+        const content = yield* fs.readFileString(path.join(home, "logs", "pie.log"));
+        assert.match(content, /event=server\.liveness\.failed/);
+        assert.match(content, /reason=process_missing/);
       }),
     );
 
-    it.effect("distinguishes a live pid whose health probe repeatedly times out", () =>
+    it.effect("logs unhealthy when a live pid's health probe keeps failing", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
-        const { daemonDir, config, wedgeFile } = yield* workspace;
+        const { daemonDir, config, home, wedgeFile } = yield* workspace;
 
         const exit = yield* Effect.scoped(
           Effect.gen(function* () {
-            const spawn = yield* makeDaemonServerProcess({
-              pollIntervalMs: 20,
-              healthTimeoutMs: 50,
-            });
+            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 20 });
             const running = yield* spawn(config, 0);
             yield* running.ready;
             const record = yield* readRecord(daemonDir);
             assert.ok(record);
             yield* fs.writeFileString(wedgeFile, "wedged");
             return yield* running.awaitExit;
-          }),
-        );
-
-        assert.equal(exit.reason, "health_timeout");
-        assert.equal(exit.consecutiveMisses, 3);
-        assert.equal(exit.pid, (yield* readRecord(daemonDir))?.pid);
-        assert.equal(exit.address, (yield* readRecord(daemonDir))?.address);
-        assert.ok((exit.probeDurationMs ?? 0) >= 40);
-        assert.match(exit.probeError ?? "", /TimeoutError/);
-      }),
-    );
-
-    it.effect("persists Desktop supervisor transitions in the selected Pie home", () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const { config, home } = yield* workspace;
-        const exited = yield* Deferred.make<{
-          readonly exitCode: number | null;
-          readonly reason: "process_missing";
-          readonly pid: number;
-          readonly address: string;
-          readonly port: number;
-          readonly consecutiveMisses: number;
-        }>();
-        const spawn: SpawnServer = () =>
-          Effect.succeed({
-            ready: Effect.succeed({
-              port: 45_678,
-              token: "desktop-observability-secret",
-              pid: 321,
-              address: "http://127.0.0.1:45678",
-              reused: true,
-            }),
-            awaitExit: Deferred.await(exited),
-          });
-
-        yield* Effect.scoped(
-          Effect.gen(function* () {
-            const server = yield* makeLocalServer(
-              {
-                entry: config.entry,
-                environment: Effect.succeed(config.environment),
-                initialRestartDelayMs: 10_000,
-              },
-              spawn,
-            );
-            yield* server.connection;
-            yield* Deferred.succeed(exited, {
-              exitCode: null,
-              reason: "process_missing",
-              pid: 321,
-              address: "http://127.0.0.1:45678",
-              port: 45_678,
-              consecutiveMisses: 1,
-            });
-            while ((yield* server.snapshot).status !== "reconnecting") {
-              yield* Effect.sleep(1);
-            }
           }).pipe(Effect.provide(Observability.layerForHome(home))),
         );
 
+        assert.deepEqual(exit, { exitCode: null });
+        const record = yield* readRecord(daemonDir);
+        assert.ok(record);
+        assert.equal(pidAlive(record.pid), true);
         const content = yield* fs.readFileString(path.join(home, "logs", "pie.log"));
-        assert.match(content, /event=server\.supervisor\.exit_detected/);
-        assert.match(content, /event=server\.supervisor\.restart_scheduled/);
-        assert.match(content, /previousPid=321/);
-        assert.doesNotMatch(content, /desktop-observability-secret/);
+        assert.match(content, /event=server\.liveness\.failed/);
+        assert.match(content, /reason=unhealthy/);
+        assert.match(content, /consecutiveMisses=3/);
+        assert.doesNotMatch(content, /reason=process_missing/);
       }),
     );
   },

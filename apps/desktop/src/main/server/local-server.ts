@@ -48,14 +48,6 @@ export type ServerProcessConfig = {
 
 export type ServerProcessExit = {
   readonly exitCode: number | null;
-  readonly reason?: "process_exit" | "process_missing" | "health_timeout" | "unhealthy";
-  readonly pid?: number;
-  readonly address?: string;
-  readonly port?: number;
-  readonly consecutiveMisses?: number;
-  readonly probeDurationMs?: number;
-  readonly probeError?: string;
-  readonly httpStatus?: number;
 };
 
 /**
@@ -66,9 +58,6 @@ export type ServerProcessExit = {
 export type ServerEndpoint = {
   readonly port: number;
   readonly token: string;
-  readonly pid?: number;
-  readonly address?: string;
-  readonly reused?: boolean;
 };
 
 export type RunningServerProcess = {
@@ -111,9 +100,9 @@ export function restartBackoff(
 function startErrorAnnotations(error: ServerStartError) {
   switch (error._tag) {
     case "ServerReadyTimeout":
-      return { reason: "ready_timeout", failureType: error._tag, timeoutMs: error.timeoutMs };
+      return { reason: "ready_timeout", timeoutMs: error.timeoutMs };
     case "ServerExitedBeforeReady":
-      return { reason: "exited_before_ready", failureType: error._tag, exitCode: error.exitCode };
+      return { reason: "exited_before_ready", exitCode: error.exitCode };
     case "ServerSpawnError": {
       const tag =
         error.cause && typeof error.cause === "object" && "_tag" in error.cause
@@ -123,39 +112,10 @@ function startErrorAnnotations(error: ServerStartError) {
         tag === "DaemonLaunchError" || tag === "DaemonStoppedError" ? tag : undefined;
       return {
         reason: "spawn_failed",
-        failureType: error._tag,
         ...(causeType === undefined ? {} : { causeType }),
       };
     }
   }
-}
-
-function previousEndpointAnnotations(endpoint: ServerEndpoint | undefined) {
-  return endpoint === undefined
-    ? {}
-    : {
-        previousPid: endpoint.pid,
-        previousAddress: endpoint.address,
-        previousPort: endpoint.port,
-      };
-}
-
-function exitAnnotations(exit: ServerProcessExit | undefined) {
-  return exit === undefined
-    ? {}
-    : {
-        reason: exit.reason ?? "process_exit",
-        exitCode: exit.exitCode,
-        ...(exit.pid === undefined ? {} : { pid: exit.pid }),
-        ...(exit.address === undefined ? {} : { address: exit.address }),
-        ...(exit.port === undefined ? {} : { port: exit.port }),
-        ...(exit.consecutiveMisses === undefined
-          ? {}
-          : { consecutiveMisses: exit.consecutiveMisses }),
-        ...(exit.probeDurationMs === undefined ? {} : { probeDurationMs: exit.probeDurationMs }),
-        ...(exit.probeError === undefined ? {} : { probeError: exit.probeError }),
-        ...(exit.httpStatus === undefined ? {} : { httpStatus: exit.httpStatus }),
-      };
 }
 
 // The supervise fiber is the only writer of statusRef, so get→set is
@@ -202,30 +162,13 @@ export function makeLocalServer(
       let first = true;
       let pinnedPort = 0;
       let fastFailures = 0;
-      let attemptNumber = 0;
-      let previousEndpoint: ServerEndpoint | undefined;
-      let restartCause: ServerProcessExit | undefined;
-      let restartFailure: ReturnType<typeof startErrorAnnotations> | undefined;
 
       while (true) {
         let readyAt: number | undefined;
-        attemptNumber += 1;
-        const requestedPort = first ? 0 : pinnedPort;
-
-        yield* Effect.logInfo(first ? "Server start attempt" : "Server restart attempt").pipe(
-          Effect.annotateLogs({
-            event: first ? "server.supervisor.start_attempt" : "server.supervisor.restart_attempt",
-            attempt: attemptNumber,
-            requestedPort,
-            ...previousEndpointAnnotations(previousEndpoint),
-            ...exitAnnotations(restartCause),
-            ...restartFailure,
-          }),
-        );
 
         const attempt = yield* Effect.scoped(
           Effect.gen(function* () {
-            const running = yield* spawnServer(processConfig, requestedPort);
+            const running = yield* spawnServer(processConfig, first ? 0 : pinnedPort);
             const endpoint = yield* running.ready;
             readyAt = yield* Clock.currentTimeMillis;
 
@@ -234,21 +177,6 @@ export function makeLocalServer(
               pinnedPort = endpoint.port;
               first = false;
             }
-
-            yield* Effect.logInfo("Server process ready").pipe(
-              Effect.annotateLogs({
-                event: "server.supervisor.ready",
-                attempt: attemptNumber,
-                pid: endpoint.pid,
-                address: endpoint.address,
-                port: endpoint.port,
-                reused: endpoint.reused,
-                ...previousEndpointAnnotations(previousEndpoint),
-                portChanged:
-                  previousEndpoint === undefined ? false : previousEndpoint.port !== endpoint.port,
-              }),
-            );
-            previousEndpoint = endpoint;
 
             const connection: ServerConnection = {
               httpBaseUrl: `http://127.0.0.1:${endpoint.port}`,
@@ -265,37 +193,17 @@ export function makeLocalServer(
         ).pipe(Effect.result);
 
         if (Result.isFailure(attempt)) {
-          restartCause = undefined;
-          restartFailure = startErrorAnnotations(attempt.failure);
           yield* Effect.logWarning("Server process attempt failed").pipe(
             Effect.annotateLogs({
               event: "server.supervisor.attempt_failed",
-              attempt: attemptNumber,
-              ...restartFailure,
-              ...previousEndpointAnnotations(previousEndpoint),
-            }),
-          );
-        } else {
-          restartCause = attempt.success;
-          restartFailure = undefined;
-          yield* Effect.logWarning("Server process exit detected").pipe(
-            Effect.annotateLogs({
-              event: "server.supervisor.exit_detected",
-              attempt: attemptNumber,
-              ...previousEndpointAnnotations(previousEndpoint),
-              ...exitAnnotations(restartCause),
+              ...startErrorAnnotations(attempt.failure),
             }),
           );
         }
 
         if (first) {
           yield* Effect.logWarning("Server supervision paused after initial failure").pipe(
-            Effect.annotateLogs({
-              event: "server.supervisor.failed",
-              attempt: attemptNumber,
-              ...exitAnnotations(restartCause),
-              ...restartFailure,
-            }),
+            Effect.annotateLogs({ event: "server.supervisor.failed" }),
           );
           yield* setStatus(statusRef, "failed");
           yield* Queue.take(retryQueue);
@@ -315,21 +223,14 @@ export function makeLocalServer(
           yield* Effect.logWarning("Server supervision paused after repeated failures").pipe(
             Effect.annotateLogs({
               event: "server.supervisor.restart_paused",
-              attempt: attemptNumber,
               fastFailures,
               uptimeMs: uptime,
-              ...previousEndpointAnnotations(previousEndpoint),
-              ...exitAnnotations(restartCause),
-              ...restartFailure,
             }),
           );
           yield* setStatus(statusRef, "failed");
           yield* Queue.take(retryQueue);
           yield* Effect.logInfo("Server restart requested").pipe(
-            Effect.annotateLogs({
-              event: "server.supervisor.retry_requested",
-              ...previousEndpointAnnotations(previousEndpoint),
-            }),
+            Effect.annotateLogs({ event: "server.supervisor.retry_requested" }),
           );
           fastFailures = 0;
           yield* setStatus(statusRef, "reconnecting");
@@ -340,13 +241,9 @@ export function makeLocalServer(
         yield* Effect.logWarning("Server restart scheduled").pipe(
           Effect.annotateLogs({
             event: "server.supervisor.restart_scheduled",
-            nextAttempt: attemptNumber + 1,
             backoffMs,
             fastFailures,
             uptimeMs: uptime,
-            ...previousEndpointAnnotations(previousEndpoint),
-            ...exitAnnotations(restartCause),
-            ...restartFailure,
           }),
         );
         yield* setStatus(statusRef, "reconnecting");

@@ -21,7 +21,12 @@ function makeRuntime(devUrl: string | undefined) {
   // minting bubble these up their R channel, and this is where they land.
   const nodeBase = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeCrypto.layer);
   const ChildProcessSpawnerLive = NodeChildProcessSpawner.layer.pipe(Layer.provide(nodeBase));
-  const DesktopObservabilityLive = ServerObservability.layerForHome(resolvePieHome());
+  // provideMerge: nothing in this graph requires the logger, and Layer.provide
+  // of an unused layer is dropped. Merge puts it in the runtime context so
+  // supervisor Effect.log* reaches `$PIE_HOME/logs/pie.log`.
+  const DesktopObservabilityLive = ServerObservability.layerForHome(resolvePieHome()).pipe(
+    Layer.provide(nodeBase),
+  );
   const DesktopConfigLive = makeDesktopConfigLive({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -35,7 +40,7 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
-      Layer.provide(DesktopObservabilityLive),
+      Layer.provideMerge(DesktopObservabilityLive),
       Layer.provide(nodeBase),
     ),
   );

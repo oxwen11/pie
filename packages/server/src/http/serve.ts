@@ -1,7 +1,6 @@
 import { Cause, Context, Effect, Option, Scope } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import pkg from "../../package.json" with { type: "json" };
 import { PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { formatReadyLine } from "./handshake";
@@ -99,11 +98,7 @@ export const runServe = (input: ServeInput) =>
   serveWith(input).pipe(
     Effect.onInterrupt(() =>
       Effect.logWarning("server interrupted").pipe(
-        Effect.annotateLogs({
-          event: "server.interrupted",
-          pid: process.pid,
-          ppid: process.ppid,
-        }),
+        Effect.annotateLogs({ event: "server.interrupted", pid: process.pid }),
       ),
     ),
     Effect.tapError((error) =>
@@ -112,7 +107,6 @@ export const runServe = (input: ServeInput) =>
           event: "server.startup_failed",
           phase: error.phase,
           pid: process.pid,
-          ppid: process.ppid,
         }),
       ),
     ),
@@ -137,9 +131,7 @@ const serveWith = (input: ServeInput) =>
         corsOrigins,
         allowedHosts,
         pid: process.pid,
-        ppid: process.ppid,
-        version: pkg.version,
-        ...(process.env.PIE_BUILD_ID === undefined ? {} : { buildId: process.env.PIE_BUILD_ID }),
+        version: process.env.npm_package_version,
         node: process.version,
       }),
     );
@@ -160,21 +152,12 @@ const serveWith = (input: ServeInput) =>
         Effect.tryPromise(() => managed.dispose()).pipe(
           Effect.andThen(
             Effect.logInfo("server stopped").pipe(
-              Effect.annotateLogs({
-                event: "server.stopped",
-                pid: process.pid,
-                ppid: process.ppid,
-                uptimeMs: Math.round(process.uptime() * 1_000),
-              }),
+              Effect.annotateLogs({ event: "server.stopped", pid: process.pid }),
             ),
           ),
           Effect.catch((error) =>
             Effect.logWarning("server shutdown failed", error).pipe(
-              Effect.annotateLogs({
-                event: "server.shutdown_failed",
-                pid: process.pid,
-                ppid: process.ppid,
-              }),
+              Effect.annotateLogs({ event: "server.shutdown_failed", pid: process.pid }),
             ),
           ),
         ),
@@ -192,12 +175,7 @@ const serveWith = (input: ServeInput) =>
     console.log(`pie listening on http://127.0.0.1:${port}`);
 
     yield* Effect.logInfo("server listening").pipe(
-      Effect.annotateLogs({
-        event: "server.listening",
-        pid: process.pid,
-        ppid: process.ppid,
-        port,
-      }),
+      Effect.annotateLogs({ event: "server.listening", pid: process.pid, port }),
     );
 
     return yield* Effect.never;

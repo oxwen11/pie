@@ -8,7 +8,6 @@ import {
   type ServerProcessConfig,
   type LocalServerConfig,
   type RunningServerProcess,
-  type ServerProcessExit,
   type SpawnServer,
   makeLocalServer,
   restartBackoff,
@@ -17,9 +16,9 @@ import {
 type FakeProcess = {
   readonly port: number;
   readonly config: ServerProcessConfig;
-  readonly becomeReady: (port?: number, token?: string, pid?: number) => void;
+  readonly becomeReady: (port?: number, token?: string) => void;
   readonly failBeforeReady: (message?: string) => void;
-  readonly exit: (details?: Partial<ServerProcessExit>) => void;
+  readonly exit: () => void;
   killed: boolean;
 };
 
@@ -52,20 +51,8 @@ function makeHarness(
         port,
         config,
         killed: false,
-        becomeReady: (
-          boundPort = port || 40_000,
-          token = "daemon-token",
-          pid = 10_000 + processes.length,
-        ) => {
-          Effect.runSync(
-            Deferred.succeed(ready, {
-              port: boundPort,
-              token,
-              pid,
-              address: `http://127.0.0.1:${boundPort}`,
-              reused: port !== 0,
-            }),
-          );
+        becomeReady: (boundPort = port || 40_000, token = "daemon-token") => {
+          Effect.runSync(Deferred.succeed(ready, { port: boundPort, token }));
         },
         failBeforeReady: (message = "exited before ready") => {
           Effect.runSync(
@@ -78,8 +65,8 @@ function makeHarness(
             ),
           );
         },
-        exit: (details = {}) => {
-          Effect.runSync(Deferred.succeed(exited, { exitCode: 1, ...details }));
+        exit: () => {
+          Effect.runSync(Deferred.succeed(exited, { exitCode: 1 }));
         },
       };
       processes.push(process);
@@ -190,7 +177,7 @@ describe("LocalServer", () => {
     expect(
       h.logs.find((entry) => entry.annotations.event === "server.supervisor.attempt_failed"),
     ).toMatchObject({
-      annotations: { reason: "spawn_failed", failureType: "ServerSpawnError" },
+      annotations: { reason: "spawn_failed" },
     });
     expect(JSON.stringify(h.logs)).not.toContain("sentinel-spawn-token");
     expect(JSON.stringify(h.logs)).not.toContain("sentinel-cause-token");
@@ -244,49 +231,28 @@ describe("LocalServer", () => {
     await h.dispose();
   });
 
-  it("logs the restart decision chain without exposing daemon tokens", async () => {
+  it("logs the restart decision without exposing daemon tokens", async () => {
     const h = makeHarness();
     await eventually(() => expect(h.processes).toHaveLength(1));
-    h.processes[0]!.becomeReady(50_000, "first-secret", 111);
+    h.processes[0]!.becomeReady(50_000, "first-secret");
     const server = await h.server;
     await Effect.runPromise(server.connection);
 
-    h.processes[0]!.exit({
-      reason: "process_missing",
-      pid: 111,
-      address: "http://127.0.0.1:50000",
-      port: 50_000,
-      consecutiveMisses: 1,
-    });
+    h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
-    h.processes[1]!.becomeReady(50_001, "replacement-secret", 222);
+    h.processes[1]!.becomeReady(50_001, "replacement-secret");
     await eventually(async () => {
       await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
         httpBaseUrl: "http://127.0.0.1:50001",
       });
     });
 
-    const restart = h.logs.find(
-      (entry) => entry.annotations.event === "server.supervisor.restart_scheduled",
-    );
-    expect(restart?.annotations).toMatchObject({
-      previousPid: 111,
-      previousAddress: "http://127.0.0.1:50000",
-      previousPort: 50_000,
-      reason: "process_missing",
-      consecutiveMisses: 1,
+    expect(
+      h.logs.find((entry) => entry.annotations.event === "server.supervisor.restart_scheduled")
+        ?.annotations,
+    ).toMatchObject({
       backoffMs: 0,
-      nextAttempt: 2,
-    });
-    const replacement = h.logs.find(
-      (entry) =>
-        entry.annotations.event === "server.supervisor.ready" && entry.annotations.pid === 222,
-    );
-    expect(replacement?.annotations).toMatchObject({
-      previousPid: 111,
-      previousPort: 50_000,
-      port: 50_001,
-      portChanged: true,
+      fastFailures: 1,
     });
     expect(JSON.stringify(h.logs)).not.toContain("first-secret");
     expect(JSON.stringify(h.logs)).not.toContain("replacement-secret");

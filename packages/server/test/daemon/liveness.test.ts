@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { daemonLiveness, healthy, pidAlive, probeHealth } from "../../src/daemon/liveness";
+import { healthy, pidAlive } from "../../src/daemon/liveness";
 
 function stubServer(handler: (res: http.ServerResponse) => void): Promise<http.Server> {
   const server = http.createServer((req, res) => {
@@ -26,28 +26,6 @@ describe("pidAlive", () => {
     expect(pidAlive(2_147_483_646)).toBe(false);
     expect(pidAlive(0)).toBe(false);
     expect(pidAlive(-1)).toBe(false);
-  });
-});
-
-describe("daemonLiveness", () => {
-  it("reports a missing process with identity and consecutive misses", async () => {
-    await expect(
-      Effect.runPromise(
-        daemonLiveness(
-          {
-            pid: 2_147_483_646,
-            address: "http://127.0.0.1:43123",
-          },
-          2,
-        ),
-      ),
-    ).resolves.toEqual({
-      status: "process_missing",
-      pid: 2_147_483_646,
-      address: "http://127.0.0.1:43123",
-      port: 43123,
-      consecutiveMisses: 3,
-    });
   });
 });
 
@@ -85,19 +63,9 @@ describe("healthy", () => {
     });
     try {
       const port = (wedged.address() as AddressInfo).port;
-      const address = `http://127.0.0.1:${port}`;
       const started = Date.now();
-      expect(await Effect.runPromise(healthy(address))).toBe(false);
+      expect(await Effect.runPromise(healthy(`http://127.0.0.1:${port}`))).toBe(false);
       expect(Date.now() - started).toBeLessThan(5_000);
-
-      await expect(
-        Effect.runPromise(probeHealth(address, AbortSignal.timeout(30))),
-      ).resolves.toMatchObject({
-        status: "health_timeout",
-        address,
-        port,
-        probeError: expect.stringMatching(/TimeoutError/),
-      });
     } finally {
       wedged.close();
     }
