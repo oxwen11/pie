@@ -24,7 +24,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.80.10",
+    "@earendil-works/pi-coding-agent": "0.84.2",
     "@effect/platform-node": "catalog:effect",
     "@getpie/contract": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",

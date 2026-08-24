@@ -195,6 +195,21 @@ describe("createPiTransform", () => {
       ),
     ]).toEqual([]);
     expect([...t(e({ type: "auto_retry_end", success: true, attempt: 1 }))]).toEqual([]);
+    expect([
+      ...t(
+        e({
+          type: "summarization_retry_scheduled",
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 10,
+          errorMessage: "x",
+        }),
+      ),
+    ]).toEqual([]);
+    expect([
+      ...t(e({ type: "summarization_retry_attempt_start", source: "branchSummary" })),
+    ]).toEqual([]);
+    expect([...t(e({ type: "summarization_retry_finished" }))]).toEqual([]);
   });
 
   it("ignores bookkeeping events and user-message echoes", () => {
@@ -214,6 +229,7 @@ describe("createPiTransform", () => {
         args: {},
         partialResult: {},
       },
+      { type: "bash_execution_update", id: "b1", delta: "output" },
     ]) {
       expect([...t(e(event))]).toEqual([]);
     }
