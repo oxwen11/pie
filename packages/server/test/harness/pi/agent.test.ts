@@ -66,7 +66,7 @@ rl.on("line", (line) => {
   send({ id: msg.id, type: "response", command: "prompt", success: true });
   send({ type: "agent_start" });
   if (text === "hold") { holding = true; return; }
-  if (text === "confirm") { send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
+  if (text === "confirm") { holding = true; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
   if (text === "tool") {
     send({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls" } });
     send({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", result: { content: [{ type: "text", text: "ok" }] }, isError: false });
@@ -203,6 +203,28 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
+  it.effect("interrupt settles a pending UI request", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const requestFiber = yield* Stream.runHead(agent.session.requestPermission(sessionId)).pipe(
+        Effect.forkChild,
+      );
+      const prompt = yield* agent.session.prompt({ sessionId, text: "confirm" });
+      const collected = yield* Effect.forkChild(Stream.runCollect(prompt.output));
+
+      assert.equal((yield* Fiber.join(requestFiber))._tag, "Some");
+      yield* agent.session.interrupt(sessionId);
+      assert.equal(Array.from(yield* Fiber.join(collected)).at(-1)?.type, "finish");
+
+      const unavailable = yield* agent.session
+        .respondPermission(sessionId, "ui1", { type: "question", answers: [] })
+        .pipe(Effect.flip);
+      assert.equal(unavailable._tag, "AgentRequestUnavailable");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
   it.effect("steers an active turn instead of starting a new one", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
@@ -228,8 +250,14 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const collected = yield* Effect.forkChild(Stream.runCollect(prompt.output));
 
       yield* agent.session.interrupt(sessionId);
+      yield* agent.session.interrupt(sessionId);
       const chunks = yield* Fiber.join(collected);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+
+      // A late interrupt is also a no-op and cannot poison the next turn.
+      yield* agent.session.interrupt(sessionId);
+      const next = yield* agent.session.prompt({ sessionId, text: "ping" });
+      assert.equal(Array.from(yield* Stream.runCollect(next.output)).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -299,6 +327,31 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       assert.deepEqual(after, { provider: "p", modelId: "m2", name: "Model 2" });
 
       yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("PiAgent interrupt ends the runtime turn as canceled", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
+      const collected = yield* Effect.forkChild(
+        Stream.runCollect(
+          session.events.pipe(
+            Stream.takeUntil((event) => event.body.type === "session.turn.ended"),
+          ),
+        ),
+      );
+
+      yield* session.prompt({ parts: [{ type: "text", text: "hold" }] });
+      yield* session.interrupt;
+      const events = yield* Fiber.join(collected);
+      const ended = Array.from(events).find(
+        (event) => event.body.type === "session.turn.ended",
+      )?.body;
+
+      assert.equal(ended?.type, "session.turn.ended");
+      if (ended?.type === "session.turn.ended") assert.equal(ended.outcome, "canceled");
+      yield* session.close;
     }),
   );
 
