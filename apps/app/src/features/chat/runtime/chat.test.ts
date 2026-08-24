@@ -113,6 +113,13 @@ const userMessage = (id: string, text: string): UIMessage => ({
   parts: [{ type: "text", text }],
 });
 
+const assistantMessage = (id: string, text: string, stopReason: string): UIMessage => ({
+  id,
+  role: "assistant",
+  metadata: { stopReason },
+  parts: [{ type: "text", text }],
+});
+
 const assistantText = (message: UIMessage): string =>
   message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
 
@@ -543,7 +550,77 @@ describe("Chat stream errors", () => {
       cursor: 4,
     });
 
-    expect(chat.store.getState().error?.message).toBe(providerError);
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
+  });
+
+  it("clears a retained error after reconnect history proves recovery", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({ cursor: 1 });
+    transport.history = [
+      userMessage("user-1", "go"),
+      assistantMessage("assistant-1", "recovered", "stop"),
+    ];
+
+    await attach({
+      status: { phase: "idle" },
+      activeTurn: activeTurn({
+        turnId: "turn-1",
+        chunks: [chunkEvent(2, "turn-1", { type: "error", errorText: "Connection error." })],
+        complete: true,
+      }),
+      cursor: 3,
+    });
+
+    expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
+      "user-1",
+      "assistant-1",
+    ]);
+    expect(chat.store.getState().error).toBeUndefined();
+  });
+
+  it("does not let a pre-reattach history read clear a newer retained error", async () => {
+    const { chat, transport, emit } = makeChat();
+    transport.history = [assistantMessage("assistant-old", "older success", "stop")];
+    let releaseHistory: () => void = () => undefined;
+    transport.historyGate = new Promise((resolve) => {
+      releaseHistory = resolve;
+    });
+
+    emit({
+      type: "attached",
+      snapshot: {
+        ref,
+        status: { phase: "idle" },
+        activeTurn: null,
+        activePrompt: null,
+        pendingRequests: [],
+        cursor: 1,
+      },
+    });
+    await settle();
+    emit({
+      type: "attached",
+      snapshot: {
+        ref,
+        status: { phase: "idle" },
+        activeTurn: activeTurn({
+          turnId: "turn-1",
+          chunks: [chunkEvent(2, "turn-1", { type: "error", errorText: "Connection error." })],
+          complete: true,
+        }),
+        activePrompt: null,
+        pendingRequests: [],
+        cursor: 3,
+      },
+    });
+    releaseHistory();
+    await settle();
+
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
   });
 
   it("lets a newer retained prompt clear an older completed-turn error", async () => {
@@ -680,11 +757,97 @@ describe("Chat history reconcile", () => {
       turnId: "turn-1",
       chunk: { type: "error", errorText: "Connection error." },
     });
-    transport.history = [userMessage("user-1", "prompt"), userMessage("assistant-1", "retried")];
+    transport.history = [
+      userMessage("user-1", "prompt"),
+      assistantMessage("assistant-1", "retried", "stop"),
+    ];
     live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
     await settle();
     expect(transport.getMessagesCalls).toBe(2);
     expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
+    expect(chat.store.getState().error).toBeUndefined();
+  });
+
+  it("keeps a genuine provider failure visible after history reconciliation", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    transport.history = [
+      userMessage("user-1", "prompt"),
+      assistantMessage("assistant-1", "", "error"),
+    ];
+    live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
+    await settle();
+
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
+  });
+
+  it("does not treat an aborted assistant as connection recovery", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    transport.history = [assistantMessage("assistant-1", "", "aborted")];
+    live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "canceled", phase: "idle" });
+    await settle();
+
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
+  });
+
+  it("does not let stale older history clear the current provider failure", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    transport.history = [assistantMessage("assistant-old", "older success", "stop")];
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
+    await settle();
+
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
+  });
+
+  it("does not let an older recovery clear a newer prompt RPC failure", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    let releaseHistory: () => void = () => undefined;
+    transport.historyGate = new Promise((resolve) => {
+      releaseHistory = resolve;
+    });
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    transport.history = [assistantMessage("assistant-1", "recovered", "stop")];
+    live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
+
+    const promptError = new Error("Prompt RPC failed");
+    transport.promptError = promptError;
+    await expect(chat.prompt("next")).rejects.toThrow(promptError);
+    releaseHistory();
+    await settle();
+
+    expect(chat.store.getState().error).toBe(promptError);
   });
 
   it("skips the reconcile while a newer turn is already streaming", async () => {
