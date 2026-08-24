@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-// Plain `.ts` + createElement on purpose: apps/app's vitest config carries no
-// JSX transform, and one element isn't worth adding a babel pass to every test.
+// Plain `.ts` + createElement keeps this one-element probe simpler than JSX.
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
