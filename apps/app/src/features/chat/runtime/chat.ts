@@ -1,6 +1,5 @@
 import type {
   PromptPart,
-  SessionMessageChunkEvent,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -83,6 +82,15 @@ const latestHistoryAssistant = (
 const isSuccessfulStopReason = (stopReason: string | undefined): boolean =>
   stopReason === "stop" || stopReason === "length" || stopReason === "toolUse";
 
+const isProviderRecoveryChunk = (chunk: UIMessageChunk): boolean =>
+  chunk.type === "text-start" ||
+  chunk.type === "text-delta" ||
+  chunk.type === "reasoning-start" ||
+  chunk.type === "reasoning-delta" ||
+  chunk.type === "tool-input-start" ||
+  chunk.type === "tool-input-delta" ||
+  chunk.type === "tool-input-available";
+
 // One turn's chunk sink: chunks are pushed in as they arrive and the AI-SDK's
 // own reducer (readUIMessageStream — the same machinery the server-side
 // history folds use) turns them into evolving UIMessage snapshots.
@@ -123,6 +131,7 @@ export class Chat {
   #providerStreamError:
     | {
         readonly error: Error;
+        readonly turnId: string;
         readonly historyAssistantId: string | undefined;
         readonly historyReadAfterSnapshot: boolean;
       }
@@ -183,7 +192,7 @@ export class Chat {
     this.#cursor = event.seq;
     switch (event.type) {
       case "session.message.chunk":
-        this.#captureChunkError(event.chunk);
+        this.#observeProviderChunk(event.turnId, event.chunk);
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
           this.#turnFold(event.turnId).enqueue(event.chunk);
@@ -408,21 +417,23 @@ export class Chat {
       if (this.#pushUserMessage(activePrompt.messageId, activePrompt.parts)) this.#clearError();
     }
 
-    // Error text is not part of the settled transcript floor. Only the latest
-    // unseen error matters, but compare its seq with the retained prompt: the
-    // runtime can hold a completed old turn beside a newer submitted prompt.
-    // In that shape the prompt clears the old error rather than resurrecting
-    // it; an error after the prompt belongs to the new turn and wins.
-    let latestError: SessionMessageChunkEvent | undefined;
-    for (const chunkEvent of activeTurn?.chunks ?? []) {
-      if (chunkEvent.seq > this.#cursor && chunkEvent.chunk.type === "error") {
-        latestError = chunkEvent;
+    // Error text is not part of the settled transcript floor. Replay its
+    // ownership separately from message folding so a retry that emits fresh
+    // assistant output can clear its own error while the turn is still live.
+    // Ignore chunks older than a retained prompt: the runtime can hold a
+    // completed old turn beside a newer submitted prompt, and the old turn
+    // must not overwrite errors owned by that newer submission.
+    if (activeTurn) {
+      for (const chunkEvent of activeTurn.chunks) {
+        if (
+          chunkEvent.seq > this.#cursor &&
+          (appliedPromptSeq === undefined || chunkEvent.seq > appliedPromptSeq)
+        ) {
+          this.#observeProviderChunk(activeTurn.turnId, chunkEvent.chunk, {
+            historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
+          });
+        }
       }
-    }
-    if (latestError && (appliedPromptSeq === undefined || latestError.seq > appliedPromptSeq)) {
-      this.#captureChunkError(latestError.chunk, {
-        historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
-      });
     }
 
     // A turn flagged for recovery that is no longer active ended while we
@@ -503,18 +514,30 @@ export class Chat {
   // Shared handlers
   // ---------------------------------------------------------------------
 
-  #captureChunkError(
+  #observeProviderChunk(
+    turnId: string,
     chunk: UIMessageChunk,
     options?: { readonly historyReadAfterSnapshot?: boolean },
   ): void {
-    if (chunk.type !== "error") return;
-    const error = new Error(providerErrorMessage(chunk.errorText));
-    this.#providerStreamError = {
-      error,
-      historyAssistantId: this.#historyAssistantId,
-      historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
-    };
-    this.#state.error = error;
+    if (chunk.type === "error") {
+      const error = new Error(providerErrorMessage(chunk.errorText));
+      this.#providerStreamError = {
+        error,
+        turnId,
+        historyAssistantId: this.#historyAssistantId,
+        historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
+      };
+      this.#state.error = error;
+      return;
+    }
+    const providerError = this.#providerStreamError;
+    if (
+      providerError?.turnId === turnId &&
+      this.#state.error === providerError.error &&
+      isProviderRecoveryChunk(chunk)
+    ) {
+      this.#clearError();
+    }
   }
 
   #clearError(): void {

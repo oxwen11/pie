@@ -529,6 +529,74 @@ describe("Chat stream errors", () => {
     expect(transport.promptCalls.at(-1)?.parts).toEqual([{ type: "text", text: "retry" }]);
   });
 
+  it("clears a provider error when the same running turn resumes output", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    expect(chat.store.getState().error).toBeDefined();
+
+    live(3, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "text-start", id: "retry-text" },
+    });
+
+    expect(chat.store.getState().status).toBe("streaming");
+    expect(chat.store.getState().error).toBeUndefined();
+
+    live(4, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Retry failed" },
+    });
+    expect(chat.store.getState().error?.message).toBe("Retry failed");
+  });
+
+  it("does not let another turn's output clear the current provider error", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+
+    live(1, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "error", errorText: "Connection error." },
+    });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-2",
+      chunk: { type: "text-start", id: "other-text" },
+    });
+
+    expect(chat.store.getState().error?.message).toBe(
+      "The agent couldn't connect to the model provider. Try sending your message again.",
+    );
+  });
+
+  it("does not restore a retained error after its turn has resumed output", async () => {
+    const { chat, attach } = makeChat();
+    await attach({ cursor: 1 });
+
+    await attach({
+      status: { phase: "running" },
+      activeTurn: activeTurn({
+        turnId: "turn-1",
+        chunks: [
+          chunkEvent(2, "turn-1", { type: "error", errorText: "Connection error." }),
+          chunkEvent(3, "turn-1", { type: "text-start", id: "retry-text" }),
+        ],
+      }),
+      cursor: 3,
+    });
+
+    expect(chat.store.getState().error).toBeUndefined();
+  });
+
   it("restores an unseen provider error after its retained prompt boundary", async () => {
     const { chat, attach } = makeChat();
     const providerError = "Connection error.";
