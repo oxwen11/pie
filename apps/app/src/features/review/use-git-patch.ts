@@ -2,14 +2,14 @@ import type { GitReviewMode } from "@getpie/contract/git";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 
-export function useGitReview(
+export function useGitPatch(
   cwd: string | undefined,
   mode: GitReviewMode,
   other: string | undefined,
 ) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   return useQuery({
-    ...orpcQueryUtils.git.review.queryOptions({
+    ...orpcQueryUtils.git.patch.queryOptions({
       input:
         cwd === undefined
           ? skipToken
@@ -25,4 +25,4 @@ export function useGitReview(
   });
 }
 
-export type GitReviewQuery = ReturnType<typeof useGitReview>;
+export type GitPatchQuery = ReturnType<typeof useGitPatch>;

@@ -34,6 +34,11 @@ describe("git router", () => {
       expect(review.baseBranch).toBeNull();
       expect(review.files).toEqual([{ path: "a.txt", status: "modified" }]);
 
+      const patch = await harness.client.git.patch({ cwd });
+      expect(patch.files).toEqual(review.files);
+      expect(patch.issues).toEqual([]);
+      expect(patch.patch).toContain("diff --git a/a.txt b/a.txt");
+
       const diff = await harness.client.git.diff({ cwd, path: "a.txt" });
       expect(diff.oldContents).toBe("hi\n");
       expect(diff.newContents).toBe("hello\n");
@@ -48,10 +53,26 @@ describe("git router", () => {
     const harness = await makeRpcTestHarness(home);
     try {
       await expect(
-        harness.client.git.review({ cwd, mode: "branch", other: "nope" }),
+        harness.client.git.patch({ cwd, mode: "branch", other: "nope" }),
       ).rejects.toMatchObject({
         code: "REF_NOT_FOUND",
         data: { ref: "nope" },
+      });
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("maps an oversized patch to PATCH_TOO_LARGE", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
+    const cwd = await makeRepo();
+    fs.writeFileSync(path.join(cwd, "huge.txt"), "x".repeat(2 * 1024 * 1024 + 1));
+    await simpleGit(cwd).add("huge.txt");
+    const harness = await makeRpcTestHarness(home);
+    try {
+      await expect(harness.client.git.patch({ cwd })).rejects.toMatchObject({
+        code: "PATCH_TOO_LARGE",
+        data: { limit: 2 * 1024 * 1024 },
       });
     } finally {
       await harness.dispose();
