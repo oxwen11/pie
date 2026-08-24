@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import {
+  claimSessionStartPrompt,
   clearPendingSessionStart,
   type PendingSessionStart,
 } from "@/features/chat/pending-session-start";
@@ -29,6 +30,7 @@ export function SessionStartBootstrap({
   const [workspaceMode] = useState(pending.workspaceMode);
 
   useEffect(() => {
+    if (!claimSessionStartPrompt(pending.ref.sessionId)) return;
     void manager.chatFor(pending.ref).prompt(pending.text);
     clearPendingSessionStart(pending.ref.sessionId);
   }, [manager, pending]);
