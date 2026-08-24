@@ -6,6 +6,7 @@ import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
 
+import icon from "../../resources/icon.png?asset";
 import { makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
@@ -85,6 +86,8 @@ export function startDesktopRuntime(): void {
 
   const startPrimaryInstance = async (): Promise<void> => {
     await app.whenReady();
+
+    if (is.dev && process.platform === "darwin") app.dock?.setIcon(icon);
 
     electronApp.setAppUserModelId("com.pie.desktop");
     app.on("browser-window-created", (_, window) => {
