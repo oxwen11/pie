@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { gitWorkspaceForRef } from "@/lib/git-workspace";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -50,17 +51,18 @@ export const reviewPanel = definePanel({
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
   const workspace = useSessionWorkspace(instance.sessionRef.projectId);
+  const gitWorkspace = gitWorkspaceForRef(instance.sessionRef);
   const panel = useContentPanel();
   const cwd = workspace?.path;
   const mode = instance.payload.mode ?? "uncommitted";
-  const branch = useGitBranch(cwd);
+  const branch = useGitBranch(gitWorkspace);
   const other =
     mode === "branch"
       ? (instance.payload.other ?? branch.data?.defaultBranch ?? undefined)
       : undefined;
-  const review = useGitReview(cwd, mode, other);
+  const review = useGitReview(gitWorkspace, mode, other);
   const tree = useWorkspaceTree(cwd);
-  const diffs = useGitDiffs(cwd, review.data?.files ?? [], mode, other);
+  const diffs = useGitDiffs(gitWorkspace, review.data?.files ?? [], mode, other);
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
 

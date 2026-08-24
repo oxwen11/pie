@@ -1,4 +1,5 @@
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 
@@ -26,6 +27,7 @@ export function SessionStartBootstrap({
 }) {
   const manager = useChatManager();
   const chat = useChatHandle(pending.ref);
+  const router = useRouter();
   const status = useStore(chat.store, (state) => state.status);
   const [workspaceMode] = useState(pending.workspaceMode);
 
@@ -36,6 +38,13 @@ export function SessionStartBootstrap({
   }, [manager, pending]);
 
   const turnStarted = status === "streaming";
+
+  useEffect(() => {
+    if (!turnStarted) return;
+    void router.invalidate({
+      filter: (match) => match.routeId === "/session/$sessionId",
+    });
+  }, [router, turnStarted]);
 
   return (
     <>

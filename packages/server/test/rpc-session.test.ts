@@ -265,7 +265,7 @@ describe("agent.session router", () => {
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
-        worktree: { branch: "pie/rpc-test" },
+        worktree: {},
       });
 
       expect(created.workspace.cwd).toBe(workspace);
@@ -278,12 +278,14 @@ describe("agent.session router", () => {
       const prepared = await (async () => {
         for (let attempt = 0; attempt < 40; attempt += 1) {
           const next = await client.agent.session.prepare({ ref: created.ref });
-          if (next.workspace.gitBranch === "pie/rpc-test") return next;
+          if (next.workspace.gitBranch !== undefined && next.workspace.cwd !== workspace) {
+            return next;
+          }
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
-        throw new Error("worktree branch was not persisted");
+        throw new Error("worktree was not created");
       })();
-      expect(prepared.workspace.gitBranch).toBe("pie/rpc-test");
+      expect(prepared.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
       expect(prepared.workspace.cwd).not.toBe(workspace);
       expect(fs.existsSync(prepared.workspace.cwd)).toBe(true);
 

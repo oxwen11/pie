@@ -4,9 +4,7 @@ import { Effect, Option, Schema } from "effect";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
-const PendingWorktreeSchema = Schema.Struct({
-  branch: Schema.optionalKey(Schema.String),
-});
+const PendingWorktreeSchema = Schema.Struct({});
 
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,

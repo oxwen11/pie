@@ -2,12 +2,10 @@ import path from "node:path";
 
 import type {
   GitBranch,
-  GitDiffQuery,
   GitFileDiff,
   GitReview,
   GitReviewFile,
   GitReviewMode,
-  GitReviewQuery,
   GitStatus,
   GitStatusFile,
 } from "@getpie/contract/git";
@@ -15,6 +13,20 @@ import { Context, Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
 import { Paths } from "../config/paths";
+
+/** GitService always runs against a resolved absolute cwd — not a session ref. */
+export type GitReviewCwdQuery = {
+  readonly cwd: string;
+  readonly mode?: GitReviewMode;
+  readonly other?: string;
+};
+
+export type GitDiffCwdQuery = {
+  readonly cwd: string;
+  readonly path: string;
+  readonly mode?: GitReviewMode;
+  readonly other?: string;
+};
 import {
   GitBranchExists,
   GitError,
@@ -152,8 +164,8 @@ export class GitService extends Context.Service<
   {
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
-    readonly review: (query: GitReviewQuery) => Effect.Effect<GitReview, GitReviewFailure>;
-    readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
+    readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
+    readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
     readonly worktreeCreate: (
       cwd: string,
       input?: { readonly branch?: string; readonly worktreeKey?: string },

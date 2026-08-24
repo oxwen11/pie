@@ -1,9 +1,13 @@
 import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { toStandardSchema } from "./domain";
+import { SessionRefSchema, toStandardSchema } from "./domain";
 
 const CwdInput = Schema.Struct({ cwd: Schema.String });
+const SessionRefInput = Schema.Struct({ ref: SessionRefSchema });
+
+export const GitWorkspaceInputSchema = Schema.Union([CwdInput, SessionRefInput]);
+export type GitWorkspaceInput = typeof GitWorkspaceInputSchema.Type;
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
@@ -38,19 +42,34 @@ export type GitBranch = typeof GitBranchSchema.Type;
 export const GitReviewModeSchema = Schema.Literals(["uncommitted", "committed", "branch"]);
 export type GitReviewMode = typeof GitReviewModeSchema.Type;
 
-export const GitReviewQuerySchema = Schema.Struct({
-  cwd: Schema.String,
-  mode: Schema.optionalKey(GitReviewModeSchema),
-  other: Schema.optionalKey(Schema.String),
-});
+export const GitReviewQuerySchema = Schema.Union([
+  Schema.Struct({
+    cwd: Schema.String,
+    mode: Schema.optionalKey(GitReviewModeSchema),
+    other: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    ref: SessionRefSchema,
+    mode: Schema.optionalKey(GitReviewModeSchema),
+    other: Schema.optionalKey(Schema.String),
+  }),
+]);
 export type GitReviewQuery = typeof GitReviewQuerySchema.Type;
 
-export const GitDiffQuerySchema = Schema.Struct({
-  cwd: Schema.String,
-  path: Schema.String,
-  mode: Schema.optionalKey(GitReviewModeSchema),
-  other: Schema.optionalKey(Schema.String),
-});
+export const GitDiffQuerySchema = Schema.Union([
+  Schema.Struct({
+    cwd: Schema.String,
+    path: Schema.String,
+    mode: Schema.optionalKey(GitReviewModeSchema),
+    other: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    ref: SessionRefSchema,
+    path: Schema.String,
+    mode: Schema.optionalKey(GitReviewModeSchema),
+    other: Schema.optionalKey(Schema.String),
+  }),
+]);
 export type GitDiffQuery = typeof GitDiffQuerySchema.Type;
 
 export const GitReviewFileStatusSchema = Schema.Literals([
@@ -117,6 +136,9 @@ const cwdErrors = {
   NOT_DIRECTORY: { data: pathData },
   NOT_REPOSITORY: { data: cwdData },
   GIT_FAILED: { data: cwdData },
+  SESSION_NOT_FOUND: {
+    data: toStandardSchema(Schema.Struct({ message: Schema.String })),
+  },
 };
 
 const reviewErrors = {
@@ -149,16 +171,17 @@ const worktreeErrors = {
 };
 
 /**
- * Read-only git. Callers pass `cwd`; the server confines paths to that
- * workspace and never writes. `review` / `diff` take an explicit compare mode.
+ * Read-only git. Each call takes either an absolute `cwd` or a session `ref`;
+ * the server resolves `ref` to the session workspace path. Paths are confined
+ * to that workspace and git never writes except via explicit worktree RPCs.
  */
 export const gitContract = {
   status: oc
-    .input(toStandardSchema(CwdInput))
+    .input(toStandardSchema(GitWorkspaceInputSchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitStatusSchema)),
   branch: oc
-    .input(toStandardSchema(CwdInput))
+    .input(toStandardSchema(GitWorkspaceInputSchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitBranchSchema)),
   review: oc

@@ -74,7 +74,7 @@ export type PiAgentSessionServiceShape = {
     cwd: string,
     model?: { readonly provider: string; readonly modelId: string },
     gitBranch?: string,
-    pendingWorktree?: { readonly branch?: string },
+    pendingWorktree?: Record<string, never>,
   ) => Effect.Effect<SessionRef, StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -256,24 +256,17 @@ export const makePiAgentSessionService = (deps: {
           ref,
           projectPathFor(metadata.projectId).pipe(
             Effect.flatMap((projectPath) =>
-              git
-                .worktreeCreate(
-                  projectPath,
-                  metadata.pendingWorktree?.branch !== undefined
-                    ? { branch: metadata.pendingWorktree.branch }
-                    : undefined,
-                )
-                .pipe(
-                  Effect.flatMap((worktree) => {
-                    const updated: Session = {
-                      ...metadata,
-                      cwd: worktree.path,
-                      gitBranch: worktree.branch,
-                      pendingWorktree: undefined,
-                    };
-                    return repo.write(updated).pipe(Effect.as(updated));
-                  }),
-                ),
+              git.worktreeCreate(projectPath).pipe(
+                Effect.flatMap((worktree) => {
+                  const updated: Session = {
+                    ...metadata,
+                    cwd: worktree.path,
+                    gitBranch: worktree.branch,
+                    pendingWorktree: undefined,
+                  };
+                  return repo.write(updated).pipe(Effect.as(updated));
+                }),
+              ),
             ),
           ),
         );
@@ -415,12 +408,7 @@ export const makePiAgentSessionService = (deps: {
             cwd,
             ...(gitBranch !== undefined ? { gitBranch } : {}),
             ...(model !== undefined ? { provider: model.provider, modelId: model.modelId } : {}),
-            ...(pendingWorktree !== undefined
-              ? {
-                  pendingWorktree:
-                    pendingWorktree.branch !== undefined ? { branch: pendingWorktree.branch } : {},
-                }
-              : {}),
+            ...(pendingWorktree !== undefined ? { pendingWorktree: {} } : {}),
             archived: false,
           };
           return repo.write(metadata).pipe(

@@ -67,7 +67,6 @@ function DraftRoute() {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<DraftWorkspaceMode>("project");
-  const [worktreeBranch, setWorktreeBranch] = useState("");
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
@@ -97,7 +96,6 @@ function DraftRoute() {
   useEffect(() => {
     if (gitAvailable) return;
     setWorkspaceMode("project");
-    setWorktreeBranch("");
   }, [gitAvailable, selected?.id]);
 
   const startSession = useMutation({
@@ -108,11 +106,7 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
-        ...(workspaceMode === "worktree"
-          ? {
-              worktree: worktreeBranch.trim().length > 0 ? { branch: worktreeBranch.trim() } : {},
-            }
-          : {}),
+        ...(workspaceMode === "worktree" ? { worktree: {} } : {}),
       });
       setPendingSessionStart({
         ref: created.ref,
@@ -235,10 +229,8 @@ function DraftRoute() {
           {gitAvailable ? (
             <CardFrameAction>
               <DraftWorkspaceSelect
-                branch={worktreeBranch}
                 disabled={startSession.isPending || selected === null}
                 mode={workspaceMode}
-                onBranchChange={setWorktreeBranch}
                 onModeChange={setWorkspaceMode}
               />
             </CardFrameAction>

@@ -26,17 +26,13 @@ export const sessionRouter = orpc.router({
         Effect.gen(function* () {
           const sessionCwd = input.cwd ?? project.path;
           const pendingWorktree =
-            input.cwd === undefined && input.worktree !== undefined
-              ? input.worktree.branch !== undefined
-                ? { branch: input.worktree.branch }
-                : {}
-              : undefined;
+            input.cwd === undefined && input.worktree !== undefined ? ({} as const) : undefined;
 
           const ref = yield* sessions.create(
             input.projectId,
             sessionCwd,
             model,
-            input.gitBranch,
+            undefined,
             pendingWorktree,
           );
 
@@ -44,7 +40,6 @@ export const sessionRouter = orpc.router({
             ref,
             workspace: {
               cwd: sessionCwd,
-              ...(input.gitBranch === undefined ? {} : { gitBranch: input.gitBranch }),
             },
           };
         }),

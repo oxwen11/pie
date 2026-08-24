@@ -31,7 +31,7 @@ export interface Session {
    * When set, the first accepted prompt creates a git worktree from `project.path`
    * and persists the resulting `cwd` / `gitBranch` before Pi opens.
    */
-  readonly pendingWorktree?: { readonly branch?: string };
+  readonly pendingWorktree?: Record<string, never>;
   /** Model selected at create; applied when Pi opens on the first prompt. */
   readonly provider?: string;
   readonly modelId?: string;
