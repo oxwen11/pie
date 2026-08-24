@@ -3,18 +3,47 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { readRecord, stopDaemon } from "@getpie/server/daemon";
+import { pidAlive, readRecord, stopDaemon } from "@getpie/server/daemon";
+import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
+import { describe, expect, it as test } from "vitest";
 
-import { makeDaemonServerProcess } from "./daemon-server-process";
+import { makeDaemonServerProcess, resolveServerRuntimeExecutable } from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
+
+describe("resolveServerRuntimeExecutable", () => {
+  test("uses Electron's LSUIElement helper for a macOS app bundle", () => {
+    expect(
+      resolveServerRuntimeExecutable("darwin", "/Applications/Pie.app/Contents/MacOS/Pie"),
+    ).toBe("/Applications/Pie.app/Contents/Frameworks/Pie Helper.app/Contents/MacOS/Pie Helper");
+    expect(
+      resolveServerRuntimeExecutable(
+        "darwin",
+        "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+      ),
+    ).toBe(
+      "/repo/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
+    );
+  });
+
+  test("uses the current executable outside a macOS app bundle", () => {
+    expect(resolveServerRuntimeExecutable("darwin", "/opt/homebrew/bin/node")).toBe(
+      "/opt/homebrew/bin/node",
+    );
+    expect(resolveServerRuntimeExecutable("linux", "/opt/Pie/pie")).toBe("/opt/Pie/pie");
+  });
+});
 
 // A minimal daemon body: binds PIE_PORT and answers /api/health, which is
 // all the launcher's readiness and the spawner's liveness poll observe.
 const FAKE_SERVER = `
+import fs from "node:fs";
 import http from "node:http";
 const server = http.createServer((req, res) => {
-  if (req.method === "GET" && req.url === "/api/health") return res.end("ok");
+  if (req.method === "GET" && req.url === "/api/health") {
+    if (process.env.PIE_TEST_WEDGE_FILE && fs.existsSync(process.env.PIE_TEST_WEDGE_FILE)) return;
+    return res.end("ok");
+  }
   res.statusCode = 404;
   res.end();
 });
@@ -38,13 +67,19 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-desktop-" });
       const daemonDir = path.join(home, "isolated-daemon");
       const entry = path.join(home, "fake-server.mjs");
+      const wedgeFile = path.join(home, "wedge-health");
       yield* fs.writeFileString(entry, FAKE_SERVER);
       yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(daemonDir)));
       const config: ServerProcessConfig = {
         entry,
-        environment: { ...process.env, PIE_HOME: home, PIE_DAEMON_DIR: daemonDir },
+        environment: {
+          ...process.env,
+          PIE_HOME: home,
+          PIE_DAEMON_DIR: daemonDir,
+          PIE_TEST_WEDGE_FILE: wedgeFile,
+        },
       };
-      return { daemonDir, config };
+      return { daemonDir, config, home, wedgeFile };
     });
 
     it.effect("spawns the shared daemon and reports its endpoint, then attaches on respawn", () =>
@@ -79,9 +114,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       }),
     );
 
-    it.effect("resolves awaitExit when the daemon dies", () =>
+    it.effect("resolves awaitExit when the daemon dies and logs process_missing", () =>
       Effect.gen(function* () {
-        const { daemonDir, config } = yield* workspace;
+        const fs = yield* FileSystem.FileSystem;
+        const { daemonDir, config, home } = yield* workspace;
 
         const exit = yield* Effect.scoped(
           Effect.gen(function* () {
@@ -90,10 +126,42 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
             yield* running.ready;
             yield* stopDaemon(daemonDir);
             return yield* running.awaitExit;
-          }),
+          }).pipe(Effect.provide(Observability.layerForHome(home))),
         );
 
         assert.deepEqual(exit, { exitCode: null });
+        const content = yield* fs.readFileString(path.join(home, "logs", "pie.log"));
+        assert.match(content, /event=server\.liveness\.failed/);
+        assert.match(content, /reason=process_missing/);
+      }),
+    );
+
+    it.effect("logs unhealthy when a live pid's health probe keeps failing", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const { daemonDir, config, home, wedgeFile } = yield* workspace;
+
+        const exit = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 20 });
+            const running = yield* spawn(config, 0);
+            yield* running.ready;
+            const record = yield* readRecord(daemonDir);
+            assert.ok(record);
+            yield* fs.writeFileString(wedgeFile, "wedged");
+            return yield* running.awaitExit;
+          }).pipe(Effect.provide(Observability.layerForHome(home))),
+        );
+
+        assert.deepEqual(exit, { exitCode: null });
+        const record = yield* readRecord(daemonDir);
+        assert.ok(record);
+        assert.equal(pidAlive(record.pid), true);
+        const content = yield* fs.readFileString(path.join(home, "logs", "pie.log"));
+        assert.match(content, /event=server\.liveness\.failed/);
+        assert.match(content, /reason=unhealthy/);
+        assert.match(content, /consecutiveMisses=3/);
+        assert.doesNotMatch(content, /reason=process_missing/);
       }),
     );
   },

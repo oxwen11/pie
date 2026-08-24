@@ -8,6 +8,7 @@ export type ChatSessionValue = {
   sessionId: string;
   store: StoreApi<ChatStoreState>;
   prompt: (text: string) => void;
+  interrupt: () => Promise<void>;
   respondToRequest: (requestId: string, response: AgentResponse) => void;
   turnInProgress: boolean;
 };

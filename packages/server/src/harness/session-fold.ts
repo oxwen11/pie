@@ -218,6 +218,7 @@ export const foldSessionEvent = (
         ...base,
         phase: "idle",
         activeTurn: current.activeTurn ? { ...current.activeTurn, complete: true } : null,
+        pendingRequests: new Map(),
       };
     case "session.request.asked": {
       const pendingRequests = new Map(current.pendingRequests).set(event.request.id, event.request);

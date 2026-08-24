@@ -22,6 +22,7 @@ class FakeTransport implements ChatSessionTransport {
     };
   }
   prompt = async () => ({ turnId: "turn-receipt" });
+  interrupt = async () => {};
   getMessages = async () => null;
   respondToAgentRequest = async (_requestId: string, _response: AgentResponse) => {};
 }
