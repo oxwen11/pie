@@ -14,6 +14,7 @@ import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
 import { Paths } from "../config/paths";
 import {
+  ProjectNotFound,
   type SessionNotFound,
   type SessionRefNotFound,
   type StoreReadError,
@@ -21,6 +22,7 @@ import {
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
+import { ProjectRepository } from "../project/repository";
 import type { Session } from "../types";
 import type {
   AgentOperationError,
@@ -61,11 +63,8 @@ const toUserInput = (
       : Effect.succeed(part),
   ).pipe(Effect.map((userParts) => ({ parts: userParts })));
 
-const resolveWorkspaceCwd = (metadata: Session, projectPath: string): string =>
-  metadata.cwd ?? projectPath;
-
-const toSessionWorkspace = (metadata: Session, projectPath: string): SessionWorkspace => ({
-  cwd: resolveWorkspaceCwd(metadata, projectPath),
+const toSessionWorkspace = (metadata: Session): SessionWorkspace => ({
+  cwd: metadata.cwd!,
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
 });
 
@@ -78,15 +77,21 @@ export type PiAgentSessionServiceShape = {
   ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
-    projectPath: string,
   ) => Effect.Effect<
     SessionWorkspace,
-    SessionNotFound | StoreReadError | StoreWriteError | SessionNotResumable | AgentOperationError
+    | SessionNotFound
+    | ProjectNotFound
+    | StoreReadError
+    | StoreWriteError
+    | SessionNotResumable
+    | AgentOperationError
   >;
   readonly workspaceFor: (
     ref: SessionRef,
-    projectPath: string,
-  ) => Effect.Effect<SessionWorkspace, SessionNotFound | StoreReadError>;
+  ) => Effect.Effect<
+    SessionWorkspace,
+    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError
+  >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
     ref: SessionRef,
@@ -105,11 +110,12 @@ export type PiAgentSessionServiceShape = {
   ) => Effect.Effect<ReadonlyArray<SessionSummary>, StoreReadError>;
   readonly getMessages: (
     ref: SessionRef,
-    cwd: string,
   ) => Effect.Effect<
     ReadonlyArray<UIMessage>,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -150,11 +156,12 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly getModelState: (
     ref: SessionRef,
-    cwd: string,
   ) => Effect.Effect<
     AgentModelState,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -162,12 +169,13 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly setModel: (
     ref: SessionRef,
-    cwd: string,
     model: { readonly provider: string; readonly modelId: string },
   ) => Effect.Effect<
     AgentModelState,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -175,7 +183,10 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly getSessionInfo: (
     ref: SessionRef,
-  ) => Effect.Effect<SessionInfoResult, SessionNotFound | StoreReadError | AgentOperationError>;
+  ) => Effect.Effect<
+    SessionInfoResult,
+    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | AgentOperationError
+  >;
   readonly getStatus: (ref: SessionRef) => Effect.Effect<SessionStatus>;
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
   readonly resolveRef: (
@@ -194,8 +205,12 @@ export const makePiAgentSessionService = (deps: {
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly newSessionId: Effect.Effect<string>;
+  /** Backfill `metadata.cwd` for records created before cwd was persisted. */
+  readonly projectPathFor: (
+    projectId: string,
+  ) => Effect.Effect<string, ProjectNotFound | StoreReadError>;
 }): PiAgentSessionServiceShape => {
-  const { manager, pi, repo, bus, newSessionId } = deps;
+  const { manager, pi, repo, bus, newSessionId, projectPathFor } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -209,6 +224,17 @@ export const makePiAgentSessionService = (deps: {
   };
 
   const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
+
+  const ensureCwd = (
+    metadata: Session,
+  ): Effect.Effect<Session, ProjectNotFound | StoreReadError | StoreWriteError> =>
+    metadata.cwd !== undefined
+      ? Effect.succeed(metadata)
+      : projectPathFor(metadata.projectId).pipe(
+          Effect.flatMap((cwd) =>
+            repo.write({ ...metadata, cwd }).pipe(Effect.map(() => ({ ...metadata, cwd }))),
+          ),
+        );
 
   const readHistory = (
     ref: SessionRef,
@@ -318,35 +344,29 @@ export const makePiAgentSessionService = (deps: {
         }),
       ),
 
-    prepare: (ref, projectPath) =>
+    prepare: (ref) =>
       withMetadataMutation(
         ref,
-        readMetadata(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.cwd !== undefined) return Effect.succeed(metadata);
-            const updated = { ...metadata, cwd: projectPath };
-            return repo.write(updated).pipe(Effect.as(updated));
-          }),
-        ),
+        readMetadata(ref).pipe(Effect.flatMap((metadata) => ensureCwd(metadata))),
       ).pipe(
-        Effect.flatMap((metadata) => {
-          const workspaceCwd = resolveWorkspaceCwd(metadata, projectPath);
-          return pi
-            .getSessionInfo(metadata.agentSessionId, workspaceCwd)
+        Effect.flatMap((metadata) =>
+          pi
+            .getSessionInfo(metadata.agentSessionId, metadata.cwd)
             .pipe(
               Effect.flatMap((info) =>
                 info._tag === "missing"
                   ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-                  : Effect.succeed(toSessionWorkspace(metadata, projectPath)),
+                  : Effect.succeed(toSessionWorkspace(metadata)),
               ),
-            );
-        }),
+            ),
+        ),
         inSession(ref),
       ),
 
-    workspaceFor: (ref, projectPath) =>
+    workspaceFor: (ref) =>
       readMetadata(ref).pipe(
-        Effect.map((metadata) => toSessionWorkspace(metadata, projectPath)),
+        Effect.flatMap((metadata) => ensureCwd(metadata)),
+        Effect.map(toSessionWorkspace),
         inSession(ref),
       ),
 
@@ -441,19 +461,23 @@ export const makePiAgentSessionService = (deps: {
         ),
       ),
 
-    getMessages: (ref, cwd) =>
+    getMessages: (ref) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          readHistory(ref, metadata.agentSessionId, cwd).pipe(
-            Effect.flatMap((messages) =>
-              manager.status(ref).pipe(
-                Effect.map((status) => {
-                  if (status.activeTurnId === undefined) return messages;
-                  for (let index = messages.length - 1; index >= 0; index -= 1) {
-                    if (messages[index]?.role === "user") return messages.slice(0, index);
-                  }
-                  return messages;
-                }),
+          ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              readHistory(ref, resolved.agentSessionId, resolved.cwd!).pipe(
+                Effect.flatMap((messages) =>
+                  manager.status(ref).pipe(
+                    Effect.map((status) => {
+                      if (status.activeTurnId === undefined) return messages;
+                      for (let index = messages.length - 1; index >= 0; index -= 1) {
+                        if (messages[index]?.role === "user") return messages.slice(0, index);
+                      }
+                      return messages;
+                    }),
+                  ),
+                ),
               ),
             ),
           ),
@@ -515,28 +539,36 @@ export const makePiAgentSessionService = (deps: {
         inSession(ref),
       ),
 
-    getModelState: (ref, cwd) =>
+    getModelState: (ref) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          withLiveRuntime(
-            ref,
-            metadata.agentSessionId,
-            cwd,
-            (runtime) =>
-              runtime.getModelState ??
-              Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+          ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              withLiveRuntime(
+                ref,
+                resolved.agentSessionId,
+                resolved.cwd!,
+                (runtime) =>
+                  runtime.getModelState ??
+                  Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+              ),
+            ),
           ),
         ),
         inSession(ref),
       ),
 
-    setModel: (ref, cwd, model) =>
+    setModel: (ref, model) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) =>
-          withLiveRuntime(ref, metadata.agentSessionId, cwd, (runtime) =>
-            runtime.setModel
-              ? runtime.setModel(model)
-              : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+          ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              withLiveRuntime(ref, resolved.agentSessionId, resolved.cwd!, (runtime) =>
+                runtime.setModel
+                  ? runtime.setModel(model)
+                  : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+              ),
+            ),
           ),
         ),
         inSession(ref),
@@ -544,7 +576,11 @@ export const makePiAgentSessionService = (deps: {
 
     getSessionInfo: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
+        Effect.flatMap((metadata) =>
+          ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) => pi.getSessionInfo(resolved.agentSessionId, resolved.cwd!)),
+          ),
+        ),
         inSession(ref),
       ),
 
@@ -566,13 +602,20 @@ export const makePiAgentSessionService = (deps: {
 export const PiAgentSessionServiceLayer: Layer.Layer<
   PiAgentSessionService,
   never,
-  PiAgentSessionManager | PiAgent | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
+  | PiAgentSessionManager
+  | PiAgent
+  | EventBus
+  | ProjectRepository
+  | Paths
+  | Crypto.Crypto
+  | FileSystem.FileSystem
 > = Layer.effect(
   PiAgentSessionService,
   Effect.gen(function* () {
     const manager = yield* PiAgentSessionManager;
     const pi = yield* PiAgent;
     const bus = yield* EventBus;
+    const projects = yield* ProjectRepository;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makePiAgentSessionRepository(paths.sessionsDir);
@@ -586,6 +629,15 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
           Effect.die(new Error("invariant: platform RNG failed minting a session id", { cause })),
         ),
       ),
+      projectPathFor: (projectId) =>
+        projects.list().pipe(
+          Effect.flatMap((list) => {
+            const found = list.find((project) => project.id === projectId);
+            return found === undefined
+              ? Effect.fail(new ProjectNotFound({ projectId }))
+              : Effect.succeed(found.path);
+          }),
+        ),
     });
   }),
 );

@@ -13,15 +13,6 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
-const sessionWorkspace = (
-  ref: { readonly projectId: string; readonly sessionId: string },
-  projectPath: string,
-) =>
-  Effect.gen(function* () {
-    const sessions = yield* PiAgentSessionService;
-    return yield* sessions.workspaceFor(ref, projectPath);
-  });
-
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
@@ -99,17 +90,12 @@ export const sessionRouter = orpc.router({
     );
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
-    const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
-    return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) =>
-        sessions.prepare(input.ref, project.path).pipe(
-          Effect.map((workspace) => ({
-            ref: input.ref,
-            workspace,
-          })),
-        ),
-      ),
+    const workspace = yield* sessions.prepare(input.ref).pipe(
+      Effect.map((workspace) => ({
+        ref: input.ref,
+        workspace,
+      })),
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
@@ -119,6 +105,7 @@ export const sessionRouter = orpc.router({
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
     );
+    return workspace;
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
@@ -169,14 +156,8 @@ export const sessionRouter = orpc.router({
     );
   }),
   getMessages: orpc.getMessages.effect(function* ({ input, errors }) {
-    const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
-    return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) =>
-        sessionWorkspace(input.ref, project.path).pipe(
-          Effect.flatMap((workspace) => sessions.getMessages(input.ref, workspace.cwd)),
-        ),
-      ),
+    return yield* sessions.getMessages(input.ref).pipe(
       Effect.map((messages) => ({ messages })),
       Effect.catchTags({
         ProjectNotFound: (e) =>
@@ -267,14 +248,8 @@ export const sessionRouter = orpc.router({
   }),
 
   getModelState: orpc.getModelState.effect(function* ({ input, errors }) {
-    const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
-    return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) =>
-        sessionWorkspace(input.ref, project.path).pipe(
-          Effect.flatMap((workspace) => sessions.getModelState(input.ref, workspace.cwd)),
-        ),
-      ),
+    return yield* sessions.getModelState(input.ref).pipe(
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
@@ -293,35 +268,29 @@ export const sessionRouter = orpc.router({
     );
   }),
   setModel: orpc.setModel.effect(function* ({ input, errors }) {
-    const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
-    return yield* projects.findById(input.ref.projectId).pipe(
-      Effect.flatMap((project) =>
-        sessionWorkspace(input.ref, project.path).pipe(
-          Effect.flatMap((workspace) =>
-            sessions.setModel(input.ref, workspace.cwd, {
-              provider: input.provider,
-              modelId: input.modelId,
-            }),
-          ),
-        ),
-      ),
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
+    return yield* sessions
+      .setModel(input.ref, {
+        provider: input.provider,
+        modelId: input.modelId,
+      })
+      .pipe(
+        Effect.catchTags({
+          ProjectNotFound: (e) =>
+            Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+          SessionNotFound: (e) =>
+            Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+          AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+          ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+          CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+          HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+          SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+          AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+          SessionClosed: (e) =>
+            Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+          AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        }),
+      );
   }),
 
   subscribe: orpc.subscribe.effect(function* ({ input }) {

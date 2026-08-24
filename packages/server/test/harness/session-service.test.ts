@@ -17,6 +17,7 @@ import {
 } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ProjectNotFound } from "../../src/errors";
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
 import type { PiAgentShape } from "../../src/harness/pi/agent";
@@ -193,6 +194,10 @@ describe("PiAgentSessionService", () => {
                 repo,
                 bus,
                 newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
+                projectPathFor: (projectId) =>
+                  projectId === "proj-a"
+                    ? Effect.succeed("/tmp/pie-app")
+                    : Effect.fail(new ProjectNotFound({ projectId })),
               });
               return { service, repo, bus, spy, restart: build };
             });
@@ -243,7 +248,7 @@ describe("PiAgentSessionService", () => {
         const { cwd: _dropped, ...withoutCwd } = stored;
         yield* fixture.repo.write(withoutCwd);
 
-        const workspace = yield* fixture.service.prepare(ref, "/tmp/pie-app");
+        const workspace = yield* fixture.service.prepare(ref);
         const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         return { workspace, cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
       }),
@@ -265,7 +270,7 @@ describe("PiAgentSessionService", () => {
           "pie/test",
         );
         yield* fixture.service.close(ref);
-        const workspace = yield* fixture.service.prepare(ref, "/tmp/pie-app");
+        const workspace = yield* fixture.service.prepare(ref);
         const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         return { workspace, cwd: after.cwd };
       }),
@@ -285,8 +290,8 @@ describe("PiAgentSessionService", () => {
           "pie/test",
         );
         yield* fixture.service.close(ref);
-        const workspace = yield* fixture.service.workspaceFor(ref, "/tmp/pie-app");
-        const messages = yield* fixture.service.getMessages(ref, workspace.cwd);
+        const workspace = yield* fixture.service.workspaceFor(ref);
+        const messages = yield* fixture.service.getMessages(ref);
         return { workspace, messages };
       }),
     );
@@ -296,9 +301,7 @@ describe("PiAgentSessionService", () => {
 
   it("prepare fails with SessionNotFound for an unknown session", async () => {
     const err = await run({}, (fixture) =>
-      Effect.flip(
-        fixture.service.prepare({ projectId: "proj-a", sessionId: "missing" }, "/tmp/pie-app"),
-      ),
+      Effect.flip(fixture.service.prepare({ projectId: "proj-a", sessionId: "missing" })),
     );
     expect(err._tag).toBe("SessionNotFound");
   });
@@ -391,7 +394,7 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
-        const messages = yield* fixture.service.getMessages(ref, "/tmp/pie-app");
+        const messages = yield* fixture.service.getMessages(ref);
         return { messages, resume: fixture.spy.resume };
       }),
     );
@@ -446,7 +449,7 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
-        return yield* fixture.service.getMessages(ref, "/tmp/pie-app");
+        return yield* fixture.service.getMessages(ref);
       }),
     );
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1"]);
@@ -457,7 +460,7 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && turn.complete);
-        return yield* fixture.service.getMessages(ref, "/tmp/pie-app");
+        return yield* fixture.service.getMessages(ref);
       }),
     );
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "u2", "a2"]);
@@ -469,7 +472,7 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         yield* fixture.service.close(ref);
-        const messages = yield* fixture.service.getMessages(ref, "/tmp/pie-app");
+        const messages = yield* fixture.service.getMessages(ref);
         return { messages, resume: fixture.spy.resume };
       }),
     );
@@ -482,7 +485,7 @@ describe("PiAgentSessionService", () => {
     const err = await run({}, (fixture) =>
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
-        return yield* Effect.flip(fixture.service.getMessages(ref, "/tmp/pie-app"));
+        return yield* Effect.flip(fixture.service.getMessages(ref));
       }),
     );
     expect(err._tag).toBe("CapabilityUnsupported");
@@ -530,11 +533,11 @@ describe("PiAgentSessionService", () => {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const restarted = yield* fixture.restart;
 
-        yield* restarted.service.prepare(ref, "/tmp/pie-app");
+        yield* restarted.service.prepare(ref);
         const status = yield* restarted.service.getStatus(ref);
         const snapshot = yield* restarted.service.getSnapshot(ref);
         const listed = yield* restarted.service.list("proj-a", false);
-        const messages = yield* restarted.service.getMessages(ref, "/tmp/pie-app");
+        const messages = yield* restarted.service.getMessages(ref);
         return { ref, status, snapshot, listed, messages, spy: fixture.spy };
       }),
     );
@@ -561,7 +564,7 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
         const restarted = yield* fixture.restart;
-        yield* restarted.service.prepare(ref, "/tmp/pie-app");
+        yield* restarted.service.prepare(ref);
 
         yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
         yield* restarted.service.prompt({ ref, parts: [{ type: "text", text: "again" }] });

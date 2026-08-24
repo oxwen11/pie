@@ -86,6 +86,7 @@ async function setup() {
     ),
     Layer.provide(piAgentLayer),
     Layer.provide(EventBusLayer),
+    Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
     Layer.provide(NodeServices.layer),
   );

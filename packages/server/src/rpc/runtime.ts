@@ -51,6 +51,7 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PiAgentSessionManagerProvided),
   Layer.provide(PiAgentProvided),
   Layer.provide(EventBusLayer),
+  Layer.provide(ProjectRepositoryLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
 );
