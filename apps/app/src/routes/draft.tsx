@@ -35,6 +35,10 @@ import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
 } from "@/features/projects/draft-workspace-select";
+import {
+  DraftWorktreeBaseSelect,
+  defaultWorktreeBase,
+} from "@/features/projects/draft-worktree-base-select";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useProject, useProjects } from "@/features/projects/use-projects";
@@ -67,6 +71,7 @@ function DraftRoute() {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<DraftWorkspaceMode>("project");
+  const [worktreeBaseOverride, setWorktreeBaseOverride] = useState<string | null>(null);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
@@ -76,7 +81,18 @@ function DraftRoute() {
     }),
     retry: false,
   });
+  const gitBranch = useQuery({
+    ...orpcQueryUtils.git.branch.queryOptions({
+      input: selected === null ? skipToken : { cwd: selected.path },
+    }),
+    enabled: gitStatus.isSuccess,
+    staleTime: Infinity,
+  });
   const gitAvailable = gitStatus.isSuccess;
+  const worktreeBase =
+    workspaceMode === "worktree"
+      ? (worktreeBaseOverride ?? defaultWorktreeBase(gitBranch.data))
+      : null;
   const modelsQuery = useAgentModels(selected?.id);
   const defaultModel = modelsQuery.data?.defaultModel;
 
@@ -96,6 +112,7 @@ function DraftRoute() {
   useEffect(() => {
     if (gitAvailable) return;
     setWorkspaceMode("project");
+    setWorktreeBaseOverride(null);
   }, [gitAvailable, selected?.id]);
 
   const startSession = useMutation({
@@ -106,7 +123,11 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
-        ...(workspaceMode === "worktree" ? { worktree: {} } : {}),
+        ...(workspaceMode === "worktree" && worktreeBase !== null
+          ? { worktree: { base: worktreeBase } }
+          : workspaceMode === "worktree"
+            ? { worktree: {} }
+            : {}),
       });
       setPendingSessionStart({
         ref: created.ref,
@@ -157,6 +178,10 @@ function DraftRoute() {
         return false;
       }
       if (startSession.isPending) return false;
+      if (workspaceMode === "worktree" && worktreeBase === null) {
+        toast.error("Pick a base branch for the worktree.");
+        return false;
+      }
       startSession.mutate({ text });
       return false;
     },
@@ -216,23 +241,35 @@ function DraftRoute() {
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
           <ProjectSelect
-            onChange={(next) =>
+            onChange={(next) => {
+              setWorktreeBaseOverride(null);
               navigate({
                 to: "/draft",
                 search: { projectId: next },
                 replace: true,
-              })
-            }
+              });
+            }}
             projects={projects.data}
             value={selected?.id ?? null}
           />
           {gitAvailable ? (
-            <CardFrameAction>
+            <CardFrameAction className="flex items-center gap-1">
               <DraftWorkspaceSelect
                 disabled={startSession.isPending || selected === null}
                 mode={workspaceMode}
-                onModeChange={setWorkspaceMode}
+                onModeChange={(mode) => {
+                  setWorkspaceMode(mode);
+                  if (mode === "project") setWorktreeBaseOverride(null);
+                }}
               />
+              {workspaceMode === "worktree" ? (
+                <DraftWorktreeBaseSelect
+                  branch={gitBranch.data}
+                  disabled={startSession.isPending || selected === null || gitBranch.isPending}
+                  onValueChange={setWorktreeBaseOverride}
+                  value={worktreeBase}
+                />
+              ) : null}
             </CardFrameAction>
           ) : null}
         </CardFrameHeader>
@@ -263,7 +300,14 @@ function DraftRoute() {
                   }
                 />
               </PromptInputTools>
-              <PromptInputSubmit disabled={!hasContent || !selected || startSession.isPending} />
+              <PromptInputSubmit
+                disabled={
+                  !hasContent ||
+                  !selected ||
+                  startSession.isPending ||
+                  (workspaceMode === "worktree" && worktreeBase === null)
+                }
+              />
             </PromptInputToolbar>
           </ChatInputProvider>
         </Card>

@@ -134,7 +134,8 @@ type GitWorktreeFailure =
   | GitInvalidBranchName
   | GitInvalidWorktreeKey
   | GitBranchExists
-  | GitWorktreePathExists;
+  | GitWorktreePathExists
+  | GitRefNotFound;
 
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
@@ -168,7 +169,7 @@ export class GitService extends Context.Service<
     readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
     readonly worktreeCreate: (
       cwd: string,
-      input?: { readonly branch?: string; readonly worktreeKey?: string },
+      input?: { readonly branch?: string; readonly worktreeKey?: string; readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly worktreeRemove: (path: string) => Effect.Effect<void, GitFailure>;
   }
@@ -522,6 +523,17 @@ export const GitServiceLayer: Layer.Layer<
           const repoRoot = yield* resolveRepoRoot(realRoot);
           const fixedWorktreeKey = input?.worktreeKey;
           const fixedBranch = input?.branch;
+          const startPoint = input?.base ?? "HEAD";
+
+          if (input?.base !== undefined) {
+            if (isUnsafeRef(input.base)) {
+              return yield* new GitRefNotFound({ ref: input.base });
+            }
+            const refs = yield* listRefs(realRoot);
+            if (!refs.all.includes(input.base)) {
+              return yield* new GitRefNotFound({ ref: input.base });
+            }
+          }
 
           const createOnce = (
             worktreeKey: string,
@@ -555,7 +567,14 @@ export const GitServiceLayer: Layer.Layer<
                 .pipe(Effect.mapError(readError(worktreePath)));
               yield* Effect.tryPromise({
                 try: () =>
-                  simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]),
+                  simpleGit(repoRoot).raw([
+                    "worktree",
+                    "add",
+                    "-b",
+                    branch,
+                    worktreePath,
+                    startPoint,
+                  ]),
                 catch: gitError(realRoot),
               });
               return { path: worktreePath, branch, worktreeKey };

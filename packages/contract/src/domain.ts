@@ -508,8 +508,11 @@ export const BrowseResultSchema = Schema.Struct({
 
 // Session-scoped config is owned by Pi — there are no session config RPCs.
 
-/** When present, a git worktree is created on the first accepted prompt (branch name is server-assigned). */
-export const CreateWorktreeInputSchema = Schema.Struct({});
+/** When present, a git worktree is created on the first accepted prompt (new branch name is server-assigned). */
+export const CreateWorktreeInputSchema = Schema.Struct({
+  /** Local or remote-tracking ref to branch from. Defaults to HEAD when omitted. */
+  base: Schema.optionalKey(Schema.NonEmptyString),
+});
 export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
 export const CreateSessionInputSchema = Schema.Struct({

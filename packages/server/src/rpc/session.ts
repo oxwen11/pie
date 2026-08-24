@@ -26,7 +26,7 @@ export const sessionRouter = orpc.router({
         Effect.gen(function* () {
           const sessionCwd = input.cwd ?? project.path;
           const pendingWorktree =
-            input.cwd === undefined && input.worktree !== undefined ? ({} as const) : undefined;
+            input.cwd === undefined && input.worktree !== undefined ? input.worktree : undefined;
 
           const ref = yield* sessions.create(
             input.projectId,

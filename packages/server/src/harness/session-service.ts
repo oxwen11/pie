@@ -74,7 +74,7 @@ export type PiAgentSessionServiceShape = {
     cwd: string,
     model?: { readonly provider: string; readonly modelId: string },
     gitBranch?: string,
-    pendingWorktree?: Record<string, never>,
+    pendingWorktree?: { readonly base?: string },
   ) => Effect.Effect<SessionRef, StoreWriteError>;
   readonly prepare: (
     ref: SessionRef,
@@ -208,7 +208,7 @@ export const makePiAgentSessionService = (deps: {
   readonly git: {
     readonly worktreeCreate: (
       cwd: string,
-      input?: { readonly branch?: string; readonly worktreeKey?: string },
+      input?: { readonly branch?: string; readonly worktreeKey?: string; readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, unknown>;
   };
   readonly newSessionId: Effect.Effect<string>;
@@ -255,19 +255,25 @@ export const makePiAgentSessionService = (deps: {
       : withMetadataMutation(
           ref,
           projectPathFor(metadata.projectId).pipe(
-            Effect.flatMap((projectPath) =>
-              git.worktreeCreate(projectPath).pipe(
-                Effect.flatMap((worktree) => {
-                  const updated: Session = {
-                    ...metadata,
-                    cwd: worktree.path,
-                    gitBranch: worktree.branch,
-                    pendingWorktree: undefined,
-                  };
-                  return repo.write(updated).pipe(Effect.as(updated));
-                }),
-              ),
-            ),
+            Effect.flatMap((projectPath) => {
+              const pendingWorktree = metadata.pendingWorktree!;
+              return git
+                .worktreeCreate(
+                  projectPath,
+                  pendingWorktree.base !== undefined ? { base: pendingWorktree.base } : undefined,
+                )
+                .pipe(
+                  Effect.flatMap((worktree) => {
+                    const updated: Session = {
+                      ...metadata,
+                      cwd: worktree.path,
+                      gitBranch: worktree.branch,
+                      pendingWorktree: undefined,
+                    };
+                    return repo.write(updated).pipe(Effect.as(updated));
+                  }),
+                );
+            }),
           ),
         );
 
@@ -408,7 +414,7 @@ export const makePiAgentSessionService = (deps: {
             cwd,
             ...(gitBranch !== undefined ? { gitBranch } : {}),
             ...(model !== undefined ? { provider: model.provider, modelId: model.modelId } : {}),
-            ...(pendingWorktree !== undefined ? { pendingWorktree: {} } : {}),
+            ...(pendingWorktree !== undefined ? { pendingWorktree } : {}),
             archived: false,
           };
           return repo.write(metadata).pipe(

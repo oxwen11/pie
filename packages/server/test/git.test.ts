@@ -259,6 +259,36 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
+  it.effect("creates a worktree from a specified base ref", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const git = yield* GitService;
+      yield* Effect.promise(async () => {
+        const repoGit = simpleGit(dir);
+        await repoGit.checkoutLocalBranch("feature");
+        await repoGit.checkout("main");
+      });
+
+      const created = yield* git.worktreeCreate(dir, { base: "feature" });
+      assert.match(created.branch, /^pie\//);
+
+      const branch = yield* git.branch(created.path);
+      assert.equal(branch.current, created.branch);
+
+      const featureContents = yield* Effect.promise(async () => {
+        const repoGit = simpleGit(created.path);
+        return repoGit.revparse(["HEAD"]);
+      });
+      const mainHead = yield* Effect.promise(async () => {
+        const repoGit = simpleGit(dir);
+        return repoGit.revparse(["feature"]);
+      });
+      assert.equal(featureContents.trim(), mainHead.trim());
+
+      yield* git.worktreeRemove(created.path);
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
   it.effect("rejects a relative cwd and a non-repository", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
