@@ -19,7 +19,11 @@ const assistant = (over: Record<string, unknown> = {}) => ({
 });
 
 const update = (assistantMessageEvent: Record<string, unknown>) =>
-  e({ type: "message_update", message: assistant(), assistantMessageEvent });
+  e({
+    type: "message_update",
+    usage: assistant().usage,
+    assistantMessageEvent,
+  });
 
 // RPC mode never emits the assistantMessageEvent `start` delta; the
 // per-assistant-message marker on the real wire is `message_start`.

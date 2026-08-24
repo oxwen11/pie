@@ -1,5 +1,5 @@
 import type {
-  AgentSessionEvent,
+  JsonAgentSessionEvent,
   RpcCommand,
   RpcExtensionUIRequest,
   RpcExtensionUIResponse,
@@ -16,9 +16,12 @@ import type {
 // stdout frames:
 //   • `{ type: "response", command, success, ... }`  — reply to a stdin command
 //   • `{ type: "extension_ui_request", ... }`        — extension UI sub-protocol
-//   • everything else                                 — an AgentSessionEvent
+//   • everything else                                 — a JsonAgentSessionEvent
+// The JSON shape intentionally omits cumulative message snapshots from
+// message_update; using the in-process AgentSessionEvent type hides that gap.
+export type AgentSessionEvent = JsonAgentSessionEvent;
+
 export type {
-  AgentSessionEvent,
   RpcCommand,
   RpcExtensionUIRequest,
   RpcExtensionUIResponse,

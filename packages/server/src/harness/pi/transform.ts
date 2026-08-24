@@ -141,7 +141,7 @@ export function createPiTransform(
         break;
 
       case "message_update":
-        if (event.message.role === "assistant") yield* onAssistantDelta(event);
+        yield* onAssistantDelta(event);
         break;
 
       case "tool_execution_start":

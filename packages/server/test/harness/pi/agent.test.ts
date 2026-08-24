@@ -22,7 +22,7 @@ if (sessionId === "missing-session") {
   process.stdout.write("No session found matching 'missing-session'\\n", () => process.exit(0));
 }
 const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
-const upd = (ev) => send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
+const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
@@ -42,6 +42,7 @@ rl.on("line", (line) => {
     return;
   }
   if (msg.type === "extension_ui_response") {
+    send({ type: "message_start", message: assistant() });
     upd({ type: "start" });
     upd({ type: "text_start", contentIndex: 0 });
     upd({ type: "text_delta", contentIndex: 0, delta: "confirmed:" + String(msg.confirmed) });
@@ -73,12 +74,14 @@ rl.on("line", (line) => {
     return;
   }
   if (text === "crash") {
+    send({ type: "message_start", message: assistant() });
     upd({ type: "start" });
     upd({ type: "text_start", contentIndex: 0 });
     upd({ type: "text_delta", contentIndex: 0, delta: "po" });
     process.stdout.write("", () => process.exit(1));
     return;
   }
+  send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });
   upd({ type: "text_delta", contentIndex: 0, delta: "pong" });

@@ -368,7 +368,11 @@ describe("entriesToUIMessages", () => {
     const transform = createPiTransform("s1");
     const event = (value: unknown) => value as AgentSessionEvent;
     const update = (assistantMessageEvent: Record<string, unknown>) =>
-      event({ type: "message_update", message: assistantMessage([]), assistantMessageEvent });
+      event({
+        type: "message_update",
+        usage: assistantMessage([]).usage,
+        assistantMessageEvent,
+      });
     const liveEvents: AgentSessionEvent[] = [
       event({ type: "agent_start" }),
       update({ type: "start" }),
