@@ -11,7 +11,7 @@ import type {
   GitStatus,
   GitStatusFile,
 } from "@getpie/contract/git";
-import { Context, Effect, FileSystem, Layer } from "effect";
+import { Context, Effect, FileSystem, Layer, Semaphore } from "effect";
 import { simpleGit } from "simple-git";
 
 import {
@@ -30,6 +30,9 @@ import { FileSystemService } from "../fs";
 import { parseNameStatus, parseNulPaths } from "./name-status";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+// Review opens one diff RPC per changed file. Bound the shared child-process fanout so a
+// large change set cannot starve the daemon's health endpoint and trigger supervision.
+const MAX_CONCURRENT_GIT_COMMANDS = 8;
 const NUL_BYTE = 0;
 const BINARY_MAGIC_PREFIXES: ReadonlyArray<ReadonlyArray<number>> = [
   [0x25, 0x50, 0x44, 0x46, 0x2d],
@@ -139,6 +142,7 @@ export const GitServiceLayer: Layer.Layer<
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
+    const gitCommands = yield* Semaphore.make(MAX_CONCURRENT_GIT_COMMANDS);
 
     const readError = (relativePath: string) => (cause: unknown) =>
       new WorkspaceReadError({ path: relativePath, cause });
@@ -160,10 +164,17 @@ export const GitServiceLayer: Layer.Layer<
       isNotRepositoryMessage(cause) ? new GitNotRepository({ cwd }) : new GitError({ cwd, cause });
 
     const raw = (cwd: string, args: readonly string[]) =>
-      Effect.tryPromise({
-        try: () => simpleGit(cwd).raw([...args]),
-        catch: gitError(cwd),
-      });
+      gitCommands.withPermit(
+        // simple-git does not expose cancellation for a running child. Keep the permit until
+        // its Promise settles even if the RPC fiber is interrupted, or replacement requests
+        // can start another batch while the canceled children are still alive.
+        Effect.uninterruptible(
+          Effect.tryPromise({
+            try: () => simpleGit(cwd).raw([...args]),
+            catch: gitError(cwd),
+          }),
+        ),
+      );
 
     const resolveRepoRoot = (cwd: string) =>
       raw(cwd, ["rev-parse", "--show-toplevel"]).pipe(
