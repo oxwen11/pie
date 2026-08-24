@@ -1,0 +1,48 @@
+import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
+import { useEffect, useState, type ReactNode } from "react";
+import { useStore } from "zustand";
+
+import {
+  clearPendingSessionStart,
+  type PendingSessionStart,
+} from "@/features/chat/pending-session-start";
+import { useChatManager } from "@/features/chat/runtime/chat-context";
+import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
+
+function SessionStartProgress({ mode }: { mode: PendingSessionStart["workspaceMode"] }) {
+  if (mode === "worktree") {
+    return <Shimmer className="text-sm">Creating worktree…</Shimmer>;
+  }
+  return <Shimmer className="text-sm">Starting conversation…</Shimmer>;
+}
+
+export function SessionStartBootstrap({
+  pending,
+  children,
+}: {
+  pending: PendingSessionStart;
+  children: ReactNode;
+}) {
+  const manager = useChatManager();
+  const chat = useChatHandle(pending.ref);
+  const status = useStore(chat.store, (state) => state.status);
+  const [workspaceMode] = useState(pending.workspaceMode);
+
+  useEffect(() => {
+    void manager.chatFor(pending.ref).prompt(pending.text);
+    clearPendingSessionStart(pending.ref.sessionId);
+  }, [manager, pending]);
+
+  const turnStarted = status === "streaming";
+
+  return (
+    <>
+      {!turnStarted ? (
+        <div className="mx-auto w-full max-w-4xl min-w-80 px-4 pt-2">
+          <SessionStartProgress mode={workspaceMode} />
+        </div>
+      ) : null}
+      {children}
+    </>
+  );
+}

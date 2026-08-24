@@ -3,8 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
-import { SessionWorktreeBootstrap } from "@/features/chat/components/session-worktree-bootstrap";
-import { peekPendingWorktreeSetup } from "@/features/chat/pending-worktree-setup";
+import { SessionStartBootstrap } from "@/features/chat/components/session-start-controller";
+import { peekPendingSessionStart } from "@/features/chat/pending-session-start";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -54,11 +54,12 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function Component() {
   const prepared = Route.useLoaderData();
-  const pending = peekPendingWorktreeSetup(prepared.ref.sessionId);
+  const pending = peekPendingSessionStart(prepared.ref.sessionId);
+  const chat = <Chat cwd={prepared.workspace.cwd} sessionRef={prepared.ref} />;
 
   if (pending) {
-    return <SessionWorktreeBootstrap pending={pending} prepared={prepared} />;
+    return <SessionStartBootstrap pending={pending}>{chat}</SessionStartBootstrap>;
   }
 
-  return <Chat cwd={prepared.workspace.cwd} sessionRef={prepared.ref} />;
+  return chat;
 }

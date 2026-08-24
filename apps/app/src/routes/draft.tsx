@@ -30,8 +30,7 @@ import { createSubmitKeymap } from "@/features/chat/components/input/extensions/
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
-import { setPendingWorktreeSetup } from "@/features/chat/pending-worktree-setup";
-import { useChatManager } from "@/features/chat/runtime/chat-context";
+import { setPendingSessionStart } from "@/features/chat/pending-session-start";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
@@ -64,7 +63,6 @@ export const Route = createFileRoute("/draft")({
 function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
   const search = Route.useSearch();
-  const manager = useChatManager();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
@@ -110,17 +108,17 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
+        ...(workspaceMode === "worktree"
+          ? {
+              worktree: worktreeBranch.trim().length > 0 ? { branch: worktreeBranch.trim() } : {},
+            }
+          : {}),
       });
-      if (workspaceMode === "worktree") {
-        setPendingWorktreeSetup({
-          ref: created.ref,
-          projectPath: selected.path,
-          text,
-          worktreeBranch,
-        });
-      } else {
-        void manager.chatFor(created.ref).prompt(text);
-      }
+      setPendingSessionStart({
+        ref: created.ref,
+        text,
+        workspaceMode,
+      });
       return created;
     },
     onSuccess: (created, { text }) => {

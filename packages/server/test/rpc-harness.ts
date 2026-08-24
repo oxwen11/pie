@@ -32,6 +32,11 @@ export async function makeRpcTestHarness(home: string) {
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
+  const gitProvided = GitServiceLayer.pipe(
+    Layer.provide(FileSystemServiceLayer),
+    Layer.provide(pathsLayer),
+    Layer.provide(NodeServices.layer),
+  );
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -44,6 +49,7 @@ export async function makeRpcTestHarness(home: string) {
     Layer.provide(EventBusLayer),
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
   const projectServiceLayer = ProjectServiceLayer.pipe(
@@ -58,11 +64,7 @@ export async function makeRpcTestHarness(home: string) {
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
-    GitServiceLayer.pipe(
-      Layer.provide(FileSystemServiceLayer),
-      Layer.provide(pathsLayer),
-      Layer.provide(NodeServices.layer),
-    ),
+    gitProvided,
     NodeServices.layer,
     Observability.discard,
   );

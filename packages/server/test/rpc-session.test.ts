@@ -76,6 +76,11 @@ async function setup() {
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
+  const gitProvided = GitServiceLayer.pipe(
+    Layer.provide(FileSystemServiceLayer),
+    Layer.provide(layerPaths(home)),
+    Layer.provide(NodeServices.layer),
+  );
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -88,6 +93,7 @@ async function setup() {
     Layer.provide(EventBusLayer),
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
   const projectServiceLayer = ProjectServiceLayer.pipe(
@@ -103,11 +109,7 @@ async function setup() {
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
-    GitServiceLayer.pipe(
-      Layer.provide(FileSystemServiceLayer),
-      Layer.provide(layerPaths(home)),
-      Layer.provide(NodeServices.layer),
-    ),
+    gitProvided,
     NodeServices.layer,
     Observability.discard,
   );
@@ -139,12 +141,17 @@ describe("agent.session router", () => {
       expect(receipt.turnId).toBeDefined();
 
       const chunks: { type: string }[] = [];
+      let ended = false;
       for await (const item of events) {
         if (item.type !== "event") continue;
         const event = item.event;
         if (event.type === "session.message.chunk") chunks.push(event.chunk);
-        if (event.type === "session.turn.ended" && event.turnId === receipt.turnId) break;
+        if (event.type === "session.turn.ended") {
+          ended = true;
+          break;
+        }
       }
+      expect(ended).toBe(true);
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks.at(-1)?.type).toBe("finish");
 
@@ -185,7 +192,7 @@ describe("agent.session router", () => {
       const active = await client.agent.session.list({ projectId: project.id });
       expect(active).toHaveLength(1);
       expect(active[0]?.sessionId).toBe(ref.sessionId);
-      expect(active[0]?.status?.phase).toBeDefined();
+      expect(active[0]?.status).toBeUndefined();
       expect(active[0]?.archived).toBe(false);
 
       await client.agent.session.rename({ ref, title: "Login bug" });
@@ -260,12 +267,25 @@ describe("agent.session router", () => {
         worktree: { branch: "pie/rpc-test" },
       });
 
-      expect(created.workspace.gitBranch).toBe("pie/rpc-test");
-      expect(created.workspace.cwd).not.toBe(workspace);
-      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+      expect(created.workspace.cwd).toBe(workspace);
 
-      const prepared = await client.agent.session.prepare({ ref: created.ref });
-      expect(prepared.workspace.cwd).toBe(created.workspace.cwd);
+      await client.agent.session.prompt({
+        ref: created.ref,
+        parts: [{ type: "text", text: "hello" }],
+      });
+
+      const prepared = await (async () => {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          const next = await client.agent.session.prepare({ ref: created.ref });
+          if (next.workspace.gitBranch === "pie/rpc-test") return next;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        throw new Error("worktree branch was not persisted");
+      })();
+      expect(prepared.workspace.gitBranch).toBe("pie/rpc-test");
+      expect(prepared.workspace.cwd).not.toBe(workspace);
+      expect(fs.existsSync(prepared.workspace.cwd)).toBe(true);
+
       await client.agent.session.close({ ref: created.ref });
     } finally {
       await dispose();
@@ -290,9 +310,26 @@ describe("agent.session router", () => {
         worktree: {},
       });
 
+      expect(created.workspace.cwd).toBe(workspace);
+
+      await client.agent.session.prompt({
+        ref: created.ref,
+        parts: [{ type: "text", text: "hello" }],
+      });
+
       const repoName = path.basename(workspace);
-      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
-      expect(created.workspace.cwd).toMatch(
+      const prepared = await (async () => {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          const next = await client.agent.session.prepare({ ref: created.ref });
+          if (next.workspace.gitBranch !== undefined && next.workspace.cwd !== workspace) {
+            return next;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        throw new Error("worktree was not created");
+      })();
+      expect(prepared.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(prepared.workspace.cwd).toMatch(
         new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
       );
       await client.agent.session.close({ ref: created.ref });

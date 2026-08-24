@@ -27,6 +27,14 @@ export interface Session {
   readonly cwd?: string;
   /** Branch checked out in `cwd` when the session was created in a worktree. */
   readonly gitBranch?: string;
+  /**
+   * When set, the first accepted prompt creates a git worktree from `project.path`
+   * and persists the resulting `cwd` / `gitBranch` before Pi opens.
+   */
+  readonly pendingWorktree?: { readonly branch?: string };
+  /** Model selected at create; applied when Pi opens on the first prompt. */
+  readonly provider?: string;
+  readonly modelId?: string;
   /** Display title, set from the session's first prompt. */
   readonly title?: string;
   /** Whether the session is hidden from the project's primary session list. */

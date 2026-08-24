@@ -4,6 +4,10 @@ import { Effect, Option, Schema } from "effect";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
+const PendingWorktreeSchema = Schema.Struct({
+  branch: Schema.optionalKey(Schema.String),
+});
+
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
@@ -11,6 +15,9 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  pendingWorktree: Schema.optionalKey(PendingWorktreeSchema),
+  provider: Schema.optionalKey(Schema.String),
+  modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
@@ -24,6 +31,9 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   createdAt: metadata.createdAt,
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
+  ...(metadata.pendingWorktree !== undefined ? { pendingWorktree: metadata.pendingWorktree } : {}),
+  ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
+  ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
   ...(metadata.title !== undefined ? { title: metadata.title } : {}),
   ...(metadata.archived !== undefined ? { archived: metadata.archived } : {}),
   ...(metadata.updatedAt !== undefined ? { updatedAt: metadata.updatedAt } : {}),
