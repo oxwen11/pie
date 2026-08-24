@@ -200,17 +200,20 @@ export const makePiAgentRuntime = (
           }
 
           const finished = yield* Ref.make(false);
+          const outcome = yield* Ref.make<"completed" | "canceled">("completed");
           const pump = Stream.runForEach(prompt.output, (chunk) =>
-            emit(chunk).pipe(
+            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
+              Effect.andThen(emit(chunk)),
               Effect.andThen(
                 chunk.type === "finish"
                   ? Ref.set(finished, true).pipe(
-                      Effect.andThen(
+                      Effect.andThen(Ref.get(outcome)),
+                      Effect.flatMap((turnOutcome) =>
                         emit({
                           type: "session.turn.ended",
                           sessionId,
                           turnId: prompt.turnId,
-                          outcome: "completed",
+                          outcome: turnOutcome,
                         }).pipe(
                           Effect.andThen(
                             Ref.update(activeTurn, (current) =>

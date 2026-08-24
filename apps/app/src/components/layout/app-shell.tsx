@@ -3,6 +3,7 @@ import { createContext, type ReactNode, use, useCallback, useMemo } from "react"
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
+import { shellProviderStyle } from "@/components/layout/shell-chrome";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -10,6 +11,8 @@ import {
   ShellSeparator,
   ShellSidebarPanel,
 } from "@/components/layout/shell-panels";
+import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
+import { usePlatform } from "@/platform-context";
 
 interface AppShellContextValue {
   readonly contentPanel: {
@@ -76,15 +79,19 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const platform = usePlatform();
+
   return (
     // The provider is shell-owned: it supplies responsive/sidebar state and is
-    // also the viewport wrapper. The app-region rule drags desktop windows;
-    // h-svh keeps long transcripts scrolling inside the card, not the document.
+    // also the viewport wrapper. Individual titlebar headers own draggable
+    // regions; h-svh keeps long transcripts scrolling inside the card.
     <SidebarProvider
-      className="bg-sidebar h-svh overflow-hidden [-webkit-app-region:drag]"
+      className="bg-sidebar h-svh overflow-hidden"
       defaultOpen={readSidebarCookie()}
+      style={shellProviderStyle(platform)}
     >
       {children}
+      <ShellSidebarToggle />
     </SidebarProvider>
   );
 }

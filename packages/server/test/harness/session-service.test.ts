@@ -856,6 +856,31 @@ describe("PiAgentSessionService", () => {
     expect(result.afterRestart[0]?.title).toBe("Login bug");
   });
 
+  it("publishes session.closed on the global firehose when the runtime is torn down", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create("proj-a", "/tmp/pie-app");
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const stream = yield* fixture.bus.subscribe({ kind: "global" });
+            yield* fixture.service.close(ref);
+            const items = yield* Stream.runCollect(Stream.take(stream, 1));
+            return Array.from(items);
+          }),
+        );
+      }),
+    );
+    expect(result).toEqual([
+      {
+        type: "event",
+        event: {
+          ref: expect.objectContaining({ projectId: "proj-a", sessionId: expect.any(String) }),
+          type: "session.closed",
+        },
+      },
+    ]);
+  });
+
   it("publishes session.renamed per change, and nothing for a no-op rename", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {

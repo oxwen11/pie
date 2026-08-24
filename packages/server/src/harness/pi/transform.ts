@@ -141,7 +141,7 @@ export function createPiTransform(
         break;
 
       case "message_update":
-        if (event.message.role === "assistant") yield* onAssistantDelta(event);
+        yield* onAssistantDelta(event);
         break;
 
       case "tool_execution_start":
@@ -212,7 +212,11 @@ export function createPiTransform(
           | "compaction_start"
           | "compaction_end"
           | "auto_retry_start"
-          | "auto_retry_end");
+          | "auto_retry_end"
+          | "summarization_retry_scheduled"
+          | "summarization_retry_attempt_start"
+          | "summarization_retry_finished"
+          | "bash_execution_update");
     }
   };
 }

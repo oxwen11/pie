@@ -44,6 +44,21 @@ testLayer(NodePlatformLayer, { excludeTestServices: true })("observability loggi
     }),
   );
 
+  it.effect("binds a process logger directly to an explicit home", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* fs.makeTempDirectoryScoped();
+
+      yield* Effect.logInfo("desktop supervisor persisted").pipe(
+        Effect.provide(Observability.layerForHome(home)),
+        Effect.scoped,
+      );
+
+      const content = yield* fs.readFileString(pieLogPath(logsDirectory(home)));
+      assert.match(content, /message="desktop supervisor persisted"/);
+    }),
+  );
+
   it.effect("stamps the process run id from Crypto", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

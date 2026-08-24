@@ -3,13 +3,11 @@ import type { ReactElement } from "react";
 
 import pieMarkUrl from "@/assets/pie-mark.svg?url";
 
-// Fills the sidebar row macOS gives to native traffic lights (see
-// app-sidebar.tsx). `size-4` + `gap-2` + `text-sm` are the sidebar menu
-// button's own icon/label metrics, so it reads as the row above the menu
-// rather than as a differently-scaled header.
+// Titlebar product mark. Desktop macOS omits it — native traffic lights own
+// that corner.
 export function BrandMark({ className }: { className?: string }): ReactElement {
   return (
-    <div className={cn("flex items-center gap-2 select-none", className)}>
+    <div className={cn("flex h-7 items-center gap-2 select-none", className)}>
       <span
         aria-hidden="true"
         className="bg-foreground block size-4 shrink-0 [mask-size:contain] [mask-position:center] [mask-repeat:no-repeat] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"

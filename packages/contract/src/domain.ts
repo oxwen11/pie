@@ -191,6 +191,7 @@ export const CollectionEventTypes = [
   "session.archived",
   "session.deleted",
   "session.renamed",
+  "session.closed",
 ] as const;
 export type CollectionEventType = (typeof CollectionEventTypes)[number];
 
@@ -263,6 +264,8 @@ export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.archived"; readonly archived: boolean }
   | { readonly type: "session.deleted" }
   | { readonly type: "session.renamed"; readonly title: string }
+  // Runtime torn down; list rows drop `status` (no live session in memory).
+  | { readonly type: "session.closed" }
 );
 
 export type ServerEvent = SessionScopedEvent | CollectionEvent;

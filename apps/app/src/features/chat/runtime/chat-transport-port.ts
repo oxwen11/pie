@@ -62,6 +62,8 @@ export interface ChatSessionTransport {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
   }): Promise<{ readonly turnId: string }>;
+  /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
+  interrupt(): Promise<void>;
   /**
    * The session's native history as final-form UIMessages, or `null` when Pi
    * serves no history for this session — capability absence is a normal outcome

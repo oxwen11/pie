@@ -33,7 +33,7 @@ const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
 process.stdout.write("pi startup banner (not json)\\n");
 send({ type: "extension_ui_request", id: "st", method: "setStatus", statusKey: "k", statusText: "v" });
 const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
-const upd = (ev) => send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
+const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
@@ -41,6 +41,7 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   send({ id: msg.id, type: "response", command: "prompt", success: true });
   send({ type: "agent_start" });
+  send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });
   upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
