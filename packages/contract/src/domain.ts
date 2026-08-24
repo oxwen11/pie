@@ -513,6 +513,11 @@ export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
+  /** When set, the server uses this id instead of minting one — enables optimistic navigation. */
+  sessionId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
+  /** Absolute workspace path. When set, skips project.path and inline worktree creation. */
+  cwd: Schema.optionalKey(Schema.String),
+  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),

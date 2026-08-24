@@ -82,6 +82,44 @@ export const gitRouter = orpc.router({
       }),
     );
   }),
+  worktreeCreate: orpc.worktreeCreate.effect(function* ({ input, errors }) {
+    const git = yield* GitService;
+    return yield* git
+      .worktreeCreate(input.cwd, input.branch !== undefined ? { branch: input.branch } : undefined)
+      .pipe(
+        Effect.catchTags({
+          WorkspacePathEscape: (error) =>
+            Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
+          WorkspaceNotDirectory: (error) =>
+            Effect.fail(errors.NOT_DIRECTORY({ data: { path: error.path } })),
+          WorkspaceReadError: () => Effect.fail(errors.GIT_FAILED({ data: { cwd: input.cwd } })),
+          GitNotRepository: (error) =>
+            Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
+          GitError: (error) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+          GitInvalidBranchName: (error) =>
+            Effect.fail(errors.INVALID_BRANCH({ data: { branch: error.branch } })),
+          GitBranchExists: (error) =>
+            Effect.fail(errors.BRANCH_EXISTS({ data: { cwd: error.cwd, branch: error.branch } })),
+          GitWorktreePathExists: (error) =>
+            Effect.fail(errors.WORKTREE_EXISTS({ data: { cwd: error.cwd, path: error.path } })),
+        }),
+      );
+  }),
+  worktreeRemove: orpc.worktreeRemove.effect(function* ({ input, errors }) {
+    const git = yield* GitService;
+    yield* git.worktreeRemove(input.path).pipe(
+      Effect.catchTags({
+        WorkspacePathEscape: (error) =>
+          Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
+        WorkspaceNotDirectory: (error) =>
+          Effect.fail(errors.NOT_DIRECTORY({ data: { path: error.path } })),
+        WorkspaceReadError: () => Effect.fail(errors.GIT_FAILED({ data: { cwd: input.path } })),
+        GitNotRepository: (error) =>
+          Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
+        GitError: () => Effect.fail(errors.GIT_FAILED({ data: { cwd: input.path } })),
+      }),
+    );
+  }),
 });
 
 export type GitRouter = typeof gitRouter;

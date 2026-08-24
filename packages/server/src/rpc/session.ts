@@ -26,11 +26,11 @@ export const sessionRouter = orpc.router({
     return yield* projects.findById(input.projectId).pipe(
       Effect.flatMap((project) =>
         Effect.gen(function* () {
-          let sessionCwd = project.path;
-          let gitBranch: string | undefined;
+          let sessionCwd = input.cwd ?? project.path;
+          let gitBranch = input.gitBranch;
           let createdWorktreePath: string | undefined;
 
-          if (input.worktree !== undefined) {
+          if (input.cwd === undefined && input.worktree !== undefined) {
             const worktree = yield* git
               .worktreeCreate(
                 project.path,
@@ -47,7 +47,7 @@ export const sessionRouter = orpc.router({
           }
 
           const ref = yield* sessions
-            .create(input.projectId, sessionCwd, model, gitBranch)
+            .create(input.projectId, sessionCwd, model, gitBranch, input.sessionId)
             .pipe(
               Effect.tapError(() =>
                 createdWorktreePath === undefined
@@ -91,10 +91,10 @@ export const sessionRouter = orpc.router({
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
-    const workspace = yield* sessions.prepare(input.ref).pipe(
-      Effect.map((workspace) => ({
+    const preparedWorkspace = yield* sessions.prepare(input.ref).pipe(
+      Effect.map((sessionWorkspace) => ({
         ref: input.ref,
-        workspace,
+        workspace: sessionWorkspace,
       })),
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -105,7 +105,7 @@ export const sessionRouter = orpc.router({
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
     );
-    return workspace;
+    return preparedWorkspace;
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;

@@ -3,10 +3,19 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
+import { SessionStartBootstrap } from "@/features/chat/components/session-start-bootstrap";
+import {
+  peekPendingSessionStart,
+  type PendingSessionStart,
+} from "@/features/chat/pending-session-start";
 
 type SessionSearch = {
   readonly projectId?: string;
 };
+
+export type SessionLoaderData =
+  | (PrepareSessionOutput & { bootstrap?: undefined })
+  | { bootstrap: PendingSessionStart; ref?: undefined; workspace?: undefined };
 
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
@@ -17,7 +26,12 @@ export const Route = createFileRoute("/session/$sessionId")({
     return projectId !== undefined ? { projectId } : {};
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
+  loader: async ({ context, params, deps }): Promise<SessionLoaderData> => {
+    const pending = peekPendingSessionStart(params.sessionId);
+    if (pending) {
+      return { bootstrap: pending };
+    }
+
     const { session } = context.orpcQueryUtils.agent;
 
     if (deps.projectId !== undefined) {
@@ -51,7 +65,11 @@ export const Route = createFileRoute("/session/$sessionId")({
 });
 
 function Component() {
-  const { ref: sessionRef, workspace } = Route.useLoaderData();
+  const data = Route.useLoaderData();
 
-  return <Chat cwd={workspace.cwd} sessionRef={sessionRef} />;
+  if (data.bootstrap) {
+    return <SessionStartBootstrap bootstrap={data.bootstrap} />;
+  }
+
+  return <Chat cwd={data.workspace.cwd} sessionRef={data.ref} />;
 }

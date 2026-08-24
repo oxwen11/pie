@@ -94,6 +94,24 @@ export const GitFileDiffSchema = Schema.Struct({
 });
 export type GitFileDiff = typeof GitFileDiffSchema.Type;
 
+export const GitWorktreeCreateInputSchema = Schema.Struct({
+  cwd: Schema.String,
+  branch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type GitWorktreeCreateInput = typeof GitWorktreeCreateInputSchema.Type;
+
+export const GitWorktreeCreateResultSchema = Schema.Struct({
+  path: Schema.String,
+  branch: Schema.String,
+  worktreeKey: Schema.String,
+});
+export type GitWorktreeCreateResult = typeof GitWorktreeCreateResultSchema.Type;
+
+export const GitWorktreeRemoveInputSchema = Schema.Struct({
+  path: Schema.String,
+});
+export type GitWorktreeRemoveInput = typeof GitWorktreeRemoveInputSchema.Type;
+
 const cwdErrors = {
   PATH_ESCAPE: { data: pathEscapeData },
   NOT_DIRECTORY: { data: pathData },
@@ -114,6 +132,19 @@ const diffErrors = {
     data: toStandardSchema(
       Schema.Struct({ path: Schema.String, size: Schema.Number, limit: Schema.Number }),
     ),
+  },
+};
+
+const worktreeErrors = {
+  ...cwdErrors,
+  INVALID_BRANCH: {
+    data: toStandardSchema(Schema.Struct({ branch: Schema.String })),
+  },
+  BRANCH_EXISTS: {
+    data: toStandardSchema(Schema.Struct({ cwd: Schema.String, branch: Schema.String })),
+  },
+  WORKTREE_EXISTS: {
+    data: toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String })),
   },
 };
 
@@ -138,4 +169,9 @@ export const gitContract = {
     .input(toStandardSchema(GitDiffQuerySchema))
     .errors(diffErrors)
     .output(toStandardSchema(GitFileDiffSchema)),
+  worktreeCreate: oc
+    .input(toStandardSchema(GitWorktreeCreateInputSchema))
+    .errors(worktreeErrors)
+    .output(toStandardSchema(GitWorktreeCreateResultSchema)),
+  worktreeRemove: oc.input(toStandardSchema(GitWorktreeRemoveInputSchema)).errors(cwdErrors),
 };
