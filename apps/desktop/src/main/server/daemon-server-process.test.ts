@@ -6,9 +6,33 @@ import { layer } from "@effect/vitest";
 import { pidAlive, readRecord, stopDaemon } from "@getpie/server/daemon";
 import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
+import { describe, expect, it as test } from "vitest";
 
-import { makeDaemonServerProcess } from "./daemon-server-process";
+import { makeDaemonServerProcess, resolveServerRuntimeExecutable } from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
+
+describe("resolveServerRuntimeExecutable", () => {
+  test("uses Electron's LSUIElement helper for a macOS app bundle", () => {
+    expect(
+      resolveServerRuntimeExecutable("darwin", "/Applications/Pie.app/Contents/MacOS/Pie"),
+    ).toBe("/Applications/Pie.app/Contents/Frameworks/Pie Helper.app/Contents/MacOS/Pie Helper");
+    expect(
+      resolveServerRuntimeExecutable(
+        "darwin",
+        "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+      ),
+    ).toBe(
+      "/repo/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
+    );
+  });
+
+  test("uses the current executable outside a macOS app bundle", () => {
+    expect(resolveServerRuntimeExecutable("darwin", "/opt/homebrew/bin/node")).toBe(
+      "/opt/homebrew/bin/node",
+    );
+    expect(resolveServerRuntimeExecutable("linux", "/opt/Pie/pie")).toBe("/opt/Pie/pie");
+  });
+});
 
 // A minimal daemon body: binds PIE_PORT and answers /api/health, which is
 // all the launcher's readiness and the spawner's liveness poll observe.
