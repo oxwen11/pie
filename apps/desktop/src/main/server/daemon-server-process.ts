@@ -75,10 +75,18 @@ export function makeDaemonServerProcess(
             let misses = 0;
             while (true) {
               yield* Effect.sleep(pollIntervalMs);
-              if (!pidAlive(handle.pid)) return { exitCode: null };
+              if (!pidAlive(handle.pid)) {
+                yield* logLivenessFailed("process_missing", handle);
+                return { exitCode: null };
+              }
               // Tolerate transient probe failures; a wedged-but-alive daemon
               // still counts as dead after enough consecutive misses.
-              misses = (yield* healthy(handle.address)) ? 0 : misses + 1;
+              if (yield* healthy(handle.address)) {
+                misses = 0;
+                continue;
+              }
+              misses += 1;
+              yield* logLivenessFailed("unhealthy", handle, misses);
               if (misses >= MAX_HEALTH_MISSES) return { exitCode: null };
             }
           },
@@ -94,4 +102,20 @@ export function makeDaemonServerProcess(
 
 function endpointOf(handle: DaemonHandle): { port: number; token: string } {
   return { port: handle.port, token: handle.token };
+}
+
+function logLivenessFailed(
+  reason: "process_missing" | "unhealthy",
+  handle: DaemonHandle,
+  consecutiveMisses?: number,
+) {
+  return Effect.logWarning("Daemon liveness probe failed").pipe(
+    Effect.annotateLogs({
+      event: "server.liveness.failed",
+      reason,
+      pid: handle.pid,
+      address: handle.address,
+      ...(consecutiveMisses === undefined ? {} : { consecutiveMisses }),
+    }),
+  );
 }
