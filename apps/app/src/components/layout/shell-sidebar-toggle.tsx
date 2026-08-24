@@ -1,12 +1,6 @@
 import { SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
-import { cn } from "@getpie/ui/lib/utils";
 import type { ReactElement } from "react";
 
-import {
-  desktopToggleInsetClass,
-  SHELL_TITLEBAR_ROW_CLASS,
-  SHELL_TITLEBAR_TOP_CLASS,
-} from "@/components/layout/shell-chrome";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost } from "@/platform-host";
 
@@ -18,14 +12,7 @@ export function ShellSidebarToggle(): ReactElement | null {
   if (isMobile || !isDesktopHost(platform)) return null;
 
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed start-0 z-50",
-        SHELL_TITLEBAR_TOP_CLASS,
-        SHELL_TITLEBAR_ROW_CLASS,
-        desktopToggleInsetClass(platform),
-      )}
-    >
+    <div className="pointer-events-none fixed start-[var(--shell-controls-left)] top-1.5 z-50 flex h-10 items-center">
       <SidebarTrigger className="pointer-events-auto [-webkit-app-region:no-drag]" />
     </div>
   );

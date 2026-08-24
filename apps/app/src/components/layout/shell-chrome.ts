@@ -1,13 +1,10 @@
 import type { CSSProperties } from "react";
 
 import type { Platform } from "@/platform";
-import { isDesktopMacosHost, isDesktopHost } from "@/platform-host";
+import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
 /** Matches `ShellSidebarPanel` / `ShellMainPanel` `md:py-1.5` and `md:ps-1.5`. */
-export const SHELL_GUTTER_PX = 6;
-
-/** Shared header band (`h-10`). */
-export const SHELL_TITLEBAR_HEIGHT_PX = 40;
+const SHELL_GUTTER_PX = 6;
 
 /** Electron `trafficLightPosition.x` (see `main-window.ts`). */
 const MACOS_TRAFFIC_LIGHT_X_PX = 22;
@@ -15,12 +12,12 @@ const MACOS_TRAFFIC_LIGHT_X_PX = 22;
 /** Standard hidden-inset traffic-light cluster width. */
 const MACOS_TRAFFIC_LIGHT_CLUSTER_PX = 52;
 
-const MACOS_TRAFFIC_LIGHTS_END_PX = MACOS_TRAFFIC_LIGHT_X_PX + MACOS_TRAFFIC_LIGHT_CLUSTER_PX;
-
 /** Clears the native traffic-light hit area before the sidebar toggle. */
 const MACOS_TOGGLE_GAP_PX = 22;
 
-export const MACOS_TOGGLE_LEFT_PX = MACOS_TRAFFIC_LIGHTS_END_PX + MACOS_TOGGLE_GAP_PX;
+/** Viewport offset of the fixed desktop toggle on macOS. */
+export const MACOS_TOGGLE_LEFT_PX =
+  MACOS_TRAFFIC_LIGHT_X_PX + MACOS_TRAFFIC_LIGHT_CLUSTER_PX + MACOS_TOGGLE_GAP_PX;
 
 /** Gap between chrome controls in the titlebar row. */
 const CHROME_GAP_PX = 8;
@@ -28,45 +25,29 @@ const CHROME_GAP_PX = 8;
 /** `SidebarTrigger` is `size-7`. */
 const TOGGLE_SIZE_PX = 28;
 
-/** Fixed chrome row — lines up with sidebar/card `h-10` headers under `md:py-1.5`. */
-export const SHELL_TITLEBAR_TOP_CLASS = "top-1.5" as const;
-export const SHELL_TITLEBAR_ROW_CLASS = "flex h-10 items-center" as const;
-
-/** Inline-start offset for the fixed desktop toggle inside the titlebar row. */
-export function desktopToggleInsetClass(platform: Platform): string {
-  return isDesktopMacosHost(platform) ? `ms-[${MACOS_TOGGLE_LEFT_PX}px]` : "ms-1.5";
-}
-
 const desktopToggleLeftPx = (platform: Platform): number =>
   isDesktopMacosHost(platform) ? MACOS_TOGGLE_LEFT_PX : SHELL_GUTTER_PX;
 
-/** Viewport offset where sidebar brand content starts (after the fixed toggle). */
+/** Viewport offset where titlebar content starts (after the fixed toggle). */
 export function shellTitlebarContentLeftPx(platform: Platform): number {
   return desktopToggleLeftPx(platform) + TOGGLE_SIZE_PX + CHROME_GAP_PX;
 }
 
-/** Card header inset when the sidebar is collapsed under fixed desktop chrome. */
-export const desktopCollapsedCardInsetClass = (platform: Platform): string => {
-  const insetPx = shellTitlebarContentLeftPx(platform);
-  return `ps-[${insetPx}px]`;
-};
-
-/** Sidebar brand inset inside the panel gutter (desktop expanded only). */
-export function desktopSidebarBrandInsetClass(platform: Platform): string {
-  const insetPx = shellTitlebarContentLeftPx(platform) - SHELL_GUTTER_PX;
-  return `ms-[${insetPx}px]`;
-}
-
-/** CSS vars for shell titlebar geometry (desktop hosts only). */
+/**
+ * Desktop titlebar geometry. Consumed as complete Tailwind literals
+ * (`start-[var(--shell-controls-left)]`, `ps-[var(--shell-titlebar-content-left)]`,
+ * `ms-[var(--shell-sidebar-brand-inset)]`) so the scanner can see them.
+ */
 export function shellProviderStyle(platform: Platform): CSSProperties {
   if (!isDesktopHost(platform)) return {};
 
+  const controlsLeft = desktopToggleLeftPx(platform);
+  const contentLeft = shellTitlebarContentLeftPx(platform);
+
   return {
-    "--shell-controls-left": `${desktopToggleLeftPx(platform)}px`,
-    "--shell-titlebar-control-gap": `${CHROME_GAP_PX}px`,
-    "--shell-titlebar-control-size": `${TOGGLE_SIZE_PX}px`,
-    "--shell-titlebar-content-left":
-      "calc(var(--shell-controls-left) + var(--shell-titlebar-control-size) + var(--shell-titlebar-control-gap))",
+    "--shell-controls-left": `${controlsLeft}px`,
+    "--shell-titlebar-content-left": `${contentLeft}px`,
+    "--shell-sidebar-brand-inset": `${contentLeft - SHELL_GUTTER_PX}px`,
   } as CSSProperties;
 }
 

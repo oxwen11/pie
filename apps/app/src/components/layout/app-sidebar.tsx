@@ -16,14 +16,11 @@ import { SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import {
-  desktopSidebarBrandInsetClass,
-  SHELL_TITLEBAR_HEADER_CLASS,
-} from "@/components/layout/shell-chrome";
+import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
-import { useHostLayout } from "@/use-host-layout";
+import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
 export function AppSidebar({
   isSessionActive,
@@ -34,14 +31,12 @@ export function AppSidebar({
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
-  const { showsDesktopTitlebarHeader, showsInlineSidebarToggle, showsSidebarBrandMark } =
-    useHostLayout();
+  const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
-  const showsWebHeader =
-    !showsDesktopTitlebarHeader &&
-    (showsSidebarBrandMark || (!isMobile && state === "expanded" && showsInlineSidebarToggle));
-  const showsSidebarHeader =
-    showsWebHeader || (showsDesktopTitlebarHeader && !isMobile && state === "expanded");
+  const expanded = !isMobile && state === "expanded";
+  // Web: always (offcanvas on mobile). Desktop: spacer row while expanded so
+  // content clears the viewport-fixed toggle; collapsed panel width is 0.
+  const showHeader = desktop ? expanded : true;
 
   return (
     <Sidebar
@@ -50,20 +45,18 @@ export function AppSidebar({
       collapsible={isMobile ? "offcanvas" : "none"}
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
-      {showsSidebarHeader ? (
+      {showHeader ? (
         <SidebarHeader
           className={cn(
             SHELL_TITLEBAR_HEADER_CLASS,
-            showsDesktopTitlebarHeader ? "px-0" : undefined,
+            desktop && "px-0",
             "[-webkit-app-region:drag]",
           )}
         >
-          {showsSidebarBrandMark ? (
-            <BrandMark
-              className={cn(showsDesktopTitlebarHeader && desktopSidebarBrandInsetClass(platform))}
-            />
-          ) : null}
-          {showsWebHeader && !isMobile && state === "expanded" && showsInlineSidebarToggle ? (
+          {isDesktopMacosHost(platform) ? null : (
+            <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
+          )}
+          {!desktop && expanded ? (
             <SidebarTrigger className="[-webkit-app-region:no-drag]" />
           ) : null}
         </SidebarHeader>

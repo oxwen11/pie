@@ -5,12 +5,11 @@ import { Outlet } from "@tanstack/react-router";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 import {
-  desktopCollapsedCardInsetClass,
   SHELL_TITLEBAR_HEADER_CLASS,
   SHELL_TITLEBAR_LABEL_CLASS,
 } from "@/components/layout/shell-chrome";
 import { usePlatform } from "@/platform-context";
-import { useHostLayout } from "@/use-host-layout";
+import { isDesktopHost } from "@/platform-host";
 
 export interface CardPanelProps {
   readonly heading: string;
@@ -19,38 +18,32 @@ export interface CardPanelProps {
 
 export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
-  const platform = usePlatform();
-  const { showsSidebarBrandMark, usesFixedSidebarToggle } = useHostLayout();
+  const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
-  const ownsWebSidebarChrome = collapsedDesktop && !usesFixedSidebarToggle;
-  const ownsToggle = isMobile || ownsWebSidebarChrome;
+  const webCollapsedChrome = collapsedDesktop && !desktop;
 
   return (
     <SidebarInset
       className={cn(
         "flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5",
-        // Drop the top border when collapsed so the card header lines up with the
-        // viewport-fixed titlebar row (toggle ± BrandMark).
-        collapsedDesktop && usesFixedSidebarToggle && "border-t-0",
+        // Drop the top border when collapsed so the card header lines up with
+        // the viewport-fixed titlebar row.
+        collapsedDesktop && desktop && "border-t-0",
       )}
     >
       <header
         className={cn(
           SHELL_TITLEBAR_HEADER_CLASS,
           "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
-          collapsedDesktop && usesFixedSidebarToggle && desktopCollapsedCardInsetClass(platform),
+          collapsedDesktop && desktop && "ps-[var(--shell-titlebar-content-left)]",
         )}
       >
-        {ownsToggle ? (
+        {isMobile ? (
+          <SidebarTrigger className="-ms-0.5 [-webkit-app-region:no-drag]" />
+        ) : webCollapsedChrome ? (
           <>
-            {ownsWebSidebarChrome && showsSidebarBrandMark ? <BrandMark /> : null}
-            <SidebarTrigger
-              className={cn(
-                isMobile && "-ms-0.5",
-                ownsWebSidebarChrome && "-ms-px -translate-y-px",
-                "[-webkit-app-region:no-drag]",
-              )}
-            />
+            <BrandMark />
+            <SidebarTrigger className="-ms-px -translate-y-px [-webkit-app-region:no-drag]" />
           </>
         ) : null}
         <div className={SHELL_TITLEBAR_LABEL_CLASS}>

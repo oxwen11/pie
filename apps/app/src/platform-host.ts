@@ -11,8 +11,6 @@ export function isDesktopHost(platform: Platform): platform is Platform & { os: 
 }
 
 /** Desktop on macOS — native traffic lights overlay the shell chrome. */
-export function isDesktopMacosHost(
-  platform: Platform,
-): platform is Platform & { os: "macos" } {
+export function isDesktopMacosHost(platform: Platform): platform is Platform & { os: "macos" } {
   return platform.os === "macos";
 }
