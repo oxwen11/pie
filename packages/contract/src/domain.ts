@@ -513,8 +513,6 @@ export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
-  /** When set, the server uses this id instead of minting one — enables optimistic navigation. */
-  sessionId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
   /** Absolute workspace path. When set, skips project.path and inline worktree creation. */
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.NonEmptyString),
@@ -523,6 +521,13 @@ export const CreateSessionInputSchema = Schema.Struct({
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
+
+export const RelocateSessionWorkspaceInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  cwd: Schema.String,
+  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type RelocateSessionWorkspaceInput = typeof RelocateSessionWorkspaceInputSchema.Type;
 
 /** Absolute directory Pi runs in for one session. */
 export const SessionWorkspaceSchema = Schema.Struct({

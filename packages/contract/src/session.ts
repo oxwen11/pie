@@ -6,6 +6,7 @@ import {
   CreateSessionInputSchema,
   CreateSessionOutputSchema,
   PrepareSessionOutputSchema,
+  RelocateSessionWorkspaceInputSchema,
   serverErrors,
   ListSessionsInputSchema,
   type ListSessionsOutput,
@@ -18,6 +19,7 @@ import {
   SetAgentModelInputSchema,
   type SessionMessages,
   SessionRefSchema,
+  SessionWorkspaceSchema,
   type SessionRuntimeSnapshot,
   SessionStatusSchema,
   SubscribeInputSchema,
@@ -34,6 +36,9 @@ export const sessionContract = {
   prepare: base
     .input(toStandardSchema(RefInputSchema))
     .output(toStandardSchema(PrepareSessionOutputSchema)),
+  relocateWorkspace: base
+    .input(toStandardSchema(RelocateSessionWorkspaceInputSchema))
+    .output(toStandardSchema(SessionWorkspaceSchema)),
   close: base.input(toStandardSchema(RefInputSchema)),
 
   list: base.input(toStandardSchema(ListSessionsInputSchema)).output(type<ListSessionsOutput>()),

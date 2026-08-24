@@ -15,7 +15,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -30,7 +30,8 @@ import { createSubmitKeymap } from "@/features/chat/components/input/extensions/
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
-import { setPendingSessionStart } from "@/features/chat/pending-session-start";
+import { setPendingWorktreeSetup } from "@/features/chat/pending-worktree-setup";
+import { useChatManager } from "@/features/chat/runtime/chat-context";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
@@ -63,6 +64,7 @@ export const Route = createFileRoute("/draft")({
 function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
   const search = Route.useSearch();
+  const manager = useChatManager();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
@@ -100,47 +102,55 @@ function DraftRoute() {
     setWorktreeBranch("");
   }, [gitAvailable, selected?.id]);
 
-  const startSession = ({ text }: { text: string }) => {
-    if (!selected) {
-      toast.error("Pick a project before sending.");
-      return;
-    }
-    const sessionId = crypto.randomUUID();
-    setPendingSessionStart({
-      projectId: selected.id,
-      projectPath: selected.path,
-      sessionId,
-      text,
-      workspaceMode,
-      worktreeBranch,
-      ...(search.provider && search.modelId
-        ? { provider: search.provider, modelId: search.modelId }
-        : {}),
-    });
-
-    const listKey = orpcQueryUtils.agent.session.list.queryOptions({
-      input: { projectId: selected.id, archived: false },
-    }).queryKey;
-
-    queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
-      if (prev?.some((session) => session.sessionId === sessionId)) return prev;
-      const optimistic: SessionSummary = {
+  const startSession = useMutation({
+    mutationFn: async ({ text }: { text: string }) => {
+      if (!selected) throw new Error("No project selected");
+      const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
-        sessionId,
-        title: text,
-        archived: false,
-        createdAt: new Date().toISOString(),
-        historyAvailable: true,
-      };
-      return [...(prev ?? []), optimistic];
-    });
+        ...(search.provider && search.modelId
+          ? { provider: search.provider, modelId: search.modelId }
+          : {}),
+      });
+      if (workspaceMode === "worktree") {
+        setPendingWorktreeSetup({
+          ref: created.ref,
+          projectPath: selected.path,
+          text,
+          worktreeBranch,
+        });
+      } else {
+        void manager.chatFor(created.ref).prompt(text);
+      }
+      return created;
+    },
+    onSuccess: (created, { text }) => {
+      const listKey = orpcQueryUtils.agent.session.list.queryOptions({
+        input: { projectId: created.ref.projectId, archived: false },
+      }).queryKey;
 
-    navigate({
-      to: "/session/$sessionId",
-      params: { sessionId },
-      search: { projectId: selected.id },
-    });
-  };
+      queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
+        if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
+        const optimistic: SessionSummary = {
+          projectId: created.ref.projectId,
+          sessionId: created.ref.sessionId,
+          title: text,
+          archived: false,
+          createdAt: new Date().toISOString(),
+          historyAvailable: true,
+        };
+        return [...(prev ?? []), optimistic];
+      });
+
+      navigate({
+        to: "/session/$sessionId",
+        params: { sessionId: created.ref.sessionId },
+        search: { projectId: created.ref.projectId },
+      });
+    },
+    onError: (error) => {
+      toast.error(`Failed to start session: ${error.message}`);
+    },
+  });
 
   const controller = useChatInputController({
     extensions: (self) => [
@@ -154,7 +164,8 @@ function DraftRoute() {
         toast.error("Pick a project before sending.");
         return false;
       }
-      startSession({ text });
+      if (startSession.isPending) return false;
+      startSession.mutate({ text });
       return false;
     },
   });
@@ -227,7 +238,7 @@ function DraftRoute() {
             <CardFrameAction>
               <DraftWorkspaceSelect
                 branch={worktreeBranch}
-                disabled={selected === null}
+                disabled={startSession.isPending || selected === null}
                 mode={workspaceMode}
                 onBranchChange={setWorktreeBranch}
                 onModeChange={setWorkspaceMode}
@@ -262,7 +273,7 @@ function DraftRoute() {
                   }
                 />
               </PromptInputTools>
-              <PromptInputSubmit disabled={!hasContent || !selected} />
+              <PromptInputSubmit disabled={!hasContent || !selected || startSession.isPending} />
             </PromptInputToolbar>
           </ChatInputProvider>
         </Card>

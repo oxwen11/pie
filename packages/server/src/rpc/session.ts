@@ -47,7 +47,7 @@ export const sessionRouter = orpc.router({
           }
 
           const ref = yield* sessions
-            .create(input.projectId, sessionCwd, model, gitBranch, input.sessionId)
+            .create(input.projectId, sessionCwd, model, gitBranch)
             .pipe(
               Effect.tapError(() =>
                 createdWorktreePath === undefined
@@ -106,6 +106,15 @@ export const sessionRouter = orpc.router({
       }),
     );
     return preparedWorkspace;
+  }),
+  relocateWorkspace: orpc.relocateWorkspace.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.relocateWorkspace(input.ref, input.cwd, input.gitBranch).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+      }),
+    );
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
