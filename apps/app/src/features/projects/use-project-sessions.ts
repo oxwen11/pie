@@ -1,4 +1,4 @@
-import type { SessionRef, SessionSummary } from "@getpie/contract";
+import type { SessionPhase, SessionRef, SessionSummary } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -40,6 +40,15 @@ export const selectProjectSessionTitle = (
   return session === undefined ? undefined : (session.title ?? null);
 };
 
+export const selectProjectSessionPhase = (
+  sessions: ReadonlyArray<SessionSummary>,
+  ref: SessionRef,
+): SessionPhase | null | undefined => {
+  const session = sessions.find((candidate) => sameSessionRef(candidate, ref));
+  if (session === undefined) return undefined;
+  return session.status?.phase ?? null;
+};
+
 /**
  * One session title from a project's held lists.
  *
@@ -60,6 +69,46 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
       projectId === undefined || sessionId === undefined
         ? undefined
         : selectProjectSessionTitle(sessions, { projectId, sessionId }),
+    [projectId, sessionId],
+  );
+  const active = useQuery({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
+      input: { projectId: projectId ?? "", archived: false },
+    }),
+    enabled,
+    staleTime: 30_000,
+    select,
+  });
+  const archived = useQuery({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
+      input: { projectId: projectId ?? "", archived: true },
+    }),
+    enabled: enabled && active.isSuccess && active.data === undefined,
+    staleTime: 30_000,
+    select,
+  });
+
+  if (active.data !== undefined) return active.data ?? undefined;
+  return archived.data ?? undefined;
+}
+
+/**
+ * One session runtime phase from a project's held lists.
+ *
+ * Same cache seam as `useProjectSessionTitle`: server events patch
+ * `SessionSummary.status` in the shared list, so the header can reflect
+ * background turns without opening the transcript.
+ */
+export function useProjectSessionPhase(ref: SessionRef | undefined): SessionPhase | undefined {
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const projectId = ref?.projectId;
+  const sessionId = ref?.sessionId;
+  const enabled = projectId !== undefined && sessionId !== undefined;
+  const select = useCallback(
+    (sessions: ReadonlyArray<SessionSummary>) =>
+      projectId === undefined || sessionId === undefined
+        ? undefined
+        : selectProjectSessionPhase(sessions, { projectId, sessionId }),
     [projectId, sessionId],
   );
   const active = useQuery({

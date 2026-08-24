@@ -20,7 +20,12 @@ vi.mock("@tanstack/react-router", () => ({
   }),
 }));
 
-import { selectProjectSessionTitle, useProjectSessionTitle } from "./use-project-sessions";
+import {
+  selectProjectSessionPhase,
+  selectProjectSessionTitle,
+  useProjectSessionPhase,
+  useProjectSessionTitle,
+} from "./use-project-sessions";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -28,6 +33,7 @@ const session = (
   sessionId: string,
   title: string | undefined,
   archived = false,
+  status?: SessionSummary["status"],
 ): SessionSummary => ({
   projectId: "project-1",
   sessionId,
@@ -35,6 +41,7 @@ const session = (
   archived,
   createdAt: "2026-08-08T00:00:00.000Z",
   historyAvailable: true,
+  ...(status === undefined ? {} : { status }),
 });
 
 let root: Root | undefined;
@@ -46,9 +53,14 @@ const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): Session
   ...overrides,
 });
 
-function Probe({ sessionId }: { sessionId: string }) {
+function TitleProbe({ sessionId }: { sessionId: string }) {
   const title = useProjectSessionTitle(refFor(sessionId));
   return createElement("span", null, title ?? "missing");
+}
+
+function PhaseProbe({ sessionId }: { sessionId: string }) {
+  const phase = useProjectSessionPhase(refFor(sessionId));
+  return createElement("span", null, phase ?? "missing");
 }
 
 const renderSession = async (
@@ -78,13 +90,54 @@ const renderSession = async (
       createElement(
         QueryClientProvider,
         { client: queryClient },
-        createElement(Probe, { sessionId }),
+        createElement(TitleProbe, { sessionId }),
       ),
     ),
   );
   await act(async () => {
     await vi.waitFor(() =>
       waitForTitle
+        ? expect(host?.textContent).not.toBe("missing")
+        : expect(fetches).toHaveLength(1),
+    );
+  });
+  return host.textContent ?? "";
+};
+
+const renderSessionPhase = async (
+  sessionId: string,
+  active: ReadonlyArray<SessionSummary>,
+  archived: ReadonlyArray<SessionSummary> = [],
+  fetches: boolean[] = [],
+  waitForPhase = true,
+): Promise<string> => {
+  mocks.queryOptions.mockImplementation(
+    ({ input }: { input: { projectId: string; archived: boolean } }) => ({
+      queryKey: ["session.list", input],
+      queryFn: async () => {
+        fetches.push(input.archived);
+        return input.archived ? archived : active;
+      },
+    }),
+  );
+  if (!host) {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+  }
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  act(() =>
+    root?.render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(PhaseProbe, { sessionId }),
+      ),
+    ),
+  );
+  await act(async () => {
+    await vi.waitFor(() =>
+      waitForPhase
         ? expect(host?.textContent).not.toBe("missing")
         : expect(fetches).toHaveLength(1),
     );
@@ -113,6 +166,21 @@ describe("selectProjectSessionTitle", () => {
     expect(
       selectProjectSessionTitle([session("untitled", undefined)], refFor("untitled")),
     ).toBeNull();
+  });
+});
+
+describe("selectProjectSessionPhase", () => {
+  it("selects the runtime phase for the active session", () => {
+    const sessions = [
+      session("session-1", "First chat", false, { phase: "running" }),
+      session("session-2", "Second chat", false, { phase: "requires_action" }),
+      session("session-3", "Idle chat"),
+    ];
+
+    expect(selectProjectSessionPhase(sessions, refFor("session-1"))).toBe("running");
+    expect(selectProjectSessionPhase(sessions, refFor("session-2"))).toBe("requires_action");
+    expect(selectProjectSessionPhase(sessions, refFor("session-3"))).toBeNull();
+    expect(selectProjectSessionPhase(sessions, refFor("missing"))).toBeUndefined();
   });
 });
 
@@ -148,5 +216,47 @@ describe("useProjectSessionTitle", () => {
     await expect(
       renderSession("session-3", [], [session("session-3", "Archived chat", true)]),
     ).resolves.toBe("Archived chat");
+  });
+});
+
+describe("useProjectSessionPhase", () => {
+  it("reads an active session phase without fetching the archived list", async () => {
+    const fetches: boolean[] = [];
+    await expect(
+      renderSessionPhase(
+        "session-2",
+        [
+          session("session-1", "First chat", false, { phase: "running" }),
+          session("session-2", "Second chat", false, { phase: "crashed" }),
+        ],
+        [],
+        fetches,
+      ),
+    ).resolves.toBe("crashed");
+    expect(fetches).toEqual([false]);
+  });
+
+  it("does not query archived sessions when the active session exists without status", async () => {
+    const fetches: boolean[] = [];
+    await expect(
+      renderSessionPhase(
+        "untitled",
+        [session("untitled", undefined)],
+        [session("untitled", "stale archived title", true, { phase: "running" })],
+        fetches,
+        false,
+      ),
+    ).resolves.toBe("missing");
+    expect(fetches).toEqual([false]);
+  });
+
+  it("falls back to the archived list for a valid archived-session route", async () => {
+    await expect(
+      renderSessionPhase(
+        "session-3",
+        [],
+        [session("session-3", "Archived chat", true, { phase: "requires_action" })],
+      ),
+    ).resolves.toBe("requires_action");
   });
 });

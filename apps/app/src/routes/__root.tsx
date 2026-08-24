@@ -22,7 +22,14 @@ import { ContentPanelSessionProvider } from "@/components/layout/content-panel/r
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
-import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
+import {
+  formatSessionPhaseLabel,
+  sessionPhaseBadgeVariant,
+} from "@/features/projects/session-phase";
+import {
+  useProjectSessionPhase,
+  useProjectSessionTitle,
+} from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { reviewPanel } from "@/features/review/review-panel";
@@ -73,6 +80,11 @@ function RootLayout() {
   });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
+  const sessionPhase = useProjectSessionPhase(sessionRef ?? undefined);
+  const sessionStatusLabel =
+    sessionPhase === undefined ? undefined : formatSessionPhaseLabel(sessionPhase);
+  const sessionStatusVariant =
+    sessionPhase === undefined ? undefined : sessionPhaseBadgeVariant(sessionPhase);
   // Mutations can settle after navigation. Read the router's current match at
   // call time instead of capturing a render-time `active` boolean.
   const router = useRouter();
@@ -98,6 +110,8 @@ function RootLayout() {
             <CardPanel
               hasTrafficLights={os === "macos"}
               heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
+              statusLabel={sessionStatusLabel}
+              statusVariant={sessionStatusVariant}
               supportingText={project?.name}
             />
           </AppShellMain>
