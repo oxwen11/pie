@@ -55,6 +55,24 @@ export const gitRouter = orpc.router({
       }),
     );
   }),
+  patch: orpc.patch.effect(function* ({ input, errors }) {
+    const git = yield* GitService;
+    return yield* git.patch(input).pipe(
+      Effect.catchTags({
+        WorkspacePathEscape: (error) =>
+          Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
+        WorkspaceNotDirectory: (error) =>
+          Effect.fail(errors.NOT_DIRECTORY({ data: { path: error.path } })),
+        WorkspaceReadError: () => Effect.fail(errors.GIT_FAILED({ data: { cwd: input.cwd } })),
+        GitNotRepository: (error) =>
+          Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
+        GitError: (error) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+        GitRefNotFound: (error) => Effect.fail(errors.REF_NOT_FOUND({ data: { ref: error.ref } })),
+        GitPatchTooLarge: (error) =>
+          Effect.fail(errors.PATCH_TOO_LARGE({ data: { limit: error.limit } })),
+      }),
+    );
+  }),
   diff: orpc.diff.effect(function* ({ input, errors }) {
     const git = yield* GitService;
     return yield* git.diff(input).pipe(

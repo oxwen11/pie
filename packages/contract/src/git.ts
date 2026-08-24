@@ -9,6 +9,7 @@ const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
 const cwdData = toStandardSchema(Schema.Struct({ cwd: Schema.String }));
 const refData = toStandardSchema(Schema.Struct({ ref: Schema.String }));
+const limitData = toStandardSchema(Schema.Struct({ limit: Schema.Number }));
 
 export const GitStatusFileSchema = Schema.Struct({
   path: Schema.String,
@@ -84,6 +85,31 @@ export const GitReviewSchema = Schema.Struct({
 });
 export type GitReview = typeof GitReviewSchema.Type;
 
+export const GitPatchFileIssueReasonSchema = Schema.Literals([
+  "binary",
+  "too-large",
+  "unavailable",
+]);
+export type GitPatchFileIssueReason = typeof GitPatchFileIssueReasonSchema.Type;
+
+export const GitPatchFileIssueSchema = Schema.Struct({
+  path: Schema.String,
+  reason: GitPatchFileIssueReasonSchema,
+});
+export type GitPatchFileIssue = typeof GitPatchFileIssueSchema.Type;
+
+export const GitPatchSchema = Schema.Struct({
+  mode: GitReviewModeSchema,
+  other: Schema.Union([Schema.String, Schema.Null]),
+  branch: Schema.Union([Schema.String, Schema.Null]),
+  base: Schema.String,
+  baseBranch: Schema.Union([Schema.String, Schema.Null]),
+  files: Schema.Array(GitReviewFileSchema),
+  issues: Schema.Array(GitPatchFileIssueSchema),
+  patch: Schema.String,
+});
+export type GitPatch = typeof GitPatchSchema.Type;
+
 export const GitFileDiffSchema = Schema.Struct({
   path: Schema.String,
   status: GitReviewFileStatusSchema,
@@ -106,6 +132,11 @@ const reviewErrors = {
   REF_NOT_FOUND: { data: refData },
 };
 
+const patchErrors = {
+  ...reviewErrors,
+  PATCH_TOO_LARGE: { data: limitData },
+};
+
 const diffErrors = {
   ...reviewErrors,
   NOT_FOUND: { data: pathData },
@@ -119,7 +150,7 @@ const diffErrors = {
 
 /**
  * Read-only git. Callers pass `cwd`; the server confines paths to that
- * workspace and never writes. `review` / `diff` take an explicit compare mode.
+ * workspace and never writes. `review`, `patch`, and `diff` take an explicit compare mode.
  */
 export const gitContract = {
   status: oc
@@ -134,6 +165,10 @@ export const gitContract = {
     .input(toStandardSchema(GitReviewQuerySchema))
     .errors(reviewErrors)
     .output(toStandardSchema(GitReviewSchema)),
+  patch: oc
+    .input(toStandardSchema(GitReviewQuerySchema))
+    .errors(patchErrors)
+    .output(toStandardSchema(GitPatchSchema)),
   diff: oc
     .input(toStandardSchema(GitDiffQuerySchema))
     .errors(diffErrors)

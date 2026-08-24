@@ -15,8 +15,8 @@ import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 import { ReviewWorkspaceLayout } from "./review-workspace-layout";
 import { useGitBranch } from "./use-git-branch";
-import { useGitDiffs } from "./use-git-diffs";
-import { useGitReview } from "./use-git-review";
+import { useGitDiffLoader } from "./use-git-diff-loader";
+import { useGitPatch } from "./use-git-patch";
 import { useSessionWorkspace } from "./use-session-workspace";
 import { useWorkspaceTree } from "./use-workspace-tree";
 
@@ -58,9 +58,9 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     mode === "branch"
       ? (instance.payload.other ?? branch.data?.defaultBranch ?? undefined)
       : undefined;
-  const review = useGitReview(cwd, mode, other);
+  const review = useGitPatch(cwd, mode, other);
+  const loadDiffFiles = useGitDiffLoader(cwd, mode, other);
   const tree = useWorkspaceTree(cwd);
-  const diffs = useGitDiffs(cwd, review.data?.files ?? [], mode, other);
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
 
@@ -155,12 +155,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
 
   const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
   const refresh = (): void => {
-    void Promise.all([
-      review.refetch(),
-      branch.refetch(),
-      tree.refetch(),
-      ...diffs.map((diff) => diff.refetch()),
-    ]);
+    void Promise.all([review.refetch(), branch.refetch(), tree.refetch()]);
   };
 
   return (
@@ -178,8 +173,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
       filesLabel={workspace.data.name}
       preview={
         <ReviewDiffPane
-          diffs={diffs}
           key={`${mode}:${other ?? ""}`}
+          loadDiffFiles={loadDiffFiles}
           locateRequest={locateRequest}
           path={selectedPath}
           review={review}
@@ -208,6 +203,8 @@ function reviewErrorTitle(error: Error): string {
       return "Not a Git repository";
     case "REF_NOT_FOUND":
       return "Compare branch not found";
+    case "PATCH_TOO_LARGE":
+      return "Review too large";
     default:
       return "Unable to load review";
   }
@@ -220,7 +217,20 @@ function reviewErrorMessage(error: Error): string {
       return "Open a Git project to review uncommitted work, commits, or another branch.";
     case "REF_NOT_FOUND":
       return "Pick a local branch or a remote-tracking ref that already exists.";
+    case "PATCH_TOO_LARGE": {
+      const data = error.data as { limit?: number } | undefined;
+      return data?.limit === undefined
+        ? "The review patch is too large to preview safely."
+        : `The review patch exceeds the ${formatBytes(data.limit)} preview limit.`;
+    }
     default:
       return error.message;
   }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kibibytes = bytes / 1024;
+  if (kibibytes < 1024) return `${kibibytes.toFixed(1)} KiB`;
+  return `${(kibibytes / 1024).toFixed(1)} MiB`;
 }
