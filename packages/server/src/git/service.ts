@@ -1,9 +1,12 @@
+import childProcess from "node:child_process";
 import path from "node:path";
 
 import type {
   GitBranch,
   GitDiffQuery,
   GitFileDiff,
+  GitPatch,
+  GitPatchFileIssue,
   GitReview,
   GitReviewFile,
   GitReviewMode,
@@ -11,12 +14,13 @@ import type {
   GitStatus,
   GitStatusFile,
 } from "@getpie/contract/git";
-import { Context, Effect, FileSystem, Layer } from "effect";
+import { Context, Effect, FileSystem, Layer, Semaphore } from "effect";
 import { simpleGit } from "simple-git";
 
 import {
   GitError,
   GitNotRepository,
+  GitPatchTooLarge,
   GitRefNotFound,
   WorkspaceBinaryFile,
   WorkspaceFileNotFound,
@@ -30,6 +34,10 @@ import { FileSystemService } from "../fs";
 import { parseNameStatus, parseNulPaths } from "./name-status";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_PATCH_BYTES = MAX_FILE_BYTES;
+// Keep Git subprocesses within a shared budget so large reviews cannot starve the daemon's
+// health endpoint and trigger supervision.
+const MAX_CONCURRENT_GIT_COMMANDS = 8;
 const NUL_BYTE = 0;
 const BINARY_MAGIC_PREFIXES: ReadonlyArray<ReadonlyArray<number>> = [
   [0x25, 0x50, 0x44, 0x46, 0x2d],
@@ -54,6 +62,27 @@ const contains = (parent: string, child: string): boolean => {
 
 const toPosixPath = (value: string): string => value.split(path.sep).join("/");
 
+const quotePatchPath = (prefix: "a" | "b", relativePath: string): string => {
+  const value = `${prefix}/${relativePath}`;
+  return /["\\\t\n\r]/.test(value) ? JSON.stringify(value) : value;
+};
+
+const createAddedFilePatch = (relativePath: string, contents: string, mode = "100644"): string => {
+  const oldPath = quotePatchPath("a", relativePath);
+  const newPath = quotePatchPath("b", relativePath);
+  const trailingNewline = contents.endsWith("\n");
+  const lines = contents === "" ? [] : contents.split("\n");
+  if (trailingNewline) lines.pop();
+
+  let patch = `diff --git ${oldPath} ${newPath}\nnew file mode ${mode}\n--- /dev/null\n+++ ${newPath}\n`;
+  if (lines.length === 0) return patch;
+
+  patch += `@@ -0,0 +1,${lines.length} @@\n`;
+  patch += lines.map((line) => `+${line}\n`).join("");
+  if (!trailingNewline) patch += "\\ No newline at end of file\n";
+  return patch;
+};
+
 const hasBinaryMagicPrefix = (bytes: Uint8Array): boolean =>
   BINARY_MAGIC_PREFIXES.some(
     (prefix) =>
@@ -64,6 +93,14 @@ const isNotRepositoryMessage = (cause: unknown): boolean => {
   const message = cause instanceof Error ? cause.message : String(cause);
   return /not a git repository/i.test(message);
 };
+
+const isMaxBufferError = (cause: unknown): boolean => {
+  if (!(cause instanceof Error)) return false;
+  const code = "code" in cause ? cause.code : undefined;
+  return code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" || /maxBuffer/i.test(cause.message);
+};
+
+const byteLength = (value: string): number => new TextEncoder().encode(value).byteLength;
 
 const decodeText = (
   bytes: Uint8Array,
@@ -99,6 +136,8 @@ type GitFailure =
 
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
+type GitPatchFailure = GitReviewFailure | GitPatchTooLarge;
+
 type GitDiffFailure =
   | GitReviewFailure
   | WorkspaceFileNotFound
@@ -115,6 +154,15 @@ type ComparePlan = {
   readonly includeUntracked: boolean;
 };
 
+type ReviewFiles = {
+  readonly files: ReadonlyArray<GitReviewFile>;
+  readonly untracked: ReadonlyArray<string>;
+};
+
+type UntrackedPatchResult =
+  | { readonly patch: string; readonly issue?: never }
+  | { readonly patch?: never; readonly issue: GitPatchFileIssue };
+
 /**
  * Read-only `git` module. Workspace confinement matches `FileSystemService`:
  * `cwd` must be an absolute directory, and every path git reports is rewritten
@@ -126,6 +174,7 @@ export class GitService extends Context.Service<
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
     readonly review: (query: GitReviewQuery) => Effect.Effect<GitReview, GitReviewFailure>;
+    readonly patch: (query: GitReviewQuery) => Effect.Effect<GitPatch, GitPatchFailure>;
     readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
 >()("GitService") {}
@@ -139,6 +188,7 @@ export const GitServiceLayer: Layer.Layer<
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
+    const gitCommands = yield* Semaphore.make(MAX_CONCURRENT_GIT_COMMANDS);
 
     const readError = (relativePath: string) => (cause: unknown) =>
       new WorkspaceReadError({ path: relativePath, cause });
@@ -160,10 +210,41 @@ export const GitServiceLayer: Layer.Layer<
       isNotRepositoryMessage(cause) ? new GitNotRepository({ cwd }) : new GitError({ cwd, cause });
 
     const raw = (cwd: string, args: readonly string[]) =>
-      Effect.tryPromise({
-        try: () => simpleGit(cwd).raw([...args]),
-        catch: gitError(cwd),
-      });
+      gitCommands.withPermit(
+        // simple-git does not expose cancellation for a running child. Keep the permit until
+        // its Promise settles even if the RPC fiber is interrupted, or replacement requests
+        // can start another batch while the canceled children are still alive.
+        Effect.uninterruptible(
+          Effect.tryPromise({
+            try: () => simpleGit(cwd).raw([...args]),
+            catch: gitError(cwd),
+          }),
+        ),
+      );
+
+    const rawBounded = (cwd: string, args: readonly string[]) =>
+      gitCommands.withPermit(
+        Effect.uninterruptible(
+          Effect.tryPromise({
+            try: () =>
+              new Promise<string>((resolve, reject) => {
+                childProcess.execFile(
+                  "git",
+                  [...args],
+                  { cwd, encoding: "utf8", maxBuffer: MAX_PATCH_BYTES },
+                  (error, stdout) => {
+                    if (error !== null) reject(error);
+                    else resolve(stdout);
+                  },
+                );
+              }),
+            catch: (cause) =>
+              isMaxBufferError(cause)
+                ? new GitPatchTooLarge({ limit: MAX_PATCH_BYTES })
+                : gitError(cwd)(cause),
+          }),
+        ),
+      );
 
     const resolveRepoRoot = (cwd: string) =>
       raw(cwd, ["rev-parse", "--show-toplevel"]).pipe(
@@ -312,36 +393,193 @@ export const GitServiceLayer: Layer.Layer<
         }),
       );
 
-    const reviewFiles = (cwd: string, repoRoot: string, plan: ComparePlan) =>
+    const collectReviewFiles = <E>(
+      runGit: (cwd: string, args: readonly string[]) => Effect.Effect<string, E>,
+      cwd: string,
+      repoRoot: string,
+      plan: ComparePlan,
+    ): Effect.Effect<ReviewFiles, E> =>
       Effect.gen(function* () {
         const diffArgs =
           plan.head === null
             ? ["diff", "--name-status", "-z", "--find-renames", plan.base]
             : ["diff", "--name-status", "-z", "--find-renames", plan.base, plan.head];
-        const nameStatus = yield* raw(cwd, diffArgs);
+        const nameStatus = yield* runGit(cwd, diffArgs);
         const tracked = parseNameStatus(nameStatus)
           .map((file) => relocate(cwd, repoRoot, file))
           .filter((file): file is GitReviewFile => file !== null);
         const files = [...tracked];
+        const untracked: string[] = [];
         const seen = new Set(tracked.map((file) => file.path));
         if (plan.includeUntracked) {
-          const untrackedRaw = yield* raw(cwd, [
+          const untrackedRaw = yield* runGit(cwd, [
             "ls-files",
             "-z",
             "--others",
             "--exclude-standard",
+            "--full-name",
           ]);
           for (const gitPath of parseNulPaths(untrackedRaw)) {
             const nextPath = toWorkspacePath(cwd, repoRoot, gitPath);
             if (nextPath === null || seen.has(nextPath)) continue;
             seen.add(nextPath);
+            untracked.push(nextPath);
             files.push({ path: nextPath, status: "added" });
           }
         }
         files.sort((left, right) =>
           left.path.localeCompare(right.path, undefined, { numeric: true, sensitivity: "base" }),
         );
-        return files;
+        return { files, untracked };
+      });
+
+    const reviewFiles = (cwd: string, repoRoot: string, plan: ComparePlan) =>
+      collectReviewFiles(raw, cwd, repoRoot, plan);
+
+    const boundedReviewFiles = (cwd: string, repoRoot: string, plan: ComparePlan) =>
+      collectReviewFiles(rawBounded, cwd, repoRoot, plan);
+
+    const binaryReviewPaths = (cwd: string, repoRoot: string, plan: ComparePlan) =>
+      rawBounded(cwd, [
+        "diff",
+        "--numstat",
+        "-z",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--find-renames",
+        plan.base,
+        ...(plan.head === null ? [] : [plan.head]),
+        "--",
+        ".",
+      ]).pipe(
+        Effect.map((output) => {
+          const fields = output.split("\0");
+          const paths: string[] = [];
+          for (let index = 0; index < fields.length; index += 1) {
+            const header = fields[index];
+            if (header === undefined || header === "") continue;
+            const firstTab = header.indexOf("\t");
+            const secondTab = header.indexOf("\t", firstTab + 1);
+            if (firstTab < 0 || secondTab < 0) continue;
+            if (
+              header.slice(0, firstTab) !== "-" ||
+              header.slice(firstTab + 1, secondTab) !== "-"
+            ) {
+              continue;
+            }
+            let gitPath = header.slice(secondTab + 1);
+            if (gitPath === "") {
+              index += 2;
+              gitPath = fields[index] ?? "";
+            }
+            const relativePath = toWorkspacePath(cwd, repoRoot, gitPath);
+            if (relativePath !== null) paths.push(relativePath);
+          }
+          return paths;
+        }),
+      );
+
+    const readUntrackedPatch = (
+      cwd: string,
+      relativePath: string,
+    ): Effect.Effect<UntrackedPatchResult> => {
+      const absolutePath = path.join(cwd, relativePath);
+      const regularFile = Effect.gen(function* () {
+        const contents = yield* workspace.readFileString(cwd, relativePath);
+        const info = yield* fs
+          .stat(absolutePath)
+          .pipe(Effect.catch(() => Effect.succeed(undefined)));
+        const mode = info !== undefined && (info.mode & 0o111) !== 0 ? "100755" : "100644";
+        return { patch: createAddedFilePatch(relativePath, contents, mode) } as const;
+      });
+      return fs.readLink(absolutePath).pipe(
+        Effect.map(
+          (target): UntrackedPatchResult => ({
+            patch: createAddedFilePatch(relativePath, target, "120000"),
+          }),
+        ),
+        Effect.catch(() => regularFile),
+        Effect.catch((error) =>
+          Effect.succeed({
+            issue: {
+              path: relativePath,
+              reason:
+                error._tag === "WorkspaceBinaryFile"
+                  ? "binary"
+                  : error._tag === "WorkspaceFileTooLarge"
+                    ? "too-large"
+                    : "unavailable",
+            },
+          } as const),
+        ),
+      );
+    };
+
+    const reviewPatch = (
+      cwd: string,
+      repoRoot: string,
+      plan: ComparePlan,
+      files: ReadonlyArray<GitReviewFile>,
+      untracked: ReadonlyArray<string>,
+    ) =>
+      Effect.gen(function* () {
+        const diffArgs = [
+          "diff",
+          "--patch",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-color",
+          "--find-renames",
+          "--relative",
+          plan.base,
+          ...(plan.head === null ? [] : [plan.head]),
+          "--",
+          ".",
+        ];
+        const trackedPatch = yield* rawBounded(cwd, diffArgs);
+        const binaryPaths = yield* binaryReviewPaths(cwd, repoRoot, plan);
+        const issues: GitPatchFileIssue[] = binaryPaths.map((filePath) => ({
+          path: filePath,
+          reason: "binary",
+        }));
+        const chunks = trackedPatch === "" ? [] : [trackedPatch];
+        let totalBytes =
+          byteLength(trackedPatch) +
+          byteLength(JSON.stringify(files)) +
+          byteLength(JSON.stringify(issues));
+        if (totalBytes > MAX_PATCH_BYTES) {
+          return yield* new GitPatchTooLarge({ limit: MAX_PATCH_BYTES });
+        }
+
+        for (const relativePath of untracked) {
+          const result = yield* readUntrackedPatch(cwd, relativePath);
+          if (result.issue !== undefined) {
+            totalBytes += byteLength(JSON.stringify(result.issue));
+            if (totalBytes > MAX_PATCH_BYTES) {
+              return yield* new GitPatchTooLarge({ limit: MAX_PATCH_BYTES });
+            }
+            issues.push(result.issue);
+            continue;
+          }
+          const chunk = result.patch.endsWith("\n") ? result.patch : `${result.patch}\n`;
+          totalBytes += byteLength(chunk);
+          if (totalBytes > MAX_PATCH_BYTES) {
+            return yield* new GitPatchTooLarge({ limit: MAX_PATCH_BYTES });
+          }
+          chunks.push(chunk);
+        }
+
+        return { patch: chunks.join(""), issues };
+      });
+
+    const loadReview = (query: GitReviewQuery) =>
+      Effect.gen(function* () {
+        const realRoot = yield* resolveRoot(query.cwd);
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const branch = yield* currentBranch(realRoot);
+        const plan = yield* resolveCompare(realRoot, query);
+        const fileSet = yield* reviewFiles(realRoot, repoRoot, plan);
+        return { realRoot, repoRoot, branch, plan, fileSet };
       });
 
     const readWorktreeText = (cwd: string, relativePath: string) =>
@@ -423,19 +661,45 @@ export const GitServiceLayer: Layer.Layer<
 
       review: (query) =>
         Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(query.cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch = yield* currentBranch(realRoot);
-          const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
+          const { branch, plan, fileSet } = yield* loadReview(query);
           return {
             mode: plan.mode,
             other: plan.other,
             branch,
             base: plan.base,
             baseBranch: plan.baseBranch,
-            files,
+            files: fileSet.files,
           };
+        }),
+
+      patch: (query) =>
+        Effect.gen(function* () {
+          const realRoot = yield* resolveRoot(query.cwd);
+          const repoRoot = yield* resolveRepoRoot(realRoot);
+          const branch = yield* currentBranch(realRoot);
+          const plan = yield* resolveCompare(realRoot, query);
+          const fileSet = yield* boundedReviewFiles(realRoot, repoRoot, plan);
+          const result = yield* reviewPatch(
+            realRoot,
+            repoRoot,
+            plan,
+            fileSet.files,
+            fileSet.untracked,
+          );
+          const response: GitPatch = {
+            mode: plan.mode,
+            other: plan.other,
+            branch,
+            base: plan.base,
+            baseBranch: plan.baseBranch,
+            files: fileSet.files,
+            issues: result.issues,
+            patch: result.patch,
+          };
+          if (byteLength(JSON.stringify(response)) > MAX_PATCH_BYTES) {
+            return yield* new GitPatchTooLarge({ limit: MAX_PATCH_BYTES });
+          }
+          return response;
         }),
 
       diff: (query) =>
@@ -446,8 +710,8 @@ export const GitServiceLayer: Layer.Layer<
           }
           const repoRoot = yield* resolveRepoRoot(realRoot);
           const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
-          const file = files.find((entry) => entry.path === query.path);
+          const fileSet = yield* reviewFiles(realRoot, repoRoot, plan);
+          const file = fileSet.files.find((entry) => entry.path === query.path);
           if (file === undefined) {
             return yield* new WorkspaceFileNotFound({ path: query.path });
           }

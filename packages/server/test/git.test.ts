@@ -83,7 +83,7 @@ layer(NodePlatformLayer)("GitService", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const dir = yield* repo;
       yield* fs.writeFileString(path.join(dir, "a.txt"), "hello\n");
-      yield* fs.writeFileString(path.join(dir, "added.txt"), "new\n");
+      yield* fs.writeFileString(path.join(dir, "added file.txt"), "new");
 
       const git = yield* GitService;
       const review = yield* git.review({ cwd: dir });
@@ -94,18 +94,27 @@ layer(NodePlatformLayer)("GitService", (it) => {
       assert.equal(review.baseBranch, null);
       assert.deepEqual(Array.from(review.files.map((file) => file.path)).toSorted(), [
         "a.txt",
-        "added.txt",
+        "added file.txt",
       ]);
+
+      const patch = yield* git.patch({ cwd: dir });
+      assert.deepEqual(patch.files, review.files);
+      assert.deepEqual(patch.issues, []);
+      assert.match(patch.patch, /diff --git a\/a\.txt b\/a\.txt/);
+      assert.match(patch.patch, /diff --git a\/added file\.txt b\/added file\.txt/);
+      assert.match(patch.patch, /new file mode/);
+      assert.match(patch.patch, /\+new/);
+      assert.match(patch.patch, /No newline at end of file/);
 
       const modified = yield* git.diff({ cwd: dir, path: "a.txt" });
       assert.equal(modified.status, "modified");
       assert.equal(modified.oldContents, "hi\n");
       assert.equal(modified.newContents, "hello\n");
 
-      const added = yield* git.diff({ cwd: dir, path: "added.txt" });
+      const added = yield* git.diff({ cwd: dir, path: "added file.txt" });
       assert.equal(added.status, "added");
       assert.equal(added.oldContents, null);
-      assert.equal(added.newContents, "new\n");
+      assert.equal(added.newContents, "new");
     }).pipe(Effect.provide(GitLayer)),
   );
 
@@ -134,6 +143,10 @@ layer(NodePlatformLayer)("GitService", (it) => {
       assert.deepEqual(Array.from(review.files.map((file) => file.path)).toSorted(), [
         "feature.txt",
       ]);
+
+      const patch = yield* git.patch({ cwd: dir, mode: "committed" });
+      assert.match(patch.patch, /diff --git a\/feature\.txt b\/feature\.txt/);
+      assert.doesNotMatch(patch.patch, /wip\.txt/);
 
       const diff = yield* git.diff({ cwd: dir, mode: "committed", path: "feature.txt" });
       assert.equal(diff.oldContents, null);
@@ -183,6 +196,9 @@ layer(NodePlatformLayer)("GitService", (it) => {
         "feature.txt",
         "wip.txt",
       ]);
+      const patch = yield* git.patch({ cwd: dir, mode: "branch", other: "main" });
+      assert.match(patch.patch, /diff --git a\/feature\.txt b\/feature\.txt/);
+      assert.match(patch.patch, /diff --git a\/wip\.txt b\/wip\.txt/);
 
       const vsOrigin = yield* git.review({ cwd: dir, mode: "branch", other: "origin/main" });
       assert.equal(vsOrigin.other, "origin/main");
@@ -239,6 +255,101 @@ layer(NodePlatformLayer)("GitService", (it) => {
 
       const missing = yield* git.review({ cwd: dir }).pipe(Effect.flip);
       assert.equal(missing._tag, "GitNotRepository");
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("reports unsupported untracked files and preserves symlinks", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* repo;
+      yield* fs.writeFile(path.join(dir, "binary.bin"), Uint8Array.from([0, 1, 2]));
+      yield* fs.writeFile(path.join(dir, "staged-binary.bin"), Uint8Array.from([0, 1, 2]));
+      yield* Effect.promise(() => simpleGit(dir).add("staged-binary.bin"));
+      yield* fs.writeFileString(path.join(dir, "large.txt"), "x".repeat(2 * 1024 * 1024 + 1));
+      yield* fs.writeFileString(path.join(dir, "executable.sh"), "#!/bin/sh\n");
+      yield* fs.chmod(path.join(dir, "executable.sh"), 0o755);
+      yield* fs.writeFileString(path.join(dir, "target.txt"), "private\n");
+      yield* fs.symlink("target.txt", path.join(dir, "link.txt"));
+
+      const git = yield* GitService;
+      const patch = yield* git.patch({ cwd: dir });
+
+      assert.deepEqual(
+        Array.from(patch.issues).toSorted((left, right) => left.path.localeCompare(right.path)),
+        [
+          { path: "binary.bin", reason: "binary" },
+          { path: "large.txt", reason: "too-large" },
+          { path: "staged-binary.bin", reason: "binary" },
+        ],
+      );
+      assert.doesNotMatch(patch.patch, /diff --git a\/binary\.bin/);
+      assert.doesNotMatch(patch.patch, /diff --git a\/large\.txt/);
+      const executablePatch = patch.patch.slice(
+        patch.patch.indexOf("diff --git a/executable.sh b/executable.sh"),
+        patch.patch.indexOf("diff --git a/link.txt b/link.txt"),
+      );
+      assert.match(executablePatch, /new file mode 100755/);
+
+      const linkPatch = patch.patch.slice(
+        patch.patch.indexOf("diff --git a/link.txt b/link.txt"),
+        patch.patch.indexOf("diff --git a/target.txt b/target.txt"),
+      );
+      assert.match(linkPatch, /new file mode 120000/);
+      assert.match(linkPatch, /\+target\.txt/);
+      assert.doesNotMatch(linkPatch, /\+private/);
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("rejects a tracked patch that exceeds the review payload limit", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* repo;
+      yield* fs.writeFileString(path.join(dir, "huge.txt"), "x".repeat(2 * 1024 * 1024 + 1));
+      yield* Effect.promise(() => simpleGit(dir).add("huge.txt"));
+
+      const git = yield* GitService;
+      const error = yield* git.patch({ cwd: dir }).pipe(Effect.flip);
+      assert.equal(error._tag, "GitPatchTooLarge");
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("bounds the serialized review response", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* repo;
+      yield* fs.writeFileString(path.join(dir, "escaped.txt"), "\x01".repeat(400_000));
+      yield* Effect.promise(() => simpleGit(dir).add("escaped.txt"));
+
+      const git = yield* GitService;
+      const error = yield* git.patch({ cwd: dir }).pipe(Effect.flip);
+      assert.equal(error._tag, "GitPatchTooLarge");
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("returns workspace-relative patch paths from a repository subdirectory", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* repo;
+      const nested = path.join(dir, "nested");
+      yield* fs.makeDirectory(nested);
+      yield* fs.writeFileString(path.join(nested, "inside.txt"), "before\n");
+      yield* Effect.promise(async () => {
+        const git = simpleGit(dir);
+        await git.add("nested/inside.txt");
+        await git.commit("add nested file");
+      });
+      yield* fs.writeFileString(path.join(nested, "inside.txt"), "after\n");
+      yield* fs.writeFileString(path.join(nested, "untracked.txt"), "new\n");
+
+      const git = yield* GitService;
+      const patch = yield* git.patch({ cwd: nested });
+      assert.deepEqual(patch.files, [
+        { path: "inside.txt", status: "modified" },
+        { path: "untracked.txt", status: "added" },
+      ]);
+      assert.match(patch.patch, /diff --git a\/inside\.txt b\/inside\.txt/);
+      assert.match(patch.patch, /diff --git a\/untracked\.txt b\/untracked\.txt/);
+      assert.doesNotMatch(patch.patch, /a\/nested\//);
     }).pipe(Effect.provide(GitLayer)),
   );
 

@@ -31,6 +31,11 @@ export class GitRefNotFound extends Data.TaggedError("GitRefNotFound")<{
   readonly ref: string;
 }> {}
 
+/** The generated review patch exceeded the bounded RPC payload size. */
+export class GitPatchTooLarge extends Data.TaggedError("GitPatchTooLarge")<{
+  readonly limit: number;
+}> {}
+
 export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly projectId: string;
   readonly sessionId: string;

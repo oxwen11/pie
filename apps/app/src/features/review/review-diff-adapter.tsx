@@ -1,12 +1,21 @@
-import type { GitFileDiff } from "@getpie/contract/git";
-import { parseDiffFromFile } from "@pierre/diffs";
+import type { GitPatchFileIssue, GitReviewFile } from "@getpie/contract/git";
+import type { FileDiffContentsLoader } from "@pierre/diffs";
 import {
   CodeView,
   type CodeViewHandle,
   type CodeViewItem,
   type CodeViewReactOptions,
 } from "@pierre/diffs/react";
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+
+import { parseReviewPatch } from "./review-patch";
 
 const DIFF_UNSAFE_CSS = `
   :host {
@@ -41,15 +50,6 @@ const subscribeToAppTheme = (listener: () => void): (() => void) => {
   return () => observer.disconnect();
 };
 
-function parseReviewDiff(diff: GitFileDiff) {
-  return parseDiffFromFile(
-    diff.oldContents === null
-      ? null
-      : { name: diff.oldPath ?? diff.path, contents: diff.oldContents },
-    diff.newContents === null ? null : { name: diff.path, contents: diff.newContents },
-  );
-}
-
 function itemIdFromInstance(instance: object): string | undefined {
   if (!("fileDiff" in instance)) return undefined;
   const fileDiff = instance.fileDiff;
@@ -59,11 +59,17 @@ function itemIdFromInstance(instance: object): string | undefined {
 }
 
 export function ReviewDiffAdapter({
-  diffs,
+  patch,
+  files,
+  issues,
+  loadDiffFiles,
   locatePath,
   locateRequest,
 }: {
-  diffs: ReadonlyArray<GitFileDiff>;
+  patch: string;
+  files: ReadonlyArray<GitReviewFile>;
+  issues: ReadonlyArray<GitPatchFileIssue>;
+  loadDiffFiles: FileDiffContentsLoader;
   locatePath?: string;
   locateRequest: number;
 }) {
@@ -83,18 +89,20 @@ export function ReviewDiffAdapter({
       setCollapsed(next);
     }
   }
-  const fileDiffs = useMemo(
-    () => diffs.map((diff) => ({ path: diff.path, fileDiff: parseReviewDiff(diff) })),
-    [diffs],
+  const fileDiffs = useMemo(() => parseReviewPatch(patch, files, issues), [files, issues, patch]);
+  const issuesByPath = useMemo(
+    () => new Map(issues.map((issue) => [issue.path, issue.reason])),
+    [issues],
   );
 
   const items = useMemo<ReadonlyArray<CodeViewItem>>(
     () =>
-      fileDiffs.map(({ path, fileDiff }) => ({
-        id: path,
+      fileDiffs.map((fileDiff) => ({
+        id: fileDiff.name,
         type: "diff",
         fileDiff,
-        collapsed: collapsed.has(path),
+        collapsed: collapsed.has(fileDiff.name),
+        version: collapsed.has(fileDiff.name) ? 1 : 0,
       })),
     [collapsed, fileDiffs],
   );
@@ -106,6 +114,7 @@ export function ReviewDiffAdapter({
       theme: { dark: "pierre-dark", light: "pierre-light" },
       themeType,
       unsafeCSS: DIFF_UNSAFE_CSS,
+      loadDiffFiles,
       onPostRender(node, instance, phase) {
         if (phase === "unmount") return;
         const header = node.shadowRoot?.querySelector("[data-diffs-header]");
@@ -126,18 +135,41 @@ export function ReviewDiffAdapter({
         });
       },
     }),
-    [themeType],
+    [loadDiffFiles, themeType],
+  );
+
+  const renderHeaderMetadata = useCallback(
+    (item: CodeViewItem) => {
+      const reason = issuesByPath.get(item.id);
+      if (reason === undefined) return null;
+      return (
+        <span className="text-muted-foreground text-xs">
+          {reason === "binary"
+            ? "Binary preview unavailable"
+            : reason === "too-large"
+              ? "File too large to preview"
+              : "Preview unavailable"}
+        </span>
+      );
+    },
+    [issuesByPath],
   );
 
   useLayoutEffect(() => {
     if (locatePath === undefined) return;
-    if (!fileDiffs.some((entry) => entry.path === locatePath)) return;
+    if (!fileDiffs.some((fileDiff) => fileDiff.name === locatePath)) return;
     codeViewRef.current?.scrollTo({ type: "item", id: locatePath, align: "start" });
   }, [fileDiffs, locatePath, locateRequest]);
 
   return (
     <div className="h-full min-h-0 w-full">
-      <CodeView className="h-full w-full" items={items} options={options} ref={codeViewRef} />
+      <CodeView
+        className="h-full w-full"
+        items={items}
+        options={options}
+        ref={codeViewRef}
+        renderHeaderMetadata={renderHeaderMetadata}
+      />
     </div>
   );
 }
