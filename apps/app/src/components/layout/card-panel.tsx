@@ -2,33 +2,51 @@ import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
 
+import { BrandMark } from "@/components/layout/brand-mark";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
+import {
+  SHELL_TITLEBAR_HEADER_CLASS,
+  SHELL_TITLEBAR_LABEL_CLASS,
+} from "@/components/layout/shell-chrome";
+import { usePlatform } from "@/platform-context";
+import { isDesktopHost } from "@/platform-host";
 
 export interface CardPanelProps {
-  readonly hasTrafficLights: boolean;
   readonly heading: string;
   readonly supportingText?: string;
 }
 
-export function CardPanel({ hasTrafficLights, heading, supportingText }: CardPanelProps) {
+export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
+  const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
-  const ownsToggle = isMobile || collapsedDesktop;
+  const webCollapsedChrome = collapsedDesktop && !desktop;
 
   return (
-    <SidebarInset className="flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5">
+    <SidebarInset
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-sm/5",
+        // Drop the top border when collapsed so the card header lines up with
+        // the viewport-fixed titlebar row.
+        collapsedDesktop && desktop && "border-t-0",
+      )}
+    >
       <header
         className={cn(
-          "flex h-10 shrink-0 items-center gap-2 px-4 shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
-          collapsedDesktop && hasTrafficLights && "ps-20",
+          SHELL_TITLEBAR_HEADER_CLASS,
+          "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
+          collapsedDesktop && desktop && "ps-[var(--shell-titlebar-content-left)]",
         )}
       >
-        {ownsToggle && (
-          <SidebarTrigger
-            className={cn(isMobile ? "-ms-0.5" : "-ms-2", "[-webkit-app-region:no-drag]")}
-          />
-        )}
-        <div className="flex min-w-0 items-center gap-2 text-sm">
+        {isMobile ? (
+          <SidebarTrigger className="-ms-0.5 [-webkit-app-region:no-drag]" />
+        ) : webCollapsedChrome ? (
+          <>
+            <BrandMark />
+            <SidebarTrigger className="-ms-px -translate-y-px [-webkit-app-region:no-drag]" />
+          </>
+        ) : null}
+        <div className={SHELL_TITLEBAR_LABEL_CLASS}>
           <span className="min-w-0 truncate font-medium" title={heading}>
             {heading}
           </span>
