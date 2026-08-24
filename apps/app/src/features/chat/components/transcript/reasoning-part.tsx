@@ -19,9 +19,11 @@ export function ReasoningPart({
   if (!shouldRenderReasoningPart(part, isMessageStreaming)) return null;
 
   return (
-    <Reasoning isStreaming={isReasoningStreaming} defaultOpen={isStreaming}>
+    <Reasoning className="mb-0 py-1" isStreaming={isReasoningStreaming} defaultOpen={isStreaming}>
       <ReasoningTrigger />
-      <ReasoningContent>{text}</ReasoningContent>
+      <ReasoningContent className="mt-2 [&_.font-semibold]:font-normal [&_p]:mb-2 [&_p]:leading-5 [&_p:last-child]:mb-0">
+        {text}
+      </ReasoningContent>
     </Reasoning>
   );
 }
