@@ -99,6 +99,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
   );
   const treePane = (
     <WorkspaceTreePane
+      gitBranch={workspace.gitBranch}
       onOpenFile={openFile}
       onRefresh={refresh}
       refreshing={refreshing}

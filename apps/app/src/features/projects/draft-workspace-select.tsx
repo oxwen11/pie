@@ -39,20 +39,24 @@ export function DraftWorkspaceSelect({
         }}
         value={mode}
       >
-        <SelectTrigger className="w-auto min-w-0" size="sm">
+        {/* Match ProjectSelect: ghost trigger so it sits as a header action, not a second form field. */}
+        <SelectTrigger
+          className="hover:bg-accent w-auto min-w-0 border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+          size="sm"
+        >
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent align="end">
           <SelectItem value="project">Current directory</SelectItem>
           <SelectItem value="worktree">New worktree</SelectItem>
         </SelectContent>
       </Select>
       {mode === "worktree" ? (
         <Input
-          className="h-8 max-w-48 min-w-0"
+          className="h-8 max-w-40 min-w-0"
           disabled={disabled}
           onChange={(event) => onBranchChange(event.target.value)}
-          placeholder="Branch name (optional)"
+          placeholder="Branch (optional)"
           value={branch}
         />
       ) : null}

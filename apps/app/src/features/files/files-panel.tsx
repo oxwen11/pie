@@ -52,6 +52,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
 
   const treePane = (
     <WorkspaceTreePane
+      gitBranch={workspace.gitBranch}
       onOpenFile={openFile}
       sessionId={panel.sessionKey}
       tree={tree}

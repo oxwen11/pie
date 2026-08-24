@@ -15,7 +15,8 @@ export const toSessionWorkspaceView = (
   projectName: string,
 ): SessionWorkspaceView => ({
   path: workspace.cwd,
-  name: workspace.gitBranch ?? projectName,
+  // Always the project name — branch is metadata for the header, not the tree root label.
+  name: projectName,
   ...(workspace.gitBranch !== undefined ? { gitBranch: workspace.gitBranch } : {}),
 });
 
