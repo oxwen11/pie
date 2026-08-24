@@ -1,8 +1,8 @@
 import {
   type DaemonHandle,
+  type DaemonLivenessFailure,
   type DaemonPlatform,
-  healthy,
-  pidAlive,
+  daemonLiveness,
   resolveDaemonLocation,
   resolveOrSpawnDaemon,
 } from "@getpie/server/daemon";
@@ -16,6 +16,8 @@ const MAX_HEALTH_MISSES = 3;
 export type DaemonServerProcessOptions = {
   /** How often to probe the attached daemon's liveness. */
   readonly pollIntervalMs?: number;
+  /** Override the health deadline for deterministic isolated tests. */
+  readonly healthTimeoutMs?: number;
 };
 
 /**
@@ -72,14 +74,41 @@ export function makeDaemonServerProcess(
 
         const awaitExit: Effect.Effect<ServerProcessExit, ServerSpawnError> = Effect.gen(
           function* () {
-            let misses = 0;
+            let consecutiveMisses = 0;
             while (true) {
               yield* Effect.sleep(pollIntervalMs);
-              if (!pidAlive(handle.pid)) return { exitCode: null };
-              // Tolerate transient probe failures; a wedged-but-alive daemon
-              // still counts as dead after enough consecutive misses.
-              misses = (yield* healthy(handle.address)) ? 0 : misses + 1;
-              if (misses >= MAX_HEALTH_MISSES) return { exitCode: null };
+              const signal =
+                options.healthTimeoutMs === undefined
+                  ? undefined
+                  : AbortSignal.timeout(options.healthTimeoutMs);
+              const result = yield* daemonLiveness(handle, consecutiveMisses, signal);
+              if (result.status === "healthy") {
+                if (consecutiveMisses > 0) {
+                  yield* Effect.logInfo("Daemon liveness recovered").pipe(
+                    Effect.annotateLogs({
+                      event: "server.liveness.recovered",
+                      pid: result.pid,
+                      address: result.address,
+                      port: result.port,
+                      previousMisses: consecutiveMisses,
+                      probeDurationMs: result.probeDurationMs,
+                    }),
+                  );
+                }
+                consecutiveMisses = 0;
+                continue;
+              }
+
+              consecutiveMisses = result.consecutiveMisses;
+              yield* Effect.logWarning("Daemon liveness probe failed").pipe(
+                Effect.annotateLogs({
+                  event: "server.liveness.failed",
+                  ...livenessAnnotations(result),
+                }),
+              );
+              if (result.status === "process_missing" || consecutiveMisses >= MAX_HEALTH_MISSES) {
+                return { exitCode: null, reason: result.status, ...livenessDetails(result) };
+              }
             }
           },
         );
@@ -92,6 +121,38 @@ export function makeDaemonServerProcess(
   });
 }
 
-function endpointOf(handle: DaemonHandle): { port: number; token: string } {
-  return { port: handle.port, token: handle.token };
+function endpointOf(handle: DaemonHandle): {
+  port: number;
+  token: string;
+  pid: number;
+  address: string;
+  reused: boolean;
+} {
+  return {
+    port: handle.port,
+    token: handle.token,
+    pid: handle.pid,
+    address: handle.address,
+    reused: handle.reused,
+  };
+}
+
+function livenessDetails(result: DaemonLivenessFailure) {
+  return {
+    pid: result.pid,
+    address: result.address,
+    port: result.port,
+    consecutiveMisses: result.consecutiveMisses,
+    ...(result.status === "process_missing"
+      ? {}
+      : {
+          probeDurationMs: result.probeDurationMs,
+          probeError: result.probeError,
+          ...(result.status === "unhealthy" ? { httpStatus: result.httpStatus } : {}),
+        }),
+  };
+}
+
+function livenessAnnotations(result: DaemonLivenessFailure) {
+  return { reason: result.status, ...livenessDetails(result) };
 }

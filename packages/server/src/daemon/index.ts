@@ -14,5 +14,13 @@ export {
   statusDaemon,
   stopDaemon,
 } from "./launcher";
-export { healthy, pidAlive } from "./liveness";
+export {
+  type DaemonLivenessFailure,
+  type DaemonLivenessResult,
+  type HealthProbeResult,
+  daemonLiveness,
+  healthy,
+  pidAlive,
+  probeHealth,
+} from "./liveness";
 export { type DaemonRecord, readRecord } from "./record";

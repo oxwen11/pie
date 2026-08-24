@@ -1,12 +1,14 @@
-import { Deferred, Effect, Exit, Scope } from "effect";
+import { Context, Deferred, Effect, Exit, Logger, Scope } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
   ServerExitedBeforeReady,
+  ServerSpawnError,
   type ServerEndpoint,
   type ServerProcessConfig,
   type LocalServerConfig,
   type RunningServerProcess,
+  type ServerProcessExit,
   type SpawnServer,
   makeLocalServer,
   restartBackoff,
@@ -15,40 +17,69 @@ import {
 type FakeProcess = {
   readonly port: number;
   readonly config: ServerProcessConfig;
-  readonly becomeReady: (port?: number, token?: string) => void;
-  readonly failBeforeReady: () => void;
-  readonly exit: () => void;
+  readonly becomeReady: (port?: number, token?: string, pid?: number) => void;
+  readonly failBeforeReady: (message?: string) => void;
+  readonly exit: (details?: Partial<ServerProcessExit>) => void;
   killed: boolean;
 };
 
-function makeHarness(overrides: Partial<LocalServerConfig> = {}) {
+function makeHarness(
+  overrides: Partial<LocalServerConfig> = {},
+  initialSpawnFailure?: ServerSpawnError,
+) {
   const processes: FakeProcess[] = [];
+  const logs: Array<{ readonly message: unknown; readonly annotations: Record<string, unknown> }> =
+    [];
   const scope = Effect.runSync(Scope.make());
+  const logContext = Context.empty().pipe(
+    Context.add(
+      Logger.CurrentLoggers,
+      new Set([
+        Logger.map(Logger.formatStructured, (output) => {
+          logs.push({ message: output.message, annotations: output.annotations });
+          return output;
+        }),
+      ]),
+    ),
+  ) as Context.Context<never>;
 
-  const spawnServer: SpawnServer = (config, port) =>
-    Effect.gen(function* () {
+  const spawnServer: SpawnServer = (config, port) => {
+    if (initialSpawnFailure && processes.length === 0) return Effect.fail(initialSpawnFailure);
+    return Effect.gen(function* () {
       const ready = yield* Deferred.make<ServerEndpoint, ServerExitedBeforeReady>();
       const exited = yield* Deferred.make<{ exitCode: number | null }>();
       const process: FakeProcess = {
         port,
         config,
         killed: false,
-        becomeReady: (boundPort = port || 40_000, token = "daemon-token") => {
-          Effect.runSync(Deferred.succeed(ready, { port: boundPort, token }));
+        becomeReady: (
+          boundPort = port || 40_000,
+          token = "daemon-token",
+          pid = 10_000 + processes.length,
+        ) => {
+          Effect.runSync(
+            Deferred.succeed(ready, {
+              port: boundPort,
+              token,
+              pid,
+              address: `http://127.0.0.1:${boundPort}`,
+              reused: port !== 0,
+            }),
+          );
         },
-        failBeforeReady: () => {
+        failBeforeReady: (message = "exited before ready") => {
           Effect.runSync(
             Deferred.fail(
               ready,
               new ServerExitedBeforeReady({
                 exitCode: 1,
-                message: "exited before ready",
+                message,
               }),
             ),
           );
         },
-        exit: () => {
-          Effect.runSync(Deferred.succeed(exited, { exitCode: 1 }));
+        exit: (details = {}) => {
+          Effect.runSync(Deferred.succeed(exited, { exitCode: 1, ...details }));
         },
       };
       processes.push(process);
@@ -62,6 +93,7 @@ function makeHarness(overrides: Partial<LocalServerConfig> = {}) {
         awaitExit: Deferred.await(exited),
       } satisfies RunningServerProcess;
     });
+  };
 
   const config: LocalServerConfig = {
     entry: "/fake/cli.mjs",
@@ -78,7 +110,10 @@ function makeHarness(overrides: Partial<LocalServerConfig> = {}) {
 
   return {
     processes,
-    server: Effect.runPromise(makeLocalServer(config, spawnServer).pipe(Scope.provide(scope))),
+    logs,
+    server: Effect.runPromise(
+      makeLocalServer(config, spawnServer).pipe(Scope.provide(scope), Effect.provide(logContext)),
+    ),
     dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)),
   };
 }
@@ -139,12 +174,36 @@ describe("LocalServer", () => {
     await h.dispose();
   });
 
+  it("classifies spawn failures without logging their message or cause", async () => {
+    const h = makeHarness(
+      {},
+      new ServerSpawnError({
+        message: "spawn failed with sentinel-spawn-token",
+        cause: { _tag: "UntrustedFailure", token: "sentinel-cause-token" },
+      }),
+    );
+    const server = await h.server;
+
+    await eventually(async () => {
+      expect((await Effect.runPromise(server.snapshot)).status).toBe("failed");
+    });
+    expect(
+      h.logs.find((entry) => entry.annotations.event === "server.supervisor.attempt_failed"),
+    ).toMatchObject({
+      annotations: { reason: "spawn_failed", failureType: "ServerSpawnError" },
+    });
+    expect(JSON.stringify(h.logs)).not.toContain("sentinel-spawn-token");
+    expect(JSON.stringify(h.logs)).not.toContain("sentinel-cause-token");
+
+    await h.dispose();
+  });
+
   it("surfaces an initial failure and retries without rebuilding the service", async () => {
     const h = makeHarness();
     const server = await h.server;
 
     await eventually(() => expect(h.processes).toHaveLength(1));
-    h.processes[0]!.failBeforeReady();
+    h.processes[0]!.failBeforeReady("failed with token sentinel-secret-token");
     await eventually(async () => {
       expect((await Effect.runPromise(server.snapshot)).status).toBe("failed");
     });
@@ -157,6 +216,7 @@ describe("LocalServer", () => {
     await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
       httpBaseUrl: "http://127.0.0.1:50000",
     });
+    expect(JSON.stringify(h.logs)).not.toContain("sentinel-secret-token");
     await h.dispose();
   });
 
@@ -180,6 +240,56 @@ describe("LocalServer", () => {
         token: "rotated-token",
       });
     });
+
+    await h.dispose();
+  });
+
+  it("logs the restart decision chain without exposing daemon tokens", async () => {
+    const h = makeHarness();
+    await eventually(() => expect(h.processes).toHaveLength(1));
+    h.processes[0]!.becomeReady(50_000, "first-secret", 111);
+    const server = await h.server;
+    await Effect.runPromise(server.connection);
+
+    h.processes[0]!.exit({
+      reason: "process_missing",
+      pid: 111,
+      address: "http://127.0.0.1:50000",
+      port: 50_000,
+      consecutiveMisses: 1,
+    });
+    await eventually(() => expect(h.processes).toHaveLength(2));
+    h.processes[1]!.becomeReady(50_001, "replacement-secret", 222);
+    await eventually(async () => {
+      await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
+        httpBaseUrl: "http://127.0.0.1:50001",
+      });
+    });
+
+    const restart = h.logs.find(
+      (entry) => entry.annotations.event === "server.supervisor.restart_scheduled",
+    );
+    expect(restart?.annotations).toMatchObject({
+      previousPid: 111,
+      previousAddress: "http://127.0.0.1:50000",
+      previousPort: 50_000,
+      reason: "process_missing",
+      consecutiveMisses: 1,
+      backoffMs: 0,
+      nextAttempt: 2,
+    });
+    const replacement = h.logs.find(
+      (entry) =>
+        entry.annotations.event === "server.supervisor.ready" && entry.annotations.pid === 222,
+    );
+    expect(replacement?.annotations).toMatchObject({
+      previousPid: 111,
+      previousPort: 50_000,
+      port: 50_001,
+      portChanged: true,
+    });
+    expect(JSON.stringify(h.logs)).not.toContain("first-secret");
+    expect(JSON.stringify(h.logs)).not.toContain("replacement-secret");
 
     await h.dispose();
   });

@@ -3,6 +3,8 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
+import { resolvePieHome } from "@getpie/server/daemon";
+import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
 
@@ -19,6 +21,7 @@ function makeRuntime(devUrl: string | undefined) {
   // minting bubble these up their R channel, and this is where they land.
   const nodeBase = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeCrypto.layer);
   const ChildProcessSpawnerLive = NodeChildProcessSpawner.layer.pipe(Layer.provide(nodeBase));
+  const DesktopObservabilityLive = ServerObservability.layerForHome(resolvePieHome());
   const DesktopConfigLive = makeDesktopConfigLive({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -32,6 +35,7 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
+      Layer.provide(DesktopObservabilityLive),
       Layer.provide(nodeBase),
     ),
   );

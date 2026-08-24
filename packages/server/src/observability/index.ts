@@ -1,6 +1,6 @@
 import { Crypto, Effect, Layer, Logger, References } from "effect";
 
-import { Paths } from "../config/paths";
+import { layerPaths, Paths } from "../config/paths";
 import * as Logging from "./logging";
 
 /**
@@ -29,6 +29,11 @@ export function layer() {
       );
     }),
   );
+}
+
+/** Bind the process logger to an explicit `$PIE_HOME` at a composition root. */
+export function layerForHome(home: string) {
+  return layer().pipe(Layer.provide(layerPaths(home)));
 }
 
 /**
