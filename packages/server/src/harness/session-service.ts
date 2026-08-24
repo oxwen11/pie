@@ -22,8 +22,8 @@ import {
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
-import { ProjectRepository } from "../project/repository";
 import { GitService, type GitWorktreeCreateResult } from "../git/service";
+import { ProjectRepository } from "../project/repository";
 import type { Session } from "../types";
 import type {
   AgentOperationError,
@@ -311,10 +311,7 @@ export const makePiAgentSessionService = (deps: {
         return runtime;
       }
 
-      return yield* manager.ensureRuntime(
-        { sessionId: metadata.agentSessionId, cwd },
-        ref,
-      );
+      return yield* manager.ensureRuntime({ sessionId: metadata.agentSessionId, cwd }, ref);
     });
 
   const deliverPrompt = (
@@ -417,15 +414,11 @@ export const makePiAgentSessionService = (deps: {
             createdAt: new Date().toISOString(),
             cwd,
             ...(gitBranch !== undefined ? { gitBranch } : {}),
-            ...(model !== undefined
-              ? { provider: model.provider, modelId: model.modelId }
-              : {}),
+            ...(model !== undefined ? { provider: model.provider, modelId: model.modelId } : {}),
             ...(pendingWorktree !== undefined
               ? {
                   pendingWorktree:
-                    pendingWorktree.branch !== undefined
-                      ? { branch: pendingWorktree.branch }
-                      : {},
+                    pendingWorktree.branch !== undefined ? { branch: pendingWorktree.branch } : {},
                 }
               : {}),
             archived: false,
@@ -452,13 +445,15 @@ export const makePiAgentSessionService = (deps: {
         Effect.flatMap((metadata) =>
           sessionNeverOpened(metadata, ref)
             ? Effect.succeed(toSessionWorkspace(metadata))
-            : pi.getSessionInfo(metadata.agentSessionId, metadata.cwd!).pipe(
-                Effect.flatMap((info) =>
-                  info._tag === "missing"
-                    ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-                    : Effect.succeed(toSessionWorkspace(metadata)),
+            : pi
+                .getSessionInfo(metadata.agentSessionId, metadata.cwd!)
+                .pipe(
+                  Effect.flatMap((info) =>
+                    info._tag === "missing"
+                      ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
+                      : Effect.succeed(toSessionWorkspace(metadata)),
+                  ),
                 ),
-              ),
         ),
         inSession(ref),
       ),
