@@ -78,11 +78,7 @@ export function ToolBatch({
   const phrase = useMemo(() => buildTriggerPhrase(label), [label]);
 
   return (
-    <Collapsible
-      open={shouldShimmer || isOpen}
-      onOpenChange={setIsOpen}
-      className={cn("w-full", className)}
-    >
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={cn("w-full", className)}>
       <CollapsibleTrigger
         className={cn(
           "text-muted-foreground hover:text-foreground -mx-1 flex w-full items-center gap-2 rounded-md px-1 text-sm transition-colors duration-150",
