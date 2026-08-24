@@ -15,17 +15,13 @@ export function DraftWorkspaceSelect({
   branch,
   onBranchChange,
   disabled,
-  gitAvailable,
 }: {
   mode: DraftWorkspaceMode;
   onModeChange: (mode: DraftWorkspaceMode) => void;
   branch: string;
   onBranchChange: (branch: string) => void;
   disabled?: boolean;
-  gitAvailable: boolean;
 }) {
-  if (!gitAvailable) return null;
-
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Select

@@ -226,16 +226,17 @@ function DraftRoute() {
             projects={projects.data}
             value={selected?.id ?? null}
           />
-          <CardFrameAction>
-            <DraftWorkspaceSelect
-              branch={worktreeBranch}
-              disabled={startSession.isPending || selected === null}
-              gitAvailable={gitAvailable}
-              mode={workspaceMode}
-              onBranchChange={setWorktreeBranch}
-              onModeChange={setWorkspaceMode}
-            />
-          </CardFrameAction>
+          {gitAvailable ? (
+            <CardFrameAction>
+              <DraftWorkspaceSelect
+                branch={worktreeBranch}
+                disabled={startSession.isPending || selected === null}
+                mode={workspaceMode}
+                onBranchChange={setWorktreeBranch}
+                onModeChange={setWorkspaceMode}
+              />
+            </CardFrameAction>
+          ) : null}
         </CardFrameHeader>
         <Card
           render={
