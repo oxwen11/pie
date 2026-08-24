@@ -75,6 +75,7 @@ const throwingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
 const baseSession = {
   getSnapshot: async () => snapshot,
   prompt: unexpectedCall,
+  interrupt: unexpectedCall,
   getMessages: unexpectedCall,
   respondToAgentRequest: unexpectedCall,
   subscribe: unexpectedCall,
@@ -277,6 +278,23 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
     await expect(
       transport.respondToAgentRequest("request-1", { type: "tool", behavior: "allow" }),
     ).resolves.toBeUndefined();
+  });
+
+  it("interrupts the bound session", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        interrupt: async (input: unknown) => {
+          calls.push(input);
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+
+    await transport.interrupt();
+
+    expect(calls).toEqual([{ ref }]);
   });
 
   it("submits prompts fire-and-forget with the optimistic message id", async () => {

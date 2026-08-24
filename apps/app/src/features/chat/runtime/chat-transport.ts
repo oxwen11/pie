@@ -17,7 +17,7 @@ type PieSessionClient = PieClient["agent"]["session"];
 
 type SessionClient = Pick<
   PieSessionClient,
-  "prompt" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
+  "prompt" | "interrupt" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
 > & {
   subscribe: (
     ...args: Parameters<PieSessionClient["subscribe"]>
@@ -69,6 +69,10 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
       parts: input.parts,
       messageId: input.messageId,
     });
+  };
+
+  interrupt = async (): Promise<void> => {
+    await this.client.session.interrupt({ ref: this.#ref });
   };
 
   getMessages = async (): Promise<readonly UIMessage[] | null> => {

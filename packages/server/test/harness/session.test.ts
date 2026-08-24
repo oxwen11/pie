@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
-import type { SessionRef } from "@getpie/contract";
+import type { AgentRequest, SessionRef } from "@getpie/contract";
 import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -192,6 +192,38 @@ it.effect("a failed acquisition holds nothing and lets a later one retry", () =>
       const queue = yield* makeQueue;
       const runtime = yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue)));
       assert.equal(yield* session.peekRuntime, runtime);
+    }),
+  ),
+);
+
+it.effect("turn.ended clears pending requests from the snapshot", () =>
+  run(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      const request: AgentRequest = {
+        type: "question",
+        id: "request-1",
+        questions: [],
+        native: null,
+      };
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue)));
+      yield* Queue.offer(queue, {
+        type: "session.turn.started",
+        sessionId: nativeId,
+        turnId: "turn-1",
+      });
+      yield* Queue.offer(queue, { type: "session.request.asked", sessionId: nativeId, request });
+      yield* Queue.offer(queue, {
+        type: "session.turn.ended",
+        sessionId: nativeId,
+        turnId: "turn-1",
+        outcome: "canceled",
+      });
+
+      const snapshot = yield* awaitCursor(session, 3);
+      assert.equal(snapshot.status.phase, "idle");
+      assert.deepEqual(snapshot.pendingRequests, []);
     }),
   ),
 );
