@@ -12,11 +12,14 @@ import type { AgentRequest } from "./agent-requests";
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
 
-// Each Chat owns its own store: messages + status + error + pendingRequests.
+// Each Chat owns its own store: messages + status + error + retryNotice + pendingRequests.
 export type ChatStoreState = {
   messages: UIMessage[];
   status: ChatStatus;
   error?: Error;
+  // Transient provider retry (Pi willRetry / auto_retry). Not an Error: a
+  // successful retry must not leave a destructive banner behind.
+  retryNotice?: string;
   pendingRequests: AgentRequest[];
   historyStatus: HistoryStatus;
 };
@@ -39,6 +42,7 @@ export class ChatState implements AiChatStateSlice {
       messages: initialMessages,
       status: "ready",
       error: undefined,
+      retryNotice: undefined,
       pendingRequests: [],
       historyStatus: "loading",
     }));
@@ -70,6 +74,13 @@ export class ChatState implements AiChatStateSlice {
   }
   set error(error: Error | undefined) {
     this.store.setState({ error });
+  }
+
+  get retryNotice(): string | undefined {
+    return this.store.getState().retryNotice;
+  }
+  set retryNotice(retryNotice: string | undefined) {
+    this.store.setState({ retryNotice });
   }
 
   pushMessage = (message: UIMessage) => {

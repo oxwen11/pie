@@ -50,46 +50,24 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIM
   ) as UIMessage["parts"],
 });
 
-const providerErrorMessage = (message: string): string =>
-  message === "Connection error."
-    ? "The agent couldn't connect to the model provider. Try sending your message again."
-    : message;
-
-type HistoryAssistantTail = {
-  readonly id: string;
-  readonly stopReason: string | undefined;
+const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
+  if (chunk.type !== "data-retry") return undefined;
+  const data = chunk.data as {
+    readonly errorMessage?: unknown;
+    readonly attempt?: unknown;
+    readonly maxAttempts?: unknown;
+  };
+  const errorMessage = typeof data.errorMessage === "string" ? data.errorMessage : "";
+  const reason =
+    errorMessage === "Connection error." ? "Couldn't reach the model provider" : errorMessage;
+  const attempt = typeof data.attempt === "number" ? data.attempt : undefined;
+  const maxAttempts = typeof data.maxAttempts === "number" ? data.maxAttempts : undefined;
+  const suffix =
+    attempt !== undefined && maxAttempts !== undefined
+      ? `Retrying (${attempt}/${maxAttempts})…`
+      : "Retrying…";
+  return reason ? `${reason}. ${suffix}` : suffix;
 };
-
-const latestHistoryAssistant = (
-  messages: ReadonlyArray<UIMessage>,
-): HistoryAssistantTail | undefined => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.role !== "assistant") continue;
-    const metadata = message.metadata;
-    if (typeof metadata !== "object" || metadata === null) {
-      return { id: message.id, stopReason: undefined };
-    }
-    const stopReason = (metadata as { readonly stopReason?: unknown }).stopReason;
-    return {
-      id: message.id,
-      stopReason: typeof stopReason === "string" ? stopReason : undefined,
-    };
-  }
-  return undefined;
-};
-
-const isSuccessfulStopReason = (stopReason: string | undefined): boolean =>
-  stopReason === "stop" || stopReason === "length" || stopReason === "toolUse";
-
-const isProviderRecoveryChunk = (chunk: UIMessageChunk): boolean =>
-  chunk.type === "text-start" ||
-  chunk.type === "text-delta" ||
-  chunk.type === "reasoning-start" ||
-  chunk.type === "reasoning-delta" ||
-  chunk.type === "tool-input-start" ||
-  chunk.type === "tool-input-delta" ||
-  chunk.type === "tool-input-available";
 
 // One turn's chunk sink: chunks are pushed in as they arrive and the AI-SDK's
 // own reducer (readUIMessageStream — the same machinery the server-side
@@ -125,20 +103,6 @@ export class Chat {
   // complete, with the retried tail persisted but never streamed — reconcile
   // from history at turn end regardless of outcome.
   readonly #erroredTurnIds = new Set<string>();
-  // Identity of the currently rendered provider-stream error. History
-  // reconciliation may clear only this exact error; a newer prompt RPC or
-  // terminal session error must survive an older reconcile finishing late.
-  #providerStreamError:
-    | {
-        readonly error: Error;
-        readonly turnId: string;
-        readonly historyAssistantId: string | undefined;
-        readonly historyReadAfterSnapshot: boolean;
-      }
-    | undefined;
-  // Last settled assistant entry observed through history. A later reconcile
-  // must advance past this id before it can prove a live error recovered.
-  #historyAssistantId: string | undefined;
   // Prompts whose RPC has not settled. The link queues a call across a dropped
   // socket, so a prompt can outlive the server it was aimed at: nothing the
   // server says in the meantime — snapshot phase, settled transcript — has
@@ -154,10 +118,6 @@ export class Chat {
   // is still loading replaces it, so hydration always folds the freshest
   // server state — never a stale first snapshot over a newer one.
   #floorSnapshot: SessionRuntimeSnapshot | null = null;
-  // True only for the snapshot that started the floor read. A newer re-attach
-  // can replace #floorSnapshot while that read is still in flight; then the
-  // history result predates the snapshot and cannot prove its error recovered.
-  #floorSnapshotCoveredByHistory = false;
   // The live view is known to miss settled content (a turn completed inside a
   // subscription drop, a fold whose tail streamed while detached): re-read
   // history at the next safe point. Cleared when a reconcile lands.
@@ -192,7 +152,9 @@ export class Chat {
     this.#cursor = event.seq;
     switch (event.type) {
       case "session.message.chunk":
-        this.#observeProviderChunk(event.turnId, event.chunk);
+        this.#observeChunk(event.chunk);
+        // Retry is UI status, not transcript — keep it out of the message fold.
+        if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
           this.#turnFold(event.turnId).enqueue(event.chunk);
@@ -205,7 +167,10 @@ export class Chat {
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
-        if (this.#pushUserMessage(event.messageId, event.parts)) this.#clearError();
+        if (this.#pushUserMessage(event.messageId, event.parts)) {
+          this.#state.retryNotice = undefined;
+          this.#state.error = undefined;
+        }
         break;
       // The server rejected a prompt whose submitted event already broadcast:
       // drop the phantom user message (the sender's optimistic copy included).
@@ -219,6 +184,7 @@ export class Chat {
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
         this.#turnFolds.delete(event.turnId);
+        this.#state.retryNotice = undefined;
         // Unanswered requests are stale once the turn ends — no ghost cards.
         this.#state.clearPendingRequests();
         // The settled transcript may hold more than the live stream carried:
@@ -285,7 +251,7 @@ export class Chat {
     // so stop rendering a spinner that would never resolve.
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
-    this.#providerStreamError = undefined;
+    this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
     );
@@ -304,7 +270,6 @@ export class Chat {
       this.#historyLoaded = true;
       this.#queuedEvents = [];
       this.#floorSnapshot = snapshot;
-      this.#floorSnapshotCoveredByHistory = true;
       void this.#loadHistoryFloor();
       return;
     }
@@ -314,7 +279,6 @@ export class Chat {
       // from the latest — hydrating now and again on floor completion would
       // let the stale first snapshot win.
       this.#floorSnapshot = snapshot;
-      this.#floorSnapshotCoveredByHistory = false;
       return;
     }
     this.#hydrateFromSnapshot(snapshot);
@@ -327,11 +291,8 @@ export class Chat {
       // already ahead of the disk (optimistic prompt), while a server-side
       // active turn just means another client is mid-turn — exactly when the
       // floor is still wanted.
-      if (history !== null) {
-        this.#historyAssistantId = latestHistoryAssistant(history)?.id;
-        if (history.length > 0 && this.#state.messages.length === 0) {
-          this.#state.messages = Array.from(history);
-        }
+      if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
+        this.#state.messages = Array.from(history);
       }
       // An empty read is still a floor: the session simply has nothing settled
       // yet. Only the absent capability (null) leaves the transcript unfounded.
@@ -344,17 +305,10 @@ export class Chat {
       this.#state.historyStatus = "unavailable";
     }
     const snapshot = this.#floorSnapshot;
-    const historyReadAfterSnapshot = this.#floorSnapshotCoveredByHistory;
     this.#floorSnapshot = null;
-    this.#floorSnapshotCoveredByHistory = false;
     // The floor read itself just fetched settled history, so the gap check
     // would only re-read what this hydration already has.
-    if (snapshot) {
-      this.#hydrateFromSnapshot(snapshot, {
-        skipGapCheck: true,
-        historyReadAfterSnapshot,
-      });
-    }
+    if (snapshot) this.#hydrateFromSnapshot(snapshot, { skipGapCheck: true });
     const queued = this.#queuedEvents ?? [];
     this.#queuedEvents = null;
     for (const event of queued) this.#apply(event);
@@ -362,10 +316,7 @@ export class Chat {
 
   #hydrateFromSnapshot(
     snapshot: SessionRuntimeSnapshot,
-    options?: {
-      readonly skipGapCheck?: boolean;
-      readonly historyReadAfterSnapshot?: boolean;
-    },
+    options?: { readonly skipGapCheck?: boolean },
   ): void {
     if (this.#terminated) return;
     // A snapshot below our cursor means the server's seq counter restarted —
@@ -414,25 +365,22 @@ export class Chat {
       (!stale || activePrompt.seq === snapshot.cursor)
     ) {
       appliedPromptSeq = activePrompt.seq;
-      if (this.#pushUserMessage(activePrompt.messageId, activePrompt.parts)) this.#clearError();
+      if (this.#pushUserMessage(activePrompt.messageId, activePrompt.parts)) {
+        this.#state.retryNotice = undefined;
+        this.#state.error = undefined;
+      }
     }
 
-    // Error text is not part of the settled transcript floor. Replay its
-    // ownership separately from message folding so a retry that emits fresh
-    // assistant output can clear its own error while the turn is still live.
-    // Ignore chunks older than a retained prompt: the runtime can hold a
-    // completed old turn beside a newer submitted prompt, and the old turn
-    // must not overwrite errors owned by that newer submission.
-    if (activeTurn) {
-      for (const chunkEvent of activeTurn.chunks) {
-        if (
-          chunkEvent.seq > this.#cursor &&
-          (appliedPromptSeq === undefined || chunkEvent.seq > appliedPromptSeq)
-        ) {
-          this.#observeProviderChunk(activeTurn.turnId, chunkEvent.chunk, {
-            historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
-          });
-        }
+    // Error text and retry status are not part of the settled transcript
+    // floor. Replay them in order so a retry that later emits output (or a
+    // terminal error) wins. Ignore chunks older than a retained prompt: the
+    // runtime can hold a completed old turn beside a newer submitted prompt.
+    for (const chunkEvent of activeTurn?.chunks ?? []) {
+      if (
+        chunkEvent.seq > this.#cursor &&
+        (appliedPromptSeq === undefined || chunkEvent.seq > appliedPromptSeq)
+      ) {
+        this.#observeChunk(chunkEvent.chunk);
       }
     }
 
@@ -496,6 +444,7 @@ export class Chat {
       return;
     }
     for (const chunk of chunks) {
+      if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
       this.#turnFold(activeTurn.turnId).enqueue(chunk);
     }
@@ -514,35 +463,19 @@ export class Chat {
   // Shared handlers
   // ---------------------------------------------------------------------
 
-  #observeProviderChunk(
-    turnId: string,
-    chunk: UIMessageChunk,
-    options?: { readonly historyReadAfterSnapshot?: boolean },
-  ): void {
-    if (chunk.type === "error") {
-      const error = new Error(providerErrorMessage(chunk.errorText));
-      this.#providerStreamError = {
-        error,
-        turnId,
-        historyAssistantId: this.#historyAssistantId,
-        historyReadAfterSnapshot: options?.historyReadAfterSnapshot === true,
-      };
-      this.#state.error = error;
+  #observeChunk(chunk: UIMessageChunk): void {
+    const retryNotice = retryNoticeFrom(chunk);
+    if (retryNotice !== undefined) {
+      this.#state.error = undefined;
+      this.#state.retryNotice = retryNotice;
       return;
     }
-    const providerError = this.#providerStreamError;
-    if (
-      providerError?.turnId === turnId &&
-      this.#state.error === providerError.error &&
-      isProviderRecoveryChunk(chunk)
-    ) {
-      this.#clearError();
+    if (chunk.type === "error") {
+      this.#state.retryNotice = undefined;
+      this.#state.error = new Error(chunk.errorText);
+      return;
     }
-  }
-
-  #clearError(): void {
-    this.#providerStreamError = undefined;
-    this.#state.error = undefined;
+    if (this.#state.retryNotice !== undefined) this.#state.retryNotice = undefined;
   }
 
   #pushUserMessage(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
@@ -592,24 +525,6 @@ export class Chat {
       if (this.#turnFolds.size > 0) return;
       this.#state.messages = Array.from(history);
       this.#needsReconcile = false;
-      // Pi can emit an error chunk, retry internally, then persist a successful
-      // final assistant entry. Only an advanced assistant with an affirmative
-      // success reason proves recovery; stale, aborted, failed, or untyped
-      // history is not enough evidence to hide the current error.
-      const assistant = latestHistoryAssistant(history);
-      const providerError = this.#providerStreamError;
-      const historyAdvanced =
-        providerError?.historyReadAfterSnapshot === true ||
-        assistant?.id !== providerError?.historyAssistantId;
-      if (
-        providerError !== undefined &&
-        this.#state.error === providerError.error &&
-        historyAdvanced &&
-        isSuccessfulStopReason(assistant?.stopReason)
-      ) {
-        this.#clearError();
-      }
-      this.#historyAssistantId = assistant?.id;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
     }
@@ -667,14 +582,14 @@ export class Chat {
   prompt = async (text: string): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
-    this.#clearError();
+    this.#state.retryNotice = undefined;
+    this.#state.error = undefined;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
       await this.#transport.prompt({ messageId, parts });
     } catch (promptError) {
-      this.#providerStreamError = undefined;
       this.#state.error =
         promptError instanceof Error ? promptError : new Error(String(promptError));
       this.#setStatus("error");
