@@ -2,8 +2,6 @@
 @import "tw-shimmer";
 
 @source "../node_modules/@getpie/ui";
-@source "../../packages/ui/node_modules/streamdown/dist/*.js";
-@source "../../packages/ui/node_modules/@streamdown/code/dist/*.js";
 
 /* Scan our own src explicitly: the desktop renderer's Vite root is
  * apps/desktop, so auto-detection alone misses app-only utilities. */
