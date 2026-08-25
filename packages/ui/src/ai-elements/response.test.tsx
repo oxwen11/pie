@@ -32,7 +32,7 @@ function render(ui: ReactElement): HTMLDivElement {
 
 async function flush(): Promise<void> {
   await act(async () => {
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 50));
   });
 }
 
