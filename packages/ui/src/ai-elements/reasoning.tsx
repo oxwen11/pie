@@ -79,15 +79,17 @@ export const Reasoning = memo(
 
     // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {
-      if (defaultOpen && !isStreaming && isOpen && !hasAutoClosedRef) {
-        // Add a small delay before closing to allow user to see the content
-        const timer = setTimeout(() => {
-          setIsOpen(false);
-          setHasAutoClosedRef(true);
-        }, AUTO_CLOSE_DELAY);
-
-        return () => clearTimeout(timer);
+      if (!(defaultOpen && !isStreaming && isOpen && !hasAutoClosedRef)) {
+        return;
       }
+
+      // Add a small delay before closing to allow user to see the content
+      const timer = setTimeout(() => {
+        setIsOpen(false);
+        setHasAutoClosedRef(true);
+      }, AUTO_CLOSE_DELAY);
+
+      return () => clearTimeout(timer);
     }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosedRef]);
 
     const contextValue = useMemo<ReasoningContextValue>(
@@ -146,18 +148,21 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
   children: string;
 };
 
-export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => (
-  <CollapsibleContent
-    className={cn(
-      "mt-4 text-sm",
-      "text-popover-foreground transition-opacity outline-none data-ending-style:opacity-0 data-starting-style:opacity-0",
-      className,
-    )}
-    {...props}
-  >
-    <Response>{children}</Response>
-  </CollapsibleContent>
-));
+export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
+  const { isStreaming } = useReasoning();
+  return (
+    <CollapsibleContent
+      className={cn(
+        "mt-4 text-sm",
+        "text-popover-foreground transition-opacity outline-none data-ending-style:opacity-0 data-starting-style:opacity-0",
+        className,
+      )}
+      {...props}
+    >
+      <Response isAnimating={isStreaming}>{children}</Response>
+    </CollapsibleContent>
+  );
+});
 
 Reasoning.displayName = "Reasoning";
 ReasoningTrigger.displayName = "ReasoningTrigger";

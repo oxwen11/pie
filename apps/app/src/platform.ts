@@ -8,7 +8,7 @@ export type Platform = {
   /**
    * The desktop host's OS, left unset by the browser entry point. macOS draws
    * native traffic lights over the shell's top-left corner; everywhere else
-   * that corner is ours to fill — see `routes/__root.tsx`.
+   * that corner is ours to fill — see `components/layout/shell-chrome.ts`.
    */
   os?: PlatformOs;
 };

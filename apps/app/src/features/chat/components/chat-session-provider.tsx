@@ -17,16 +17,18 @@ export function ChatSessionProvider({
   const turnInProgress = useStore(chat.store, selectTurnInProgress);
 
   const prompt = useCallback((text: string) => chat.prompt(text), [chat]);
+  const interrupt = useCallback(() => chat.interrupt(), [chat]);
 
   const value = useMemo<ChatSessionValue>(
     () => ({
       sessionId: sessionRef.sessionId,
       store: chat.store,
       prompt,
+      interrupt,
       respondToRequest: chat.respondToAgentRequest,
       turnInProgress,
     }),
-    [sessionRef.sessionId, chat, prompt, turnInProgress],
+    [sessionRef.sessionId, chat, prompt, interrupt, turnInProgress],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

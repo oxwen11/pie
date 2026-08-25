@@ -1,5 +1,5 @@
 import type { AgentRequest, AgentResponse, AgentModelState } from "@getpie/contract";
-import { Deferred, Effect, Exit, Queue, Ref, Scope, Stream } from "effect";
+import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
@@ -41,6 +41,7 @@ type PiTurnState =
       readonly turnId: string;
       readonly ended: Deferred.Deferred<void>;
       readonly abandoned: boolean;
+      readonly interrupted: boolean;
     }
   | {
       readonly _tag: "Finishing";
@@ -51,6 +52,7 @@ type PiTurnState =
 type FinishTransition = {
   readonly deliver: boolean;
   readonly ended: Deferred.Deferred<void> | undefined;
+  readonly interrupted: boolean;
 };
 
 type TurnDecision =
@@ -68,6 +70,7 @@ type SessionState = {
   readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
+  readonly requestGate: Semaphore.Semaphore;
   readonly turnState: Ref.Ref<PiTurnState>;
   readonly transform: ReturnType<typeof createPiTransform>;
 };
@@ -244,12 +247,26 @@ export const makePiProcessWithDependencies = <R>(
               session.turnState,
               (current) => {
                 if (current._tag !== "Active") {
-                  return [{ deliver: false, ended: undefined }, current] as const;
+                  return [
+                    { deliver: false, ended: undefined, interrupted: false },
+                    current,
+                  ] as const;
                 }
                 return current.abandoned
-                  ? ([{ deliver: false, ended: current.ended }, { _tag: "Idle" } as const] as const)
+                  ? ([
+                      {
+                        deliver: false,
+                        ended: current.ended,
+                        interrupted: current.interrupted,
+                      },
+                      { _tag: "Idle" } as const,
+                    ] as const)
                   : ([
-                      { deliver: true, ended: undefined },
+                      {
+                        deliver: true,
+                        ended: undefined,
+                        interrupted: current.interrupted,
+                      },
                       {
                         _tag: "Finishing",
                         turnId: current.turnId,
@@ -260,6 +277,13 @@ export const makePiProcessWithDependencies = <R>(
             );
             if (transition.ended) yield* Deferred.succeed(transition.ended, undefined);
             if (!transition.deliver) continue;
+            if (transition.interrupted) {
+              const accepted = yield* Queue.offer(session.chunks, { type: "abort" });
+              if (!accepted) {
+                yield* evictOverflowedSession(session);
+                return;
+              }
+            }
           }
 
           const accepted = yield* Queue.offer(session.chunks, chunk);
@@ -278,18 +302,27 @@ export const makePiProcessWithDependencies = <R>(
     ) =>
       Effect.gen(function* () {
         const deferred = yield* Deferred.make<unknown>();
-        yield* Ref.update(session.pending, (current) =>
-          new Map(current).set(request.id, { deferred, settle, declineValue }),
+        const accepted = yield* session.requestGate.withPermit(
+          Effect.gen(function* () {
+            const turn = yield* Ref.get(session.turnState);
+            if (turn._tag !== "Active" || turn.interrupted) return false;
+
+            yield* Ref.update(session.pending, (current) =>
+              new Map(current).set(request.id, { deferred, settle, declineValue }),
+            );
+            const offered = yield* Queue.offer(session.requests, request);
+            if (!offered) {
+              yield* Ref.update(session.pending, (current) => {
+                const next = new Map(current);
+                next.delete(request.id);
+                return next;
+              });
+            }
+            return offered;
+          }),
         );
-        const accepted = yield* Queue.offer(session.requests, request);
-        if (!accepted) {
-          yield* Ref.update(session.pending, (current) => {
-            const next = new Map(current);
-            next.delete(request.id);
-            return next;
-          });
-          return declineValue;
-        }
+        if (!accepted) return declineValue;
+
         return yield* Deferred.await(deferred).pipe(
           Effect.onInterrupt(() =>
             Ref.update(session.pending, (current) => {
@@ -359,6 +392,7 @@ export const makePiProcessWithDependencies = <R>(
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
             pending: yield* Ref.make<ReadonlyMap<string, PendingRequest>>(new Map()),
+            requestGate: yield* Semaphore.make(1),
             turnState: yield* Ref.make<PiTurnState>({ _tag: "Idle" }),
             transform: createPiTransform(sessionId),
           };
@@ -395,9 +429,16 @@ export const makePiProcessWithDependencies = <R>(
     const interrupt = (sessionId: string): Effect.Effect<void, HarnessSessionNotFound> =>
       Effect.gen(function* () {
         const session = yield* getSession(sessionId);
-        const turn = yield* Ref.get(session.turnState);
-        if (turn._tag !== "Active") return;
+        const active = yield* session.requestGate.withPermit(
+          Ref.modify(session.turnState, (turn) =>
+            turn._tag === "Active"
+              ? [true, { ...turn, interrupted: true } as const]
+              : [false, turn],
+          ).pipe(Effect.tap((isActive) => (isActive ? settlePending(session) : Effect.void))),
+        );
+        if (!active) return;
         yield* session.transport.command({ type: "abort" }).pipe(Effect.catch(() => Effect.void));
+        yield* session.requestGate.withPermit(settlePending(session));
       });
 
     const abort = (sessionId: string): Effect.Effect<void, HarnessSessionNotFound> =>
@@ -447,7 +488,7 @@ export const makePiProcessWithDependencies = <R>(
                         case "Idle":
                           return [
                             { _tag: "Start", turnId, ended },
-                            { _tag: "Active", turnId, ended, abandoned: false },
+                            { _tag: "Active", turnId, ended, abandoned: false, interrupted: false },
                           ];
                         case "Active":
                           return [{ _tag: "Steer", turn: current }, current];

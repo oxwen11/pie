@@ -599,6 +599,16 @@ export class Chat {
     }
   };
 
+  interrupt = async (): Promise<void> => {
+    try {
+      await this.#transport.interrupt();
+    } catch (interruptError) {
+      console.error("Failed to interrupt session", interruptError);
+      this.#state.error =
+        interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+    }
+  };
+
   respondToAgentRequest = async (requestId: string, response: AgentResponse): Promise<void> => {
     const request = this.store.getState().pendingRequests.find((r) => r.id === requestId);
     this.#state.removePendingRequest(requestId); // optimistic: the card closes immediately

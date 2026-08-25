@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   type DaemonHandle,
   type DaemonPlatform,
@@ -17,6 +19,34 @@ export type DaemonServerProcessOptions = {
   /** How often to probe the attached daemon's liveness. */
   readonly pollIntervalMs?: number;
 };
+
+/**
+ * The desktop daemon's process.execPath is reused for bundled Pi children.
+ * Electron's main macOS bundle has regular activation policy, so those children
+ * register as separate Dock applications. The adjacent Helper bundle is the
+ * same Node-capable runtime with LSUIElement=true. Other platforms and plain
+ * Node processes keep their current executable unchanged.
+ */
+export function resolveServerRuntimeExecutable(
+  platform: NodeJS.Platform = process.platform,
+  execPath: string = process.execPath,
+): string {
+  if (platform !== "darwin") return execPath;
+
+  const macosDir = path.dirname(execPath);
+  const contentsDir = path.dirname(macosDir);
+  const appBundle = path.dirname(contentsDir);
+  if (
+    path.basename(macosDir) !== "MacOS" ||
+    path.basename(contentsDir) !== "Contents" ||
+    path.extname(appBundle) !== ".app"
+  ) {
+    return execPath;
+  }
+
+  const helperName = `${path.basename(execPath)} Helper`;
+  return path.join(contentsDir, "Frameworks", `${helperName}.app`, "Contents", "MacOS", helperName);
+}
 
 /**
  * The daemon-backed `SpawnServer`: instead of forking a die-with-app child,
@@ -54,7 +84,7 @@ export function makeDaemonServerProcess(
 
         const handle = yield* resolveOrSpawnDaemon({
           ...resolveDaemonLocation(config.environment),
-          serverArgv: [process.execPath, config.entry],
+          serverArgv: [resolveServerRuntimeExecutable(), config.entry],
           // 0 means "no preference" on the first attempt; afterwards the
           // supervisor pins the port it saw, which we pass as preferred.
           port: port === 0 ? undefined : port,
@@ -75,10 +105,18 @@ export function makeDaemonServerProcess(
             let misses = 0;
             while (true) {
               yield* Effect.sleep(pollIntervalMs);
-              if (!pidAlive(handle.pid)) return { exitCode: null };
+              if (!pidAlive(handle.pid)) {
+                yield* logLivenessFailed("process_missing", handle);
+                return { exitCode: null };
+              }
               // Tolerate transient probe failures; a wedged-but-alive daemon
               // still counts as dead after enough consecutive misses.
-              misses = (yield* healthy(handle.address)) ? 0 : misses + 1;
+              if (yield* healthy(handle.address)) {
+                misses = 0;
+                continue;
+              }
+              misses += 1;
+              yield* logLivenessFailed("unhealthy", handle, misses);
               if (misses >= MAX_HEALTH_MISSES) return { exitCode: null };
             }
           },
@@ -94,4 +132,20 @@ export function makeDaemonServerProcess(
 
 function endpointOf(handle: DaemonHandle): { port: number; token: string } {
   return { port: handle.port, token: handle.token };
+}
+
+function logLivenessFailed(
+  reason: "process_missing" | "unhealthy",
+  handle: DaemonHandle,
+  consecutiveMisses?: number,
+) {
+  return Effect.logWarning("Daemon liveness probe failed").pipe(
+    Effect.annotateLogs({
+      event: "server.liveness.failed",
+      reason,
+      pid: handle.pid,
+      address: handle.address,
+      ...(consecutiveMisses === undefined ? {} : { consecutiveMisses }),
+    }),
+  );
 }

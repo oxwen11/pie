@@ -47,7 +47,7 @@ export function ModelSelect({
         if (option) onChange(option.providerId, option.modelId);
       }}
     >
-      <PromptInputModelSelectTrigger className="min-h-8 py-0">
+      <PromptInputModelSelectTrigger className="hover:bg-accent min-h-8 w-auto min-w-0 border-transparent bg-transparent py-0 shadow-none before:hidden dark:bg-transparent">
         <PromptInputModelSelectValue placeholder="Default" />
       </PromptInputModelSelectTrigger>
       <PromptInputModelSelectContent>

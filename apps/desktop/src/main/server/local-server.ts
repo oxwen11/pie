@@ -97,6 +97,27 @@ export function restartBackoff(
   return Math.min(initialDelayMs * 2 ** (failureCount - 1), maxDelayMs);
 }
 
+function startErrorAnnotations(error: ServerStartError) {
+  switch (error._tag) {
+    case "ServerReadyTimeout":
+      return { reason: "ready_timeout", timeoutMs: error.timeoutMs };
+    case "ServerExitedBeforeReady":
+      return { reason: "exited_before_ready", exitCode: error.exitCode };
+    case "ServerSpawnError": {
+      const tag =
+        error.cause && typeof error.cause === "object" && "_tag" in error.cause
+          ? error.cause._tag
+          : undefined;
+      const causeType =
+        tag === "DaemonLaunchError" || tag === "DaemonStoppedError" ? tag : undefined;
+      return {
+        reason: "spawn_failed",
+        ...(causeType === undefined ? {} : { causeType }),
+      };
+    }
+  }
+}
+
 // The supervise fiber is the only writer of statusRef, so get→set is
 // race-free. Not SubscriptionRef.modify: v4's set/modify publish
 // unconditionally, which would replay no-op snapshots to subscribers.
@@ -173,13 +194,22 @@ export function makeLocalServer(
 
         if (Result.isFailure(attempt)) {
           yield* Effect.logWarning("Server process attempt failed").pipe(
-            Effect.annotateLogs({ error: String(attempt.failure) }),
+            Effect.annotateLogs({
+              event: "server.supervisor.attempt_failed",
+              ...startErrorAnnotations(attempt.failure),
+            }),
           );
         }
 
         if (first) {
+          yield* Effect.logWarning("Server supervision paused after initial failure").pipe(
+            Effect.annotateLogs({ event: "server.supervisor.failed" }),
+          );
           yield* setStatus(statusRef, "failed");
           yield* Queue.take(retryQueue);
+          yield* Effect.logInfo("Server retry requested").pipe(
+            Effect.annotateLogs({ event: "server.supervisor.retry_requested" }),
+          );
           yield* setStatus(statusRef, "starting");
           continue;
         }
@@ -190,15 +220,34 @@ export function makeLocalServer(
         fastFailures += 1;
 
         if (fastFailures > maxFailures) {
+          yield* Effect.logWarning("Server supervision paused after repeated failures").pipe(
+            Effect.annotateLogs({
+              event: "server.supervisor.restart_paused",
+              fastFailures,
+              uptimeMs: uptime,
+            }),
+          );
           yield* setStatus(statusRef, "failed");
           yield* Queue.take(retryQueue);
+          yield* Effect.logInfo("Server restart requested").pipe(
+            Effect.annotateLogs({ event: "server.supervisor.retry_requested" }),
+          );
           fastFailures = 0;
           yield* setStatus(statusRef, "reconnecting");
           continue;
         }
 
+        const backoffMs = restartBackoff(fastFailures, initialDelay, maxDelay);
+        yield* Effect.logWarning("Server restart scheduled").pipe(
+          Effect.annotateLogs({
+            event: "server.supervisor.restart_scheduled",
+            backoffMs,
+            fastFailures,
+            uptimeMs: uptime,
+          }),
+        );
         yield* setStatus(statusRef, "reconnecting");
-        yield* Effect.sleep(restartBackoff(fastFailures, initialDelay, maxDelay));
+        yield* Effect.sleep(backoffMs);
       }
     });
 

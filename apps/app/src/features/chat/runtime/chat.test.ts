@@ -39,6 +39,7 @@ class FakeTransport implements ChatSessionTransport {
   // (a dropped socket queues it until the link reconnects).
   promptGate: Promise<void> | null = null;
   responded: Array<{ requestId: string; response: AgentResponse }> = [];
+  interruptCalls = 0;
 
   subscribe(onEvent: (event: ChatTransportEvent) => void): () => void {
     this.onEvent = onEvent;
@@ -59,6 +60,9 @@ class FakeTransport implements ChatSessionTransport {
   };
   respondToAgentRequest = async (requestId: string, response: AgentResponse) => {
     this.responded.push({ requestId, response });
+  };
+  interrupt = async () => {
+    this.interruptCalls += 1;
   };
 }
 
@@ -493,6 +497,28 @@ describe("Chat prompting", () => {
     expect(messages).toHaveLength(2);
     expect(assistantText(messages[1]!)).toBe("reply");
     expect(chat.store.getState().status).toBe("ready");
+  });
+});
+
+describe("Chat interruption", () => {
+  it("requests interruption and settles from the canceled turn event", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({
+      status: { phase: "requires_action" },
+      pendingRequests: [toolRequest],
+      cursor: 1,
+    });
+
+    await chat.interrupt();
+    expect(transport.interruptCalls).toBe(1);
+    expect(chat.store.getState().status).toBe("streaming");
+    expect(chat.store.getState().pendingRequests).toHaveLength(1);
+
+    live(2, { type: "session.turn.ended", turnId: "turn-1", outcome: "canceled", phase: "idle" });
+    await settle();
+
+    expect(chat.store.getState().status).toBe("ready");
+    expect(chat.store.getState().pendingRequests).toEqual([]);
   });
 });
 

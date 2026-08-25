@@ -63,7 +63,9 @@ export function AssistantMessage({
           return (
             <Message key={index} from="assistant">
               <MessageContent>
-                <Response>{part.text}</Response>
+                <Response isAnimating={isStreaming && index === lastTextIndex}>
+                  {part.text}
+                </Response>
                 {canShowActions && <CopyMarkdownButton text={part.text} />}
               </MessageContent>
             </Message>

@@ -96,9 +96,18 @@ export function resolveServeConfig(input: ServeInput): {
  */
 export const runServe = (input: ServeInput) =>
   serveWith(input).pipe(
+    Effect.onInterrupt(() =>
+      Effect.logWarning("server interrupted").pipe(
+        Effect.annotateLogs({ event: "server.interrupted", pid: process.pid }),
+      ),
+    ),
     Effect.tapError((error) =>
       Effect.logError("server startup failed", Cause.fail(error)).pipe(
-        Effect.annotateLogs({ event: "server.startup_failed", phase: error.phase }),
+        Effect.annotateLogs({
+          event: "server.startup_failed",
+          phase: error.phase,
+          pid: process.pid,
+        }),
       ),
     ),
     Effect.provide(Observability.layer()),
@@ -121,6 +130,7 @@ const serveWith = (input: ServeInput) =>
         authenticated: authToken !== undefined,
         corsOrigins,
         allowedHosts,
+        pid: process.pid,
         version: process.env.npm_package_version,
         node: process.version,
       }),
@@ -141,9 +151,15 @@ const serveWith = (input: ServeInput) =>
       (managed) =>
         Effect.tryPromise(() => managed.dispose()).pipe(
           Effect.andThen(
-            Effect.logInfo("server stopped").pipe(Effect.annotateLogs({ event: "server.stopped" })),
+            Effect.logInfo("server stopped").pipe(
+              Effect.annotateLogs({ event: "server.stopped", pid: process.pid }),
+            ),
           ),
-          Effect.catch((error) => Effect.logWarning("server shutdown failed", error)),
+          Effect.catch((error) =>
+            Effect.logWarning("server shutdown failed", error).pipe(
+              Effect.annotateLogs({ event: "server.shutdown_failed", pid: process.pid }),
+            ),
+          ),
         ),
     );
 
@@ -159,7 +175,7 @@ const serveWith = (input: ServeInput) =>
     console.log(`pie listening on http://127.0.0.1:${port}`);
 
     yield* Effect.logInfo("server listening").pipe(
-      Effect.annotateLogs({ event: "server.listening", port }),
+      Effect.annotateLogs({ event: "server.listening", pid: process.pid, port }),
     );
 
     return yield* Effect.never;

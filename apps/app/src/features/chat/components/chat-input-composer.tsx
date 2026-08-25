@@ -23,8 +23,9 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 // prompt/turnInProgress come from ChatSessionProvider — not props.
 // toolbar = surface-composed toolbar content (e.g. <ChatModelSelect/>).
 export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
-  const { prompt, turnInProgress, store } = useChatSession();
+  const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
+  const canInterrupt = status === "streaming";
   const turnInProgressRef = useLatestRef(turnInProgress);
 
   const controller = useChatInputController({
@@ -56,7 +57,13 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
         <ChatInput />
         <PromptInputToolbar>
           <PromptInputTools>{toolbar}</PromptInputTools>
-          <PromptInputSubmit disabled={!hasContent || turnInProgress} status={status} />
+          <PromptInputSubmit
+            aria-label={canInterrupt ? "Stop generating" : "Send message"}
+            disabled={!canInterrupt && (!hasContent || turnInProgress)}
+            onClick={canInterrupt ? () => void interrupt() : undefined}
+            status={status}
+            type={canInterrupt ? "button" : "submit"}
+          />
         </PromptInputToolbar>
       </ChatInputProvider>
     </PromptInput>
