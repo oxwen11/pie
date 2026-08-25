@@ -38,6 +38,18 @@ export function useSessionListSync(): void {
           for await (const item of stream) {
             if (item.type !== "event") continue;
             applySessionListEvent(queryClient, listKeyFor, item.event);
+            if (item.event.type === "session.updated" && item.event.workspace !== undefined) {
+              void queryClient.invalidateQueries({
+                queryKey: orpcQueryUtils.fs.readTree.key(),
+              });
+              void queryClient.invalidateQueries({
+                queryKey: orpcQueryUtils.fs.readFileString.key(),
+              });
+              void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.git.status.key() });
+              void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.git.branch.key() });
+              void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.git.review.key() });
+              void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.git.diff.key() });
+            }
           }
         } catch (error) {
           if (abort.signal.aborted || isAbortError(error)) return;

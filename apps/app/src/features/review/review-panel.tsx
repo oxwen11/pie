@@ -5,9 +5,9 @@ import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
+import { useContentPanelContext } from "@/components/layout/content-panel/react/context";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
-import { gitWorkspaceForRef } from "@/lib/git-workspace";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -18,7 +18,6 @@ import { ReviewWorkspaceLayout } from "./review-workspace-layout";
 import { useGitBranch } from "./use-git-branch";
 import { useGitDiffs } from "./use-git-diffs";
 import { useGitReview } from "./use-git-review";
-import { useSessionWorkspace } from "./use-session-workspace";
 import { useWorkspaceTree } from "./use-workspace-tree";
 
 export interface ReviewPayload {
@@ -50,10 +49,9 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
-  const gitWorkspace = gitWorkspaceForRef(instance.sessionRef);
+  const { projectName } = useContentPanelContext();
+  const gitWorkspace = { ref: instance.sessionRef };
   const panel = useContentPanel();
-  const cwd = workspace?.path;
   const mode = instance.payload.mode ?? "uncommitted";
   const branch = useGitBranch(gitWorkspace);
   const other =
@@ -61,7 +59,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
       ? (instance.payload.other ?? branch.data?.defaultBranch ?? undefined)
       : undefined;
   const review = useGitReview(gitWorkspace, mode, other);
-  const tree = useWorkspaceTree(cwd);
+  const tree = useWorkspaceTree(gitWorkspace);
   const diffs = useGitDiffs(gitWorkspace, review.data?.files ?? [], mode, other);
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
@@ -104,7 +102,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [review.data],
   );
 
-  if (!workspace || cwd === undefined || panel === null) {
+  if (panel === null) {
     return (
       <ReviewState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -139,6 +137,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     );
   }
 
+  const workspaceName = projectName ?? "Workspace";
+  const workspacePath = tree.data?.cwd ?? "";
   const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
   const refresh = (): void => {
     void Promise.all([
@@ -157,11 +157,11 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           onSelectFile={selectFile}
           sessionId={panel.sessionKey}
           tree={tree}
-          workspaceName={workspace.name}
-          workspacePath={workspace.path}
+          workspaceName={workspaceName}
+          workspacePath={workspacePath}
         />
       }
-      filesLabel={workspace.name}
+      filesLabel={workspaceName}
       preview={
         <ReviewDiffPane
           diffs={diffs}

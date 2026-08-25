@@ -16,7 +16,7 @@ import {
   EmptyTitle,
 } from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -68,7 +68,6 @@ function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const router = useRouter();
   const chats = useChatManager();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
@@ -91,8 +90,9 @@ function DraftRoute() {
     staleTime: Infinity,
   });
   const gitAvailable = gitStatus.isSuccess;
+  const effectiveMode: DraftWorkspaceMode = gitAvailable ? workspaceMode : "project";
   const worktreeBase =
-    workspaceMode === "worktree"
+    effectiveMode === "worktree"
       ? (worktreeBaseOverride ?? defaultWorktreeBase(gitBranch.data))
       : null;
   const modelsQuery = useAgentModels(selected?.id);
@@ -111,12 +111,6 @@ function DraftRoute() {
     });
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
-  useEffect(() => {
-    if (gitAvailable) return;
-    setWorkspaceMode("project");
-    setWorktreeBaseOverride(null);
-  }, [gitAvailable, selected?.id]);
-
   const startSession = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       if (!selected) throw new Error("No project selected");
@@ -125,11 +119,9 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
-        ...(workspaceMode === "worktree" && worktreeBase !== null
+        ...(effectiveMode === "worktree" && worktreeBase !== null
           ? { worktree: { base: worktreeBase } }
-          : workspaceMode === "worktree"
-            ? { worktree: {} }
-            : {}),
+          : {}),
       });
       return { created, text };
     },
@@ -157,12 +149,6 @@ function DraftRoute() {
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
-        })
-        .finally(() => {
-          if (workspaceMode !== "worktree") return;
-          void router.invalidate({
-            filter: (match) => match.routeId === "/session/$sessionId",
-          });
         });
 
       void navigate({
@@ -189,7 +175,7 @@ function DraftRoute() {
         return false;
       }
       if (startSession.isPending) return false;
-      if (workspaceMode === "worktree" && worktreeBase === null) {
+      if (effectiveMode === "worktree" && worktreeBase === null) {
         toast.error("Pick a base branch for the worktree.");
         return false;
       }
@@ -318,7 +304,7 @@ function DraftRoute() {
                   !hasContent ||
                   !selected ||
                   startSession.isPending ||
-                  (workspaceMode === "worktree" && worktreeBase === null)
+                  (effectiveMode === "worktree" && worktreeBase === null)
                 }
               />
             </PromptInputToolbar>

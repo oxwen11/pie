@@ -53,19 +53,19 @@ const GitProvided = GitServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
+const ProjectServiceProvided = ProjectServiceLayer.pipe(
+  Layer.provide(ProjectRepositoryLayer),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+);
+
 const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PiAgentSessionManagerProvided),
   Layer.provide(PiAgentProvided),
   Layer.provide(EventBusLayer),
-  Layer.provide(ProjectRepositoryLayer),
+  Layer.provide(ProjectServiceProvided),
   Layer.provide(PathsLayer),
   Layer.provide(GitProvided),
-  Layer.provide(PlatformLayer),
-);
-
-const ProjectServiceProvided = ProjectServiceLayer.pipe(
-  Layer.provide(ProjectRepositoryLayer),
-  Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
 );
 

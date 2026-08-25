@@ -10,13 +10,14 @@ import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
+import { useContentPanelContext } from "@/components/layout/content-panel/react/context";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
-import { useSessionWorkspace } from "./use-session-workspace";
+import { useGitBranch } from "./use-git-branch";
 import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
@@ -30,10 +31,11 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
+  const { projectName } = useContentPanelContext();
   const panel = useContentPanel();
-  const cwd = workspace?.path;
-  const tree = useWorkspaceTree(cwd);
+  const workspace = { ref: instance.sessionRef };
+  const tree = useWorkspaceTree(workspace);
+  const branch = useGitBranch(workspace);
   const openFile = useCallback(
     (path: string) => {
       if (panel === null) return;
@@ -42,7 +44,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     [instance, panel],
   );
 
-  if (!workspace || panel === null) {
+  if (panel === null) {
     return (
       <WorkspaceState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -50,14 +52,18 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     );
   }
 
+  const workspaceName = projectName ?? "Workspace";
+  const workspacePath = tree.data?.cwd ?? "";
+  const gitBranch = branch.data?.current ?? undefined;
+
   const treePane = (
     <WorkspaceTreePane
-      gitBranch={workspace.gitBranch}
+      gitBranch={gitBranch}
       onOpenFile={openFile}
       sessionId={panel.sessionKey}
       tree={tree}
-      workspaceName={workspace.name}
-      workspacePath={workspace.path}
+      workspaceName={workspaceName}
+      workspacePath={workspacePath}
     />
   );
 
@@ -69,7 +75,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
         </FileState>
       }
       tree={treePane}
-      treeLabel={workspace.name}
+      treeLabel={workspaceName}
     />
   );
 }

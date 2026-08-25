@@ -52,5 +52,5 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function Component() {
   const prepared = Route.useLoaderData();
-  return <Chat cwd={prepared.workspace.cwd} sessionRef={prepared.ref} />;
+  return <Chat sessionRef={prepared.ref} />;
 }

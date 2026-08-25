@@ -86,6 +86,17 @@ describe("applySessionListEvent", () => {
     });
   });
 
+  it("keeps the row when session.updated carries only a workspace", () => {
+    const queryClient = seed([row({ status: { phase: "running" } })]);
+    const before = rows(queryClient);
+    applySessionListEvent(queryClient, listKeyFor, {
+      ref,
+      type: "session.updated",
+      workspace: { cwd: "/tmp/worktree", gitBranch: "pie/abcd1234" },
+    });
+    expect(rows(queryClient)).toBe(before);
+  });
+
   it("invalidates the list when session.updated targets a row we don't hold", () => {
     const queryClient = seed([row()]);
     const event: ServerEvent = {

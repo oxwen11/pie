@@ -11,7 +11,7 @@ const PendingWorktreeSchema = Schema.Struct({
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  agentSessionId: Schema.String,
+  agentSessionId: Schema.optionalKey(Schema.String),
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
@@ -24,11 +24,24 @@ const SessionSchema = Schema.Struct({
   historyAvailable: Schema.optionalKey(Schema.Boolean),
 });
 
+/** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
+const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
+  const { agentSessionId, ...rest } = parsed;
+  const opened =
+    agentSessionId !== undefined && agentSessionId !== parsed.sessionId
+      ? agentSessionId
+      : undefined;
+  return {
+    ...rest,
+    ...(opened !== undefined ? { agentSessionId: opened } : {}),
+  };
+};
+
 const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   sessionId: metadata.sessionId,
   projectId: metadata.projectId,
-  agentSessionId: metadata.agentSessionId,
   createdAt: metadata.createdAt,
+  ...(metadata.agentSessionId !== undefined ? { agentSessionId: metadata.agentSessionId } : {}),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
   ...(metadata.pendingWorktree !== undefined ? { pendingWorktree: metadata.pendingWorktree } : {}),
@@ -93,7 +106,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
       list: (projectId) =>
         isSafeId(projectId)
           ? sessions.list({ under: projectId }).pipe(
-              Effect.map((entries) => entries.map((entry) => entry.data)),
+              Effect.map((entries) => entries.map((entry) => fromStorage(entry.data))),
               Effect.mapError(asReadError),
             )
           : Effect.succeed([]),
@@ -105,7 +118,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
               Effect.mapError(asReadError),
               Effect.flatMap((found) =>
                 Option.isSome(found)
-                  ? Effect.succeed(found.value)
+                  ? Effect.succeed(fromStorage(found.value))
                   : Effect.fail(new SessionNotFound({ projectId, sessionId })),
               ),
             ),
@@ -123,7 +136,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
               if (Option.isNone(found)) {
                 return yield* Effect.fail(new SessionRefNotFound({ sessionId }));
               }
-              return found.value;
+              return fromStorage(found.value);
             }),
 
       write: (metadata) =>

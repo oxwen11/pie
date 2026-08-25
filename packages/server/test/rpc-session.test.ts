@@ -82,6 +82,10 @@ async function setup() {
     Layer.provide(layerPaths(home)),
     Layer.provide(NodeServices.layer),
   );
+  const projectServiceLayer = ProjectServiceLayer.pipe(
+    Layer.provide(ProjectRepositoryLayer),
+    Layer.provide(pathsLayer),
+  );
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -92,14 +96,10 @@ async function setup() {
     ),
     Layer.provide(piAgentLayer),
     Layer.provide(EventBusLayer),
-    Layer.provide(ProjectRepositoryLayer),
+    Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
     Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
-  );
-  const projectServiceLayer = ProjectServiceLayer.pipe(
-    Layer.provide(ProjectRepositoryLayer),
-    Layer.provide(pathsLayer),
   );
 
   const appLayer = Layer.mergeAll(

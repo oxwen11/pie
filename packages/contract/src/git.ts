@@ -1,12 +1,9 @@
 import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { SessionRefSchema, toStandardSchema } from "./domain";
+import { toStandardSchema, withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
 
-const CwdInput = Schema.Struct({ cwd: Schema.String });
-const SessionRefInput = Schema.Struct({ ref: SessionRefSchema });
-
-export const GitWorkspaceInputSchema = Schema.Union([CwdInput, SessionRefInput]);
+export const GitWorkspaceInputSchema = WorkspaceQuerySchema;
 export type GitWorkspaceInput = typeof GitWorkspaceInputSchema.Type;
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
@@ -42,34 +39,17 @@ export type GitBranch = typeof GitBranchSchema.Type;
 export const GitReviewModeSchema = Schema.Literals(["uncommitted", "committed", "branch"]);
 export type GitReviewMode = typeof GitReviewModeSchema.Type;
 
-export const GitReviewQuerySchema = Schema.Union([
-  Schema.Struct({
-    cwd: Schema.String,
-    mode: Schema.optionalKey(GitReviewModeSchema),
-    other: Schema.optionalKey(Schema.String),
-  }),
-  Schema.Struct({
-    ref: SessionRefSchema,
-    mode: Schema.optionalKey(GitReviewModeSchema),
-    other: Schema.optionalKey(Schema.String),
-  }),
-]);
+export const GitReviewQuerySchema = withWorkspaceQuery({
+  mode: Schema.optionalKey(GitReviewModeSchema),
+  other: Schema.optionalKey(Schema.String),
+});
 export type GitReviewQuery = typeof GitReviewQuerySchema.Type;
 
-export const GitDiffQuerySchema = Schema.Union([
-  Schema.Struct({
-    cwd: Schema.String,
-    path: Schema.String,
-    mode: Schema.optionalKey(GitReviewModeSchema),
-    other: Schema.optionalKey(Schema.String),
-  }),
-  Schema.Struct({
-    ref: SessionRefSchema,
-    path: Schema.String,
-    mode: Schema.optionalKey(GitReviewModeSchema),
-    other: Schema.optionalKey(Schema.String),
-  }),
-]);
+export const GitDiffQuerySchema = withWorkspaceQuery({
+  path: Schema.String,
+  mode: Schema.optionalKey(GitReviewModeSchema),
+  other: Schema.optionalKey(Schema.String),
+});
 export type GitDiffQuery = typeof GitDiffQuerySchema.Type;
 
 export const GitReviewFileStatusSchema = Schema.Literals([
@@ -113,24 +93,6 @@ export const GitFileDiffSchema = Schema.Struct({
 });
 export type GitFileDiff = typeof GitFileDiffSchema.Type;
 
-export const GitWorktreeCreateInputSchema = Schema.Struct({
-  cwd: Schema.String,
-  branch: Schema.optionalKey(Schema.NonEmptyString),
-});
-export type GitWorktreeCreateInput = typeof GitWorktreeCreateInputSchema.Type;
-
-export const GitWorktreeCreateResultSchema = Schema.Struct({
-  path: Schema.String,
-  branch: Schema.String,
-  worktreeKey: Schema.String,
-});
-export type GitWorktreeCreateResult = typeof GitWorktreeCreateResultSchema.Type;
-
-export const GitWorktreeRemoveInputSchema = Schema.Struct({
-  path: Schema.String,
-});
-export type GitWorktreeRemoveInput = typeof GitWorktreeRemoveInputSchema.Type;
-
 const cwdErrors = {
   PATH_ESCAPE: { data: pathEscapeData },
   NOT_DIRECTORY: { data: pathData },
@@ -157,23 +119,11 @@ const diffErrors = {
   },
 };
 
-const worktreeErrors = {
-  ...cwdErrors,
-  INVALID_BRANCH: {
-    data: toStandardSchema(Schema.Struct({ branch: Schema.String })),
-  },
-  BRANCH_EXISTS: {
-    data: toStandardSchema(Schema.Struct({ cwd: Schema.String, branch: Schema.String })),
-  },
-  WORKTREE_EXISTS: {
-    data: toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String })),
-  },
-};
-
 /**
  * Read-only git. Each call takes either an absolute `cwd` or a session `ref`;
  * the server resolves `ref` to the session workspace path. Paths are confined
- * to that workspace and git never writes except via explicit worktree RPCs.
+ * to that workspace. Worktree creation is not a git RPC — it runs inside the
+ * first prompt when `session.create` requested `worktree`.
  */
 export const gitContract = {
   status: oc
@@ -192,9 +142,4 @@ export const gitContract = {
     .input(toStandardSchema(GitDiffQuerySchema))
     .errors(diffErrors)
     .output(toStandardSchema(GitFileDiffSchema)),
-  worktreeCreate: oc
-    .input(toStandardSchema(GitWorktreeCreateInputSchema))
-    .errors(worktreeErrors)
-    .output(toStandardSchema(GitWorktreeCreateResultSchema)),
-  worktreeRemove: oc.input(toStandardSchema(GitWorktreeRemoveInputSchema)).errors(cwdErrors),
 };

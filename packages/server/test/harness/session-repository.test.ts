@@ -24,10 +24,10 @@ const makeLayer = (home: string) =>
     makePiAgentSessionRepository(path.join(home, "storage", "sessions")),
   ).pipe(Layer.provide(NodePlatformLayer));
 
-const meta = (sessionId: string, projectId: string, agentSessionId: string): Session => ({
+const meta = (sessionId: string, projectId: string, agentSessionId?: string): Session => ({
   sessionId,
   projectId,
-  agentSessionId,
+  ...(agentSessionId !== undefined ? { agentSessionId } : {}),
   createdAt: "2026-07-16T00:00:00.000Z",
 });
 
@@ -53,6 +53,26 @@ describe("SessionRepository", () => {
     );
     expect(read.sessionId).toBe("sess-1");
     expect(read.agentSessionId).toBe("claude-uuid-1");
+  });
+
+  it("omits agentSessionId until Pi has opened, and drops the old sentinel on read", async () => {
+    const neverOpened = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write(meta("sess-1", "proj-a"));
+        return yield* repo.read("proj-a", "sess-1");
+      }),
+    );
+    expect(neverOpened.agentSessionId).toBeUndefined();
+
+    const sentinel = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write(meta("sess-2", "proj-a", "sess-2"));
+        return yield* repo.read("proj-a", "sess-2");
+      }),
+    );
+    expect(sentinel.agentSessionId).toBeUndefined();
   });
 
   it("persists at storage/sessions/<projectId>/<sessionId>.json, sessionId in the body too", async () => {

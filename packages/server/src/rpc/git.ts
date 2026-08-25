@@ -5,16 +5,9 @@ import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import {
-  GitBranchExists,
   GitError,
-  GitInvalidBranchName,
   GitNotRepository,
   GitRefNotFound,
-  GitWorktreePathExists,
-  ProjectNotFound,
-  SessionNotFound,
-  StoreReadError,
-  StoreWriteError,
   WorkspaceBinaryFile,
   WorkspaceFileNotFound,
   WorkspaceFileTooLarge,
@@ -25,41 +18,9 @@ import {
 } from "../errors";
 import { GitService } from "../git";
 import type { RpcContext } from "./context";
-import { resolveGitWorkspaceCwd } from "./resolve-git-workspace";
+import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
 
 const orpc = implement(gitContract).$context<RpcContext>();
-
-const resolveSessionErrors = <
-  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
->(
-  errors: E,
-) =>
-  Effect.catchTags({
-    SessionNotFound: (error: SessionNotFound) =>
-      Effect.fail(
-        errors.SESSION_NOT_FOUND({
-          data: { message: `session ${error.sessionId} not found` },
-        }),
-      ),
-    ProjectNotFound: (error: ProjectNotFound) =>
-      Effect.fail(
-        errors.SESSION_NOT_FOUND({
-          data: { message: `project ${error.projectId} not found` },
-        }),
-      ),
-    StoreReadError: (error: StoreReadError) =>
-      Effect.fail(
-        errors.SESSION_NOT_FOUND({
-          data: { message: `session store read failed: ${error.file}` },
-        }),
-      ),
-    StoreWriteError: (error: StoreWriteError) =>
-      Effect.fail(
-        errors.SESSION_NOT_FOUND({
-          data: { message: `session store write failed: ${error.file}` },
-        }),
-      ),
-  });
 
 const mapGitCwdErrors = <
   E extends {
@@ -84,8 +45,10 @@ const mapGitCwdErrors = <
     GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
   });
 
-const resolveCwd = (input: GitWorkspaceInput, errors: Parameters<typeof resolveSessionErrors>[0]) =>
-  resolveGitWorkspaceCwd(input).pipe(resolveSessionErrors(errors));
+const resolveCwd = (
+  input: GitWorkspaceInput,
+  errors: Parameters<typeof catchWorkspaceResolveErrors>[0],
+) => resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));
 
 const toReviewInput = (input: GitReviewQuery, cwd: string) => ({
   cwd,
@@ -142,48 +105,6 @@ export const gitRouter = orpc.router({
               data: { path: error.path, size: error.size, limit: error.limit },
             }),
           ),
-      }),
-    );
-  }),
-  worktreeCreate: orpc.worktreeCreate.effect(function* ({ input, errors }) {
-    const git = yield* GitService;
-    return yield* git
-      .worktreeCreate(input.cwd, input.branch !== undefined ? { branch: input.branch } : undefined)
-      .pipe(
-        Effect.catchTags({
-          WorkspacePathEscape: (error: WorkspacePathEscape) =>
-            Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
-          WorkspaceNotDirectory: (error: WorkspaceNotDirectory) =>
-            Effect.fail(errors.NOT_DIRECTORY({ data: { path: error.path } })),
-          WorkspaceReadError: (_error: WorkspaceReadError) =>
-            Effect.fail(errors.GIT_FAILED({ data: { cwd: input.cwd } })),
-          GitNotRepository: (error: GitNotRepository) =>
-            Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
-          GitError: (error: GitError) =>
-            Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
-          GitInvalidBranchName: (error: GitInvalidBranchName) =>
-            Effect.fail(errors.INVALID_BRANCH({ data: { branch: error.branch } })),
-          GitBranchExists: (error: GitBranchExists) =>
-            Effect.fail(errors.BRANCH_EXISTS({ data: { cwd: error.cwd, branch: error.branch } })),
-          GitWorktreePathExists: (error: GitWorktreePathExists) =>
-            Effect.fail(errors.WORKTREE_EXISTS({ data: { cwd: error.cwd, path: error.path } })),
-        }),
-      );
-  }),
-  worktreeRemove: orpc.worktreeRemove.effect(function* ({ input, errors }) {
-    const git = yield* GitService;
-    yield* git.worktreeRemove(input.path).pipe(
-      Effect.catchTags({
-        WorkspacePathEscape: (error: WorkspacePathEscape) =>
-          Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
-        WorkspaceNotDirectory: (error: WorkspaceNotDirectory) =>
-          Effect.fail(errors.NOT_DIRECTORY({ data: { path: error.path } })),
-        WorkspaceReadError: (_error: WorkspaceReadError) =>
-          Effect.fail(errors.GIT_FAILED({ data: { cwd: input.path } })),
-        GitNotRepository: (error: GitNotRepository) =>
-          Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
-        GitError: (_error: GitError) =>
-          Effect.fail(errors.GIT_FAILED({ data: { cwd: input.path } })),
       }),
     );
   }),

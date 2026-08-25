@@ -1,4 +1,4 @@
-import type { SessionRef, SessionWorkspace } from "@getpie/contract";
+import type { SessionRef } from "@getpie/contract";
 import { type ReactNode, useMemo } from "react";
 
 import type { ContentPanel } from "../model/content-panel";
@@ -17,15 +17,15 @@ export interface ContentPanelSessionProviderProps {
   readonly contentPanel: ContentPanel<AnyPanelView>;
   /** null off a session route; every panel hook below degrades to a no-op. */
   readonly sessionRef: SessionRef | null;
-  readonly workspace: SessionWorkspace | null;
+  readonly projectName: string | null;
   readonly children: ReactNode;
 }
 
 export function ContentPanelSessionProvider(props: ContentPanelSessionProviderProps): ReactNode {
-  const { contentPanel, sessionRef, workspace, children } = props;
+  const { contentPanel, sessionRef, projectName, children } = props;
   const value = useMemo(
-    () => ({ contentPanel, sessionRef, workspace }),
-    [contentPanel, sessionRef, workspace],
+    () => ({ contentPanel, sessionRef, projectName }),
+    [contentPanel, sessionRef, projectName],
   );
   return <ContentPanelContext value={value}>{children}</ContentPanelContext>;
 }

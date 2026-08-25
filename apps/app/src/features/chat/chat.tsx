@@ -6,15 +6,7 @@ import { ChatModelSelect } from "@/features/chat/components/chat-model-select";
 import { ChatSessionProvider } from "@/features/chat/components/chat-session-provider";
 import { ChatTranscript } from "@/features/chat/components/chat-transcript";
 
-export function Chat({
-  className,
-  sessionRef,
-  cwd: _cwd,
-}: {
-  className?: string;
-  sessionRef: SessionRef;
-  cwd: string | undefined;
-}) {
+export function Chat({ className, sessionRef }: { className?: string; sessionRef: SessionRef }) {
   return (
     <ChatSessionProvider sessionRef={sessionRef}>
       <div className={cn("flex min-h-0 flex-1 flex-col", className)}>

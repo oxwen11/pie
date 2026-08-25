@@ -122,14 +122,14 @@ const isUnsafeRef = (ref: string): boolean =>
   ref.includes("@{") ||
   /\s/.test(ref);
 
-type GitFailure =
+export type GitFailure =
   | WorkspacePathEscape
   | WorkspaceNotDirectory
   | WorkspaceReadError
   | GitNotRepository
   | GitError;
 
-type GitWorktreeFailure =
+export type GitWorktreeFailure =
   | GitFailure
   | GitInvalidBranchName
   | GitInvalidWorktreeKey

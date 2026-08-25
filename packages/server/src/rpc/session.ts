@@ -23,26 +23,19 @@ export const sessionRouter = orpc.router({
 
     return yield* projects.findById(input.projectId).pipe(
       Effect.flatMap((project) =>
-        Effect.gen(function* () {
-          const sessionCwd = input.cwd ?? project.path;
-          const pendingWorktree =
-            input.cwd === undefined && input.worktree !== undefined ? input.worktree : undefined;
-
-          const ref = yield* sessions.create(
-            input.projectId,
-            sessionCwd,
-            model,
-            undefined,
-            pendingWorktree,
-          );
-
-          return {
-            ref,
-            workspace: {
-              cwd: sessionCwd,
-            },
-          };
-        }),
+        sessions
+          .create({
+            projectId: input.projectId,
+            cwd: project.path,
+            ...(model !== undefined ? { model } : {}),
+            ...(input.worktree !== undefined ? { pendingWorktree: input.worktree } : {}),
+          })
+          .pipe(
+            Effect.map((ref) => ({
+              ref,
+              workspace: { cwd: project.path },
+            })),
+          ),
       ),
       Effect.catchTags({
         ProjectNotFound: (e) =>

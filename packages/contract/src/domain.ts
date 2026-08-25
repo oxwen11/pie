@@ -16,6 +16,22 @@ export const SessionRefSchema = Schema.Struct({
 });
 export type SessionRef = typeof SessionRefSchema.Type;
 
+/** Absolute workspace directory, or a session whose stored `cwd` the server resolves. */
+export const WorkspaceCwdQuerySchema = Schema.Struct({ cwd: Schema.String });
+export const WorkspaceRefQuerySchema = Schema.Struct({ ref: SessionRefSchema });
+export const WorkspaceQuerySchema = Schema.Union([
+  WorkspaceCwdQuerySchema,
+  WorkspaceRefQuerySchema,
+]);
+export type WorkspaceQuery = typeof WorkspaceQuerySchema.Type;
+
+/** Same `{ cwd } | { ref }` arms with extra fields on each object. */
+export const withWorkspaceQuery = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.Union([
+    Schema.Struct({ cwd: Schema.String, ...fields }),
+    Schema.Struct({ ref: SessionRefSchema, ...fields }),
+  ]);
+
 // ---------------------------------------------------------------------------
 // Approval model (agent requests / responses)
 // ---------------------------------------------------------------------------
@@ -257,10 +273,14 @@ export type SessionScopedEvent = {
 
 export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }
-  // Self-owned display data changed on the server (currently the title, stamped
-  // from the first prompt). Carries the new value so clients patch the row in
-  // place instead of clobbering an optimistic title with a refetch.
-  | { readonly type: "session.updated"; readonly title?: string }
+  // Self-owned display data changed on the server (title from the first prompt,
+  // and/or workspace after a deferred worktree materializes). Title patches the
+  // list row; workspace tells `{ ref }` fs/git queries to refetch.
+  | {
+      readonly type: "session.updated";
+      readonly title?: string;
+      readonly workspace?: SessionWorkspace;
+    }
   | { readonly type: "session.archived"; readonly archived: boolean }
   | { readonly type: "session.deleted" }
   | { readonly type: "session.renamed"; readonly title: string }
@@ -517,8 +537,6 @@ export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
-  /** Absolute workspace path. When set, skips project.path for the initial cwd. */
-  cwd: Schema.optionalKey(Schema.String),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),

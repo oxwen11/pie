@@ -64,7 +64,6 @@ function RootLayout() {
       shouldThrow: false,
     }) ?? null;
   const sessionRef = sessionRoute?.loaderData?.ref ?? null;
-  const sessionWorkspace = sessionRoute?.loaderData?.workspace ?? null;
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,
@@ -89,8 +88,8 @@ function RootLayout() {
     <AppShell>
       <ContentPanelSessionProvider
         contentPanel={contentPanel}
+        projectName={project?.name ?? null}
         sessionRef={sessionRef}
-        workspace={sessionWorkspace}
       >
         <AppShellBody>
           <AppShellSidebar>
