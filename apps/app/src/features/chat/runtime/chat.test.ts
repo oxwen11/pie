@@ -444,6 +444,15 @@ describe("Chat prompting", () => {
     expect(chat.store.getState().status).toBe("streaming");
   });
 
+  it("sends a bootstrap prompt only once per Chat instance", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({});
+    await expect(chat.tryBootstrapPrompt("bootstrap")).resolves.toBe(true);
+    await expect(chat.tryBootstrapPrompt("bootstrap")).resolves.toBe(false);
+    expect(transport.promptCalls).toHaveLength(1);
+    expect(transport.promptCalls[0]?.parts).toEqual([{ type: "text", text: "bootstrap" }]);
+  });
+
   it("appends another client's prompt from the broadcast", async () => {
     const { chat, attach, live } = makeChat();
     await attach({});

@@ -30,7 +30,6 @@ import { createSubmitKeymap } from "@/features/chat/components/input/extensions/
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
-import { setPendingSessionStart } from "@/features/chat/pending-session-start";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
@@ -129,14 +128,9 @@ function DraftRoute() {
             ? { worktree: {} }
             : {}),
       });
-      setPendingSessionStart({
-        ref: created.ref,
-        text,
-        workspaceMode,
-      });
-      return created;
+      return { created, text };
     },
-    onSuccess: (created, { text }) => {
+    onSuccess: ({ created, text }) => {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
@@ -158,6 +152,13 @@ function DraftRoute() {
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
+        state: {
+          pendingSessionStart: {
+            ref: created.ref,
+            text,
+            workspaceMode,
+          },
+        },
       });
     },
     onError: (error) => {

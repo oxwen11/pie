@@ -1,25 +1,41 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  claimSessionStartPrompt,
-  clearPendingSessionStart,
-  peekPendingSessionStart,
-  setPendingSessionStart,
-} from "./pending-session-start";
+import { pendingSessionStartFromState } from "./pending-session-start";
 
 const ref = { projectId: "project-1", sessionId: "session-1" };
 
-describe("pending session start", () => {
-  it("claims the bootstrap prompt only once per session", () => {
-    expect(claimSessionStartPrompt("session-a")).toBe(true);
-    expect(claimSessionStartPrompt("session-a")).toBe(false);
-    expect(claimSessionStartPrompt("session-b")).toBe(true);
+describe("pendingSessionStartFromState", () => {
+  it("returns pending start when state matches the session ref", () => {
+    const pending = {
+      ref,
+      text: "hello",
+      workspaceMode: "project" as const,
+    };
+    expect(pendingSessionStartFromState({ pendingSessionStart: pending }, ref)).toEqual(pending);
   });
 
-  it("tracks pending start until cleared", () => {
-    setPendingSessionStart({ ref, text: "hello", workspaceMode: "project" });
-    expect(peekPendingSessionStart(ref.sessionId)?.text).toBe("hello");
-    clearPendingSessionStart(ref.sessionId);
-    expect(peekPendingSessionStart(ref.sessionId)).toBeUndefined();
+  it("rejects mismatched session ids", () => {
+    expect(
+      pendingSessionStartFromState(
+        {
+          pendingSessionStart: {
+            ref,
+            text: "hello",
+            workspaceMode: "project",
+          },
+        },
+        { ...ref, sessionId: "session-2" },
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects invalid payloads", () => {
+    expect(pendingSessionStartFromState(null, ref)).toBeUndefined();
+    expect(
+      pendingSessionStartFromState(
+        { pendingSessionStart: { ref, text: "", workspaceMode: "project" } },
+        ref,
+      ),
+    ).toBeUndefined();
   });
 });
