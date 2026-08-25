@@ -666,7 +666,15 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
-        yield* Effect.sleep("50 millis");
+        // prompt forkDetachs Pi open; keep this scope alive until the adapter
+        // log lands so the identity wrap is still on the fiber.
+        yield* Effect.gen(function* () {
+          for (let attempt = 0; attempt < 200; attempt += 1) {
+            if (records.some((record) => record.message === "pi creating")) return;
+            yield* Effect.sleep("10 millis");
+          }
+          return yield* Effect.die(new Error("timed out waiting for pi creating"));
+        });
       }).pipe(
         Effect.provide(
           Layer.merge(
