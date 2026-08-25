@@ -1,6 +1,8 @@
 import type {
   AgentModelState,
   AgentResponse,
+  CreateSessionOutput,
+  CreateWorktreeInput,
   PromptInput,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -74,10 +76,13 @@ export type CreatePiSessionInput = {
   readonly projectId: string;
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
+  readonly worktree?: CreateWorktreeInput;
 };
 
 export type PiAgentSessionServiceShape = {
-  readonly create: (input: CreatePiSessionInput) => Effect.Effect<SessionRef, StoreWriteError>;
+  readonly create: (
+    input: CreatePiSessionInput,
+  ) => Effect.Effect<CreateSessionOutput, StoreWriteError | GitWorktreeFailure>;
   readonly prepare: (
     ref: SessionRef,
   ) => Effect.Effect<
@@ -252,49 +257,6 @@ export const makePiAgentSessionService = (deps: {
           ),
         );
 
-  const resolveWorkspaceForPrompt = (
-    ref: SessionRef,
-    worktree: PromptInput["worktree"],
-  ): Effect.Effect<
-    SessionWithCwd,
-    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
-  > =>
-    withMetadataMutation(
-      ref,
-      readMetadata(ref).pipe(
-        Effect.flatMap(ensureCwd),
-        Effect.flatMap((metadata) => {
-          if (worktree === undefined || metadata.gitBranch !== undefined) {
-            return Effect.succeed(metadata);
-          }
-          return git
-            .worktreeCreate(
-              metadata.cwd,
-              worktree.base !== undefined ? { base: worktree.base } : undefined,
-            )
-            .pipe(
-              Effect.flatMap((created) => {
-                const updated: SessionWithCwd = {
-                  ...metadata,
-                  cwd: created.path,
-                  gitBranch: created.branch,
-                };
-                return repo.write(updated).pipe(
-                  Effect.andThen(
-                    bus.publish({
-                      ref,
-                      type: "session.updated",
-                      workspace: toSessionWorkspace(updated),
-                    }),
-                  ),
-                  Effect.as(updated),
-                );
-              }),
-            );
-        }),
-      ),
-    );
-
   const ensureRuntimeForPrompt = (
     ref: SessionRef,
     metadata: SessionWithCwd,
@@ -328,7 +290,6 @@ export const makePiAgentSessionService = (deps: {
   const deliverPrompt = (
     ref: SessionRef,
     userInput: UserInput,
-    worktree: PromptInput["worktree"],
   ): Effect.Effect<
     void,
     | ResumeSessionError
@@ -339,10 +300,9 @@ export const makePiAgentSessionService = (deps: {
     | SessionNotFound
     | SessionClosed
     | TurnAlreadyRunning
-    | GitWorktreeFailure
   > =>
     Effect.gen(function* () {
-      const resolved = yield* resolveWorkspaceForPrompt(ref, worktree);
+      const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
       const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
       yield* runtime.prompt(userInput).pipe(Effect.asVoid);
     });
@@ -416,24 +376,45 @@ export const makePiAgentSessionService = (deps: {
       newSessionId.pipe(
         Effect.flatMap((sessionId) => {
           const ref: SessionRef = { projectId: input.projectId, sessionId };
-          const metadata: Session = {
-            sessionId,
-            projectId: input.projectId,
-            createdAt: new Date().toISOString(),
-            cwd: input.cwd,
-            ...(input.model !== undefined
-              ? { provider: input.model.provider, modelId: input.model.modelId }
-              : {}),
-            archived: false,
-          };
-          return repo.write(metadata).pipe(
-            Effect.andThen(bus.publish({ ref, type: "session.created" })),
-            Effect.andThen(
-              logLifecycle("session.created", "session created", {
-                cwd: input.cwd,
-              }),
-            ),
-            Effect.as(ref),
+          const materializeWorkspace: Effect.Effect<SessionWorkspace, GitWorktreeFailure> =
+            input.worktree === undefined
+              ? Effect.succeed({ cwd: input.cwd })
+              : git
+                  .worktreeCreate(
+                    input.cwd,
+                    input.worktree.base !== undefined ? { base: input.worktree.base } : undefined,
+                  )
+                  .pipe(
+                    Effect.map((created) => ({
+                      cwd: created.path,
+                      gitBranch: created.branch,
+                    })),
+                  );
+          return materializeWorkspace.pipe(
+            Effect.flatMap((sessionWorkspace) => {
+              const metadata: Session = {
+                sessionId,
+                projectId: input.projectId,
+                createdAt: new Date().toISOString(),
+                cwd: sessionWorkspace.cwd,
+                ...(sessionWorkspace.gitBranch !== undefined
+                  ? { gitBranch: sessionWorkspace.gitBranch }
+                  : {}),
+                ...(input.model !== undefined
+                  ? { provider: input.model.provider, modelId: input.model.modelId }
+                  : {}),
+                archived: false,
+              };
+              return repo.write(metadata).pipe(
+                Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                Effect.andThen(
+                  logLifecycle("session.created", "session created", {
+                    cwd: sessionWorkspace.cwd,
+                  }),
+                ),
+                Effect.as({ ref, workspace: sessionWorkspace }),
+              );
+            }),
             inSession(ref),
           );
         }),
@@ -608,7 +589,7 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
-        yield* deliverPrompt(input.ref, userInput, input.worktree).pipe(
+        yield* deliverPrompt(input.ref, userInput).pipe(
           Effect.catch((error: unknown) =>
             reject(error instanceof Error ? error.message : String(error)),
           ),

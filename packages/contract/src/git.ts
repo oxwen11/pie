@@ -122,8 +122,8 @@ const diffErrors = {
 /**
  * Read-only git. Each call takes either an absolute `cwd` or a session `ref`;
  * the server resolves `ref` to the session workspace path. Paths are confined
- * to that workspace. Worktree creation is not a git RPC — it runs inside the
- * first prompt when that prompt includes `worktree`.
+ * to that workspace. Worktree creation is not a git RPC — it runs inside
+ * `session.create` when that request includes `worktree`.
  */
 export const gitContract = {
   status: oc

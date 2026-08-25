@@ -3,6 +3,18 @@ import { sessionContract } from "@getpie/contract/session";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
+import {
+  GitBranchExists,
+  GitError,
+  GitInvalidBranchName,
+  GitInvalidWorktreeKey,
+  GitNotRepository,
+  GitRefNotFound,
+  GitWorktreePathExists,
+  WorkspaceNotDirectory,
+  WorkspacePathEscape,
+  WorkspaceReadError,
+} from "../errors";
 import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
@@ -23,22 +35,38 @@ export const sessionRouter = orpc.router({
 
     return yield* projects.findById(input.projectId).pipe(
       Effect.flatMap((project) =>
-        sessions
-          .create({
-            projectId: input.projectId,
-            cwd: project.path,
-            ...(model !== undefined ? { model } : {}),
-          })
-          .pipe(
-            Effect.map((ref) => ({
-              ref,
-              workspace: { cwd: project.path },
-            })),
-          ),
+        sessions.create({
+          projectId: input.projectId,
+          cwd: project.path,
+          ...(model !== undefined ? { model } : {}),
+          ...(input.worktree !== undefined ? { worktree: input.worktree } : {}),
+        }),
       ),
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        GitRefNotFound: (e: GitRefNotFound) =>
+          Effect.fail(errors.NOT_FOUND({ message: `git ref ${e.ref} not found` })),
+        GitBranchExists: (e: GitBranchExists) =>
+          Effect.fail(errors.CONFLICT({ message: `branch ${e.branch} already exists` })),
+        GitWorktreePathExists: (e: GitWorktreePathExists) =>
+          Effect.fail(errors.CONFLICT({ message: `worktree path ${e.path} already exists` })),
+        GitInvalidBranchName: (e: GitInvalidBranchName) =>
+          Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid branch name ${e.branch}` })),
+        GitInvalidWorktreeKey: (e: GitInvalidWorktreeKey) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({ message: `invalid worktree key ${e.worktreeKey}` }),
+          ),
+        GitNotRepository: (e: GitNotRepository) =>
+          Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.cwd} is not a git repository` })),
+        WorkspacePathEscape: (e: WorkspacePathEscape) =>
+          Effect.fail(errors.FORBIDDEN({ message: `path ${e.path} escapes ${e.cwd}` })),
+        WorkspaceNotDirectory: (e: WorkspaceNotDirectory) =>
+          Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
+        WorkspaceReadError: (e: WorkspaceReadError) =>
+          Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
+        GitError: (e: GitError) =>
+          Effect.fail(errors.INTERNAL({ message: `git failed in ${e.cwd}` })),
       }),
     );
   }),

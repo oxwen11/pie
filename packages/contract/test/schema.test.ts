@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   ArchiveSessionInputSchema,
   CollectionEventTypes,
+  CreateSessionInputSchema,
   ListSessionsInputSchema,
   MAX_SESSION_TITLE_CHARS,
   RenameSessionInputSchema,
@@ -78,6 +79,19 @@ describe("ListSessionsInput", () => {
   });
 });
 
+describe("CreateSessionInput", () => {
+  it("accepts a projectId", () => {
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID })).toBe(true);
+  });
+
+  it("accepts an optional worktree request", () => {
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID, worktree: {} })).toBe(true);
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID, worktree: { base: "main" } })).toBe(
+      true,
+    );
+  });
+});
+
 describe("PromptInput", () => {
   it("accepts a text part", () => {
     expect(accepts(PromptInputSchema, { ref, parts: [{ type: "text", text: "hi" }] })).toBe(true);
@@ -89,19 +103,6 @@ describe("PromptInput", () => {
 
   it("rejects an empty text part", () => {
     expect(accepts(PromptInputSchema, { ref, parts: [{ type: "text", text: "" }] })).toBe(false);
-  });
-
-  it("accepts an optional worktree request", () => {
-    expect(
-      accepts(PromptInputSchema, { ref, parts: [{ type: "text", text: "hi" }], worktree: {} }),
-    ).toBe(true);
-    expect(
-      accepts(PromptInputSchema, {
-        ref,
-        parts: [{ type: "text", text: "hi" }],
-        worktree: { base: "main" },
-      }),
-    ).toBe(true);
   });
 
   it("keeps the file part shape on the wire (validated, server rejects with UNSUPPORTED)", () => {

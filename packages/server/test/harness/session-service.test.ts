@@ -17,7 +17,7 @@ import {
 } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ProjectNotFound } from "../../src/errors";
+import { GitNotRepository, ProjectNotFound } from "../../src/errors";
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type { GitWorktreeCreateResult, GitWorktreeFailure } from "../../src/git/service";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
@@ -219,14 +219,18 @@ describe("PiAgentSessionService", () => {
   it("create passes the cwd through, generates a uuid sessionId, persists metadata", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-        const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-        return { ref, stored, spy: fixture.spy };
+        const created = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
+        const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
+        return { created, stored, spy: fixture.spy };
       }),
     );
 
-    expect(result.ref.projectId).toBe("proj-a");
-    expect(result.ref.sessionId).toMatch(UUID_RE);
+    expect(result.created.ref.projectId).toBe("proj-a");
+    expect(result.created.ref.sessionId).toMatch(UUID_RE);
+    expect(result.created.workspace).toEqual({ cwd: "/tmp/pie-app" });
     expect(result.spy.open).toEqual([]);
     expect(result.stored.agentSessionId).toBeUndefined();
     expect(result.stored.projectId).toBe("proj-a");
@@ -237,7 +241,7 @@ describe("PiAgentSessionService", () => {
   it("create succeeds without opening Pi even when the agent is unavailable", async () => {
     const result = await run({ unavailable: "not installed" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         const listed = yield* fixture.repo.list("proj-a");
         return { ref, listed, spy: fixture.spy };
       }),
@@ -249,7 +253,7 @@ describe("PiAgentSessionService", () => {
   it("prepare backfills the cwd and starts nothing", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.close(ref);
         // A record from before we stored cwd — the case the backfill exists for.
         const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
@@ -271,7 +275,7 @@ describe("PiAgentSessionService", () => {
   it("prepare keeps an existing worktree cwd instead of replacing it with the project path", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({
+        const { ref } = yield* fixture.service.create({
           projectId: "proj-a",
           cwd: "/tmp/pie-worktree",
         });
@@ -291,7 +295,7 @@ describe("PiAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ coldHistory: history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({
+        const { ref } = yield* fixture.service.create({
           projectId: "proj-a",
           cwd: "/tmp/pie-worktree",
         });
@@ -311,12 +315,14 @@ describe("PiAgentSessionService", () => {
     expect(result.messages).toEqual(history);
   });
 
-  it("creates a worktree once when two prompts race with worktree", async () => {
+  it("creates a worktree at create and does not recreate it on prompt", async () => {
     let creates = 0;
+    const bases: Array<string | undefined> = [];
     const result = await run(
       {
-        worktreeCreate: () => {
+        worktreeCreate: (_cwd, input) => {
           creates += 1;
+          bases.push(input?.base);
           return Effect.succeed({
             path: "/tmp/pie-worktree",
             branch: "pie/abcd1234",
@@ -326,52 +332,75 @@ describe("PiAgentSessionService", () => {
       },
       (fixture) =>
         Effect.gen(function* () {
-          const ref = yield* fixture.service.create({
+          const created = yield* fixture.service.create({
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
+            worktree: { base: "main" },
           });
-          yield* Effect.all(
-            [
-              fixture.service.prompt({
-                ref,
-                parts: [{ type: "text", text: "one" }],
-                worktree: {},
-              }),
-              fixture.service.prompt({
-                ref,
-                parts: [{ type: "text", text: "two" }],
-                worktree: {},
-              }),
-            ],
-            { concurrency: "unbounded" },
+          const afterCreate = yield* fixture.repo.read(
+            created.ref.projectId,
+            created.ref.sessionId,
           );
+          yield* fixture.service.prompt({
+            ref: created.ref,
+            parts: [{ type: "text", text: "one" }],
+          });
           yield* Effect.sleep("80 millis");
-          const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-          return { stored, open: fixture.spy.open };
+          return { created, afterCreate, open: fixture.spy.open };
         }),
     );
     expect(creates).toBe(1);
-    expect(result.stored.cwd).toBe("/tmp/pie-worktree");
-    expect(result.stored.gitBranch).toBe("pie/abcd1234");
-    expect(result.stored).not.toHaveProperty("pendingWorktree");
-    expect(result.open.every((entry) => entry.cwd === "/tmp/pie-worktree")).toBe(true);
+    expect(bases).toEqual(["main"]);
+    expect(result.created.workspace).toEqual({
+      cwd: "/tmp/pie-worktree",
+      gitBranch: "pie/abcd1234",
+    });
+    expect(result.afterCreate.cwd).toBe("/tmp/pie-worktree");
+    expect(result.afterCreate.gitBranch).toBe("pie/abcd1234");
+    expect(result.afterCreate).not.toHaveProperty("pendingWorktree");
+    expect(result.open).toEqual([{ cwd: "/tmp/pie-worktree" }]);
   });
 
-  it("does not create a worktree when the prompt omits worktree", async () => {
+  it("does not persist a session when worktree creation fails", async () => {
+    const result = await run(
+      {
+        worktreeCreate: () => Effect.fail(new GitNotRepository({ cwd: "/tmp/pie-app" })),
+      },
+      (fixture) =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(
+            fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            }),
+          );
+          const listed = yield* fixture.repo.list("proj-a");
+          return { error, listed, open: fixture.spy.open };
+        }),
+    );
+    expect(result.error._tag).toBe("GitNotRepository");
+    expect(result.listed).toHaveLength(0);
+    expect(result.open).toEqual([]);
+  });
+
+  it("does not create a worktree when create omits worktree", async () => {
     const stored = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({
+        const created = yield* fixture.service.create({
           projectId: "proj-a",
           cwd: "/tmp/pie-app",
         });
-        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "one" }] });
+        yield* fixture.service.prompt({ ref: created.ref, parts: [{ type: "text", text: "one" }] });
         yield* Effect.sleep("80 millis");
-        return yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        const afterPrompt = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
+        return { created, afterPrompt };
       }),
     );
-    expect(stored.cwd).toBe("/tmp/pie-app");
-    expect(stored.gitBranch).toBeUndefined();
-    expect(stored).not.toHaveProperty("pendingWorktree");
+    expect(stored.created.workspace).toEqual({ cwd: "/tmp/pie-app" });
+    expect(stored.afterPrompt.cwd).toBe("/tmp/pie-app");
+    expect(stored.afterPrompt.gitBranch).toBeUndefined();
+    expect(stored.afterPrompt).not.toHaveProperty("pendingWorktree");
   });
 
   it("prepare fails with SessionNotFound for an unknown session", async () => {
@@ -384,7 +413,7 @@ describe("PiAgentSessionService", () => {
   it("close is a no-op when Pi was never opened", async () => {
     const closeSpy = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.close(ref);
         return fixture.spy.close;
       }),
@@ -395,7 +424,7 @@ describe("PiAgentSessionService", () => {
   it("delete removes metadata even when Pi was never opened", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.delete(ref);
         const listed = yield* fixture.service.list("proj-a", false);
         return { listed, closeSpy: fixture.spy.close };
@@ -408,8 +437,14 @@ describe("PiAgentSessionService", () => {
   it("list returns one summary per session, keyed by server sessionId", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const a = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-        const b = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref: a } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
+        const { ref: b } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
         const listed = yield* fixture.service.list("proj-a", false);
         return { a, b, listed };
       }),
@@ -426,7 +461,7 @@ describe("PiAgentSessionService", () => {
   it("archives and restores a session, publishing each changed state", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "global" });
@@ -466,7 +501,7 @@ describe("PiAgentSessionService", () => {
   it("getMessages returns empty for a session Pi has never opened", async () => {
     const messages = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* fixture.service.getMessages(ref);
       }),
     );
@@ -477,7 +512,7 @@ describe("PiAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
         yield* Effect.sleep("50 millis");
         yield* fixture.service.close(ref);
@@ -515,7 +550,7 @@ describe("PiAgentSessionService", () => {
   it("archives a running session and closes its live instance", async () => {
     const result = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
         yield* Effect.sleep("50 millis");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
@@ -535,7 +570,7 @@ describe("PiAgentSessionService", () => {
   it("getMessages trims the last user segment while a turn is in flight", async () => {
     const messages = await run({ history: fourTurnHistory, turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
         yield* Effect.sleep("50 millis");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
@@ -548,7 +583,7 @@ describe("PiAgentSessionService", () => {
   it("getMessages does not trim for a finished turn's retained buffer", async () => {
     const messages = await run({ history: fourTurnHistory, turn: "finished" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
         yield* Effect.sleep("50 millis");
         yield* waitForTurn(fixture, ref, (turn) => turn !== null && turn.complete);
@@ -562,7 +597,7 @@ describe("PiAgentSessionService", () => {
     const history: UIMessage[] = [{ id: "m1", role: "user", parts: [] }];
     const result = await run({ coldHistory: history }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
         yield* fixture.repo.write({ ...stored, agentSessionId: "native-already" });
         yield* fixture.service.close(ref);
@@ -578,7 +613,7 @@ describe("PiAgentSessionService", () => {
   it("getMessages fails CapabilityUnsupported when the harness has no history read", async () => {
     const err = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
         yield* Effect.sleep("50 millis");
         return yield* Effect.flip(fixture.service.getMessages(ref));
@@ -590,7 +625,7 @@ describe("PiAgentSessionService", () => {
   it("interrupt succeeds with nothing running instead of starting an agent", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.close(ref);
         yield* fixture.service.interrupt(ref);
         return fixture.spy.resume;
@@ -604,7 +639,7 @@ describe("PiAgentSessionService", () => {
   it("respondToAgentRequest reports the request as gone with nothing running", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.close(ref);
         const err = yield* Effect.flip(
           fixture.service.respondToAgentRequest(ref, "req-1", {
@@ -625,7 +660,7 @@ describe("PiAgentSessionService", () => {
   it("a restarted server answers for a session it has never touched", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         const restarted = yield* fixture.restart;
 
         yield* restarted.service.prepare(ref);
@@ -658,7 +693,7 @@ describe("PiAgentSessionService", () => {
   it("the first prompt after a restart starts exactly one agent", async () => {
     const result = await run({ turn: "finished" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         const restarted = yield* fixture.restart;
         yield* restarted.service.prepare(ref);
 
@@ -677,7 +712,7 @@ describe("PiAgentSessionService", () => {
   it("titles a session from its first prompt, collapsing whitespace", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({
           ref,
           parts: [{ type: "text", text: "  Fix the  login  bug " }],
@@ -693,7 +728,7 @@ describe("PiAgentSessionService", () => {
   it("publishes session.updated with the collapsed title on the first prompt", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         // Subscribe after create so only the prompt's event is in flight; the
         // queue buffers it until take(1) pulls it — no forked drain, no race.
         return yield* Effect.scoped(
@@ -747,7 +782,7 @@ describe("PiAgentSessionService", () => {
   it("broadcasts session.prompt.submitted echoing the client messageId", async () => {
     const event = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
       }),
     );
@@ -763,7 +798,7 @@ describe("PiAgentSessionService", () => {
   it("retains the accepted prompt in the runtime snapshot for mid-turn joiners", async () => {
     const snapshot = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* takePromptSubmitted(fixture, ref, { messageId: "client-msg-1" });
         return yield* fixture.service.getSnapshot(ref);
       }),
@@ -780,7 +815,7 @@ describe("PiAgentSessionService", () => {
   it("compensates a harness-rejected prompt: rejected event follows, no retained phantom", async () => {
     const result = await run({ turn: "open", promptFails: true }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
@@ -820,7 +855,7 @@ describe("PiAgentSessionService", () => {
   it("mints a messageId when the prompt carries none", async () => {
     const event = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* takePromptSubmitted(fixture, ref, {});
       }),
     );
@@ -831,7 +866,7 @@ describe("PiAgentSessionService", () => {
   it("keeps the first prompt's title; later prompts don't rename", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "first" }] });
         yield* Effect.sleep("50 millis");
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "second" }] });
@@ -861,7 +896,7 @@ describe("PiAgentSessionService", () => {
     const records: Array<LogRecord> = [];
     await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.archive(ref, true);
         yield* fixture.service.delete(ref);
       }).pipe(
@@ -904,7 +939,7 @@ describe("PiAgentSessionService", () => {
     const records: Array<LogRecord> = [];
     await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
         yield* Effect.sleep("50 millis");
       }).pipe(
@@ -932,7 +967,7 @@ describe("PiAgentSessionService", () => {
   it("rename persists the title across a restart", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.rename(ref, "Login bug");
         const listed = yield* fixture.service.list("proj-a", false);
         const restarted = yield* fixture.restart;
@@ -946,7 +981,7 @@ describe("PiAgentSessionService", () => {
   it("publishes session.closed on the global firehose when the runtime is torn down", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "global" });
@@ -971,7 +1006,7 @@ describe("PiAgentSessionService", () => {
   it("publishes session.renamed per change, and nothing for a no-op rename", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "global" });
@@ -998,7 +1033,7 @@ describe("PiAgentSessionService", () => {
   it("keeps a hand-chosen title through the first prompt", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.rename(ref, "Login bug");
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "first" }] });
         yield* Effect.sleep("50 millis");
@@ -1011,7 +1046,7 @@ describe("PiAgentSessionService", () => {
   it("preserves rename and archive changes made concurrently", async () => {
     const stored = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* Effect.all(
           [fixture.service.rename(ref, "Login bug"), fixture.service.archive(ref, true)],
           { concurrency: "unbounded" },
@@ -1026,7 +1061,7 @@ describe("PiAgentSessionService", () => {
   it("keeps the manual title when rename races the first prompt stamp", async () => {
     const listed = await run({}, (fixture) =>
       Effect.gen(function* () {
-        const ref = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.rename(ref, "Login bug");
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "automatic title" }] });
         yield* Effect.sleep("50 millis");
@@ -1056,10 +1091,16 @@ describe("PiAgentSessionService", () => {
       },
       (fixture) =>
         Effect.gen(function* () {
-          const slow = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+          const { ref: slow } = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+          });
           yield* fixture.service.prompt({ ref: slow, parts: [{ type: "text", text: "warm" }] });
           yield* Effect.sleep("50 millis");
-          const other = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+          const { ref: other } = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+          });
           const archiving = yield* Effect.forkChild(fixture.service.archive(slow, true));
           yield* Effect.promise(() => closeStarted);
           yield* fixture.service.rename(other, "Still responsive");

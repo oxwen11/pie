@@ -1,10 +1,5 @@
 import type { PieClient } from "@getpie/client";
-import type {
-  CreateWorktreeInput,
-  PromptPart,
-  SessionRef,
-  SubscribeStreamEvent,
-} from "@getpie/contract";
+import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import type { UIMessage } from "ai";
 
@@ -68,13 +63,11 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
   prompt = async (input: {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
-    readonly worktree?: CreateWorktreeInput;
   }): Promise<{ readonly turnId: string }> => {
     return await this.client.session.prompt({
       ref: this.#ref,
       parts: input.parts,
       messageId: input.messageId,
-      ...(input.worktree !== undefined ? { worktree: input.worktree } : {}),
     });
   };
 

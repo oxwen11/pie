@@ -23,8 +23,8 @@ export interface Session {
   readonly agentSessionId?: string;
   readonly createdAt: string;
   /**
-   * Working directory. Our input at `create` (the project path), later a worktree
-   * path when a prompt that requested `worktree` materializes one.
+   * Working directory, written at `create`: the project path, or a worktree
+   * path when that create requested `worktree`.
    */
   readonly cwd?: string;
   /** Branch checked out in `cwd` when this session has a git worktree. */

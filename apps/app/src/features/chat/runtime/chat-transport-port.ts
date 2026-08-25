@@ -1,5 +1,4 @@
 import type {
-  CreateWorktreeInput,
   PromptPart,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -62,7 +61,6 @@ export interface ChatSessionTransport {
   prompt(input: {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
-    readonly worktree?: CreateWorktreeInput;
   }): Promise<{ readonly turnId: string }>;
   /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
   interrupt(): Promise<void>;

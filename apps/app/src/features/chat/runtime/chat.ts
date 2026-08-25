@@ -1,5 +1,4 @@
 import type {
-  CreateWorktreeInput,
   PromptPart,
   SessionMessageChunkEvent,
   SessionPhase,
@@ -86,10 +85,6 @@ export class Chat {
   // complete, with the retried tail persisted but never streamed — reconcile
   // from history at turn end regardless of outcome.
   readonly #erroredTurnIds = new Set<string>();
-  // Kept for the Chat's lifetime so a retry of the first prompt still asks the
-  // server to create the worktree. The RPC returns before that create finishes,
-  // so success cannot clear it; the server no-ops once `gitBranch` is stored.
-  #worktree: CreateWorktreeInput | undefined;
   // Prompts whose RPC has not settled. The link queues a call across a dropped
   // socket, so a prompt can outlive the server it was aimed at: nothing the
   // server says in the meantime — snapshot phase, settled transcript — has
@@ -548,11 +543,7 @@ export class Chat {
 
   // Fire-and-forget: push the optimistic user message, submit the RPC, and
   // let the subscription carry the reply back like any other client's turn.
-  prompt = async (
-    text: string,
-    options?: { readonly worktree?: CreateWorktreeInput },
-  ): Promise<void> => {
-    if (options?.worktree !== undefined) this.#worktree = options.worktree;
+  prompt = async (text: string): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
     this.#state.error = undefined;
@@ -563,7 +554,6 @@ export class Chat {
       await this.#transport.prompt({
         messageId,
         parts,
-        ...(this.#worktree !== undefined ? { worktree: this.#worktree } : {}),
       });
     } catch (promptError) {
       this.#state.error =

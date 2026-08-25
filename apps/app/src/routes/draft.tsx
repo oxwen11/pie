@@ -117,10 +117,11 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
+        ...(worktree !== undefined ? { worktree } : {}),
       });
-      return { created, text, worktree };
+      return { created, text };
     },
-    onSuccess: ({ created, text, worktree }) => {
+    onSuccess: ({ created, text }) => {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
@@ -138,10 +139,11 @@ function DraftRoute() {
         return [...(prev ?? []), optimistic];
       });
 
-      // Chat survives the route change, so the first prompt starts here.
+      // Create already persisted cwd (and the worktree, when requested). Prompt
+      // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
         .chatFor(created.ref)
-        .prompt(text, worktree !== undefined ? { worktree } : undefined)
+        .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
         });

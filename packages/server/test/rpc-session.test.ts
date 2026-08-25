@@ -250,7 +250,7 @@ describe("agent.session router", () => {
     }
   });
 
-  it("creates a git worktree on prompt when requested", async () => {
+  it("creates a git worktree on session.create when requested", async () => {
     const { client, workspace, dispose } = await setup();
     try {
       const { simpleGit } = await import("simple-git");
@@ -265,34 +265,28 @@ describe("agent.session router", () => {
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
+        worktree: {},
       });
 
-      expect(created.workspace.cwd).toBe(workspace);
+      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.cwd).not.toBe(workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const prepared = await client.agent.session.prepare({ ref: created.ref });
+      expect(prepared.workspace).toEqual(created.workspace);
 
       await client.agent.session.prompt({
         ref: created.ref,
         parts: [{ type: "text", text: "hello" }],
-        worktree: {},
       });
 
-      const prepared = await (async () => {
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          const next = await client.agent.session.prepare({ ref: created.ref });
-          if (next.workspace.gitBranch !== undefined && next.workspace.cwd !== workspace) {
-            return next;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        throw new Error("worktree was not created");
-      })();
-      expect(prepared.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
-      expect(prepared.workspace.cwd).not.toBe(workspace);
-      expect(fs.existsSync(prepared.workspace.cwd)).toBe(true);
+      const afterPrompt = await client.agent.session.prepare({ ref: created.ref });
+      expect(afterPrompt.workspace).toEqual(created.workspace);
 
       const branch = await client.git.branch({ ref: created.ref });
-      expect(branch.current).toBe(prepared.workspace.gitBranch);
+      expect(branch.current).toBe(created.workspace.gitBranch);
       const tree = await client.fs.readTree({ ref: created.ref });
-      expect(tree.cwd).toBe(prepared.workspace.cwd);
+      expect(tree.cwd).toBe(created.workspace.cwd);
 
       await client.agent.session.close({ ref: created.ref });
     } finally {
@@ -315,29 +309,12 @@ describe("agent.session router", () => {
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
-      });
-
-      expect(created.workspace.cwd).toBe(workspace);
-
-      await client.agent.session.prompt({
-        ref: created.ref,
-        parts: [{ type: "text", text: "hello" }],
         worktree: {},
       });
 
       const repoName = path.basename(workspace);
-      const prepared = await (async () => {
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          const next = await client.agent.session.prepare({ ref: created.ref });
-          if (next.workspace.gitBranch !== undefined && next.workspace.cwd !== workspace) {
-            return next;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        throw new Error("worktree was not created");
-      })();
-      expect(prepared.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
-      expect(prepared.workspace.cwd).toMatch(
+      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.cwd).toMatch(
         new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
       );
       await client.agent.session.close({ ref: created.ref });
@@ -345,4 +322,21 @@ describe("agent.session router", () => {
       await dispose();
     }
   }, 15_000);
+
+  it("fails create when worktree is requested on a non-git project", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const project = await client.project.create({ path: workspace });
+      await expect(
+        client.agent.session.create({
+          projectId: project.id,
+          worktree: {},
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
+      const listed = await client.agent.session.list({ projectId: project.id });
+      expect(listed).toEqual([]);
+    } finally {
+      await dispose();
+    }
+  });
 });

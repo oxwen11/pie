@@ -24,7 +24,7 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
 
 **Workspace path**:
-The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` — usually `Project.path`, or a git worktree path after a prompt that requested `worktree` materializes one. The session layer only deals in `cwd`; worktree creation runs in the prompt delivery pipeline, not as a separate RPC, and is never stored as a pending flag. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire.
+The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. The session layer only deals in `cwd`; worktree creation runs inside create (not a git RPC, not the first prompt) and is never stored as a pending flag. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
 _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
@@ -32,7 +32,7 @@ _Avoid_: cwd (in session APIs)
 The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: `PiAgent` knows how to get in, Manager knows who is alive, `PiAgentRuntime` is the live child, Service is the outward face.
 
 **PiAgentSessionService** (`harness/session-service.ts`):
-The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. The router maps `projectId → path` at create; the service backfills a missing stored `cwd` via `ProjectService.findById` for records that predate persistence.
+The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. The router maps `projectId → path` at create; when create includes `worktree`, the service materializes the checkout and persists that cwd before returning. The service backfills a missing stored `cwd` via `ProjectService.findById` for records that predate persistence.
 
 **PiAgentSessionManager** (`harness/session-manager.ts`):
 The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.create`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.

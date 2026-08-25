@@ -273,9 +273,8 @@ export type SessionScopedEvent = {
 
 export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }
-  // Self-owned display data changed on the server (title from the first prompt,
-  // and/or workspace after a deferred worktree materializes). Title patches the
-  // list row; workspace tells `{ ref }` fs/git queries to refetch.
+  // Self-owned display data changed on the server (title from the first prompt).
+  // Title patches the list row; workspace tells `{ ref }` fs/git queries to refetch.
   | {
       readonly type: "session.updated";
       readonly title?: string;
@@ -418,7 +417,7 @@ export const PromptPartSchema = Schema.Union([
 ]);
 export type PromptPart = typeof PromptPartSchema.Type;
 
-/** When present on a prompt, create a git worktree before Pi opens (branch name is server-assigned). */
+/** When present on `session.create`, create a git worktree before persist (branch name is server-assigned). */
 export const CreateWorktreeInputSchema = Schema.Struct({
   /** Local or remote-tracking ref to branch from. Defaults to HEAD when omitted. */
   base: Schema.optionalKey(Schema.NonEmptyString),
@@ -432,9 +431,6 @@ export const PromptInputSchema = Schema.Struct({
   // `session.prompt.submitted` so the sender can recognise (and skip) its own
   // prompt while other clients render it. Absent → the server mints one.
   messageId: Schema.optionalKey(Schema.NonEmptyString),
-  // Create a git worktree before Pi opens. The server no-ops once `gitBranch`
-  // is already persisted — this is request payload, not session metadata.
-  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 
@@ -542,6 +538,9 @@ export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
+  // Create a git worktree and persist its cwd before returning. Request payload,
+  // not a stored pending flag — git failure fails create with no session record.
+  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 
