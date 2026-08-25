@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultWorktreeBase } from "./draft-worktree-base-select";
+import { defaultWorktreeBase } from "./draft-worktree-base";
 
 describe("defaultWorktreeBase", () => {
   it("prefers defaultBranch over current", () => {

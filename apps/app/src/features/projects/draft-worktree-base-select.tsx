@@ -23,11 +23,6 @@ function splitBranchRefs(
   return { local, remote };
 }
 
-export function defaultWorktreeBase(branch: GitBranch | undefined): string | null {
-  if (branch === undefined) return null;
-  return branch.defaultBranch ?? branch.current;
-}
-
 export function DraftWorktreeBaseSelect({
   branch,
   value,

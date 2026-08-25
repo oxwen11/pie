@@ -35,10 +35,8 @@ import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
 } from "@/features/projects/draft-workspace-select";
-import {
-  DraftWorktreeBaseSelect,
-  defaultWorktreeBase,
-} from "@/features/projects/draft-worktree-base-select";
+import { defaultWorktreeBase } from "@/features/projects/draft-worktree-base";
+import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useProject, useProjects } from "@/features/projects/use-projects";
