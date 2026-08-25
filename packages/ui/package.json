@@ -13,6 +13,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
@@ -22,11 +23,12 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
+    "@streamdown/code": "^1.1.1",
     "@tiptap/pm": "catalog:tiptap",
     "@tiptap/react": "catalog:tiptap",
     "@tiptap/suggestion": "catalog:tiptap",
     "react-day-picker": "9.14.0",
-    "streamdown": "^2.5.0"
+    "streamdown": "^2.6.0"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
@@ -38,6 +40,7 @@
     "clsx": "catalog:",
     "embla-carousel-react": "^8.6.0",
     "hast-util-to-jsx-runtime": "^2.3.6",
+    "jsdom": "^26.1.0",
     "lucide-react": "catalog:",
     "react": "catalog:react",
     "react-dom": "catalog:react",
@@ -45,6 +48,7 @@
     "tailwind-merge": "catalog:",
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:",
-    "use-stick-to-bottom": "^1.1.6"
+    "use-stick-to-bottom": "^1.1.6",
+    "vitest": "catalog:"
   }
 }
