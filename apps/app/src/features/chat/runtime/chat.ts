@@ -1,6 +1,5 @@
 import type {
   PromptPart,
-  SessionMessageChunkEvent,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -50,6 +49,25 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIM
     part.type === "data-inspector" ? { type: "data-inspector", data: part.data } : part,
   ) as UIMessage["parts"],
 });
+
+const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
+  if (chunk.type !== "data-retry") return undefined;
+  const data = chunk.data as {
+    readonly errorMessage?: unknown;
+    readonly attempt?: unknown;
+    readonly maxAttempts?: unknown;
+  };
+  const errorMessage = typeof data.errorMessage === "string" ? data.errorMessage : "";
+  const reason =
+    errorMessage === "Connection error." ? "Couldn't reach the model provider" : errorMessage;
+  const attempt = typeof data.attempt === "number" ? data.attempt : undefined;
+  const maxAttempts = typeof data.maxAttempts === "number" ? data.maxAttempts : undefined;
+  const suffix =
+    attempt !== undefined && maxAttempts !== undefined
+      ? `Retrying (${attempt}/${maxAttempts})…`
+      : "Retrying…";
+  return reason ? `${reason}. ${suffix}` : suffix;
+};
 
 // One turn's chunk sink: chunks are pushed in as they arrive and the AI-SDK's
 // own reducer (readUIMessageStream — the same machinery the server-side
@@ -134,7 +152,9 @@ export class Chat {
     this.#cursor = event.seq;
     switch (event.type) {
       case "session.message.chunk":
-        this.#captureChunkError(event.chunk);
+        this.#observeChunk(event.chunk);
+        // Retry is UI status, not transcript — keep it out of the message fold.
+        if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
           this.#turnFold(event.turnId).enqueue(event.chunk);
@@ -147,7 +167,10 @@ export class Chat {
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
-        if (this.#pushUserMessage(event.messageId, event.parts)) this.#state.error = undefined;
+        if (this.#pushUserMessage(event.messageId, event.parts)) {
+          this.#state.retryNotice = undefined;
+          this.#state.error = undefined;
+        }
         break;
       // The server rejected a prompt whose submitted event already broadcast:
       // drop the phantom user message (the sender's optimistic copy included).
@@ -161,6 +184,7 @@ export class Chat {
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
         this.#turnFolds.delete(event.turnId);
+        this.#state.retryNotice = undefined;
         // Unanswered requests are stale once the turn ends — no ghost cards.
         this.#state.clearPendingRequests();
         // The settled transcript may hold more than the live stream carried:
@@ -227,6 +251,7 @@ export class Chat {
     // so stop rendering a spinner that would never resolve.
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
+    this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
     );
@@ -341,23 +366,22 @@ export class Chat {
     ) {
       appliedPromptSeq = activePrompt.seq;
       if (this.#pushUserMessage(activePrompt.messageId, activePrompt.parts)) {
+        this.#state.retryNotice = undefined;
         this.#state.error = undefined;
       }
     }
 
-    // Error text is not part of the settled transcript floor. Only the latest
-    // unseen error matters, but compare its seq with the retained prompt: the
+    // Error text and retry status are not part of the settled transcript
+    // floor. Replay them in order so a retry that later emits output (or a
+    // terminal error) wins. Ignore chunks older than a retained prompt: the
     // runtime can hold a completed old turn beside a newer submitted prompt.
-    // In that shape the prompt clears the old error rather than resurrecting
-    // it; an error after the prompt belongs to the new turn and wins.
-    let latestError: SessionMessageChunkEvent | undefined;
     for (const chunkEvent of activeTurn?.chunks ?? []) {
-      if (chunkEvent.seq > this.#cursor && chunkEvent.chunk.type === "error") {
-        latestError = chunkEvent;
+      if (
+        chunkEvent.seq > this.#cursor &&
+        (appliedPromptSeq === undefined || chunkEvent.seq > appliedPromptSeq)
+      ) {
+        this.#observeChunk(chunkEvent.chunk);
       }
-    }
-    if (latestError && (appliedPromptSeq === undefined || latestError.seq > appliedPromptSeq)) {
-      this.#captureChunkError(latestError.chunk);
     }
 
     // A turn flagged for recovery that is no longer active ended while we
@@ -420,6 +444,7 @@ export class Chat {
       return;
     }
     for (const chunk of chunks) {
+      if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
       this.#turnFold(activeTurn.turnId).enqueue(chunk);
     }
@@ -438,8 +463,19 @@ export class Chat {
   // Shared handlers
   // ---------------------------------------------------------------------
 
-  #captureChunkError(chunk: UIMessageChunk): void {
-    if (chunk.type === "error") this.#state.error = new Error(chunk.errorText);
+  #observeChunk(chunk: UIMessageChunk): void {
+    const retryNotice = retryNoticeFrom(chunk);
+    if (retryNotice !== undefined) {
+      this.#state.error = undefined;
+      this.#state.retryNotice = retryNotice;
+      return;
+    }
+    if (chunk.type === "error") {
+      this.#state.retryNotice = undefined;
+      this.#state.error = new Error(chunk.errorText);
+      return;
+    }
+    if (this.#state.retryNotice !== undefined) this.#state.retryNotice = undefined;
   }
 
   #pushUserMessage(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
@@ -546,6 +582,7 @@ export class Chat {
   prompt = async (text: string): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
+    this.#state.retryNotice = undefined;
     this.#state.error = undefined;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     this.#setStatus("submitted");

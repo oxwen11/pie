@@ -32,7 +32,7 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
   return null;
 }
 
-// Pure view over a store snapshot: message stream, then the error line, then
+// Pure view over a store snapshot: message stream, then retry/error lines, then
 // pending agent request cards. Only the last message can be streaming, so only
 // it gets streaming affordances.
 function ChatTranscriptView({
@@ -63,6 +63,9 @@ function ChatTranscriptView({
           />
         ))}
         {snapshot.status === "submitted" && <Loader />}
+        {snapshot.retryNotice && (
+          <div className="text-muted-foreground text-xs">{snapshot.retryNotice}</div>
+        )}
         {snapshot.error && <div className="text-destructive text-xs">{snapshot.error.message}</div>}
         {snapshot.pendingRequests.map((request) => (
           <AgentRequestView key={request.id} request={request} onRespond={onRespond} />
