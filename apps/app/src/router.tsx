@@ -1,7 +1,6 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 
 import Loader from "./components/loader";
-import type { PendingSessionStart } from "./features/chat/pending-session-start";
 import type { AppClients } from "./lib/orpc";
 import { routeTree } from "./routeTree.gen";
 
@@ -22,9 +21,5 @@ export const createRouter = ({ orpcClient, orpcQueryUtils, queryClient }: Router
 declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createRouter>;
-  }
-
-  interface HistoryState {
-    pendingSessionStart?: PendingSessionStart;
   }
 }

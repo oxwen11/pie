@@ -1,10 +1,8 @@
 import type { PrepareSessionOutput } from "@getpie/contract";
-import { createFileRoute, redirect, useLocation } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
-import { SessionStartBootstrap } from "@/features/chat/components/session-start-controller";
-import { pendingSessionStartFromState } from "@/features/chat/pending-session-start";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -54,13 +52,5 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function Component() {
   const prepared = Route.useLoaderData();
-  const location = useLocation();
-  const pending = pendingSessionStartFromState(location.state, prepared.ref);
-  const chat = <Chat cwd={prepared.workspace.cwd} sessionRef={prepared.ref} />;
-
-  if (pending) {
-    return <SessionStartBootstrap pending={pending}>{chat}</SessionStartBootstrap>;
-  }
-
-  return chat;
+  return <Chat cwd={prepared.workspace.cwd} sessionRef={prepared.ref} />;
 }

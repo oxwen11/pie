@@ -90,7 +90,6 @@ export class Chat {
   // server says in the meantime — snapshot phase, settled transcript — has
   // seen it, and neither may erase the optimistic bubble it put on screen.
   #promptsInFlight = 0;
-  #bootstrapPromptSent = false;
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -561,17 +560,6 @@ export class Chat {
     } finally {
       this.#promptsInFlight -= 1;
     }
-  };
-
-  /**
-   * Session bootstrap from draft: first call wins for this Chat instance.
-   * Cached in ChatManager, so StrictMode remounts do not double-send.
-   */
-  tryBootstrapPrompt = async (text: string): Promise<boolean> => {
-    if (this.#bootstrapPromptSent) return false;
-    this.#bootstrapPromptSent = true;
-    await this.prompt(text);
-    return true;
   };
 
   interrupt = async (): Promise<void> => {

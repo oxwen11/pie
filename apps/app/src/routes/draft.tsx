@@ -16,7 +16,7 @@ import {
   EmptyTitle,
 } from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ import { createSubmitKeymap } from "@/features/chat/components/input/extensions/
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
+import { useChatManager } from "@/features/chat/runtime/chat-context";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
@@ -67,6 +68,8 @@ function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const router = useRouter();
+  const chats = useChatManager();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<DraftWorkspaceMode>("project");
@@ -148,17 +151,24 @@ function DraftRoute() {
         return [...(prev ?? []), optimistic];
       });
 
-      navigate({
+      // Chat survives the route change, so the first prompt starts here.
+      void chats
+        .chatFor(created.ref)
+        .prompt(text)
+        .catch((error: unknown) => {
+          console.error("Failed to start session prompt", error);
+        })
+        .finally(() => {
+          if (workspaceMode !== "worktree") return;
+          void router.invalidate({
+            filter: (match) => match.routeId === "/session/$sessionId",
+          });
+        });
+
+      void navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
-        state: {
-          pendingSessionStart: {
-            ref: created.ref,
-            text,
-            workspaceMode,
-          },
-        },
       });
     },
     onError: (error) => {

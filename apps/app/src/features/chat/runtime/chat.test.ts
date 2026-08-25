@@ -423,6 +423,26 @@ describe("Chat history floor state", () => {
 });
 
 describe("Chat prompting", () => {
+  it("accepts a prompt before the first attach", async () => {
+    const { chat, transport, attach } = makeChat();
+    let releasePrompt: () => void = () => undefined;
+    transport.promptGate = new Promise((resolve) => {
+      releasePrompt = resolve;
+    });
+
+    const sent = chat.prompt("from draft");
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().status).toBe("submitted");
+
+    await attach({});
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().status).toBe("submitted");
+
+    releasePrompt();
+    await sent;
+    expect(transport.promptCalls).toHaveLength(1);
+  });
+
   it("pushes the optimistic message, submits fire-and-forget, and dedupes its echo", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
@@ -442,15 +462,6 @@ describe("Chat prompting", () => {
     expect(chat.store.getState().status).toBe("submitted");
     live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
     expect(chat.store.getState().status).toBe("streaming");
-  });
-
-  it("sends a bootstrap prompt only once per Chat instance", async () => {
-    const { chat, transport, attach } = makeChat();
-    await attach({});
-    await expect(chat.tryBootstrapPrompt("bootstrap")).resolves.toBe(true);
-    await expect(chat.tryBootstrapPrompt("bootstrap")).resolves.toBe(false);
-    expect(transport.promptCalls).toHaveLength(1);
-    expect(transport.promptCalls[0]?.parts).toEqual([{ type: "text", text: "bootstrap" }]);
   });
 
   it("appends another client's prompt from the broadcast", async () => {
