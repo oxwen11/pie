@@ -1,9 +1,10 @@
-import type { GitReviewFile, GitReviewMode, GitWorkspaceInput } from "@getpie/contract/git";
+import type { WorkspaceQuery } from "@getpie/contract";
+import type { GitReviewFile, GitReviewMode } from "@getpie/contract/git";
 import { skipToken, useQueries } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 
 export function useGitDiffs(
-  workspace: GitWorkspaceInput | undefined,
+  workspace: WorkspaceQuery | undefined,
   files: ReadonlyArray<GitReviewFile>,
   mode: GitReviewMode,
   other: string | undefined,

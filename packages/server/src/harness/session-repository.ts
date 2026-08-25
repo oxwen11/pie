@@ -4,10 +4,6 @@ import { Effect, Option, Schema } from "effect";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
-const PendingWorktreeSchema = Schema.Struct({
-  base: Schema.optionalKey(Schema.String),
-});
-
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
@@ -15,8 +11,6 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
-  /** Legacy field: decoded then dropped so old files never write it back. */
-  pendingWorktree: Schema.optionalKey(PendingWorktreeSchema),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -27,7 +21,7 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, pendingWorktree: _dropped, ...rest } = parsed;
+  const { agentSessionId, ...rest } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId

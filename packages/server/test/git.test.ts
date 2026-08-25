@@ -1,22 +1,15 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
-import { layerPaths } from "../src/config/paths";
 import { FileSystemServiceLayer } from "../src/fs";
 import { GitService, GitServiceLayer } from "../src/git";
 import { NodePlatformLayer } from "./platform";
 
-const pieHome = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-git-"));
-const GitLayer = GitServiceLayer.pipe(
-  Layer.provide(FileSystemServiceLayer),
-  Layer.provide(layerPaths(pieHome)),
-);
+const GitLayer = GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer));
 
 layer(NodePlatformLayer)("GitService", (it) => {
   /** A repo with one commit on `main`, removed when the test's scope closes. */
@@ -232,60 +225,6 @@ layer(NodePlatformLayer)("GitService", (it) => {
       assert.equal(diff.status, "deleted");
       assert.equal(diff.oldContents, "hi\n");
       assert.equal(diff.newContents, null);
-    }).pipe(Effect.provide(GitLayer)),
-  );
-
-  it.effect("creates a worktree on a new branch under $PIE_HOME/worktrees", () =>
-    Effect.gen(function* () {
-      const dir = yield* repo;
-      const git = yield* GitService;
-      const worktreeKey = "mv98";
-      const created = yield* git.worktreeCreate(dir, {
-        worktreeKey,
-        branch: "pie/feature-a",
-      });
-      assert.equal(created.branch, "pie/feature-a");
-      assert.equal(created.worktreeKey, worktreeKey);
-      assert.ok(created.path.startsWith(path.join(pieHome, "worktrees")));
-      assert.match(created.path, /[\\/]mv98$/);
-
-      const branch = yield* git.branch(created.path);
-      assert.equal(branch.current, "pie/feature-a");
-
-      const status = yield* git.status(dir);
-      assert.equal(status.branch, "main");
-
-      yield* git.worktreeRemove(created.path);
-    }).pipe(Effect.provide(GitLayer)),
-  );
-
-  it.effect("creates a worktree from a specified base ref", () =>
-    Effect.gen(function* () {
-      const dir = yield* repo;
-      const git = yield* GitService;
-      yield* Effect.promise(async () => {
-        const repoGit = simpleGit(dir);
-        await repoGit.checkoutLocalBranch("feature");
-        await repoGit.checkout("main");
-      });
-
-      const created = yield* git.worktreeCreate(dir, { base: "feature" });
-      assert.match(created.branch, /^pie\//);
-
-      const branch = yield* git.branch(created.path);
-      assert.equal(branch.current, created.branch);
-
-      const featureContents = yield* Effect.promise(async () => {
-        const repoGit = simpleGit(created.path);
-        return repoGit.revparse(["HEAD"]);
-      });
-      const mainHead = yield* Effect.promise(async () => {
-        const repoGit = simpleGit(dir);
-        return repoGit.revparse(["feature"]);
-      });
-      assert.equal(featureContents.trim(), mainHead.trim());
-
-      yield* git.worktreeRemove(created.path);
     }).pipe(Effect.provide(GitLayer)),
   );
 

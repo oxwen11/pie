@@ -1,14 +1,13 @@
 export { parseNameStatus, parseNulPaths } from "./name-status";
+export { GitService, GitServiceLayer, type GitFailure } from "./service";
 export {
-  GitService,
-  GitServiceLayer,
+  WorktreeService,
+  WorktreeServiceLayer,
   type GitWorktreeCreateResult,
   type GitWorktreeFailure,
-} from "./service";
+} from "./worktree-service";
 export {
   generateWorktreeBranchName,
-  generateWorktreeBranchSuffix,
-  generateWorktreeKey,
   isValidBranchName,
   isValidWorktreeKey,
   repoWorktreeGroupKey,

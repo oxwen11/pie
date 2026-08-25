@@ -24,6 +24,39 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
+const mapGitWorktreeErrors = <
+  E extends {
+    NOT_FOUND: (input: { message: string }) => unknown;
+    CONFLICT: (input: { message: string }) => unknown;
+    INVALID_ARGUMENT: (input: { message: string }) => unknown;
+    FORBIDDEN: (input: { message: string }) => unknown;
+    INTERNAL: (input: { message: string }) => unknown;
+  },
+>(
+  errors: E,
+) =>
+  Effect.catchTags({
+    GitRefNotFound: (e: GitRefNotFound) =>
+      Effect.fail(errors.NOT_FOUND({ message: `git ref ${e.ref} not found` })),
+    GitBranchExists: (e: GitBranchExists) =>
+      Effect.fail(errors.CONFLICT({ message: `branch ${e.branch} already exists` })),
+    GitWorktreePathExists: (e: GitWorktreePathExists) =>
+      Effect.fail(errors.CONFLICT({ message: `worktree path ${e.path} already exists` })),
+    GitInvalidBranchName: (e: GitInvalidBranchName) =>
+      Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid branch name ${e.branch}` })),
+    GitInvalidWorktreeKey: (e: GitInvalidWorktreeKey) =>
+      Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid worktree key ${e.worktreeKey}` })),
+    GitNotRepository: (e: GitNotRepository) =>
+      Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.cwd} is not a git repository` })),
+    WorkspacePathEscape: (e: WorkspacePathEscape) =>
+      Effect.fail(errors.FORBIDDEN({ message: `path ${e.path} escapes ${e.cwd}` })),
+    WorkspaceNotDirectory: (e: WorkspaceNotDirectory) =>
+      Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
+    WorkspaceReadError: (e: WorkspaceReadError) =>
+      Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
+    GitError: (e: GitError) => Effect.fail(errors.INTERNAL({ message: `git failed in ${e.cwd}` })),
+  });
+
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
@@ -45,29 +78,8 @@ export const sessionRouter = orpc.router({
       Effect.catchTags({
         ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        GitRefNotFound: (e: GitRefNotFound) =>
-          Effect.fail(errors.NOT_FOUND({ message: `git ref ${e.ref} not found` })),
-        GitBranchExists: (e: GitBranchExists) =>
-          Effect.fail(errors.CONFLICT({ message: `branch ${e.branch} already exists` })),
-        GitWorktreePathExists: (e: GitWorktreePathExists) =>
-          Effect.fail(errors.CONFLICT({ message: `worktree path ${e.path} already exists` })),
-        GitInvalidBranchName: (e: GitInvalidBranchName) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid branch name ${e.branch}` })),
-        GitInvalidWorktreeKey: (e: GitInvalidWorktreeKey) =>
-          Effect.fail(
-            errors.INVALID_ARGUMENT({ message: `invalid worktree key ${e.worktreeKey}` }),
-          ),
-        GitNotRepository: (e: GitNotRepository) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.cwd} is not a git repository` })),
-        WorkspacePathEscape: (e: WorkspacePathEscape) =>
-          Effect.fail(errors.FORBIDDEN({ message: `path ${e.path} escapes ${e.cwd}` })),
-        WorkspaceNotDirectory: (e: WorkspaceNotDirectory) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
-        WorkspaceReadError: (e: WorkspaceReadError) =>
-          Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
-        GitError: (e: GitError) =>
-          Effect.fail(errors.INTERNAL({ message: `git failed in ${e.cwd}` })),
       }),
+      mapGitWorktreeErrors(errors),
     );
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {

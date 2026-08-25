@@ -55,7 +55,7 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
-  it("drops legacy pendingWorktree on read and never writes it back", async () => {
+  it("strips unknown extra fields on read and never writes them back", async () => {
     const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(

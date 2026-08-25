@@ -24,7 +24,12 @@ import {
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
-import { GitService, type GitWorktreeCreateResult, type GitWorktreeFailure } from "../git/service";
+import type { GitFailure } from "../git/service";
+import {
+  WorktreeService,
+  type GitWorktreeCreateResult,
+  type GitWorktreeFailure,
+} from "../git/worktree-service";
 import { ProjectService } from "../project/service";
 import type { Session } from "../types";
 import type {
@@ -96,10 +101,7 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly workspaceFor: (
     ref: SessionRef,
-  ) => Effect.Effect<
-    SessionWorkspace,
-    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError
-  >;
+  ) => Effect.Effect<SessionWorkspace, SessionNotFound | ProjectNotFound | StoreReadError>;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
     ref: SessionRef,
@@ -212,11 +214,12 @@ export const makePiAgentSessionService = (deps: {
   readonly pi: PiAgentShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
-  readonly git: {
-    readonly worktreeCreate: (
+  readonly worktrees: {
+    readonly create: (
       cwd: string,
-      input?: { readonly branch?: string; readonly worktreeKey?: string; readonly base?: string },
+      input?: { readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
   };
   readonly newSessionId: Effect.Effect<string>;
   /** Backfill `metadata.cwd` for records created before cwd was persisted. */
@@ -224,7 +227,7 @@ export const makePiAgentSessionService = (deps: {
     projectId: string,
   ) => Effect.Effect<string, ProjectNotFound | StoreReadError>;
 }): PiAgentSessionServiceShape => {
-  const { manager, pi, repo, bus, git, newSessionId, projectPathFor } = deps;
+  const { manager, pi, repo, bus, worktrees, newSessionId, projectPathFor } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -379,8 +382,8 @@ export const makePiAgentSessionService = (deps: {
           const materializeWorkspace: Effect.Effect<SessionWorkspace, GitWorktreeFailure> =
             input.worktree === undefined
               ? Effect.succeed({ cwd: input.cwd })
-              : git
-                  .worktreeCreate(
+              : worktrees
+                  .create(
                     input.cwd,
                     input.worktree.base !== undefined ? { base: input.worktree.base } : undefined,
                   )
@@ -406,6 +409,11 @@ export const makePiAgentSessionService = (deps: {
                 archived: false,
               };
               return repo.write(metadata).pipe(
+                Effect.tapError(() =>
+                  sessionWorkspace.gitBranch === undefined
+                    ? Effect.void
+                    : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
+                ),
                 Effect.andThen(bus.publish({ ref, type: "session.created" })),
                 Effect.andThen(
                   logLifecycle("session.created", "session created", {
@@ -444,8 +452,13 @@ export const makePiAgentSessionService = (deps: {
 
     workspaceFor: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) => ensureCwd(metadata)),
-        Effect.map(toSessionWorkspace),
+        Effect.flatMap((metadata) =>
+          metadata.cwd !== undefined
+            ? Effect.succeed(toSessionWorkspace(metadata as SessionWithCwd))
+            : projectPathFor(metadata.projectId).pipe(
+                Effect.map((cwd) => toSessionWorkspace({ ...metadata, cwd })),
+              ),
+        ),
         inSession(ref),
       ),
 
@@ -715,7 +728,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
   | EventBus
   | ProjectService
   | Paths
-  | GitService
+  | WorktreeService
   | Crypto.Crypto
   | FileSystem.FileSystem
 > = Layer.effect(
@@ -725,7 +738,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
     const pi = yield* PiAgent;
     const bus = yield* EventBus;
     const projects = yield* ProjectService;
-    const git = yield* GitService;
+    const worktrees = yield* WorktreeService;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makePiAgentSessionRepository(paths.sessionsDir);
@@ -734,7 +747,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
       pi,
       repo,
       bus,
-      git,
+      worktrees,
       newSessionId: crypto.randomUUIDv4.pipe(
         Effect.catchTag("PlatformError", (cause) =>
           Effect.die(new Error("invariant: platform RNG failed minting a session id", { cause })),

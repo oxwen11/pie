@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
-import { GitServiceLayer } from "../src/git";
+import { GitServiceLayer, WorktreeServiceLayer } from "../src/git";
 import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
@@ -79,6 +79,9 @@ async function setup() {
 
   const gitProvided = GitServiceLayer.pipe(
     Layer.provide(FileSystemServiceLayer),
+    Layer.provide(NodeServices.layer),
+  );
+  const worktreeProvided = WorktreeServiceLayer.pipe(
     Layer.provide(layerPaths(home)),
     Layer.provide(NodeServices.layer),
   );
@@ -98,7 +101,7 @@ async function setup() {
     Layer.provide(EventBusLayer),
     Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
-    Layer.provide(gitProvided),
+    Layer.provide(worktreeProvided),
     Layer.provide(NodeServices.layer),
   );
 

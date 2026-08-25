@@ -1,14 +1,14 @@
 import type { WorkspaceQuery } from "@getpie/contract";
 import { Effect } from "effect";
 
-import { ProjectNotFound, SessionNotFound, StoreReadError, StoreWriteError } from "../errors";
+import { ProjectNotFound, SessionNotFound, StoreReadError } from "../errors";
 import { PiAgentSessionService } from "../harness";
 
 export const resolveWorkspaceCwd = (
   input: WorkspaceQuery,
 ): Effect.Effect<
   string,
-  SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError,
+  SessionNotFound | ProjectNotFound | StoreReadError,
   PiAgentSessionService
 > =>
   Effect.gen(function* () {
@@ -42,12 +42,6 @@ export const catchWorkspaceResolveErrors = <
       Effect.fail(
         errors.SESSION_NOT_FOUND({
           data: { message: `session store read failed: ${error.file}` },
-        }),
-      ),
-    StoreWriteError: (error: StoreWriteError) =>
-      Effect.fail(
-        errors.SESSION_NOT_FOUND({
-          data: { message: `session store write failed: ${error.file}` },
         }),
       ),
   });

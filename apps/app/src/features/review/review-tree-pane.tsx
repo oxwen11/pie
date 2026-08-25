@@ -1,3 +1,4 @@
+import type { WorkspaceTreeResult } from "@getpie/contract/fs";
 import type { GitReviewFile } from "@getpie/contract/git";
 import {
   Empty,
@@ -8,12 +9,13 @@ import {
 } from "@getpie/ui/components/empty";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { FilesIcon, TriangleAlertIcon } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
 
 import { reviewGitStatusEntries } from "./review-file-status";
 import { unionDeletedReviewEntries } from "./review-tree";
-import type { WorkspaceTreeQuery } from "./use-workspace-tree";
+type WorkspaceTreeQuery = UseQueryResult<WorkspaceTreeResult>;
 
 const ReviewTreeAdapter = lazy(() =>
   import("./review-tree-adapter").then((module) => ({ default: module.ReviewTreeAdapter })),

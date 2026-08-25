@@ -1,5 +1,6 @@
 import "@orpc/experimental-effect/extensions/effect";
-import type { GitDiffQuery, GitReviewQuery, GitWorkspaceInput } from "@getpie/contract/git";
+import type { WorkspaceQuery } from "@getpie/contract";
+import type { GitDiffQuery, GitReviewQuery } from "@getpie/contract/git";
 import { gitContract } from "@getpie/contract/git";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
@@ -46,7 +47,7 @@ const mapGitCwdErrors = <
   });
 
 const resolveCwd = (
-  input: GitWorkspaceInput,
+  input: WorkspaceQuery,
   errors: Parameters<typeof catchWorkspaceResolveErrors>[0],
 ) => resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));
 

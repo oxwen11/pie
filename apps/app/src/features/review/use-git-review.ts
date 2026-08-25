@@ -1,9 +1,10 @@
-import type { GitReviewMode, GitWorkspaceInput } from "@getpie/contract/git";
+import type { WorkspaceQuery } from "@getpie/contract";
+import type { GitReviewMode } from "@getpie/contract/git";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 
 export function useGitReview(
-  workspace: GitWorkspaceInput | undefined,
+  workspace: WorkspaceQuery | undefined,
   mode: GitReviewMode,
   other: string | undefined,
 ) {

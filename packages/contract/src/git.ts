@@ -3,9 +3,6 @@ import { Schema } from "effect";
 
 import { toStandardSchema, withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
 
-export const GitWorkspaceInputSchema = WorkspaceQuerySchema;
-export type GitWorkspaceInput = typeof GitWorkspaceInputSchema.Type;
-
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
 const cwdData = toStandardSchema(Schema.Struct({ cwd: Schema.String }));
@@ -127,11 +124,11 @@ const diffErrors = {
  */
 export const gitContract = {
   status: oc
-    .input(toStandardSchema(GitWorkspaceInputSchema))
+    .input(toStandardSchema(WorkspaceQuerySchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitStatusSchema)),
   branch: oc
-    .input(toStandardSchema(GitWorkspaceInputSchema))
+    .input(toStandardSchema(WorkspaceQuerySchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitBranchSchema)),
   review: oc

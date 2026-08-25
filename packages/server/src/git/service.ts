@@ -12,7 +12,20 @@ import type {
 import { Context, Effect, FileSystem, Layer } from "effect";
 import { simpleGit } from "simple-git";
 
-import { Paths } from "../config/paths";
+import {
+  GitError,
+  GitNotRepository,
+  GitRefNotFound,
+  WorkspaceBinaryFile,
+  WorkspaceFileNotFound,
+  WorkspaceFileTooLarge,
+  WorkspaceNotDirectory,
+  WorkspaceNotFile,
+  WorkspacePathEscape,
+  WorkspaceReadError,
+} from "../errors";
+import { FileSystemService } from "../fs";
+import { parseNameStatus, parseNulPaths } from "./name-status";
 
 /** GitService always runs against a resolved absolute cwd — not a session ref. */
 export type GitReviewCwdQuery = {
@@ -26,39 +39,6 @@ export type GitDiffCwdQuery = {
   readonly path: string;
   readonly mode?: GitReviewMode;
   readonly other?: string;
-};
-import {
-  GitBranchExists,
-  GitError,
-  GitInvalidBranchName,
-  GitInvalidWorktreeKey,
-  GitNotRepository,
-  GitRefNotFound,
-  GitWorktreePathExists,
-  WorkspaceBinaryFile,
-  WorkspaceFileNotFound,
-  WorkspaceFileTooLarge,
-  WorkspaceNotDirectory,
-  WorkspaceNotFile,
-  WorkspacePathEscape,
-  WorkspaceReadError,
-} from "../errors";
-import { FileSystemService } from "../fs";
-import { parseNameStatus, parseNulPaths } from "./name-status";
-import {
-  generateWorktreeBranchName,
-  generateWorktreeBranchSuffix,
-  generateWorktreeKey,
-  isValidBranchName,
-  isValidWorktreeKey,
-  repoWorktreeGroupKey,
-  worktreeDirectory,
-} from "./worktree";
-
-export type GitWorktreeCreateResult = {
-  readonly path: string;
-  readonly branch: string;
-  readonly worktreeKey: string;
 };
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -129,14 +109,6 @@ export type GitFailure =
   | GitNotRepository
   | GitError;
 
-export type GitWorktreeFailure =
-  | GitFailure
-  | GitInvalidBranchName
-  | GitInvalidWorktreeKey
-  | GitBranchExists
-  | GitWorktreePathExists
-  | GitRefNotFound;
-
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
 type GitDiffFailure =
@@ -167,24 +139,18 @@ export class GitService extends Context.Service<
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
     readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
     readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
-    readonly worktreeCreate: (
-      cwd: string,
-      input?: { readonly branch?: string; readonly worktreeKey?: string; readonly base?: string },
-    ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-    readonly worktreeRemove: (path: string) => Effect.Effect<void, GitFailure>;
   }
 >()("GitService") {}
 
 export const GitServiceLayer: Layer.Layer<
   GitService,
   never,
-  FileSystem.FileSystem | FileSystemService | Paths
+  FileSystem.FileSystem | FileSystemService
 > = Layer.effect(
   GitService,
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
-    const paths = yield* Paths;
 
     const readError = (relativePath: string) => (cause: unknown) =>
       new WorkspaceReadError({ path: relativePath, cause });
@@ -515,113 +481,6 @@ export const GitServiceLayer: Layer.Layer<
             newContents,
             binary: false,
           };
-        }),
-
-      worktreeCreate: (cwd, input) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const fixedWorktreeKey = input?.worktreeKey;
-          const fixedBranch = input?.branch;
-          const startPoint = input?.base ?? "HEAD";
-
-          if (input?.base !== undefined) {
-            if (isUnsafeRef(input.base)) {
-              return yield* new GitRefNotFound({ ref: input.base });
-            }
-            const refs = yield* listRefs(realRoot);
-            if (!refs.all.includes(input.base)) {
-              return yield* new GitRefNotFound({ ref: input.base });
-            }
-          }
-
-          const createOnce = (
-            worktreeKey: string,
-            branch: string,
-          ): Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure> =>
-            Effect.gen(function* () {
-              if (!isValidWorktreeKey(worktreeKey)) {
-                return yield* Effect.fail(new GitInvalidWorktreeKey({ worktreeKey }));
-              }
-              if (!isValidBranchName(branch)) {
-                return yield* Effect.fail(new GitInvalidBranchName({ branch }));
-              }
-              const worktreePath = worktreeDirectory(paths.home, repoRoot, worktreeKey);
-              if (!contains(paths.worktreesDir, worktreePath)) {
-                return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
-              }
-              const exists = yield* fs
-                .exists(worktreePath)
-                .pipe(Effect.mapError(readError(worktreePath)));
-              if (exists) {
-                return yield* Effect.fail(
-                  new GitWorktreePathExists({ cwd: realRoot, path: worktreePath }),
-                );
-              }
-              const refs = yield* listRefs(realRoot);
-              if (refs.all.includes(branch)) {
-                return yield* Effect.fail(new GitBranchExists({ cwd: realRoot, branch }));
-              }
-              yield* fs
-                .makeDirectory(path.dirname(worktreePath), { recursive: true })
-                .pipe(Effect.mapError(readError(worktreePath)));
-              yield* Effect.tryPromise({
-                try: () =>
-                  simpleGit(repoRoot).raw([
-                    "worktree",
-                    "add",
-                    "-b",
-                    branch,
-                    worktreePath,
-                    startPoint,
-                  ]),
-                catch: gitError(realRoot),
-              });
-              return { path: worktreePath, branch, worktreeKey };
-            });
-
-          if (fixedWorktreeKey !== undefined || fixedBranch !== undefined) {
-            const worktreeKey = fixedWorktreeKey ?? generateWorktreeKey();
-            const branch =
-              fixedBranch ?? generateWorktreeBranchName(generateWorktreeBranchSuffix());
-            return yield* createOnce(worktreeKey, branch);
-          }
-
-          for (let attempt = 0; attempt < 8; attempt++) {
-            const result = yield* createOnce(
-              generateWorktreeKey(),
-              generateWorktreeBranchName(generateWorktreeBranchSuffix()),
-            ).pipe(
-              Effect.catchTags({
-                GitWorktreePathExists: () => Effect.succeed(null),
-                GitBranchExists: () => Effect.succeed(null),
-              }),
-            );
-            if (result !== null) return result;
-          }
-
-          return yield* Effect.fail(
-            new GitWorktreePathExists({
-              cwd: realRoot,
-              path: path.join(paths.worktreesDir, repoWorktreeGroupKey(repoRoot)),
-            }),
-          );
-        }),
-
-      worktreeRemove: (worktreePath) =>
-        Effect.gen(function* () {
-          if (!path.isAbsolute(worktreePath)) {
-            return yield* new WorkspacePathEscape({ cwd: worktreePath, path: "." });
-          }
-          const realPath = yield* fs.realPath(worktreePath).pipe(Effect.mapError(readError(".")));
-          if (!contains(paths.worktreesDir, realPath)) {
-            return yield* new WorkspacePathEscape({ cwd: paths.worktreesDir, path: worktreePath });
-          }
-          const repoRoot = yield* resolveRepoRoot(realPath);
-          yield* Effect.tryPromise({
-            try: () => simpleGit(repoRoot).raw(["worktree", "remove", "--force", realPath]),
-            catch: gitError(realPath),
-          });
         }),
     };
   }),

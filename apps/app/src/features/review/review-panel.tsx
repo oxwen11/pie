@@ -1,6 +1,8 @@
 import type { GitReviewMode } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -15,10 +17,8 @@ import { ReviewState } from "./review-state";
 import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 import { ReviewWorkspaceLayout } from "./review-workspace-layout";
-import { useGitBranch } from "./use-git-branch";
 import { useGitDiffs } from "./use-git-diffs";
 import { useGitReview } from "./use-git-review";
-import { useWorkspaceTree } from "./use-workspace-tree";
 
 export interface ReviewPayload {
   readonly mode?: GitReviewMode;
@@ -49,17 +49,26 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const { projectName } = useContentPanelContext();
   const gitWorkspace = { ref: instance.sessionRef };
   const panel = useContentPanel();
   const mode = instance.payload.mode ?? "uncommitted";
-  const branch = useGitBranch(gitWorkspace);
+  const branch = useQuery({
+    ...orpcQueryUtils.git.branch.queryOptions({ input: gitWorkspace }),
+    refetchOnWindowFocus: "always",
+    staleTime: Infinity,
+  });
   const other =
     mode === "branch"
       ? (instance.payload.other ?? branch.data?.defaultBranch ?? undefined)
       : undefined;
   const review = useGitReview(gitWorkspace, mode, other);
-  const tree = useWorkspaceTree(gitWorkspace);
+  const tree = useQuery({
+    ...orpcQueryUtils.fs.readTree.queryOptions({ input: gitWorkspace }),
+    refetchOnWindowFocus: "always",
+    staleTime: Infinity,
+  });
   const diffs = useGitDiffs(gitWorkspace, review.data?.files ?? [], mode, other);
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;

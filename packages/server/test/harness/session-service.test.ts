@@ -4,59 +4,16 @@ import path from "node:path";
 
 import { isSessionScopedEvent, type SessionRef } from "@getpie/contract";
 import type { UIMessage } from "ai";
-import {
-  Crypto,
-  Effect,
-  Fiber,
-  FileSystem,
-  Layer,
-  Logger,
-  References,
-  type Scope,
-  Stream,
-} from "effect";
+import { Effect, Fiber, FileSystem, Layer, Logger, References, type Scope, Stream } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { GitNotRepository, ProjectNotFound } from "../../src/errors";
-import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
-import type { GitWorktreeCreateResult, GitWorktreeFailure } from "../../src/git/service";
-import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
-import type { PiAgentShape } from "../../src/harness/pi/agent";
-import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
-import type { SessionInfoResult } from "../../src/harness/pi/types";
-import { makePiAgentSessionManager } from "../../src/harness/session-manager";
-import {
-  type PiAgentSessionRepositoryShape,
-  makePiAgentSessionRepository,
-} from "../../src/harness/session-repository";
-import {
-  type PiAgentSessionServiceShape,
-  makePiAgentSessionService,
-} from "../../src/harness/session-service";
 import { structured, type LogRecord } from "../log-record";
-import { NodePlatformLayer } from "../platform";
-
-type Spy = {
-  open: Array<{ cwd: string }>;
-  resume: Array<{ sessionId: string; cwd: string | undefined }>;
-  close: Array<string>;
-};
-
-type Fixture = {
-  readonly service: PiAgentSessionServiceShape;
-  readonly repo: PiAgentSessionRepositoryShape;
-  readonly bus: EventBusShape;
-  readonly spy: Spy;
-  /**
-   * A second service over the same storage and the same adapter — what a
-   * server restart looks like from the session domain: the records survive,
-   * nothing is live, and the spy keeps counting across both so "how many
-   * processes has this session cost" stays answerable.
-   */
-  readonly restart: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem>;
-};
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+import {
+  type Fixture,
+  run as runFixture,
+  type SessionServiceRunOpts,
+  UUID_RE,
+} from "./session-service-fixture";
 
 describe("PiAgentSessionService", () => {
   let home: string;
@@ -68,153 +25,9 @@ describe("PiAgentSessionService", () => {
   });
 
   const run = <A, E>(
-    opts: {
-      unavailable?: string;
-      history?: ReadonlyArray<UIMessage>;
-      // The adapter reads history cold, off disk — no runtime involved.
-      coldHistory?: ReadonlyArray<UIMessage>;
-      // Feed the projection a turn: "open" leaves it in flight, "finished"
-      // ends it (the runtime retains the completed buffer until the next turn).
-      turn?: "open" | "finished";
-      // The harness rejects every prompt (a turn is already running).
-      promptFails?: boolean;
-      // Optional close hook for exercising lifecycle contention.
-      close?: (sessionId: string) => Promise<void>;
-      worktreeCreate?: (
-        cwd: string,
-        input?: { readonly branch?: string; readonly worktreeKey?: string; readonly base?: string },
-      ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-    },
+    opts: SessionServiceRunOpts,
     program: (fixture: Fixture) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem>,
-  ) =>
-    Effect.runPromise(
-      Effect.scoped(
-        Effect.gen(function* () {
-          const spy: Spy = { open: [], resume: [], close: [] };
-          let opened = 0;
-          const turnEvents = (sessionId: string) => {
-            if (opts.turn === undefined) return Stream.empty;
-            const drafts = [
-              {
-                sessionId,
-                body: { type: "session.turn.started" as const, sessionId, turnId: "turn-1" },
-              },
-              ...(opts.turn === "finished"
-                ? [
-                    {
-                      sessionId,
-                      body: {
-                        type: "session.turn.ended" as const,
-                        sessionId,
-                        turnId: "turn-1",
-                        outcome: "completed" as const,
-                      },
-                    },
-                  ]
-                : []),
-            ];
-            // Stream.never keeps the drain alive so the projection stays up.
-            return Stream.concat(Stream.fromArray(drafts), Stream.never);
-          };
-          // Sessions drain an empty native stream by default — enough to
-          // exercise the orchestration without any live projection state.
-          const makeSession = (sessionId: string): PiAgentRuntime => ({
-            sessionId,
-            events: turnEvents(sessionId),
-            prompt: opts.promptFails
-              ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
-              : () => Effect.succeed({ turnId: "turn-1" }),
-            interrupt: Effect.void,
-            respondToAgentRequest: () => Effect.void,
-            getCapabilities: Effect.succeed({
-              supportsResume: true,
-              supportsSteering: false,
-              supportsPermissions: false,
-            }),
-            ...(opts.history !== undefined ? { getMessages: Effect.succeed(opts.history) } : {}),
-            close: Effect.sync(() => {
-              spy.close.push(sessionId);
-            }).pipe(
-              Effect.andThen(
-                opts.close === undefined
-                  ? Effect.void
-                  : Effect.promise(() => opts.close?.(sessionId) ?? Promise.resolve()),
-              ),
-            ),
-          });
-          const availability = Effect.sync(() =>
-            opts.unavailable !== undefined
-              ? { available: false as const, reason: opts.unavailable }
-              : { available: true as const },
-          );
-          const whenAvailable = <BodyA, BodyE, BodyR>(body: Effect.Effect<BodyA, BodyE, BodyR>) =>
-            Effect.gen(function* () {
-              const result = yield* availability;
-              if (!result.available) {
-                return yield* Effect.fail(
-                  new AgentUnavailable({ reason: result.reason ?? "Unavailable" }),
-                );
-              }
-              return yield* body;
-            });
-          const pi = {
-            availability,
-            create: ({ cwd }) =>
-              // Pi sees `cwd` and never a `SessionRef` — this line is the probe
-              // for whether the identity reaches it anyway.
-              whenAvailable(
-                Effect.logDebug("pi creating").pipe(
-                  Effect.andThen(
-                    Effect.sync(() => {
-                      spy.open.push({ cwd });
-                      opened += 1;
-                      return makeSession(`native-${opened}`);
-                    }),
-                  ),
-                ),
-              ),
-            resume: ({ sessionId, cwd }) =>
-              whenAvailable(
-                Effect.sync(() => {
-                  spy.resume.push({ sessionId, cwd });
-                  return makeSession(sessionId);
-                }),
-              ),
-            ...(opts.coldHistory !== undefined
-              ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
-              : {}),
-            getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-          } satisfies PiAgentShape;
-          const crypto = yield* Crypto.Crypto;
-          const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
-            Effect.gen(function* () {
-              const bus = yield* makeEventBus();
-              const manager = yield* makePiAgentSessionManager(pi, bus);
-              const repo = yield* makePiAgentSessionRepository(
-                path.join(home, "storage", "sessions"),
-              );
-              const service = makePiAgentSessionService({
-                manager,
-                pi,
-                repo,
-                bus,
-                git: {
-                  worktreeCreate:
-                    opts.worktreeCreate ??
-                    (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
-                },
-                newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
-                projectPathFor: (projectId) =>
-                  projectId === "proj-a"
-                    ? Effect.succeed("/tmp/pie-app")
-                    : Effect.fail(new ProjectNotFound({ projectId })),
-              });
-              return { service, repo, bus, spy, restart: build };
-            });
-          return yield* program(yield* build);
-        }),
-      ).pipe(Effect.provide(NodePlatformLayer)),
-    );
+  ) => runFixture(home, opts, program);
 
   it("create passes the cwd through, generates a uuid sessionId, persists metadata", async () => {
     const result = await run({}, (fixture) =>
@@ -313,94 +126,6 @@ describe("PiAgentSessionService", () => {
     );
     expect(result.workspace).toEqual({ cwd: "/tmp/pie-worktree", gitBranch: "pie/test" });
     expect(result.messages).toEqual(history);
-  });
-
-  it("creates a worktree at create and does not recreate it on prompt", async () => {
-    let creates = 0;
-    const bases: Array<string | undefined> = [];
-    const result = await run(
-      {
-        worktreeCreate: (_cwd, input) => {
-          creates += 1;
-          bases.push(input?.base);
-          return Effect.succeed({
-            path: "/tmp/pie-worktree",
-            branch: "pie/abcd1234",
-            worktreeKey: "ab12",
-          });
-        },
-      },
-      (fixture) =>
-        Effect.gen(function* () {
-          const created = yield* fixture.service.create({
-            projectId: "proj-a",
-            cwd: "/tmp/pie-app",
-            worktree: { base: "main" },
-          });
-          const afterCreate = yield* fixture.repo.read(
-            created.ref.projectId,
-            created.ref.sessionId,
-          );
-          yield* fixture.service.prompt({
-            ref: created.ref,
-            parts: [{ type: "text", text: "one" }],
-          });
-          yield* Effect.sleep("80 millis");
-          return { created, afterCreate, open: fixture.spy.open };
-        }),
-    );
-    expect(creates).toBe(1);
-    expect(bases).toEqual(["main"]);
-    expect(result.created.workspace).toEqual({
-      cwd: "/tmp/pie-worktree",
-      gitBranch: "pie/abcd1234",
-    });
-    expect(result.afterCreate.cwd).toBe("/tmp/pie-worktree");
-    expect(result.afterCreate.gitBranch).toBe("pie/abcd1234");
-    expect(result.afterCreate).not.toHaveProperty("pendingWorktree");
-    expect(result.open).toEqual([{ cwd: "/tmp/pie-worktree" }]);
-  });
-
-  it("does not persist a session when worktree creation fails", async () => {
-    const result = await run(
-      {
-        worktreeCreate: () => Effect.fail(new GitNotRepository({ cwd: "/tmp/pie-app" })),
-      },
-      (fixture) =>
-        Effect.gen(function* () {
-          const error = yield* Effect.flip(
-            fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-              worktree: {},
-            }),
-          );
-          const listed = yield* fixture.repo.list("proj-a");
-          return { error, listed, open: fixture.spy.open };
-        }),
-    );
-    expect(result.error._tag).toBe("GitNotRepository");
-    expect(result.listed).toHaveLength(0);
-    expect(result.open).toEqual([]);
-  });
-
-  it("does not create a worktree when create omits worktree", async () => {
-    const stored = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const created = yield* fixture.service.create({
-          projectId: "proj-a",
-          cwd: "/tmp/pie-app",
-        });
-        yield* fixture.service.prompt({ ref: created.ref, parts: [{ type: "text", text: "one" }] });
-        yield* Effect.sleep("80 millis");
-        const afterPrompt = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
-        return { created, afterPrompt };
-      }),
-    );
-    expect(stored.created.workspace).toEqual({ cwd: "/tmp/pie-app" });
-    expect(stored.afterPrompt.cwd).toBe("/tmp/pie-app");
-    expect(stored.afterPrompt.gitBranch).toBeUndefined();
-    expect(stored.afterPrompt).not.toHaveProperty("pendingWorktree");
   });
 
   it("prepare fails with SessionNotFound for an unknown session", async () => {

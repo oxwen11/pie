@@ -274,12 +274,7 @@ export type SessionScopedEvent = {
 export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }
   // Self-owned display data changed on the server (title from the first prompt).
-  // Title patches the list row; workspace tells `{ ref }` fs/git queries to refetch.
-  | {
-      readonly type: "session.updated";
-      readonly title?: string;
-      readonly workspace?: SessionWorkspace;
-    }
+  | { readonly type: "session.updated"; readonly title?: string }
   | { readonly type: "session.archived"; readonly archived: boolean }
   | { readonly type: "session.deleted" }
   | { readonly type: "session.renamed"; readonly title: string }

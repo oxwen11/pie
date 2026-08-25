@@ -15,7 +15,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,14 +31,11 @@ import { useChatInputController } from "@/features/chat/components/input/use-cha
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
-import {
-  DraftWorkspaceSelect,
-  type DraftWorkspaceMode,
-} from "@/features/projects/draft-workspace-select";
-import { defaultWorktreeBase } from "@/features/projects/draft-worktree-base";
+import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
+import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
 
 type DraftSearch = {
@@ -69,30 +66,10 @@ function DraftRoute() {
   const chats = useChatManager();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
-  const [workspaceMode, setWorkspaceMode] = useState<DraftWorkspaceMode>("project");
-  const [worktreeBaseOverride, setWorktreeBaseOverride] = useState<string | null>(null);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
-  const gitStatus = useQuery({
-    ...orpcQueryUtils.git.status.queryOptions({
-      input: selected === null ? skipToken : { cwd: selected.path },
-    }),
-    retry: false,
-  });
-  const gitBranch = useQuery({
-    ...orpcQueryUtils.git.branch.queryOptions({
-      input: selected === null ? skipToken : { cwd: selected.path },
-    }),
-    enabled: gitStatus.isSuccess,
-    staleTime: Infinity,
-  });
-  const gitAvailable = gitStatus.isSuccess;
-  const effectiveMode: DraftWorkspaceMode = gitAvailable ? workspaceMode : "project";
-  const worktreeBase =
-    effectiveMode === "worktree"
-      ? (worktreeBaseOverride ?? defaultWorktreeBase(gitBranch.data))
-      : null;
+  const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useAgentModels(selected?.id);
   const defaultModel = modelsQuery.data?.defaultModel;
 
@@ -172,15 +149,13 @@ function DraftRoute() {
         return false;
       }
       if (startSession.isPending) return false;
-      if (effectiveMode === "worktree" && worktreeBase === null) {
+      if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
         toast.error("Pick a base branch for the worktree.");
         return false;
       }
       startSession.mutate({
         text,
-        ...(effectiveMode === "worktree" && worktreeBase !== null
-          ? { worktree: { base: worktreeBase } }
-          : {}),
+        ...(draftWorktree.worktree !== undefined ? { worktree: draftWorktree.worktree } : {}),
       });
       return false;
     },
@@ -242,7 +217,6 @@ function DraftRoute() {
           <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
             <ProjectSelect
               onChange={(next) => {
-                setWorktreeBaseOverride(null);
                 navigate({
                   to: "/draft",
                   search: { projectId: next },
@@ -252,22 +226,23 @@ function DraftRoute() {
               projects={projects.data}
               value={selected?.id ?? null}
             />
-            {gitAvailable ? (
+            {draftWorktree.gitAvailable ? (
               <>
                 <DraftWorkspaceSelect
                   disabled={startSession.isPending || selected === null}
-                  mode={workspaceMode}
-                  onModeChange={(mode) => {
-                    setWorkspaceMode(mode);
-                    if (mode === "project") setWorktreeBaseOverride(null);
-                  }}
+                  mode={draftWorktree.mode}
+                  onModeChange={draftWorktree.setMode}
                 />
-                {workspaceMode === "worktree" ? (
+                {draftWorktree.mode === "worktree" ? (
                   <DraftWorktreeBaseSelect
-                    branch={gitBranch.data}
-                    disabled={startSession.isPending || selected === null || gitBranch.isPending}
-                    onValueChange={setWorktreeBaseOverride}
-                    value={worktreeBase}
+                    branch={draftWorktree.gitBranch.data}
+                    disabled={
+                      startSession.isPending ||
+                      selected === null ||
+                      draftWorktree.gitBranch.isPending
+                    }
+                    onValueChange={draftWorktree.setWorktreeBaseOverride}
+                    value={draftWorktree.worktreeBase}
                   />
                 ) : null}
               </>
@@ -306,7 +281,7 @@ function DraftRoute() {
                   !hasContent ||
                   !selected ||
                   startSession.isPending ||
-                  (effectiveMode === "worktree" && worktreeBase === null)
+                  (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }
               />
             </PromptInputToolbar>
