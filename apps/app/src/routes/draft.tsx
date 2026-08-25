@@ -6,7 +6,7 @@ import {
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
-import { Card, CardFrame, CardFrameAction, CardFrameHeader } from "@getpie/ui/components/card";
+import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -240,38 +240,40 @@ function DraftRoute() {
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
-          <ProjectSelect
-            onChange={(next) => {
-              setWorktreeBaseOverride(null);
-              navigate({
-                to: "/draft",
-                search: { projectId: next },
-                replace: true,
-              });
-            }}
-            projects={projects.data}
-            value={selected?.id ?? null}
-          />
-          {gitAvailable ? (
-            <CardFrameAction className="flex items-center gap-1">
-              <DraftWorkspaceSelect
-                disabled={startSession.isPending || selected === null}
-                mode={workspaceMode}
-                onModeChange={(mode) => {
-                  setWorkspaceMode(mode);
-                  if (mode === "project") setWorktreeBaseOverride(null);
-                }}
-              />
-              {workspaceMode === "worktree" ? (
-                <DraftWorktreeBaseSelect
-                  branch={gitBranch.data}
-                  disabled={startSession.isPending || selected === null || gitBranch.isPending}
-                  onValueChange={setWorktreeBaseOverride}
-                  value={worktreeBase}
+          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
+            <ProjectSelect
+              onChange={(next) => {
+                setWorktreeBaseOverride(null);
+                navigate({
+                  to: "/draft",
+                  search: { projectId: next },
+                  replace: true,
+                });
+              }}
+              projects={projects.data}
+              value={selected?.id ?? null}
+            />
+            {gitAvailable ? (
+              <>
+                <DraftWorkspaceSelect
+                  disabled={startSession.isPending || selected === null}
+                  mode={workspaceMode}
+                  onModeChange={(mode) => {
+                    setWorkspaceMode(mode);
+                    if (mode === "project") setWorktreeBaseOverride(null);
+                  }}
                 />
-              ) : null}
-            </CardFrameAction>
-          ) : null}
+                {workspaceMode === "worktree" ? (
+                  <DraftWorktreeBaseSelect
+                    branch={gitBranch.data}
+                    disabled={startSession.isPending || selected === null || gitBranch.isPending}
+                    onValueChange={setWorktreeBaseOverride}
+                    value={worktreeBase}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
         </CardFrameHeader>
         <Card
           render={

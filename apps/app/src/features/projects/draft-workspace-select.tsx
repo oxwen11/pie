@@ -29,14 +29,14 @@ export function DraftWorkspaceSelect({
       }}
       value={mode}
     >
-      {/* Match ProjectSelect: ghost trigger so it sits as a header action, not a second form field. */}
+      {/* Match ProjectSelect: ghost trigger aligned with other draft header picks. */}
       <SelectTrigger
-        className="hover:bg-accent w-auto min-w-0 border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+        className="hover:bg-accent w-auto min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent align="end">
+      <SelectContent>
         <SelectItem value="project">Current directory</SelectItem>
         <SelectItem value="worktree">New worktree</SelectItem>
       </SelectContent>

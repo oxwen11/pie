@@ -53,12 +53,12 @@ export function DraftWorktreeBaseSelect({
     >
       <SelectTrigger
         aria-label="Base branch for worktree"
-        className="hover:bg-accent w-auto min-w-0 border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+        className="hover:bg-accent w-auto min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"
       >
         <SelectValue placeholder="Base branch" />
       </SelectTrigger>
-      <SelectContent align="end">
+      <SelectContent>
         {refs.local.length > 0 ? (
           <SelectGroup>
             <SelectGroupLabel>Local</SelectGroupLabel>
