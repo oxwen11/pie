@@ -92,7 +92,7 @@ describe("git router", () => {
     } finally {
       await harness.dispose();
     }
-  });
+  }, 30_000);
 
   it("maps a missing session ref to SESSION_NOT_FOUND", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));

@@ -289,6 +289,11 @@ describe("agent.session router", () => {
       expect(prepared.workspace.cwd).not.toBe(workspace);
       expect(fs.existsSync(prepared.workspace.cwd)).toBe(true);
 
+      const branch = await client.git.branch({ ref: created.ref });
+      expect(branch.current).toBe(prepared.workspace.gitBranch);
+      const tree = await client.fs.readTree({ ref: created.ref });
+      expect(tree.cwd).toBe(prepared.workspace.cwd);
+
       await client.agent.session.close({ ref: created.ref });
     } finally {
       await dispose();
