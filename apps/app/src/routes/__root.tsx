@@ -86,11 +86,7 @@ function RootLayout() {
 
   return (
     <AppShell>
-      <ContentPanelSessionProvider
-        contentPanel={contentPanel}
-        projectName={project?.name ?? null}
-        sessionRef={sessionRef}
-      >
+      <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
             <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />

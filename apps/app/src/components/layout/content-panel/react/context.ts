@@ -8,8 +8,6 @@ export interface ContentPanelContextValue {
   readonly contentPanel: ContentPanel<AnyPanelView>;
   /** null outside a session route (`/draft`, `/`), where there is nothing to scope panels to. */
   readonly sessionRef: SessionRef | null;
-  /** Project display name for tree headers; null off a session route or if the project is gone. */
-  readonly projectName: string | null;
 }
 
 export const ContentPanelContext = createContext<ContentPanelContextValue | null>(null);

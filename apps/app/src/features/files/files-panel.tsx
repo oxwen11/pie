@@ -10,7 +10,6 @@ import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
-import { useContentPanelContext } from "@/components/layout/content-panel/react/context";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
@@ -18,6 +17,7 @@ import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
 import { useGitBranch } from "./use-git-branch";
+import { useProjectName } from "./use-project-name";
 import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
@@ -31,7 +31,7 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { projectName } = useContentPanelContext();
+  const projectName = useProjectName(instance.sessionRef.projectId);
   const panel = useContentPanel();
   const workspace = { ref: instance.sessionRef };
   const tree = useWorkspaceTree(workspace);

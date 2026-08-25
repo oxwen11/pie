@@ -1,3 +1,4 @@
+import type { Project } from "@getpie/contract";
 import type { GitReviewMode } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
@@ -7,7 +8,6 @@ import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
-import { useContentPanelContext } from "@/components/layout/content-panel/react/context";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
@@ -24,6 +24,20 @@ export interface ReviewPayload {
   readonly mode?: GitReviewMode;
   readonly other?: string;
   readonly path?: string;
+}
+
+function useProjectName(projectId: string): string | undefined {
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { data } = useQuery({
+    ...orpcQueryUtils.project.list.queryOptions(),
+    staleTime: Infinity,
+    select: useCallback(
+      (projects: ReadonlyArray<Project>) =>
+        projects.find((project) => project.id === projectId)?.name,
+      [projectId],
+    ),
+  });
+  return data;
 }
 
 export const reviewPanel = definePanel({
@@ -50,7 +64,7 @@ export const reviewPanel = definePanel({
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const { projectName } = useContentPanelContext();
+  const projectName = useProjectName(instance.sessionRef.projectId);
   const gitWorkspace = { ref: instance.sessionRef };
   const panel = useContentPanel();
   const mode = instance.payload.mode ?? "uncommitted";

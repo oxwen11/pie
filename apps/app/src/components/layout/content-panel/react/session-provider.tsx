@@ -17,15 +17,11 @@ export interface ContentPanelSessionProviderProps {
   readonly contentPanel: ContentPanel<AnyPanelView>;
   /** null off a session route; every panel hook below degrades to a no-op. */
   readonly sessionRef: SessionRef | null;
-  readonly projectName: string | null;
   readonly children: ReactNode;
 }
 
 export function ContentPanelSessionProvider(props: ContentPanelSessionProviderProps): ReactNode {
-  const { contentPanel, sessionRef, projectName, children } = props;
-  const value = useMemo(
-    () => ({ contentPanel, sessionRef, projectName }),
-    [contentPanel, sessionRef, projectName],
-  );
+  const { contentPanel, sessionRef, children } = props;
+  const value = useMemo(() => ({ contentPanel, sessionRef }), [contentPanel, sessionRef]);
   return <ContentPanelContext value={value}>{children}</ContentPanelContext>;
 }
