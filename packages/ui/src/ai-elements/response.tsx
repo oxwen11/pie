@@ -1,25 +1,20 @@
 "use client";
 
-import { CodeBlock, CodeBlockCopyButton } from "@getpie/ui/ai-elements/code-block";
 import { cn } from "@getpie/ui/lib/utils";
+import { code } from "@streamdown/code";
 import {
   cloneElement,
   type ComponentProps,
-  type DetailedHTMLProps,
-  type HTMLAttributes,
-  type ImgHTMLAttributes,
   isValidElement,
   type JSX,
   memo,
   type ReactNode,
 } from "react";
-import { type Components, type ExtraProps, Streamdown } from "streamdown";
+import { type Components, Streamdown } from "streamdown";
 
 type ResponseProps = ComponentProps<typeof Streamdown> & {
   className?: string;
 };
-
-const LANGUAGE_REGEX = /language-([^\s]+)/;
 
 type MarkdownPoint = { line?: number; column?: number };
 type MarkdownPosition = { start?: MarkdownPoint; end?: MarkdownPoint };
@@ -66,10 +61,14 @@ function sameNodePosition(prev?: MarkdownNode, next?: MarkdownNode): boolean {
 }
 
 function sameClassAndNode(
-  prev: { className?: string; node?: MarkdownNode },
-  next: { className?: string; node?: MarkdownNode },
+  prev: { className?: string; node?: MarkdownNode; children?: ReactNode },
+  next: { className?: string; node?: MarkdownNode; children?: ReactNode },
 ) {
-  return prev.className === next.className && sameNodePosition(prev.node, next.node);
+  return (
+    prev.children === next.children &&
+    prev.className === next.className &&
+    sameNodePosition(prev.node, next.node)
+  );
 }
 
 type OlProps = WithNode<JSX.IntrinsicElements["ol"]>;
@@ -90,7 +89,7 @@ const MemoLi = memo<LiProps>(
       {children}
     </li>
   ),
-  (p, n) => p.className === n.className && sameNodePosition(p.node, n.node),
+  (p, n) => sameClassAndNode(p, n),
 );
 MemoLi.displayName = "MarkdownLi";
 
@@ -203,79 +202,6 @@ const MemoH6 = memo<HeadingProps<"h6">>(
   (p, n) => sameClassAndNode(p, n),
 );
 MemoH6.displayName = "MarkdownH6";
-
-type TableProps = WithNode<JSX.IntrinsicElements["table"]>;
-const MemoTable = memo<TableProps>(
-  ({ children, className, node: _node, ...props }: TableProps) => (
-    <div className="my-4 flex flex-col space-y-2">
-      <div className="overflow-x-auto">
-        <table className={cn("border-border w-full border-collapse border", className)} {...props}>
-          {children}
-        </table>
-      </div>
-    </div>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoTable.displayName = "MarkdownTable";
-
-type TheadProps = WithNode<JSX.IntrinsicElements["thead"]>;
-const MemoThead = memo<TheadProps>(
-  ({ children, className, node: _node, ...props }: TheadProps) => (
-    <thead className={cn("bg-muted/80", className)} {...props}>
-      {children}
-    </thead>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoThead.displayName = "MarkdownThead";
-
-type TbodyProps = WithNode<JSX.IntrinsicElements["tbody"]>;
-const MemoTbody = memo<TbodyProps>(
-  ({ children, className, node: _node, ...props }: TbodyProps) => (
-    <tbody className={cn("divide-border bg-muted/40 divide-y", className)} {...props}>
-      {children}
-    </tbody>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoTbody.displayName = "MarkdownTbody";
-
-type TrProps = WithNode<JSX.IntrinsicElements["tr"]>;
-const MemoTr = memo<TrProps>(
-  ({ children, className, node: _node, ...props }: TrProps) => (
-    <tr className={cn("border-border border-b", className)} {...props}>
-      {children}
-    </tr>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoTr.displayName = "MarkdownTr";
-
-type ThProps = WithNode<JSX.IntrinsicElements["th"]>;
-const MemoTh = memo<ThProps>(
-  ({ children, className, node: _node, ...props }: ThProps) => (
-    <th
-      className={cn("px-4 py-2 text-left text-sm font-semibold whitespace-nowrap", className)}
-      {...props}
-    >
-      {children}
-    </th>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoTh.displayName = "MarkdownTh";
-
-type TdProps = WithNode<JSX.IntrinsicElements["td"]>;
-const MemoTd = memo<TdProps>(
-  ({ children, className, node: _node, ...props }: TdProps) => (
-    <td className={cn("px-4 py-2 text-sm", className)} {...props}>
-      {children}
-    </td>
-  ),
-  (p, n) => sameClassAndNode(p, n),
-);
-MemoTd.displayName = "MarkdownTd";
 
 type BlockquoteProps = WithNode<JSX.IntrinsicElements["blockquote"]>;
 const MemoBlockquote = memo<BlockquoteProps>(
@@ -445,67 +371,23 @@ const MemoSection = memo<SectionProps>(
 );
 MemoSection.displayName = "MarkdownSection";
 
-const CodeComponent = ({
-  node,
-  className,
-  children,
-  ...props
-}: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & ExtraProps) => {
-  const inline = node?.position?.start?.line === node?.position?.end?.line;
-
-  if (inline) {
-    return (
-      <code
-        className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-sm", className)}
-        {...props}
-      >
-        {children}
-      </code>
-    );
-  }
-
-  const match = className?.match(LANGUAGE_REGEX);
-  const language = match?.[1];
-
-  let code = "";
-  if (
-    isValidElement(children) &&
-    children.props &&
-    typeof children.props === "object" &&
-    "children" in children.props &&
-    typeof children.props.children === "string"
-  ) {
-    code = children.props.children;
-  } else if (typeof children === "string") {
-    code = children;
-  }
-
-  return (
-    <CodeBlock
-      className={cn("overflow-x-auto border-t [&+p]:mt-2 [p+&]:mt-2", className)}
-      code={code}
-      data-language={language}
-      language={language}
-      {...props}
-    >
-      <CodeBlockCopyButton />
-    </CodeBlock>
-  );
-};
-
-const MemoCode = memo<DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & ExtraProps>(
-  CodeComponent,
-  (p, n) => p.className === n.className && sameNodePosition(p.node, n.node),
+type InlineCodeProps = WithNode<JSX.IntrinsicElements["code"]>;
+const MemoInlineCode = memo<InlineCodeProps>(
+  ({ children, className, node: _node, ...props }: InlineCodeProps) => (
+    <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-sm", className)} {...props}>
+      {children}
+    </code>
+  ),
+  (p, n) => sameClassAndNode(p, n),
 );
-MemoCode.displayName = "MarkdownCode";
+MemoInlineCode.displayName = "MarkdownInlineCode";
 
-const MemoImg = memo<
-  DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & ExtraProps
->(
+type ImgProps = WithNode<JSX.IntrinsicElements["img"]>;
+const MemoImg = memo<ImgProps>(
   ({ alt, className, node: _node, ...props }) => (
     <img alt={alt ?? ""} className={cn("rounded-md", className)} {...props} />
   ),
-  (p, n) => p.className === n.className && sameNodePosition(p.node, n.node),
+  (p, n) => sameClassAndNode(p, n) && p.src === n.src && p.alt === n.alt,
 );
 MemoImg.displayName = "MarkdownImg";
 
@@ -522,37 +404,42 @@ const components: Components = {
   h4: MemoH4,
   h5: MemoH5,
   h6: MemoH6,
-  table: MemoTable,
-  thead: MemoThead,
-  tbody: MemoTbody,
-  tr: MemoTr,
-  th: MemoTh,
-  td: MemoTd,
   blockquote: MemoBlockquote,
-  code: MemoCode,
+  inlineCode: MemoInlineCode,
   img: MemoImg,
-  pre: ({ children }) => <>{children}</>,
   sup: MemoSup,
   sub: MemoSub,
   p: MemoParagraph,
   section: MemoSection,
 };
 
-export const Response = memo((props: ResponseProps) => {
-  const { className, components: overrides, ...rest } = props;
+// Fenced code and tables stay on Streamdown's built-ins so 2.6 max-height,
+// streaming auto-scroll, and download controls apply.
+const streamdownPlugins = { code };
 
-  const mergedComponents = overrides ? { ...components, ...overrides } : components;
+export const Response = memo(
+  (props: ResponseProps) => {
+    const { className, components: overrides, plugins, animated = true, ...rest } = props;
 
-  return (
-    <div
-      className={cn(
-        "size-full text-sm leading-6 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        className,
-      )}
-    >
-      <Streamdown {...rest} components={mergedComponents} />
-    </div>
-  );
-});
+    const mergedComponents = overrides ? { ...components, ...overrides } : components;
+
+    return (
+      <Streamdown
+        {...rest}
+        animated={animated}
+        className={cn(
+          "size-full text-sm leading-6 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          className,
+        )}
+        components={mergedComponents}
+        plugins={plugins ? { ...streamdownPlugins, ...plugins } : streamdownPlugins}
+      />
+    );
+  },
+  (prev, next) =>
+    prev.children === next.children &&
+    prev.isAnimating === next.isAnimating &&
+    prev.className === next.className,
+);
 
 Response.displayName = "Response";
