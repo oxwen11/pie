@@ -24,16 +24,11 @@ export interface Session {
   readonly createdAt: string;
   /**
    * Working directory. Our input at `create` (the project path), later a worktree
-   * path when the first prompt materializes a pending worktree.
+   * path when a prompt that requested `worktree` materializes one.
    */
   readonly cwd?: string;
-  /** Branch checked out in `cwd` when the session was created in a worktree. */
+  /** Branch checked out in `cwd` when this session has a git worktree. */
   readonly gitBranch?: string;
-  /**
-   * When set, the first accepted prompt creates a git worktree from `project.path`
-   * and persists the resulting `cwd` / `gitBranch` before Pi opens.
-   */
-  readonly pendingWorktree?: { readonly base?: string };
   /** Model selected at create; applied when Pi opens on the first prompt. */
   readonly provider?: string;
   readonly modelId?: string;

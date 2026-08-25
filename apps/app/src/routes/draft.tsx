@@ -1,4 +1,4 @@
-import type { ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -110,20 +110,17 @@ function DraftRoute() {
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
   const startSession = useMutation({
-    mutationFn: async ({ text }: { text: string }) => {
+    mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       if (!selected) throw new Error("No project selected");
       const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
-        ...(effectiveMode === "worktree" && worktreeBase !== null
-          ? { worktree: { base: worktreeBase } }
-          : {}),
       });
-      return { created, text };
+      return { created, text, worktree };
     },
-    onSuccess: ({ created, text }) => {
+    onSuccess: ({ created, text, worktree }) => {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
@@ -144,7 +141,7 @@ function DraftRoute() {
       // Chat survives the route change, so the first prompt starts here.
       void chats
         .chatFor(created.ref)
-        .prompt(text)
+        .prompt(text, worktree !== undefined ? { worktree } : undefined)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
         });
@@ -177,7 +174,12 @@ function DraftRoute() {
         toast.error("Pick a base branch for the worktree.");
         return false;
       }
-      startSession.mutate({ text });
+      startSession.mutate({
+        text,
+        ...(effectiveMode === "worktree" && worktreeBase !== null
+          ? { worktree: { base: worktreeBase } }
+          : {}),
+      });
       return false;
     },
   });

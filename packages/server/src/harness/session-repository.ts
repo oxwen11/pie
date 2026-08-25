@@ -15,6 +15,7 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  /** Legacy field: decoded then dropped so old files never write it back. */
   pendingWorktree: Schema.optionalKey(PendingWorktreeSchema),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
@@ -26,7 +27,7 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, ...rest } = parsed;
+  const { agentSessionId, pendingWorktree: _dropped, ...rest } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
@@ -44,7 +45,6 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   ...(metadata.agentSessionId !== undefined ? { agentSessionId: metadata.agentSessionId } : {}),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
-  ...(metadata.pendingWorktree !== undefined ? { pendingWorktree: metadata.pendingWorktree } : {}),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
   ...(metadata.title !== undefined ? { title: metadata.title } : {}),

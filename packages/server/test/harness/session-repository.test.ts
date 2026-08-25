@@ -55,6 +55,40 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
+  it("drops legacy pendingWorktree on read and never writes it back", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "sess-legacy",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+          cwd: "/tmp/pie-app",
+          pendingWorktree: { base: "main" },
+        },
+      }),
+    );
+
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        const loaded = yield* repo.read("proj-a", "sess-legacy");
+        yield* repo.write(loaded);
+        return loaded;
+      }),
+    );
+    expect(read).not.toHaveProperty("pendingWorktree");
+    expect(read.cwd).toBe("/tmp/pie-app");
+
+    const raw = JSON.parse(await fs.readFile(file, "utf8")) as {
+      readonly data: Record<string, unknown>;
+    };
+    expect(raw.data).not.toHaveProperty("pendingWorktree");
+  });
+
   it("omits agentSessionId until Pi has opened, and drops the old sentinel on read", async () => {
     const neverOpened = await run(
       Effect.gen(function* () {

@@ -74,7 +74,6 @@ export type CreatePiSessionInput = {
   readonly projectId: string;
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
-  readonly pendingWorktree?: { readonly base?: string };
 };
 
 export type PiAgentSessionServiceShape = {
@@ -255,6 +254,7 @@ export const makePiAgentSessionService = (deps: {
 
   const resolveWorkspaceForPrompt = (
     ref: SessionRef,
+    worktree: PromptInput["worktree"],
   ): Effect.Effect<
     SessionWithCwd,
     SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
@@ -264,20 +264,20 @@ export const makePiAgentSessionService = (deps: {
       readMetadata(ref).pipe(
         Effect.flatMap(ensureCwd),
         Effect.flatMap((metadata) => {
-          const pending = metadata.pendingWorktree;
-          if (pending === undefined) return Effect.succeed(metadata);
+          if (worktree === undefined || metadata.gitBranch !== undefined) {
+            return Effect.succeed(metadata);
+          }
           return git
             .worktreeCreate(
               metadata.cwd,
-              pending.base !== undefined ? { base: pending.base } : undefined,
+              worktree.base !== undefined ? { base: worktree.base } : undefined,
             )
             .pipe(
-              Effect.flatMap((worktree) => {
-                const { pendingWorktree: _dropped, ...rest } = metadata;
+              Effect.flatMap((created) => {
                 const updated: SessionWithCwd = {
-                  ...rest,
-                  cwd: worktree.path,
-                  gitBranch: worktree.branch,
+                  ...metadata,
+                  cwd: created.path,
+                  gitBranch: created.branch,
                 };
                 return repo.write(updated).pipe(
                   Effect.andThen(
@@ -328,6 +328,7 @@ export const makePiAgentSessionService = (deps: {
   const deliverPrompt = (
     ref: SessionRef,
     userInput: UserInput,
+    worktree: PromptInput["worktree"],
   ): Effect.Effect<
     void,
     | ResumeSessionError
@@ -341,7 +342,7 @@ export const makePiAgentSessionService = (deps: {
     | GitWorktreeFailure
   > =>
     Effect.gen(function* () {
-      const resolved = yield* resolveWorkspaceForPrompt(ref);
+      const resolved = yield* resolveWorkspaceForPrompt(ref, worktree);
       const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
       yield* runtime.prompt(userInput).pipe(Effect.asVoid);
     });
@@ -422,9 +423,6 @@ export const makePiAgentSessionService = (deps: {
             cwd: input.cwd,
             ...(input.model !== undefined
               ? { provider: input.model.provider, modelId: input.model.modelId }
-              : {}),
-            ...(input.pendingWorktree !== undefined
-              ? { pendingWorktree: input.pendingWorktree }
               : {}),
             archived: false,
           };
@@ -610,7 +608,7 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
-        yield* deliverPrompt(input.ref, userInput).pipe(
+        yield* deliverPrompt(input.ref, userInput, input.worktree).pipe(
           Effect.catch((error: unknown) =>
             reject(error instanceof Error ? error.message : String(error)),
           ),

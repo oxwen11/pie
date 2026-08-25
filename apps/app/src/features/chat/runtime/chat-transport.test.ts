@@ -316,4 +316,31 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
     expect(receipt.turnId).toBe("turn-9");
     expect(calls).toEqual([{ ref, parts: [{ type: "text", text: "hi" }], messageId: "message-1" }]);
   });
+
+  it("forwards a worktree request on the prompt RPC", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        prompt: async (input: unknown) => {
+          calls.push(input);
+          return { turnId: "turn-9" };
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+    await transport.prompt({
+      messageId: "message-1",
+      parts: [{ type: "text", text: "hi" }],
+      worktree: { base: "main" },
+    });
+    expect(calls).toEqual([
+      {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        messageId: "message-1",
+        worktree: { base: "main" },
+      },
+    ]);
+  });
 });

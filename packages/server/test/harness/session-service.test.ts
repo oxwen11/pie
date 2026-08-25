@@ -311,7 +311,7 @@ describe("PiAgentSessionService", () => {
     expect(result.messages).toEqual(history);
   });
 
-  it("creates a worktree once when two prompts race on a pending worktree", async () => {
+  it("creates a worktree once when two prompts race with worktree", async () => {
     let creates = 0;
     const result = await run(
       {
@@ -329,12 +329,19 @@ describe("PiAgentSessionService", () => {
           const ref = yield* fixture.service.create({
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
-            pendingWorktree: {},
           });
           yield* Effect.all(
             [
-              fixture.service.prompt({ ref, parts: [{ type: "text", text: "one" }] }),
-              fixture.service.prompt({ ref, parts: [{ type: "text", text: "two" }] }),
+              fixture.service.prompt({
+                ref,
+                parts: [{ type: "text", text: "one" }],
+                worktree: {},
+              }),
+              fixture.service.prompt({
+                ref,
+                parts: [{ type: "text", text: "two" }],
+                worktree: {},
+              }),
             ],
             { concurrency: "unbounded" },
           );
@@ -346,8 +353,25 @@ describe("PiAgentSessionService", () => {
     expect(creates).toBe(1);
     expect(result.stored.cwd).toBe("/tmp/pie-worktree");
     expect(result.stored.gitBranch).toBe("pie/abcd1234");
-    expect(result.stored.pendingWorktree).toBeUndefined();
+    expect(result.stored).not.toHaveProperty("pendingWorktree");
     expect(result.open.every((entry) => entry.cwd === "/tmp/pie-worktree")).toBe(true);
+  });
+
+  it("does not create a worktree when the prompt omits worktree", async () => {
+    const stored = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const ref = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
+        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "one" }] });
+        yield* Effect.sleep("80 millis");
+        return yield* fixture.repo.read(ref.projectId, ref.sessionId);
+      }),
+    );
+    expect(stored.cwd).toBe("/tmp/pie-app");
+    expect(stored.gitBranch).toBeUndefined();
+    expect(stored).not.toHaveProperty("pendingWorktree");
   });
 
   it("prepare fails with SessionNotFound for an unknown session", async () => {

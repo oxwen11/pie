@@ -418,6 +418,13 @@ export const PromptPartSchema = Schema.Union([
 ]);
 export type PromptPart = typeof PromptPartSchema.Type;
 
+/** When present on a prompt, create a git worktree before Pi opens (branch name is server-assigned). */
+export const CreateWorktreeInputSchema = Schema.Struct({
+  /** Local or remote-tracking ref to branch from. Defaults to HEAD when omitted. */
+  base: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
+
 export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
@@ -425,6 +432,9 @@ export const PromptInputSchema = Schema.Struct({
   // `session.prompt.submitted` so the sender can recognise (and skip) its own
   // prompt while other clients render it. Absent → the server mints one.
   messageId: Schema.optionalKey(Schema.NonEmptyString),
+  // Create a git worktree before Pi opens. The server no-ops once `gitBranch`
+  // is already persisted — this is request payload, not session metadata.
+  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 
@@ -528,18 +538,10 @@ export const BrowseResultSchema = Schema.Struct({
 
 // Session-scoped config is owned by Pi — there are no session config RPCs.
 
-/** When present, a git worktree is created on the first accepted prompt (new branch name is server-assigned). */
-export const CreateWorktreeInputSchema = Schema.Struct({
-  /** Local or remote-tracking ref to branch from. Defaults to HEAD when omitted. */
-  base: Schema.optionalKey(Schema.NonEmptyString),
-});
-export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
-
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
-  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

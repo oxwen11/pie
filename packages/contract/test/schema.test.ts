@@ -91,6 +91,19 @@ describe("PromptInput", () => {
     expect(accepts(PromptInputSchema, { ref, parts: [{ type: "text", text: "" }] })).toBe(false);
   });
 
+  it("accepts an optional worktree request", () => {
+    expect(
+      accepts(PromptInputSchema, { ref, parts: [{ type: "text", text: "hi" }], worktree: {} }),
+    ).toBe(true);
+    expect(
+      accepts(PromptInputSchema, {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        worktree: { base: "main" },
+      }),
+    ).toBe(true);
+  });
+
   it("keeps the file part shape on the wire (validated, server rejects with UNSUPPORTED)", () => {
     expect(
       accepts(PromptInputSchema, {

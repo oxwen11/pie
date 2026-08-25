@@ -1,5 +1,6 @@
 import type {
   AgentRequest,
+  CreateWorktreeInput,
   PromptPart,
   SessionMessageChunkEvent,
   SessionPhase,
@@ -33,7 +34,11 @@ class FakeTransport implements ChatSessionTransport {
   // floor against live traffic.
   historyGate: Promise<void> | null = null;
   getMessagesCalls = 0;
-  promptCalls: Array<{ messageId: string; parts: ReadonlyArray<PromptPart> }> = [];
+  promptCalls: Array<{
+    messageId: string;
+    parts: ReadonlyArray<PromptPart>;
+    worktree?: CreateWorktreeInput;
+  }> = [];
   promptError: unknown = null;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
   // (a dropped socket queues it until the link reconnects).
@@ -47,7 +52,11 @@ class FakeTransport implements ChatSessionTransport {
       this.disposed += 1;
     };
   }
-  prompt = async (input: { messageId: string; parts: ReadonlyArray<PromptPart> }) => {
+  prompt = async (input: {
+    messageId: string;
+    parts: ReadonlyArray<PromptPart>;
+    worktree?: CreateWorktreeInput;
+  }) => {
     this.promptCalls.push(input);
     if (this.promptGate) await this.promptGate;
     if (this.promptError) throw this.promptError;
@@ -441,6 +450,20 @@ describe("Chat prompting", () => {
     releasePrompt();
     await sent;
     expect(transport.promptCalls).toHaveLength(1);
+  });
+
+  it("keeps a worktree request on later prompts from the same Chat", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({});
+    await chat.prompt("from draft", { worktree: { base: "main" } });
+    expect(transport.promptCalls[0]?.worktree).toEqual({ base: "main" });
+
+    await chat.prompt("follow up");
+    expect(transport.promptCalls[1]?.worktree).toEqual({ base: "main" });
+
+    transport.promptError = new Error("rpc failed");
+    await expect(chat.prompt("retry")).rejects.toThrow("rpc failed");
+    expect(transport.promptCalls[2]?.worktree).toEqual({ base: "main" });
   });
 
   it("pushes the optimistic message, submits fire-and-forget, and dedupes its echo", async () => {

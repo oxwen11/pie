@@ -28,7 +28,6 @@ export const sessionRouter = orpc.router({
             projectId: input.projectId,
             cwd: project.path,
             ...(model !== undefined ? { model } : {}),
-            ...(input.worktree !== undefined ? { pendingWorktree: input.worktree } : {}),
           })
           .pipe(
             Effect.map((ref) => ({

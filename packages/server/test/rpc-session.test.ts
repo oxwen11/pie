@@ -250,7 +250,7 @@ describe("agent.session router", () => {
     }
   });
 
-  it("creates a session in a new git worktree when requested", async () => {
+  it("creates a git worktree on prompt when requested", async () => {
     const { client, workspace, dispose } = await setup();
     try {
       const { simpleGit } = await import("simple-git");
@@ -265,7 +265,6 @@ describe("agent.session router", () => {
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
-        worktree: {},
       });
 
       expect(created.workspace.cwd).toBe(workspace);
@@ -273,6 +272,7 @@ describe("agent.session router", () => {
       await client.agent.session.prompt({
         ref: created.ref,
         parts: [{ type: "text", text: "hello" }],
+        worktree: {},
       });
 
       const prepared = await (async () => {
@@ -315,7 +315,6 @@ describe("agent.session router", () => {
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
-        worktree: {},
       });
 
       expect(created.workspace.cwd).toBe(workspace);
@@ -323,6 +322,7 @@ describe("agent.session router", () => {
       await client.agent.session.prompt({
         ref: created.ref,
         parts: [{ type: "text", text: "hello" }],
+        worktree: {},
       });
 
       const repoName = path.basename(workspace);
