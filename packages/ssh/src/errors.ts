@@ -9,6 +9,11 @@ export class SshInvalidTargetError extends Data.TaggedError("SshInvalidTargetErr
   readonly message: string;
 }> {}
 
+export class SshClientMissingError extends Data.TaggedError("SshClientMissingError")<{
+  readonly message: string;
+  readonly command: string;
+}> {}
+
 export class SshCommandError extends Data.TaggedError("SshCommandError")<{
   readonly message: string;
   readonly command: readonly string[];
@@ -36,6 +41,7 @@ export class SshPasswordPromptError extends Data.TaggedError("SshPasswordPromptE
 
 export type SshEnvironmentError =
   | SshCommandError
+  | SshClientMissingError
   | SshInvalidTargetError
   | SshLaunchError
   | SshReadinessError

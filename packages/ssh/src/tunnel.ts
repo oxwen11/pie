@@ -6,12 +6,15 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { buildSshChildEnvironment, isSshAuthFailure } from "./auth";
 import {
   baseSshArgs,
+  isSshSpawnNotFound,
   redactSshErrorOutput,
+  requireSshCommand,
   runSshCommand,
-  sshCommandForPlatform,
+  sshClientMissingMessage,
   sshSpawnEnv,
 } from "./command";
 import {
+  SshClientMissingError,
   SshCommandError,
   SshInvalidTargetError,
   SshLaunchError,
@@ -140,9 +143,11 @@ export const waitForHttpReady = (input: {
   });
 
 function toLaunchError(
-  error: SshCommandError | SshInvalidTargetError,
-): SshLaunchError | SshInvalidTargetError {
-  if (error instanceof SshInvalidTargetError) return error;
+  error: SshCommandError | SshClientMissingError | SshInvalidTargetError,
+): SshLaunchError | SshClientMissingError | SshInvalidTargetError {
+  if (error instanceof SshInvalidTargetError || error instanceof SshClientMissingError) {
+    return error;
+  }
 
   const stdout = redactSshErrorOutput(error.stdout ?? "");
   const stderr = redactSshErrorOutput(error.stderr);
@@ -166,7 +171,7 @@ export const launchOrReuseRemoteServer = (
   target: SshTarget,
 ): Effect.Effect<
   RemoteLaunchResult,
-  SshLaunchError | SshInvalidTargetError,
+  SshLaunchError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
@@ -198,15 +203,15 @@ export const startSshTunnel = (
   remotePort: number,
 ): Effect.Effect<
   SshTunnel,
-  SshLaunchError | SshInvalidTargetError,
+  SshLaunchError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
     const hostSpec = yield* buildSshHostSpecEffect(target);
+    const sshCommand = yield* requireSshCommand();
     const localPort = yield* reserveLoopbackPort();
     const tunnelScope = yield* Scope.make();
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const sshCommand = sshCommandForPlatform();
     const environment = yield* buildSshChildEnvironment({
       baseEnv: sshSpawnEnv(),
     }).pipe(
@@ -252,16 +257,20 @@ export const startSshTunnel = (
       )
       .pipe(
         Effect.provideService(Scope.Scope, tunnelScope),
-        Effect.mapError(
-          (cause) =>
-            new SshLaunchError({
-              message:
-                cause instanceof Error
-                  ? cause.message
-                  : `Failed to spawn SSH tunnel for ${hostSpec}.`,
-              stdout: "",
-              cause,
-            }),
+        Effect.mapError((cause) =>
+          isSshSpawnNotFound(cause)
+            ? new SshClientMissingError({
+                command: sshCommand,
+                message: sshClientMissingMessage(sshCommand),
+              })
+            : new SshLaunchError({
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : `Failed to spawn SSH tunnel for ${hostSpec}.`,
+                stdout: "",
+                cause,
+              }),
         ),
       );
 
@@ -300,7 +309,7 @@ export const connectSshEnvironment = (
   target: SshTarget,
 ): Effect.Effect<
   SshConnectedEnvironment,
-  SshLaunchError | SshInvalidTargetError | SshReadinessError,
+  SshLaunchError | SshClientMissingError | SshInvalidTargetError | SshReadinessError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {

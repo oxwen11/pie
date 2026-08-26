@@ -34,7 +34,12 @@ export type EnvironmentFeed = {
   subscribe: (listener: (snapshot: EnvironmentSnapshot) => void) => () => void;
 };
 
+export type SshClientAvailability =
+  | { readonly available: true }
+  | { readonly available: false; readonly message: string };
+
 export type PlatformSsh = {
+  readonly client: SshClientAvailability;
   readonly environments: EnvironmentFeed;
   readonly discoverHosts: () => Promise<readonly DiscoveredSshHost[]>;
   readonly connect: (target: string) => Promise<void>;
@@ -54,7 +59,8 @@ export type Platform = {
   os?: PlatformOs;
   /**
    * Desktop-only: switch between this computer's daemon and an SSH-forwarded
-   * remote pie daemon. Absent in the browser.
+   * remote pie daemon. Absent in the browser. On desktop, `client.available`
+   * is false when OpenSSH is not on PATH — local stays the only environment.
    */
   ssh?: PlatformSsh;
 };

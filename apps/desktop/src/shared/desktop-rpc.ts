@@ -64,10 +64,17 @@ export const emptyEnvironmentSnapshot = (): EnvironmentSnapshot => ({
   remotes: [],
 });
 
+export const SshClientAvailabilitySchema = Schema.Union([
+  Schema.Struct({ available: Schema.Literal(true) }),
+  Schema.Struct({ available: Schema.Literal(false), message: Schema.NonEmptyString }),
+]);
+export type SshClientAvailability = typeof SshClientAvailabilitySchema.Type;
+
 export const DesktopBootstrapSchema = Schema.Struct({
   status: ServerStatusSchema,
   statusRevision: Schema.Natural,
   os: DesktopOsSchema,
+  sshClient: SshClientAvailabilitySchema,
   environments: EnvironmentSnapshotSchema,
 });
 export type DesktopBootstrap = typeof DesktopBootstrapSchema.Type;

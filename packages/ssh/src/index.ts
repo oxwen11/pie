@@ -2,17 +2,28 @@ export { SshPasswordPrompt, isSshAuthFailure } from "./auth";
 export type { SshPasswordPromptShape, SshPasswordRequest } from "./auth";
 export {
   baseSshArgs,
+  findSshCommand,
+  isSshSpawnNotFound,
+  probeSshClient,
   redactSshErrorOutput,
+  requireSshCommand,
   resolveSshInput,
   resolveSshTarget,
   runSshCommand,
+  sshClientMissingMessage,
   sshCommandForPlatform,
   SSH_UNSET_ENV_KEYS,
   sshSpawnEnv,
 } from "./command";
-export type { RunSshCommandOptions, SshCommandResult } from "./command";
+export type {
+  FindSshCommandOptions,
+  RunSshCommandOptions,
+  SshClientAvailability,
+  SshCommandResult,
+} from "./command";
 export { discoverSshHosts } from "./config";
 export {
+  SshClientMissingError,
   SshCommandError,
   SshHostDiscoveryError,
   SshInvalidTargetError,
