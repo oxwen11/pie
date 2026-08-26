@@ -37,6 +37,8 @@ export async function stopDaemonFor(pieHome: string): Promise<void> {
 export const test = base.extend<{
   e2ePaths: {
     fakePiLog: string;
+    /** Stale name still read by desktop-rpc.spec.ts — same file as fakePiLog. */
+    fakeClaudeLog: string;
     userData: string;
     pieHome: string;
   };
@@ -50,8 +52,10 @@ export const test = base.extend<{
     const pieHome = path.join(output, "pie-home");
     fs.mkdirSync(pieHome, { recursive: true });
     seedProject(pieHome, path.join(output, "workspace"));
+    const fakePiLog = path.join(output, "fake-pi.jsonl");
     await use({
-      fakePiLog: path.join(output, "fake-pi.jsonl"),
+      fakePiLog,
+      fakeClaudeLog: fakePiLog,
       userData: path.join(output, "user-data"),
       pieHome,
     });
