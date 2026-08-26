@@ -9,10 +9,10 @@ import {
 } from "@getpie/ui/components/dialog";
 import { Input } from "@getpie/ui/components/input";
 import { Label } from "@getpie/ui/components/label";
-import { use, useState, type FormEvent, type ReactElement } from "react";
+import { Suspense, use, useState, type FormEvent, type ReactElement } from "react";
 import { toast } from "sonner";
 
-import type { DiscoveredSshHost } from "@/platform";
+import type { DiscoveredSshHost, PlatformSsh } from "@/platform";
 import { usePlatform } from "@/platform-context";
 
 function discoveredHostOptionLabel(host: DiscoveredSshHost): string {
@@ -29,10 +29,29 @@ function discoveredHostOptionLabel(host: DiscoveredSshHost): string {
   }
 }
 
+function loadDiscoveredHosts(ssh: PlatformSsh): Promise<readonly DiscoveredSshHost[]> {
+  return ssh.discoverHosts().catch((error: unknown) => {
+    toast.error(error instanceof Error ? error.message : "Failed to list SSH hosts.");
+    return [];
+  });
+}
+
+function DiscoveredSshHostOptions({ ssh }: { ssh: PlatformSsh }): ReactElement {
+  const [hostsPromise] = useState(() => loadDiscoveredHosts(ssh));
+  const hosts = use(hostsPromise);
+  return (
+    <>
+      {hosts.map((host) => (
+        <option key={`${host.source}:${host.alias}`} value={host.alias}>
+          {discoveredHostOptionLabel(host)}
+        </option>
+      ))}
+    </>
+  );
+}
+
 export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactElement {
   const ssh = usePlatform().ssh;
-  const [hostsPromise] = useState(() => ssh?.discoverHosts() ?? Promise.resolve([]));
-  const hosts = use(hostsPromise);
   const [target, setTarget] = useState("");
   const [pending, setPending] = useState(false);
   const trimmed = target.trim();
@@ -80,11 +99,9 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
                 onChange={(event) => setTarget(event.target.value)}
               />
               <datalist id="ssh-discovered-hosts">
-                {hosts.map((host) => (
-                  <option key={`${host.source}:${host.alias}`} value={host.alias}>
-                    {discoveredHostOptionLabel(host)}
-                  </option>
-                ))}
+                <Suspense fallback={null}>
+                  <DiscoveredSshHostOptions ssh={ssh} />
+                </Suspense>
               </datalist>
             </div>
           </div>

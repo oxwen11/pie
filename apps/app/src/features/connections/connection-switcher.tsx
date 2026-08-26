@@ -1,7 +1,7 @@
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { Check, Laptop, Plus, Server, Share2 } from "lucide-react";
-import { Suspense, useState, useSyncExternalStore, type ReactElement } from "react";
+import { useState, useSyncExternalStore, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import { AddSshHostDialog } from "@/features/connections/add-ssh-host-dialog";
@@ -117,16 +117,8 @@ export function ConnectionSwitcher(): ReactElement | null {
           </Menu>
         </SidebarMenuItem>
       </SidebarMenu>
-      {addOpen ? (
-        <Suspense fallback={null}>
-          <AddSshHostDialog onClose={() => setAddOpen(false)} />
-        </Suspense>
-      ) : null}
-      {shareOpen ? (
-        <Suspense fallback={null}>
-          <ShareTailscaleDialog onClose={() => setShareOpen(false)} />
-        </Suspense>
-      ) : null}
+      {addOpen ? <AddSshHostDialog onClose={() => setAddOpen(false)} /> : null}
+      {shareOpen ? <ShareTailscaleDialog onClose={() => setShareOpen(false)} /> : null}
     </>
   );
 }

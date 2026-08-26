@@ -7,7 +7,7 @@ import {
   type ServerStatusSnapshot,
 } from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
-import { disabledDesktopSsh } from "../ssh/desktop-ssh";
+import { disabledDesktopSsh, SshHostDiscoveryError } from "../ssh/desktop-ssh";
 import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
 import { makeDesktopApplication } from "./desktop-application";
 
@@ -226,6 +226,39 @@ describe("DesktopApplication", () => {
         port: null,
         source: "ssh-config",
       },
+      {
+        alias: "other.tailnet.ts.net",
+        hostname: "other.tailnet.ts.net",
+        username: null,
+        port: null,
+        source: "tailscale",
+      },
+    ]);
+  });
+
+  it("returns Tailscale peers when SSH config discovery fails", async () => {
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        discoverHosts: Effect.fail(
+          new SshHostDiscoveryError({
+            message: "Failed to discover SSH hosts.",
+            cause: new Error("unreadable config"),
+          }),
+        ),
+      }),
+      disabledDesktopTailscale({
+        listSshHosts: Effect.succeed([
+          {
+            alias: "other.tailnet.ts.net",
+            hostname: "other.tailnet.ts.net",
+            online: true,
+          },
+        ]),
+      }),
+    );
+
+    await expect(Effect.runPromise(h.application.discoverSshHosts)).resolves.toEqual([
       {
         alias: "other.tailnet.ts.net",
         hostname: "other.tailnet.ts.net",
