@@ -60,7 +60,7 @@ pnpm turbo run e2e --filter=@getpie/app
 
 That builds the SPA (`e2e` `dependsOn: ["build"]`), boots `pie serve` against
 `tools/testing/fake-pi.mjs`, and drives `/` → `/draft` → `/session/<id>`.
-First-time Chromium: `pnpm --filter @getpie/app exec playwright install chromium`.
+First-time Chromium: `cd apps/app && pnpm exec playwright install chromium`.
 See `apps/app/README.md`.
 
 ## Flows worth driving

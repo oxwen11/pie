@@ -28,7 +28,7 @@ First time on a machine, install Chromium for this package (not a global
 Playwright install):
 
 ```bash
-pnpm --filter @getpie/app exec playwright install chromium
+cd apps/app && pnpm exec playwright install chromium
 ```
 
 Headed / last HTML report:
