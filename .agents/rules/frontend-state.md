@@ -57,13 +57,28 @@ for per-agent tool rendering.
 - **Query keys come from `orpcQueryUtils.<router>.<proc>`.** Write cache with
   `queryOptions({input}).queryKey`; `.key()` omits the `type:"query"` segment, so
   using it for `setQueryData` silently writes a cache the UI never reads. `.key()`
-  is for `invalidateQueries` only.
-- **Narrow a query with `select`, not in the component.** When a hook needs one
-  field out of a list query, derive it inside `useQuery`'s `select` — narrowing
-  after the fact (`data?.find(...)`) subscribes the component to the whole list.
-  A `select` that closes over a prop must be memoised (`select: useCallback(fn,
-[dep])`) or it re-runs every render and loses referential stability; say so in
-  a comment so nobody "simplifies" the `useCallback` away.
+  is for prefix operations (`invalidateQueries`, `setQueryDefaults`) only.
+- **Do not wrap a bare `useQuery` in a hook.** Call `useQuery` /
+  `useQueries` at the consumer. A hook is justified only when it owns extra
+  state, a mutation, or a multi-query policy (`useProjects`,
+  `useProjectSessionTitle`, `useDraftWorktree`, `useSessionModels`). This is a
+  review judgment, not a lint rule — "thin" is semantic.
+- **Query cache policy lives on the QueryClient** in `createAppClients`:
+  `staleTime: Infinity`, `refetchOnWindowFocus: "always"`. Do not repeat those
+  two literals on individual `useQuery` calls. A call site may still set its
+  own capabilities: `select`, `enabled`, `retry`, `placeholderData`, or a cache
+  option that actually differs (`staleTime: 30_000`,
+  `refetchOnWindowFocus: false`). The one key-wide exception is
+  `agent.session.list` (`staleTime: 30_000` via `setQueryDefaults`). Enforced
+  by `pie-query/no-query-client-default-overrides`
+  (`tools/oxlint/query-policy.mjs`).
+- **Narrow a query with `select`, not after the result.** When a consumer needs
+  one field out of a list query, derive it inside `useQuery`'s `select` —
+  narrowing after the fact (`data?.find(...)`) subscribes the component to the
+  whole list. A `select` that closes over a prop must be memoised
+  (`select: useCallback(fn, [dep])`) or it re-runs every render and loses
+  referential stability; say so in a comment so nobody "simplifies" the
+  `useCallback` away.
 - Zustand here is not a global store: each `Chat` instance creates its own vanilla
   store as the AI SDK `ChatState`. `ChatManager` caches Chat instances by the
   complete `SessionRef` so transcripts survive navigation without crossing

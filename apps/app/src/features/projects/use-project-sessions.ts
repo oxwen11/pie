@@ -5,33 +5,6 @@ import { useCallback } from "react";
 
 import { sameSessionRef } from "@/lib/session-ref";
 
-// Newest-first: a session is opened right after it is created. Module scope
-// keeps `select` referentially stable across renders.
-const selectNewestFirst = (
-  sessions: ReadonlyArray<SessionSummary>,
-): ReadonlyArray<SessionSummary> =>
-  Array.from(sessions).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-/**
- * The sessions under one project, newest-first.
- *
- * Held briefly, unlike `project.list`: this key has writers we don't drive —
- * the draft route seeds an optimistic row, `useSessionListSync` patches titles
- * in from `session.updated`.
- */
-export function useProjectSessions(
-  projectId: string,
-  { archived = false, enabled = true }: { archived?: boolean; enabled?: boolean } = {},
-) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  return useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } }),
-    enabled,
-    staleTime: 30_000,
-    select: selectNewestFirst,
-  });
-}
-
 export const selectProjectSessionTitle = (
   sessions: ReadonlyArray<SessionSummary>,
   ref: SessionRef,
@@ -67,7 +40,6 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
       input: { projectId: projectId ?? "", archived: false },
     }),
     enabled,
-    staleTime: 30_000,
     select,
   });
   const archived = useQuery({
@@ -75,7 +47,6 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
       input: { projectId: projectId ?? "", archived: true },
     }),
     enabled: enabled && active.isSuccess && active.data === undefined,
-    staleTime: 30_000,
     select,
   });
 

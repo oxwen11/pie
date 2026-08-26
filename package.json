@@ -8,7 +8,7 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint --fix",
-    "lint:check": "oxlint --deny-warnings",
+    "lint:check": "oxlint --deny-warnings && node --test tools/oxlint/*.test.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check": "pnpm run lint:check && pnpm run format:check && pnpm run typecheck",

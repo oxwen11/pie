@@ -2,16 +2,16 @@ import type { SessionRef } from "@getpie/contract";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 
-import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
-
 export function useSessionModels(ref: SessionRef) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
 
-  const modelsQuery = useAgentModels(ref.projectId);
-  const stateQuery = useQuery({
-    ...orpcQueryUtils.agent.session.getModelState.queryOptions({ input: { ref } }),
-  });
+  const modelsQuery = useQuery(
+    orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: ref.projectId } }),
+  );
+  const stateQuery = useQuery(
+    orpcQueryUtils.agent.session.getModelState.queryOptions({ input: { ref } }),
+  );
 
   const setModel = useMutation({
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>

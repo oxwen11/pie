@@ -46,7 +46,6 @@ export function ImportProjectDialog({
       input: path === null ? { includeHidden: true } : { path, includeHidden: true },
     }),
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
     select: (data) => ({
       path: data.path,
       entries: [
