@@ -19,7 +19,6 @@ import {
   type DesktopSshConnectResult,
   type SavedSshEnvironment,
   type SshEnvironmentError,
-  type SshHostDiscoveryError,
 } from "../ssh/desktop-ssh";
 import {
   portFromHttpBaseUrl,
@@ -52,7 +51,7 @@ export class DesktopApplication extends Context.Service<
     readonly connectSsh: (target: string) => Effect.Effect<void, SshEnvironmentError>;
     readonly disconnectSsh: Effect.Effect<void>;
     readonly removeSsh: (id: string) => Effect.Effect<void>;
-    readonly discoverSshHosts: Effect.Effect<readonly DiscoveredSshHost[], SshHostDiscoveryError>;
+    readonly discoverSshHosts: Effect.Effect<readonly DiscoveredSshHost[]>;
     readonly tailscaleSnapshot: Effect.Effect<TailscaleSnapshot>;
     readonly enableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
     readonly disableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
@@ -192,8 +191,10 @@ export function makeDesktopApplication({
         }));
       }),
     discoverSshHosts: Effect.gen(function* () {
-      const sshHosts = yield* ssh.discoverHosts;
-      const tailscaleHosts = yield* tailscale.listSshHosts;
+      const [sshHosts, tailscaleHosts] = yield* Effect.all(
+        [ssh.discoverHosts.pipe(Effect.orElseSucceed(() => [])), tailscale.listSshHosts],
+        { concurrency: 2 },
+      );
       return mergeDiscoveredHosts(sshHosts, tailscaleHosts);
     }),
     tailscaleSnapshot: tailscale.snapshot,
