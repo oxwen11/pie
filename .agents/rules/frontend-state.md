@@ -57,7 +57,7 @@ for per-agent tool rendering.
 - **Query keys come from `orpcQueryUtils.<router>.<proc>`.** Write cache with
   `queryOptions({input}).queryKey`; `.key()` omits the `type:"query"` segment, so
   using it for `setQueryData` silently writes a cache the UI never reads. `.key()`
-  is for `invalidateQueries` only.
+  is for prefix operations (`invalidateQueries`, `setQueryDefaults`) only.
 - **Do not wrap a bare `useQuery` in a hook.** Call `useQuery` /
   `useQueries` at the consumer. A hook is justified only when it owns extra
   state, a mutation, or a multi-query policy (`useProjects`,
