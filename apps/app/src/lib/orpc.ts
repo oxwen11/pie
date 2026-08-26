@@ -11,8 +11,19 @@ export type AppClients = {
   orpcQueryUtils: ReturnType<typeof createTanstackQueryUtils<PieClient>>;
 };
 
+/**
+ * App-wide query policy. Call sites should not repeat these; override only
+ * when a key has writers we do not drive (`agent.session.list`) or when a
+ * probe must fail fast (draft git availability).
+ */
+const queryDefaults = {
+  staleTime: Infinity,
+  refetchOnWindowFocus: "always" as const,
+};
+
 function createQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
+    defaultOptions: { queries: queryDefaults },
     queryCache: new QueryCache({
       onError: (error) => {
         toast.error(`Error: ${error.message}`, {
@@ -29,21 +40,11 @@ function createQueryClient(): QueryClient {
   return queryClient;
 }
 
-/** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
-export function createAppClients(server?: ServerConnection): AppClients {
-  const queryClient = createQueryClient();
-
-  if (!server) {
-    const orpcClient = createPieClient();
-    return {
-      orpcClient,
-      queryClient,
-      orpcQueryUtils: createTanstackQueryUtils(orpcClient),
-    };
-  }
+function createOrpcClient(server?: ServerConnection): PieClient {
+  if (!server) return createPieClient();
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
-  const orpcClient = createPieClient({
+  return createPieClient({
     url: `${wsBaseUrl}/ws/rpc`,
     getTicket: async () => {
       const response = await globalThis.fetch(`${httpBaseUrl}/api/ws-ticket`, {
@@ -57,10 +58,18 @@ export function createAppClients(server?: ServerConnection): AppClients {
       return body.ticket;
     },
   });
+}
 
-  return {
-    orpcClient,
-    queryClient,
-    orpcQueryUtils: createTanstackQueryUtils(orpcClient),
-  };
+/** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
+export function createAppClients(server?: ServerConnection): AppClients {
+  const queryClient = createQueryClient();
+  const orpcClient = createOrpcClient(server);
+  const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
+
+  // Draft seeds optimistic rows; `useSessionListSync` patches titles. Hold briefly.
+  queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
+    staleTime: 30_000,
+  });
+
+  return { orpcClient, queryClient, orpcQueryUtils };
 }

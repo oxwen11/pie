@@ -10,14 +10,21 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
-import { useProjectSessions } from "@/features/projects/use-project-sessions";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
+
+// Newest-first: a session is opened right after it is created. Module scope
+// keeps `select` referentially stable across renders.
+const selectNewestFirst = (
+  sessions: ReadonlyArray<SessionSummary>,
+): ReadonlyArray<SessionSummary> =>
+  Array.from(sessions).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 /**
  * One project and the sessions under it, as a collapsible sidebar group. The
@@ -33,7 +40,13 @@ export function ProjectSessionsGroup({
   readonly project: Project;
 }) {
   const navigate = useNavigate();
-  const sessions = useProjectSessions(project.id);
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const sessions = useQuery({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
+      input: { projectId: project.id, archived: false },
+    }),
+    select: selectNewestFirst,
+  });
   const rows = sessions.data ?? EMPTY_SESSIONS;
 
   return (

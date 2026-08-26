@@ -23,8 +23,9 @@ export function useDraftWorktree(selected: Project | null) {
     ...orpcQueryUtils.git.branch.queryOptions({
       input: selected === null ? skipToken : { cwd: selected.path },
     }),
+    // Non-git folders fail on purpose — don't retry or toast-on-focus.
     retry: false,
-    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   const gitAvailable = gitBranch.isSuccess;

@@ -4,6 +4,7 @@
   "jsPlugins": [
     "./tools/oxlint/node-import-style.mjs",
     "./tools/oxlint/feature-boundaries.mjs",
+    "./tools/oxlint/query-policy.mjs",
     "eslint-plugin-react-you-might-not-need-an-effect"
   ],
   "categories": {
@@ -16,6 +17,7 @@
     "pie-boundaries/feature-no-route-match": "error",
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",
+    "pie-query/no-query-client-default-overrides": "error",
     "react/exhaustive-deps": [
       "error",
       {

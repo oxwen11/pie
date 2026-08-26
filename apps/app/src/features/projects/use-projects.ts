@@ -4,9 +4,8 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 /**
- * The one place that says how `project.list` is held. Its only writer is the
- * import dialog's create mutation, which invalidates on success, so nothing can
- * change it behind our back.
+ * Shared `project.list` readers. The import dialog's create mutation is the
+ * only writer and invalidates on success.
  */
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,
@@ -14,7 +13,6 @@ function useProjectListQuery<TData>(
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   return useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
-    staleTime: Infinity,
     select,
   });
 }

@@ -1,3 +1,4 @@
+import type { WorkspaceTreeResult } from "@getpie/contract/fs";
 import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
@@ -9,10 +10,9 @@ import {
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { FilesIcon, RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
-
-import type { WorkspaceTreeQuery } from "./use-workspace-tree";
 
 const FileTreeAdapter = lazy(() =>
   import("./file-tree-adapter").then((module) => ({ default: module.FileTreeAdapter })),
@@ -32,7 +32,7 @@ export function WorkspaceTreePane({
   workspaceName: string;
   workspacePath: string;
   gitBranch?: string;
-  tree: WorkspaceTreeQuery;
+  tree: UseQueryResult<WorkspaceTreeResult>;
   onOpenFile: (path: string) => void;
   onRefresh?: () => void;
   refreshing?: boolean;

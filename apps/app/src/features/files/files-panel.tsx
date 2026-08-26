@@ -1,3 +1,4 @@
+import type { Project } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
@@ -6,6 +7,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
@@ -16,9 +19,6 @@ import { definePanel } from "@/components/layout/content-panel/react/view";
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
-import { useGitBranch } from "./use-git-branch";
-import { useProjectName } from "./use-project-name";
-import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export const filesPanel = definePanel({
@@ -31,11 +31,21 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const projectName = useProjectName(instance.sessionRef.projectId);
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const projectId = instance.sessionRef.projectId;
+  const { data: projectName } = useQuery({
+    ...orpcQueryUtils.project.list.queryOptions(),
+    // `select` closes over `projectId` — memoised so the query stays stable.
+    select: useCallback(
+      (projects: ReadonlyArray<Project>) =>
+        projects.find((project) => project.id === projectId)?.name,
+      [projectId],
+    ),
+  });
   const panel = useContentPanel();
   const workspace = { ref: instance.sessionRef };
-  const tree = useWorkspaceTree(workspace);
-  const branch = useGitBranch(workspace);
+  const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
+  const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
   const openFile = useCallback(
     (path: string) => {
       if (panel === null) return;
