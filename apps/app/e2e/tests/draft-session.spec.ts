@@ -31,5 +31,5 @@ test("draft composer sends a prompt to a session against fake-pi", async ({ page
   await expect(page.getByText(prompt).first()).toBeVisible();
   await expect(page.getByText(FAKE_REPLY).first()).toBeVisible({ timeout: 15_000 });
   // Sidebar session list is the Query cache / agent.session.list surface.
-  await expect(page.getByRole("button", { name: prompt })).toBeVisible();
+  await expect(page.getByRole("button", { name: prompt, exact: true })).toBeVisible();
 });
