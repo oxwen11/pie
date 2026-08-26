@@ -11,8 +11,9 @@
 - **Lint:** `lint:check` runs `--deny-warnings`, so the whole `suspicious`
   category fails CI while only warning locally. oxfmt reorders imports.
   Custom JS plugins live in `tools/oxlint/` (`pie`, `pie-boundaries`,
-  `pie-query`). `lint:check` also runs their RuleTester files
-  (`node --test tools/oxlint/*.test.mjs`).
+  `pie-query`). Plugin RuleTester files are `@getpie/oxlint`'s `test`
+  script, so they run with the rest of the repo under `pnpm test` — not
+  via `lint:check`.
 - **Commits rewrite files:** pre-commit runs lint-staged (`oxlint --fix` + `oxfmt`)
   over every staged file. No typecheck, no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips
   it. Hooks only exist after `pnpm install` — `prepare` sets `core.hooksPath`,

@@ -1,11 +1,10 @@
-import test from "node:test";
-
 import { RuleTester } from "oxlint/plugins-dev";
+import { describe, it } from "vitest";
 
 import { noQueryClientDefaultOverrides } from "./query-policy.mjs";
 
-RuleTester.describe = test.describe;
-RuleTester.it = test.it;
+RuleTester.describe = describe;
+RuleTester.it = it;
 
 const filename = "apps/app/src/features/demo.ts";
 const tester = new RuleTester({
