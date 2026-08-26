@@ -1,0 +1,29 @@
+{
+  "name": "@getpie/ssh",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Desktop SSH launch and loopback tunnel for a remote pie daemon",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "dependencies": {
+    "effect": "catalog:effect"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:effect",
+    "@getpie/typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

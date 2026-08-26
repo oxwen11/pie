@@ -16,6 +16,8 @@ import { Link, useMatch } from "@tanstack/react-router";
 import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
+import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
@@ -112,7 +114,7 @@ export function AppSidebar() {
         {!desktop && expanded ? <SidebarTrigger /> : null}
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="[-webkit-app-region:no-drag]">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -128,6 +130,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {platform.ssh ? <ConnectionSwitcher /> : null}
         <SidebarMenu>
           <SettingsNavItem />
         </SidebarMenu>

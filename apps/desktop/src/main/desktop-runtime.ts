@@ -8,6 +8,7 @@ import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { resolveDevelopmentScope } from "@getpie/core/development-scope";
 import { resolvePieHome, settingsFile } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
+import { SshPasswordPrompt } from "@getpie/ssh";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog, nativeTheme } from "electron";
 
@@ -19,6 +20,7 @@ import { MainWindow, MainWindowLive } from "./electron/main-window";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { DesktopResourceMonitoringLive } from "./resources/resource-monitoring-live";
 import { LocalServerLive } from "./server/local-server-live";
+import { DesktopSshLive } from "./ssh/desktop-ssh";
 import { formatStartupFailure } from "./startup-failure";
 import { readThemePreference, windowBackgroundColor } from "./window-background";
 
@@ -47,6 +49,7 @@ function makeRuntime(devUrl: string | undefined) {
     resourcesPath: process.resourcesPath,
     devUrl,
     windowBackgroundColor: resolveWindowBackgroundColor(),
+    userDataPath: app.getPath("userData"),
   });
 
   return ManagedRuntime.make(
@@ -55,6 +58,8 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(DesktopApplicationLive),
       Layer.provideMerge(DesktopResourceMonitoringLive),
       Layer.provide(LocalServerLive),
+      Layer.provide(DesktopSshLive),
+      Layer.provide(SshPasswordPrompt.disabledLayer),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
       Layer.provideMerge(DesktopObservabilityLive),

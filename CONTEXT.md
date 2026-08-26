@@ -124,3 +124,9 @@ _Avoid_: using `executionId` as a SessionRef or wire session identity; calling H
 **Session source**:
 Optional floor field on session metadata, `{ kind: "hub", executionId }`, written only when Hub created the session. Absence means a human-created session. The channel (`github`, later others) lives on the create frame's `trigger`, not on `kind`.
 _Avoid_: storing GitHub issue numbers on the session record; overlaying `source` from Pi
+
+## Environments (desktop)
+
+**Environment**:
+A pie daemon the desktop app is talking to. `local` is this computer's daemon. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel. The renderer never talks to a remote address — only `127.0.0.1`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
+_Avoid_: server (ambiguous with the HTTP process), remote machine, workspace, connection (the token+URL triple is `ServerConnection`)
