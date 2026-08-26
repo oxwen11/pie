@@ -1,12 +1,15 @@
-import childProcess from "node:child_process";
-import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import net from "node:net";
-import path from "node:path";
 
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
-import { PROJECT_ID, seedProject } from "./fixtures.js";
+import {
+  appDistExists,
+  PROJECT_ID,
+  seedProject,
+  startPieServe,
+  type PieServe,
+} from "../../../../tools/testing/e2e-web.js";
 
 /**
  * Browser-mode multi-client session sync. Unlike the Electron spec, this
@@ -24,68 +27,30 @@ import { PROJECT_ID, seedProject } from "./fixtures.js";
  * — serve has no dev branch and serves `apps/app/dist` statically.
  */
 
-const repoRoot = path.join(import.meta.dirname, "../../../..");
-const appDist = path.join(repoRoot, "apps/app/dist");
-const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
-
 const FAKE_REPLY = "E2E fake Pi reply";
 
 test.skip(
-  !fs.existsSync(path.join(appDist, "index.html")),
+  !appDistExists(),
   "apps/app/dist is missing — build the SPA first (turbo run build --filter=@getpie/app)",
 );
 
-let server: childProcess.ChildProcessWithoutNullStreams | undefined;
+let server: PieServe | undefined;
 let baseUrl = "";
 
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
 test.beforeAll(async ({}, testInfo) => {
   const home = testInfo.outputPath("pie-home");
   seedProject(home, testInfo.outputPath("workspace"));
-
-  server = childProcess.spawn(
-    path.join(repoRoot, "node_modules/.bin/tsx"),
-    [path.join(repoRoot, "packages/pie/src/node/cli.ts"), "serve"],
-    {
-      env: {
-        ...process.env,
-        PIE_PORT: "0",
-        PIE_HOME: home,
-        PIE_E2E: "1",
-        PIE_E2E_PI_EXECUTABLE: fakePi,
-        PIE_E2E_PI_LOG: testInfo.outputPath("fake-pi.jsonl"),
-        PIE_E2E_PI_RESPONSE: FAKE_REPLY,
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-
-  baseUrl = await new Promise<string>((resolve, reject) => {
-    let output = "";
-    const timeout = setTimeout(
-      () => reject(new Error(`pie serve never became ready:\n${output}`)),
-      30_000,
-    );
-    const scan = (chunk: Buffer) => {
-      output += chunk.toString();
-      const ready = output.match(/pie:ready\s*({.+})/);
-      if (ready?.[1]) {
-        clearTimeout(timeout);
-        const { port } = JSON.parse(ready[1]) as { port: number };
-        resolve(`http://127.0.0.1:${port}`);
-      }
-    };
-    server?.stdout.on("data", scan);
-    server?.stderr.on("data", scan);
-    server?.once("exit", (code) => {
-      clearTimeout(timeout);
-      reject(new Error(`pie serve exited with ${code}:\n${output}`));
-    });
+  server = await startPieServe({
+    pieHome: home,
+    fakePiLog: testInfo.outputPath("fake-pi.jsonl"),
+    fakePiResponse: FAKE_REPLY,
   });
+  baseUrl = server.baseUrl;
 });
 
 test.afterAll(() => {
-  server?.kill("SIGTERM");
+  server?.stop();
   server = undefined;
 });
 

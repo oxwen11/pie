@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turborepo.com/schema.v2.json",
+  "extends": ["//"],
+  "tasks": {
+    "e2e": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
+    "e2e:headed": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
+    "e2e:report": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

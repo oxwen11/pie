@@ -11,7 +11,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:headed": "playwright test -c e2e/playwright.config.ts --headed",
+    "e2e:report": "playwright show-report e2e/report",
+    "e2e:install": "playwright install chromium",
     "doctor": "react-doctor --yes",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
@@ -48,6 +52,7 @@
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",
     "@types/react": "catalog:",

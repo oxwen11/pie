@@ -8,33 +8,9 @@ import {
   test as base,
 } from "@playwright/test";
 
-/** The one seeded project's id — the contract validates projectId as a UUID. */
-export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+import { PROJECT_ID, seedProject } from "../../../../tools/testing/e2e-web.js";
 
-/**
- * Seed one project into a per-test `$PIE_HOME`: a fresh home renders the
- * first-project onboarding instead of the composer, so chat flows need a
- * project up front.
- */
-export function seedProject(pieHome: string, workspace: string): void {
-  fs.mkdirSync(workspace, { recursive: true });
-  const storage = path.join(pieHome, "storage");
-  fs.mkdirSync(storage, { recursive: true });
-  fs.writeFileSync(
-    path.join(storage, "projects.json"),
-    JSON.stringify({
-      version: 1,
-      data: [
-        {
-          id: PROJECT_ID,
-          name: "e2e-workspace",
-          path: workspace,
-          createdAt: "2026-08-03T00:00:00.000Z",
-        },
-      ],
-    }),
-  );
-}
+export { PROJECT_ID, seedProject };
 
 /**
  * Stop the daemon recorded under this home. The app attaches to (or spawns)

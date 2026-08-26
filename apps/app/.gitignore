@@ -1,0 +1,6 @@
+# E2E test artifacts
+e2e/results
+# Playwright's default outputDir, produced when the suite is run without
+# -c e2e/playwright.config.ts (the real outputDir is e2e/results).
+test-results
+e2e/report
