@@ -14,7 +14,7 @@ T3 Code's desktop-managed SSH path is **not** "the renderer SSHes to the host." 
 4. Locally: `ssh -N -L <localPort>:127.0.0.1:<remotePort>` with `ExitOnForwardFailure` and keepalives.
 5. The renderer talks **only to loopback** HTTP/WS. Pairing then exchanges a one-time token for a bearer session.
 
-Pie should copy steps 1–4 and the loopback-only client rule. It should **not** copy pairing, LAN/Tailscale environments, in-app password prompts (v1), or killing the remote server on disconnect.
+Pie should copy steps 1–4 and the loopback-only client rule. It should **not** copy pairing, LAN/Tailscale environments, in-app password prompts (v1), or killing the remote server on disconnect. Local OpenSSH is optional: probe PATH, and if `ssh`/`ssh.exe` is missing, keep the local environment and do not offer launch.
 
 ## Canonical sources
 
@@ -63,6 +63,7 @@ The runner prefers a PATH `t3`, else `npx t3@<channel>`. It starts `t3 serve --h
 | `t3 serve --host 127.0.0.1` + ssh-launch pid/port files | `pie daemon start`, then read `~/.pie/daemon/daemon.pid`               |
 | Pairing token in launch JSON                            | Daemon **auth token** in `{ remotePort, token, serverKind: "daemon" }` |
 | Local `ssh -N -L` + loopback client                     | Same; `/api/health` body `"ok"`, no auth                               |
+| Local `ssh` / `ssh.exe` assumed present                 | Probe PATH; if missing, keep local-only and disable Add                |
 | Kill managed server on disconnect                       | **Do not.** Close the local tunnel; remote daemon stays                |
 | Askpass + password prompt                               | Helpers exist; v1 is `BatchMode=yes` (ssh-agent / IdentityFile)        |
 | LAN / Tailscale / hosted pairing                        | Out of scope                                                           |

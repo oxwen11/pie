@@ -1,10 +1,11 @@
 import os from "node:os";
+import path from "node:path";
 
 import { Duration, Effect, FileSystem, Option, Scope, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { buildSshChildEnvironment, type SshAuthOptions } from "./auth";
-import { SshCommandError, SshInvalidTargetError } from "./errors";
+import { SshClientMissingError, SshCommandError, SshInvalidTargetError } from "./errors";
 import {
   buildSshHostSpecEffect,
   getLastNonEmptyOutputLine,
@@ -57,6 +58,105 @@ export type RunSshCommandOptions = SshAuthOptions & {
 
 export function sshCommandForPlatform(platform: NodeJS.Platform = os.platform()): string {
   return platform === "win32" ? "ssh.exe" : "ssh";
+}
+
+export type SshClientAvailability =
+  | { readonly available: true }
+  | { readonly available: false; readonly message: string };
+
+export type FindSshCommandOptions = {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly platform?: NodeJS.Platform;
+};
+
+function pathDelimiter(platform: NodeJS.Platform): string {
+  return platform === "win32" ? ";" : ":";
+}
+
+const isRunnableSsh = (
+  fs: FileSystem.FileSystem,
+  candidate: string,
+  platform: NodeJS.Platform,
+): Effect.Effect<boolean> =>
+  fs.stat(candidate).pipe(
+    Effect.map(
+      (info) => info.type === "File" && (platform === "win32" || (info.mode & 0o111) !== 0),
+    ),
+    Effect.catch(() => Effect.succeed(false)),
+  );
+
+/** PATH lookup only — spawn uses the same search, so extra dirs would lie. */
+export const findSshCommand = (
+  input: FindSshCommandOptions = {},
+): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const platform = input.platform ?? os.platform();
+    const env = input.env ?? process.env;
+    const command = sshCommandForPlatform(platform);
+    const fs = yield* FileSystem.FileSystem;
+    if (path.isAbsolute(command)) {
+      return (yield* isRunnableSsh(fs, command, platform)) ? command : undefined;
+    }
+    for (const dir of (env["PATH"] ?? "").split(pathDelimiter(platform))) {
+      if (!dir) continue;
+      const candidate = path.join(dir, command);
+      if (yield* isRunnableSsh(fs, candidate, platform)) return candidate;
+    }
+    return undefined;
+  });
+
+export function sshClientMissingMessage(
+  command: string = sshCommandForPlatform(),
+  platform: NodeJS.Platform = os.platform(),
+): string {
+  if (platform === "win32") {
+    return `OpenSSH client not found (${command}). Install OpenSSH Client from Optional Features and restart pie.`;
+  }
+  return `OpenSSH client not found (${command}). Install OpenSSH, ensure it is on PATH, and restart pie.`;
+}
+
+export const requireSshCommand = (
+  input: FindSshCommandOptions = {},
+): Effect.Effect<string, SshClientMissingError, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const platform = input.platform ?? os.platform();
+    const command = sshCommandForPlatform(platform);
+    const found = yield* findSshCommand(input);
+    if (found === undefined) {
+      return yield* new SshClientMissingError({
+        command,
+        message: sshClientMissingMessage(command, platform),
+      });
+    }
+    return command;
+  });
+
+export const probeSshClient = (
+  input: FindSshCommandOptions = {},
+): Effect.Effect<SshClientAvailability, never, FileSystem.FileSystem> =>
+  requireSshCommand(input).pipe(
+    Effect.map((): SshClientAvailability => ({ available: true })),
+    Effect.catchTag("SshClientMissingError", (error) =>
+      Effect.succeed({ available: false, message: error.message } satisfies SshClientAvailability),
+    ),
+  );
+
+export function isSshSpawnNotFound(cause: unknown): boolean {
+  if (typeof cause !== "object" || cause === null) return false;
+  if ("code" in cause && cause.code === "ENOENT") return true;
+  if ("reason" in cause && cause.reason === "NotFound") return true;
+  if ("cause" in cause) return isSshSpawnNotFound(cause.cause);
+  return false;
+}
+
+function missingSshClientError(
+  command: string,
+  platform: NodeJS.Platform = os.platform(),
+): SshClientMissingError {
+  return new SshClientMissingError({
+    command,
+    message: sshClientMissingMessage(command, platform),
+  });
 }
 
 export function baseSshArgs(
@@ -121,11 +221,12 @@ const runSshCommandInScope = (
   commandScope: Scope.Scope,
 ): Effect.Effect<
   SshCommandResult,
-  SshCommandError | SshInvalidTargetError,
+  SshCommandError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
     const hostSpec = yield* buildSshHostSpecEffect(target);
+    const sshCommand = yield* requireSshCommand();
     const environment = yield* buildSshChildEnvironment({
       baseEnv: sshSpawnEnv(),
       ...(input.interactiveAuth === undefined ? {} : { interactiveAuth: input.interactiveAuth }),
@@ -151,7 +252,6 @@ const runSshCommandInScope = (
       ...(input.remoteCommandArgs ?? []),
     ];
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const sshCommand = sshCommandForPlatform();
     yield* Effect.logDebug("ssh.command.start").pipe(
       Effect.annotateLogs({
         ...sshTargetLogFields(target),
@@ -173,18 +273,19 @@ const runSshCommandInScope = (
       )
       .pipe(
         Effect.provideService(Scope.Scope, commandScope),
-        Effect.mapError(
-          (cause) =>
-            new SshCommandError({
-              command: [sshCommand, ...args],
-              exitCode: null,
-              stderr: "",
-              message:
-                cause instanceof Error
-                  ? cause.message
-                  : `Failed to spawn SSH command for ${hostSpec}.`,
-              cause,
-            }),
+        Effect.mapError((cause) =>
+          isSshSpawnNotFound(cause)
+            ? missingSshClientError(sshCommand)
+            : new SshCommandError({
+                command: [sshCommand, ...args],
+                exitCode: null,
+                stderr: "",
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : `Failed to spawn SSH command for ${hostSpec}.`,
+                cause,
+              }),
         ),
       );
 
@@ -247,7 +348,7 @@ export const runSshCommand = (
   input: RunSshCommandOptions = {},
 ): Effect.Effect<
   SshCommandResult,
-  SshCommandError | SshInvalidTargetError,
+  SshCommandError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.scopedWith((commandScope) => runSshCommandInScope(target, input, commandScope)).pipe(
@@ -278,7 +379,7 @@ export const resolveSshTarget = (
   alias: string,
 ): Effect.Effect<
   SshTarget,
-  SshCommandError | SshInvalidTargetError,
+  SshCommandError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
@@ -305,8 +406,11 @@ export const resolveSshTarget = (
           Effect.annotateLogs(sshTargetLogFields(target)),
         ),
       ),
-      Effect.catch(() =>
-        Effect.logDebug("ssh.target.resolve.fallback").pipe(
+      Effect.catch((error) => {
+        if (error instanceof SshClientMissingError || error instanceof SshInvalidTargetError) {
+          return Effect.fail(error);
+        }
+        return Effect.logDebug("ssh.target.resolve.fallback").pipe(
           Effect.annotateLogs({ alias: trimmedAlias }),
           Effect.as({
             alias: trimmedAlias,
@@ -314,8 +418,8 @@ export const resolveSshTarget = (
             username: null,
             port: null,
           } satisfies SshTarget),
-        ),
-      ),
+        );
+      }),
     );
   });
 
@@ -323,7 +427,7 @@ export const resolveSshInput = (
   raw: string,
 ): Effect.Effect<
   SshTarget,
-  SshCommandError | SshInvalidTargetError,
+  SshCommandError | SshClientMissingError | SshInvalidTargetError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {

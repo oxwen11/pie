@@ -4,10 +4,14 @@ import {
   connectSshEnvironment,
   discoverSshHosts,
   environmentLabel,
+  probeSshClient,
   remoteStateKey,
   resolveSshInput,
+  SshClientMissingError,
+  sshCommandForPlatform,
   SshInvalidTargetError,
   type DiscoveredSshHost,
+  type SshClientAvailability,
   type SshConnectedEnvironment,
   type SshEnvironmentError,
   type SshHostDiscoveryError,
@@ -19,7 +23,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import { DesktopConfig } from "../desktop-config";
 
 export { environmentLabel, formatSshInput } from "@getpie/ssh";
-export type { SshEnvironmentError, SshTarget } from "@getpie/ssh";
+export type { SshClientAvailability, SshEnvironmentError, SshTarget } from "@getpie/ssh";
 
 const SAVED_ENVIRONMENTS_FILE = "ssh-environments.json";
 const SAVED_FILE_MODE = 0o600;
@@ -57,6 +61,7 @@ type SavedFile = {
 };
 
 export type DesktopSshShape = {
+  readonly client: SshClientAvailability;
   readonly listSaved: Effect.Effect<readonly SavedSshEnvironment[]>;
   readonly connect: (raw: string) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError>;
   readonly disconnect: (id: string) => Effect.Effect<void>;
@@ -72,6 +77,7 @@ export class DesktopSsh extends Context.Service<DesktopSsh, DesktopSshShape>()(
 /** Test double: no saved hosts, and connect fails until the caller overrides it. */
 export function disabledDesktopSsh(overrides?: Partial<DesktopSshShape>): DesktopSsh["Service"] {
   return DesktopSsh.of({
+    client: { available: true },
     listSaved: Effect.succeed([]),
     connect: () => Effect.fail(new SshInvalidTargetError({ message: "SSH is disabled." })),
     disconnect: () => Effect.void,
@@ -172,6 +178,7 @@ export function makeDesktopSsh(input: {
     >();
     const filePath = savedFilePath(input.userDataPath);
     const liveRef = yield* Ref.make<LiveSshSession | undefined>(undefined);
+    const client = yield* probeSshClient();
 
     const persist = (environments: readonly SavedSshEnvironment[]) =>
       writeSaved(filePath, environments).pipe(Effect.provide(platform), Effect.ignore);
@@ -185,9 +192,16 @@ export function makeDesktopSsh(input: {
       });
 
     return DesktopSsh.of({
+      client,
       listSaved: readSaved(filePath).pipe(Effect.provide(platform)),
       connect: (raw) =>
         Effect.gen(function* () {
+          if (!client.available) {
+            return yield* new SshClientMissingError({
+              command: sshCommandForPlatform(),
+              message: client.message,
+            });
+          }
           const target = yield* resolveSshInput(raw);
           const id = remoteStateKey(target);
           const current = yield* Ref.get(liveRef);
