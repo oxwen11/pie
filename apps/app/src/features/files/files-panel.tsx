@@ -6,7 +6,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { Spinner } from "@getpie/ui/components/spinner";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
@@ -17,7 +16,8 @@ import { definePanel } from "@/components/layout/content-panel/react/view";
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
-import { useSessionWorkspace } from "./use-session-workspace";
+import { useGitBranch } from "./use-git-branch";
+import { useProjectName } from "./use-project-name";
 import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
@@ -31,10 +31,11 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
+  const projectName = useProjectName(instance.sessionRef.projectId);
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
-  const tree = useWorkspaceTree(cwd);
+  const workspace = { ref: instance.sessionRef };
+  const tree = useWorkspaceTree(workspace);
+  const branch = useGitBranch(workspace);
   const openFile = useCallback(
     (path: string) => {
       if (panel === null) return;
@@ -43,23 +44,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     [instance, panel],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <WorkspaceState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </WorkspaceState>
-    );
-  }
-
-  if (!workspace.data || panel === null) {
+  if (panel === null) {
     return (
       <WorkspaceState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -67,13 +52,18 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     );
   }
 
+  const workspaceName = projectName ?? "Workspace";
+  const workspacePath = tree.data?.cwd ?? "";
+  const gitBranch = branch.data?.current ?? undefined;
+
   const treePane = (
     <WorkspaceTreePane
+      gitBranch={gitBranch}
       onOpenFile={openFile}
       sessionId={panel.sessionKey}
       tree={tree}
-      workspaceName={workspace.data.name}
-      workspacePath={workspace.data.path}
+      workspaceName={workspaceName}
+      workspacePath={workspacePath}
     />
   );
 
@@ -85,7 +75,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
         </FileState>
       }
       tree={treePane}
-      treeLabel={workspace.data.name}
+      treeLabel={workspaceName}
     />
   );
 }

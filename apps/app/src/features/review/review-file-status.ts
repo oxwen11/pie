@@ -1,21 +1,5 @@
 import type { GitReviewFile, GitReviewFileStatus, GitReviewMode } from "@getpie/contract/git";
 
-export const REVIEW_STATUS_LABEL: Record<GitReviewFileStatus, string> = {
-  modified: "Modified",
-  added: "Added",
-  deleted: "Deleted",
-  renamed: "Renamed",
-  copied: "Copied",
-};
-
-export const REVIEW_STATUS_BADGE: Record<GitReviewFileStatus, string> = {
-  modified: "M",
-  added: "A",
-  deleted: "D",
-  renamed: "R",
-  copied: "C",
-};
-
 export const REVIEW_MODE_ITEMS = [
   { value: "uncommitted", label: "Uncommitted" },
   { value: "committed", label: "Committed" },

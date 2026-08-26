@@ -8,7 +8,7 @@ import { Context, Effect, Layer } from "effect";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
-import { GitServiceLayer } from "../git";
+import { GitServiceLayer, WorktreeServiceLayer } from "../git";
 import {
   PiAgentSessionManagerLayer,
   PiAgentServiceLayer,
@@ -47,10 +47,11 @@ const PiAgentSessionManagerProvided = PiAgentSessionManagerLayer.pipe(
   Layer.provide(EventBusLayer),
   Layer.provide(PlatformLayer),
 );
-const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
-  Layer.provide(PiAgentSessionManagerProvided),
-  Layer.provide(PiAgentProvided),
-  Layer.provide(EventBusLayer),
+const GitProvided = GitServiceLayer.pipe(
+  Layer.provide(FileSystemServiceLayer),
+  Layer.provide(PlatformLayer),
+);
+const WorktreeProvided = WorktreeServiceLayer.pipe(
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
 );
@@ -58,6 +59,16 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
 const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(ProjectRepositoryLayer),
   Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+);
+
+const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
+  Layer.provide(PiAgentSessionManagerProvided),
+  Layer.provide(PiAgentProvided),
+  Layer.provide(EventBusLayer),
+  Layer.provide(ProjectServiceProvided),
+  Layer.provide(PathsLayer),
+  Layer.provide(WorktreeProvided),
   Layer.provide(PlatformLayer),
 );
 
@@ -71,7 +82,8 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
-  GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(PlatformLayer)),
+  GitProvided,
+  WorktreeProvided,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

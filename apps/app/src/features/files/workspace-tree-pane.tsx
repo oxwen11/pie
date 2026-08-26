@@ -22,6 +22,7 @@ export function WorkspaceTreePane({
   sessionId,
   workspaceName,
   workspacePath,
+  gitBranch,
   tree,
   onOpenFile,
   onRefresh,
@@ -30,6 +31,7 @@ export function WorkspaceTreePane({
   sessionId: string;
   workspaceName: string;
   workspacePath: string;
+  gitBranch?: string;
   tree: WorkspaceTreeQuery;
   onOpenFile: (path: string) => void;
   onRefresh?: () => void;
@@ -47,6 +49,9 @@ export function WorkspaceTreePane({
           title={workspacePath}
         >
           {workspaceName}
+          {gitBranch !== undefined ? (
+            <span className="text-muted-foreground/80"> · {gitBranch}</span>
+          ) : null}
         </span>
         <Button
           aria-label={`Refresh files in ${workspaceName}`}

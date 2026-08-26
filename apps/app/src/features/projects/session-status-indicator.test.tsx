@@ -33,21 +33,21 @@ describe("SessionStatusIndicator", () => {
     const dot = node.querySelector<HTMLSpanElement>("span > span");
     expect(dot?.className).toContain("animate-pulse");
     expect(dot?.className).toContain("bg-emerald-500");
-    expect(dot?.title).toBe("A turn is running in this session");
+    expect(dot?.getAttribute("title")).toBe("A turn is running in this session");
   });
 
   it("shows an amber dot while waiting for user action", () => {
     const node = renderIndicator("requires_action");
     const dot = node.querySelector<HTMLSpanElement>("span > span");
     expect(dot?.className).toContain("bg-warning");
-    expect(dot?.title).toBe("Waiting for your action");
+    expect(dot?.getAttribute("title")).toBe("Waiting for your action");
   });
 
   it("shows a red dot when the session crashed", () => {
     const node = renderIndicator("crashed");
     const dot = node.querySelector<HTMLSpanElement>("span > span");
     expect(dot?.className).toContain("bg-destructive");
-    expect(dot?.title).toBe("Session crashed");
+    expect(dot?.getAttribute("title")).toBe("Session crashed");
   });
 
   it("reserves a fixed slot for idle or missing status", () => {

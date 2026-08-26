@@ -58,12 +58,12 @@ function RootLayout() {
   // — and the session route's would never be seen. The match's loaderData is
   // also the ref the server confirmed, unlike the URL's search hints. Off a
   // session route it is null and every panel hook degrades to a no-op.
-  const sessionRef =
+  const sessionRoute =
     useMatch({
       from: "/session/$sessionId",
       shouldThrow: false,
-      select: (match) => match.loaderData ?? null,
     }) ?? null;
+  const sessionRef = sessionRoute?.loaderData?.ref ?? null;
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,
@@ -76,9 +76,8 @@ function RootLayout() {
   const router = useRouter();
   const isSessionActive = useCallback(
     (candidate: SessionRef) => {
-      const current = router.state.matches.find(
-        (match) => match.routeId === "/session/$sessionId",
-      )?.loaderData;
+      const current = router.state.matches.find((match) => match.routeId === "/session/$sessionId")
+        ?.loaderData?.ref;
       return sameSessionRef(candidate, current);
     },
     [router],

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   ArchiveSessionInputSchema,
   CollectionEventTypes,
+  CreateSessionInputSchema,
   ListSessionsInputSchema,
   MAX_SESSION_TITLE_CHARS,
   RenameSessionInputSchema,
@@ -75,6 +76,19 @@ describe("ListSessionsInput", () => {
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: false })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: true })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID })).toBe(true);
+  });
+});
+
+describe("CreateSessionInput", () => {
+  it("accepts a projectId", () => {
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID })).toBe(true);
+  });
+
+  it("accepts an optional worktree request", () => {
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID, worktree: {} })).toBe(true);
+    expect(accepts(CreateSessionInputSchema, { projectId: UUID, worktree: { base: "main" } })).toBe(
+      true,
+    );
   });
 });
 

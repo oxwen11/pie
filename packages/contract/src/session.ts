@@ -4,6 +4,8 @@ import {
   AgentModelStateSchema,
   ArchiveSessionInputSchema,
   CreateSessionInputSchema,
+  CreateSessionOutputSchema,
+  PrepareSessionOutputSchema,
   serverErrors,
   ListSessionsInputSchema,
   type ListSessionsOutput,
@@ -28,8 +30,10 @@ const base = oc.errors(serverErrors);
 export const sessionContract = {
   create: base
     .input(toStandardSchema(CreateSessionInputSchema))
-    .output(toStandardSchema(SessionRefSchema)),
-  prepare: base.input(toStandardSchema(RefInputSchema)).output(toStandardSchema(SessionRefSchema)),
+    .output(toStandardSchema(CreateSessionOutputSchema)),
+  prepare: base
+    .input(toStandardSchema(RefInputSchema))
+    .output(toStandardSchema(PrepareSessionOutputSchema)),
   close: base.input(toStandardSchema(RefInputSchema)),
 
   list: base.input(toStandardSchema(ListSessionsInputSchema)).output(type<ListSessionsOutput>()),

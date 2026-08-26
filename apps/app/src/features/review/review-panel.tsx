@@ -1,6 +1,9 @@
+import type { Project } from "@getpie/contract";
 import type { GitReviewMode } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -14,16 +17,27 @@ import { ReviewState } from "./review-state";
 import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 import { ReviewWorkspaceLayout } from "./review-workspace-layout";
-import { useGitBranch } from "./use-git-branch";
 import { useGitDiffs } from "./use-git-diffs";
 import { useGitReview } from "./use-git-review";
-import { useSessionWorkspace } from "./use-session-workspace";
-import { useWorkspaceTree } from "./use-workspace-tree";
 
 export interface ReviewPayload {
   readonly mode?: GitReviewMode;
   readonly other?: string;
   readonly path?: string;
+}
+
+function useProjectName(projectId: string): string | undefined {
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { data } = useQuery({
+    ...orpcQueryUtils.project.list.queryOptions(),
+    staleTime: Infinity,
+    select: useCallback(
+      (projects: ReadonlyArray<Project>) =>
+        projects.find((project) => project.id === projectId)?.name,
+      [projectId],
+    ),
+  });
+  return data;
 }
 
 export const reviewPanel = definePanel({
@@ -49,18 +63,27 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const projectName = useProjectName(instance.sessionRef.projectId);
+  const gitWorkspace = { ref: instance.sessionRef };
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
   const mode = instance.payload.mode ?? "uncommitted";
-  const branch = useGitBranch(cwd);
+  const branch = useQuery({
+    ...orpcQueryUtils.git.branch.queryOptions({ input: gitWorkspace }),
+    refetchOnWindowFocus: "always",
+    staleTime: Infinity,
+  });
   const other =
     mode === "branch"
       ? (instance.payload.other ?? branch.data?.defaultBranch ?? undefined)
       : undefined;
-  const review = useGitReview(cwd, mode, other);
-  const tree = useWorkspaceTree(cwd);
-  const diffs = useGitDiffs(cwd, review.data?.files ?? [], mode, other);
+  const review = useGitReview(gitWorkspace, mode, other);
+  const tree = useQuery({
+    ...orpcQueryUtils.fs.readTree.queryOptions({ input: gitWorkspace }),
+    refetchOnWindowFocus: "always",
+    staleTime: Infinity,
+  });
+  const diffs = useGitDiffs(gitWorkspace, review.data?.files ?? [], mode, other);
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
 
@@ -102,23 +125,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [review.data],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <ReviewState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </ReviewState>
-    );
-  }
-
-  if (!workspace.data || cwd === undefined || panel === null) {
+  if (panel === null) {
     return (
       <ReviewState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -153,6 +160,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     );
   }
 
+  const workspaceName = projectName ?? "Workspace";
+  const workspacePath = tree.data?.cwd ?? "";
   const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
   const refresh = (): void => {
     void Promise.all([
@@ -171,11 +180,11 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           onSelectFile={selectFile}
           sessionId={panel.sessionKey}
           tree={tree}
-          workspaceName={workspace.data.name}
-          workspacePath={workspace.data.path}
+          workspaceName={workspaceName}
+          workspacePath={workspacePath}
         />
       }
-      filesLabel={workspace.data.name}
+      filesLabel={workspaceName}
       preview={
         <ReviewDiffPane
           diffs={diffs}

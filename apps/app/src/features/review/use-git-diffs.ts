@@ -1,9 +1,10 @@
+import type { WorkspaceQuery } from "@getpie/contract";
 import type { GitReviewFile, GitReviewMode } from "@getpie/contract/git";
 import { skipToken, useQueries } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 
 export function useGitDiffs(
-  cwd: string | undefined,
+  workspace: WorkspaceQuery | undefined,
   files: ReadonlyArray<GitReviewFile>,
   mode: GitReviewMode,
   other: string | undefined,
@@ -13,10 +14,10 @@ export function useGitDiffs(
     queries: files.map((file) => ({
       ...orpcQueryUtils.git.diff.queryOptions({
         input:
-          cwd === undefined
+          workspace === undefined
             ? skipToken
             : {
-                cwd,
+                ...workspace,
                 path: file.path,
                 mode,
                 ...(mode === "branch" && other !== undefined ? { other } : {}),

@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
-import { GitServiceLayer } from "../src/git";
+import { GitServiceLayer, WorktreeServiceLayer } from "../src/git";
 import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
@@ -77,6 +77,18 @@ async function setup() {
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
+  const gitProvided = GitServiceLayer.pipe(
+    Layer.provide(FileSystemServiceLayer),
+    Layer.provide(NodeServices.layer),
+  );
+  const worktreeProvided = WorktreeServiceLayer.pipe(
+    Layer.provide(layerPaths(home)),
+    Layer.provide(NodeServices.layer),
+  );
+  const projectServiceLayer = ProjectServiceLayer.pipe(
+    Layer.provide(ProjectRepositoryLayer),
+    Layer.provide(pathsLayer),
+  );
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -87,12 +99,10 @@ async function setup() {
     ),
     Layer.provide(piAgentLayer),
     Layer.provide(EventBusLayer),
+    Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
+    Layer.provide(worktreeProvided),
     Layer.provide(NodeServices.layer),
-  );
-  const projectServiceLayer = ProjectServiceLayer.pipe(
-    Layer.provide(ProjectRepositoryLayer),
-    Layer.provide(pathsLayer),
   );
 
   const appLayer = Layer.mergeAll(
@@ -103,7 +113,7 @@ async function setup() {
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
-    GitServiceLayer.pipe(Layer.provide(FileSystemServiceLayer), Layer.provide(NodeServices.layer)),
+    gitProvided,
     NodeServices.layer,
     Observability.discard,
   );
@@ -120,10 +130,12 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({
+      const created = await client.agent.session.create({
         projectId: project.id,
       });
+      const { ref } = created;
       expect(ref.projectId).toBe(project.id);
+      expect(created.workspace.cwd).toBe(workspace);
 
       const events = await client.agent.session.subscribe({ scope: { kind: "session", ref } });
       const receipt = await client.agent.session.prompt({
@@ -133,12 +145,17 @@ describe("agent.session router", () => {
       expect(receipt.turnId).toBeDefined();
 
       const chunks: { type: string }[] = [];
+      let ended = false;
       for await (const item of events) {
         if (item.type !== "event") continue;
         const event = item.event;
         if (event.type === "session.message.chunk") chunks.push(event.chunk);
-        if (event.type === "session.turn.ended" && event.turnId === receipt.turnId) break;
+        if (event.type === "session.turn.ended") {
+          ended = true;
+          break;
+        }
       }
+      expect(ended).toBe(true);
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks.at(-1)?.type).toBe("finish");
 
@@ -154,14 +171,14 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
       await client.agent.session.close({ ref });
 
       const prepared = await client.agent.session.prepare({ ref });
       const status = await client.agent.session.getStatus({ ref });
       const snapshot = await client.agent.session.getSnapshot({ ref });
 
-      expect(prepared).toEqual(ref);
+      expect(prepared).toEqual({ ref, workspace: { cwd: workspace } });
       expect(status).toEqual({ phase: "idle" });
       expect(snapshot.cursor).toBe(0);
       expect(snapshot.activeTurn).toBeNull();
@@ -174,12 +191,12 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
 
       const active = await client.agent.session.list({ projectId: project.id });
       expect(active).toHaveLength(1);
       expect(active[0]?.sessionId).toBe(ref.sessionId);
-      expect(active[0]?.status?.phase).toBeDefined();
+      expect(active[0]?.status).toBeUndefined();
       expect(active[0]?.archived).toBe(false);
 
       await client.agent.session.rename({ ref, title: "Login bug" });
@@ -217,7 +234,7 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
 
       const observer = await client.agent.session.subscribe({ scope: { kind: "global" } });
       await client.agent.session.rename({ ref, title: "Login bug" });
@@ -231,6 +248,96 @@ describe("agent.session router", () => {
         }
       }
       expect(announced).toBe("Login bug");
+    } finally {
+      await dispose();
+    }
+  });
+
+  it("creates a git worktree on session.create when requested", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const { simpleGit } = await import("simple-git");
+      const git = simpleGit(workspace);
+      await git.init(["-b", "main"]);
+      await git.addConfig("user.email", "test@example.com");
+      await git.addConfig("user.name", "Test");
+      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+      await git.add(".");
+      await git.commit("init");
+
+      const project = await client.project.create({ path: workspace });
+      const created = await client.agent.session.create({
+        projectId: project.id,
+        worktree: {},
+      });
+
+      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.cwd).not.toBe(workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const prepared = await client.agent.session.prepare({ ref: created.ref });
+      expect(prepared.workspace).toEqual(created.workspace);
+
+      await client.agent.session.prompt({
+        ref: created.ref,
+        parts: [{ type: "text", text: "hello" }],
+      });
+
+      const afterPrompt = await client.agent.session.prepare({ ref: created.ref });
+      expect(afterPrompt.workspace).toEqual(created.workspace);
+
+      const branch = await client.git.branch({ ref: created.ref });
+      expect(branch.current).toBe(created.workspace.gitBranch);
+      const tree = await client.fs.readTree({ ref: created.ref });
+      expect(tree.cwd).toBe(created.workspace.cwd);
+
+      await client.agent.session.close({ ref: created.ref });
+    } finally {
+      await dispose();
+    }
+  }, 30_000);
+
+  it("defaults worktree layout and branch like Cursor (pie/<hex> under worktrees/<repo>/<key>)", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const { simpleGit } = await import("simple-git");
+      const git = simpleGit(workspace);
+      await git.init(["-b", "main"]);
+      await git.addConfig("user.email", "test@example.com");
+      await git.addConfig("user.name", "Test");
+      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+      await git.add(".");
+      await git.commit("init");
+
+      const project = await client.project.create({ path: workspace });
+      const created = await client.agent.session.create({
+        projectId: project.id,
+        worktree: {},
+      });
+
+      const repoName = path.basename(workspace);
+      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.cwd).toMatch(
+        new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
+      );
+      await client.agent.session.close({ ref: created.ref });
+    } finally {
+      await dispose();
+    }
+  }, 30_000);
+
+  it("fails create when worktree is requested on a non-git project", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const project = await client.project.create({ path: workspace });
+      await expect(
+        client.agent.session.create({
+          projectId: project.id,
+          worktree: {},
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
+      const listed = await client.agent.session.list({ projectId: project.id });
+      expect(listed).toEqual([]);
     } finally {
       await dispose();
     }

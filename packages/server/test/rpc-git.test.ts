@@ -75,4 +75,37 @@ describe("git router", () => {
       await harness.dispose();
     }
   });
+
+  it("resolves git status and branch from a session ref", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
+    const cwd = await makeRepo();
+    const harness = await makeRpcTestHarness(home);
+    try {
+      const project = await harness.client.project.create({ path: cwd });
+      const { ref } = await harness.client.agent.session.create({ projectId: project.id });
+
+      const branch = await harness.client.git.branch({ ref });
+      expect(branch.current).toBe("main");
+
+      const status = await harness.client.git.status({ ref });
+      expect(status.branch).toBe("main");
+    } finally {
+      await harness.dispose();
+    }
+  }, 30_000);
+
+  it("maps a missing session ref to SESSION_NOT_FOUND", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-home-"));
+    const harness = await makeRpcTestHarness(home);
+    try {
+      const project = await harness.client.project.create({ path: await makeRepo() });
+      await expect(
+        harness.client.git.branch({
+          ref: { projectId: project.id, sessionId: crypto.randomUUID() },
+        }),
+      ).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+    } finally {
+      await harness.dispose();
+    }
+  });
 });

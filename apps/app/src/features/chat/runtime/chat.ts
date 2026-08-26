@@ -588,7 +588,10 @@ export class Chat {
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
-      await this.#transport.prompt({ messageId, parts });
+      await this.#transport.prompt({
+        messageId,
+        parts,
+      });
     } catch (promptError) {
       this.#state.error =
         promptError instanceof Error ? promptError : new Error(String(promptError));

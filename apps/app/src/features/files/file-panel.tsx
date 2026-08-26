@@ -1,5 +1,4 @@
-import { Spinner } from "@getpie/ui/components/spinner";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FileCodeIcon } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
@@ -12,7 +11,8 @@ import { createFileNavigationTracker, type FileNavigationTracker } from "./file-
 import { FilePreviewPane } from "./file-preview-pane";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
-import { useSessionWorkspace } from "./use-session-workspace";
+import { useGitBranch } from "./use-git-branch";
+import { useProjectName } from "./use-project-name";
 import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
@@ -59,14 +59,15 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     instance.navigation.getSnapshot,
     instance.navigation.getSnapshot,
   );
-  const workspace = useSessionWorkspace(instance.sessionRef.projectId);
+  const projectName = useProjectName(instance.sessionRef.projectId);
   const panel = useContentPanel();
-  const cwd = workspace.data?.path;
-  const tree = useWorkspaceTree(cwd);
+  const workspace = { ref: instance.sessionRef };
+  const tree = useWorkspaceTree(workspace);
+  const branch = useGitBranch(workspace);
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const file = useQuery({
     ...orpcQueryUtils.fs.readFileString.queryOptions({
-      input: cwd === undefined ? skipToken : { cwd, path },
+      input: { ref: instance.sessionRef, path },
     }),
     refetchOnWindowFocus: "always",
     staleTime: Infinity,
@@ -76,23 +77,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     [panel],
   );
 
-  if (workspace.isPending) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (workspace.isError) {
-    return (
-      <FileState title="Unable to load workspace" onRetry={() => void workspace.refetch()}>
-        The project list could not be loaded.
-      </FileState>
-    );
-  }
-
-  if (!workspace.data || panel === null || cwd === undefined) {
+  if (panel === null) {
     return (
       <FileState title="Workspace unavailable">
         This session no longer resolves to an imported project.
@@ -100,6 +85,9 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     );
   }
 
+  const workspaceName = projectName ?? "Workspace";
+  const workspacePath = tree.data?.cwd ?? "";
+  const gitBranch = branch.data?.current ?? undefined;
   const refreshing = file.isFetching || tree.isFetching;
   const refresh = (): void => {
     void Promise.all([file.refetch(), tree.refetch()]);
@@ -116,13 +104,14 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
   );
   const treePane = (
     <WorkspaceTreePane
+      gitBranch={gitBranch}
       onOpenFile={openFile}
       onRefresh={refresh}
       refreshing={refreshing}
       sessionId={panel.sessionKey}
       tree={tree}
-      workspaceName={workspace.data.name}
-      workspacePath={workspace.data.path}
+      workspaceName={workspaceName}
+      workspacePath={workspacePath}
     />
   );
 

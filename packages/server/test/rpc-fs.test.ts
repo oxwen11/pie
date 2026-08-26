@@ -38,6 +38,7 @@ describe("fs router", () => {
           { path: "src/index.ts", type: "file" },
         ]),
       );
+      expect(tree.cwd).toBe(cwd);
       expect(tree.entries.some((entry) => entry.path.startsWith("node_modules"))).toBe(false);
       await expect(
         harness.client.fs.readFileString({ cwd, path: "outside-link" }),
@@ -56,6 +57,25 @@ describe("fs router", () => {
           code: "PATH_ESCAPE",
           data: { cwd: "relative/workspace", path: "." },
         },
+      );
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("resolves a workspace tree from a session ref", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pie-workspace-"));
+    fs.writeFileSync(path.join(cwd, "README.md"), "# Hello");
+    const harness = await makeRpcTestHarness(home);
+    try {
+      const project = await harness.client.project.create({ path: cwd });
+      const { ref } = await harness.client.agent.session.create({ projectId: project.id });
+      const tree = await harness.client.fs.readTree({ ref });
+      expect(tree.cwd).toBe(cwd);
+      expect(tree.entries).toEqual(expect.arrayContaining([{ path: "README.md", type: "file" }]));
+      await expect(harness.client.fs.readFileString({ ref, path: "README.md" })).resolves.toBe(
+        "# Hello",
       );
     } finally {
       await harness.dispose();

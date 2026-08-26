@@ -1,4 +1,4 @@
-import type { ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -31,8 +31,11 @@ import { useChatInputController } from "@/features/chat/components/input/use-cha
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
+import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
+import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
+import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
 
 type DraftSearch = {
@@ -59,13 +62,14 @@ export const Route = createFileRoute("/draft")({
 function DraftRoute() {
   const { orpcQueryUtils } = Route.useRouteContext();
   const search = Route.useSearch();
-  const manager = useChatManager();
   const navigate = useNavigate();
+  const chats = useChatManager();
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
+  const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useAgentModels(selected?.id);
   const defaultModel = modelsQuery.data?.defaultModel;
 
@@ -83,27 +87,27 @@ function DraftRoute() {
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
   const startSession = useMutation({
-    mutationFn: async ({ text }: { text: string }) => {
+    mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       if (!selected) throw new Error("No project selected");
-      const ref = await orpcQueryUtils.agent.session.create.call({
+      const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : {}),
+        ...(worktree !== undefined ? { worktree } : {}),
       });
-      void manager.chatFor(ref).prompt(text);
-      return ref;
+      return { created, text };
     },
-    onSuccess: (ref, { text }) => {
+    onSuccess: ({ created, text }) => {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
-        input: { projectId: ref.projectId, archived: false },
+        input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
-        if (prev?.some((session) => session.sessionId === ref.sessionId)) return prev;
+        if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
         const optimistic: SessionSummary = {
-          projectId: ref.projectId,
-          sessionId: ref.sessionId,
+          projectId: created.ref.projectId,
+          sessionId: created.ref.sessionId,
           title: text,
           archived: false,
           createdAt: new Date().toISOString(),
@@ -112,10 +116,19 @@ function DraftRoute() {
         return [...(prev ?? []), optimistic];
       });
 
-      navigate({
+      // Create already persisted cwd (and the worktree, when requested). Prompt
+      // only opens Pi — fire-and-forget so spawn does not block the jump.
+      void chats
+        .chatFor(created.ref)
+        .prompt(text)
+        .catch((error: unknown) => {
+          console.error("Failed to start session prompt", error);
+        });
+
+      void navigate({
         to: "/session/$sessionId",
-        params: { sessionId: ref.sessionId },
-        search: { projectId: ref.projectId },
+        params: { sessionId: created.ref.sessionId },
+        search: { projectId: created.ref.projectId },
       });
     },
     onError: (error) => {
@@ -136,7 +149,14 @@ function DraftRoute() {
         return false;
       }
       if (startSession.isPending) return false;
-      startSession.mutate({ text });
+      if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
+        toast.error("Pick a base branch for the worktree.");
+        return false;
+      }
+      startSession.mutate({
+        text,
+        ...(draftWorktree.worktree !== undefined ? { worktree: draftWorktree.worktree } : {}),
+      });
       return false;
     },
   });
@@ -194,17 +214,40 @@ function DraftRoute() {
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
-          <ProjectSelect
-            onChange={(next) =>
-              navigate({
-                to: "/draft",
-                search: { projectId: next },
-                replace: true,
-              })
-            }
-            projects={projects.data}
-            value={selected?.id ?? null}
-          />
+          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
+            <ProjectSelect
+              onChange={(next) => {
+                navigate({
+                  to: "/draft",
+                  search: { projectId: next },
+                  replace: true,
+                });
+              }}
+              projects={projects.data}
+              value={selected?.id ?? null}
+            />
+            {draftWorktree.gitAvailable ? (
+              <>
+                <DraftWorkspaceSelect
+                  disabled={startSession.isPending || selected === null}
+                  mode={draftWorktree.mode}
+                  onModeChange={draftWorktree.setMode}
+                />
+                {draftWorktree.mode === "worktree" ? (
+                  <DraftWorktreeBaseSelect
+                    branch={draftWorktree.gitBranch.data}
+                    disabled={
+                      startSession.isPending ||
+                      selected === null ||
+                      draftWorktree.gitBranch.isPending
+                    }
+                    onValueChange={draftWorktree.setWorktreeBaseOverride}
+                    value={draftWorktree.worktreeBase}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
         </CardFrameHeader>
         <Card
           render={
@@ -233,7 +276,14 @@ function DraftRoute() {
                   }
                 />
               </PromptInputTools>
-              <PromptInputSubmit disabled={!hasContent || !selected || startSession.isPending} />
+              <PromptInputSubmit
+                disabled={
+                  !hasContent ||
+                  !selected ||
+                  startSession.isPending ||
+                  (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
+                }
+              />
             </PromptInputToolbar>
           </ChatInputProvider>
         </Card>

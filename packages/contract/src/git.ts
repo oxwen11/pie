@@ -1,9 +1,7 @@
 import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { toStandardSchema } from "./domain";
-
-const CwdInput = Schema.Struct({ cwd: Schema.String });
+import { toStandardSchema, withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
@@ -38,15 +36,13 @@ export type GitBranch = typeof GitBranchSchema.Type;
 export const GitReviewModeSchema = Schema.Literals(["uncommitted", "committed", "branch"]);
 export type GitReviewMode = typeof GitReviewModeSchema.Type;
 
-export const GitReviewQuerySchema = Schema.Struct({
-  cwd: Schema.String,
+export const GitReviewQuerySchema = withWorkspaceQuery({
   mode: Schema.optionalKey(GitReviewModeSchema),
   other: Schema.optionalKey(Schema.String),
 });
 export type GitReviewQuery = typeof GitReviewQuerySchema.Type;
 
-export const GitDiffQuerySchema = Schema.Struct({
-  cwd: Schema.String,
+export const GitDiffQuerySchema = withWorkspaceQuery({
   path: Schema.String,
   mode: Schema.optionalKey(GitReviewModeSchema),
   other: Schema.optionalKey(Schema.String),
@@ -99,6 +95,9 @@ const cwdErrors = {
   NOT_DIRECTORY: { data: pathData },
   NOT_REPOSITORY: { data: cwdData },
   GIT_FAILED: { data: cwdData },
+  SESSION_NOT_FOUND: {
+    data: toStandardSchema(Schema.Struct({ message: Schema.String })),
+  },
 };
 
 const reviewErrors = {
@@ -118,16 +117,18 @@ const diffErrors = {
 };
 
 /**
- * Read-only git. Callers pass `cwd`; the server confines paths to that
- * workspace and never writes. `review` / `diff` take an explicit compare mode.
+ * Read-only git. Each call takes either an absolute `cwd` or a session `ref`;
+ * the server resolves `ref` to the session workspace path. Paths are confined
+ * to that workspace. Worktree creation is not a git RPC — it runs inside
+ * `session.create` when that request includes `worktree`.
  */
 export const gitContract = {
   status: oc
-    .input(toStandardSchema(CwdInput))
+    .input(toStandardSchema(WorkspaceQuerySchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitStatusSchema)),
   branch: oc
-    .input(toStandardSchema(CwdInput))
+    .input(toStandardSchema(WorkspaceQuerySchema))
     .errors(cwdErrors)
     .output(toStandardSchema(GitBranchSchema)),
   review: oc

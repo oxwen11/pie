@@ -2,12 +2,10 @@ import path from "node:path";
 
 import type {
   GitBranch,
-  GitDiffQuery,
   GitFileDiff,
   GitReview,
   GitReviewFile,
   GitReviewMode,
-  GitReviewQuery,
   GitStatus,
   GitStatusFile,
 } from "@getpie/contract/git";
@@ -28,6 +26,20 @@ import {
 } from "../errors";
 import { FileSystemService } from "../fs";
 import { parseNameStatus, parseNulPaths } from "./name-status";
+
+/** GitService always runs against a resolved absolute cwd — not a session ref. */
+export type GitReviewCwdQuery = {
+  readonly cwd: string;
+  readonly mode?: GitReviewMode;
+  readonly other?: string;
+};
+
+export type GitDiffCwdQuery = {
+  readonly cwd: string;
+  readonly path: string;
+  readonly mode?: GitReviewMode;
+  readonly other?: string;
+};
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const NUL_BYTE = 0;
@@ -90,7 +102,7 @@ const isUnsafeRef = (ref: string): boolean =>
   ref.includes("@{") ||
   /\s/.test(ref);
 
-type GitFailure =
+export type GitFailure =
   | WorkspacePathEscape
   | WorkspaceNotDirectory
   | WorkspaceReadError
@@ -125,8 +137,8 @@ export class GitService extends Context.Service<
   {
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
     readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
-    readonly review: (query: GitReviewQuery) => Effect.Effect<GitReview, GitReviewFailure>;
-    readonly diff: (query: GitDiffQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
+    readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
+    readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
 >()("GitService") {}
 

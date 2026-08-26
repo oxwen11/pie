@@ -1,17 +1,22 @@
 import { oc, type } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { BrowseInputSchema, BrowseResultSchema, toStandardSchema } from "./domain";
+import {
+  BrowseInputSchema,
+  BrowseResultSchema,
+  toStandardSchema,
+  withWorkspaceQuery,
+  WorkspaceQuerySchema,
+} from "./domain";
 
-// `path` is resolved relative to `cwd` and confined within it on the server.
-const CwdPathInput = Schema.Struct({
-  cwd: Schema.String,
-  path: Schema.String,
-});
-
-const CwdInput = Schema.Struct({ cwd: Schema.String });
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
+const sessionNotFoundData = toStandardSchema(Schema.Struct({ message: Schema.String }));
+
+export const FsReadFileInputSchema = withWorkspaceQuery({
+  path: Schema.String,
+});
+export type FsReadFileInput = typeof FsReadFileInputSchema.Type;
 
 export const WorkspaceTreeEntrySchema = Schema.Union([
   Schema.Struct({ path: Schema.String, type: Schema.Literal("directory") }),
@@ -31,6 +36,7 @@ export const WorkspaceTreeEntrySchema = Schema.Union([
 export type WorkspaceTreeEntry = typeof WorkspaceTreeEntrySchema.Type;
 
 const WorkspaceTreeResultSchema = Schema.Struct({
+  cwd: Schema.String,
   entries: Schema.Array(WorkspaceTreeEntrySchema),
 });
 export type WorkspaceTreeResult = typeof WorkspaceTreeResultSchema.Type;
@@ -47,27 +53,30 @@ const readFileErrors = {
   },
   BINARY_FILE: { data: pathData },
   READ_FAILED: { data: pathData },
+  SESSION_NOT_FOUND: { data: sessionNotFoundData },
 };
 
 const readTreeErrors = {
   PATH_ESCAPE: { data: pathEscapeData },
   NOT_DIRECTORY: { data: pathData },
   READ_FAILED: { data: pathData },
+  SESSION_NOT_FOUND: { data: sessionNotFoundData },
 };
 
 /**
- * Read-only filesystem access. File reads and workspace-tree scans are confined
- * to the caller-supplied `cwd`; `browse` is rootless because it powers the
- * project folder picker and returns directory names only.
+ * Read-only filesystem access. File reads and workspace-tree scans take either
+ * an absolute `cwd` or a session `ref` (resolved to the session workspace);
+ * `browse` is rootless because it powers the project folder picker and returns
+ * directory names only.
  */
 export const fsContract = {
   readFileString: oc
-    .input(toStandardSchema(CwdPathInput))
+    .input(toStandardSchema(FsReadFileInputSchema))
     .errors(readFileErrors)
     .output(type<string>()),
   /** Recursively index a workspace for the read-only Content Panel Explorer. */
   readTree: oc
-    .input(toStandardSchema(CwdInput))
+    .input(toStandardSchema(WorkspaceQuerySchema))
     .errors(readTreeErrors)
     .output(toStandardSchema(WorkspaceTreeResultSchema)),
   /** Browse immediate subdirectories of `path` (default: the home directory). Hidden directories are opt-in. */

@@ -33,7 +33,10 @@ class FakeTransport implements ChatSessionTransport {
   // floor against live traffic.
   historyGate: Promise<void> | null = null;
   getMessagesCalls = 0;
-  promptCalls: Array<{ messageId: string; parts: ReadonlyArray<PromptPart> }> = [];
+  promptCalls: Array<{
+    messageId: string;
+    parts: ReadonlyArray<PromptPart>;
+  }> = [];
   promptError: unknown = null;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
   // (a dropped socket queues it until the link reconnects).
@@ -423,6 +426,26 @@ describe("Chat history floor state", () => {
 });
 
 describe("Chat prompting", () => {
+  it("accepts a prompt before the first attach", async () => {
+    const { chat, transport, attach } = makeChat();
+    let releasePrompt: () => void = () => undefined;
+    transport.promptGate = new Promise((resolve) => {
+      releasePrompt = resolve;
+    });
+
+    const sent = chat.prompt("from draft");
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().status).toBe("submitted");
+
+    await attach({});
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().status).toBe("submitted");
+
+    releasePrompt();
+    await sent;
+    expect(transport.promptCalls).toHaveLength(1);
+  });
+
   it("pushes the optimistic message, submits fire-and-forget, and dedupes its echo", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});

@@ -1,11 +1,14 @@
 import type {
   AgentModelState,
   AgentResponse,
+  CreateSessionOutput,
+  CreateWorktreeInput,
   PromptInput,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
   SessionSummary,
+  SessionWorkspace,
 } from "@getpie/contract";
 import type { SessionCapabilities } from "@getpie/contract";
 import type { UIMessage } from "ai";
@@ -13,6 +16,7 @@ import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
 import { Paths } from "../config/paths";
 import {
+  ProjectNotFound,
   type SessionNotFound,
   type SessionRefNotFound,
   type StoreReadError,
@@ -20,10 +24,16 @@ import {
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
+import type { GitFailure } from "../git/service";
+import {
+  WorktreeService,
+  type GitWorktreeCreateResult,
+  type GitWorktreeFailure,
+} from "../git/worktree-service";
+import { ProjectService } from "../project/service";
 import type { Session } from "../types";
 import type {
   AgentOperationError,
-  CreateSessionError,
   HarnessSessionNotFound,
   ResumeSessionError,
   SessionClosed,
@@ -60,19 +70,38 @@ const toUserInput = (
       : Effect.succeed(part),
   ).pipe(Effect.map((userParts) => ({ parts: userParts })));
 
+type SessionWithCwd = Session & { readonly cwd: string };
+
+const toSessionWorkspace = (metadata: SessionWithCwd): SessionWorkspace => ({
+  cwd: metadata.cwd,
+  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
+});
+
+export type CreatePiSessionInput = {
+  readonly projectId: string;
+  readonly cwd: string;
+  readonly model?: { readonly provider: string; readonly modelId: string };
+  readonly worktree?: CreateWorktreeInput;
+};
+
 export type PiAgentSessionServiceShape = {
   readonly create: (
-    projectId: string,
-    cwd: string,
-    model?: { readonly provider: string; readonly modelId: string },
-  ) => Effect.Effect<SessionRef, CreateSessionError | StoreWriteError>;
+    input: CreatePiSessionInput,
+  ) => Effect.Effect<CreateSessionOutput, StoreWriteError | GitWorktreeFailure>;
   readonly prepare: (
     ref: SessionRef,
-    cwd: string,
   ) => Effect.Effect<
-    void,
-    SessionNotFound | StoreReadError | StoreWriteError | SessionNotResumable | AgentOperationError
+    SessionWorkspace,
+    | SessionNotFound
+    | ProjectNotFound
+    | StoreReadError
+    | StoreWriteError
+    | SessionNotResumable
+    | AgentOperationError
   >;
+  readonly workspaceFor: (
+    ref: SessionRef,
+  ) => Effect.Effect<SessionWorkspace, SessionNotFound | ProjectNotFound | StoreReadError>;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
     ref: SessionRef,
@@ -91,11 +120,12 @@ export type PiAgentSessionServiceShape = {
   ) => Effect.Effect<ReadonlyArray<SessionSummary>, StoreReadError>;
   readonly getMessages: (
     ref: SessionRef,
-    cwd: string,
   ) => Effect.Effect<
     ReadonlyArray<UIMessage>,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -136,11 +166,12 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly getModelState: (
     ref: SessionRef,
-    cwd: string,
   ) => Effect.Effect<
     AgentModelState,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -148,12 +179,13 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly setModel: (
     ref: SessionRef,
-    cwd: string,
     model: { readonly provider: string; readonly modelId: string },
   ) => Effect.Effect<
     AgentModelState,
     | SessionNotFound
+    | ProjectNotFound
     | StoreReadError
+    | StoreWriteError
     | ResumeSessionError
     | CapabilityUnsupported
     | SessionClosed
@@ -161,7 +193,10 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly getSessionInfo: (
     ref: SessionRef,
-  ) => Effect.Effect<SessionInfoResult, SessionNotFound | StoreReadError | AgentOperationError>;
+  ) => Effect.Effect<
+    SessionInfoResult,
+    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | AgentOperationError
+  >;
   readonly getStatus: (ref: SessionRef) => Effect.Effect<SessionStatus>;
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
   readonly resolveRef: (
@@ -179,9 +214,20 @@ export const makePiAgentSessionService = (deps: {
   readonly pi: PiAgentShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
+  readonly worktrees: {
+    readonly create: (
+      cwd: string,
+      input?: { readonly base?: string },
+    ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
+  };
   readonly newSessionId: Effect.Effect<string>;
+  /** Backfill `metadata.cwd` for records created before cwd was persisted. */
+  readonly projectPathFor: (
+    projectId: string,
+  ) => Effect.Effect<string, ProjectNotFound | StoreReadError>;
 }): PiAgentSessionServiceShape => {
-  const { manager, pi, repo, bus, newSessionId } = deps;
+  const { manager, pi, repo, bus, worktrees, newSessionId, projectPathFor } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -195,6 +241,74 @@ export const makePiAgentSessionService = (deps: {
   };
 
   const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
+
+  const sessionNeverOpened = (metadata: Session): boolean => metadata.agentSessionId === undefined;
+
+  const modelStateFromMetadata = (metadata: Session): AgentModelState => ({
+    ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
+    ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
+  });
+
+  const ensureCwd = (
+    metadata: Session,
+  ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | StoreWriteError> =>
+    metadata.cwd !== undefined
+      ? Effect.succeed(metadata as SessionWithCwd)
+      : projectPathFor(metadata.projectId).pipe(
+          Effect.flatMap((cwd) =>
+            repo.write({ ...metadata, cwd }).pipe(Effect.map(() => ({ ...metadata, cwd }))),
+          ),
+        );
+
+  const ensureRuntimeForPrompt = (
+    ref: SessionRef,
+    metadata: SessionWithCwd,
+  ): Effect.Effect<
+    PiAgentRuntime,
+    ResumeSessionError | StoreReadError | StoreWriteError | AgentOperationError
+  > =>
+    Effect.gen(function* () {
+      const existing = yield* manager.peek(ref);
+      if (existing) return existing;
+
+      if (metadata.agentSessionId === undefined) {
+        const runtime = yield* manager.open(
+          {
+            cwd: metadata.cwd,
+            ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
+            ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
+          },
+          ref,
+        );
+        yield* repo.write({ ...metadata, agentSessionId: runtime.sessionId });
+        return runtime;
+      }
+
+      return yield* manager.ensureRuntime(
+        { sessionId: metadata.agentSessionId, cwd: metadata.cwd },
+        ref,
+      );
+    });
+
+  const deliverPrompt = (
+    ref: SessionRef,
+    userInput: UserInput,
+  ): Effect.Effect<
+    void,
+    | ResumeSessionError
+    | StoreReadError
+    | StoreWriteError
+    | AgentOperationError
+    | ProjectNotFound
+    | SessionNotFound
+    | SessionClosed
+    | TurnAlreadyRunning
+  > =>
+    Effect.gen(function* () {
+      const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
+      const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
+      yield* runtime.prompt(userInput).pipe(Effect.asVoid);
+    });
 
   const readHistory = (
     ref: SessionRef,
@@ -221,9 +335,6 @@ export const makePiAgentSessionService = (deps: {
         ),
       );
   };
-
-  const resolveAgentSessionId = (ref: SessionRef) =>
-    readMetadata(ref).pipe(Effect.map((metadata) => metadata.agentSessionId));
 
   const runtimeInput = (agentSessionId: string, cwd: string) => ({
     sessionId: agentSessionId,
@@ -264,67 +375,95 @@ export const makePiAgentSessionService = (deps: {
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
   return {
-    create: (projectId, cwd, model) =>
+    create: (input) =>
       newSessionId.pipe(
         Effect.flatMap((sessionId) => {
-          const ref: SessionRef = { projectId, sessionId };
-          return manager
-            .open(
-              {
-                cwd,
-                ...(model ? { provider: model.provider, modelId: model.modelId } : {}),
-              },
-              ref,
-            )
-            .pipe(
-              Effect.flatMap((session) => {
-                const metadata: Session = {
-                  sessionId,
-                  projectId,
-                  agentSessionId: session.sessionId,
-                  createdAt: new Date().toISOString(),
-                  cwd,
-                  archived: false,
-                };
-                return repo.write(metadata).pipe(
-                  Effect.tapError(() => manager.close(ref)),
-                  Effect.andThen(bus.publish({ ref, type: "session.created" })),
-                  Effect.andThen(
-                    logLifecycle("session.created", "session created", {
-                      cwd,
-                      agentSessionId: session.sessionId,
-                    }),
-                  ),
-                  Effect.as(ref),
-                );
-              }),
-              inSession(ref),
-            );
+          const ref: SessionRef = { projectId: input.projectId, sessionId };
+          const materializeWorkspace: Effect.Effect<SessionWorkspace, GitWorktreeFailure> =
+            input.worktree === undefined
+              ? Effect.succeed({ cwd: input.cwd })
+              : worktrees
+                  .create(
+                    input.cwd,
+                    input.worktree.base !== undefined ? { base: input.worktree.base } : undefined,
+                  )
+                  .pipe(
+                    Effect.map((created) => ({
+                      cwd: created.path,
+                      gitBranch: created.branch,
+                    })),
+                  );
+          return materializeWorkspace.pipe(
+            Effect.flatMap((sessionWorkspace) => {
+              const metadata: Session = {
+                sessionId,
+                projectId: input.projectId,
+                createdAt: new Date().toISOString(),
+                cwd: sessionWorkspace.cwd,
+                ...(sessionWorkspace.gitBranch !== undefined
+                  ? { gitBranch: sessionWorkspace.gitBranch }
+                  : {}),
+                ...(input.model !== undefined
+                  ? { provider: input.model.provider, modelId: input.model.modelId }
+                  : {}),
+                archived: false,
+              };
+              return repo.write(metadata).pipe(
+                Effect.tapError(() =>
+                  sessionWorkspace.gitBranch === undefined
+                    ? Effect.void
+                    : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
+                ),
+                Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                Effect.andThen(
+                  logLifecycle("session.created", "session created", {
+                    cwd: sessionWorkspace.cwd,
+                  }),
+                ),
+                Effect.as({ ref, workspace: sessionWorkspace }),
+              );
+            }),
+            inSession(ref),
+          );
         }),
       ),
 
-    prepare: (ref, cwd) =>
+    prepare: (ref) =>
       withMetadataMutation(
         ref,
-        readMetadata(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.cwd === cwd) return Effect.succeed(metadata);
-            const updated = { ...metadata, cwd };
-            return repo.write(updated).pipe(Effect.as(updated));
-          }),
-        ),
+        readMetadata(ref).pipe(Effect.flatMap((metadata) => ensureCwd(metadata))),
       ).pipe(
-        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, cwd)),
-        Effect.flatMap((info) =>
-          info._tag === "missing"
-            ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-            : Effect.void,
+        Effect.flatMap((metadata) => {
+          if (metadata.agentSessionId === undefined) {
+            return Effect.succeed(toSessionWorkspace(metadata));
+          }
+          return pi
+            .getSessionInfo(metadata.agentSessionId, metadata.cwd)
+            .pipe(
+              Effect.flatMap((info) =>
+                info._tag === "missing"
+                  ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
+                  : Effect.succeed(toSessionWorkspace(metadata)),
+              ),
+            );
+        }),
+        inSession(ref),
+      ),
+
+    workspaceFor: (ref) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) =>
+          metadata.cwd !== undefined
+            ? Effect.succeed(toSessionWorkspace(metadata as SessionWithCwd))
+            : projectPathFor(metadata.projectId).pipe(
+                Effect.map((cwd) => toSessionWorkspace({ ...metadata, cwd })),
+              ),
         ),
         inSession(ref),
       ),
 
     close: (ref) =>
-      resolveAgentSessionId(ref).pipe(
+      readMetadata(ref).pipe(
         Effect.andThen(manager.close(ref)),
         Effect.andThen(bus.closeSession(ref, "session_closed")),
         Effect.andThen(bus.publish({ ref, type: "session.closed" })),
@@ -415,53 +554,62 @@ export const makePiAgentSessionService = (deps: {
         ),
       ),
 
-    getMessages: (ref, cwd) =>
+    getMessages: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) =>
-          readHistory(ref, metadata.agentSessionId, cwd).pipe(
-            Effect.flatMap((messages) =>
-              manager.status(ref).pipe(
-                Effect.map((status) => {
-                  if (status.activeTurnId === undefined) return messages;
-                  for (let index = messages.length - 1; index >= 0; index -= 1) {
-                    if (messages[index]?.role === "user") return messages.slice(0, index);
-                  }
-                  return messages;
-                }),
+        Effect.flatMap((metadata) => {
+          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+            return Effect.succeed<ReadonlyArray<UIMessage>>([]);
+          }
+          const agentSessionId = metadata.agentSessionId;
+          return ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              readHistory(ref, agentSessionId, resolved.cwd).pipe(
+                Effect.flatMap((messages) =>
+                  manager.status(ref).pipe(
+                    Effect.map((status) => {
+                      if (status.activeTurnId === undefined) return messages;
+                      for (let index = messages.length - 1; index >= 0; index -= 1) {
+                        if (messages[index]?.role === "user") return messages.slice(0, index);
+                      }
+                      return messages;
+                    }),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        }),
         inSession(ref),
       ),
 
     prompt: (input) =>
       Effect.gen(function* () {
         const userInput = yield* toUserInput(input.parts);
-        const metadata = yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
+        yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
         const messageId = input.messageId ?? (yield* newSessionId);
+        const turnId = yield* newSessionId;
 
         yield* manager.emit(input.ref, {
           type: "session.prompt.submitted",
           messageId,
           parts: input.parts,
         });
-        const runtime = yield* manager.ensureRuntime(
-          {
-            sessionId: metadata.agentSessionId,
-            ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
-          },
-          input.ref,
-        );
-        return yield* runtime.prompt(userInput).pipe(
-          Effect.tapError((promptError) =>
-            manager.emit(input.ref, {
-              type: "session.prompt.rejected",
-              messageId,
-              reason: promptError.message,
-            }),
+
+        const reject = (reason: string) =>
+          manager.emit(input.ref, {
+            type: "session.prompt.rejected",
+            messageId,
+            reason,
+          });
+
+        yield* deliverPrompt(input.ref, userInput).pipe(
+          Effect.catch((error: unknown) =>
+            reject(error instanceof Error ? error.message : String(error)),
           ),
+          Effect.forkDetach,
         );
+
+        return { turnId };
       }).pipe(inSession(input.ref)),
 
     interrupt: (ref) =>
@@ -489,36 +637,71 @@ export const makePiAgentSessionService = (deps: {
         inSession(ref),
       ),
 
-    getModelState: (ref, cwd) =>
+    getModelState: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) =>
-          withLiveRuntime(
-            ref,
-            metadata.agentSessionId,
-            cwd,
-            (runtime) =>
-              runtime.getModelState ??
-              Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
-          ),
-        ),
+        Effect.flatMap((metadata) => {
+          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+            return Effect.succeed(modelStateFromMetadata(metadata));
+          }
+          const agentSessionId = metadata.agentSessionId;
+          return ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              withLiveRuntime(
+                ref,
+                agentSessionId,
+                resolved.cwd,
+                (runtime) =>
+                  runtime.getModelState ??
+                  Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+              ),
+            ),
+          );
+        }),
         inSession(ref),
       ),
 
-    setModel: (ref, cwd, model) =>
-      readMetadata(ref).pipe(
-        Effect.flatMap((metadata) =>
-          withLiveRuntime(ref, metadata.agentSessionId, cwd, (runtime) =>
-            runtime.setModel
-              ? runtime.setModel(model)
-              : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
-          ),
+    setModel: (ref, model) =>
+      withMetadataMutation(
+        ref,
+        readMetadata(ref).pipe(
+          Effect.flatMap((metadata) => {
+            const persistModel = repo.write({
+              ...metadata,
+              provider: model.provider,
+              modelId: model.modelId,
+            });
+            if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+              return persistModel.pipe(Effect.as(model satisfies AgentModelState));
+            }
+            const agentSessionId = metadata.agentSessionId;
+            return ensureCwd(metadata).pipe(
+              Effect.flatMap((resolved) =>
+                persistModel.pipe(
+                  Effect.andThen(
+                    withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
+                      runtime.setModel
+                        ? runtime.setModel(model)
+                        : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
-        inSession(ref),
-      ),
+      ).pipe(inSession(ref)),
 
     getSessionInfo: (ref) =>
       readMetadata(ref).pipe(
-        Effect.flatMap((metadata) => pi.getSessionInfo(metadata.agentSessionId, metadata.cwd)),
+        Effect.flatMap((metadata) => {
+          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+            return Effect.succeed<SessionInfoResult>({ _tag: "unsupported" });
+          }
+          const agentSessionId = metadata.agentSessionId;
+          return ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) => pi.getSessionInfo(agentSessionId, resolved.cwd)),
+          );
+        }),
         inSession(ref),
       ),
 
@@ -540,13 +723,22 @@ export const makePiAgentSessionService = (deps: {
 export const PiAgentSessionServiceLayer: Layer.Layer<
   PiAgentSessionService,
   never,
-  PiAgentSessionManager | PiAgent | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
+  | PiAgentSessionManager
+  | PiAgent
+  | EventBus
+  | ProjectService
+  | Paths
+  | WorktreeService
+  | Crypto.Crypto
+  | FileSystem.FileSystem
 > = Layer.effect(
   PiAgentSessionService,
   Effect.gen(function* () {
     const manager = yield* PiAgentSessionManager;
     const pi = yield* PiAgent;
     const bus = yield* EventBus;
+    const projects = yield* ProjectService;
+    const worktrees = yield* WorktreeService;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makePiAgentSessionRepository(paths.sessionsDir);
@@ -555,11 +747,14 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
       pi,
       repo,
       bus,
+      worktrees,
       newSessionId: crypto.randomUUIDv4.pipe(
         Effect.catchTag("PlatformError", (cause) =>
           Effect.die(new Error("invariant: platform RNG failed minting a session id", { cause })),
         ),
       ),
+      projectPathFor: (projectId) =>
+        projects.findById(projectId).pipe(Effect.map((project) => project.path)),
     });
   }),
 );

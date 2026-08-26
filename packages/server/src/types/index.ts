@@ -19,12 +19,19 @@ export type { Project } from "@getpie/contract";
 export interface Session {
   readonly sessionId: string;
   readonly projectId: string;
-  readonly agentSessionId: string;
+  /** Pi-native id, written when the first prompt opens a process. Absent until then. */
+  readonly agentSessionId?: string;
   readonly createdAt: string;
   /**
-   * Working directory. Our input at `create` (currently the project path).
+   * Working directory, written at `create`: the project path, or a worktree
+   * path when that create requested `worktree`.
    */
   readonly cwd?: string;
+  /** Branch checked out in `cwd` when this session has a git worktree. */
+  readonly gitBranch?: string;
+  /** Model selected at create; applied when Pi opens on the first prompt. */
+  readonly provider?: string;
+  readonly modelId?: string;
   /** Display title, set from the session's first prompt. */
   readonly title?: string;
   /** Whether the session is hidden from the project's primary session list. */

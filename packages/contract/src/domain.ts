@@ -16,6 +16,22 @@ export const SessionRefSchema = Schema.Struct({
 });
 export type SessionRef = typeof SessionRefSchema.Type;
 
+/** Absolute workspace directory, or a session whose stored `cwd` the server resolves. */
+export const WorkspaceCwdQuerySchema = Schema.Struct({ cwd: Schema.String });
+export const WorkspaceRefQuerySchema = Schema.Struct({ ref: SessionRefSchema });
+export const WorkspaceQuerySchema = Schema.Union([
+  WorkspaceCwdQuerySchema,
+  WorkspaceRefQuerySchema,
+]);
+export type WorkspaceQuery = typeof WorkspaceQuerySchema.Type;
+
+/** Same `{ cwd } | { ref }` arms with extra fields on each object. */
+export const withWorkspaceQuery = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
+  Schema.Union([
+    Schema.Struct({ cwd: Schema.String, ...fields }),
+    Schema.Struct({ ref: SessionRefSchema, ...fields }),
+  ]);
+
 // ---------------------------------------------------------------------------
 // Approval model (agent requests / responses)
 // ---------------------------------------------------------------------------
@@ -257,9 +273,7 @@ export type SessionScopedEvent = {
 
 export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }
-  // Self-owned display data changed on the server (currently the title, stamped
-  // from the first prompt). Carries the new value so clients patch the row in
-  // place instead of clobbering an optimistic title with a refetch.
+  // Self-owned display data changed on the server (title from the first prompt).
   | { readonly type: "session.updated"; readonly title?: string }
   | { readonly type: "session.archived"; readonly archived: boolean }
   | { readonly type: "session.deleted" }
@@ -398,6 +412,13 @@ export const PromptPartSchema = Schema.Union([
 ]);
 export type PromptPart = typeof PromptPartSchema.Type;
 
+/** When present on `session.create`, create a git worktree before persist (branch name is server-assigned). */
+export const CreateWorktreeInputSchema = Schema.Struct({
+  /** Local or remote-tracking ref to branch from. Defaults to HEAD when omitted. */
+  base: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
+
 export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
@@ -512,8 +533,27 @@ export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
+  // Create a git worktree and persist its cwd before returning. Request payload,
+  // not a stored pending flag — git failure fails create with no session record.
+  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
+
+/** Absolute directory Pi runs in for one session. */
+export const SessionWorkspaceSchema = Schema.Struct({
+  cwd: Schema.String,
+  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type SessionWorkspace = typeof SessionWorkspaceSchema.Type;
+
+export const CreateSessionOutputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  workspace: SessionWorkspaceSchema,
+});
+export type CreateSessionOutput = typeof CreateSessionOutputSchema.Type;
+
+export const PrepareSessionOutputSchema = CreateSessionOutputSchema;
+export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
 
 export const ListSessionsInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
