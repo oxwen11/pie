@@ -3,7 +3,9 @@
 How the Pie desktop app reaches a pie daemon on another machine. Companion to
 [`2026-07-19-server-daemon-topology-design.md`](./2026-07-19-server-daemon-topology-design.md)
 (local attach-or-spawn) and the T3 research in
-[`research/2026-08-26-t3code-remote-ssh.md`](./research/2026-08-26-t3code-remote-ssh.md).
+[`research/2026-08-26-t3code-remote-ssh.md`](./research/2026-08-26-t3code-remote-ssh.md)
+and Tailscale notes in
+[`research/2026-08-26-t3code-tailscale.md`](./research/2026-08-26-t3code-tailscale.md).
 
 This replaces the placeholder link to `2026-07-19-remote-ssh-server-design.md`.
 
@@ -16,13 +18,15 @@ endpoint with the daemon token. Disconnect closes the tunnel only.
 
 ## Non-goals (v1)
 
-- Pairing, LAN, Tailscale, or any client that is not this desktop app.
+- Pairing, LAN, or any client that is not this desktop app.
 - In-app SSH password prompts (ssh-agent / `IdentityFile` only).
 - Killing the remote daemon on disconnect or on desktop quit.
 - More than one live SSH tunnel at a time.
 - Auto-revert to local when the tunnel dies (RPC errors; user picks Disconnect).
 - Publishing `@getpie/cli` so remote `npx @getpie/cli` works everywhere — the
   runner prefers `pie` on PATH, then npx latest.
+- Using `tailscale ssh` as a substitute for a local OpenSSH client (`ssh -L`
+  still needs `ssh` / `ssh.exe` on PATH).
 
 ## Shape
 
@@ -37,12 +41,14 @@ The renderer never sees a remote address. `ServerConnection` is the same
 
 ### Package split
 
-| Piece                                      | Owns                                                                                                |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `@getpie/ssh`                              | Parse/resolve target, spawn `ssh`, launch script, local forward, health wait. No Electron, no oRPC. |
-| `apps/desktop/src/main/ssh/desktop-ssh.ts` | Persist saved hosts (`userData/ssh-environments.json`, `0600`), one live tunnel, `DesktopSsh` Tag.  |
-| `DesktopApplication`                       | Which environment is active (`local` vs ssh id), snapshot stream, maps SSH errors out through RPC.  |
-| `@getpie/app` `Platform.ssh`               | Optional; desktop host fills it. Web host omits it, so the switcher is hidden.                      |
+| Piece                                               | Owns                                                                                                |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@getpie/ssh`                                       | Parse/resolve target, spawn `ssh`, launch script, local forward, health wait. No Electron, no oRPC. |
+| `@getpie/tailscale`                                 | PATH probe, `status --json` (Self + peers), Serve enable/disable. Never logs CLI stderr.            |
+| `apps/desktop/src/main/ssh/desktop-ssh.ts`          | Persist saved hosts (`userData/ssh-environments.json`, `0600`), one live tunnel, `DesktopSsh` Tag.  |
+| `apps/desktop/src/main/tailscale/`                  | `DesktopTailscale` Tag; merge MagicDNS peers into SSH discovery; MagicDNS → `PIE_ALLOWED_HOSTS`.    |
+| `DesktopApplication`                                | Which environment is active (`local` vs ssh id), snapshot stream, maps SSH errors out through RPC.  |
+| `@getpie/app` `Platform.ssh` / `Platform.tailscale` | Optional; desktop host fills them. Web host omits both, so the switcher is hidden.                  |
 
 Application code depends on the `DesktopSsh` Tag, not on `@getpie/ssh` directly.
 
@@ -85,11 +91,23 @@ keys, keeping `SSH_AUTH_SOCK`.
 ### UI
 
 Desktop sidebar: This computer, saved remotes, Add SSH host (datalist from
-`~/.ssh/config` + `known_hosts`). If the local OpenSSH client is not on PATH,
-Add is replaced with a disabled “OpenSSH client not found” row and remotes
-cannot reconnect until the user installs OpenSSH and restarts pie. Connecting
+`~/.ssh/config` + `known_hosts` + online Tailscale MagicDNS peers). If the local
+OpenSSH client is not on PATH, Add is replaced with a disabled “OpenSSH client
+not found” row and remotes cannot reconnect until the user installs OpenSSH and
+restarts pie. Tailscale peers still appear only as SSH launch targets — they do
+not bypass OpenSSH. Share this computer via Tailscale runs `tailscale serve`
+against the **local** daemon port (the renderer stays on loopback). Connecting
 covers the app with the status overlay. While an SSH environment is active,
 local daemon restart chrome stays hidden.
+
+### Tailscale
+
+A tailnet MagicDNS host is an ordinary SSH host. Discovery lists online peers
+from `tailscale status --json` (FQDN alias, no invented username). Connecting
+still uses `ssh -G` + `ssh -L`. The local daemon spawn merges Self’s MagicDNS
+name into `PIE_ALLOWED_HOSTS` so `tailscale serve` Host headers pass CORS
+without allowlisting `*.ts.net`. Serve is opt-in and does not mint a pairing
+token. `tailscale ssh` is not a transport.
 
 ## Auth
 

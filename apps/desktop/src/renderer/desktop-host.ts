@@ -86,6 +86,12 @@ export function createDesktopHost(
         disconnect: () => client.environments.disconnectSsh(),
         remove: (id) => client.environments.removeSsh({ id }),
       },
+      tailscale: {
+        client: bootstrap.tailscaleClient,
+        snapshot: () => client.tailscale.snapshot(),
+        enableServe: () => client.tailscale.enableServe(),
+        disableServe: () => client.tailscale.disableServe(),
+      },
     },
     server,
     refreshServer: () => client.server.connection(),

@@ -22,8 +22,13 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { DesktopConfig } from "../desktop-config";
 
-export { environmentLabel, formatSshInput } from "@getpie/ssh";
-export type { SshClientAvailability, SshEnvironmentError, SshTarget } from "@getpie/ssh";
+export { environmentLabel, formatSshInput, SshHostDiscoveryError } from "@getpie/ssh";
+export type {
+  DiscoveredSshHost,
+  SshClientAvailability,
+  SshEnvironmentError,
+  SshTarget,
+} from "@getpie/ssh";
 
 const SAVED_ENVIRONMENTS_FILE = "ssh-environments.json";
 const SAVED_FILE_MODE = 0o600;

@@ -1,10 +1,11 @@
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
-import { Check, Laptop, Plus, Server } from "lucide-react";
+import { Check, Laptop, Plus, Server, Share2 } from "lucide-react";
 import { Suspense, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import { AddSshHostDialog } from "@/features/connections/add-ssh-host-dialog";
+import { ShareTailscaleDialog } from "@/features/connections/share-tailscale-dialog";
 import { LOCAL_ENVIRONMENT_ID, type EnvironmentSnapshot } from "@/platform";
 import { usePlatform } from "@/platform-context";
 
@@ -23,12 +24,13 @@ function sshErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function ConnectionSwitcher(): ReactElement | null {
-  const ssh = usePlatform().ssh;
+  const { ssh, tailscale } = usePlatform();
   const environments = useSyncExternalStore(
     ssh?.environments.subscribe ?? subscribeNoop,
     ssh?.environments.getSnapshot ?? getMissingSnapshot,
   );
   const [addOpen, setAddOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!ssh) return null;
 
@@ -88,6 +90,16 @@ export function ConnectionSwitcher(): ReactElement | null {
                   <span>OpenSSH client not found</span>
                 </MenuItem>
               )}
+              {tailscale === undefined ? null : tailscale.client.available ? (
+                <MenuItem disabled={connecting} onClick={() => setShareOpen(true)}>
+                  <Share2 />
+                  <span>Share this computer via Tailscale…</span>
+                </MenuItem>
+              ) : (
+                <MenuItem disabled title={tailscale.client.message}>
+                  <span>Tailscale client not found</span>
+                </MenuItem>
+              )}
               {activeRemote ? (
                 <MenuItem
                   disabled={connecting}
@@ -108,6 +120,11 @@ export function ConnectionSwitcher(): ReactElement | null {
       {addOpen ? (
         <Suspense fallback={null}>
           <AddSshHostDialog onClose={() => setAddOpen(false)} />
+        </Suspense>
+      ) : null}
+      {shareOpen ? (
+        <Suspense fallback={null}>
+          <ShareTailscaleDialog onClose={() => setShareOpen(false)} />
         </Suspense>
       ) : null}
     </>

@@ -6,6 +6,7 @@ import { DesktopApplication } from "./application/desktop-application";
 import { DesktopApplicationLive } from "./desktop-runtime-glue";
 import { LocalServer } from "./server/local-server";
 import { DesktopSsh, disabledDesktopSsh } from "./ssh/desktop-ssh";
+import { DesktopTailscale, disabledDesktopTailscale } from "./tailscale/desktop-tailscale";
 
 describe("DesktopApplicationLive", () => {
   it("resolves a DesktopApplication built from a LocalServer provided through the Layer graph", async () => {
@@ -27,9 +28,14 @@ describe("DesktopApplicationLive", () => {
     });
 
     const fakeSshLive = Layer.succeed(DesktopSsh, disabledDesktopSsh());
+    const fakeTailscaleLive = Layer.succeed(DesktopTailscale, disabledDesktopTailscale());
 
     const runtime = ManagedRuntime.make(
-      DesktopApplicationLive.pipe(Layer.provide(fakeLocalServerLive), Layer.provide(fakeSshLive)),
+      DesktopApplicationLive.pipe(
+        Layer.provide(fakeLocalServerLive),
+        Layer.provide(fakeSshLive),
+        Layer.provide(fakeTailscaleLive),
+      ),
     );
 
     try {

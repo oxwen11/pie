@@ -8,6 +8,7 @@ import {
 } from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
 import { disabledDesktopSsh } from "../ssh/desktop-ssh";
+import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
 import { makeDesktopApplication } from "./desktop-application";
 
 const anyOs = expect.stringMatching(/^(macos|windows|linux)$/);
@@ -27,6 +28,7 @@ const sshConnection: ServerConnection = {
 function makeHarness(
   connection: Effect.Effect<ServerConnection> = Effect.succeed(localConnection),
   ssh = disabledDesktopSsh(),
+  tailscale = disabledDesktopTailscale(),
 ) {
   const statusRef = Effect.runSync(
     SubscriptionRef.make<ServerStatusSnapshot>({ revision: 0, status: "ready" }),
@@ -44,6 +46,7 @@ function makeHarness(
   const application = makeDesktopApplication({
     server,
     ssh,
+    tailscale,
     initialRemotes: [],
     quit: Effect.sync(() => {
       quits += 1;
@@ -68,6 +71,7 @@ describe("DesktopApplication", () => {
       statusRevision: 0,
       os: anyOs,
       sshClient: { available: true },
+      tailscaleClient: { available: true },
       environments: {
         revision: 0,
         activeId: LOCAL_ENVIRONMENT_ID,
@@ -182,5 +186,53 @@ describe("DesktopApplication", () => {
     await expect(Effect.runPromise(h.application.bootstrap)).resolves.toMatchObject({
       sshClient: { available: false, message: "OpenSSH client not found (ssh)." },
     });
+  });
+
+  it("merges Tailscale peers into SSH host discovery without failing SSH config", async () => {
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        discoverHosts: Effect.succeed([
+          {
+            alias: "devbox",
+            hostname: "devbox.tailnet.ts.net",
+            username: null,
+            port: null,
+            source: "ssh-config",
+          },
+        ]),
+      }),
+      disabledDesktopTailscale({
+        listSshHosts: Effect.succeed([
+          {
+            alias: "devbox.tailnet.ts.net",
+            hostname: "devbox.tailnet.ts.net",
+            online: true,
+          },
+          {
+            alias: "other.tailnet.ts.net",
+            hostname: "other.tailnet.ts.net",
+            online: true,
+          },
+        ]),
+      }),
+    );
+
+    await expect(Effect.runPromise(h.application.discoverSshHosts)).resolves.toEqual([
+      {
+        alias: "devbox",
+        hostname: "devbox.tailnet.ts.net",
+        username: null,
+        port: null,
+        source: "ssh-config",
+      },
+      {
+        alias: "other.tailnet.ts.net",
+        hostname: "other.tailnet.ts.net",
+        username: null,
+        port: null,
+        source: "tailscale",
+      },
+    ]);
   });
 });

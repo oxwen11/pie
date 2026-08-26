@@ -25,7 +25,7 @@ export type DiscoveredSshHost = {
   readonly hostname: string;
   readonly username: string | null;
   readonly port: number | null;
-  readonly source: "ssh-config" | "known-hosts";
+  readonly source: "ssh-config" | "known-hosts" | "tailscale";
 };
 
 /** How the UI observes which server the desktop host is talking to. */
@@ -47,6 +47,25 @@ export type PlatformSsh = {
   readonly remove: (id: string) => Promise<void>;
 };
 
+export type TailscaleClientAvailability =
+  | { readonly available: true }
+  | { readonly available: false; readonly message: string };
+
+export type TailscaleSnapshot = {
+  readonly client: TailscaleClientAvailability;
+  readonly loggedIn: boolean;
+  readonly magicDnsName: string | null;
+  readonly httpsBaseUrl: string | null;
+  readonly serveEnabled: boolean;
+};
+
+export type PlatformTailscale = {
+  readonly client: TailscaleClientAvailability;
+  readonly snapshot: () => Promise<TailscaleSnapshot>;
+  readonly enableServe: () => Promise<void>;
+  readonly disableServe: () => Promise<void>;
+};
+
 /** Browser or native capabilities supplied by the host entry point. */
 export type Platform = {
   /** Close the host application when that operation exists. */
@@ -63,4 +82,10 @@ export type Platform = {
    * is false when OpenSSH is not on PATH — local stays the only environment.
    */
   ssh?: PlatformSsh;
+  /**
+   * Desktop-only: Tailscale CLI on PATH. Used to list MagicDNS peers as SSH
+   * hosts and optionally `tailscale serve` this computer's daemon. Absent in
+   * the browser. `client.available` is false when `tailscale` is not on PATH.
+   */
+  tailscale?: PlatformTailscale;
 };

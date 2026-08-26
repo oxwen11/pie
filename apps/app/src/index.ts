@@ -8,8 +8,11 @@ export type {
   Platform,
   PlatformOs,
   PlatformSsh,
+  PlatformTailscale,
   SshClientAvailability,
   SshRemoteEnvironment,
+  TailscaleClientAvailability,
+  TailscaleSnapshot,
 } from "./platform";
 export { LOCAL_ENVIRONMENT_ID } from "./platform";
 export { PlatformProvider } from "./platform-provider";

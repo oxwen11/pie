@@ -14,7 +14,7 @@ T3 Code's desktop-managed SSH path is **not** "the renderer SSHes to the host." 
 4. Locally: `ssh -N -L <localPort>:127.0.0.1:<remotePort>` with `ExitOnForwardFailure` and keepalives.
 5. The renderer talks **only to loopback** HTTP/WS. Pairing then exchanges a one-time token for a bearer session.
 
-Pie should copy steps 1–4 and the loopback-only client rule. It should **not** copy pairing, LAN/Tailscale environments, in-app password prompts (v1), or killing the remote server on disconnect. Local OpenSSH is optional: probe PATH, and if `ssh`/`ssh.exe` is missing, keep the local environment and do not offer launch.
+Pie should copy steps 1–4 and the loopback-only client rule. It should **not** copy pairing, LAN environments, in-app password prompts (v1), or killing the remote server on disconnect. Local OpenSSH is optional: probe PATH, and if `ssh`/`ssh.exe` is missing, keep the local environment and do not offer launch. Tailscale is a reach layer under that SSH path: list MagicDNS peers as SSH hosts, and optionally `tailscale serve` this computer’s loopback daemon.
 
 ## Canonical sources
 
@@ -23,6 +23,7 @@ Pie should copy steps 1–4 and the loopback-only client rule. It should **not**
 - [`packages/ssh/src/auth.ts`](https://github.com/pingdotgg/t3code/blob/78f462c4/packages/ssh/src/auth.ts) — askpass helper + `SshPasswordPrompt`.
 - [`packages/ssh/src/config.ts`](https://github.com/pingdotgg/t3code/blob/78f462c4/packages/ssh/src/config.ts) — `~/.ssh/config` Host aliases + `known_hosts`.
 - [`apps/desktop/src/ssh/DesktopSshEnvironment.ts`](https://github.com/pingdotgg/t3code/blob/78f462c4/apps/desktop/src/ssh/DesktopSshEnvironment.ts) — desktop Tag over the tunnel manager.
+- [`packages/tailscale/src/tailscale.ts`](https://github.com/pingdotgg/t3code/blob/78f462c4/packages/tailscale/src/tailscale.ts) — CLI wrappers; pie’s copy is documented in [`2026-08-26-t3code-tailscale.md`](./2026-08-26-t3code-tailscale.md).
 - [`docs/user/remote-access.md`](https://github.com/pingdotgg/t3code/blob/78f462c4/docs/user/remote-access.md) — user-facing SSH launch + pairing.
 
 ## What T3 actually does
@@ -66,7 +67,8 @@ The runner prefers a PATH `t3`, else `npx t3@<channel>`. It starts `t3 serve --h
 | Local `ssh` / `ssh.exe` assumed present                 | Probe PATH; if missing, keep local-only and disable Add                |
 | Kill managed server on disconnect                       | **Do not.** Close the local tunnel; remote daemon stays                |
 | Askpass + password prompt                               | Helpers exist; v1 is `BatchMode=yes` (ssh-agent / IdentityFile)        |
-| LAN / Tailscale / hosted pairing                        | Out of scope                                                           |
+| Tailscale `status` / `serve` CLI wrappers               | `@getpie/tailscale`: peers as SSH hosts + opt-in Serve; no pairing     |
+| LAN / hosted pairing catalog                            | Out of scope                                                           |
 
 ## What pie must not copy
 
