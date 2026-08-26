@@ -32,9 +32,11 @@ export function ConnectionSwitcher(): ReactElement | null {
 
   if (!ssh) return null;
 
+  const launch = ssh.client;
   const activeRemote = environments.remotes.find((remote) => remote.id === environments.activeId);
   const label = activeRemote?.label ?? "This computer";
   const connecting = environments.connectingLabel !== null;
+  const canLaunch = launch.available;
 
   return (
     <>
@@ -61,7 +63,7 @@ export function ConnectionSwitcher(): ReactElement | null {
               </MenuItem>
               {environments.remotes.map((remote) => (
                 <MenuItem
-                  disabled={connecting}
+                  disabled={connecting || !canLaunch}
                   key={remote.id}
                   onClick={() => {
                     if (remote.id !== environments.activeId) {
@@ -76,10 +78,16 @@ export function ConnectionSwitcher(): ReactElement | null {
                 </MenuItem>
               ))}
               <MenuSeparator />
-              <MenuItem disabled={connecting} onClick={() => setAddOpen(true)}>
-                <Plus />
-                <span>Add SSH host…</span>
-              </MenuItem>
+              {launch.available ? (
+                <MenuItem disabled={connecting} onClick={() => setAddOpen(true)}>
+                  <Plus />
+                  <span>Add SSH host…</span>
+                </MenuItem>
+              ) : (
+                <MenuItem disabled title={launch.message}>
+                  <span>OpenSSH client not found</span>
+                </MenuItem>
+              )}
               {activeRemote ? (
                 <MenuItem
                   disabled={connecting}

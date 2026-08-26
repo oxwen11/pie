@@ -22,7 +22,7 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
   const [pending, setPending] = useState(false);
   const trimmed = target.trim();
 
-  if (!ssh) return <></>;
+  if (!ssh || !ssh.client.available) return <></>;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

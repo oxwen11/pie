@@ -48,6 +48,9 @@ Application code depends on the `DesktopSsh` Tag, not on `@getpie/ssh` directly.
 
 ### Launch
 
+0. Probe PATH for `ssh` / `ssh.exe`. Missing client → `sshClient.available: false`;
+   connect fails with `SshClientMissingError`. `ssh -G` must not fall back to the
+   typed hostname in that case.
 1. `parseSshInput` then `ssh -G` (`resolveSshInput`). Typed user/port win;
    hostname always from `-G`.
 2. `ssh` stdin = generated script; remote argv `sh -l -s <stateKey>`.
@@ -82,9 +85,11 @@ keys, keeping `SSH_AUTH_SOCK`.
 ### UI
 
 Desktop sidebar: This computer, saved remotes, Add SSH host (datalist from
-`~/.ssh/config` + `known_hosts`). Connecting covers the app with the status
-overlay. While an SSH environment is active, local daemon restart chrome stays
-hidden.
+`~/.ssh/config` + `known_hosts`). If the local OpenSSH client is not on PATH,
+Add is replaced with a disabled “OpenSSH client not found” row and remotes
+cannot reconnect until the user installs OpenSSH and restarts pie. Connecting
+covers the app with the status overlay. While an SSH environment is active,
+local daemon restart chrome stays hidden.
 
 ## Auth
 

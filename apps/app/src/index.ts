@@ -8,6 +8,7 @@ export type {
   Platform,
   PlatformOs,
   PlatformSsh,
+  SshClientAvailability,
   SshRemoteEnvironment,
 } from "./platform";
 export { LOCAL_ENVIRONMENT_ID } from "./platform";

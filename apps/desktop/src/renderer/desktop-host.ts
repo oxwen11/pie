@@ -45,6 +45,7 @@ export function createDesktopHost(
       },
       os: bootstrap.os,
       ssh: {
+        client: bootstrap.sshClient,
         environments: {
           getSnapshot: () => environments,
           subscribe: (listener) => {

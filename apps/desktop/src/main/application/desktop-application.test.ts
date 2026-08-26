@@ -67,6 +67,7 @@ describe("DesktopApplication", () => {
       status: "ready",
       statusRevision: 0,
       os: anyOs,
+      sshClient: { available: true },
       environments: {
         revision: 0,
         activeId: LOCAL_ENVIRONMENT_ID,
@@ -167,6 +168,19 @@ describe("DesktopApplication", () => {
     await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
       activeId: LOCAL_ENVIRONMENT_ID,
       remotes: [{ id: "remote-1", status: "idle" }],
+    });
+  });
+
+  it("reports a missing OpenSSH client on bootstrap", async () => {
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        client: { available: false, message: "OpenSSH client not found (ssh)." },
+      }),
+    );
+
+    await expect(Effect.runPromise(h.application.bootstrap)).resolves.toMatchObject({
+      sshClient: { available: false, message: "OpenSSH client not found (ssh)." },
     });
   });
 });

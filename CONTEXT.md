@@ -93,5 +93,5 @@ _Avoid_: inner tabs, sub-tabs, splits
 ## Environments (desktop)
 
 **Environment**:
-A pie daemon the desktop app is talking to. `local` is this computer's daemon. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel. The renderer never talks to a remote address — only `127.0.0.1`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
+A pie daemon the desktop app is talking to. `local` is this computer's daemon and does not need OpenSSH. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel, and only exists when this computer has an OpenSSH client on PATH. The renderer never talks to a remote address — only `127.0.0.1`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
 _Avoid_: server (ambiguous with the HTTP process), remote machine, workspace, connection (the token+URL triple is `ServerConnection`)

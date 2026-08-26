@@ -125,6 +125,7 @@ export function makeDesktopApplication({
         status: current.status,
         statusRevision: current.revision,
         os: currentOs(),
+        sshClient: ssh.client,
         environments,
       };
     }),
