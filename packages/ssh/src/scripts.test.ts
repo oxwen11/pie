@@ -1,10 +1,57 @@
+import childProcess from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
   buildRemoteLaunchScript,
+  buildRemoteNodeEnvScript,
   buildRemotePieRunnerScript,
   DEFAULT_NODE_ENGINE_RANGE,
 } from "./scripts";
+
+const posix = process.platform !== "win32";
+
+async function writeExecutable(file: string, body: string): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, body);
+  await fs.chmod(file, 0o755);
+}
+
+function nodeShim(version: string): string {
+  return `#!/bin/sh\necho ${version}\n`;
+}
+
+async function runEnsure(
+  home: string,
+  pathEnv: string,
+): Promise<{
+  stdout: string;
+  stderr: string;
+  status: number;
+}> {
+  const script = `set -eu
+${buildRemoteNodeEnvScript()}
+if ! ensure_remote_node_path; then
+  exit 1
+fi
+command -v node
+node -v
+`;
+  return await new Promise((resolve) => {
+    childProcess.execFile(
+      "/bin/sh",
+      ["-c", script],
+      { env: { HOME: home, PATH: pathEnv }, timeout: 10_000 },
+      (error, stdout, stderr) => {
+        const status = error && typeof error.code === "number" ? error.code : error ? 1 : 0;
+        resolve({ stdout, stderr, status });
+      },
+    );
+  });
+}
 
 describe("remote launch scripts", () => {
   it("starts or attaches the remote pie daemon and prints launch JSON", () => {
@@ -17,18 +64,61 @@ describe("remote launch scripts", () => {
     expect(script).not.toContain("@@PIE_");
   });
 
-  it("prefers a PATH pie, then npx @getpie/cli", () => {
+  it("prefers a PATH pie, then npx @getpie/cli@0.0.0", () => {
     const runner = buildRemotePieRunnerScript();
     expect(runner).toContain("command -v pie");
-    expect(runner).toContain("@getpie/cli@latest");
+    expect(runner).toContain("@getpie/cli@0.0.0");
     expect(runner).toContain("ensure_remote_node_path");
     expect(runner).toContain(DEFAULT_NODE_ENGINE_RANGE);
   });
 
   it("embeds the Node 24 engine check", () => {
     const script = buildRemoteLaunchScript({ nodeEngineRange: DEFAULT_NODE_ENGINE_RANGE });
-    expect(script).toContain("major !== 24");
+    expect(script).toContain("v24.*");
     expect(script).toContain("VOLTA_HOME");
     expect(script).toContain("nvm.sh");
+    expect(script).toContain("NVM_NO_USE");
+    expect(script).toContain("node-versions");
+    expect(script).toContain("pie needs Node 24");
+  });
+});
+
+describe.skipIf(!posix)("ensure_remote_node_path", () => {
+  it("picks fnm Node 24 over nvm 20 and a PATH Node 25", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-node-"));
+    try {
+      const brewBin = path.join(home, "brew", "bin");
+      await writeExecutable(path.join(brewBin, "node"), nodeShim("v25.2.1"));
+      await writeExecutable(
+        path.join(home, ".nvm", "versions", "node", "v20.9.0", "bin", "node"),
+        nodeShim("v20.9.0"),
+      );
+      await writeExecutable(
+        path.join(home, ".nvm", "nvm.sh"),
+        `PATH="$HOME/.nvm/versions/node/v20.9.0/bin:$PATH"
+export PATH
+nvm() { :; }
+`,
+      );
+      const fnmNode = path.join(
+        home,
+        ".local",
+        "share",
+        "fnm",
+        "node-versions",
+        "v24.18.0",
+        "installation",
+        "bin",
+        "node",
+      );
+      await writeExecutable(fnmNode, nodeShim("v24.18.0"));
+
+      const result = await runEnsure(home, `${brewBin}:/usr/bin:/bin`);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("v24.18.0");
+      expect(result.stdout).toContain(`${path.dirname(fnmNode)}/node`);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
   });
 });

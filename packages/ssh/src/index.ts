@@ -36,6 +36,7 @@ export {
   buildRemoteLaunchScript,
   buildRemotePieRunnerScript,
   DEFAULT_NODE_ENGINE_RANGE,
+  DEFAULT_PIE_PACKAGE_SPEC,
   DEFAULT_REMOTE_PORT,
   REMOTE_LAUNCH_TIMEOUT_MS,
   SSH_READY_TIMEOUT_MS,

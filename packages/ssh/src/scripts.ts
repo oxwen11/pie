@@ -13,6 +13,8 @@ export const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
 export const TUNNEL_SHUTDOWN_TIMEOUT_MS = 2_000;
 /** Pie's published engine: Node 24 only. */
 export const DEFAULT_NODE_ENGINE_RANGE = ">=24.0.0 <25";
+/** Occupying publish; remote npx installs this until a later release. */
+export const DEFAULT_PIE_PACKAGE_SPEC = "@getpie/cli@0.0.0";
 
 function stripTrailingNewlines(value: string): string {
   return value.replace(/\n+$/u, "");
@@ -33,16 +35,9 @@ function applyScriptPlaceholders(
   return result;
 }
 
-const REMOTE_NODE_ENGINE_CHECK = `const range = process.argv[2] || "";
-const raw = process.versions && process.versions.node ? process.versions.node : process.version;
-const major = Number(String(raw).replace(/^v/, "").split(".")[0]);
-if (major !== 24) {
-  process.stderr.write("Remote Node " + raw + " does not satisfy required range " + range + ". pie needs Node 24.\\n");
-  process.exit(1);
-}
-`;
+export const REMOTE_NODE_ENV_SCRIPT = `PIE_NODE_ENGINE_RANGE=@@PIE_NODE_ENGINE_RANGE@@
 
-export const REMOTE_NODE_ENV_SCRIPT = `prepend_path_if_dir() {
+prepend_path_if_dir() {
   if [ -d "$1" ]; then
     case ":$PATH:" in
       *":$1:"*) ;;
@@ -51,100 +46,150 @@ export const REMOTE_NODE_ENV_SCRIPT = `prepend_path_if_dir() {
   fi
 }
 
-remote_node_satisfies_engine() {
-  PIE_NODE_ENGINE_RANGE=@@PIE_NODE_ENGINE_RANGE@@
-  if [ -z "$PIE_NODE_ENGINE_RANGE" ]; then
+remote_node_major_is_24() {
+  command -v node >/dev/null 2>&1 || return 1
+  PIE_NODE_RAW=$(node -v 2>/dev/null) || return 1
+  case "$PIE_NODE_RAW" in
+    v24.*|24.*) return 0 ;;
+  esac
+  return 1
+}
+
+prefer_node_from_dirs() {
+  PIE_MATCH=
+  for PIE_NODE_BIN in "$@"; do
+    if [ -x "$PIE_NODE_BIN/node" ]; then
+      PIE_SAVED=$PATH
+      PATH="$PIE_NODE_BIN:$PATH"
+      export PATH
+      if remote_node_major_is_24; then
+        PIE_MATCH=$PIE_NODE_BIN
+      fi
+      PATH=$PIE_SAVED
+      export PATH
+    fi
+  done
+  if [ -n "$PIE_MATCH" ]; then
+    PATH="$PIE_MATCH:$PATH"
+    export PATH
     return 0
   fi
-  node - "$PIE_NODE_ENGINE_RANGE" <<'NODE'
-@@PIE_NODE_ENGINE_CHECK_SCRIPT@@
-NODE
+  return 1
 }
 
 ensure_remote_node_path() {
-  if command -v node >/dev/null 2>&1 && remote_node_satisfies_engine >/dev/null 2>&1; then
+  if remote_node_major_is_24; then
     return 0
   fi
+
+  # Scan $HOME installs before PATH/nvm.sh. Login sh -l skips .zshrc, so
+  # Homebrew Node 25 or nvm's default 20 must not shadow fnm/mise Node 24.
+  if [ -z "\${FNM_DIR:-}" ]; then
+    FNM_DIR="$HOME/.local/share/fnm"
+  fi
+  export FNM_DIR
+  prefer_node_from_dirs "$FNM_DIR"/node-versions/*/installation/bin "$HOME/.fnm"/node-versions/*/installation/bin && return 0
+
+  prefer_node_from_dirs "$HOME/.local/share/mise/installs/node"/*/bin "$HOME/.mise/installs/node"/*/bin && return 0
+
+  if [ -z "\${NVM_DIR:-}" ]; then
+    NVM_DIR="$HOME/.nvm"
+  fi
+  export NVM_DIR
+  prefer_node_from_dirs "$NVM_DIR"/versions/node/*/bin && return 0
 
   prepend_path_if_dir "$HOME/.local/bin"
   prepend_path_if_dir "$HOME/bin"
   prepend_path_if_dir "/opt/homebrew/bin"
   prepend_path_if_dir "/usr/local/bin"
-  prepend_path_if_dir "/usr/bin"
-  prepend_path_if_dir "/bin"
+  if remote_node_major_is_24; then
+    return 0
+  fi
+
+  prepend_path_if_dir "$FNM_DIR"
+  prepend_path_if_dir "$HOME/.fnm"
+  if command -v fnm >/dev/null 2>&1; then
+    eval "$(fnm env --shell bash 2>/dev/null)" || true
+    fnm use 24 >/dev/null 2>&1 || fnm use default >/dev/null 2>&1 || fnm use --silent-if-unchanged >/dev/null 2>&1 || true
+  fi
+  if remote_node_major_is_24; then
+    return 0
+  fi
+
+  prepend_path_if_dir "$HOME/.local/share/mise/shims"
+  prepend_path_if_dir "$HOME/.mise/shims"
+  if command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate sh 2>/dev/null)" || true
+  fi
+  if remote_node_major_is_24; then
+    return 0
+  fi
 
   if [ -z "\${VOLTA_HOME:-}" ]; then
     VOLTA_HOME="$HOME/.volta"
   fi
   export VOLTA_HOME
   prepend_path_if_dir "$VOLTA_HOME/bin"
+  if remote_node_major_is_24; then
+    return 0
+  fi
 
   prepend_path_if_dir "$HOME/.asdf/shims"
   prepend_path_if_dir "$HOME/.asdf/bin"
-  if [ ! -x "$HOME/.asdf/shims/node" ] && [ -s "$HOME/.asdf/asdf.sh" ]; then
+  if [ -s "$HOME/.asdf/asdf.sh" ]; then
     # shellcheck disable=SC1090
     . "$HOME/.asdf/asdf.sh"
   fi
-
-  prepend_path_if_dir "$HOME/.local/share/mise/shims"
-  prepend_path_if_dir "$HOME/.mise/shims"
-  if ! command -v node >/dev/null 2>&1 && command -v mise >/dev/null 2>&1; then
-    eval "$(mise activate sh)" >/dev/null 2>&1 || true
-  fi
-
-  if [ -z "\${FNM_DIR:-}" ]; then
-    FNM_DIR="$HOME/.local/share/fnm"
-  fi
-  export FNM_DIR
-  prepend_path_if_dir "$FNM_DIR"
-  prepend_path_if_dir "$HOME/.fnm"
-  if ! command -v node >/dev/null 2>&1 && command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env --shell bash)" >/dev/null 2>&1 || true
-    fnm use --silent-if-unchanged >/dev/null 2>&1 || fnm use default >/dev/null 2>&1 || true
+  if remote_node_major_is_24; then
+    return 0
   fi
 
   prepend_path_if_dir "$HOME/.nodenv/bin"
   prepend_path_if_dir "$HOME/.nodenv/shims"
-  if ! command -v node >/dev/null 2>&1 && command -v nodenv >/dev/null 2>&1; then
-    eval "$(nodenv init -)" >/dev/null 2>&1 || true
+  if command -v nodenv >/dev/null 2>&1; then
+    eval "$(nodenv init - 2>/dev/null)" || true
   fi
-
-  if [ -z "\${NVM_DIR:-}" ]; then
-    NVM_DIR="$HOME/.nvm"
+  if remote_node_major_is_24; then
+    return 0
   fi
-  export NVM_DIR
 
   if [ -s "$NVM_DIR/nvm.sh" ]; then
+    NVM_NO_USE=1
+    export NVM_NO_USE
     # shellcheck disable=SC1090
     . "$NVM_DIR/nvm.sh"
-    if ! command -v node >/dev/null 2>&1 && command -v nvm >/dev/null 2>&1; then
-      nvm use --silent default >/dev/null 2>&1 || nvm use --silent node >/dev/null 2>&1 || nvm use --silent --lts >/dev/null 2>&1 || true
+    if command -v nvm >/dev/null 2>&1; then
+      nvm use --silent 24 >/dev/null 2>&1 || nvm use --silent default >/dev/null 2>&1 || nvm use --silent node >/dev/null 2>&1 || nvm use --silent --lts >/dev/null 2>&1 || true
     fi
   fi
-
-  if ! command -v node >/dev/null 2>&1 && [ -d "$NVM_DIR/versions/node" ]; then
-    for PIE_NODE_BIN in "$NVM_DIR"/versions/node/*/bin; do
-      if [ -x "$PIE_NODE_BIN/node" ]; then
-        PATH="$PIE_NODE_BIN:$PATH"
-        export PATH
-      fi
-    done
+  if remote_node_major_is_24; then
+    return 0
   fi
 
-  command -v node >/dev/null 2>&1 && remote_node_satisfies_engine
+  prepend_path_if_dir "/usr/bin"
+  prepend_path_if_dir "/bin"
+  if remote_node_major_is_24; then
+    return 0
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    PIE_NODE_RAW=$(node -v 2>/dev/null) || PIE_NODE_RAW=unknown
+    printf 'Remote Node %s does not satisfy required range %s. pie needs Node 24.\\n' "$PIE_NODE_RAW" "$PIE_NODE_ENGINE_RANGE" >&2
+  else
+    printf 'Remote host is missing node on PATH. Install Node 24 or configure a supported version manager for non-interactive shells.\\n' >&2
+  fi
+  return 1
 }
 `;
 
 export const REMOTE_RUNNER_SCRIPT = `#!/bin/sh
 set -eu
 @@PIE_NODE_ENV_SCRIPT@@
-ensure_remote_node_path || true
+if ! ensure_remote_node_path; then
+  exit 1
+fi
 PIE_NODE_SCRIPT_PATH=@@PIE_NODE_SCRIPT_PATH@@
 if [ -n "$PIE_NODE_SCRIPT_PATH" ]; then
-  if ! command -v node >/dev/null 2>&1; then
-    printf 'Remote host is missing node on PATH. Install Node 24 or configure a supported version manager for non-interactive shells.\\n' >&2
-    exit 1
-  fi
   exec node "$PIE_NODE_SCRIPT_PATH" "$@"
 fi
 if command -v pie >/dev/null 2>&1; then
@@ -185,7 +230,6 @@ cat >"$RUNNER_FILE" <<'SH'
 SH
 chmod 700 "$RUNNER_FILE"
 if ! ensure_remote_node_path; then
-  printf 'Remote host is missing node on PATH. Install Node 24 or configure a supported version manager for non-interactive shells.\\n' >&2
   exit 1
 fi
 if ! "$RUNNER_FILE" daemon start >>"$LOG_FILE" 2>&1; then
@@ -228,13 +272,12 @@ export function buildRemoteNodeEnvScript(input?: RemotePieRunnerOptions): string
       PIE_NODE_ENGINE_RANGE: shellSingleQuote(
         input?.nodeEngineRange?.trim() || DEFAULT_NODE_ENGINE_RANGE,
       ),
-      PIE_NODE_ENGINE_CHECK_SCRIPT: stripTrailingNewlines(REMOTE_NODE_ENGINE_CHECK),
     }),
   );
 }
 
 export function buildRemotePieRunnerScript(input?: RemotePieRunnerOptions): string {
-  const packageSpec = shellSingleQuote(input?.packageSpec?.trim() || "@getpie/cli@latest");
+  const packageSpec = shellSingleQuote(input?.packageSpec?.trim() || DEFAULT_PIE_PACKAGE_SPEC);
   const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
