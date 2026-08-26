@@ -277,6 +277,7 @@ function DraftRoute() {
                 />
               </PromptInputTools>
               <PromptInputSubmit
+                aria-label="Send message"
                 disabled={
                   !hasContent ||
                   !selected ||
