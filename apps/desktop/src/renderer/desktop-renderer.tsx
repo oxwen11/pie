@@ -20,6 +20,7 @@ export function DesktopRenderer({
           server={desktop.server}
           refresh={desktop.refreshServer}
           status={desktop.status}
+          environments={desktop.platform.ssh?.environments}
           onReady={onReady}
         />
       </Suspense>

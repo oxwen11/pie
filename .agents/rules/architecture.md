@@ -2,12 +2,14 @@
 
 `core ← server|cli|desktop`, `contract ← server ← cli|desktop`, and
 `contract ← client ← app ← desktop`.
+Desktop also depends on `@getpie/ssh` for SSH-launched remote daemons (loopback tunnel only).
 
 | dir                 | name                      | role                                                                                                           |
 | ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `packages/core`     | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
 | `packages/contract` | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
 | `packages/server`   | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
+| `packages/ssh`      | `@getpie/ssh`             | Desktop SSH launch + loopback tunnel. No Electron, renderer, or oRPC.                                          |
 | `packages/client`   | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
 | `packages/ui`       | `@getpie/ui`              | React components. Subpath-only exports, no barrel.                                                             |
 | `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |

@@ -2,8 +2,19 @@ import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { type ReactElement, useSyncExternalStore } from "react";
 
+import { LOCAL_ENVIRONMENT_ID, type EnvironmentSnapshot } from "./platform";
 import { usePlatform } from "./platform-context";
 import type { ServerStatusFeed } from "./server-status";
+
+const LOCAL_ENVIRONMENT_SNAPSHOT: EnvironmentSnapshot = {
+  revision: 0,
+  activeId: LOCAL_ENVIRONMENT_ID,
+  connectingLabel: null,
+  remotes: [],
+};
+
+const subscribeNoop = (): (() => void) => () => {};
+const getLocalEnvironmentSnapshot = (): EnvironmentSnapshot => LOCAL_ENVIRONMENT_SNAPSHOT;
 
 /**
  * Covers the UI while the host restarts a crashed server. The oRPC client
@@ -15,10 +26,33 @@ export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): React
   // The host owns this status; React only reads it. `feed` is a host singleton,
   // so both methods are referentially stable.
   const status = useSyncExternalStore(feed.subscribe, feed.getSnapshot);
+  const environments = useSyncExternalStore(
+    platform.ssh?.environments.subscribe ?? subscribeNoop,
+    platform.ssh?.environments.getSnapshot ?? getLocalEnvironmentSnapshot,
+  );
+  const remoteActive = environments.activeId !== LOCAL_ENVIRONMENT_ID;
+  const connectingLabel = environments.connectingLabel;
+
+  if (connectingLabel) {
+    return (
+      <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Spinner className="text-muted-foreground size-6" />
+          <div>
+            <p className="text-foreground text-sm font-medium">Connecting…</p>
+            <p className="text-muted-foreground text-sm">
+              Starting the pie daemon on {connectingLabel} over SSH.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Initial startup is owned by the host's branded sequence. This overlay
-  // only handles reconnecting or terminal failure.
-  if (status === "starting") return null;
+  // only handles reconnecting or terminal failure. An SSH session talks to a
+  // tunneled remote daemon, so local restart noise stays off-screen.
+  if (status === "starting" || remoteActive) return null;
 
   if (status === "reconnecting") {
     return (

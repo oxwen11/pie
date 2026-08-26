@@ -26,6 +26,7 @@
     "@getpie/app": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
+    "@getpie/ssh": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/experimental-effect": "catalog:orpc",

@@ -353,6 +353,9 @@ importers:
       '@getpie/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@getpie/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
       '@orpc/client':
         specifier: catalog:orpc
         version: 2.0.0-beta.32(@opentelemetry/api@1.9.1)
@@ -632,6 +635,28 @@ importers:
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
+
+  packages/ssh:
+    dependencies:
+      effect:
+        specifier: 4.0.0-rc.110
+        version: 4.0.0-rc.110
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 4.0.0-rc.110
+        version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))
+      '@getpie/typescript':
+        specifier: workspace:*
+        version: link:../../tools/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-preview@4.1.10)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
   packages/ui:
     dependencies:
