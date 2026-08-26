@@ -49,6 +49,20 @@ Gotchas:
   (`curl -o /dev/null http://localhost:4190/`) before typechecking, or typecheck
   fails against the stale tree.
 
+## Automated web e2e
+
+The verify happy path is encoded as Playwright under `apps/app/e2e/`. Prefer
+that for regressions; the manual drive below is for exploratory checks.
+
+```bash
+pnpm turbo run e2e --filter=@getpie/app
+```
+
+That builds the SPA (`e2e` `dependsOn: ["build"]`), boots `pie serve` against
+`tools/testing/fake-pi.mjs`, and drives `/` → `/draft` → `/session/<id>`.
+First-time Chromium: `pnpm --filter @getpie/app exec playwright install chromium`.
+See `apps/app/README.md`.
+
 ## Flows worth driving
 
 - `/` redirects to `/draft` (the new-session surface: a centered composer with a

@@ -19,8 +19,13 @@
   `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
   `include`, so a test file placed elsewhere is silently ignored. `server` and
   `harness` enable `test.typecheck`, so type errors fail the run.
-  `apps/desktop/e2e/` is Playwright and not in CI. `tools/testing/fake-claude.mjs`
-  is referenced by relative path from both server tests and desktop e2e.
+  `apps/app/e2e/` is Playwright for the web SPA (built `dist` + `pie serve` +
+  `tools/testing/fake-pi.mjs`). Run `pnpm turbo run e2e --filter=@getpie/app`.
+  Not in quality CI — that job is a single self-hosted runner and already
+  excludes desktop e2e; do not bolt a browser job onto it until the suite is
+  measured hermetic there. `apps/desktop/e2e/` is Electron Playwright (also not
+  in CI); its browser-mode spec shares `tools/testing/e2e-web.ts` for seed and
+  serve bootstrap.
 - **Assertions:** the runner is always vitest; only the assertion library splits.
   Effect tests (`it.effect`, `layer`) use `node:assert/strict`, plain synchronous
   `it` uses vitest `expect` — currently no exceptions either way. The `/strict`
