@@ -1,7 +1,7 @@
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { Check, Laptop, Plus, Server, Share2 } from "lucide-react";
-import { useState, useSyncExternalStore, type ReactElement } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import { AddSshHostDialog } from "@/features/connections/add-ssh-host-dialog";
@@ -19,6 +19,8 @@ const MISSING_SNAPSHOT: EnvironmentSnapshot = {
 const subscribeNoop = (): (() => void) => () => {};
 const getMissingSnapshot = (): EnvironmentSnapshot => MISSING_SNAPSHOT;
 
+type PendingDialog = "add" | "share";
+
 function sshErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -31,6 +33,7 @@ export function ConnectionSwitcher(): ReactElement | null {
   );
   const [addOpen, setAddOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const pendingDialog = useRef<PendingDialog | null>(null);
 
   if (!ssh) return null;
 
@@ -44,8 +47,32 @@ export function ConnectionSwitcher(): ReactElement | null {
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <Menu>
-            <MenuTrigger disabled={connecting} render={<SidebarMenuButton tooltip="Server" />}>
+          <Menu
+            onOpenChange={(open) => {
+              if (open) return;
+              const pending = pendingDialog.current;
+              pendingDialog.current = null;
+              if (pending === null) return;
+              // The item click also restores focus to the menu trigger. Mounting
+              // the dialog in that turn lets Dialog treat the restore as focus
+              // leaving the popup and unmount it — the click looks dead.
+              window.setTimeout(() => {
+                switch (pending) {
+                  case "add":
+                    setAddOpen(true);
+                    break;
+                  case "share":
+                    setShareOpen(true);
+                    break;
+                  default: {
+                    const exhaustive: never = pending;
+                    return exhaustive;
+                  }
+                }
+              }, 0);
+            }}
+          >
+            <MenuTrigger disabled={connecting} render={<SidebarMenuButton />}>
               {activeRemote ? <Server /> : <Laptop />}
               <span>{environments.connectingLabel ?? label}</span>
             </MenuTrigger>
@@ -81,7 +108,12 @@ export function ConnectionSwitcher(): ReactElement | null {
               ))}
               <MenuSeparator />
               {launch.available ? (
-                <MenuItem disabled={connecting} onClick={() => setAddOpen(true)}>
+                <MenuItem
+                  disabled={connecting}
+                  onClick={() => {
+                    pendingDialog.current = "add";
+                  }}
+                >
                   <Plus />
                   <span>Add SSH host…</span>
                 </MenuItem>
@@ -91,7 +123,12 @@ export function ConnectionSwitcher(): ReactElement | null {
                 </MenuItem>
               )}
               {tailscale === undefined ? null : tailscale.client.available ? (
-                <MenuItem disabled={connecting} onClick={() => setShareOpen(true)}>
+                <MenuItem
+                  disabled={connecting}
+                  onClick={() => {
+                    pendingDialog.current = "share";
+                  }}
+                >
                   <Share2 />
                   <span>Share this computer via Tailscale…</span>
                 </MenuItem>

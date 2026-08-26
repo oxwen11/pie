@@ -12,15 +12,17 @@ import { PlatformProvider } from "@/platform-provider";
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
+const hangingSnapshot = {
+  revision: 0,
+  activeId: LOCAL_ENVIRONMENT_ID,
+  connectingLabel: null,
+  remotes: [],
+} as const;
+
 const hangingSsh: PlatformSsh = {
   client: { available: true },
   environments: {
-    getSnapshot: () => ({
-      revision: 0,
-      activeId: LOCAL_ENVIRONMENT_ID,
-      connectingLabel: null,
-      remotes: [],
-    }),
+    getSnapshot: () => hangingSnapshot,
     subscribe: () => () => {},
   },
   discoverHosts: () => new Promise(() => {}),
