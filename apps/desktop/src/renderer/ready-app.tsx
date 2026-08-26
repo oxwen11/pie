@@ -54,7 +54,9 @@ function KeyedApp({
   status: ServerStatusFeed;
   onReady: () => void;
 }): ReactElement {
-  const [promise] = useState(load);
+  // Once per environment mount (`key={activeId}`). A new promise every render
+  // would re-suspend `use`.
+  const [promise] = useState(() => load());
   const initial = use(promise);
   const [connection, setConnection] = useState(initial);
 
