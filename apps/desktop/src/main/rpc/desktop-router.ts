@@ -8,7 +8,7 @@ import { implement } from "./orpc";
 
 export type DesktopRpcContext = WithEffectContext<never>;
 
-function sshRpcError(error: { readonly message: string }): ORPCError<"BAD_REQUEST", undefined> {
+function rpcUserError(error: { readonly message: string }): ORPCError<"BAD_REQUEST", undefined> {
   return new ORPCError("BAD_REQUEST", { message: error.message });
 }
 
@@ -48,18 +48,29 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
         );
       }),
       discoverSshHosts: orpc.environments.discoverSshHosts.effect(function* () {
-        const hosts = yield* application.discoverSshHosts.pipe(Effect.mapError(sshRpcError));
+        const hosts = yield* application.discoverSshHosts.pipe(Effect.mapError(rpcUserError));
         // oRPC's contract is mutable T[]; ssh config discovery returns readonly.
         return [...hosts];
       }),
       connectSsh: orpc.environments.connectSsh.effect(function* ({ input }) {
-        yield* application.connectSsh(input.target).pipe(Effect.mapError(sshRpcError));
+        yield* application.connectSsh(input.target).pipe(Effect.mapError(rpcUserError));
       }),
       disconnectSsh: orpc.environments.disconnectSsh.effect(function* () {
         yield* application.disconnectSsh;
       }),
       removeSsh: orpc.environments.removeSsh.effect(function* ({ input }) {
         yield* application.removeSsh(input.id);
+      }),
+    },
+    tailscale: {
+      snapshot: orpc.tailscale.snapshot.effect(function* () {
+        return yield* application.tailscaleSnapshot;
+      }),
+      enableServe: orpc.tailscale.enableServe.effect(function* () {
+        yield* application.enableTailscaleServe.pipe(Effect.mapError(rpcUserError));
+      }),
+      disableServe: orpc.tailscale.disableServe.effect(function* () {
+        yield* application.disableTailscaleServe.pipe(Effect.mapError(rpcUserError));
       }),
     },
     app: {

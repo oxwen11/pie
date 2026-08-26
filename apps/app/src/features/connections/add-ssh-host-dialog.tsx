@@ -12,7 +12,22 @@ import { Label } from "@getpie/ui/components/label";
 import { use, useState, type FormEvent, type ReactElement } from "react";
 import { toast } from "sonner";
 
+import type { DiscoveredSshHost } from "@/platform";
 import { usePlatform } from "@/platform-context";
+
+function discoveredHostOptionLabel(host: DiscoveredSshHost): string {
+  switch (host.source) {
+    case "tailscale":
+      return `${host.alias} (Tailscale)`;
+    case "ssh-config":
+    case "known-hosts":
+      return host.alias;
+    default: {
+      const exhaustive: never = host.source;
+      return exhaustive;
+    }
+  }
+}
 
 export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactElement {
   const ssh = usePlatform().ssh;
@@ -47,7 +62,8 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
             <DialogTitle>Add SSH host</DialogTitle>
             <DialogDescription>
               Pie launches the remote pie daemon and forwards it to this computer over SSH. Use
-              ssh-agent or an IdentityFile; password prompts are not wired yet.
+              ssh-agent or an IdentityFile; password prompts are not wired yet. Tailscale MagicDNS
+              names from your tailnet appear in the list when the Tailscale CLI is on PATH.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 px-6 py-2">
@@ -59,14 +75,14 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
                 autoFocus
                 disabled={pending}
                 list="ssh-discovered-hosts"
-                placeholder="user@example.com"
+                placeholder="user@host or user@machine.tailnet.ts.net"
                 value={target}
                 onChange={(event) => setTarget(event.target.value)}
               />
               <datalist id="ssh-discovered-hosts">
                 {hosts.map((host) => (
                   <option key={`${host.source}:${host.alias}`} value={host.alias}>
-                    {host.alias}
+                    {discoveredHostOptionLabel(host)}
                   </option>
                 ))}
               </datalist>

@@ -3,10 +3,12 @@ import { Context, Effect, Ref, Stream, SubscriptionRef } from "effect";
 import type {
   DesktopBootstrap,
   DesktopOs,
+  DiscoveredSshHost,
   EnvironmentSnapshot,
   SshRemoteEnvironment,
   ServerConnection,
   ServerStatusSnapshot,
+  TailscaleSnapshot,
 } from "../../shared/desktop-rpc";
 import { LOCAL_ENVIRONMENT_ID } from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
@@ -17,7 +19,15 @@ import {
   type DesktopSshConnectResult,
   type SavedSshEnvironment,
   type SshEnvironmentError,
+  type SshHostDiscoveryError,
 } from "../ssh/desktop-ssh";
+import {
+  portFromHttpBaseUrl,
+  TailscaleCommandError,
+  type DesktopTailscale,
+  type TailscaleEnvironmentError,
+} from "../tailscale/desktop-tailscale";
+import { mergeDiscoveredHosts } from "../tailscale/merge-discovered-hosts";
 
 /** `process.platform` is Node's vocabulary; the renderer speaks `DesktopOs`. */
 function currentOs(): DesktopOs {
@@ -42,7 +52,10 @@ export class DesktopApplication extends Context.Service<
     readonly connectSsh: (target: string) => Effect.Effect<void, SshEnvironmentError>;
     readonly disconnectSsh: Effect.Effect<void>;
     readonly removeSsh: (id: string) => Effect.Effect<void>;
-    readonly discoverSshHosts: DesktopSsh["Service"]["discoverHosts"];
+    readonly discoverSshHosts: Effect.Effect<readonly DiscoveredSshHost[], SshHostDiscoveryError>;
+    readonly tailscaleSnapshot: Effect.Effect<TailscaleSnapshot>;
+    readonly enableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
+    readonly disableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
     readonly quit: Effect.Effect<void>;
   }
 >()("desktop/DesktopApplication") {}
@@ -50,6 +63,7 @@ export class DesktopApplication extends Context.Service<
 export type DesktopApplicationDependencies = {
   readonly server: LocalServer["Service"];
   readonly ssh: DesktopSsh["Service"];
+  readonly tailscale: DesktopTailscale["Service"];
   readonly initialRemotes: readonly SavedSshEnvironment[];
   readonly quit: Effect.Effect<void>;
 };
@@ -86,6 +100,7 @@ function upsertRemote(
 export function makeDesktopApplication({
   server,
   ssh,
+  tailscale,
   initialRemotes,
   quit,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
@@ -126,6 +141,7 @@ export function makeDesktopApplication({
         statusRevision: current.revision,
         os: currentOs(),
         sshClient: ssh.client,
+        tailscaleClient: tailscale.client,
         environments,
       };
     }),
@@ -175,7 +191,25 @@ export function makeDesktopApplication({
           remotes: current.remotes.filter((remote) => remote.id !== id),
         }));
       }),
-    discoverSshHosts: ssh.discoverHosts,
+    discoverSshHosts: Effect.gen(function* () {
+      const sshHosts = yield* ssh.discoverHosts;
+      const tailscaleHosts = yield* tailscale.listSshHosts;
+      return mergeDiscoveredHosts(sshHosts, tailscaleHosts);
+    }),
+    tailscaleSnapshot: tailscale.snapshot,
+    enableTailscaleServe: Effect.gen(function* () {
+      const connection = yield* server.connection;
+      const localPort = portFromHttpBaseUrl(connection.httpBaseUrl);
+      if (localPort === null) {
+        return yield* new TailscaleCommandError({
+          command: ["tailscale", "serve"],
+          exitCode: null,
+          message: "The local pie daemon has no port to share over Tailscale.",
+        });
+      }
+      yield* tailscale.enableServe(localPort);
+    }),
+    disableTailscaleServe: tailscale.disableServe,
     quit,
   } satisfies DesktopApplication["Service"];
 }

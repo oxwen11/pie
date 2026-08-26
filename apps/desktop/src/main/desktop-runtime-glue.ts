@@ -6,6 +6,7 @@ import { RendererChannel, makeRendererChannel } from "./electron/renderer-channe
 import { makeDesktopRpcServer } from "./rpc/desktop-rpc-server";
 import { LocalServer } from "./server/local-server";
 import { DesktopSsh } from "./ssh/desktop-ssh";
+import { DesktopTailscale } from "./tailscale/desktop-tailscale";
 
 // These two Live layers need Electron capabilities (app.quit, and the oRPC
 // MessagePort wiring that reaches into application/** and rpc/**) that the
@@ -18,10 +19,12 @@ export const DesktopApplicationLive = Layer.effect(
   Effect.gen(function* () {
     const server = yield* LocalServer;
     const ssh = yield* DesktopSsh;
+    const tailscale = yield* DesktopTailscale;
     const initialRemotes = yield* ssh.listSaved;
     return makeDesktopApplication({
       server,
       ssh,
+      tailscale,
       initialRemotes,
       quit: Effect.sync(() => {
         setTimeout(() => app.quit(), 0);

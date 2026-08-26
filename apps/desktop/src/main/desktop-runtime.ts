@@ -19,6 +19,7 @@ import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { DesktopSshLive } from "./ssh/desktop-ssh";
 import { formatStartupFailure } from "./startup-failure";
+import { DesktopTailscaleLive } from "./tailscale/desktop-tailscale";
 
 function makeRuntime(devUrl: string | undefined) {
   // The Node platform services: the daemon launcher's file state and token
@@ -44,6 +45,7 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(DesktopApplicationLive),
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopSshLive),
+      Layer.provide(DesktopTailscaleLive),
       Layer.provide(SshPasswordPrompt.disabledLayer),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
