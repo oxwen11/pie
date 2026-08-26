@@ -1,0 +1,13 @@
+{
+  "name": "@getpie/oxlint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "clean": "git clean -xdf node_modules .turbo"
+  },
+  "devDependencies": {
+    "oxlint": "^1.78.0"
+  }
+}
