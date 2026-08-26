@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { Effect, Layer } from "effect";
+import { resolveDevelopmentScope } from "@getpie/core/development-scope";
+import { developmentDaemonEnvironment } from "@getpie/server/daemon";
+import { Effect, FileSystem, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { applyDesktopRuntime, DesktopConfig } from "../desktop-config";
+import { withTailscaleAllowedHosts } from "../tailscale/allowed-hosts";
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import { LocalServer, makeLocalServer } from "./local-server";
 import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
@@ -16,11 +19,16 @@ export const LocalServerLive = Layer.effect(
   LocalServer,
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
+    const platform = yield* Effect.context<
+      FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+    >();
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const environment = (
       config.isPackaged
         ? resolveLoginShellEnvironmentWith(spawner)
-        : Effect.sync(() => ({ ...process.env }))
+        : Effect.sync(() =>
+            developmentDaemonEnvironment({ ...process.env }, resolveDevelopmentScope()),
+          )
     ).pipe(
       Effect.map((env) =>
         applyDesktopRuntime(env, {
@@ -34,6 +42,8 @@ export const LocalServerLive = Layer.effect(
           ),
         }),
       ),
+      Effect.flatMap(withTailscaleAllowedHosts),
+      Effect.provide(platform),
     );
 
     // Attach the daemon selected by PIE_HOME (the same one the CLI uses)

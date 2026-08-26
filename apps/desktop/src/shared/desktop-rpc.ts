@@ -53,7 +53,7 @@ export const DiscoveredSshHostSchema = Schema.Struct({
   hostname: Schema.NonEmptyString,
   username: Schema.NullOr(Schema.String),
   port: Schema.NullOr(Schema.Int),
-  source: Schema.Literals(["ssh-config", "known-hosts"]),
+  source: Schema.Literals(["ssh-config", "known-hosts", "tailscale"]),
 });
 export type DiscoveredSshHost = typeof DiscoveredSshHostSchema.Type;
 
@@ -70,11 +70,24 @@ export const SshClientAvailabilitySchema = Schema.Union([
 ]);
 export type SshClientAvailability = typeof SshClientAvailabilitySchema.Type;
 
+export const TailscaleClientAvailabilitySchema = SshClientAvailabilitySchema;
+export type TailscaleClientAvailability = typeof TailscaleClientAvailabilitySchema.Type;
+
+export const TailscaleSnapshotSchema = Schema.Struct({
+  client: TailscaleClientAvailabilitySchema,
+  loggedIn: Schema.Boolean,
+  magicDnsName: Schema.NullOr(Schema.String),
+  httpsBaseUrl: Schema.NullOr(Schema.String),
+  serveEnabled: Schema.Boolean,
+});
+export type TailscaleSnapshot = typeof TailscaleSnapshotSchema.Type;
+
 export const DesktopBootstrapSchema = Schema.Struct({
   status: ServerStatusSchema,
   statusRevision: Schema.Natural,
   os: DesktopOsSchema,
   sshClient: SshClientAvailabilitySchema,
+  tailscaleClient: TailscaleClientAvailabilitySchema,
   environments: EnvironmentSnapshotSchema,
 });
 export type DesktopBootstrap = typeof DesktopBootstrapSchema.Type;
@@ -103,6 +116,11 @@ export const desktopContract = {
     connectSsh: oc.input(Schema.Struct({ target: Schema.NonEmptyString })).output(Schema.Void),
     disconnectSsh: oc.output(Schema.Void),
     removeSsh: oc.input(Schema.Struct({ id: Schema.NonEmptyString })).output(Schema.Void),
+  },
+  tailscale: {
+    snapshot: oc.output(TailscaleSnapshotSchema),
+    enableServe: oc.output(Schema.Void),
+    disableServe: oc.output(Schema.Void),
   },
   app: {
     quit: oc.output(Schema.Void),
