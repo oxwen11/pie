@@ -48,7 +48,9 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
         );
       }),
       discoverSshHosts: orpc.environments.discoverSshHosts.effect(function* () {
-        return yield* application.discoverSshHosts.pipe(Effect.mapError(sshRpcError));
+        const hosts = yield* application.discoverSshHosts.pipe(Effect.mapError(sshRpcError));
+        // oRPC's contract is mutable T[]; ssh config discovery returns readonly.
+        return [...hosts];
       }),
       connectSsh: orpc.environments.connectSsh.effect(function* ({ input }) {
         yield* application.connectSsh(input.target).pipe(Effect.mapError(sshRpcError));
