@@ -17,19 +17,22 @@
 | Agent teams（Claude，实验） | lead + 对等会话 | lead，一回合一回合 | 共享任务列表 | 团队定义 |
 | Dynamic workflows | 运行时执行的脚本 | **脚本** | **脚本变量** | **编排本身** |
 
-Grok Build 没有公开的 agent-teams 对等物。它把「后台 fan-out + 校验 + 一份结果」收进 workflows，把「对等会话协作」收进 `/fork`、Agent Dashboard 和云端 Grok Bot。
+Grok Build 公开树里没有 agent-teams 那种对等会话。后台 fan-out、校验、一份结果，都收进 workflows。Grok Bot 不在这棵树里，不能拿它当本地编排的对等物。
 
 对 pie 最有用的判断：pie 现在的会话模型是「一条 transcript + 一个 live runtime」。Workflow 跑的是**会话外的一批子 agent**，进度不该折进主 chat。如果以后要接 Claude Code 或 Grok Build 的这一层，需要独立的 run 对象、phase/agent 进度事件、以及和主 session 分开的许可面。现在仓库里没有 workflow 这个词，也没有对应 RPC。
 
 ## 调研范围与方法
 
-读的是 2026-08-26 当天的官方文档，不是本地装过的 CLI。
+Grok Build 以源码为准。读的是 [xai-org/grok-build](https://github.com/xAI-org/grok-build) 在 `77cd7eb675ba911c225c3aaeeece3a20cbccc426`（2026-08-25 `Synced from monorepo`）的树。仓库声明自己是内部 monorepo 的定期同步，所以这是公开树上的实现，不是已安装二进制的证明。
 
-- Claude Code：[workflows](https://code.claude.com/docs/en/workflows)、[agents](https://code.claude.com/docs/en/agents)、[sub-agents](https://code.claude.com/docs/en/sub-agents)、[agent-teams](https://code.claude.com/docs/en/agent-teams)、[features-overview](https://code.claude.com/docs/en/features-overview)、[scheduled-tasks](https://code.claude.com/docs/en/scheduled-tasks)、[routines](https://code.claude.com/docs/en/routines)、[docs index](https://code.claude.com/docs/llms.txt)
-- Grok Build：[overview](https://docs.x.ai/build/overview)、[modes-and-commands](https://docs.x.ai/build/modes-and-commands)、[subagents](https://docs.x.ai/build/features/subagents)、[skills / plugins / marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)、[worktrees](https://docs.x.ai/build/features/worktrees)、[background-tasks](https://docs.x.ai/build/features/background-tasks)、[settings](https://docs.x.ai/build/settings/reference)、[cli](https://x.ai/cli)、[docs index](https://docs.x.ai/llms.txt)
-- 产品页：[Grok Build 发布](https://x.ai/news/grok-build-cli)、[Workflows 发布](https://x.ai/news/workflows)（2026-07-23）
+主路径：
 
-没跑过 `claude` / `grok` 本体。Grok 没有独立的 `/build/features/workflows` 页面（404）。部分运行时数字来自对公开源码快照的二次分析，单独标成推断。
+- `crates/codegen/xai-workflow/`：Rhai 引擎、journal、meta、validate
+- `crates/codegen/xai-grok-shell/src/session/workflow/`：manager、registry、host、tracker、store
+- `crates/codegen/xai-grok-tools/src/implementations/grok_build/workflow/mod.rs`：`workflow` 工具
+- `crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai`：唯一编进二进制的 workflow
+
+Claude Code 没有同等公开 harness 源码，那一半仍按 2026-08-26 的 [code.claude.com/docs](https://code.claude.com/docs/en/workflows) 写，并标明。没跑过本机 `claude` / `grok`。
 
 ## 先把名词拆开
 
@@ -162,99 +165,95 @@ return audits.filter(Boolean)
 
 Grok Build 是 xAI 的终端 coding agent，SuperGrok / X Premium Plus 可用，Grok 4.6 驱动。[产品页](https://x.ai/cli) 和 [docs overview](https://docs.x.ai/build/overview) 把它定位成 TUI、headless（`-p`）、以及 ACP 三种入口。
 
-### 兼容层是设计，不是事后补丁
+### 兼容层（源码）
 
-[Skills / plugins 页](https://docs.x.ai/build/features/skills-plugins-marketplaces) 写得很硬：Grok 零配置读 Claude Code 的 marketplaces、plugins、skills、MCPs、agents、hooks，以及 `CLAUDE.md` / `Claude.md` / `CLAUDE.local.md` / `.claude/rules/`，同时也读 `AGENTS.md` 家族和 `~/.agents/skills|commands/`。设置里有一整组 `GROK_CURSOR_*` / `GROK_CLAUDE_*` 开关，默认全开。TUI 还有 `/import-claude`。
+`xai-grok-tools/src/types/compat.rs` 自己写：历史上目录列表 `[".grok", ".agents", ".claude", ".cursor"]` 散落在三个 crate 的大约 6 个调用点。现在由这个模块当唯一注册表。解析链是 env → config TOML → remote setting → **默认开**。
 
-Skill frontmatter 和 Claude 几乎同形：`name`、`description`、`when-to-use`、`paths`、`allowed-tools`、`argument-hint`、`user-invocable`、`disable-model-invocation`。Grok 接受但不应用 `model`、`effort`、`license`、`compatibility`。`allowed-tools` **不授予也不限制**工具，这点和「写了就收权」的直觉相反。
+`COMPAT_CELLS` 有 18 格。Cursor / Claude 各覆盖 skills、rules、agents、mcps、hooks、sessions。Codex 只有 sessions 默认开，skills / rules / agents / mcps / hooks 那几格默认关。`agents_md_tracker.rs` 把 `CLAUDE.md` 和 `.claude/CLAUDE.md` 列进发现名单。这是读 Claude 约定的实现，不是文档承诺。
+
+兼容层扫的是 skills / hooks / MCP / agents / `CLAUDE.md`。workflow 文件不在这份名单里。registry 只认 `.rhai`，不会去读 `.claude/workflows/`。
 
 ### Subagents
 
-[官方页很短](https://docs.x.ai/build/features/subagents)。内置三类：`general-purpose`（完整能力）、`explore`（只读，无 shell / 编辑）、`plan`（写计划，无 shell / 编辑）。自定义放 `.grok/agents/` 或 `~/.grok/agents/`。Personas 只覆盖语气和契约，不是另一种 agent。
+workflow 子调用的默认 `agent_type` 是 `general-purpose`（`host.rs`）。`capability_mode` 才是脚本侧的权限旋钮：`read-only` / `read-write` / `execute` / `all`。`deep_research.rhai` 把 planner / researcher / verifier 都钉成 `read-only`。内置 explore / plan 的产品说明在文档里，本树的 workflow 路径不靠那两个类型。
 
-环境变量 `GROK_SUBAGENTS` 默认写的是 `0`，文档又说「unset 时默认开」。以 `[subagents] enabled` 和 unset 行为为准，不要只看这个 env 默认值。
+### Workflows（源码）
 
-### Workflows
+树在 `77cd7eb`。实现分三层：`xai-workflow` 跑 Rhai；`session/workflow` 管 run 生命周期；`GrokBuild:workflow` 工具是模型的入口。工具描述写明：调用立刻返回，进度走 `/workflow runs`，完成会自动通知，不要 poll。
 
-官方没有独立 feature 页。能核对的是 [modes-and-commands](https://docs.x.ai/build/modes-and-commands) 和 2026-07-23 的 [x.ai/news/workflows](https://x.ai/news/workflows)。
+开关在 `resolve_workflows()`：远端 `workflows_enabled == false` 最高优先，然后 `GROK_WORKFLOWS`，然后 `[workflows] enabled`，默认 `true`。关掉时 launch 通道直接 `workflows_disabled`。子 agent 启动时 `is_subagent` 也不会带上这个工具。子 session 按 kind 或短 id 剥掉 `workflow`，所以脚本里的孩子不能再开 workflow。
 
-命令面：
+**脚本契约。** 第一句必须是 `let meta` 或 `const meta`。`meta.name` 是 kebab-case（小写字母数字，单连字符，不能打头或收尾）。未知 meta 字段直接拒。名字最多 64 字节，phases 最多 64 个且 title 不能重复。引擎关了 `eval` 和模块加载；`timestamp()`、`sleep()`、`exit()` 会报错。`timestamp` 的错误写得很白：墙钟时间会破坏 resume，时间从 `args` 传入。结束用 `complete(value)` 或 `pause(kind, msg)`。`await_user` 会先记 journal 再 pause，resume 时跳过这道门。
 
-| 命令 | 做什么 |
-| --- | --- |
-| `/create-workflow [description]` | 写并保存一份新 workflow。Grok 会问 fan-out、校验、范围，然后作者、smoke-check、落盘 |
-| `/workflow <name> [args]` | 启动已保存的，或 `pause` / `resume` / `stop` / `save` |
-| `/workflows` | 全屏 run dashboard。列的是正在跑和保留的 run，不是磁盘上的文件 |
-| `/deep-research <query>` | 内置调研 workflow |
+宿主函数（`engine.rs` `register_host_fns`）：`agent`、`parallel`、`phase`、`log`、`telemetry_event`、`complete`、`pause`、`await_user`、`budget`、`render_template`、`write_scratch_file`、`read_scratch_file`、`git_diff_since`、`fingerprint`、`json_encode`。没有 Claude 那种 `pipeline()`；fan-out 就是 `parallel([#{ prompt, ... }, ...])`。
 
-落盘：项目 `.grok/workflows/<name>.rhai`，或个人 `~/.grok/workflows/<name>.rhai`。启动可带 JSON args：
+`agent` 的 opts（`host.rs` `AgentOpts`）：`prompt`、`label`、`model`、`effort`、`max_output_tokens`（host 忽略，只打 debug）、`agent_type`（默认 `general-purpose`）、`capability_mode`（`read-only` / `read-write` / `execute` / `all`）、`isolation_worktree`、`fork_context`、`resume_from`、`output_schema`、`phase`。`fork_context` 只允许 builtin workflow；用户脚本要这个会 `Unsupported`。
 
-```text
-/create-workflow Review the current branch for bugs, then verify each finding
-/workflow review-changes {"target":"origin/main...HEAD"}
-/workflow pause review-changes
-```
+**三个不是同一个数的「1024」。** `xai-workflow/src/lib.rs`：
 
-关掉：`~/.grok/config.toml` 里 `[workflows] enabled = false`，或 `GROK_WORKFLOWS=0`。默认开。
+| 常量 | 值 | 含义 |
+| --- | --- | --- |
+| `DEFAULT_AGENT_BUDGET` | 128 | 逻辑子 agent 调用的默认上限 |
+| `MAX_AGENT_BUDGET` | 1_024 | `agent_budget` 能设到的顶 |
+| `MAX_PARALLEL` | 1_024 | 单次 `parallel()` 的 item 数 |
+| `MAX_HOST_CALLS` | 10_000 | 带结果的宿主调用（含非 agent） |
+| `WORKFLOW_MAX_ACTIVE_RUNS_PER_SESSION` | 4 | 一个 session 同时活着的 run（含 retiring） |
 
-[新闻页原文](https://x.ai/news/workflows) 的产品承诺：
+工具 schema 把 `agent_budget` 写成：「绝对累计上限。每个 `agent()` 和每个 `parallel()` item 占一格；schema retry 不占。1–1024，默认 128。会超预算的 panel 在任何孩子启动前整组拒绝。」
 
-- 用自然语言描述大任务，Grok 写成带 phase 的脚本，后台 fan-out「数百」个并行 agent，会话保持空闲
-- 「Runs get a budget of 128 agents, and up to 1,024 for big jobs」
-- 「Progress is saved as the run goes, so pausing and resuming never redoes finished work」
-- `/workflows` 按 phase 看进度和每 agent 的 token
-- Grok 写脚本、启动前 smoke-check、跑之间会改；「you never write the script yourself」
-- 项目 `.grok/workflows/` 跟仓库走，个人 `~/.grok/workflows/` 跟人走；存下来的变成带参数的 slash command（示例：`/pr-review 5137`）
-- 内置 `/deep-research`：并行调查、按源校验 claim、交带引用的报告
+同时在跑几个是另一条轴。`DEFAULT_WORKFLOW_MAX_CONCURRENT_AGENTS = 32`，再和 `available_parallelism().max(2)` 取小。更宽的 `parallel()` 排队，仍然是 barrier。物理模型调用还可以再高：`SCHEMA_CONTRACT_RETRIES = 1`，`WORKFLOW_MAX_AGENT_RUNS = 1024 * (1+1) = 2048`。逻辑 budget 打满之后，structured-output 修一次还可以再跑一轮，不另占逻辑格。
 
-这些数字和 Claude 官方表不是同一量纲。Claude 写的是**同时并发 16、单次总计 1000**。Grok 公开写的是**budget 128–1024**，没有同时在跑几个的官方数。二次分析（对公开源码快照）还说：每会话最多 4 个活跃 workflow、workflow 不能嵌套、resume 只活在同一进程里、CLI 重启后中断的 run 算终止。这些没有出现在 `docs.x.ai` 或新闻页里，当推断，不要当 SLA。
+**发现顺序。** `WorkflowRegistry::scan`：`~/.grok/bundled/workflows` → 编译进二进制的 builtin → 受信任项目下的 `.grok/workflows/` → `~/.grok/workflows/`。`merge_scope` 是先到先得。注释写明：项目/用户**不能**覆盖编译进二进制的名字。GCS 下发的 `deep-research.rhai` 可以影子 `include_str!`，但仍算 Builtin（保留 `fork_context` 特权，且不可 save）。同 scope 重名整组标 ambiguous 并丢掉。workflow 目录若是 symlink 直接跳过。按路径加载拒 symlink。文件名必须是 `<meta.name>.rhai`。源文件上限 1 MiB。
 
-脚本语言是 Rhai，不是 JS。官方 docs 没给 `agent()` / `parallel()` 的 API。二次来源和一份公开的 `engine.rs` 快照显示宿主函数包括 `agent(prompt)` / `agent(prompt, opts)`，以及并行 fan-out；`eval`、模块加载、`sleep`、`exit` 被关掉。可信度低于 Claude 那份带 `pipeline()` 示例的官方页。
+编进树的 builtin 只有一个：`deep-research`。`create-workflow` 是平台 skill（`builtin.rs` 里有 hash），本树没有它的 `SKILL.md`。
 
-### 工作区隔离、后台、计划
+**Resume 是同进程 journal 回放，不是云作业。** journal 在 `session_dir/workflows/<run_id>/journal.jsonl`，按 `seq` 密集编号，回放对 `kind + req_hash`。脚本中途改了会 `Divergence`。resume 时脚本和 args 不可变；`LaunchError` 在 args 对不上时直接拒。工具 schema 原文：「Process-restart interruptions are terminal。」
 
-[Worktrees](https://docs.x.ai/build/features/worktrees) 是一等能力。`grok -w` 在隔离 checkout 里开会话；subagent 做并行工作时也可以要 worktree。路径在 `~/.grok/worktrees/<repo>/<key>/`，从当前 HEAD 起，包含未提交改动。结束会话不会自动删 worktree，要自己 `grok worktree gc`。
+`WorkflowRunStatus::is_resumable`：paused 全家、`Failed`、`Cancelled` 可 resume。`Complete` 和 `Interrupted` 不行。`/workflow stop` 的 Cancelled 留着 journal，按 pause 同一条路续。`BudgetLimited` 只有传入更高的 `agent_budget` 才能续；已经用到 `MAX_AGENT_BUDGET` 就只能新开。`Failed` resume 会 `prune_trailing_host_error`。journal 上限 64 MiB / 10000 条，写满会拒，避免不可 resume 的半截。
 
-[Background tasks](https://docs.x.ai/build/features/background-tasks) 把命令、subagent、monitor 从对话里拆出去。`Ctrl+G` 开任务窗，`Ctrl+B` 把前台命令降到后台。`/loop` 按间隔重跑 prompt（最短 60 秒，7 天过期，最多 50 个）。Monitor 把脚本的每一行打进对话，不适合高噪声日志。
+**`deep_research.rhai`。** 默认 `breadth = 4`，`args.breadth` 夹在 2–6。四段：Plan / Research / Verify / Report。planner、researcher、verifier 都是 `capability_mode: "read-only"`。每个 researcher 最多 6 条 claim；候选池 24。verifier 按 `claim_idx % verifier_count` 分片，1 或 2 个 shard，**每条 claim 只给一个 verifier**。shard 输出对不上 expected IDs 就整片作废。`supported == true` 还要非空的 `evidence` / `source_title` / `source_locator`。报告写进 scratch `report.md`。默认成功路径大约 1 个 planner + ≤4 个 researcher + 1–2 个 verifier + 1 个 synthesizer，远小于 128。
 
-Plan mode 和 permission mode 正交：`/plan` 或 `Shift+Tab` 进去之后，批准计划之前只能改计划文件。Auto 用分类器放行安全工具。Always-approve 跳过工具提示，deny 规则和 hooks 仍生效。
+scratch：每 run 最多 64 个文件，单文件 10 MiB，合计 64 MiB。脚本 telemetry 最多 64 条。agent prompt 上限 1 MiB。
 
-ACP：`grok agent stdio` 让外部 IDE / bot 当 Grok Build 的客户端。Headless `-p` 带 `streaming-json`。这是把 Grok 嵌进别的编排器的官方口，不是 Grok 自己的 workflow 脚本。
+### 工作区隔离（workflow 相关）
+
+`AgentOpts.isolation_worktree` 会传到 `host_service.rs`。子 agent 可以要独立 checkout。会话级 worktree（`grok -w`、`~/.grok/worktrees/`、`gc`）在 `session/worktree.rs` 和 `extensions/worktree.rs`，跟 workflow run 不是同一条对象。resume 会话会走 `create_worktree_for_resume`，检测 jj 还是 git。
+
+后台任务、`/loop`、Plan mode、ACP 的产品页不在这条调研的源码路径里。ACP spawn 只核对过一件事：`background_workflows_enabled == false` 时 launch 直接拒，错误字符串点名 `[workflows] enabled` / `GROK_WORKFLOWS=0` / remote flag。
 
 ### Grok Bot
 
-另一条产品线：云上持久电脑里的 teammate，带消息、审批、connectors、routines。[changelog](https://docs.x.ai/llms.txt) 2026 年 8 月条把它标成已可用。审批模型是「允许一次 / 拒绝 / 总是允许」，另有 Auto Review 规则。这是云端队友，不是本地 `.rhai` 编排。Claude 对应的是 routines + Claude Code on the web，不是 Dynamic Workflows。
+公开树里搜不到 Grok Bot / cloud routines 的实现。那是另一条产品线，不是本地 `.rhai` 编排。Claude 对应的是 routines + Claude Code on the web，不是 Dynamic Workflows。这段不再用 changelog 当依据。
 
 ## 对照
 
 ### 脚本编排这一层
 
-| | Claude Code Dynamic Workflows | Grok Build Workflows |
+| | Claude Code Dynamic Workflows（文档） | Grok Build Workflows（`77cd7eb` 源码） |
 | --- | --- | --- |
-| 首次公开 | 2026-05-25 那一周的 changelog（v2.1 线，要 2.1.154+） | 2026-07-23 新闻页 |
-| 脚本 | JavaScript，`agent()` + `pipeline()` | Rhai，`.rhai`；宿主 API 官方未文档化 |
-| 谁写脚本 | 模型写；你可事后看、存、改 | 模型写；`/create-workflow` 会先问再 smoke-check |
-| 内置 | `/deep-research` | `/deep-research` |
-| 保存 | `.claude/workflows/`、`~/.claude/workflows/`、plugin | `.grok/workflows/`、`~/.grok/workflows/` |
-| 调用 | `/<name>`，`args` 进脚本全局 | `/workflow <name> {json}` 或 `/<name>` |
-| Dashboard | `/workflows` | `/workflows` |
-| 规模（官方） | 同时 16，总计 1000 | budget 128，最高 1024（逻辑调用） |
-| 规模建议 | `workflowSizeGuideline` | 未见对等设置 |
-| 恢复 | 同会话；进程退出即丢 | 官方说已完成不重做；二次来源说同进程 journal |
-| 许可 | 启动提示随 mode 变；子 agent 固定 `acceptEdits` | 文档没写 workflow 专用许可例外 |
-| 关 | `/config`、`disableWorkflows`、`CLAUDE_CODE_DISABLE_WORKFLOWS` | `[workflows] enabled`、`GROK_WORKFLOWS=0` |
-| 出现在 | CLI、Desktop、IDE、`-p`、Agent SDK | TUI 默认开；headless / ACP 是否完整暴露未写清 |
-| 文档完整度 | 有独立页、约束表、示例脚本、恢复规则 | 一段命令说明 + 新闻稿 |
+| 脚本 | JavaScript，`agent()` + `pipeline()` | Rhai，`agent()` + `parallel()` |
+| 谁写脚本 | 模型写；你可事后看、存、改 | 模型经 `workflow` 工具写；`validate_only` 做 smoke-check |
+| 内置 | `/deep-research` | 编译进树的只有 `deep-research` |
+| 保存 | `.claude/workflows/`、`~/.claude/workflows/`、plugin | `.grok/workflows/`、`~/.grok/workflows/`；builtin 名不可被项目影子 |
+| 规模 | 同时 16，总计 1000 | 逻辑 128–1024；同时默认 32 再按 CPU clamp；每 session 最多 4 个 run |
+| 物理调用 | 文档未拆 retry | schema retry 1 次，物理上限 2048 |
+| 恢复 | 同会话；进程退出即丢 | 同进程 journal；工具写明进程重启即终止 |
+| 中途问人 | 不行（只能拆成多次 workflow） | `await_user` / `pause`；resume 跳过已记录的 await |
+| 子 agent 再开 workflow | 文档未写死 | 从子 session 工具表剥掉 |
+| `fork_context` | skill `context: fork` | 仅 builtin |
+| 关 | `disableWorkflows` / env | 远端 flag > `GROK_WORKFLOWS` > `[workflows] enabled`，默认开 |
 
-产品形状几乎是一份作业抄了两次。有意义的差别不在 1000 对 1024，而在：
+产品形状同形，量纲不同。Claude 文档把并发和总计写在一起。Grok 源码把逻辑 budget、同时在跑、每 session 的 run 数、物理 retry 拆开。新闻稿里的「1024 agents」在树上是累计逻辑调用，不是 1024 路同时跑。
 
-1. **脚本能不能被团队审。** Claude 的 JS + 官方示例更好读。Grok 的 Rhai 更难在仓库外找到规范。
-2. **花费能不能事先框住。** Claude 有 size guideline 和 `Large workflow` 警告。Grok 有更大的逻辑 budget，没有已发布的并发或预计 token 阈值。
-3. **恢复是不是跨进程。** 两边官方都把 resume 限制在当前会话 / 当前进程。都不是云队列。
-4. **脚本能不能带走。** Grok 读 Claude 的 skills / hooks / MCP / `CLAUDE.md`，但 workflow 文件格式不通用。`.js` 和 `.rhai` 是两套运营资产。
-5. **谁先把「计划」从模型脑子里挪进代码。** 这是这一层真正的产品决定。模型当编排器时，每一步的中间结果都进上下文，打断就重来一回合。脚本当编排器时，循环和分支活在 runtime 里，模型上下文只收终局。
+1. **脚本是可审的。** Grok 的 API 在 `engine.rs` / `host.rs`，bundled 脚本在仓库里。Claude 的 JS 示例在文档里，harness 不公开。
+2. **花费。** Claude 有 size guideline 和 150 万 token 警告。Grok 硬顶的是逻辑调用和 32 路并发，没有 workflow 级 token / 美元 cap。`max_output_tokens` 被忽略。
+3. **恢复。** 两边都不是云队列。Grok 把这句话写进工具 schema：进程重启即终止。
+4. **格式。** `.js` 和 `.rhai` 不能互换。Grok 读 Claude 的 skills / hooks / MCP，不读 Claude 的 workflows。
+5. **谁拿着计划。** 两边都把循环从模型上下文挪进 runtime。Grok 还多了 `await_user`，所以脚本可以在阶段之间停下来等人，而不必拆成两次 run。
 
 ### 整栈，不只 workflow
+
+Claude 栏仍是文档。Grok 栏里 workflows、compat 格、`isolation_worktree` 对过源码。marketplace、`/fork`、`/loop`、Plan mode、Grok Bot 没对。
 
 | 能力 | Claude Code | Grok Build |
 | --- | --- | --- |
@@ -281,7 +280,7 @@ Grok 的策略很清楚：做成 Claude Code 配置的超集，再在编排语�
 
 弱的形状也对称。共享状态上的编辑、步骤严格依赖前一步的迁移、事故响应里的现场判断，都不该先上百个 agent。Claude 自己写：workflow 中途不能问用户；要阶段签字就拆成多次。Grok 的 `/create-workflow` 会先问校验和范围，也是在逼你承认「校验是拓扑的一部分，不是礼貌」。
 
-`/deep-research` 两边都内置，而且都不是「搜得越多越好」。Claude 过滤没挺过交叉校验的 claim。Grok 新闻页同样强调独立 skeptics。二次来源里那份 `deep_research.rhai` 默认广度 4（2–6），完整路径大约 4–8 次逻辑调用：1 个 planner、最多 4 个只读 researcher、1–2 个 verifier shard、1 个报告。平台天花板是营销数字；捆绑脚本是生产形状。
+`/deep-research` 两边都内置，都不是「搜得越多越好」。Claude 文档写交叉校验和投票。Grok 的 `deep_research.rhai` 默认广度 4，完整成功路径大约 4–8 次逻辑调用。平台天花板是 1024；捆绑脚本是个位数。verifier 是分片排斥，不是双人投票：一条 claim 只进一个 shard。
 
 ## 对 pie 的含义
 
@@ -294,38 +293,46 @@ pie 当前会话域（`CONTEXT.md`、`packages/server/src/harness/`）按 **一�
 1. **Run 不是 turn。** 主会话在 workflow 跑的时候仍然能说话。进度是 phase / agent / token，不是 assistant message。不能把这些折进现在的 `session.turn.ended` 边界。
 2. **事件面要多一个对象。** 至少要有 `workflow.started|progress|paused|resumed|stopped|finished`，payload 带 run id、phase、agent 计数、token。订阅模型今天是按 SessionRef。workflow 挂在 session 下还是并列，要单独定。
 3. **许可面是第二次提示。** Claude 把「启不启动这场 fan-out」和「子 agent 能不能改文件」分开。pie 现在的 agent-request 通道是为工具调用准备的。一场 50 agent 的 run 如果每个 shell 都冒泡，UI 会不可用。
-4. **历史冷读。** Claude 已经有 `getSubagentMessages` / `listSubagents`。workflow 的脚本写在 `~/.claude/projects/` 下的 session 目录。pie 的 getMessages 路径（wayfinder ticket 10）还没走到这一层。
-5. **配置发现。** Grok 已经扫 `.claude/` 和 `.cursor/`。pie 如果做 skill 安装（harness 设计里的 `skill` 模块标了暂不细化），发现路径要按「多 harness 共读同一份仓库约定」来设计，不要为每个 adapter 各做一套。
+4. **历史冷读。** Claude 文档有 `getSubagentMessages` / `listSubagents`。Grok 的 journal 在 `session_dir/workflows/<run_id>/journal.jsonl`，tracker 另记 roster。pie 的 getMessages 路径（wayfinder ticket 10）还没走到这一层。
+5. **配置发现。** Grok 扫 `.claude/` 和 `.cursor/`（compat 开关，默认开）。pie 如果做 skill 安装，发现路径要按「多 harness 共读同一份仓库约定」来设计。workflow 文件不要指望能共用：Grok 的 registry 只认 `.rhai`。
 
 不建议现在实现 workflow runtime。建议先把词汇表写进 `CONTEXT.md` 的避免列表：pie 自己的词继续用 session / turn / worktree；提到 Claude / Grok 时把 workflow 特指「脚本编排的后台 run」，不要用来形容 skill 或日常开发流程。
 
 ## 没核实的部分
 
-- 没在本机跑过 `claude` 或 `grok`，所有行为以文档为准。
-- Grok 没有独立 workflows 文档页。并发、journal、嵌套禁止、每会话 4 个活跃 run，来自二次分析和源码快照，不是 `docs.x.ai` 的规范承诺。
-- 没在本机打开过 `/workflows` dashboard，UI 细节以文档截图和命令表为准。
-- 没核对 Agent SDK 里 Workflow tool 的完整 TypeScript 类型；Claude 文档指向 [Agent SDK TypeScript reference](https://code.claude.com/docs/en/agent-sdk/typescript)。
-- 没查 GitHub issues / 团队聊天 / 产品分析。这是公开文档调研，不是 pie 内部决策考古。
-- 没比较 OpenAI Codex 的对等层。Codex 在 pie 里是另一条 harness，不在这次范围。
+- 没跑过本机编译出的 `xai-grok-pager`。源码是公开树，不是已安装二进制。xAI 说这个仓库是 monorepo 定期同步。
+- `create-workflow` skill 的 `SKILL.md` 不在这个树里，只有 hash。作者指南以工具描述里的那句 “read the create-workflow skill” 为准，正文没读到。
+- Grok Bot / cloud routines 不在这棵树里。后台任务、`/loop`、Plan mode、marketplace 安装路径没对源码。
+- Claude Code 一半仍是文档。没对过 Agent SDK 的 Workflow tool 类型。
+- 没比 Codex。没查 pie 内部决策记录。
 
 ## 来源
 
-- Claude Code workflows: https://code.claude.com/docs/en/workflows
-- Claude Code parallel agents: https://code.claude.com/docs/en/agents
-- Claude Code features overview: https://code.claude.com/docs/en/features-overview
-- Claude Code agent teams: https://code.claude.com/docs/en/agent-teams
-- Claude Code scheduled tasks: https://code.claude.com/docs/en/scheduled-tasks
-- Claude Code routines: https://code.claude.com/docs/en/routines
-- Claude Code docs index（changelog 条目，2026-w22 引入 dynamic workflows）: https://code.claude.com/docs/llms.txt
-- Grok Build overview: https://docs.x.ai/build/overview
-- Grok Build modes and commands: https://docs.x.ai/build/modes-and-commands
-- Grok Build skills / plugins / marketplaces: https://docs.x.ai/build/features/skills-plugins-marketplaces
-- Grok Build subagents: https://docs.x.ai/build/features/subagents
-- Grok Build worktrees: https://docs.x.ai/build/features/worktrees
-- Grok Build background tasks: https://docs.x.ai/build/features/background-tasks
-- Grok Build settings: https://docs.x.ai/build/settings/reference
-- Grok Build product page: https://x.ai/cli
-- Grok Build 发布: https://x.ai/news/grok-build-cli
-- Grok Build workflows 发布: https://x.ai/news/workflows
-- Grok docs index（Grok Bot 2026-08 条目）: https://docs.x.ai/llms.txt
-- 二次分析（Grok runtime 数字，非官方）: https://rohitai.com/blog/xai-grok-build-workflows-parallel-agents
+Grok Build，[xai-org/grok-build](https://github.com/xAI-org/grok-build) @ `77cd7eb675ba911c225c3aaeeece3a20cbccc426`：
+
+- `crates/codegen/xai-workflow/src/lib.rs`
+- `crates/codegen/xai-workflow/src/engine.rs`
+- `crates/codegen/xai-workflow/src/host.rs`
+- `crates/codegen/xai-workflow/src/journal.rs`
+- `crates/codegen/xai-workflow/src/meta.rs`
+- `crates/codegen/xai-workflow/src/run.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflow/manager.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflow/registry.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflow/host_service.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflow/tracker.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflow/schema_contract.rs`
+- `crates/codegen/xai-grok-shell/src/session/workflows/deep_research.rhai`
+- `crates/codegen/xai-grok-tools/src/implementations/grok_build/workflow/mod.rs`
+- `crates/codegen/xai-grok-shell/src/agent/config.rs`（`resolve_workflows`）
+- `crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs`（disabled 拒绝）
+- `crates/codegen/xai-grok-tools/src/types/compat.rs`（vendor 兼容格，默认开）
+- `crates/codegen/xai-grok-tools/src/types/agents_md_tracker.rs`（`CLAUDE.md` 发现）
+
+Claude Code（文档，无公开 harness 树）：
+
+- https://code.claude.com/docs/en/workflows
+- https://code.claude.com/docs/en/agents
+- https://code.claude.com/docs/en/features-overview
+- https://code.claude.com/docs/en/agent-teams
+- https://code.claude.com/docs/en/scheduled-tasks
+- https://code.claude.com/docs/en/routines
