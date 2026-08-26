@@ -61,13 +61,14 @@ for per-agent tool rendering.
 - **Do not wrap a bare `useQuery` in a hook.** Call `useQuery` /
   `useQueries` at the consumer. A hook is justified only when it owns extra
   state, a mutation, or a multi-query policy (`useProjects`,
-  `useProjectSessionTitle`, `useDraftWorktree`, `useSessionModels`).
+  `useProjectSessionTitle`, `useDraftWorktree`, `useSessionModels`). Enforced
+  by `pie-query/no-thin-use-query-hook` (`tools/oxlint/query-policy.mjs`).
 - **Query cache policy lives on the QueryClient** in `createAppClients`:
   `staleTime: Infinity`, `refetchOnWindowFocus: "always"`. Do not repeat those
   on individual `useQuery` calls. The one key exception is `agent.session.list`
   (`staleTime: 30_000` via `setQueryDefaults`). Per-query `select`, `enabled`,
   `retry`, and `placeholderData` stay at the call site — they are not cache
-  policy.
+  policy. Enforced by `pie-query/no-query-client-default-overrides`.
 - **Narrow a query with `select`, not after the result.** When a consumer needs
   one field out of a list query, derive it inside `useQuery`'s `select` —
   narrowing after the fact (`data?.find(...)`) subscribes the component to the
