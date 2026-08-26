@@ -27,7 +27,7 @@ Grok Build 没有公开的 agent-teams 对等物。它把「后台 fan-out + 校
 
 - Claude Code：[workflows](https://code.claude.com/docs/en/workflows)、[agents](https://code.claude.com/docs/en/agents)、[sub-agents](https://code.claude.com/docs/en/sub-agents)、[agent-teams](https://code.claude.com/docs/en/agent-teams)、[features-overview](https://code.claude.com/docs/en/features-overview)、[scheduled-tasks](https://code.claude.com/docs/en/scheduled-tasks)、[routines](https://code.claude.com/docs/en/routines)、[docs index](https://code.claude.com/docs/llms.txt)
 - Grok Build：[overview](https://docs.x.ai/build/overview)、[modes-and-commands](https://docs.x.ai/build/modes-and-commands)、[subagents](https://docs.x.ai/build/features/subagents)、[skills / plugins / marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)、[worktrees](https://docs.x.ai/build/features/worktrees)、[background-tasks](https://docs.x.ai/build/features/background-tasks)、[settings](https://docs.x.ai/build/settings/reference)、[cli](https://x.ai/cli)、[docs index](https://docs.x.ai/llms.txt)
-- 产品页：[Grok Build 发布](https://x.ai/news/grok-build-cli)、[Workflows 发布](https://x.ai/news/workflows)（后者抓取被限流，正文以二次来源转述并标出）
+- 产品页：[Grok Build 发布](https://x.ai/news/grok-build-cli)、[Workflows 发布](https://x.ai/news/workflows)（2026-07-23）
 
 没跑过 `claude` / `grok` 本体。Grok 没有独立的 `/build/features/workflows` 页面（404）。部分运行时数字来自对公开源码快照的二次分析，单独标成推断。
 
@@ -176,7 +176,7 @@ Skill frontmatter 和 Claude 几乎同形：`name`、`description`、`when-to-us
 
 ### Workflows
 
-官方没有独立 feature 页。能核对的是 [modes-and-commands](https://docs.x.ai/build/modes-and-commands) 和 [x.ai/news/workflows](https://x.ai/news/workflows)（新闻页本次抓取 429，下文转述二次来源时标明）。
+官方没有独立 feature 页。能核对的是 [modes-and-commands](https://docs.x.ai/build/modes-and-commands) 和 2026-07-23 的 [x.ai/news/workflows](https://x.ai/news/workflows)。
 
 命令面：
 
@@ -197,16 +197,17 @@ Skill frontmatter 和 Claude 几乎同形：`name`、`description`、`when-to-us
 
 关掉：`~/.grok/config.toml` 里 `[workflows] enabled = false`，或 `GROK_WORKFLOWS=0`。默认开。
 
-新闻页（[RohitAI 转述](https://rohitai.com/blog/xai-grok-build-workflows-parallel-agents)，对照 [x.ai/news/workflows](https://x.ai/news/workflows)）给出的产品承诺：
+[新闻页原文](https://x.ai/news/workflows) 的产品承诺：
 
-- 用自然语言描述大任务，Grok 写成带 phase 的脚本，后台 fan-out「数百」个并行 agent
-- 默认 budget 128，大任务可到 1,024
+- 用自然语言描述大任务，Grok 写成带 phase 的脚本，后台 fan-out「数百」个并行 agent，会话保持空闲
+- 「Runs get a budget of 128 agents, and up to 1,024 for big jobs」
+- 「Progress is saved as the run goes, so pausing and resuming never redoes finished work」
 - `/workflows` 按 phase 看进度和每 agent 的 token
-- 跑成功后存进 `.grok/workflows/`，变成带参数的 slash command
+- Grok 写脚本、启动前 smoke-check、跑之间会改；「you never write the script yourself」
+- 项目 `.grok/workflows/` 跟仓库走，个人 `~/.grok/workflows/` 跟人走；存下来的变成带参数的 slash command（示例：`/pr-review 5137`）
 - 内置 `/deep-research`：并行调查、按源校验 claim、交带引用的报告
-- 暂停 / 恢复时已完成的工作不重做
 
-这些数字和 Claude 官方表不是同一量纲。Claude 写的是**同时并发 16、单次总计 1000**。Grok 公开写的是**逻辑调用 budget 128–1024**，没有同时在跑几个的官方数。二次分析（对公开源码快照）还说：每会话最多 4 个活跃 workflow、workflow 不能嵌套、resume 只活在同一进程里、CLI 重启后中断的 run 算终止。这些没有出现在 `docs.x.ai` 的 workflow 段落里，当推断，不要当 SLA。
+这些数字和 Claude 官方表不是同一量纲。Claude 写的是**同时并发 16、单次总计 1000**。Grok 公开写的是**budget 128–1024**，没有同时在跑几个的官方数。二次分析（对公开源码快照）还说：每会话最多 4 个活跃 workflow、workflow 不能嵌套、resume 只活在同一进程里、CLI 重启后中断的 run 算终止。这些没有出现在 `docs.x.ai` 或新闻页里，当推断，不要当 SLA。
 
 脚本语言是 Rhai，不是 JS。官方 docs 没给 `agent()` / `parallel()` 的 API。二次来源和一份公开的 `engine.rs` 快照显示宿主函数包括 `agent(prompt)` / `agent(prompt, opts)`，以及并行 fan-out；`eval`、模块加载、`sleep`、`exit` 被关掉。可信度低于 Claude 那份带 `pipeline()` 示例的官方页。
 
@@ -230,7 +231,7 @@ ACP：`grok agent stdio` 让外部 IDE / bot 当 Grok Build 的客户端。Headl
 
 | | Claude Code Dynamic Workflows | Grok Build Workflows |
 | --- | --- | --- |
-| 首次公开 | 2026-05-25 那一周的 changelog（v2.1 线，要 2.1.154+） | 2026-07 左右的产品公告（二次来源写 7 月 23 日） |
+| 首次公开 | 2026-05-25 那一周的 changelog（v2.1 线，要 2.1.154+） | 2026-07-23 新闻页 |
 | 脚本 | JavaScript，`agent()` + `pipeline()` | Rhai，`.rhai`；宿主 API 官方未文档化 |
 | 谁写脚本 | 模型写；你可事后看、存、改 | 模型写；`/create-workflow` 会先问再 smoke-check |
 | 内置 | `/deep-research` | `/deep-research` |
@@ -302,7 +303,7 @@ pie 当前会话域（`CONTEXT.md`、`packages/server/src/harness/`）按 **一�
 
 - 没在本机跑过 `claude` 或 `grok`，所有行为以文档为准。
 - Grok 没有独立 workflows 文档页。并发、journal、嵌套禁止、每会话 4 个活跃 run，来自二次分析和源码快照，不是 `docs.x.ai` 的规范承诺。
-- [x.ai/news/workflows](https://x.ai/news/workflows) 本次抓取 429，新闻页原句没有全文核对。
+- 没在本机打开过 `/workflows` dashboard，UI 细节以文档截图和命令表为准。
 - 没核对 Agent SDK 里 Workflow tool 的完整 TypeScript 类型；Claude 文档指向 [Agent SDK TypeScript reference](https://code.claude.com/docs/en/agent-sdk/typescript)。
 - 没查 GitHub issues / 团队聊天 / 产品分析。这是公开文档调研，不是 pie 内部决策考古。
 - 没比较 OpenAI Codex 的对等层。Codex 在 pie 里是另一条 harness，不在这次范围。
