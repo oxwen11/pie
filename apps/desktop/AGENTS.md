@@ -11,6 +11,7 @@ src/main/index.ts
   -> src/main/desktop-runtime.ts
        -> application
        -> server
+       -> ssh
        -> rpc
        -> electron adapters
 ```
@@ -20,7 +21,8 @@ Allowed production dependencies:
 - `src/main/index.ts` imports only `desktop-runtime.ts`.
 - `desktop-runtime.ts` and `desktop-runtime-glue.ts` may import every Main module because they are the composition root. `desktop-runtime-glue.ts` holds the subset of glue Layers that need to stay importable from tests without pulling in `electron/main-window.ts` (see "Tag and Layer ownership" below).
 - `desktop-config.ts` has no dependencies of its own (besides the shared `APP_ORIGIN` constant) and may be depended on by any Main module.
-- `application/**` may depend on server interfaces, shared desktop types, and Effect core.
+- `application/**` may depend on server interfaces (`LocalServer`, `DesktopSsh`), shared desktop types, and Effect core. It must not import `@getpie/ssh` — consume SSH through the `DesktopSsh` Tag (which re-exports the types the application needs).
+- `ssh/desktop-ssh.ts` (`DesktopSsh` Tag): persist saved hosts and open/close tunnels via `@getpie/ssh`. May import `@getpie/ssh`, Effect platform, and `desktop-config`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
 - `server/local-server.ts` may depend on Effect core and shared desktop types.
 - Server platform adapters (including `server/local-server-live.ts`) may depend on server-owned ports, `desktop-config.ts`, Effect platform, and the CLI handshake.
 - `rpc/**` may depend on the application interface, the shared contract, oRPC, and Effect core.
@@ -42,7 +44,7 @@ Keep implementation adapters behind interfaces owned by the module that consumes
 
 ### Tag and Layer ownership
 
-Most capability modules (`LocalServer`, `DesktopApplication`, `RendererChannel`, `MainWindow`, `DesktopConfig`) are exposed as an Effect `Context.Service` Tag rather than a plain interface, so the composition root can wire them as a Layer graph instead of threading constructor parameters by hand.
+Most capability modules (`LocalServer`, `DesktopSsh`, `DesktopApplication`, `RendererChannel`, `MainWindow`, `DesktopConfig`) are exposed as an Effect `Context.Service` Tag rather than a plain interface, so the composition root can wire them as a Layer graph instead of threading constructor parameters by hand.
 
 - The Tag and its factory function live together in the module that owns the capability (e.g. `LocalServer` and `makeLocalServer` in `server/local-server.ts`). The factory keeps taking plain parameters and stays the unit tests target — Layer wiring is a thin wrapper around it, not a replacement for it.
 - The `Live` Layer for a Tag lives next to the Tag **only if building it needs nothing the module isn't already allowed to import** (e.g. `MainWindowLive` in `electron/main-window.ts` only needs `DesktopConfig` and `RendererChannel`, both already-allowed electron/** dependencies).
