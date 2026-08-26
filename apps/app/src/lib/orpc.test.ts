@@ -19,4 +19,18 @@ describe("createAppClients", () => {
     expect(clients.orpcQueryUtils).toBeDefined();
     clients.queryClient.clear();
   });
+
+  it("keeps cache policy on the query client instead of per-query options", () => {
+    const { queryClient, orpcQueryUtils } = createAppClients();
+
+    expect(queryClient.getDefaultOptions().queries).toMatchObject({
+      staleTime: Infinity,
+      refetchOnWindowFocus: "always",
+    });
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.agent.session.list.key()).staleTime).toBe(
+      30_000,
+    );
+
+    queryClient.clear();
+  });
 });

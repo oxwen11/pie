@@ -1,3 +1,4 @@
+import type { Project } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FileCodeIcon } from "lucide-react";
@@ -11,9 +12,6 @@ import { createFileNavigationTracker, type FileNavigationTracker } from "./file-
 import { FilePreviewPane } from "./file-preview-pane";
 import { FileState } from "./file-state";
 import { FileWorkspaceLayout } from "./file-workspace-layout";
-import { useGitBranch } from "./use-git-branch";
-import { useProjectName } from "./use-project-name";
-import { useWorkspaceTree } from "./use-workspace-tree";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export interface FilePayload {
@@ -59,19 +57,26 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     instance.navigation.getSnapshot,
     instance.navigation.getSnapshot,
   );
-  const projectName = useProjectName(instance.sessionRef.projectId);
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const projectId = instance.sessionRef.projectId;
+  const { data: projectName } = useQuery({
+    ...orpcQueryUtils.project.list.queryOptions(),
+    // `select` closes over `projectId` — memoised so the query stays stable.
+    select: useCallback(
+      (projects: ReadonlyArray<Project>) =>
+        projects.find((project) => project.id === projectId)?.name,
+      [projectId],
+    ),
+  });
   const panel = useContentPanel();
   const workspace = { ref: instance.sessionRef };
-  const tree = useWorkspaceTree(workspace);
-  const branch = useGitBranch(workspace);
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const file = useQuery({
-    ...orpcQueryUtils.fs.readFileString.queryOptions({
+  const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
+  const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
+  const file = useQuery(
+    orpcQueryUtils.fs.readFileString.queryOptions({
       input: { ref: instance.sessionRef, path },
     }),
-    refetchOnWindowFocus: "always",
-    staleTime: Infinity,
-  });
+  );
   const openFile = useCallback(
     (nextPath: string) => panel?.open(filePanel, { path: nextPath }),
     [panel],

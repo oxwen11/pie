@@ -1,13 +1,12 @@
-import type { GitFileDiff } from "@getpie/contract/git";
+import type { GitFileDiff, GitReview } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { FileDiffIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 import { emptyReviewMessage } from "./review-file-status";
 import { ReviewState } from "./review-state";
-import type { GitDiffsQuery } from "./use-git-diffs";
-import type { GitReviewQuery } from "./use-git-review";
 
 const ReviewDiffAdapter = lazy(() =>
   import("./review-diff-adapter").then((module) => ({ default: module.ReviewDiffAdapter })),
@@ -19,8 +18,8 @@ export function ReviewDiffPane({
   path,
   locateRequest,
 }: {
-  review: GitReviewQuery;
-  diffs: GitDiffsQuery;
+  review: UseQueryResult<GitReview>;
+  diffs: ReadonlyArray<UseQueryResult<GitFileDiff>>;
   path?: string;
   locateRequest: number;
 }) {

@@ -15,7 +15,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -29,7 +29,6 @@ import { createChatBaseExtensions } from "@/features/chat/components/input/exten
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
-import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
@@ -70,7 +69,11 @@ function DraftRoute() {
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
   const draftWorktree = useDraftWorktree(selected);
-  const modelsQuery = useAgentModels(selected?.id);
+  const modelsQuery = useQuery(
+    orpcQueryUtils.agent.listModels.queryOptions({
+      input: selected?.id ? { projectId: selected.id } : {},
+    }),
+  );
   const defaultModel = modelsQuery.data?.defaultModel;
 
   useEffect(() => {
