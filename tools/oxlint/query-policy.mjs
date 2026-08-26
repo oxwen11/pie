@@ -1,5 +1,7 @@
-// Enforces TanStack Query conventions in .agents/rules/frontend-state.md:
-// call useQuery at the consumer, and do not repeat QueryClient defaults.
+// Enforces TanStack Query cache-policy conventions in
+// .agents/rules/frontend-state.md: do not repeat QueryClient defaults.
+// Per-query capabilities (select, enabled, retry, placeholderData, or a
+// cache option that actually differs) stay at the call site.
 
 const APP_SRC = "apps/app/";
 const QUERY_HOOKS = new Set([
@@ -9,14 +11,11 @@ const QUERY_HOOKS = new Set([
   "useSuspenseQueries",
   "useInfiniteQuery",
 ]);
-const COMPANION_HOOKS = new Set(["useRouteContext", "useCallback", "useMemo"]);
 
 const isAppSrc = (filename) => filename.replaceAll("\\", "/").includes(APP_SRC);
 
 const isTestFile = (filename) =>
   /\.(test|spec)\.[cm]?[jt]sx?$/.test(filename.replaceAll("\\", "/"));
-
-const isHookName = (name) => typeof name === "string" && /^use[A-Z]/.test(name);
 
 const calleeName = (node) => {
   if (node.type === "Identifier") return node.name;
@@ -95,85 +94,11 @@ const noQueryClientDefaultOverrides = {
   },
 };
 
-const noThinUseQueryHook = {
-  create(context) {
-    const filename = context.filename ?? context.getFilename?.() ?? "";
-    if (!isAppSrc(filename) || isTestFile(filename)) return {};
-
-    const functions = [];
-    const callCounts = new Map();
-    const stack = [];
-    let declaratorName = null;
-
-    const enterFunction = (node, name) => {
-      stack.push({ node, name, hooks: [] });
-    };
-
-    const exitFunction = () => {
-      const current = stack.pop();
-      if (current !== undefined) functions.push(current);
-    };
-
-    return {
-      VariableDeclarator(node) {
-        declaratorName = node.id.type === "Identifier" ? node.id.name : null;
-      },
-      "VariableDeclarator:exit"() {
-        declaratorName = null;
-      },
-      FunctionDeclaration(node) {
-        enterFunction(node, node.id?.name ?? null);
-      },
-      "FunctionDeclaration:exit"() {
-        exitFunction();
-      },
-      FunctionExpression(node) {
-        enterFunction(node, node.id?.name ?? declaratorName);
-      },
-      "FunctionExpression:exit"() {
-        exitFunction();
-      },
-      ArrowFunctionExpression(node) {
-        enterFunction(node, declaratorName);
-      },
-      "ArrowFunctionExpression:exit"() {
-        exitFunction();
-      },
-      CallExpression(node) {
-        const name = calleeName(node.callee);
-        if (name === null) return;
-        callCounts.set(name, (callCounts.get(name) ?? 0) + 1);
-        const current = stack.at(-1);
-        if (current !== undefined && isHookName(name)) current.hooks.push(name);
-      },
-      "Program:exit"() {
-        for (const fn of functions) {
-          if (!isHookName(fn.name)) continue;
-          const queryHooks = fn.hooks.filter((hook) => QUERY_HOOKS.has(hook));
-          if (queryHooks.length !== 1) continue;
-          const extra = fn.hooks.filter(
-            (hook) => !QUERY_HOOKS.has(hook) && !COMPANION_HOOKS.has(hook),
-          );
-          if (extra.length > 0) continue;
-          if ((callCounts.get(fn.name) ?? 0) >= 2) continue;
-
-          context.report({
-            node: fn.node.id ?? fn.node,
-            message:
-              "Do not wrap a bare useQuery in a hook. Call useQuery at the consumer. A hook is justified only when it owns extra state, a mutation, or a multi-query policy.",
-          });
-        }
-      },
-    };
-  },
-};
-
-export { noQueryClientDefaultOverrides, noThinUseQueryHook };
+export { noQueryClientDefaultOverrides };
 
 export default {
   meta: { name: "pie-query" },
   rules: {
     "no-query-client-default-overrides": noQueryClientDefaultOverrides,
-    "no-thin-use-query-hook": noThinUseQueryHook,
   },
 };

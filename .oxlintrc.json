@@ -18,7 +18,6 @@
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",
     "pie-query/no-query-client-default-overrides": "error",
-    "pie-query/no-thin-use-query-hook": "error",
     "react/exhaustive-deps": [
       "error",
       {
