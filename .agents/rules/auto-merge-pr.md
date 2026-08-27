@@ -2,7 +2,7 @@
 
 Squash-merge PRs that cannot change product behavior. Unsure → skip. Fail closed.
 
-Eligible only if all hold: repo `oxwen11/pie`; base `main`; author `oxwen11`; not draft; `MERGEABLE`; review is not `CHANGES_REQUESTED`; every CI check is `SUCCESS` (pending, skipped, missing, failed → ineligible).
+Eligible only if all hold: repo `oxwen11/pie`; base `main`; author `oxwen11`; not draft; `MERGEABLE`; review is not `CHANGES_REQUESTED`. CI is a GitHub required-check gate — do not inspect, wait on, or decide from checks.
 
 Merge with `gh pr merge <n> --squash --delete-branch` only. No merge commit, rebase merge, `--admin`, or force-push.
 
