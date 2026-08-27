@@ -6,7 +6,7 @@ import {
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
-import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
+import { Card, CardFrame } from "@getpie/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -231,44 +231,6 @@ function DraftRoute() {
   return (
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
-        <CardFrameHeader className="py-2">
-          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
-            <ProjectSelect
-              onChange={(next) => {
-                navigate({
-                  to: "/draft",
-                  search: { projectId: next },
-                  replace: true,
-                }).catch((error: unknown) => {
-                  console.error("Failed to select draft project", error);
-                });
-              }}
-              projects={projects.data}
-              value={selected?.id ?? null}
-            />
-            {draftWorktree.gitAvailable ? (
-              <>
-                <DraftWorkspaceSelect
-                  disabled={startSession.isPending || selected === null}
-                  mode={draftWorktree.mode}
-                  onModeChange={draftWorktree.setMode}
-                />
-                {draftWorktree.mode === "worktree" ? (
-                  <DraftWorktreeBaseSelect
-                    branch={draftWorktree.gitBranch.data}
-                    disabled={
-                      startSession.isPending ||
-                      selected === null ||
-                      draftWorktree.gitBranch.isPending
-                    }
-                    onValueChange={draftWorktree.setWorktreeBaseOverride}
-                    value={draftWorktree.worktreeBase}
-                  />
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        </CardFrameHeader>
         <Card
           render={
             <PromptInput
@@ -280,7 +242,48 @@ function DraftRoute() {
           }
         >
           <ChatInputProvider controller={controller}>
-            <ChatInput />
+            {/* Picks row embedded in the card: hugs its content, aligned with
+                the toolbar below. Wrapped with the editor in one block so the
+                form's divide-y never draws a rule between picks and text. */}
+            <div>
+              <div className="flex min-w-0 flex-wrap items-center gap-0 px-2 pt-2">
+                <ProjectSelect
+                  onChange={(next) => {
+                    navigate({
+                      to: "/draft",
+                      search: { projectId: next },
+                      replace: true,
+                    }).catch((error: unknown) => {
+                      console.error("Failed to select draft project", error);
+                    });
+                  }}
+                  projects={projects.data}
+                  value={selected?.id ?? null}
+                />
+                {draftWorktree.gitAvailable ? (
+                  <>
+                    <DraftWorkspaceSelect
+                      disabled={startSession.isPending || selected === null}
+                      mode={draftWorktree.mode}
+                      onModeChange={draftWorktree.setMode}
+                    />
+                    {draftWorktree.mode === "worktree" ? (
+                      <DraftWorktreeBaseSelect
+                        branch={draftWorktree.gitBranch.data}
+                        disabled={
+                          startSession.isPending ||
+                          selected === null ||
+                          draftWorktree.gitBranch.isPending
+                        }
+                        onValueChange={draftWorktree.setWorktreeBaseOverride}
+                        value={draftWorktree.worktreeBase}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+              <ChatInput />
+            </div>
             <PromptInputToolbar>
               <PromptInputTools>
                 <DraftModelSelect

@@ -29,7 +29,7 @@ export function DraftWorkspaceSelect({
       }}
       value={mode}
     >
-      {/* Match ProjectSelect: ghost trigger aligned with other draft header picks. */}
+      {/* Match ProjectSelect: ghost trigger aligned with the other draft picks. */}
       <SelectTrigger
         className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"
