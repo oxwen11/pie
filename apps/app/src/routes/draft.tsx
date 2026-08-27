@@ -213,9 +213,15 @@ function DraftRoute() {
         {importOpen && (
           <ImportProjectDialog
             onClose={() => setImportOpen(false)}
-            onImported={(project) =>
-              navigate({ to: "/draft", search: { projectId: project.id }, replace: true })
-            }
+            onImported={(project) => {
+              navigate({
+                to: "/draft",
+                search: { projectId: project.id },
+                replace: true,
+              }).catch((error: unknown) => {
+                console.error("Failed to open the imported project", error);
+              });
+            }}
           />
         )}
       </Empty>
@@ -281,13 +287,15 @@ function DraftRoute() {
                   projectId={selected?.id}
                   providerId={search.provider}
                   modelId={search.modelId}
-                  onChange={(provider, modelId) =>
+                  onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
                       search: (prev) => ({ ...prev, provider, modelId }),
                       replace: true,
-                    })
-                  }
+                    }).catch((error: unknown) => {
+                      console.error("Failed to set the draft model", error);
+                    });
+                  }}
                 />
               </PromptInputTools>
               <PromptInputSubmit

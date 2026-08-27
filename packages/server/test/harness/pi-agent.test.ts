@@ -11,6 +11,6 @@ it("makePiAgent never touches the process", () => {
 
 it("PiAgent exposes create and resume", () => {
   const pi: PiAgentShape = makePiAgent(stub<PiProcess>());
-  expect(typeof pi.create).toBe("function");
-  expect(typeof pi.resume).toBe("function");
+  expect(pi.create).toBeTypeOf("function");
+  expect(pi.resume).toBeTypeOf("function");
 });

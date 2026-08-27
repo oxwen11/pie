@@ -16,7 +16,8 @@ export type PiModelCatalog = {
  */
 export async function listAvailablePiModels(cwd: string): Promise<PiModelCatalog> {
   const services = await createAgentSessionServices({ cwd });
-  const models = (await services.modelRuntime.getAvailable()).map(toAgentModel);
+  const available = await services.modelRuntime.getAvailable();
+  const models = available.map(toAgentModel);
   const defaultModel = await resolveDefaultPiModel(services);
   return { models, defaultModel };
 }

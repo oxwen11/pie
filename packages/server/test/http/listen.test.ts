@@ -17,7 +17,9 @@ afterEach(async () => {
   await Promise.all(
     Array.from(servers, (server) =>
       server.listening
-        ? new Promise<void>((resolve) => server.close(() => resolve()))
+        ? new Promise<void>((resolve) => {
+            server.close(() => resolve());
+          })
         : Promise.resolve(),
     ),
   );

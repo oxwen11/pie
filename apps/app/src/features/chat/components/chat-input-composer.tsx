@@ -40,7 +40,6 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
       // Turn in progress: don't send, don't clear.
       if (turnInProgressRef.current) return false;
       prompt(text);
-      return;
     },
   });
 

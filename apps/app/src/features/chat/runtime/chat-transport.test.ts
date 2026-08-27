@@ -56,7 +56,9 @@ const hangingIterableOf = (
         index += 1;
         if (item) return Promise.resolve({ done: false as const, value: item });
         onDrained();
-        return new Promise<never>(() => undefined);
+        return new Promise<never>(() => {
+          /* never settles */
+        });
       },
     };
   },
@@ -81,7 +83,10 @@ const baseSession = {
   subscribe: unexpectedCall,
 };
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 
 describe("OrpcChatSessionTransport subscription", () => {
   it("emits attached (subscription first, then snapshot) and forwards session-scoped events", async () => {
@@ -123,7 +128,9 @@ describe("OrpcChatSessionTransport subscription", () => {
     const transport = new OrpcChatSessionTransport(client, ref);
     const unsubscribe = transport.subscribe((event) => received.push(event));
     await streamDone;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(snapshotSawSubscription).toBe(true);
     expect(received.map((event) => event.type)).toEqual([
       "attached",
@@ -262,7 +269,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
       },
     } satisfies ChatTransportClient;
     const transport = new OrpcChatSessionTransport(client, ref);
-    expect(await transport.getMessages()).toBeNull();
+    await expect(transport.getMessages()).resolves.toBeNull();
   });
 
   it("treats NOT_FOUND on respond as resolution (another client answered first)", async () => {

@@ -206,16 +206,16 @@ describe("agent.session router", () => {
       await client.agent.session.archive({ ref, archived: true });
       const archived = await client.agent.session.list({ projectId: project.id, archived: true });
       expect(archived[0]?.archived).toBe(true);
-      expect(await client.agent.session.list({ projectId: project.id, archived: false })).toEqual(
-        [],
-      );
+      await expect(
+        client.agent.session.list({ projectId: project.id, archived: false }),
+      ).resolves.toEqual([]);
 
       await client.agent.session.archive({ ref, archived: false });
       const restored = await client.agent.session.list({ projectId: project.id, archived: false });
       expect(restored[0]?.archived).toBe(false);
-      expect(await client.agent.session.list({ projectId: project.id, archived: true })).toEqual(
-        [],
-      );
+      await expect(
+        client.agent.session.list({ projectId: project.id, archived: true }),
+      ).resolves.toEqual([]);
 
       await client.agent.session.close({ ref });
       const idle = await client.agent.session.list({ projectId: project.id, archived: false });

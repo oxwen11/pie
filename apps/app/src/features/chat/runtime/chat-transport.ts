@@ -64,7 +64,7 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
   }): Promise<{ readonly turnId: string }> => {
-    return await this.client.session.prompt({
+    return this.client.session.prompt({
       ref: this.#ref,
       parts: input.parts,
       messageId: input.messageId,

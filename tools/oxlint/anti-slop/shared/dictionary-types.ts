@@ -85,9 +85,10 @@ export function createTypeEnvironment(program: ESTree.Program): TypeEnvironment 
 
     if (
       (declaration?.type === "ClassDeclaration" || declaration?.type === "FunctionDeclaration") &&
-      declaration.id !== null
+      declaration.id !== null &&
+      BUILT_INS.has(declaration.id.name)
     ) {
-      if (BUILT_INS.has(declaration.id.name)) shadowedBuiltIns.add(declaration.id.name);
+      shadowedBuiltIns.add(declaration.id.name);
     }
   }
 
@@ -148,8 +149,7 @@ function isEffectivelyEmptyInterface(
   if (declarations.length !== 1) return false;
   const [type] = declarations;
   return (
-    type !== undefined &&
-    type.extends.length === 0 &&
+    type?.extends.length === 0 &&
     (type.body.body.length === 0 || type.body.body.every(isEffectivelyEmptyMember))
   );
 }
@@ -165,9 +165,7 @@ function resolvedSubstitutionArgument(
   if (name === null || resolving.has(name)) return type;
   const substitution = base.get(name);
   if (substitution === undefined) return type;
-  const nextResolving = new Set(resolving);
-  nextResolving.add(name);
-  return resolvedSubstitutionArgument(substitution, base, nextResolving);
+  return resolvedSubstitutionArgument(substitution, base, new Set([...resolving, name]));
 }
 
 function aliasSubstitution(
@@ -237,9 +235,12 @@ function unsafeDirectValue(
   if (alias === undefined || resolvingAliases.has(name)) return null;
   const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
   if (nextSubstitutions === null) return null;
-  const nextResolving = new Set(resolvingAliases);
-  nextResolving.add(name);
-  return unsafeDirectValue(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
+  return unsafeDirectValue(
+    alias.typeAnnotation,
+    environment,
+    nextSubstitutions,
+    new Set([...resolvingAliases, name]),
+  );
 }
 
 function dictionaryValueTypes(
@@ -298,9 +299,12 @@ function dictionaryValueTypes(
   if (alias === undefined || resolvingAliases.has(name)) return [];
   const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
   if (nextSubstitutions === null) return [];
-  const nextResolving = new Set(resolvingAliases);
-  nextResolving.add(name);
-  return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
+  return dictionaryValueTypes(
+    alias.typeAnnotation,
+    environment,
+    nextSubstitutions,
+    new Set([...resolvingAliases, name]),
+  );
 }
 
 export function classifyUnsafeDictionaryValue(
@@ -446,13 +450,11 @@ function classifyAliasBroadTarget(
   if (alias === undefined || resolvingAliases.has(name)) return null;
   const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
   if (nextSubstitutions === null) return null;
-  const nextResolving = new Set(resolvingAliases);
-  nextResolving.add(name);
   return classifyAliasBroadTarget(
     alias.typeAnnotation,
     environment,
     nextSubstitutions,
-    nextResolving,
+    new Set([...resolvingAliases, name]),
   );
 }
 

@@ -133,7 +133,7 @@ export function FilePreviewAdapter({
         for (const previous of shadowRoot.querySelectorAll("[data-pie-target-line]")) {
           previous.removeAttribute("aria-current");
           previous.removeAttribute("aria-label");
-          previous.removeAttribute("data-pie-target-line");
+          delete previous.dataset.pieTargetLine;
         }
         if (validTargetLine === undefined || scrollTargetKey === null) return;
 

@@ -113,7 +113,9 @@ async function eventually(assertion: () => void | Promise<void>): Promise<void> 
       return;
     } catch (error) {
       lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
     }
   }
   throw lastError;
@@ -172,7 +174,8 @@ describe("LocalServer", () => {
     const server = await h.server;
 
     await eventually(async () => {
-      expect((await Effect.runPromise(server.snapshot)).status).toBe("failed");
+      const snapshot = await Effect.runPromise(server.snapshot);
+      expect(snapshot.status).toBe("failed");
     });
     expect(
       h.logs.find((entry) => entry.annotations.event === "server.supervisor.attempt_failed"),
@@ -192,7 +195,8 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.failBeforeReady("failed with token sentinel-secret-token");
     await eventually(async () => {
-      expect((await Effect.runPromise(server.snapshot)).status).toBe("failed");
+      const snapshot = await Effect.runPromise(server.snapshot);
+      expect(snapshot.status).toBe("failed");
     });
 
     await Effect.runPromise(server.retry);
@@ -272,7 +276,8 @@ describe("LocalServer", () => {
     expect(h.processes[1]!.port).toBe(50_000);
     h.processes[1]!.becomeReady();
     await eventually(async () => {
-      expect((await Effect.runPromise(server.snapshot)).status).toBe("ready");
+      const snapshot = await Effect.runPromise(server.snapshot);
+      expect(snapshot.status).toBe("ready");
     });
 
     await h.dispose();
@@ -291,7 +296,8 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(3));
     h.processes[2]!.failBeforeReady();
     await eventually(async () => {
-      expect((await Effect.runPromise(server.snapshot)).status).toBe("failed");
+      const snapshot = await Effect.runPromise(server.snapshot);
+      expect(snapshot.status).toBe("failed");
     });
 
     await Promise.all([
@@ -303,7 +309,8 @@ describe("LocalServer", () => {
     expect(h.processes[3]!.port).toBe(50_000);
     h.processes[3]!.becomeReady();
     await eventually(async () => {
-      expect((await Effect.runPromise(server.snapshot)).status).toBe("ready");
+      const snapshot = await Effect.runPromise(server.snapshot);
+      expect(snapshot.status).toBe("ready");
     });
 
     await h.dispose();

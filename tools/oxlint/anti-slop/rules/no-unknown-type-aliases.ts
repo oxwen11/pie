@@ -40,9 +40,7 @@ export const noUnknownTypeAliasesRule = defineRule({
       ) {
         return false;
       }
-      const nextVisited = new Set(visited);
-      nextVisited.add(name);
-      return resolvesToUnknown(alias.typeAnnotation, nextVisited);
+      return resolvesToUnknown(alias.typeAnnotation, new Set([...visited, name]));
     };
 
     return {

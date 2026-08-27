@@ -69,7 +69,13 @@ export function ProjectSessionsGroup({
         </SidebarGroupLabel>
         <SidebarGroupAction
           className="top-1 right-1"
-          onClick={() => navigate({ to: "/draft", search: { projectId: project.id } })}
+          onClick={() => {
+            navigate({ to: "/draft", search: { projectId: project.id } }).catch(
+              (error: unknown) => {
+                console.error("Failed to start a draft chat", error);
+              },
+            );
+          }}
           title={`New chat in ${project.name}`}
         >
           <SquarePen />

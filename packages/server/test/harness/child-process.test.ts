@@ -10,7 +10,7 @@ layer(NodeServices.layer)("Effect child process integration", (it) => {
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const handle = yield* spawner.spawn(
-        ChildProcess.make(process.execPath, ["-e", 'process.stdout.write("ready\\n")']),
+        ChildProcess.make(process.execPath, ["-e", String.raw`process.stdout.write("ready\n")`]),
       );
       const output = yield* handle.stdout.pipe(
         Stream.decodeText(),

@@ -72,9 +72,7 @@ export const noObjectParametersRule = defineRule({
       }
       const alias = aliases.get(type.typeName.name);
       if (alias === undefined) return false;
-      const nextVisited = new Set(visited);
-      nextVisited.add(type.typeName.name);
-      return resolvesToObject(alias, shadowedAliases, nextVisited);
+      return resolvesToObject(alias, shadowedAliases, new Set([...visited, type.typeName.name]));
     };
 
     const checkParameters = (node: ParameterOwner) => {

@@ -82,7 +82,11 @@ function RootLayout() {
     },
     [router],
   );
-  const handleNewChat = () => navigate({ to: "/draft" });
+  const handleNewChat = () => {
+    navigate({ to: "/draft" }).catch((error: unknown) => {
+      console.error("Failed to open a new chat", error);
+    });
+  };
 
   return (
     <AppShell>
