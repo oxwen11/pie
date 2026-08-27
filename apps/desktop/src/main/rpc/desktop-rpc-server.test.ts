@@ -190,7 +190,8 @@ describe("Desktop MessagePort RPC", () => {
       ...application,
       // Simulates a handler failing with an expected oRPC error; the
       // application type does not model it, hence the cast.
-      quit: Effect.fail(new ORPCError("NOT_FOUND")) as Effect.Effect<void>,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- handler error type is not on the application contract
+      quit: Effect.fail(new ORPCError("NOT_FOUND")) as unknown as Effect.Effect<void>,
     }));
     try {
       await expect(h.client.app.quit()).rejects.toThrow("Not Found");

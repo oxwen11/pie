@@ -50,12 +50,9 @@ function parseReviewDiff(diff: GitFileDiff) {
   );
 }
 
-type PierrePostRenderInstance = {
+function itemIdFromInstance(instance: {
   readonly fileDiff?: { readonly name?: unknown } | null;
-};
-
-function itemIdFromInstance(instance: PierrePostRenderInstance): string | undefined {
-  if (!("fileDiff" in instance)) return undefined;
+}): string | undefined {
   const fileDiff = instance.fileDiff;
   if (fileDiff === null || typeof fileDiff !== "object" || !("name" in fileDiff)) return undefined;
   const name = fileDiff.name;
@@ -114,7 +111,7 @@ export function ReviewDiffAdapter({
         if (phase === "unmount") return;
         const header = node.shadowRoot?.querySelector("[data-diffs-header]");
         if (!(header instanceof HTMLElement)) return;
-        const id = itemIdFromInstance(instance);
+        const id = "fileDiff" in instance ? itemIdFromInstance(instance) : undefined;
         if (id !== undefined) header.dataset.reviewPath = id;
         if (header.dataset.reviewCollapseBound === "true") return;
         header.dataset.reviewCollapseBound = "true";

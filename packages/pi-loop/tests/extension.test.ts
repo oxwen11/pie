@@ -36,7 +36,8 @@ function fakePi() {
       throw new Error("loop must not send user messages");
     },
   };
-  piLoopExtension(pi as ExtensionAPI);
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- fake implements the methods this test exercises
+  piLoopExtension(pi as unknown as ExtensionAPI);
   return { commands, tools, events, sent, userMessages };
 }
 

@@ -46,11 +46,17 @@ type DraftSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
+const optional = <K extends keyof DraftSearch>(
+  key: K,
+  value: DraftSearch[K],
+): Pick<DraftSearch, K> | undefined =>
+  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
+
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
-    projectId: asText(search.projectId),
-    provider: asText(search.provider),
-    modelId: asText(search.modelId),
+    ...optional("projectId", asText(search.projectId)),
+    ...optional("provider", asText(search.provider)),
+    ...optional("modelId", asText(search.modelId)),
   }),
   component: DraftRoute,
 });
@@ -68,7 +74,7 @@ function DraftRoute() {
   const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
-      input: selected?.id ? { projectId: selected.id } : undefined,
+      input: selected?.id ? { projectId: selected.id } : {},
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;

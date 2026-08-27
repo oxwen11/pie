@@ -12,7 +12,7 @@ vi.mock("./reasoning-part", () => ({ ReasoningPart: () => null }));
 // oxlint-disable-next-line anti-slop/no-module-mocking -- isolate batch chrome from part renderers
 vi.mock("./tool-part", () => ({ ToolPart: () => createElement("div", null, "tool") }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const message: UIMessage = {
   id: "message-1",

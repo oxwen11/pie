@@ -23,7 +23,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { selectProjectSessionTitle, useProjectSessionTitle } from "./use-project-sessions";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const session = (
   sessionId: string,
