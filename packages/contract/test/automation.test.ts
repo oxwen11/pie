@@ -8,7 +8,7 @@ import {
   MIN_AUTOMATION_EVERY_MS,
 } from "../src/automation";
 
-const UUID = "11111111-1111-1111-1111-111111111111";
+const UUID = "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61";
 
 const accepts = <A>(schema: Schema.ConstraintDecoder<A>, value: unknown): boolean =>
   Exit.isSuccess(Schema.decodeUnknownExit(schema)(value));

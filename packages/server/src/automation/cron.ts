@@ -169,15 +169,15 @@ export function nextOccurrence(cron: string, afterMs: number, timeZone?: string)
   while (t <= end) {
     const wall = wallClock(t, timeZone);
     if (!expr.month.values.has(wall.month)) {
-      t = timeZone === undefined ? startOfNextMonth(new Date(t)) : t + 24 * 60 * 60 * 1000;
+      t = timeZone === undefined ? startOfNextMonth(new Date(t)) : nextWallDay(t, wall);
       continue;
     }
     if (!matchesWall(expr, wall)) {
-      t = timeZone === undefined ? startOfNextDay(new Date(t)) : t + 24 * 60 * 60 * 1000;
+      t = timeZone === undefined ? startOfNextDay(new Date(t)) : nextWallDay(t, wall);
       continue;
     }
     if (!expr.hour.values.has(wall.hour)) {
-      t = timeZone === undefined ? startOfNextHour(new Date(t)) : t + 60 * 60 * 1000;
+      t = timeZone === undefined ? startOfNextHour(new Date(t)) : nextWallHour(t, wall);
       continue;
     }
     if (!expr.minute.values.has(wall.minute)) {
@@ -201,15 +201,15 @@ export function previousOccurrence(
   while (t >= start) {
     const wall = wallClock(t, timeZone);
     if (!expr.month.values.has(wall.month)) {
-      t = timeZone === undefined ? endOfPreviousMonth(new Date(t)) : t - 24 * 60 * 60 * 1000;
+      t = timeZone === undefined ? endOfPreviousMonth(new Date(t)) : previousWallDay(t, wall);
       continue;
     }
     if (!matchesWall(expr, wall)) {
-      t = timeZone === undefined ? endOfPreviousDay(new Date(t)) : t - 24 * 60 * 60 * 1000;
+      t = timeZone === undefined ? endOfPreviousDay(new Date(t)) : previousWallDay(t, wall);
       continue;
     }
     if (!expr.hour.values.has(wall.hour)) {
-      t = timeZone === undefined ? endOfPreviousHour(new Date(t)) : t - 60 * 60 * 1000;
+      t = timeZone === undefined ? endOfPreviousHour(new Date(t)) : previousWallHour(t, wall);
       continue;
     }
     if (!expr.minute.values.has(wall.minute)) {
@@ -221,18 +221,28 @@ export function previousOccurrence(
   return null;
 }
 
+function nextWallHour(t: number, wall: WallClock): number {
+  return t + (60 - wall.minute) * 60_000;
+}
+
+function nextWallDay(t: number, wall: WallClock): number {
+  return t + ((24 - wall.hour) * 60 - wall.minute) * 60_000;
+}
+
+function previousWallHour(t: number, wall: WallClock): number {
+  return t - (wall.minute + 1) * 60_000;
+}
+
+function previousWallDay(t: number, wall: WallClock): number {
+  return t - (wall.hour * 60 + wall.minute + 1) * 60_000;
+}
+
 function nextMinuteBoundary(afterMs: number): number {
-  const d = new Date(afterMs + 1);
-  d.setSeconds(0, 0);
-  if (d.getTime() <= afterMs) d.setMinutes(d.getMinutes() + 1);
-  return d.getTime();
+  return Math.floor(afterMs / 60_000) * 60_000 + 60_000;
 }
 
 function previousMinuteBoundary(beforeMs: number): number {
-  const d = new Date(beforeMs - 1);
-  d.setSeconds(0, 0);
-  if (d.getTime() >= beforeMs) d.setMinutes(d.getMinutes() - 1);
-  return d.getTime();
+  return Math.floor((beforeMs - 1) / 60_000) * 60_000;
 }
 
 function startOfNextHour(d: Date): number {
