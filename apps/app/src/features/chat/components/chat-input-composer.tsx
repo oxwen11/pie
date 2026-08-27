@@ -22,13 +22,8 @@ import { createSubmitKeymap } from "./input/extensions/keymaps";
 import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
-// Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
-// handled by the submit keymap) / Shift+Enter breaks the line; an in-flight
-// turn blocks sending but not typing (onSubmit returns false → content stays).
-// prompt/turnInProgress come from ChatSessionProvider — not props.
-// Frame: CardFrame card stack — the editor Card plus a branch footer; the
-// composer is the query consumer, so the git.branch call lives here.
-// toolbar = surface-composed toolbar content (e.g. <ChatModelSelect/>).
+// Live-session input bar: Enter sends (submit keymap), Shift+Enter breaks the
+// line. The CardFrame footer shows the session workspace's current git branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
