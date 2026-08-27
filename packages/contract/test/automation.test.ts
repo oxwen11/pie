@@ -80,21 +80,28 @@ describe("Automation", () => {
     ).toBe(true);
   });
 
-  it("rejects the retired started status", () => {
-    expect(
-      accepts(AutomationSchema, {
-        id: UUID,
-        name: "Nightly",
-        projectId: UUID,
-        prompt: "review",
-        spec: { kind: "manual" },
-        enabled: true,
-        createdAt: "2026-08-27T08:00:00.000Z",
-        updatedAt: "2026-08-27T08:00:00.000Z",
-        nextRunAt: null,
-        lastRunStatus: "started",
-        runs: [],
-      }),
-    ).toBe(false);
+  it("maps the retired started status to running", () => {
+    const decoded = Schema.decodeUnknownSync(AutomationSchema)({
+      id: UUID,
+      name: "Nightly",
+      projectId: UUID,
+      prompt: "review",
+      spec: { kind: "manual" },
+      enabled: true,
+      createdAt: "2026-08-27T08:00:00.000Z",
+      updatedAt: "2026-08-27T08:00:00.000Z",
+      nextRunAt: null,
+      lastRunStatus: "started",
+      runs: [
+        {
+          id: "run-1",
+          startedAt: "2026-08-27T08:00:00.000Z",
+          reason: "manual",
+          status: "started",
+        },
+      ],
+    });
+    expect(decoded.lastRunStatus).toBe("running");
+    expect(decoded.runs[0]?.status).toBe("running");
   });
 });

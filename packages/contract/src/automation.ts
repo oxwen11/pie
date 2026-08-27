@@ -1,5 +1,5 @@
 import { oc } from "@orpc/contract";
-import { Schema } from "effect";
+import { Schema, SchemaGetter } from "effect";
 
 import {
   CreateWorktreeInputSchema,
@@ -75,7 +75,8 @@ export const AutomationRunReasonSchema = Schema.Literals([
 ]);
 export type AutomationRunReason = typeof AutomationRunReasonSchema.Type;
 
-export const AutomationRunStatusSchema = Schema.Literals([
+const StoredRunStatusSchema = Schema.Literals([
+  "started",
   "running",
   "succeeded",
   "failed",
@@ -83,6 +84,16 @@ export const AutomationRunStatusSchema = Schema.Literals([
   "missed",
   "interrupted",
 ]);
+
+export const AutomationRunStatusSchema = StoredRunStatusSchema.pipe(
+  Schema.decodeTo(
+    Schema.Literals(["running", "succeeded", "failed", "skipped", "missed", "interrupted"]),
+    {
+      decode: SchemaGetter.transform((status) => (status === "started" ? "running" : status)),
+      encode: SchemaGetter.transform((status) => status),
+    },
+  ),
+);
 export type AutomationRunStatus = typeof AutomationRunStatusSchema.Type;
 
 export const AutomationSkipReasonSchema = Schema.Literals([
