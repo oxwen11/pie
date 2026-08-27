@@ -48,7 +48,7 @@ export function FilePreviewPane({
           <Spinner className="text-muted-foreground size-4" />
         </div>
       ) : file.isError ? (
-        <FileState title={fileErrorTitle(file.error)} onRetry={() => void file.refetch()}>
+        <FileState title={fileErrorTitle(file.error)} onRetry={() => file.refetch()}>
           {fileErrorMessage(file.error)}
         </FileState>
       ) : (

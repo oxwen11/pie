@@ -17,7 +17,7 @@ export function useSessionModels(ref: SessionRef) {
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>
       orpcQueryUtils.agent.session.setModel.call({ ref, provider, modelId }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({
+      queryClient.invalidateQueries({
         queryKey: orpcQueryUtils.agent.session.getModelState.key({ input: { ref } }),
       });
     },

@@ -46,7 +46,7 @@ const patchLists = (
 
 const invalidateLists = (queryClient: QueryClient, listKeys: ReadonlyArray<QueryKey>): void => {
   for (const listKey of listKeys) {
-    void queryClient.invalidateQueries({ queryKey: listKey });
+    queryClient.invalidateQueries({ queryKey: listKey });
   }
 };
 
@@ -123,7 +123,7 @@ export const applySessionListEvent = (
       removeFromLists(queryClient, [sourceKey], event.ref.sessionId);
       // The event carries no full summary. An open destination query refetches
       // now; a disabled archived query remains lazy until its panel opens.
-      void queryClient.invalidateQueries({ queryKey: destinationKey });
+      queryClient.invalidateQueries({ queryKey: destinationKey });
       break;
     }
     case "session.deleted":

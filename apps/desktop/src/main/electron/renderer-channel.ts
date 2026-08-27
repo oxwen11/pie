@@ -22,7 +22,7 @@ export function makeRendererChannel(attachPort: AttachMessagePort): RendererChan
       try {
         webContents.postMessage(DESKTOP_PORT_CHANNEL, undefined, [port2]);
       } catch (error) {
-        void detach();
+        detach();
         port1.close();
         throw error;
       }

@@ -168,7 +168,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
 
   if (review.isError && review.data === undefined) {
     return (
-      <ReviewState title={reviewErrorTitle(review.error)} onRetry={() => void review.refetch()}>
+      <ReviewState title={reviewErrorTitle(review.error)} onRetry={() => review.refetch()}>
         {reviewErrorMessage(review.error)}
       </ReviewState>
     );
@@ -178,7 +178,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   const workspacePath = tree.data?.cwd ?? "";
   const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
   const refresh = (): void => {
-    void Promise.all([
+    Promise.all([
       review.refetch(),
       branch.refetch(),
       tree.refetch(),

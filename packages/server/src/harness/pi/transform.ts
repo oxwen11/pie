@@ -220,7 +220,7 @@ export function createPiTransform(
       // skip-list explicit: a new AgentSessionEvent arm fails typecheck until
       // it's routed or listed.
       default:
-        void (event.type satisfies
+        event.type satisfies
           | "message_end"
           | "tool_execution_update"
           | "turn_start"
@@ -235,7 +235,7 @@ export function createPiTransform(
           | "summarization_retry_scheduled"
           | "summarization_retry_attempt_start"
           | "summarization_retry_finished"
-          | "bash_execution_update");
+          | "bash_execution_update";
     }
   };
 }

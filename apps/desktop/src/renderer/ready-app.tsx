@@ -29,7 +29,7 @@ export function ReadyApp({
     let cancelled = false;
     const unsubscribe = status.subscribe((next) => {
       if (next !== "ready") return;
-      void refresh()
+      refresh()
         .then((fresh) => {
           if (cancelled) return;
           setConnection((current) => (sameConnection(current, fresh) ? current : fresh));

@@ -81,7 +81,7 @@ function DraftRoute() {
 
   useEffect(() => {
     if (!defaultModel || search.provider || search.modelId) return;
-    void navigate({
+    navigate({
       to: "/draft",
       search: (prev) => ({
         ...prev,
@@ -124,14 +124,14 @@ function DraftRoute() {
 
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
-      void chats
+      chats
         .chatFor(created.ref)
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
         });
 
-      void navigate({
+      navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
@@ -147,7 +147,7 @@ function DraftRoute() {
       ...createChatBaseExtensions({
         placeholder: () => "Ask Pi anything...",
       }),
-      createSubmitKeymap({ onSubmit: () => void self.submit() }),
+      createSubmitKeymap({ onSubmit: () => self.submit() }),
     ],
     onSubmit: (text) => {
       if (!selected) {
@@ -181,7 +181,7 @@ function DraftRoute() {
         <p className="text-muted-foreground text-sm">
           Couldn&apos;t load your projects: {projects.error.message}
         </p>
-        <Button onClick={() => void projects.refetch()} size="sm" variant="outline">
+        <Button onClick={() => projects.refetch()} size="sm" variant="outline">
           Retry
         </Button>
       </div>
@@ -262,7 +262,7 @@ function DraftRoute() {
             <PromptInput
               onSubmit={(e) => {
                 e.preventDefault();
-                void controller?.submit();
+                controller?.submit();
               }}
             />
           }

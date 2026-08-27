@@ -53,7 +53,7 @@ export function ReviewDiffPane({
 
   if (loaded.length === 0 && firstError !== undefined) {
     return (
-      <ReviewState title={diffErrorTitle(firstError)} onRetry={() => void review.refetch()}>
+      <ReviewState title={diffErrorTitle(firstError)} onRetry={() => review.refetch()}>
         {diffErrorMessage(firstError)}
       </ReviewState>
     );

@@ -83,7 +83,7 @@ function userParts(message: PiUserMessage): PiUIMessagePart[] {
         });
         break;
       default:
-        void (block satisfies never);
+        block satisfies never;
     }
   }
   return parts;
@@ -215,7 +215,7 @@ export function entriesToUIMessages(
           break;
         }
         default:
-          void (block satisfies never);
+          block satisfies never;
       }
     }
   };
@@ -236,7 +236,7 @@ export function entriesToUIMessages(
       // summaries/custom_message gap deferred to their own ticket. The
       // satisfies keeps the list exhaustive — a new entry type fails
       // typecheck until routed or listed.
-      void (entry.type satisfies
+      entry.type satisfies
         | "model_change"
         | "thinking_level_change"
         | "custom"
@@ -244,7 +244,7 @@ export function entriesToUIMessages(
         | "session_info"
         | "compaction"
         | "branch_summary"
-        | "custom_message");
+        | "custom_message";
       continue;
     }
     const message = entry.message;
@@ -260,11 +260,7 @@ export function entriesToUIMessages(
         break;
       default:
         // Custom message roles stay off the transcript this phase (§5).
-        void (message.role satisfies
-          | "bashExecution"
-          | "custom"
-          | "branchSummary"
-          | "compactionSummary");
+        message.role satisfies "bashExecution" | "custom" | "branchSummary" | "compactionSummary";
     }
   }
 

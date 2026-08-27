@@ -148,8 +148,8 @@ export function startDesktopRuntime(): void {
   app.on("before-quit", (event) => {
     if (allowQuit || !runtime) return;
     event.preventDefault();
-    void disposeAndQuit();
+    disposeAndQuit();
   });
 
-  void startPrimaryInstance();
+  startPrimaryInstance();
 }

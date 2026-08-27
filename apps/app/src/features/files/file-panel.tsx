@@ -95,7 +95,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
   const gitBranch = branch.data?.current ?? undefined;
   const refreshing = file.isFetching || tree.isFetching;
   const refresh = (): void => {
-    void Promise.all([file.refetch(), tree.refetch()]);
+    Promise.all([file.refetch(), tree.refetch()]);
   };
   const preview = (
     <FilePreviewPane

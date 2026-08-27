@@ -310,7 +310,7 @@ export async function createServer(
 
   const server = built.value;
   server.once("close", () => {
-    void dispose();
+    dispose();
   });
 
   return Object.assign(server, { dispose });
