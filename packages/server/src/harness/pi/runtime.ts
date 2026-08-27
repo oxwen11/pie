@@ -184,12 +184,11 @@ export const makePiAgentRuntime = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          const command = { sessionId, text: toPromptText(input) };
           const prompt = yield* process.session
-            .prompt({
-              sessionId,
-              text: toPromptText(input),
-              ...(input.delivery !== undefined ? { delivery: input.delivery } : {}),
-            })
+            .prompt(
+              input.delivery !== undefined ? { ...command, delivery: input.delivery } : command,
+            )
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning

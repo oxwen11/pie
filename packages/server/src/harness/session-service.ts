@@ -70,10 +70,11 @@ const toUserInput = (
       ? Effect.fail(new UnsupportedPromptPart({ kind: "file" }))
       : Effect.succeed(part),
   ).pipe(
-    Effect.map((userParts) => ({
-      parts: userParts,
-      ...(delivery !== undefined ? { delivery } : {}),
-    })),
+    Effect.map((userParts) => {
+      const userInput: UserInput = { parts: userParts };
+      if (delivery === undefined) return userInput;
+      return { ...userInput, delivery };
+    }),
   );
 
 type SessionWithCwd = Session & { readonly cwd: string };
