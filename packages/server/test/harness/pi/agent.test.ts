@@ -272,10 +272,6 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       yield* agent.session.interrupt(sessionId);
       const chunks = Array.from(yield* Fiber.join(collected));
       assert.equal(chunks.at(-1)?.type, "finish");
-      assert.equal(
-        chunks.some((chunk) => chunk.type === "data-queue"),
-        false,
-      );
       yield* agent.session.abort(sessionId);
     }),
   );

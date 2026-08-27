@@ -1,3 +1,5 @@
+import type { AgentRequest } from "@getpie/contract";
+import type { UIMessageChunk } from "ai";
 import { describe, expect, it } from "vitest";
 
 import {
