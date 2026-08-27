@@ -17,4 +17,3 @@ Merge with `gh pr merge <n> --squash --delete-branch` only. No merge commit, reb
 
 feat / fix / perf / refactor of product behavior; desktop / Dock / sidebar; CSS / visual tweaks; runtime dep upgrades; tests that also change product control flow; `packages/ui/src/components/**` except oxfmt/import reorder.
 
-Yes: #8 #35 #37 #39 #40 #41. No: #19 #20 #31 #33 #36.
