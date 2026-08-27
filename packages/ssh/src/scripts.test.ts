@@ -39,6 +39,7 @@ ${buildRemoteNodeEnvScript()}
 if ! ensure_remote_node_path; then
   exit 1
 fi
+command -v pie
 command -v node
 node -v
 `;
