@@ -46,10 +46,11 @@ export const UserInputSchema = Schema.Struct({
 });
 export type UserInput = typeof UserInputSchema.Type;
 
-export const PromptReceiptSchema = Schema.Struct({ turnId: Schema.String });
+export const PromptReceiptSchema = Schema.Struct({
+  turnId: Schema.String,
+  started: Schema.Boolean,
+});
 export type PromptReceipt = typeof PromptReceiptSchema.Type;
 
-/** Runtime-only: whether this call opened a new turn (`prompt`) or queued. */
-export type RuntimePromptReceipt = PromptReceipt & {
-  readonly started: boolean;
-};
+/** Runtime receipt is the wire receipt — `started` is on both. */
+export type RuntimePromptReceipt = PromptReceipt;

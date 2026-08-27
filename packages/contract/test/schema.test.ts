@@ -13,6 +13,7 @@ import {
   ServerErrorCodes,
   isSessionScopedEvent,
   PromptInputSchema,
+  PromptOutputSchema,
   SessionRefSchema,
   SessionScopedEventTypes,
   SubscribeInputSchema,
@@ -132,6 +133,17 @@ describe("PromptInput", () => {
         delivery: "later",
       }),
     ).toBe(false);
+  });
+});
+
+describe("PromptOutput", () => {
+  it("accepts a turn receipt with started", () => {
+    expect(accepts(PromptOutputSchema, { turnId: "t1", started: true })).toBe(true);
+    expect(accepts(PromptOutputSchema, { turnId: "t1", started: false })).toBe(true);
+  });
+
+  it("rejects a receipt missing started", () => {
+    expect(accepts(PromptOutputSchema, { turnId: "t1" })).toBe(false);
   });
 });
 

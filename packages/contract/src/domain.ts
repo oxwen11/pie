@@ -455,7 +455,11 @@ export const PromptInputSchema = Schema.Struct({
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 
-export const PromptOutputSchema = Schema.Struct({ turnId: Schema.String });
+export const PromptOutputSchema = Schema.Struct({
+  turnId: Schema.String,
+  // Whether this call opened a new turn. Queued follow-ups/steers are false.
+  started: Schema.Boolean,
+});
 export type PromptOutput = typeof PromptOutputSchema.Type;
 
 // ---------------------------------------------------------------------------

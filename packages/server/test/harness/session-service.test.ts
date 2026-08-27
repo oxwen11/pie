@@ -596,17 +596,44 @@ describe("PiAgentSessionService", () => {
     const result = await run({ turn: "open", promptStarted: false }, (fixture) =>
       Effect.gen(function* () {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-        yield* fixture.service.prompt({
+        const receipt = yield* fixture.service.prompt({
           ref,
           parts: [{ type: "text", text: "later" }],
           delivery: "followUp",
           messageId: "queued-1",
         });
-        yield* Effect.sleep("50 millis");
         const snapshot = yield* fixture.service.getSnapshot(ref);
-        return { activePrompt: snapshot.activePrompt, prompts: fixture.spy.prompts };
+        return {
+          receipt,
+          activePrompt: snapshot.activePrompt,
+          prompts: fixture.spy.prompts,
+        };
       }),
     );
+    expect(result.receipt).toEqual({ turnId: "turn-1", started: false });
+    expect(result.activePrompt).toBeNull();
+    expect(result.prompts).toEqual([
+      { parts: [{ type: "text", text: "later" }], delivery: "followUp" },
+    ]);
+  });
+
+  it("fails the RPC when a queued follow-up's deliverPrompt fails", async () => {
+    const result = await run({ turn: "open", promptFails: true }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const error = yield* fixture.service
+          .prompt({
+            ref,
+            parts: [{ type: "text", text: "later" }],
+            delivery: "followUp",
+            messageId: "queued-fail",
+          })
+          .pipe(Effect.flip);
+        const snapshot = yield* fixture.service.getSnapshot(ref);
+        return { error, activePrompt: snapshot.activePrompt, prompts: fixture.spy.prompts };
+      }),
+    );
+    expect(result.error._tag).toBe("TurnAlreadyRunning");
     expect(result.activePrompt).toBeNull();
     expect(result.prompts).toEqual([
       { parts: [{ type: "text", text: "later" }], delivery: "followUp" },

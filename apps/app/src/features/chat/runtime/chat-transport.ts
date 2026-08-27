@@ -64,7 +64,7 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
     readonly delivery?: "steer" | "followUp";
-  }): Promise<{ readonly turnId: string }> => {
+  }): Promise<{ readonly turnId: string; readonly started: boolean }> => {
     const payload = {
       ref: this.#ref,
       parts: input.parts,

@@ -248,15 +248,9 @@ describe("createPiTransform", () => {
     expect([...t(e({ type: "summarization_retry_finished" }))]).toEqual([]);
   });
 
-  it("projects queue_update as a transient data-queue chunk", () => {
+  it("treats queue_update as skipped bookkeeping", () => {
     const t = createPiTransform("s1");
-    expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual([
-      {
-        type: "data-queue",
-        transient: true,
-        data: { steering: ["steer"], followUp: ["later"] },
-      },
-    ]);
+    expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual([]);
   });
 
   it("ignores bookkeeping events and user-message echoes", () => {

@@ -187,7 +187,9 @@ pendingQueue: { steering: string[]; followUp: string[] }
 - `Active` + `steer`（或省略 delivery，保持兼容）→ 现有 `steer`。
 - `Finishing` → 仍 Wait，再 suspend。跟在 Pi 自己的队列后面再发，避免和 `queue_update` 打架。
 
-runtime 的事件泵：transform 把 `queue_update` 收成 transient `data-queue`，泵拦截后 `emit({ type: "session.queue.updated", steering, followUp })`，不进 transcript chunk。fold 写入 `pendingQueue`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort 不清队列（跟 Pi）；crash 把 `pendingQueue` 置空，因为子进程没了。
+`queue_update` 不进 transcript chunk：process 把它 offer 到独立的 `queueUpdates` 队列，runtime 在 `requestPermission` 旁边常驻消费，`emit({ type: "session.queue.updated", steering, followUp })`。fold 写入 `pendingQueue`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort 不清队列（跟 Pi）；crash 把 `pendingQueue` 置空，因为子进程没了。
+
+排队路径（调用方带了 `delivery`）**await** `deliverPrompt`；失败直接让 RPC 失败，不发 `rejected`。空闲路径仍是 fire-and-forget：先 `submitted`，再 `forkDetach` deliver。
 
 `TurnAlreadyRunning` 对 Pi 路径继续不出现（能力位已是 true）。不要把排队失败映射成 `CONFLICT`，那是「硬拒、用户输入丢了」。
 
@@ -198,7 +200,7 @@ runtime 的事件泵：transform 把 `queue_update` 收成 transient `data-queue
 `Chat.prompt(text, delivery?)`：
 
 - idle：今天的路径（乐观气泡 + submitted）。
-- streaming/submitted：不 `pushMessage`，不把 status 卡在 `submitted` 盖住 `streaming`；RPC 带 `delivery`（默认 `followUp`）。以随后的 `session.queue.updated` 为准。乐观可以先把文本插进本地 pending 列表，按正文匹配去重（和 Pi 一样没有 id）。
+- streaming/submitted：不 `pushMessage`，不把 status 卡在 `submitted` 盖住 `streaming`；RPC 带 `delivery`（默认 `followUp`）。**不要**本地乐观写 `pendingQueue`——只跟 `session.queue.updated` 和 snapshot。
 
 `ChatInputComposer`：
 

@@ -62,7 +62,7 @@ export interface ChatSessionTransport {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
     readonly delivery?: "steer" | "followUp";
-  }): Promise<{ readonly turnId: string }>;
+  }): Promise<{ readonly turnId: string; readonly started: boolean }>;
   /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
   interrupt(): Promise<void>;
   /**

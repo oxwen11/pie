@@ -154,7 +154,7 @@ export class Chat {
       case "session.message.chunk":
         this.#observeChunk(event.chunk);
         // Retry is UI status, not transcript — keep it out of the message fold.
-        if (event.chunk.type === "data-retry" || event.chunk.type === "data-queue") break;
+        if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
           this.#turnFold(event.turnId).enqueue(event.chunk);
@@ -171,9 +171,6 @@ export class Chat {
           this.#state.retryNotice = undefined;
           this.#state.error = undefined;
         }
-        // Idle race: a follow-up the UI queued became a real prompt. Drop the
-        // optimistic queue line so it doesn't sit there with no queue_update.
-        this.#removeFollowUpText(event.parts.find((part) => part.type === "text")?.text);
         break;
       // The server rejected a prompt whose submitted event already broadcast:
       // drop the phantom user message (the sender's optimistic copy included).
@@ -456,7 +453,7 @@ export class Chat {
       return;
     }
     for (const chunk of chunks) {
-      if (chunk.type === "data-retry" || chunk.type === "data-queue") continue;
+      if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
       this.#turnFold(activeTurn.turnId).enqueue(chunk);
     }
@@ -476,7 +473,6 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   #observeChunk(chunk: UIMessageChunk): void {
-    if (chunk.type === "data-queue") return;
     const retryNotice = retryNoticeFrom(chunk);
     if (retryNotice !== undefined) {
       this.#state.error = undefined;
@@ -495,17 +491,6 @@ export class Chat {
     if (this.#state.messages.some((message) => message.id === messageId)) return false;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     return true;
-  }
-
-  #removeFollowUpText(text: string | undefined): void {
-    if (text === undefined || text.length === 0) return;
-    const current = this.#state.pendingQueue;
-    const index = current.followUp.indexOf(text);
-    if (index === -1) return;
-    this.#state.setPendingQueue({
-      steering: current.steering,
-      followUp: current.followUp.filter((_, i) => i !== index),
-    });
   }
 
   // Policy, not transport: an empty plan carries nothing to review, so it is
@@ -602,8 +587,8 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   // Fire-and-forget: idle prompts push an optimistic user message; a turn
-  // already in flight queues as a Pi follow-up (no transcript bubble until
-  // Pi delivers it). The subscription carries the reply back either way.
+  // already in flight is a Pi follow-up (no transcript bubble, no local
+  // queue write — `session.queue.updated` is the only writer).
   prompt = async (text: string): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
@@ -612,11 +597,6 @@ export class Chat {
 
     const busy = this.#state.status === "submitted" || this.#state.status === "streaming";
     if (busy) {
-      const previous = this.#state.pendingQueue;
-      this.#state.setPendingQueue({
-        steering: previous.steering,
-        followUp: [...previous.followUp, text],
-      });
       try {
         await this.#transport.prompt({
           messageId,
@@ -624,7 +604,6 @@ export class Chat {
           delivery: "followUp",
         });
       } catch (promptError) {
-        this.#state.setPendingQueue(previous);
         this.#state.error =
           promptError instanceof Error ? promptError : new Error(String(promptError));
         this.#setStatus("error");

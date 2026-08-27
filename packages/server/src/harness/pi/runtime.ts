@@ -177,6 +177,14 @@ export const makePiAgentRuntime = (
     yield* Stream.runForEach(process.session.requestPermission(sessionId), (request) =>
       emit({ type: "session.request.asked", sessionId, request }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
+    yield* Stream.runForEach(process.session.queueUpdates(sessionId), (queue) =>
+      emit({
+        type: "session.queue.updated",
+        sessionId,
+        steering: queue.steering,
+        followUp: queue.followUp,
+      }),
+    ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
     return {
       sessionId,
@@ -208,16 +216,8 @@ export const makePiAgentRuntime = (
 
           const finished = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
-          const pump = Stream.runForEach(prompt.output, (chunk) => {
-            if (chunk.type === "data-queue") {
-              return emit({
-                type: "session.queue.updated",
-                sessionId,
-                steering: chunk.data.steering,
-                followUp: chunk.data.followUp,
-              });
-            }
-            return (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
+          const pump = Stream.runForEach(prompt.output, (chunk) =>
+            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
               Effect.andThen(emit(chunk)),
               Effect.andThen(
                 chunk.type === "finish"
@@ -240,8 +240,8 @@ export const makePiAgentRuntime = (
                     )
                   : Effect.void,
               ),
-            );
-          }).pipe(
+            ),
+          ).pipe(
             Effect.flatMap(() => Ref.get(finished)),
             Effect.flatMap((didFinish) =>
               prompt.started && !didFinish

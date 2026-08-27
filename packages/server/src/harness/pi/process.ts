@@ -1,4 +1,9 @@
-import type { AgentRequest, AgentResponse, AgentModelState } from "@getpie/contract";
+import type {
+  AgentRequest,
+  AgentResponse,
+  AgentModelState,
+  SessionPendingQueue,
+} from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -69,6 +74,7 @@ type SessionState = {
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
   readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
+  readonly queueUpdates: Queue.Queue<SessionPendingQueue, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
   readonly requestGate: Semaphore.Semaphore;
   readonly turnState: Ref.Ref<PiTurnState>;
@@ -123,6 +129,10 @@ export interface PiProcess {
     readonly requestPermission: (
       sessionId: string,
     ) => Stream.Stream<AgentRequest, HarnessSessionNotFound>;
+    /** Pi `queue_update` events — not a transcript chunk. One consumer (the runtime). */
+    readonly queueUpdates: (
+      sessionId: string,
+    ) => Stream.Stream<SessionPendingQueue, HarnessSessionNotFound>;
     readonly awaitTermination: (
       sessionId: string,
     ) => Effect.Effect<never, HarnessSessionNotFound | PiSessionFailure>;
@@ -208,6 +218,7 @@ export const makePiProcessWithDependencies = <R>(
         Effect.andThen(settlePending(session)),
         Effect.andThen(completeTurn(session)),
         Effect.andThen(Queue.end(session.requests)),
+        Effect.andThen(Queue.end(session.queueUpdates)),
         Effect.andThen(Queue.fail(session.chunks, error)),
         Effect.andThen(closeScope(session)),
         Effect.asVoid,
@@ -222,6 +233,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(settlePending(session)),
             Effect.andThen(completeTurn(session)),
             Effect.andThen(Queue.end(session.requests)),
+            Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(
               Queue.offer(session.chunks, { type: "error", errorText: failure.message }),
             ),
@@ -244,6 +256,15 @@ export const makePiProcessWithDependencies = <R>(
       event: Parameters<SessionState["transform"]>[0],
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
+        if (event.type === "queue_update") {
+          const accepted = yield* Queue.offer(session.queueUpdates, {
+            steering: Array.from(event.steering),
+            followUp: Array.from(event.followUp),
+          });
+          if (!accepted) yield* evictOverflowedSession(session);
+          return;
+        }
+
         for (const chunk of session.transform(event)) {
           if (chunk.type === "finish") {
             const transition = yield* Ref.modify<PiTurnState, FinishTransition>(
@@ -394,6 +415,9 @@ export const makePiProcessWithDependencies = <R>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
+            queueUpdates: yield* Queue.dropping<SessionPendingQueue, Cause.Done>(
+              SESSION_QUEUE_CAPACITY,
+            ),
             pending: yield* Ref.make<ReadonlyMap<string, PendingRequest>>(new Map()),
             requestGate: yield* Semaphore.make(1),
             turnState: yield* Ref.make<PiTurnState>({ _tag: "Idle" }),
@@ -451,6 +475,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(settlePending(session)),
             Effect.andThen(completeTurn(session)),
             Effect.andThen(Queue.end(session.requests)),
+            Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(Queue.end(session.chunks)),
             Effect.andThen(closeScope(session)),
             Effect.asVoid,
@@ -621,6 +646,12 @@ export const makePiProcessWithDependencies = <R>(
           Stream.unwrap(
             getSession(sessionId).pipe(
               Effect.map((session) => streamFromQueueOne(session.requests)),
+            ),
+          ),
+        queueUpdates: (sessionId) =>
+          Stream.unwrap(
+            getSession(sessionId).pipe(
+              Effect.map((session) => streamFromQueueOne(session.queueUpdates)),
             ),
           ),
         awaitTermination: (sessionId) =>

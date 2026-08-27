@@ -313,7 +313,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
         ...baseSession,
         prompt: async (input: unknown) => {
           calls.push(input);
-          return { turnId: "turn-9" };
+          return { turnId: "turn-9", started: true };
         },
       },
     } satisfies ChatTransportClient;
@@ -323,6 +323,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
       parts: [{ type: "text", text: "hi" }],
     });
     expect(receipt.turnId).toBe("turn-9");
+    expect(receipt.started).toBe(true);
     expect(calls).toEqual([{ ref, parts: [{ type: "text", text: "hi" }], messageId: "message-1" }]);
   });
 
@@ -333,7 +334,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
         ...baseSession,
         prompt: async (input: unknown) => {
           calls.push(input);
-          return { turnId: "turn-9" };
+          return { turnId: "turn-9", started: false };
         },
       },
     } satisfies ChatTransportClient;
