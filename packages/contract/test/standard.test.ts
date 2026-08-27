@@ -16,7 +16,7 @@ describe("toStandardSchema", () => {
     const validation = await GreetingInputStandard["~standard"].validate({ name: "Ada" });
 
     expect("issues" in validation).toBe(false);
-    expect(typeof GreetingInputStandard["~standard"].jsonSchema?.input).toBe("function");
+    expect(GreetingInputStandard["~standard"].jsonSchema?.input).toBeTypeOf("function");
 
     const procedure = oc.input(GreetingInputStandard);
     const aiTool = tool({

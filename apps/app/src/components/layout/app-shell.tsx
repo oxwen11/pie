@@ -42,7 +42,7 @@ export interface AppShellSidebarProps {
 export function AppShellSidebar({ children }: AppShellSidebarProps) {
   const { isMobile } = useSidebar();
   const { contentPanel } = useAppShell();
-  if (isMobile) return <>{children}</>;
+  if (isMobile) return children;
   return (
     <>
       <ShellSidebarPanel>{children}</ShellSidebarPanel>

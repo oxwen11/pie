@@ -71,7 +71,7 @@ export function syncSessionFileTree(
   const expandedPaths: string[] = [];
   for (const directoryPath of state.directoryPaths) {
     const item = state.model.getItem(directoryPath);
-    if (item !== null && item.isDirectory() && "isExpanded" in item && item.isExpanded()) {
+    if (item?.isDirectory() && "isExpanded" in item && item.isExpanded()) {
       expandedPaths.push(directoryPath);
     }
   }

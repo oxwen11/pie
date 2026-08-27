@@ -41,7 +41,7 @@ export function ModelSelect({
   return (
     <PromptInputModelSelect
       items={items}
-      value={selectedIndex >= 0 ? String(selectedIndex) : null}
+      value={selectedIndex !== -1 ? String(selectedIndex) : null}
       onValueChange={(next) => {
         const option = next === null ? undefined : options[Number(next)];
         if (option) onChange(option.providerId, option.modelId);

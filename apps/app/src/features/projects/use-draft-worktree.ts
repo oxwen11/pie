@@ -3,7 +3,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { type DraftWorkspaceMode } from "./draft-workspace-select";
+import type { DraftWorkspaceMode } from "./draft-workspace-select";
 import { defaultWorktreeBase } from "./draft-worktree-base";
 
 export function useDraftWorktree(selected: Project | null) {

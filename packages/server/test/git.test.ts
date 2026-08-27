@@ -31,7 +31,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
   const addRemoteMain = (dir: string) =>
     Effect.promise(async () => {
       const git = simpleGit(dir);
-      const sha = (await git.revparse(["main"])).trim();
+      const main = await git.revparse(["main"]);
+      const sha = main.trim();
       await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
       await git.raw(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
     });
@@ -162,7 +163,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
         const git = simpleGit(dir);
         await git.add(["a.txt", "extra.txt"]);
         await git.commit("main moved forward");
-        const sha = (await git.revparse(["main"])).trim();
+        const main = await git.revparse(["main"]);
+        const sha = main.trim();
         await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
         await git.checkout("feature");
       });

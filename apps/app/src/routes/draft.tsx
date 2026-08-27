@@ -81,7 +81,7 @@ function DraftRoute() {
 
   useEffect(() => {
     if (!defaultModel || search.provider || search.modelId) return;
-    void navigate({
+    navigate({
       to: "/draft",
       search: (prev) => ({
         ...prev,
@@ -89,6 +89,8 @@ function DraftRoute() {
         modelId: defaultModel.modelId,
       }),
       replace: true,
+    }).catch((error: unknown) => {
+      console.error("Failed to apply default draft model", error);
     });
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
@@ -131,10 +133,12 @@ function DraftRoute() {
           console.error("Failed to start session prompt", error);
         });
 
-      void navigate({
+      navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
+      }).catch((error: unknown) => {
+        console.error("Failed to open the new session", error);
       });
     },
     onError: (error) => {
@@ -209,9 +213,15 @@ function DraftRoute() {
         {importOpen && (
           <ImportProjectDialog
             onClose={() => setImportOpen(false)}
-            onImported={(project) =>
-              navigate({ to: "/draft", search: { projectId: project.id }, replace: true })
-            }
+            onImported={(project) => {
+              navigate({
+                to: "/draft",
+                search: { projectId: project.id },
+                replace: true,
+              }).catch((error: unknown) => {
+                console.error("Failed to open the imported project", error);
+              });
+            }}
           />
         )}
       </Empty>
@@ -229,6 +239,8 @@ function DraftRoute() {
                   to: "/draft",
                   search: { projectId: next },
                   replace: true,
+                }).catch((error: unknown) => {
+                  console.error("Failed to select draft project", error);
                 });
               }}
               projects={projects.data}
@@ -275,13 +287,15 @@ function DraftRoute() {
                   projectId={selected?.id}
                   providerId={search.provider}
                   modelId={search.modelId}
-                  onChange={(provider, modelId) =>
+                  onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
                       search: (prev) => ({ ...prev, provider, modelId }),
                       replace: true,
-                    })
-                  }
+                    }).catch((error: unknown) => {
+                      console.error("Failed to set the draft model", error);
+                    });
+                  }}
                 />
               </PromptInputTools>
               <PromptInputSubmit

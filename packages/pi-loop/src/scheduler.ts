@@ -303,7 +303,7 @@ export class SessionLoopScheduler {
     this.assertActive();
     const flight = this.inFlight;
     const task = flight ? this.tasks.get(flight.taskId) : undefined;
-    if (!flight || !task || task.kind !== "dynamic") {
+    if (!flight || task?.kind !== "dynamic") {
       throw new LoopError(
         "NO_ACTIVE_DYNAMIC_LOOP",
         "schedule_wakeup is only valid during a scheduled dynamic iteration",

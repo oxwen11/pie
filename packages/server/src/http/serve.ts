@@ -138,7 +138,7 @@ const serveWith = (input: ServeInput) =>
       }),
     );
 
-    const effectContext = Context.omit(Scope.Scope)(yield* Effect.context<never>());
+    const effectContext = Context.omit(Scope.Scope)(yield* Effect.context());
     const server = yield* Effect.acquireRelease(
       Effect.tryPromise({
         try: () => createServer({ authToken, corsOrigins, allowedHosts, effectContext }),

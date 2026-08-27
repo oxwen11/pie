@@ -69,8 +69,8 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         // the directory world-readable.
         const logs = yield* fs.stat(path.join(home, "logs"));
         const stdio = yield* fs.stat(path.join(home, "logs", "daemon-stdio.log"));
-        assert.equal((Number(logs.mode) & 0o777).toString(8), "700");
-        assert.equal((Number(stdio.mode) & 0o777).toString(8), "600");
+        assert.equal(((logs.mode ?? 0) & 0o777).toString(8), "700");
+        assert.equal(((stdio.mode ?? 0) & 0o777).toString(8), "600");
 
         const record = yield* readRecord(daemonDir);
         assert.equal(record?.pid, spawned.pid);

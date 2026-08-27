@@ -179,15 +179,13 @@ function wireServer(options: {
       return;
     }
 
-    if (authToken !== undefined) {
-      // A WS handshake carries no Authorization header, so the renderer proves
-      // itself with a single-use ticket minted over the authenticated HTTP link.
-      if (!tickets.consume(requestUrl.searchParams.get("ticket"))) {
-        rejectUpgrade(socket, "401 Unauthorized", "invalid_ticket", {
-          presented: requestUrl.searchParams.has("ticket"),
-        });
-        return;
-      }
+    // A WS handshake carries no Authorization header, so the renderer proves
+    // itself with a single-use ticket minted over the authenticated HTTP link.
+    if (authToken !== undefined && !tickets.consume(requestUrl.searchParams.get("ticket"))) {
+      rejectUpgrade(socket, "401 Unauthorized", "invalid_ticket", {
+        presented: requestUrl.searchParams.has("ticket"),
+      });
+      return;
     }
 
     wss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
@@ -208,7 +206,9 @@ const closeWiredServer = ({ server, wss }: WiredServer) =>
       : Promise.resolve();
 
     for (const client of wss.clients) client.terminate();
-    await new Promise<void>((resolve) => wss.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      wss.close(() => resolve());
+    });
     await serverClosed;
   });
 

@@ -26,7 +26,7 @@ type BuiltinImport = {
 
 const bareName = (source: string): string => source.replace(/^node:/, "");
 const camelize = (value: string): string =>
-  value.replace(/[/_](\w)/g, (_, char: string) => char.toUpperCase());
+  value.replaceAll(/[/_](\w)/g, (_, char: string) => char.toUpperCase());
 const firstSegment = (source: string): string => bareName(source).split("/")[0] ?? bareName(source);
 
 const canonicalNames = (declarations: BuiltinImport[]): ((source: string) => string) => {

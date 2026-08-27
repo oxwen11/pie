@@ -50,7 +50,7 @@ export function ChatInputComposer({
       // Turn in progress: don't send, don't clear.
       if (turnInProgressRef.current) return false;
       prompt(text);
-      return;
+      return undefined;
     },
   });
 

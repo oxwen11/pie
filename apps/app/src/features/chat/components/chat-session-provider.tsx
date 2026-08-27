@@ -16,8 +16,23 @@ export function ChatSessionProvider({
   const chat = useChatHandle(sessionRef);
   const turnInProgress = useStore(chat.store, selectTurnInProgress);
 
-  const prompt = useCallback((text: string) => chat.prompt(text), [chat]);
+  const prompt = useCallback(
+    (text: string) => {
+      chat.prompt(text).catch((error: unknown) => {
+        console.error("Failed to prompt", error);
+      });
+    },
+    [chat],
+  );
   const interrupt = useCallback(() => chat.interrupt(), [chat]);
+  const respondToRequest = useCallback<ChatSessionValue["respondToRequest"]>(
+    (requestId, response) => {
+      chat.respondToAgentRequest(requestId, response).catch((error: unknown) => {
+        console.error("Failed to respond to agent request", error);
+      });
+    },
+    [chat],
+  );
 
   const value = useMemo<ChatSessionValue>(
     () => ({
@@ -25,10 +40,10 @@ export function ChatSessionProvider({
       store: chat.store,
       prompt,
       interrupt,
-      respondToRequest: chat.respondToAgentRequest,
+      respondToRequest,
       turnInProgress,
     }),
-    [sessionRef.sessionId, chat, prompt, interrupt, turnInProgress],
+    [sessionRef.sessionId, chat, prompt, interrupt, respondToRequest, turnInProgress],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

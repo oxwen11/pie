@@ -171,7 +171,9 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
     );
     fs.createReadStream(target).pipe(response);
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Development server did not bind");
   const origin = `http://127.0.0.1:${address.port}`;
@@ -203,9 +205,9 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
     await expect(window.getByText("Pie could not start")).toHaveCount(0);
   } finally {
     await app.close();
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
     // This test builds its own $PIE_HOME instead of using the fixture, so
     // it also owns stopping the per-test daemon.
     await stopDaemonFor(pieHome);
@@ -269,7 +271,9 @@ test("leaves the daemon running through Electron shutdown", async ({ electronApp
   // it deliberately outlives Electron so the CLI and the next app launch
   // converge on the same backend. `pie daemon stop` is how it ends (the
   // fixture teardown does the equivalent for the per-test daemon).
-  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 2_000);
+  });
   expect(processExists(pid)).toBe(true);
 });
 

@@ -84,7 +84,9 @@ describe("runServe", () => {
     // Occupy a port so runServe's listen stage fails after the server (and its
     // runtime) has been built; the scope then releases what was acquired.
     const blocker = net.createServer();
-    await new Promise<void>((resolve) => blocker.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => {
+      blocker.listen(0, "127.0.0.1", resolve);
+    });
     const { port } = blocker.address() as AddressInfo;
 
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-serve-"));
@@ -109,7 +111,9 @@ describe("runServe", () => {
       expect(startupFailure).toContain("cause=");
       expect(startupFailure).toContain("ServerStartupError");
     } finally {
-      await new Promise<void>((resolve) => blocker.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        blocker.close(() => resolve());
+      });
       await fs.rm(home, { recursive: true, force: true });
     }
   });

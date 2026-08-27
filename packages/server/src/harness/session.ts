@@ -8,7 +8,7 @@ import type {
 import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";
-import { type ResumeSessionError } from "./errors";
+import type { ResumeSessionError } from "./errors";
 import type { PiAgentRuntime } from "./pi/runtime";
 import {
   foldSessionEvent,
