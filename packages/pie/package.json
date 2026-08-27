@@ -2,6 +2,11 @@
   "name": "@getpie/cli",
   "version": "0.0.1",
   "description": "Pie CLI — daemon and serve for the Pi coding agent",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxwen11/pie.git",
+    "directory": "packages/pie"
+  },
   "bin": {
     "pie": "./dist/cli.mjs"
   },
@@ -11,11 +16,6 @@
   "type": "module",
   "publishConfig": {
     "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/oxwen11/pie.git",
-    "directory": "packages/pie"
   },
   "scripts": {
     "dev": "PIE_PORT=4180 tsx src/node/cli.ts serve",
