@@ -19,8 +19,17 @@
   fire-and-forget `.then()` is house style. `eqeqeq` is on with
   `null: ignore` so `== null` stays. Do not enable the `restriction`,
   `style`, `pedantic`, or `nursery` categories wholesale — cherry-pick.
-  Type-aware rules (`typescript/no-floating-promises`) need
-  `oxlint-tsgolint` and are not on yet. `@getpie/oxlint#build`
+  Type-aware linting is on (`options.typeAware`, `oxlint-tsgolint`).
+  `typescript/no-floating-promises` is error; ignore with `.catch` or
+  `await`, not `void` (that operator stays banned once `no-void` lands).
+  `typescript/no-unsafe-type-assertion`,
+  `typescript/no-unnecessary-type-assertion`,
+  `typescript/consistent-return`, and
+  `typescript/no-unnecessary-type-parameters` stay off — the first
+  three flood and overlap anti-slop; the last flags inference-only
+  generics on oRPC error maps. Vendored UI also turns off
+  `no-floating-promises`, `unbound-method`, and
+  `no-useless-default-assignment`. `@getpie/oxlint#build`
   emits them to `dist/`; the root `.oxlintrc.json` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is

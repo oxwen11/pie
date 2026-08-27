@@ -21,6 +21,14 @@ const queryDefaults = {
   refetchOnWindowFocus: "always" as const,
 };
 
+function retryAllQueries(queryClient: QueryClient): void {
+  queryClient.invalidateQueries().catch((retryError: unknown) => {
+    toast.error(
+      `Retry failed: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
+    );
+  });
+}
+
 function createQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: queryDefaults },
@@ -30,7 +38,7 @@ function createQueryClient(): QueryClient {
           action: {
             label: "retry",
             onClick: () => {
-              queryClient.invalidateQueries();
+              retryAllQueries(queryClient);
             },
           },
         });

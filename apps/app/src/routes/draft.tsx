@@ -81,7 +81,7 @@ function DraftRoute() {
 
   useEffect(() => {
     if (!defaultModel || search.provider || search.modelId) return;
-    void navigate({
+    navigate({
       to: "/draft",
       search: (prev) => ({
         ...prev,
@@ -89,6 +89,8 @@ function DraftRoute() {
         modelId: defaultModel.modelId,
       }),
       replace: true,
+    }).catch((error: unknown) => {
+      console.error("Failed to apply default draft model", error);
     });
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
@@ -131,10 +133,12 @@ function DraftRoute() {
           console.error("Failed to start session prompt", error);
         });
 
-      void navigate({
+      navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
+      }).catch((error: unknown) => {
+        console.error("Failed to open the new session", error);
       });
     },
     onError: (error) => {
@@ -229,6 +233,8 @@ function DraftRoute() {
                   to: "/draft",
                   search: { projectId: next },
                   replace: true,
+                }).catch((error: unknown) => {
+                  console.error("Failed to select draft project", error);
                 });
               }}
               projects={projects.data}

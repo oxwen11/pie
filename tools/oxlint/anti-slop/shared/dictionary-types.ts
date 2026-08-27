@@ -131,7 +131,7 @@ function isNeverType(type: ESTree.TSType): boolean {
 function isEffectivelyEmptyMember(member: ESTree.TSSignature): boolean {
   return (
     member.type === "TSPropertySignature" &&
-    member.optional === true &&
+    member.optional &&
     member.typeAnnotation !== null &&
     member.typeAnnotation !== undefined &&
     isNeverType(member.typeAnnotation.typeAnnotation)

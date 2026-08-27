@@ -34,7 +34,12 @@ export const ConversationScrollButton = ({
   const { isAtBottom, escapedFromLock, scrollToBottom } = useStickToBottomContext();
 
   const handleScrollToBottom = useCallback(() => {
-    scrollToBottom("smooth");
+    const scrolled = scrollToBottom("smooth");
+    if (scrolled instanceof Promise) {
+      scrolled.catch((error: unknown) => {
+        console.error("Failed to scroll conversation", error);
+      });
+    }
   }, [scrollToBottom]);
 
   if (isAtBottom) {

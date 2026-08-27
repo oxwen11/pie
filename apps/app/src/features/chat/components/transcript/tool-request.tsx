@@ -17,6 +17,18 @@ function buttonVariant(
   return "outline";
 }
 
+function stringifyInputValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || value == null) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value) ?? Object.prototype.toString.call(value);
+  } catch {
+    return Object.prototype.toString.call(value);
+  }
+}
+
 // Compact read-only summary of tool input (unknown shape).
 function InputSummary({ input }: { input: unknown }) {
   if (input == null) return null;
@@ -24,9 +36,9 @@ function InputSummary({ input }: { input: unknown }) {
     typeof input === "object"
       ? Object.entries(input as Record<string, unknown>)
           .slice(0, 3)
-          .map(([k, v]) => `${k}: ${String(v)}`)
+          .map(([k, v]) => `${k}: ${stringifyInputValue(v)}`)
           .join("\n")
-      : String(input);
+      : stringifyInputValue(input);
   if (!text) return null;
   return (
     <pre className="bg-muted text-muted-foreground overflow-x-auto rounded px-2 py-1 text-xs">

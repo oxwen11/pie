@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import { makePiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiProcess } from "../../src/harness/pi/process";
 
-const stub = <T>() => ({}) as T;
+const stub = <T>(): T => ({}) as T;
 
 it("makePiAgent never touches the process", () => {
   expect(() => makePiAgent(stub<PiProcess>())).not.toThrow();

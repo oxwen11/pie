@@ -31,7 +31,7 @@ export const RendererChannelLive = Layer.effect(
     const application = yield* DesktopApplication;
     // Hand the composition root's full ServiceMap (including logger and
     // other references) to the detached oRPC handler fibers.
-    const rpcContext = yield* Effect.context<never>();
+    const rpcContext = yield* Effect.context();
     return makeRendererChannel(makeDesktopRpcServer(application, rpcContext).attach);
   }),
 );
