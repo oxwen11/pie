@@ -28,6 +28,7 @@ export const SSH_UNSET_ENV_KEYS = [
   "PIE_PORT",
   "PIE_CORS_ORIGINS",
   "PIE_E2E",
+  "PIE_SSH_CLI_PACKAGE",
   "ELECTRON_RUN_AS_NODE",
   "ELECTRON_RENDERER_URL",
 ] as const;
