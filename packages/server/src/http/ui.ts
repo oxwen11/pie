@@ -17,6 +17,36 @@ export type UIApp = Effect.Effect<
 
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 
+const IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+const REVALIDATE_CACHE_CONTROL = "no-cache";
+
+/**
+ * Vite fingerprints every emitted file under `/assets/`; extensionless misses
+ * are the only paths `HttpStaticServer` can rewrite to the SPA shell. Keep the
+ * extension check so a route such as `/assets/settings` can never make a
+ * fallback `index.html` immutable, including on its later 304 response where
+ * the content type is no longer present.
+ */
+const isVersionedAssetPath = (pathname: string): boolean =>
+  pathname.startsWith("/assets/") && path.posix.extname(pathname) !== "";
+
+/** Apply the built-UI cache contract without caching error responses. */
+export const withStaticCacheControl = (
+  requestUrl: string,
+  response: HttpServerResponse.HttpServerResponse,
+): HttpServerResponse.HttpServerResponse => {
+  if (response.status !== 200 && response.status !== 206 && response.status !== 304) {
+    return response;
+  }
+
+  const pathname = new URL(requestUrl, "http://localhost").pathname;
+  return HttpServerResponse.setHeader(
+    response,
+    "cache-control",
+    isVersionedAssetPath(pathname) ? IMMUTABLE_ASSET_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
+  );
+};
+
 /** `node:url` has no Effect equivalent; the URLs below are all module-relative. */
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
@@ -69,10 +99,10 @@ export const createUIHandler = (): Effect.Effect<
 
     // `spa: true` is the old `sirv(dir, { single: true })`: an unknown path
     // falls back to index.html so the client router owns deep links.
-    // No `cacheControl` here, despite the hashed asset names: the option is
-    // global, and `HttpStaticServer` reuses `serveFile` for the SPA fallback
-    // (`HttpStaticServer.js:104`), so `immutable` would pin `index.html` too
-    // and strand clients on a stale app. Per-asset headers need a wrapper.
+    // No `cacheControl` here: the option is global, and `HttpStaticServer`
+    // reuses `serveFile` for the SPA fallback. The wrapper below gives hashed
+    // assets a long immutable lifetime while index.html and deep-link
+    // fallbacks always revalidate.
     const assets = yield* HttpStaticServer.make({ root: staticDir, spa: true }).pipe(
       // `resolveStaticDir` just proved `index.html` exists here, so a platform
       // failure opening the same directory is a defect, not a served error.
@@ -89,14 +119,18 @@ export const createUIHandler = (): Effect.Effect<
     // side. `RouteNotFound` covers both a missing asset and a deep link the
     // SPA fallback declined (it only rewrites extensionless paths from a
     // client that accepts HTML — a browser navigation, never a fetch).
-    return assets.pipe(
-      Effect.catch((error) =>
-        error.reason._tag === "RouteNotFound"
-          ? Effect.succeed(notFound)
-          : Effect.as(
-              Effect.logError("static asset read failed", error),
-              HttpServerResponse.text("Internal Server Error", { status: 500 }),
-            ),
-      ),
-    );
+    return Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const response = yield* assets.pipe(
+        Effect.catch((error) =>
+          error.reason._tag === "RouteNotFound"
+            ? Effect.succeed(notFound)
+            : Effect.as(
+                Effect.logError("static asset read failed", error),
+                HttpServerResponse.text("Internal Server Error", { status: 500 }),
+              ),
+        ),
+      );
+      return withStaticCacheControl(request.url, response);
+    });
   });
