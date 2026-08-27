@@ -19,31 +19,58 @@ const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 
 const IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 const REVALIDATE_CACHE_CONTROL = "no-cache";
+const ERROR_CACHE_CONTROL = "no-store";
 
 /**
- * Vite fingerprints every emitted file under `/assets/`; extensionless misses
- * are the only paths `HttpStaticServer` can rewrite to the SPA shell. Keep the
- * extension check so a route such as `/assets/settings` can never make a
- * fallback `index.html` immutable, including on its later 304 response where
- * the content type is no longer present.
+ * Match Vite's default eight-character content hash. A successful file response
+ * still has to pass this check: merely living under `/assets` is not enough to
+ * earn a year-long immutable lifetime.
  */
-const isVersionedAssetPath = (pathname: string): boolean =>
-  pathname.startsWith("/assets/") && path.posix.extname(pathname) !== "";
+const VERSIONED_ASSET_PATH = /^\/assets\/(?:[^/]+\/)*[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$/;
 
-/** Apply the built-UI cache contract without caching error responses. */
+/**
+ * Mirror `HttpStaticServer`'s decode + normalize order before classifying the
+ * response. In particular, `/assets/%2e%2e%2findex.html` resolves to the app
+ * shell, not an asset. Node's host path implementation matches the NodePath
+ * layer used by the static server; separators are converted back to URL form
+ * only after traversal checks.
+ */
+const normalizedRequestPath = (requestUrl: string): string | undefined => {
+  const queryIndex = requestUrl.indexOf("?");
+  const urlPath = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return undefined;
+  }
+  if (decodedPath.includes("\u0000")) return undefined;
+
+  const normalizedPath = path.normalize(
+    decodedPath.startsWith("/") ? decodedPath.slice(1) : decodedPath,
+  );
+  if (normalizedPath === ".." || normalizedPath.startsWith(`..${path.sep}`)) {
+    return undefined;
+  }
+  return `/${normalizedPath.split(path.sep).join("/")}`;
+};
+
+/** Apply the built-UI cache contract after the static handler resolves a response. */
 export const withStaticCacheControl = (
   requestUrl: string,
   response: HttpServerResponse.HttpServerResponse,
 ): HttpServerResponse.HttpServerResponse => {
   if (response.status !== 200 && response.status !== 206 && response.status !== 304) {
-    return response;
+    return HttpServerResponse.setHeader(response, "cache-control", ERROR_CACHE_CONTROL);
   }
 
-  const pathname = new URL(requestUrl, "http://localhost").pathname;
+  const pathname = normalizedRequestPath(requestUrl);
   return HttpServerResponse.setHeader(
     response,
     "cache-control",
-    isVersionedAssetPath(pathname) ? IMMUTABLE_ASSET_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
+    pathname !== undefined && VERSIONED_ASSET_PATH.test(pathname)
+      ? IMMUTABLE_ASSET_CACHE_CONTROL
+      : REVALIDATE_CACHE_CONTROL,
   );
 };
 
@@ -55,16 +82,20 @@ const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, 
  * bundle as `client/`, while running from monorepo source falls back to
  * `apps/app/dist`.
  */
-const resolveStaticDir = (): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
+const resolveStaticDir = (
+  override: string | undefined,
+): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const candidates = [
-      "./client/", // packaged: dist/client next to dist/cli.js
-      "../../../../apps/app/dist/", // monorepo, from src/node
-      "../../../apps/app/dist/", // monorepo, from packages/pie/dist
-    ];
+    const candidates = override
+      ? [override]
+      : [
+          "./client/", // packaged: dist/client next to dist/cli.js
+          "../../../../apps/app/dist/", // monorepo, from src/node
+          "../../../apps/app/dist/", // monorepo, from packages/pie/dist
+        ];
     for (const candidate of candidates) {
-      const dir = path.resolve(fromModuleUrl(candidate));
+      const dir = override ? path.resolve(candidate) : path.resolve(fromModuleUrl(candidate));
       const built = yield* fs
         .exists(path.join(dir, "index.html"))
         .pipe(Effect.orElseSucceed(() => false));
@@ -80,7 +111,9 @@ const resolveStaticDir = (): Effect.Effect<string | undefined, never, FileSystem
  * proxies `/api` and `/ws/rpc` here, so this server serves files in every mode
  * and never hosts a bundler.
  */
-export const createUIHandler = (): Effect.Effect<
+export const createUIHandler = (
+  options: { readonly staticDir?: string } = {},
+): Effect.Effect<
   UIApp,
   never,
   // `Path` is not ours: `HttpStaticServer.make` asks for it. Our own path math
@@ -88,12 +121,15 @@ export const createUIHandler = (): Effect.Effect<
   FileSystem.FileSystem | HttpPlatform.HttpPlatform | Path.Path
 > =>
   Effect.gen(function* () {
-    const staticDir = yield* resolveStaticDir();
+    const staticDir = yield* resolveStaticDir(options.staticDir);
     if (!staticDir) {
       return Effect.succeed(
-        HttpServerResponse.text("Web UI not built. Run the @getpie/app build first.", {
-          status: 503,
-        }),
+        withStaticCacheControl(
+          "/",
+          HttpServerResponse.text("Web UI not built. Run the @getpie/app build first.", {
+            status: 503,
+          }),
+        ),
       );
     }
 
