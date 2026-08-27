@@ -719,6 +719,26 @@ export const makeAutomationService = (deps: {
                 : undefined),
         };
         yield* repo.write(updated);
+        yield* logAutomation({
+          event:
+            input.enabled === true
+              ? "automation.enabled"
+              : input.enabled === false
+                ? "automation.paused"
+                : "automation.updated",
+          message:
+            input.enabled === true
+              ? "automation enabled"
+              : input.enabled === false
+                ? "automation paused"
+                : "automation updated",
+          annotations: {
+            automationId: input.id,
+            ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
+            ...(input.enabled === false ? { pauseReason: "manual" } : undefined),
+            ...(input.spec !== undefined ? { specKind: spec.kind } : undefined),
+          },
+        });
         return updated;
       }),
 

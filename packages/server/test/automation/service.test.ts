@@ -468,6 +468,22 @@ describe("AutomationService", () => {
     expect(after?.runs[0]?.error).toBe("app-exit");
   });
 
+  it("logs enable and pause", async () => {
+    const h = setup();
+    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
+    const records: Array<LogRecord> = [];
+    await Effect.runPromise(
+      captureLogs(h.service.update({ id: created.id, enabled: false }), records),
+    );
+    await Effect.runPromise(
+      captureLogs(h.service.update({ id: created.id, enabled: true }), records),
+    );
+    expect(records.map((record) => record.annotations.event)).toEqual([
+      "automation.paused",
+      "automation.enabled",
+    ]);
+  });
+
   it("logs fire and settle bookends", async () => {
     const h = setup();
     const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
