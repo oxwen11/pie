@@ -28,7 +28,7 @@ declare global {
 // the default init fires a version check at react-grab.com, which the Electron
 // renderer's CSP blocks with a console error.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
+  import("react-grab/core").then(({ init }) => init({ telemetry: false }));
 }
 
 // Dev only: highlights components as they re-render so you can spot wasted
@@ -39,7 +39,7 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
 // Its own version check has no opt-out and is patched out instead — see
 // `patches/react-scan@0.5.7.patch`.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  void import("react-scan").then(({ scan }) => scan());
+  import("react-scan").then(({ scan }) => scan());
 }
 
 /** Shared application entry. PlatformProvider is the host seam above it. */

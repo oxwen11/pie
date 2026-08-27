@@ -28,7 +28,7 @@ export function createDesktopHost(
 ): DesktopHost {
   // AppInterface reads this promise only after the desktop shell is mounted.
   // Keep a rejection handler attached before that first read.
-  void server.catch((error: unknown) => {
+  server.catch((error: unknown) => {
     if (!isAbortError(error)) console.error("Desktop server connection failed", error);
   });
 
@@ -42,7 +42,7 @@ export function createDesktopHost(
   return {
     platform: {
       quit: () => {
-        void client.app.quit().catch((error: unknown) => {
+        client.app.quit().catch((error: unknown) => {
           if (!isAbortError(error)) console.error("Failed to request desktop quit", error);
         });
       },
@@ -78,7 +78,7 @@ export function createDesktopHost(
 
         return () => {
           controller.abort();
-          void unsubscribe().catch((error: unknown) => {
+          unsubscribe().catch((error: unknown) => {
             if (!isAbortError(error)) {
               console.error("Failed to unsubscribe from desktop status", error);
             }
@@ -86,7 +86,7 @@ export function createDesktopHost(
         };
       },
       retry: () => {
-        void client.server.retry().catch((error: unknown) => {
+        client.server.retry().catch((error: unknown) => {
           if (!isAbortError(error)) console.error("Failed to retry desktop server", error);
         });
       },

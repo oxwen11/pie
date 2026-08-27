@@ -84,7 +84,7 @@ function CopyMarkdownButton({ text }: { text: string }) {
       <Action
         tooltip={copied ? "Copied" : "Copy"}
         onClick={() => {
-          void navigator.clipboard.writeText(text);
+          navigator.clipboard.writeText(text);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}

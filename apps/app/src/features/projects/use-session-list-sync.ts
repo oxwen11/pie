@@ -46,14 +46,14 @@ export function useSessionListSync(): void {
         // The stream ended (server teardown / dropped connection): phase
         // transitions may have been missed, so the patched statuses can be
         // stale — refetch every list rather than trust them.
-        void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() });
+        queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() });
         // Back off, then re-subscribe. Resolves early on abort so unmount
         // doesn't wait out the delay.
         await sleep(RESUBSCRIBE_DELAY_MS, abort.signal);
       }
     };
 
-    void run();
+    run();
     return () => abort.abort();
   }, [orpcClient, queryClient, orpcQueryUtils]);
 }

@@ -41,8 +41,7 @@ function setup(idle = true) {
   const scheduler = new SessionLoopScheduler({
     clock,
     dispatch,
-    setInterval: ((fn: () => void) => {
-      void fn;
+    setInterval: ((_fn: () => void) => {
       // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- stub timer id is a number, Node's is Timeout
       return 1 as unknown as ReturnType<typeof setInterval>;
     }) as typeof setInterval,

@@ -199,7 +199,7 @@ export class Chat {
           // next turn boundary, when the replace is safe again.
           this.#needsReconcile
         ) {
-          void this.#reconcileHistory();
+          this.#reconcileHistory();
         }
         this.#recoverTurnIds.delete(event.turnId);
         this.#erroredTurnIds.delete(event.turnId);
@@ -270,7 +270,7 @@ export class Chat {
       this.#historyLoaded = true;
       this.#queuedEvents = [];
       this.#floorSnapshot = snapshot;
-      void this.#loadHistoryFloor();
+      this.#loadHistoryFloor();
       return;
     }
     if (this.#queuedEvents !== null) {
@@ -409,7 +409,7 @@ export class Chat {
 
     if (activeTurn && !stale) this.#replayActiveTurn(activeTurn);
 
-    if (this.#needsReconcile) void this.#reconcileHistory();
+    if (this.#needsReconcile) this.#reconcileHistory();
 
     this.#cursor = Math.max(this.#cursor, snapshot.cursor);
     // A prompt still on the wire is invisible to the server, so this phase
@@ -437,7 +437,7 @@ export class Chat {
       chunks = sanitizeTail(unseen.map((chunkEvent) => chunkEvent.chunk));
       this.#recoverTurnIds.add(activeTurn.turnId);
     } else if (activeTurn.complete) {
-      void this.#reconcileHistory();
+      this.#reconcileHistory();
       return;
     } else {
       this.#recoverTurnIds.add(activeTurn.turnId);
@@ -455,7 +455,7 @@ export class Chat {
       // short-circuit would leave the second entry behind.
       const recovered = this.#recoverTurnIds.delete(activeTurn.turnId);
       const errored = this.#erroredTurnIds.delete(activeTurn.turnId);
-      if (recovered || errored) void this.#reconcileHistory();
+      if (recovered || errored) this.#reconcileHistory();
     }
   }
 
@@ -488,7 +488,7 @@ export class Chat {
   // approved on sight instead of surfacing a blank card.
   #handleRequest(request: AgentRequest): void {
     if (request.type === "plan" && !request.plan.trim()) {
-      void this.#transport
+      this.#transport
         .respondToAgentRequest(request.id, { type: "plan", behavior: "allow" })
         .catch((error: unknown) => {
           console.error("Failed to auto-approve empty plan request", error);
@@ -539,7 +539,7 @@ export class Chat {
         controller = c;
       },
     });
-    void (async () => {
+    (async () => {
       try {
         // Seed the fold with a turn-derived id: a start chunk that carries no
         // messageId (claude-code) would otherwise leave the reader's constant

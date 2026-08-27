@@ -81,7 +81,7 @@ describe("ContentPanel", () => {
     const entry = definePanel({
       type: "entry",
       label: "Entry",
-      create: () => ({ dispose: () => void disposed++ }),
+      create: () => ({ dispose: () => disposed++ }),
       view: null,
     });
     const host = withPanels(entry, file);
@@ -116,7 +116,7 @@ describe("ContentPanel", () => {
       type: "tracked",
       key: (payload: { path: string; line?: number }) => payload.path,
       label: (payload) => payload.path,
-      create: () => ({ reopen: (payload: unknown) => void reopened.push(payload) }),
+      create: () => ({ reopen: (payload: unknown) => reopened.push(payload) }),
       view: null,
     });
     const host = withPanels(tracked);
@@ -158,7 +158,7 @@ describe("ContentPanel", () => {
     const disposable = definePanel({
       type: "disposable",
       label: "Disposable",
-      create: () => ({ dispose: () => void disposed++ }),
+      create: () => ({ dispose: () => disposed++ }),
       view: null,
     });
     const host = withPanels(disposable);
@@ -332,7 +332,7 @@ describe("ContentPanel", () => {
     const disposable = definePanel({
       type: "disposable",
       label: "Disposable",
-      create: () => ({ dispose: () => void disposed++ }),
+      create: () => ({ dispose: () => disposed++ }),
       view: null,
     });
     const host = withPanels(disposable);

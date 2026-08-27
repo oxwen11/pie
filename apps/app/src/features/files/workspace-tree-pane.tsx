@@ -39,7 +39,7 @@ export function WorkspaceTreePane({
 }) {
   const hasTree = tree.data !== undefined;
   const isRefreshing = refreshing ?? tree.isFetching;
-  const refresh = onRefresh ?? (() => void tree.refetch());
+  const refresh = onRefresh ?? (() => tree.refetch());
 
   return (
     <div className="bg-background flex min-h-0 flex-1 flex-col">

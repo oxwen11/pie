@@ -36,7 +36,7 @@ export class RecoveringSubscription {
   start(): void {
     if (this.#started) return;
     this.#started = true;
-    void this.#run();
+    this.#run();
   }
 
   // Aborting #controller is the whole teardown: #open chains each cycle's own

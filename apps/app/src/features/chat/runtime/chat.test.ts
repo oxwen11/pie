@@ -928,7 +928,7 @@ describe("Chat truncated buffers", () => {
   });
 
   it("reconciles on re-attach when a flagged turn ended while detached", async () => {
-    const { chat, attach, transport, live } = makeChat();
+    const { chat, attach, transport } = makeChat();
     const [start, delta] = textChunks("t", "seen");
     await attach({
       status: { phase: "running" },
@@ -957,7 +957,6 @@ describe("Chat truncated buffers", () => {
     await attach({ status: { phase: "idle" }, activeTurn: null, cursor: 12 });
     await settle();
     expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["assistant-1"]);
-    void live;
   });
 });
 

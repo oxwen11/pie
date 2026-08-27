@@ -34,7 +34,7 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
     // the keymap ever sees it.
     extensions: (self) => [
       ...createChatBaseExtensions(),
-      createSubmitKeymap({ onSubmit: () => void self.submit() }),
+      createSubmitKeymap({ onSubmit: () => self.submit() }),
     ],
     onSubmit: (text) => {
       // Turn in progress: don't send, don't clear.
@@ -50,7 +50,7 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
     <PromptInput
       onSubmit={(e) => {
         e.preventDefault();
-        void controller?.submit();
+        controller?.submit();
       }}
     >
       <ChatInputProvider controller={controller}>
@@ -60,7 +60,7 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
           <PromptInputSubmit
             aria-label={canInterrupt ? "Stop generating" : "Send message"}
             disabled={!canInterrupt && (!hasContent || turnInProgress)}
-            onClick={canInterrupt ? () => void interrupt() : undefined}
+            onClick={canInterrupt ? () => interrupt() : undefined}
             status={status}
             type={canInterrupt ? "button" : "submit"}
           />

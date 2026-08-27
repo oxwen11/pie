@@ -43,7 +43,7 @@ export function makeMainWindow(
     const disconnectCurrentRenderer = (): void => {
       const disconnect = disconnectRenderer;
       disconnectRenderer = undefined;
-      if (disconnect) void disconnect();
+      if (disconnect) disconnect();
     };
 
     const target = is.dev && options.devUrl ? options.devUrl : `${APP_ORIGIN}/`;
@@ -86,7 +86,7 @@ export function makeMainWindow(
       });
 
       window.webContents.setWindowOpenHandler(({ url: href }) => {
-        if (canOpenExternal(href)) void shell.openExternal(href);
+        if (canOpenExternal(href)) shell.openExternal(href);
         return { action: "deny" };
       });
 
