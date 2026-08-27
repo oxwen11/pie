@@ -59,7 +59,7 @@ export function makeMainWindow(
         titleBarStyle: "hiddenInset",
         // y=19 centers the ~14px traffic lights on the 26px titlebar centerline.
         trafficLightPosition: { x: 22, y: 19 },
-        ...(process.platform === "linux" ? { icon } : {}),
+        ...(process.platform === "linux" ? { icon } : undefined),
         webPreferences: {
           preload: path.join(
             path.dirname(url.fileURLToPath(import.meta.url)),

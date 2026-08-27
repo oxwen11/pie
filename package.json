@@ -7,8 +7,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "lint": "oxlint --fix",
-    "lint:check": "oxlint --deny-warnings",
+    "lint": "turbo run lint",
+    "lint:check": "turbo run lint:check",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check": "pnpm run lint:check && pnpm run format:check && pnpm run typecheck",
@@ -23,13 +23,15 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
+    "@getpie/oxlint": "workspace:*",
+    "@oxlint/plugins": "1.80.0",
     "@types/node": "catalog:",
     "agent-cli-detector": "^0.1.6",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.1",
     "jsdom": "^26.1.0",
     "lint-staged": "^17.3.0",
     "oxfmt": "^0.58.0",
-    "oxlint": "^1.78.0",
+    "oxlint": "^1.80.0",
     "publint": "^0.3.23",
     "simple-git-hooks": "^2.13.1",
     "taze": "^19.17.2",
@@ -42,7 +44,7 @@
     "vitest": "catalog:"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx --no-install lint-staged"
+    "pre-commit": "pnpm exec turbo run build --filter=@getpie/oxlint --output-logs=errors-only && npx --no-install lint-staged"
   },
   "lint-staged": {
     "*": [

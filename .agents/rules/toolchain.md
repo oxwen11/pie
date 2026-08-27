@@ -8,16 +8,28 @@
   caret breaks the runtime. The reasons are commented inline; read them before
   changing versions. `packages/server` pins the Claude SDK as a literal while
   `packages/pie` uses `catalog:` — bump both together.
-- **Lint:** `lint:check` runs `--deny-warnings`, so the whole `suspicious`
-  category fails CI while only warning locally. oxfmt reorders imports.
-  Custom JS plugins live in `tools/oxlint/` (`pie`, `pie-boundaries`,
-  `pie-query`). Plugin RuleTester files are `@getpie/oxlint`'s `test`
+- **Lint:** `lint` / `lint:check` are turbo tasks (`dependsOn:
+  ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
+  oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
+  whole `suspicious` category fails CI while only warning locally. oxfmt
+  reorders imports and stays a root-only script. Custom plugins live in
+  `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
+  `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
+  emits them to `dist/`; the root `.oxlintrc.json` loads them as
+  `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
+  sources including vendored anti-slop are linted and formatted; `dist/` is
+  ignored as generated output. Effect service
+  types keep the `Shape` suffix (`Context.Service<Self, Shape>`), so
+  `anti-slop/no-shape-in-symbol-names` is off. Composition roots still call
+  `make*` constructors, so `anti-slop-effect/no-service-constructor-imports`
+  is off. Plugin RuleTester files are `@getpie/oxlint`'s `test`
   script, so they run with the rest of the repo under `pnpm test` — not
   via `lint:check`.
-- **Commits rewrite files:** pre-commit runs lint-staged (`oxlint --fix` + `oxfmt`)
-  over every staged file. No typecheck, no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips
-  it. Hooks only exist after `pnpm install` — `prepare` sets `core.hooksPath`,
-  which is also what makes them fire inside worktrees.
+- **Commits rewrite files:** pre-commit runs `@getpie/oxlint#build` then
+  lint-staged (`oxlint --fix` + `oxfmt`) over every staged file. No typecheck,
+  no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
+  `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
+  them fire inside worktrees.
 - **Tests:** no root vitest workspace; every package has its own config and goes
   through turbo. Layout is inconsistent — `server`/`contract`/`harness` use
   `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit

@@ -362,8 +362,8 @@ export const makePiProcessWithDependencies = <R>(
           const transport = yield* dependencies
             .makeTransport({
               sessionId,
-              ...(cwd ? { cwd } : {}),
-              ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : {}),
+              ...(cwd ? { cwd } : undefined),
+              ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : undefined),
             })
             .pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(buildContext));
 
@@ -668,9 +668,9 @@ export const makePiProcess = (
   makePiProcessWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
-        ...(options.executable ? { executable: options.executable } : {}),
-        ...(options.args ? { args: options.args } : {}),
+        ...(options.executable ? { executable: options.executable } : undefined),
+        ...(options.args ? { args: options.args } : undefined),
         sessionId: config.sessionId,
-        ...(config.cwd ? { cwd: config.cwd } : {}),
+        ...(config.cwd ? { cwd: config.cwd } : undefined),
       }),
   });

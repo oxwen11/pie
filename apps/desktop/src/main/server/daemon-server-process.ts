@@ -130,7 +130,12 @@ export function makeDaemonServerProcess(
   });
 }
 
-function endpointOf(handle: DaemonHandle): { port: number; token: string } {
+type DaemonEndpoint = {
+  port: number;
+  token: string;
+};
+
+function endpointOf(handle: DaemonHandle): DaemonEndpoint {
   return { port: handle.port, token: handle.token };
 }
 
@@ -145,7 +150,7 @@ function logLivenessFailed(
       reason,
       pid: handle.pid,
       address: handle.address,
-      ...(consecutiveMisses === undefined ? {} : { consecutiveMisses }),
+      ...(consecutiveMisses === undefined ? undefined : { consecutiveMisses }),
     }),
   );
 }

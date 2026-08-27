@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   >(),
 }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- route context comes from the route tree, not a test seam
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: () => ({
     orpcQueryUtils: { agent: { session: { list: { queryOptions: mocks.queryOptions } } } },
@@ -22,7 +23,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { selectProjectSessionTitle, useProjectSessionTitle } from "./use-project-sessions";
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const session = (
   sessionId: string,
@@ -31,7 +32,7 @@ const session = (
 ): SessionSummary => ({
   projectId: "project-1",
   sessionId,
-  ...(title === undefined ? {} : { title }),
+  ...(title === undefined ? undefined : { title }),
   archived,
   createdAt: "2026-08-08T00:00:00.000Z",
   historyAvailable: true,

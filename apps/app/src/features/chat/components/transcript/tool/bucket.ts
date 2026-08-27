@@ -17,7 +17,11 @@ export const BUCKET_ORDER: readonly BucketKey[] = [
 // string. Tools NOT in this map still enter the accordion (see
 // use-tool-batches) but stay silent in the trigger phrase. Subagent
 // invocations opt out of batching entirely via `isStandalone`.
-const TOOL_BUCKETS: Record<string, BucketKey> = {
+interface ToolBucketMap {
+  readonly [toolType: string]: BucketKey;
+}
+
+const TOOL_BUCKETS: ToolBucketMap = {
   "tool-Read": "files",
   "tool-WebFetch": "files",
   "tool-Glob": "lists",

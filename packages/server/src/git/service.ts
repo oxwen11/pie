@@ -412,7 +412,7 @@ export const GitServiceLayer: Layer.Layer<
               index: file.index,
               worktree: file.working_dir,
               ...(relocatedFrom === undefined || relocatedFrom === null
-                ? {}
+                ? undefined
                 : { oldPath: relocatedFrom }),
             });
           }
@@ -476,7 +476,7 @@ export const GitServiceLayer: Layer.Layer<
           return {
             path: file.path,
             status: file.status,
-            ...(file.oldPath === undefined ? {} : { oldPath: file.oldPath }),
+            ...(file.oldPath === undefined ? undefined : { oldPath: file.oldPath }),
             oldContents,
             newContents,
             binary: false,

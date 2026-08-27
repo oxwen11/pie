@@ -284,8 +284,8 @@ export const createPiAgentRuntime = (
   process.session
     .create({
       cwd: input.cwd,
-      ...(input.provider ? { provider: input.provider } : {}),
-      ...(input.modelId ? { modelId: input.modelId } : {}),
+      ...(input.provider ? { provider: input.provider } : undefined),
+      ...(input.modelId ? { modelId: input.modelId } : undefined),
     })
     .pipe(
       Effect.mapError((cause) => new AgentOpenError({ cause })),

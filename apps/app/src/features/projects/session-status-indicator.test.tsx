@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { SessionStatusIndicator } from "./session-status-indicator";
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;

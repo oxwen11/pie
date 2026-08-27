@@ -1,5 +1,8 @@
 import module from "node:module";
 
+import { definePlugin, defineRule } from "@oxlint/plugins";
+import type { ESTree } from "@oxlint/plugins";
+
 const { isBuiltin } = module;
 
 // Enforces the repo convention for Node builtin imports:
@@ -16,33 +19,44 @@ const { isBuiltin } = module;
 // node:fs/promises) does the subpath import fall back to the full camelCased
 // path (fsPromises).
 
-const bareName = (source) => source.replace(/^node:/, "");
-const camelize = (s) => s.replace(/[/_](\w)/g, (_, c) => c.toUpperCase());
-const firstSegment = (source) => bareName(source).split("/")[0];
+type BuiltinImport = {
+  source: string;
+  node: ESTree.ImportDeclaration;
+};
 
-const canonicalNames = (declarations) => {
-  const byFirst = new Map();
-  for (const d of declarations) {
-    const first = firstSegment(d.source);
-    if (!byFirst.has(first)) byFirst.set(first, new Set());
-    byFirst.get(first).add(bareName(d.source));
+const bareName = (source: string): string => source.replace(/^node:/, "");
+const camelize = (value: string): string =>
+  value.replace(/[/_](\w)/g, (_, char: string) => char.toUpperCase());
+const firstSegment = (source: string): string => bareName(source).split("/")[0] ?? bareName(source);
+
+const canonicalNames = (declarations: BuiltinImport[]): ((source: string) => string) => {
+  const byFirst = new Map<string, Set<string>>();
+  for (const declaration of declarations) {
+    const first = firstSegment(declaration.source);
+    const names = byFirst.get(first);
+    if (names === undefined) {
+      byFirst.set(first, new Set([bareName(declaration.source)]));
+    } else {
+      names.add(bareName(declaration.source));
+    }
   }
   return (source) => {
     const bare = bareName(source);
     const first = firstSegment(source);
-    const contested = byFirst.get(first).size > 1 && bare !== first;
+    const names = byFirst.get(first);
+    const contested = names !== undefined && names.size > 1 && bare !== first;
     return camelize(contested ? bare : first);
   };
 };
 
-const nodeImportStyle = {
+const nodeImportStyleRule = defineRule({
   create(context) {
-    const declarations = [];
+    const declarations: BuiltinImport[] = [];
 
     return {
       ImportDeclaration(node) {
         const source = node.source.value;
-        if (typeof source !== "string" || !isBuiltin(source)) return;
+        if (!isBuiltin(source)) return;
         if (node.importKind === "type") return;
 
         declarations.push({ source, node });
@@ -66,8 +80,10 @@ const nodeImportStyle = {
       "Program:exit"() {
         const expectedFor = canonicalNames(declarations);
         for (const { source, node } of declarations) {
-          const def = node.specifiers.find((s) => s.type === "ImportDefaultSpecifier");
-          if (!def) continue;
+          const def = node.specifiers.find(
+            (specifier) => specifier.type === "ImportDefaultSpecifier",
+          );
+          if (def === undefined) continue;
           const expected = expectedFor(source);
           if (def.local.name !== expected) {
             context.report({
@@ -79,11 +95,11 @@ const nodeImportStyle = {
       },
     };
   },
-};
+});
 
-export default {
+export default definePlugin({
   meta: { name: "pie" },
   rules: {
-    "node-import-style": nodeImportStyle,
+    "node-import-style": nodeImportStyleRule,
   },
-};
+});

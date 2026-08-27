@@ -27,7 +27,7 @@ const makeLayer = (home: string) =>
 const meta = (sessionId: string, projectId: string, agentSessionId?: string): Session => ({
   sessionId,
   projectId,
-  ...(agentSessionId !== undefined ? { agentSessionId } : {}),
+  ...(agentSessionId !== undefined ? { agentSessionId } : undefined),
   createdAt: "2026-07-16T00:00:00.000Z",
 });
 

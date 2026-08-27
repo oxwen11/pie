@@ -54,6 +54,12 @@ export interface OneShotTask extends LoopTaskBase {
   expiresAt: null;
 }
 
+type LoopCommandArgs = {
+  interval?: string;
+  prompt: string;
+  maintenance: boolean;
+};
+
 export interface DynamicTask extends LoopTaskBase {
   kind: "dynamic";
   expiresAt: number;
@@ -162,7 +168,7 @@ export class SessionLoopScheduler {
     this.drain();
   }
 
-  parseLoopArgs(args: string): { interval?: string; prompt: string; maintenance: boolean } {
+  parseLoopArgs(args: string): LoopCommandArgs {
     const trimmed = args.trim();
     if (!trimmed) return { prompt: this.maintenancePrompt(), maintenance: true };
     const leading = parseLeadingInterval(trimmed);

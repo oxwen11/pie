@@ -189,7 +189,7 @@ export function entriesToUIMessages(
             text: block.text,
             state: "done",
             ...(block.textSignature === undefined
-              ? {}
+              ? undefined
               : { providerMetadata: { pi: { textSignature: block.textSignature } } }),
           });
           break;

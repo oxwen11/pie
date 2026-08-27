@@ -1,0 +1,62 @@
+name: Preview package
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["!**"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+
+concurrency:
+  group: preview-package-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish @getpie/cli preview
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
+    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare persistent CI caches
+        run: |
+          cache_root="${RUNNER_WORKSPACE}/../.pie-ci-cache"
+          mkdir -p "${cache_root}/pnpm-store" "${cache_root}/turbo"
+          {
+            echo "PNPM_STORE_DIR=${cache_root}/pnpm-store"
+            echo "TURBO_CACHE_DIR=${cache_root}/turbo"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup project toolchain
+        run: |
+          {
+            echo "/usr/local/bin"
+            echo "${HOME}/.local/share/mise/shims"
+          } >> "$GITHUB_PATH"
+          export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
+          mise install --locked
+        shell: bash
+
+      - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
+
+      - run: pnpm turbo run build --filter=@getpie/cli
+
+      # Preview tarball for this commit/branch. Not npm. Needs the pkg-pr-new
+      # GitHub App on oxwen11/pie: https://github.com/apps/pkg-pr-new
+      # Compact URLs need the package to already exist on npm, so stay long-form.
+      - name: Publish preview to pkg.pr.new
+        run: >
+          pnpm dlx pkg-pr-new publish
+          --pnpm --bin --previewVersion --no-template --no-compact
+          ./packages/pie

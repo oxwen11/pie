@@ -115,7 +115,7 @@ function wireServer(options: {
           Effect.annotateLogs({
             event: "ws.disconnected",
             code,
-            ...(reason.length > 0 ? { reason: reason.toString() } : {}),
+            ...(reason.length > 0 ? { reason: reason.toString() } : undefined),
             clients: wss.clients.size,
           }),
         ),
@@ -174,7 +174,7 @@ function wireServer(options: {
     ) {
       rejectUpgrade(socket, "403 Forbidden", "host_or_origin", {
         host: req.headers.host,
-        ...(origin !== undefined ? { origin } : {}),
+        ...(origin !== undefined ? { origin } : undefined),
       });
       return;
     }

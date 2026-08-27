@@ -53,15 +53,15 @@ const resolveCwd = (
 
 const toReviewInput = (input: GitReviewQuery, cwd: string) => ({
   cwd,
-  ...(input.mode !== undefined ? { mode: input.mode } : {}),
-  ...(input.other !== undefined ? { other: input.other } : {}),
+  ...(input.mode !== undefined ? { mode: input.mode } : undefined),
+  ...(input.other !== undefined ? { other: input.other } : undefined),
 });
 
 const toDiffInput = (input: GitDiffQuery, cwd: string) => ({
   cwd,
   path: input.path,
-  ...(input.mode !== undefined ? { mode: input.mode } : {}),
-  ...(input.other !== undefined ? { other: input.other } : {}),
+  ...(input.mode !== undefined ? { mode: input.mode } : undefined),
+  ...(input.other !== undefined ? { other: input.other } : undefined),
 });
 
 export const gitRouter = orpc.router({

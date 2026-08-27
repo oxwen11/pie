@@ -46,8 +46,11 @@ type DraftSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const optional = <K extends string, V extends string>(key: K, value: V | undefined) =>
-  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
+const optional = <K extends keyof DraftSearch>(
+  key: K,
+  value: DraftSearch[K],
+): Pick<DraftSearch, K> | undefined =>
+  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
@@ -96,8 +99,8 @@ function DraftRoute() {
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
-          : {}),
-        ...(worktree !== undefined ? { worktree } : {}),
+          : undefined),
+        ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
     },
@@ -158,7 +161,9 @@ function DraftRoute() {
       }
       startSession.mutate({
         text,
-        ...(draftWorktree.worktree !== undefined ? { worktree: draftWorktree.worktree } : {}),
+        ...(draftWorktree.worktree !== undefined
+          ? { worktree: draftWorktree.worktree }
+          : undefined),
       });
       return false;
     },

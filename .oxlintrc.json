@@ -2,10 +2,12 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "unicorn", "oxc", "jsx-a11y", "vitest", "vue"],
   "jsPlugins": [
-    "./tools/oxlint/node-import-style.mjs",
-    "./tools/oxlint/feature-boundaries.mjs",
-    "./tools/oxlint/query-policy.mjs",
-    "eslint-plugin-react-you-might-not-need-an-effect"
+    { "name": "pie", "specifier": "@getpie/oxlint/pie" },
+    { "name": "pie-boundaries", "specifier": "@getpie/oxlint/pie-boundaries" },
+    { "name": "pie-query", "specifier": "@getpie/oxlint/pie-query" },
+    "eslint-plugin-react-you-might-not-need-an-effect",
+    { "name": "anti-slop", "specifier": "@getpie/oxlint/anti-slop" },
+    { "name": "anti-slop-effect", "specifier": "@getpie/oxlint/anti-slop-effect" }
   ],
   "categories": {
     "correctness": "error",
@@ -18,6 +20,22 @@
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",
     "pie-query/no-query-client-default-overrides": "error",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": "off",
+    "anti-slop/no-shape-in-symbol-names": "off",
+    "anti-slop/no-unknown-parameters": "off",
+    "anti-slop/no-unknown-returns": "off",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "off",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "off",
+    "anti-slop-effect/no-service-constructor-imports": "off",
     "react/exhaustive-deps": [
       "error",
       {
@@ -34,6 +52,10 @@
     "unicorn/no-array-sort": "off",
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
+    "react/purity": "off",
+    "react/set-state-in-effect": "off",
+    "react/exhaustive-effect-dependencies": "off",
+    "react/immutability": "off",
     "no-unused-vars": [
       "error",
       {
@@ -74,9 +96,33 @@
         "react-you-might-not-need-an-effect/no-event-handler": "off",
         "react-you-might-not-need-an-effect/no-pass-data-to-parent": "off",
         "react-you-might-not-need-an-effect/no-pass-live-state-to-parent": "off",
-        "react-you-might-not-need-an-effect/no-external-store-subscription": "off"
+        "react-you-might-not-need-an-effect/no-external-store-subscription": "off",
+        "anti-slop/no-chained-type-assertions": "off",
+        "anti-slop/no-conditional-empty-object-spread": "off",
+        "anti-slop/no-known-value-widening": "off",
+        "anti-slop/no-module-mocking": "off",
+        "anti-slop/no-object-parameters": "off",
+        "anti-slop/no-unknown-type-aliases": "off",
+        "anti-slop/no-widen-then-assert": "off"
       }
     }
   ],
-  "ignorePatterns": ["**/routeTree.gen.ts", ".conductor", "**/dist/**", "**/node_modules/**"]
+  "ignorePatterns": [
+    "**/routeTree.gen.ts",
+    ".conductor",
+    "**/dist/**",
+    "**/node_modules/**",
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".factory/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**"
+  ]
 }
