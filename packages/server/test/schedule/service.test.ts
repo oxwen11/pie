@@ -1,4 +1,4 @@
-import type { CreateScheduleInput, Schedule, SessionRef } from "@getpie/contract";
+import type { CreateScheduleInput, Schedule } from "@getpie/contract";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -47,7 +47,6 @@ function setup(opts: { readonly live?: boolean; readonly missingProject?: boolea
   let next = 1;
   let clock = Date.parse("2026-08-27T08:00:00.000Z");
   const created: Array<{ title?: string; scheduleId?: string; projectId: string }> = [];
-  const prompted: SessionRef[] = [];
   const repo: ScheduleStore = {
     list: () => Effect.succeed(Array.from(store.values())),
     read: (id) => {
@@ -78,11 +77,7 @@ function setup(opts: { readonly live?: boolean; readonly missingProject?: boolea
           workspace: { cwd: input.cwd },
         };
       }),
-    prompt: (input) =>
-      Effect.sync(() => {
-        prompted.push(input.ref);
-        return { turnId: "turn-1" };
-      }),
+    prompt: () => Effect.succeed({ turnId: "turn-1" }),
     getStatus: () => Effect.succeed({ phase: opts.live === true ? "running" : "idle" }),
   };
   const service = makeScheduleService({
@@ -105,7 +100,6 @@ function setup(opts: { readonly live?: boolean; readonly missingProject?: boolea
     service,
     store,
     created,
-    prompted,
     setNow: (iso: string) => {
       clock = Date.parse(iso);
     },
@@ -136,10 +130,33 @@ describe("ScheduleService", () => {
     expect(h.created).toEqual([
       { projectId: PROJECT_ID, title: "Morning review", scheduleId: created.id },
     ]);
-    expect(h.prompted).toEqual([{ projectId: PROJECT_ID, sessionId: "sess-1" }]);
     expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-1" });
     expect(fired.schedule.lastRunStatus).toBe("started");
     expect(fired.schedule.runs[0]?.reason).toBe("manual");
+  });
+
+  it("runNow returns after create even if prompt never settles", async () => {
+    const hanging = makeScheduleService({
+      repo: memoryStore(),
+      projects: {
+        findById: () => Effect.succeed({ path: "/tmp/app" }),
+      },
+      sessions: {
+        create: (input) =>
+          Effect.succeed({
+            ref: { projectId: input.projectId, sessionId: "sess-hang" },
+            workspace: { cwd: input.cwd },
+          }),
+        prompt: () => Effect.never,
+        getStatus: () => Effect.succeed({ phase: "idle" }),
+      },
+      newId: Effect.succeed("00000000-0000-0000-0000-000000000088"),
+      now: () => Date.parse("2026-08-27T08:00:00.000Z"),
+    });
+    const created = await run(hanging.create(cronInput()));
+    const fired = await run(hanging.runNow(created.id));
+    expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-hang" });
+    expect(fired.schedule.lastRunStatus).toBe("started");
   });
 
   it("tick fires a due schedule and advances nextRunAt", async () => {

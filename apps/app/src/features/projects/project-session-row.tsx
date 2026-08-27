@@ -35,11 +35,12 @@ export function ProjectSessionRow({
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="truncate">{session.title ?? "New chat"}</span>
         {session.scheduleId !== undefined ? (
-          <Clock
-            aria-hidden
-            className="text-muted-foreground size-3.5 shrink-0 opacity-70"
+          <span
+            className="text-muted-foreground inline-flex shrink-0"
             title="Created by a schedule"
-          />
+          >
+            <Clock aria-hidden className="size-3.5 opacity-70" />
+          </span>
         ) : null}
       </SidebarMenuButton>
       <SessionActionsMenu isActive={isActive} session={session} />

@@ -185,8 +185,9 @@ export const makeScheduleService = (deps: {
           : undefined),
         ...(schedule.worktree !== undefined ? { worktree: schedule.worktree } : undefined),
       });
-      // The session is already durable. A prompt failure is logged; the user
-      // can open the session and retry. Do not roll the create back.
+      // The session is already durable. Kick the prompt off the fire path so a
+      // slow or wedged Pi cannot stall runNow or the tick. Failures are logged;
+      // the user can open the session and retry.
       yield* sessions
         .prompt({
           ref: created.ref,
@@ -203,6 +204,7 @@ export const makeScheduleService = (deps: {
               }),
             ),
           ),
+          Effect.forkDetach,
         );
       return created.ref;
     });

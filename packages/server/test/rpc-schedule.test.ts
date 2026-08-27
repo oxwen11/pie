@@ -4,13 +4,13 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { makeRpcTestHarness } from "./rpc-harness";
+import { makeRpcTestHarness, writeFakePiExecutable } from "./rpc-harness";
 
 describe("schedule router", () => {
   it("creates, lists, updates, runs, and deletes an application schedule", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-project-"));
-    const h = await makeRpcTestHarness(home);
+    const h = await makeRpcTestHarness(home, { executable: writeFakePiExecutable() });
     try {
       const project = await h.client.project.create({ path: workspace });
       const created = await h.client.schedule.create({
@@ -45,6 +45,9 @@ describe("schedule router", () => {
 
       await h.client.schedule.delete({ id: created.id });
       await expect(h.client.schedule.list()).resolves.toEqual([]);
+      if (fired.ref !== undefined) {
+        await h.client.agent.session.close({ ref: fired.ref });
+      }
     } finally {
       await h.dispose();
     }

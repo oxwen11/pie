@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { createRouterClient } from "@orpc/server";
 import { Effect, Layer, ManagedRuntime } from "effect";
@@ -13,6 +17,7 @@ import {
 } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
+import type { PiExecutable } from "../src/harness/pi/resolve-executable";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
@@ -20,16 +25,55 @@ import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 
-export async function makeRpcTestHarness(home: string) {
+const FAKE_PI = `#!/usr/bin/env node
+const readline = require("node:readline");
+const rl = readline.createInterface({ input: process.stdin });
+const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
+const sidIndex = process.argv.indexOf("--session-id");
+const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
+process.stdout.write("pi startup banner (not json)\\n");
+send({ type: "extension_ui_request", id: "st", method: "setStatus", statusKey: "k", statusText: "v" });
+const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
+const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
+const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
+rl.on("line", (line) => {
+  const msg = JSON.parse(line);
+  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
+  if (msg.type !== "prompt") return;
+  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ type: "agent_start" });
+  send({ type: "message_start", message: assistant() });
+  upd({ type: "start" });
+  upd({ type: "text_start", contentIndex: 0 });
+  upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
+  upd({ type: "text_end", contentIndex: 0, content: "pong" });
+  send({ type: "message_end", message: assistant() });
+  settle();
+});
+`;
+
+export function writeFakePiExecutable(): PiExecutable {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-"));
+  const file = path.join(dir, "fake-pi.js");
+  fs.writeFileSync(file, FAKE_PI);
+  fs.chmodSync(file, 0o755);
+  return { command: file, prefixArgs: [] };
+}
+
+export async function makeRpcTestHarness(
+  home: string,
+  options: { readonly executable?: PiExecutable } = {},
+) {
+  const processOptions = options.executable !== undefined ? { executable: options.executable } : {};
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
-  const piProcessLayer = Layer.effect(PiProcessTag, makePiProcess()).pipe(
+  const piProcessLayer = Layer.effect(PiProcessTag, makePiProcess(processOptions)).pipe(
     Layer.provide(NodeServices.layer),
   );
   const piAgentLayer = Layer.effect(
     PiAgent,
     Effect.gen(function* () {
       const process = yield* PiProcessTag;
-      return yield* cachePiAgentAvailability(makePiAgent(process));
+      return yield* cachePiAgentAvailability(makePiAgent(process, processOptions));
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
