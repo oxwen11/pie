@@ -51,6 +51,27 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
+  it("create persists an optional title and scheduleId", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const created = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          title: "Morning review",
+          scheduleId: "sched-1",
+        });
+        const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
+        const listed = yield* fixture.service.list("proj-a", false);
+        return { stored, listed };
+      }),
+    );
+
+    expect(result.stored.title).toBe("Morning review");
+    expect(result.stored.scheduleId).toBe("sched-1");
+    expect(result.listed[0]?.title).toBe("Morning review");
+    expect(result.listed[0]?.scheduleId).toBe("sched-1");
+  });
+
   it("create succeeds without opening Pi even when the agent is unavailable", async () => {
     const result = await run({ unavailable: "not installed" }, (fixture) =>
       Effect.gen(function* () {

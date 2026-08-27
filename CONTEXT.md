@@ -23,6 +23,10 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 **Session metadata**:
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
 
+**Schedule**:
+An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon ticks the collection; when a Schedule is due it creates a new Session in the Schedule's Project and sends the stored prompt. Specs are `cron` (5-field, local timezone), `once` (timezone-aware ISO), or `manual` (run now only).
+_Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, automation, cron (as the domain noun — it is one spec kind)
+
 **Workspace path**:
 The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. The session layer only deals in `cwd`; worktree creation runs inside create (not a git RPC, not the first prompt) and is never stored as a pending flag. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
 _Avoid_: cwd (in session APIs)

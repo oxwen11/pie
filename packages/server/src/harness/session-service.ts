@@ -82,6 +82,10 @@ export type CreatePiSessionInput = {
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
   readonly worktree?: CreateWorktreeInput;
+  /** Display title written at create so a scheduled session is named before the first prompt. */
+  readonly title?: string;
+  /** Application-level Schedule that created this session. */
+  readonly scheduleId?: string;
 };
 
 export type PiAgentSessionServiceShape = {
@@ -406,6 +410,8 @@ export const makePiAgentSessionService = (deps: {
                 ...(input.model !== undefined
                   ? { provider: input.model.provider, modelId: input.model.modelId }
                   : undefined),
+                ...(input.title !== undefined ? { title: input.title } : undefined),
+                ...(input.scheduleId !== undefined ? { scheduleId: input.scheduleId } : undefined),
                 archived: false,
               };
               return repo.write(metadata).pipe(
@@ -415,6 +421,11 @@ export const makePiAgentSessionService = (deps: {
                     : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                 ),
                 Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                Effect.andThen(
+                  input.title === undefined
+                    ? Effect.void
+                    : bus.publish({ ref, type: "session.updated", title: input.title }),
+                ),
                 Effect.andThen(
                   logLifecycle("session.created", "session created", {
                     cwd: sessionWorkspace.cwd,
@@ -545,6 +556,9 @@ export const makePiAgentSessionService = (deps: {
                       ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
                       ...(metadata.updatedAt !== undefined
                         ? { updatedAt: metadata.updatedAt }
+                        : undefined),
+                      ...(metadata.scheduleId !== undefined
+                        ? { scheduleId: metadata.scheduleId }
                         : undefined),
                       ...(status !== undefined ? { status } : undefined),
                     }) satisfies SessionSummary,

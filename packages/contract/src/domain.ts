@@ -570,6 +570,8 @@ export type SessionSummary = {
   readonly updatedAt?: string;
   readonly historyAvailable: boolean;
   readonly status?: SessionStatus;
+  /** Present when this session was created by an application-level Schedule. */
+  readonly scheduleId?: string;
 };
 
 /** `session.list` returns the summaries directly — one shape, no wrapper. */
