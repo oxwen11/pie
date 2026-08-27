@@ -33,6 +33,7 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
+  const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const status = useStore(store, (s) => s.status);
@@ -84,22 +85,24 @@ export function ChatInputComposer({
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>
-      <CardFrameFooter className="py-2">
-        {branch.data?.kind === "repository" && branch.data.current ? (
-          <span
-            className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs"
-            title="Current git branch"
-          >
-            <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="truncate">{branch.data.current}</span>
-          </span>
-        ) : null}
-        {branch.data?.kind === "not-repository" ? (
-          <span className="text-muted-foreground px-3 text-xs">Not a Git repository</span>
-        ) : null}
-        {workspaceUnavailable ? (
-          <span className="text-destructive px-3 text-xs">Workspace unavailable</span>
-        ) : null}
+      <CardFrameFooter className="px-3 py-2">
+        <span className="flex h-4 min-w-0 items-center text-xs">
+          {branch.isPending ? (
+            <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />
+          ) : currentBranch ? (
+            <span
+              className="text-muted-foreground flex min-w-0 items-center gap-1.5"
+              title="Current git branch"
+            >
+              <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+              <span className="truncate">{currentBranch}</span>
+            </span>
+          ) : branch.data?.kind === "not-repository" ? (
+            <span className="text-muted-foreground">Not a Git repository</span>
+          ) : workspaceUnavailable ? (
+            <span className="text-destructive">Workspace unavailable</span>
+          ) : null}
+        </span>
       </CardFrameFooter>
     </CardFrame>
   );
