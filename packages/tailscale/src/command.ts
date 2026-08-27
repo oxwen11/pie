@@ -227,12 +227,18 @@ const runTailscaleCommandInScope = (
           stderrDiagnostic: stderrDiagnostic ?? "none",
         }),
       );
-      return yield* new TailscaleCommandError({
+      const commandError = {
         command: argv,
         exitCode,
         message: tailscaleExitUserMessage(stderrDiagnostic),
-        ...(stderrDiagnostic === undefined ? {} : { stderrDiagnostic }),
         stderrLength: stderr.length,
+      };
+      if (stderrDiagnostic === undefined) {
+        return yield* new TailscaleCommandError(commandError);
+      }
+      return yield* new TailscaleCommandError({
+        ...commandError,
+        stderrDiagnostic,
       });
     }
 
