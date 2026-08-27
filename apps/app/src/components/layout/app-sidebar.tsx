@@ -12,7 +12,7 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { SquarePen } from "lucide-react";
+import { Clock, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -25,9 +25,13 @@ import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 export function AppSidebar({
   isSessionActive,
   onNewChat,
+  onSchedules,
+  schedulesActive,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onNewChat: () => void;
+  readonly onSchedules: () => void;
+  readonly schedulesActive: boolean;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
@@ -70,6 +74,12 @@ export function AppSidebar({
                 <SidebarMenuButton onClick={onNewChat}>
                   <SquarePen />
                   <span>New chat</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={schedulesActive} onClick={onSchedules}>
+                  <Clock />
+                  <span>Schedules</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
