@@ -2,15 +2,12 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "unicorn", "oxc", "jsx-a11y", "vitest", "vue"],
   "jsPlugins": [
-    "./tools/oxlint/node-import-style.mjs",
-    "./tools/oxlint/feature-boundaries.mjs",
-    "./tools/oxlint/query-policy.mjs",
+    { "name": "pie", "specifier": "@getpie/oxlint/pie" },
+    { "name": "pie-boundaries", "specifier": "@getpie/oxlint/pie-boundaries" },
+    { "name": "pie-query", "specifier": "@getpie/oxlint/pie-query" },
     "eslint-plugin-react-you-might-not-need-an-effect",
-    { "name": "anti-slop", "specifier": "./tools/oxlint/anti-slop.mjs" },
-    {
-      "name": "anti-slop-effect",
-      "specifier": "./tools/oxlint/anti-slop-effect.mjs"
-    }
+    { "name": "anti-slop", "specifier": "@getpie/oxlint/anti-slop" },
+    { "name": "anti-slop-effect", "specifier": "@getpie/oxlint/anti-slop-effect" }
   ],
   "categories": {
     "correctness": "error",
@@ -126,9 +123,6 @@
     ".opencode/**",
     ".pi/**",
     ".roo/**",
-    ".windsurf/**",
-    "tools/oxlint/anti-slop/**",
-    "tools/oxlint/anti-slop.mjs",
-    "tools/oxlint/anti-slop-effect.mjs"
+    ".windsurf/**"
   ]
 }

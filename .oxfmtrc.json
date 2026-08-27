@@ -26,9 +26,6 @@
     ".opencode/**",
     ".pi/**",
     ".roo/**",
-    ".windsurf/**",
-    "tools/oxlint/anti-slop/**",
-    "tools/oxlint/anti-slop.mjs",
-    "tools/oxlint/anti-slop-effect.mjs"
+    ".windsurf/**"
   ]
 }

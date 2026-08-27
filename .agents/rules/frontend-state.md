@@ -71,7 +71,7 @@ for per-agent tool rendering.
   `refetchOnWindowFocus: false`). The one key-wide exception is
   `agent.session.list` (`staleTime: 30_000` via `setQueryDefaults`). Enforced
   by `pie-query/no-query-client-default-overrides`
-  (`tools/oxlint/query-policy.mjs`).
+  (`tools/oxlint/query-policy.ts`).
 - **Narrow a query with `select`, not after the result.** When a consumer needs
   one field out of a list query, derive it inside `useQuery`'s `select` —
   narrowing after the fact (`data?.find(...)`) subscribes the component to the
