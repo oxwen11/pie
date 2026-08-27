@@ -101,19 +101,19 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
         const tree = yield* readTree(cwd);
         const paths = tree.entries.map((entry) => entry.path);
 
-        assert(paths.includes("sub"));
-        assert(paths.includes("sub/nested.ts"));
-        assert(paths.includes(".yarn"));
-        assert(paths.includes(".yarn/patches/keep.patch"));
-        assert(paths.includes("vendor"));
-        assert(paths.includes("vendor/source/keep.rb"));
+        assert.ok(paths.includes("sub"));
+        assert.ok(paths.includes("sub/nested.ts"));
+        assert.ok(paths.includes(".yarn"));
+        assert.ok(paths.includes(".yarn/patches/keep.patch"));
+        assert.ok(paths.includes("vendor"));
+        assert.ok(paths.includes("vendor/source/keep.rb"));
 
-        assert(!paths.some((entry) => entry === ".git" || entry.startsWith(".git/")));
-        assert(
+        assert.ok(!paths.some((entry) => entry === ".git" || entry.startsWith(".git/")));
+        assert.ok(
           !paths.some((entry) => entry === "node_modules" || entry.startsWith("node_modules/")),
         );
-        assert(!paths.some((entry) => entry.startsWith(".yarn/unplugged")));
-        assert(!paths.some((entry) => entry.startsWith("vendor/bundle")));
+        assert.ok(!paths.some((entry) => entry.startsWith(".yarn/unplugged")));
+        assert.ok(!paths.some((entry) => entry.startsWith("vendor/bundle")));
       }),
     );
 
@@ -149,7 +149,7 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
           { path: "outside-dir", type: "symlink", symlinkTarget: "outside" },
           { path: "outside-link", type: "symlink", symlinkTarget: "outside" },
         ]);
-        assert(!tree.entries.some((entry) => entry.path.startsWith("outside-dir/")));
+        assert.ok(!tree.entries.some((entry) => entry.path.startsWith("outside-dir/")));
       }),
     );
 

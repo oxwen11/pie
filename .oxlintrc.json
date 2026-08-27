@@ -30,10 +30,19 @@
     "unicorn/prefer-node-protocol": "error",
     "unicorn/prefer-at": "error",
     "unicorn/prefer-string-replace-all": "error",
+    "unicorn/prefer-string-slice": "error",
+    "unicorn/prefer-string-starts-ends-with": "error",
+    "unicorn/prefer-string-trim-start-end": "error",
     "unicorn/prefer-array-flat-map": "error",
+    "unicorn/prefer-array-flat": "error",
+    "unicorn/prefer-array-some": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-array-index-of": "error",
     "unicorn/prefer-set-has": "error",
     "unicorn/prefer-includes": "error",
     "unicorn/no-array-for-each": "error",
+    "unicorn/explicit-length-check": "error",
+    "unicorn/consistent-assert": "error",
     "import/no-cycle": "error",
     "import/no-duplicates": "error",
     "import/no-named-as-default": "error",
@@ -145,7 +154,9 @@
         "react/jsx-no-useless-fragment": "off",
         "typescript/no-floating-promises": "off",
         "typescript/unbound-method": "off",
-        "typescript/no-useless-default-assignment": "off"
+        "typescript/no-useless-default-assignment": "off",
+        "unicorn/prefer-string-slice": "off",
+        "unicorn/explicit-length-check": "off"
       }
     }
   ],

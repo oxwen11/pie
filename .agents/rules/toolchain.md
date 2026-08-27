@@ -14,11 +14,18 @@
   whole `suspicious` category fails CI while only warning locally. oxfmt
   reorders imports and stays a root-only script.   Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
-  `anti-slop` / `anti-slop-effect`) as TypeScript. Native `import` and
+  `anti-slop` / `anti-slop-effect`) as TypeScript.   Native `import` and
   `promise` plugins are on; `promise/always-return` is off because
   fire-and-forget `.then()` is house style. `eqeqeq` is on with
-  `null: ignore` so `== null` stays. Do not enable the `restriction`,
-  `style`, `pedantic`, or `nursery` categories wholesale — cherry-pick.
+  `null: ignore` so `== null` stays. Unicorn cherry-picks include
+  `prefer-string-slice`, `prefer-string-starts-ends-with`,
+  `prefer-string-trim-start-end`, `prefer-array-flat` / `some` /
+  `find` / `index-of`, `explicit-length-check`, and
+  `consistent-assert` (`assert.ok`, not bare `assert()`). Leave
+  off `no-null`, `no-array-reduce`, `filename-case`,
+  `prefer-number-properties`, and `no-useless-undefined`. Do not
+  enable the `restriction`, `style`, `pedantic`, or `nursery`
+  categories wholesale — cherry-pick.
   Type-aware linting is on (`options.typeAware`, `oxlint-tsgolint`).
   `typescript/no-floating-promises` is error; ignore with `.catch` or
   `await`, not `void` (that operator stays banned once `no-void` lands).
@@ -28,8 +35,9 @@
   `typescript/no-unnecessary-type-parameters` stay off — the first
   three flood and overlap anti-slop; the last flags inference-only
   generics on oRPC error maps. Vendored UI also turns off
-  `no-floating-promises`, `unbound-method`, and
-  `no-useless-default-assignment`. `@getpie/oxlint#build`
+  `no-floating-promises`, `unbound-method`,
+  `no-useless-default-assignment`, `unicorn/prefer-string-slice`,
+  and `unicorn/explicit-length-check`. `@getpie/oxlint#build`
   emits them to `dist/`; the root `.oxlintrc.json` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is
