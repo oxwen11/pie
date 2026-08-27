@@ -8,6 +8,7 @@ import {
   type AutomationStore,
 } from "../../src/automation/service";
 import { ProjectNotFound, AutomationNotFound, StoreWriteError } from "../../src/errors";
+import * as Observability from "../../src/observability";
 import { structured, type LogRecord } from "../log-record";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
@@ -20,7 +21,8 @@ const cronInput = (overrides: Partial<CreateAutomationInput> = {}): CreateAutoma
   ...overrides,
 });
 
-const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
+const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>
+  Effect.runPromise(effect.pipe(Effect.provide(Observability.discard)));
 
 const captureLogs = <A, E>(
   effect: Effect.Effect<A, E>,
@@ -470,7 +472,7 @@ describe("AutomationService", () => {
     const h = setup();
     const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
     const records: Array<LogRecord> = [];
-    await run(captureLogs(h.service.runNow(created.id), records));
+    await Effect.runPromise(captureLogs(h.service.runNow(created.id), records));
     const events = records.map((record) => record.annotations.event);
     expect(events).toContain("automation.fired");
     expect(events).toContain("automation.settled");
