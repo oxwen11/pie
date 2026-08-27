@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "lint": "oxlint --fix ../..",
-    "lint:check": "oxlint --deny-warnings ../..",
+    "lint": "oxlint --fix \"$(cd ../.. && pwd)\"",
+    "lint:check": "oxlint --deny-warnings \"$(cd ../.. && pwd)\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "git clean -xdf node_modules dist .turbo"
