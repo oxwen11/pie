@@ -13,10 +13,10 @@ import type { AgentRequest } from "./agent-requests";
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
 
-const emptyPendingQueue: SessionPendingQueue = { steering: [], followUp: [] };
+const emptyPendingPrompt: SessionPendingQueue = { steering: [], followUp: [] };
 
 // Each Chat owns its own store: messages + status + error + retryNotice +
-// pendingRequests + pendingQueue.
+// pendingRequests + pendingPrompt.
 export type ChatStoreState = {
   messages: UIMessage[];
   status: ChatStatus;
@@ -25,7 +25,7 @@ export type ChatStoreState = {
   // successful retry must not leave a destructive banner behind.
   retryNotice?: string;
   pendingRequests: AgentRequest[];
-  pendingQueue: SessionPendingQueue;
+  pendingPrompt: SessionPendingQueue;
   historyStatus: HistoryStatus;
 };
 
@@ -49,7 +49,7 @@ export class ChatState implements AiChatStateSlice {
       error: undefined,
       retryNotice: undefined,
       pendingRequests: [],
-      pendingQueue: emptyPendingQueue,
+      pendingPrompt: emptyPendingPrompt,
       historyStatus: "loading",
     }));
   }
@@ -89,8 +89,8 @@ export class ChatState implements AiChatStateSlice {
     this.store.setState({ retryNotice });
   }
 
-  get pendingQueue(): SessionPendingQueue {
-    return this.store.getState().pendingQueue;
+  get pendingPrompt(): SessionPendingQueue {
+    return this.store.getState().pendingPrompt;
   }
 
   pushMessage = (message: UIMessage) => {
@@ -133,11 +133,11 @@ export class ChatState implements AiChatStateSlice {
     this.store.setState({ pendingRequests: [] });
   };
 
-  setPendingQueue = (pendingQueue: SessionPendingQueue) => {
-    this.store.setState({ pendingQueue });
+  setPendingPrompt = (pendingPrompt: SessionPendingQueue) => {
+    this.store.setState({ pendingPrompt });
   };
 
-  clearPendingQueue = () => {
-    this.store.setState({ pendingQueue: emptyPendingQueue });
+  clearPendingPrompt = () => {
+    this.store.setState({ pendingPrompt: emptyPendingPrompt });
   };
 }

@@ -80,10 +80,10 @@ export type SessionState = {
   readonly activeTurn: ActiveTurn | null;
   readonly activePrompt: ActivePrompt | null;
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
-  readonly pendingQueue: SessionPendingQueue;
+  readonly pendingPrompt: SessionPendingQueue;
 };
 
-const emptyPendingQueue: SessionPendingQueue = { steering: [], followUp: [] };
+const emptyPendingPrompt: SessionPendingQueue = { steering: [], followUp: [] };
 
 export const initialSessionState: SessionState = {
   seq: 0,
@@ -92,7 +92,7 @@ export const initialSessionState: SessionState = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: new Map(),
-  pendingQueue: emptyPendingQueue,
+  pendingPrompt: emptyPendingPrompt,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -246,7 +246,7 @@ export const foldSessionEvent = (
     case "session.queue.updated":
       return {
         ...base,
-        pendingQueue: { steering: event.steering, followUp: event.followUp },
+        pendingPrompt: { steering: event.steering, followUp: event.followUp },
       };
     case "session.crashed":
       return {
@@ -255,7 +255,7 @@ export const foldSessionEvent = (
         activeTurn: null,
         activePrompt: null,
         pendingRequests: new Map(),
-        pendingQueue: emptyPendingQueue,
+        pendingPrompt: emptyPendingPrompt,
       };
   }
 };
@@ -271,7 +271,7 @@ export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntime
   ref,
   status: toStatus(state),
   pendingRequests: [...state.pendingRequests.values()],
-  pendingQueue: state.pendingQueue,
+  pendingPrompt: state.pendingPrompt,
   activeTurn: state.activeTurn
     ? {
         turnId: state.activeTurn.turnId,

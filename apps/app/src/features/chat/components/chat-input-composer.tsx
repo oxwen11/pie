@@ -42,7 +42,7 @@ export function ChatInputComposer({
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const { prompt, interrupt, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
-  const pendingPrompt = useStore(store, (s) => s.pendingQueue);
+  const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const canInterrupt = status === "streaming";
   const queueLines = [...pendingPrompt.steering, ...pendingPrompt.followUp];
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);

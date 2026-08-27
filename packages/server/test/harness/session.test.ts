@@ -103,7 +103,7 @@ it.effect("a session that never had a runtime reads as idle at cursor 0", () =>
       assert.equal(snapshot.activeTurn, null);
       assert.equal(snapshot.activePrompt, null);
       assert.deepEqual(snapshot.pendingRequests, []);
-      assert.deepEqual(snapshot.pendingQueue, { steering: [], followUp: [] });
+      assert.deepEqual(snapshot.pendingPrompt, { steering: [], followUp: [] });
     }),
   ),
 );
@@ -264,7 +264,7 @@ it.effect("a chunk after turn.ended is dropped without consuming a seq", () =>
   ),
 );
 
-it.effect("projects session.queue.updated into the snapshot pending queue", () =>
+it.effect("projects session.queue.updated into the snapshot pending prompt", () =>
   run(
     Effect.gen(function* () {
       const session = yield* SessionService;
@@ -277,7 +277,7 @@ it.effect("projects session.queue.updated into the snapshot pending queue", () =
         followUp: ["later"],
       });
       const snapshot = yield* awaitCursor(session, 1);
-      assert.deepEqual(snapshot.pendingQueue, { steering: ["steer"], followUp: ["later"] });
+      assert.deepEqual(snapshot.pendingPrompt, { steering: ["steer"], followUp: ["later"] });
     }),
   ),
 );

@@ -383,7 +383,7 @@ export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;
   readonly pendingRequests: ReadonlyArray<AgentRequest>;
-  readonly pendingQueue: SessionPendingQueue;
+  readonly pendingPrompt: SessionPendingQueue;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.

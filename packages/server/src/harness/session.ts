@@ -259,7 +259,7 @@ export const makePiAgentSession = (
               activeTurn: null,
               activePrompt: null,
               pendingRequests: new Map(),
-              pendingQueue: initialSessionState.pendingQueue,
+              pendingPrompt: initialSessionState.pendingPrompt,
             }
           : current,
       ),

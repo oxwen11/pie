@@ -212,7 +212,7 @@ export class Chat {
         this.#state.removePendingRequest(event.requestId);
         break;
       case "session.queue.updated":
-        this.#state.setPendingQueue({
+        this.#state.setPendingPrompt({
           steering: event.steering,
           followUp: event.followUp,
         });
@@ -223,7 +223,7 @@ export class Chat {
         // The server projection drops its pending requests on crash; a card
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
-        this.#state.clearPendingQueue();
+        this.#state.clearPendingPrompt();
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -258,7 +258,7 @@ export class Chat {
     // so stop rendering a spinner that would never resolve.
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
-    this.#state.clearPendingQueue();
+    this.#state.clearPendingPrompt();
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -341,7 +341,7 @@ export class Chat {
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
-    this.#state.setPendingQueue(snapshot.pendingQueue);
+    this.#state.setPendingPrompt(snapshot.pendingPrompt);
 
     const activeTurn = snapshot.activeTurn;
 

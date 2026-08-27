@@ -140,7 +140,7 @@ composer ──prompt({ delivery })──► session-service
                                Pi child (队列权威)
                                       │ queue_update
                                       ▼
-                               session-fold.pendingQueue
+                               session-fold.pendingPrompt
                                       │ session.queue.updated
                                       ▼
                                Chat / 其他客户端画排队条
@@ -171,12 +171,12 @@ delivery: Schema.optionalKey(Schema.Literals(["steer", "followUp"]));
 snapshot 增加：
 
 ```ts
-pendingQueue: { steering: string[]; followUp: string[] }
+pendingPrompt: { steering: string[]; followUp: string[] }
 ```
 
 始终存在：空数组 = 队列为空（含进程刚起来、从未见过 `queue_update`）。中途加入的客户端从 snapshot 水合，不靠重放全部 `queue_update`。
 
-`session.prompt.submitted` **不要**用于排队条目。它的语义是「这条已经是 transcript 里的 user 消息」（`activePrompt` 给中途加入者补气泡）。排队条目只活在 `pendingQueue`。投递后由 live chunk / 历史读进入 messages。
+`session.prompt.submitted` **不要**用于排队条目。它的语义是「这条已经是 transcript 里的 user 消息」（`activePrompt` 给中途加入者补气泡）。排队条目只活在 `pendingPrompt`。投递后由 live chunk / 历史读进入 messages。
 
 ### 4.2 服务端
 
@@ -187,7 +187,7 @@ pendingQueue: { steering: string[]; followUp: string[] }
 - `Active` + `steer`（或省略 delivery，保持兼容）→ 现有 `steer`。
 - `Finishing` → 仍 Wait，再 suspend。跟在 Pi 自己的队列后面再发，避免和 `queue_update` 打架。
 
-`queue_update` 不进 transcript chunk：process 把它 offer 到独立的 `queueUpdates` 队列，runtime 在 `requestPermission` 旁边常驻消费，`emit({ type: "session.queue.updated", steering, followUp })`。fold 写入 `pendingQueue`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort 不清队列（跟 Pi）；crash 把 `pendingQueue` 置空，因为子进程没了。
+`queue_update` 不进 transcript chunk：process 把它 offer 到独立的 `queueUpdates` 队列，runtime 在 `requestPermission` 旁边常驻消费，`emit({ type: "session.queue.updated", steering, followUp })`。fold 写入 `pendingPrompt`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort 不清队列（跟 Pi）；crash 把 `pendingPrompt` 置空，因为子进程没了。
 
 排队路径（调用方带了 `delivery`）**await** `deliverPrompt`；失败直接让 RPC 失败，不发 `rejected`。空闲路径仍是 fire-and-forget：先 `submitted`，再 `forkDetach` deliver。
 
@@ -200,14 +200,14 @@ pendingQueue: { steering: string[]; followUp: string[] }
 `Chat.prompt(text, delivery?)`：
 
 - idle：今天的路径（乐观气泡 + submitted）。
-- streaming/submitted：不 `pushMessage`，不把 status 卡在 `submitted` 盖住 `streaming`；RPC 带 `delivery`（默认 `followUp`）。**不要**本地乐观写 `pendingQueue`——只跟 `session.queue.updated` 和 snapshot。
+- streaming/submitted：不 `pushMessage`，不把 status 卡在 `submitted` 盖住 `streaming`；RPC 带 `delivery`（默认 `followUp`）。**不要**本地乐观写 `pendingPrompt`——只跟 `session.queue.updated` 和 snapshot。
 
 `ChatInputComposer`：
 
 - 去掉「进行中 return false」。
 - **Stop 与 Send 拆开**：有内容就能发；streaming 时另有 Stop。今天把 Submit 变成 Stop，是队列功能的主障碍。
 - Enter = follow-up（streaming 时）/ 新轮（idle 时）。Steer 修饰键本期不做。
-- 会话 composer 套 `CardFrame`（与 draft 相同）：有队列时 `CardFrameHeader` 一行一条截断文本（steering 在前、follow-up 在后）；空队列不渲染 header。v1 没有叉按钮。数据从 Chat store 的 `pendingQueue` 来，fold 自事件 + snapshot，不要 `useEffect` 同步。
+- 会话 composer 套 `CardFrame`（与 draft 相同）：有队列时 `CardFrameHeader` 一行一条截断文本（steering 在前、follow-up 在后）；空队列不渲染 header。v1 没有叉按钮。数据从 Chat store 的 `pendingPrompt` 来，fold 自事件 + snapshot，不要 `useEffect` 同步。
 
 多客户端：A 排队，B 的订阅会收到 `session.queue.updated`。不要第二条乐观路径。
 
@@ -249,7 +249,7 @@ live：`message_start role=user` 且本 run 已有 assistant → transform 切�
 四步，每步可单独合。不要和「多端 inbox」捆在一起。
 
 1. **Pi 分流 + 单测**：`process.ts` 按 delivery 发 `follow_up`/`steer`；假 RPC 钉 `follow_up` 命令；idle 回退仍走 `prompt`。无 UI。
-2. **投影**：runtime 转发 `queue_update` → `session.queue.updated`；fold + snapshot `pendingQueue`；transform 继续 skip。契约测试。
+2. **投影**：runtime 转发 `queue_update` → `session.queue.updated`；fold + snapshot `pendingPrompt`；transform 继续 skip。契约测试。
 3. **Composer**：Send/Stop 拆开；streaming 可发；默认 `followUp`。无排队条也能用（用户只是暂时看不见排了什么）。
 4. **排队条**：snapshot + 事件水合；多端可见。
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { makeChat } from "./chat-test-helpers";
 
-describe("Chat pending queue", () => {
+describe("Chat pending prompt", () => {
   it("sends a follow-up while streaming without a transcript bubble or local queue write", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
@@ -21,11 +21,11 @@ describe("Chat pending queue", () => {
       delivery: "followUp",
     });
     expect(chat.store.getState().messages).toHaveLength(1);
-    expect(chat.store.getState().pendingQueue.followUp).toEqual([]);
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual([]);
     expect(chat.store.getState().status).toBe("streaming");
   });
 
-  it("replaces the pending queue from session.queue.updated", async () => {
+  it("replaces the pending prompt from session.queue.updated", async () => {
     const { chat, attach, live } = makeChat();
     await attach({});
     live(1, {
@@ -34,20 +34,20 @@ describe("Chat pending queue", () => {
       followUp: ["later"],
       phase: "running",
     });
-    expect(chat.store.getState().pendingQueue).toEqual({
+    expect(chat.store.getState().pendingPrompt).toEqual({
       steering: ["steer me"],
       followUp: ["later"],
     });
   });
 
-  it("hydrates the pending queue from a snapshot", async () => {
+  it("hydrates the pending prompt from a snapshot", async () => {
     const { chat, attach } = makeChat();
     await attach({
-      pendingQueue: { steering: [], followUp: ["held"] },
+      pendingPrompt: { steering: [], followUp: ["held"] },
       status: { phase: "running" },
       cursor: 4,
     });
-    expect(chat.store.getState().pendingQueue.followUp).toEqual(["held"]);
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual(["held"]);
   });
 
   it("keeps the queue empty when a follow-up races to a real prompt", async () => {
@@ -69,10 +69,10 @@ describe("Chat pending queue", () => {
       phase: "running",
     });
     expect(chat.store.getState().messages).toHaveLength(2);
-    expect(chat.store.getState().pendingQueue.followUp).toEqual([]);
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual([]);
   });
 
-  it("applies a follow-up to the queue only after session.queue.updated", async () => {
+  it("applies a follow-up to the pending prompt only after session.queue.updated", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     await chat.prompt("hello there");
@@ -84,17 +84,17 @@ describe("Chat pending queue", () => {
     });
     live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
     await chat.prompt("and then this");
-    expect(chat.store.getState().pendingQueue.followUp).toEqual([]);
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual([]);
     live(3, {
       type: "session.queue.updated",
       steering: [],
       followUp: ["and then this"],
       phase: "running",
     });
-    expect(chat.store.getState().pendingQueue.followUp).toEqual(["and then this"]);
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual(["and then this"]);
   });
 
-  it("clears the pending queue when the session crashes", async () => {
+  it("clears the pending prompt when the session crashes", async () => {
     const { chat, attach, live } = makeChat();
     await attach({});
     live(1, {
@@ -104,6 +104,6 @@ describe("Chat pending queue", () => {
       phase: "running",
     });
     live(2, { type: "session.crashed", reason: "boom", phase: "crashed" });
-    expect(chat.store.getState().pendingQueue).toEqual({ steering: [], followUp: [] });
+    expect(chat.store.getState().pendingPrompt).toEqual({ steering: [], followUp: [] });
   });
 });

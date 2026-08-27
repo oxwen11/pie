@@ -86,7 +86,7 @@ export const makeChat = (options?: { onTerminated?: () => void }) => {
         activeTurn: null,
         activePrompt: null,
         pendingRequests: [],
-        pendingQueue: { steering: [], followUp: [] },
+        pendingPrompt: { steering: [], followUp: [] },
         cursor: 0,
         ...snapshot,
       },
