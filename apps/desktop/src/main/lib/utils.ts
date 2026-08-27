@@ -36,7 +36,7 @@ export const devWorktreeSlug: Effect.Effect<string | undefined> = Effect.try(() 
     .trim(),
 ).pipe(
   Effect.map((top) => {
-    const slug = path.basename(top).replace(/[^a-zA-Z0-9._-]/g, "-");
+    const slug = path.basename(top).replaceAll(/[^a-zA-Z0-9._-]/g, "-");
     return slug.length > 0 ? slug : undefined;
   }),
   Effect.catch(() => Effect.succeed(undefined)),

@@ -12,9 +12,15 @@
   ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
   oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
   whole `suspicious` category fails CI while only warning locally. oxfmt
-  reorders imports and stays a root-only script. Custom plugins live in
+  reorders imports and stays a root-only script.   Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
-  `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
+  `anti-slop` / `anti-slop-effect`) as TypeScript. Native `import` and
+  `promise` plugins are on; `promise/always-return` is off because
+  fire-and-forget `.then()` is house style. `eqeqeq` is on with
+  `null: ignore` so `== null` stays. Do not enable the `restriction`,
+  `style`, `pedantic`, or `nursery` categories wholesale — cherry-pick.
+  Type-aware rules (`typescript/no-floating-promises`) need
+  `oxlint-tsgolint` and are not on yet. `@getpie/oxlint#build`
   emits them to `dist/`; the root `.oxlintrc.json` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is

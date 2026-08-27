@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import readline from "node:readline";
 
-const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+const send = (frame) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 
 const logPath = process.env["PIE_E2E_PI_LOG"];
 const configuredResponse = process.env["PIE_E2E_PI_RESPONSE"] ?? "E2E fake Pi reply";

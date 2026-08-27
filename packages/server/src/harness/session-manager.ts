@@ -19,8 +19,7 @@ import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
 import { type AcquireRuntime, type PiAgentSessionShape, makePiAgentSession } from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
-import type { CreateSessionInput } from "./session-io";
-import type { ResumeManagedSessionInput } from "./session-io";
+import type { CreateSessionInput, ResumeManagedSessionInput } from "./session-io";
 
 /**
  * The sole owner of live session state: one {@link PiAgentSessionShape}

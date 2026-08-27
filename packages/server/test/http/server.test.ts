@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { Context, Effect, Layer, Logger, Scope } from "effect";
 import { HttpServerResponse } from "effect/unstable/http";
 import { afterEach, describe, expect, it } from "vitest";
-import WebSocket from "ws";
+import { WebSocket } from "ws";
 
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";

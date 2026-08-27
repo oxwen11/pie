@@ -1,10 +1,10 @@
 import { Document } from "@tiptap/extension-document";
 import { HardBreak } from "@tiptap/extension-hard-break";
 import { Paragraph } from "@tiptap/extension-paragraph";
-import Placeholder from "@tiptap/extension-placeholder";
+import { Placeholder } from "@tiptap/extension-placeholder";
 import { Text } from "@tiptap/extension-text";
 import { UndoRedo } from "@tiptap/extensions";
-import { type Extensions } from "@tiptap/react";
+import type { Extensions } from "@tiptap/react";
 
 import { createPastePlainTextExtension } from "./paste-plain-text";
 

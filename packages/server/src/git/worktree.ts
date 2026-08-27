@@ -11,7 +11,7 @@ export const isValidWorktreeKey = (worktreeKey: string): boolean =>
   WORKTREE_KEY_PATTERN.test(worktreeKey);
 
 const sanitizePathSegment = (value: string): string =>
-  value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "repo";
+  value.replaceAll(/[^a-zA-Z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "") || "repo";
 
 /** Repository folder name under `$PIE_HOME/worktrees/` (e.g. `pie`). */
 export const repoWorktreeGroupKey = (repoRoot: string): string =>
