@@ -31,7 +31,7 @@ export function DraftWorkspaceSelect({
     >
       {/* Match ProjectSelect: ghost trigger aligned with other draft header picks. */}
       <SelectTrigger
-        className="hover:bg-accent w-auto min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+        className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"
       >
         <SelectValue />
