@@ -131,6 +131,7 @@ export function FilePreviewAdapter({
         if (shadowRoot === null) return;
 
         for (const previous of shadowRoot.querySelectorAll("[data-pie-target-line]")) {
+          if (!(previous instanceof HTMLElement)) continue;
           previous.removeAttribute("aria-current");
           previous.removeAttribute("aria-label");
           delete previous.dataset.pieTargetLine;
