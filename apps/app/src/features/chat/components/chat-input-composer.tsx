@@ -33,6 +33,7 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
+  const currentBranch = branch.data?.current;
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const canInterrupt = status === "streaming";
@@ -82,16 +83,20 @@ export function ChatInputComposer({
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>
-      <CardFrameFooter className="py-2">
-        {branch.data?.current ? (
-          <span
-            className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs"
-            title="Current git branch"
-          >
-            <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="truncate">{branch.data.current}</span>
-          </span>
-        ) : null}
+      <CardFrameFooter className="px-3 py-2">
+        <span
+          className="text-muted-foreground flex h-4 min-w-0 items-center gap-1.5 text-xs"
+          title={currentBranch ? "Current git branch" : undefined}
+        >
+          {branch.isPending ? (
+            <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />
+          ) : currentBranch ? (
+            <>
+              <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+              <span className="truncate">{currentBranch}</span>
+            </>
+          ) : null}
+        </span>
       </CardFrameFooter>
     </CardFrame>
   );
