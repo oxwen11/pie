@@ -376,15 +376,7 @@ export const makeAutomationService = (deps: {
         status: "failed",
         error: "session did not settle",
       });
-    }).pipe(
-      Effect.catch((error) =>
-        finishRun(automationId, runId, {
-          status: "failed",
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      ),
-      Effect.ensuring(Effect.sync(() => inFlight.delete(automationId))),
-    );
+    }).pipe(Effect.ensuring(Effect.sync(() => inFlight.delete(automationId))));
 
   const fireSession = (
     snapshot: AutomationRunSnapshot,
