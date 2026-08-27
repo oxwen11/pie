@@ -1,6 +1,3 @@
-import path from "node:path";
-import url from "node:url";
-
 import { Effect, FileSystem } from "effect";
 
 import { findExecutable } from "../executable";
@@ -12,24 +9,10 @@ export type PiExecutable = {
 };
 
 /**
- * Resolve the npm-shipped Pi CLI when `@earendil-works/pi-coding-agent` is on
- * disk next to the running server (desktop asar or global `pie` install).
- */
-export function resolveBundledPiCli(): string | undefined {
-  try {
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    return path.join(path.dirname(indexPath), "cli.js");
-  } catch {
-    return undefined;
-  }
-}
-
-/**
  * Pick the Pi binary for this process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1`
  * 2. `PIE_PI_EXECUTABLE`
- * 3. bundled `@earendil-works/pi-coding-agent` via Node (`process.execPath`)
- * 4. bare `pi` on PATH
+ * 3. bare `pi` on PATH (the user installs Pi themselves)
  */
 export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExecutable {
   if (env.PIE_E2E === "1" && env.PIE_E2E_PI_EXECUTABLE) {
@@ -39,11 +22,6 @@ export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExe
   const explicit = env.PIE_PI_EXECUTABLE?.trim();
   if (explicit) {
     return { command: explicit, prefixArgs: [] };
-  }
-
-  const bundled = resolveBundledPiCli();
-  if (bundled) {
-    return { command: process.execPath, prefixArgs: [bundled] };
   }
 
   return { command: "pi", prefixArgs: [] };

@@ -13,8 +13,20 @@ export const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
 export const TUNNEL_SHUTDOWN_TIMEOUT_MS = 2_000;
 /** Pie's published engine: Node 24 only. */
 export const DEFAULT_NODE_ENGINE_RANGE = ">=24.0.0 <25";
-/** Occupying publish; remote npx installs this until a later release. */
-export const DEFAULT_PIE_PACKAGE_SPEC = "@getpie/cli@0.0.0";
+/** Default remote npx spec. Override with `PIE_SSH_CLI_PACKAGE` or `packageSpec`. */
+export const DEFAULT_PIE_PACKAGE_SPEC = "@getpie/cli@latest";
+export const PIE_SSH_CLI_PACKAGE_ENV = "PIE_SSH_CLI_PACKAGE";
+
+export function resolveRemotePiePackageSpec(
+  explicit?: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const fromExplicit = explicit?.trim();
+  if (fromExplicit) return fromExplicit;
+  const fromEnv = env[PIE_SSH_CLI_PACKAGE_ENV]?.trim();
+  if (fromEnv) return fromEnv;
+  return DEFAULT_PIE_PACKAGE_SPEC;
+}
 
 function stripTrailingNewlines(value: string): string {
   return value.replace(/\n+$/u, "");
@@ -78,6 +90,11 @@ prefer_node_from_dirs() {
 }
 
 ensure_remote_node_path() {
+  # Always put a user-local pie on PATH before returning. Finding Node 24 in
+  # fnm must not skip ~/.local/bin, or the runner falls through to npx.
+  prepend_path_if_dir "$HOME/.local/bin"
+  prepend_path_if_dir "$HOME/bin"
+
   if remote_node_major_is_24; then
     return 0
   fi
@@ -98,8 +115,6 @@ ensure_remote_node_path() {
   export NVM_DIR
   prefer_node_from_dirs "$NVM_DIR"/versions/node/*/bin && return 0
 
-  prepend_path_if_dir "$HOME/.local/bin"
-  prepend_path_if_dir "$HOME/bin"
   prepend_path_if_dir "/opt/homebrew/bin"
   prepend_path_if_dir "/usr/local/bin"
   if remote_node_major_is_24; then
@@ -277,7 +292,7 @@ export function buildRemoteNodeEnvScript(input?: RemotePieRunnerOptions): string
 }
 
 export function buildRemotePieRunnerScript(input?: RemotePieRunnerOptions): string {
-  const packageSpec = shellSingleQuote(input?.packageSpec?.trim() || DEFAULT_PIE_PACKAGE_SPEC);
+  const packageSpec = shellSingleQuote(resolveRemotePiePackageSpec(input?.packageSpec));
   const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {

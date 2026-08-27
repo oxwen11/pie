@@ -56,6 +56,7 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
+  console.error(`[pie] desktop runtime starting pid=${String(process.pid)}`);
   const isE2E = process.env["PIE_E2E"] === "1";
   if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
 
@@ -137,6 +138,11 @@ export function startDesktopRuntime(): void {
   };
 
   if (!app.requestSingleInstanceLock()) {
+    // electron-vite prints "starting electron app..." then this process exits
+    // with no other log, which looks like a failed boot.
+    console.error(
+      "Pie is already running for this worktree (single-instance lock). Quit the other window and retry.",
+    );
     allowQuit = true;
     app.quit();
     return;

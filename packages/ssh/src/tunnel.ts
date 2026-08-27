@@ -22,6 +22,8 @@ import {
 } from "./errors";
 import {
   buildRemoteLaunchScript,
+  resolveRemotePiePackageSpec,
+  type RemotePieRunnerOptions,
   REMOTE_LAUNCH_TIMEOUT_MS,
   SSH_READY_PROBE_TIMEOUT_MS,
   SSH_READY_TIMEOUT_MS,
@@ -169,6 +171,7 @@ function toLaunchError(
 
 export const launchOrReuseRemoteServer = (
   target: SshTarget,
+  options?: RemotePieRunnerOptions,
 ): Effect.Effect<
   RemoteLaunchResult,
   SshLaunchError | SshClientMissingError | SshInvalidTargetError,
@@ -183,7 +186,10 @@ export const launchOrReuseRemoteServer = (
       }),
     );
     const result = yield* runSshCommand(target, {
-      stdin: buildRemoteLaunchScript(),
+      stdin: buildRemoteLaunchScript({
+        ...options,
+        packageSpec: resolveRemotePiePackageSpec(options?.packageSpec),
+      }),
       remoteCommandArgs: ["sh", "-l", "-s", remoteStateKey(target)],
       timeoutMs: REMOTE_LAUNCH_TIMEOUT_MS,
     }).pipe(Effect.mapError(toLaunchError));
@@ -307,13 +313,14 @@ export const waitForForwardedDaemon = (localPort: number): Effect.Effect<void, S
 
 export const connectSshEnvironment = (
   target: SshTarget,
+  options?: RemotePieRunnerOptions,
 ): Effect.Effect<
   SshConnectedEnvironment,
   SshLaunchError | SshClientMissingError | SshInvalidTargetError | SshReadinessError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
-    const launch = yield* launchOrReuseRemoteServer(target);
+    const launch = yield* launchOrReuseRemoteServer(target, options);
     const tunnel = yield* startSshTunnel(target, launch.remotePort);
     yield* waitForForwardedDaemon(tunnel.localPort).pipe(Effect.tapError(() => tunnel.close));
     return {

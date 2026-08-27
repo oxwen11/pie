@@ -1,13 +1,9 @@
-import path from "node:path";
-import url from "node:url";
-
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
   checkPiAvailability,
   piAvailabilityTarget,
-  resolveBundledPiCli,
   resolvePiExecutable,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
@@ -30,19 +26,8 @@ describe("resolvePiExecutable", () => {
     });
   });
 
-  it("falls back to bundled pi-coding-agent via Node", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
-    expect(resolvePiExecutable({})).toEqual({
-      command: process.execPath,
-      prefixArgs: [bundled!],
-    });
-  });
-
-  it("resolves the bundled cli from the workspace dependency graph", () => {
-    const bundled = resolveBundledPiCli();
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
+  it("uses PATH pi when no executable override is set", () => {
+    expect(resolvePiExecutable({})).toEqual({ command: "pi", prefixArgs: [] });
   });
 });
 
@@ -59,13 +44,10 @@ describe("piAvailabilityTarget", () => {
 });
 
 describe("checkPiAvailability", () => {
-  it("reports bundled Pi available when the script file exists", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
-
+  it("reports a Node-run Pi script available when the file exists", () => {
     const result = Effect.runSync(
-      checkPiAvailability({ command: process.execPath, prefixArgs: [bundled!] }).pipe(
-        Effect.provide(fakeStats({ [bundled!]: fileInfo("File", 0o644) })),
+      checkPiAvailability({ command: process.execPath, prefixArgs: ["/opt/pi/cli.js"] }).pipe(
+        Effect.provide(fakeStats({ ["/opt/pi/cli.js"]: fileInfo("File", 0o644) })),
       ),
     );
     expect(result).toEqual({ available: true });
