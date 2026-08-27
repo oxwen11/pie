@@ -29,7 +29,7 @@ function reviewInput(workspace: WorkspaceQuery, mode: GitReviewMode, other: stri
   return {
     ...workspace,
     mode,
-    ...(mode === "branch" ? { other } : {}),
+    ...(mode === "branch" ? { other } : undefined),
   };
 }
 
@@ -54,9 +54,9 @@ export const reviewPanel = definePanel({
     const mode = isReviewMode(record.mode) ? record.mode : undefined;
     const other = typeof record.other === "string" ? record.other : undefined;
     return {
-      ...(path === undefined ? {} : { path }),
-      ...(mode === undefined ? {} : { mode }),
-      ...(other === undefined ? {} : { other }),
+      ...(path === undefined ? undefined : { path }),
+      ...(mode === undefined ? undefined : { mode }),
+      ...(other === undefined ? undefined : { other }),
     };
   },
   view: {
@@ -117,7 +117,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           return {
             ...current,
             mode: next,
-            ...(nextOther === undefined ? {} : { other: nextOther }),
+            ...(nextOther === undefined ? undefined : { other: nextOther }),
           };
         }
         const { other: _other, ...rest } = current;

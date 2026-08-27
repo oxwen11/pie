@@ -49,8 +49,12 @@ export type AcquireRuntime = Effect.Effect<PiAgentRuntime, ResumeSessionError, S
 /** The runtime a session currently holds, its scope, and the fiber draining
  * its events. The token is what lets only this holding's own cleanup clear the
  * slot, so a dead runtime's crash handler can never evict its replacement. */
+type HeldToken = {
+  readonly _heldToken: true;
+};
+
 type Held = {
-  readonly token: object;
+  readonly token: HeldToken;
   readonly runtime: PiAgentRuntime;
   readonly scope: Scope.Closeable;
   readonly fiber: Fiber.Fiber<void>;
@@ -177,8 +181,10 @@ export const makePiAgentSession = (
           turnId: body.turnId,
           outcome: body.outcome,
           seq,
-          ...(body.usage ? { usage: body.usage } : {}),
-          ...(body.error ? { errorCategory: body.error.category, error: body.error.message } : {}),
+          ...(body.usage ? { usage: body.usage } : undefined),
+          ...(body.error
+            ? { errorCategory: body.error.category, error: body.error.message }
+            : undefined),
         }),
       );
     };
@@ -260,7 +266,7 @@ export const makePiAgentSession = (
 
     /** Identity-guarded, so a dying runtime disowns itself and only itself —
      * it can never evict the replacement that came after it. */
-    const clearHeld = (token: object): Effect.Effect<Held | undefined> =>
+    const clearHeld = (token: HeldToken): Effect.Effect<Held | undefined> =>
       Ref.modify(lifecycle, (current) =>
         current.held?.token === token
           ? [current.held, { ...current, held: undefined }]
@@ -300,7 +306,7 @@ export const makePiAgentSession = (
         const runtime = outcome.value;
         yield* clearCrash;
 
-        const token = {};
+        const token: HeldToken = { _heldToken: true };
         const release = clearHeld(token).pipe(
           Effect.flatMap((owned) => (owned ? dispose(owned) : Effect.void)),
         );

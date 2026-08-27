@@ -36,7 +36,7 @@ function fakePi() {
       throw new Error("loop must not send user messages");
     },
   };
-  piLoopExtension(pi as unknown as ExtensionAPI);
+  piLoopExtension(pi as ExtensionAPI);
   return { commands, tools, events, sent, userMessages };
 }
 

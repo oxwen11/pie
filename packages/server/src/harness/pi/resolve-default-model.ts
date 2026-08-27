@@ -7,7 +7,11 @@ import { toAgentModel } from "./model-mapping";
  * Default model IDs per provider — kept in sync with Pi's `defaultModelPerProvider`
  * (`pi-coding-agent` `core/model-resolver.ts`) for draft picker defaults.
  */
-const defaultModelPerProvider: Readonly<Record<string, string>> = {
+interface DefaultModelPerProvider {
+  readonly [provider: string]: string;
+}
+
+const defaultModelPerProvider: DefaultModelPerProvider = {
   "amazon-bedrock": "us.anthropic.claude-opus-4-6-v1",
   "ant-ling": "Ring-2.6-1T",
   anthropic: "claude-opus-4-8",

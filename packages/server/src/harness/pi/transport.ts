@@ -87,7 +87,7 @@ export const makePiTransport = (
             ...(options.args ?? []),
           ],
           {
-            ...(options.cwd ? { cwd: options.cwd } : {}),
+            ...(options.cwd ? { cwd: options.cwd } : undefined),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),
@@ -246,7 +246,7 @@ export const makePiTransport = (
             terminate(
               new AgentProcessExited({
                 code,
-                ...(tail.length > 0 ? { stderrTail: tail } : {}),
+                ...(tail.length > 0 ? { stderrTail: tail } : undefined),
               }),
             ),
           ),

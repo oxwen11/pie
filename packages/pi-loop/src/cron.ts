@@ -40,7 +40,7 @@ export interface LeadingInterval {
   prompt: string;
 }
 
-const ZH_UNIT_TO_COMPACT: Record<string, "s" | "m" | "h" | "d"> = {
+const ZH_UNIT_TO_COMPACT = {
   秒: "s",
   分: "m",
   分钟: "m",
@@ -51,7 +51,7 @@ const ZH_UNIT_TO_COMPACT: Record<string, "s" | "m" | "h" | "d"> = {
   m: "m",
   h: "h",
   d: "d",
-};
+} satisfies Record<string, "s" | "m" | "h" | "d">;
 
 /**
  * Only the start of `/loop` args. Accepts `5m`, `1h`, `1 分钟`, `1小时`, `每 1 分钟`.

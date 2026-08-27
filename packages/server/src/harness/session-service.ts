@@ -74,7 +74,7 @@ type SessionWithCwd = Session & { readonly cwd: string };
 
 const toSessionWorkspace = (metadata: SessionWithCwd): SessionWorkspace => ({
   cwd: metadata.cwd,
-  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
+  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
 });
 
 export type CreatePiSessionInput = {
@@ -245,8 +245,8 @@ export const makePiAgentSessionService = (deps: {
   const sessionNeverOpened = (metadata: Session): boolean => metadata.agentSessionId === undefined;
 
   const modelStateFromMetadata = (metadata: Session): AgentModelState => ({
-    ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
-    ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
+    ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
+    ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   });
 
   const ensureCwd = (
@@ -275,8 +275,8 @@ export const makePiAgentSessionService = (deps: {
         const runtime = yield* manager.open(
           {
             cwd: metadata.cwd,
-            ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
-            ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
+            ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
+            ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
           },
           ref,
         );
@@ -402,10 +402,10 @@ export const makePiAgentSessionService = (deps: {
                 cwd: sessionWorkspace.cwd,
                 ...(sessionWorkspace.gitBranch !== undefined
                   ? { gitBranch: sessionWorkspace.gitBranch }
-                  : {}),
+                  : undefined),
                 ...(input.model !== undefined
                   ? { provider: input.model.provider, modelId: input.model.modelId }
-                  : {}),
+                  : undefined),
                 archived: false,
               };
               return repo.write(metadata).pipe(
@@ -542,11 +542,11 @@ export const makePiAgentSessionService = (deps: {
                       archived: metadata.archived ?? false,
                       createdAt: metadata.createdAt,
                       historyAvailable: metadata.historyAvailable ?? true,
-                      ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+                      ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
                       ...(metadata.updatedAt !== undefined
                         ? { updatedAt: metadata.updatedAt }
-                        : {}),
-                      ...(status !== undefined ? { status } : {}),
+                        : undefined),
+                      ...(status !== undefined ? { status } : undefined),
                     }) satisfies SessionSummary,
                 ),
               ),

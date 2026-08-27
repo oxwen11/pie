@@ -112,7 +112,7 @@ function startErrorAnnotations(error: ServerStartError) {
         tag === "DaemonLaunchError" || tag === "DaemonStoppedError" ? tag : undefined;
       return {
         reason: "spawn_failed",
-        ...(causeType === undefined ? {} : { causeType }),
+        ...(causeType === undefined ? undefined : { causeType }),
       };
     }
   }

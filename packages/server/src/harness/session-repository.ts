@@ -28,7 +28,7 @@ const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
       : undefined;
   return {
     ...rest,
-    ...(opened !== undefined ? { agentSessionId: opened } : {}),
+    ...(opened !== undefined ? { agentSessionId: opened } : undefined),
   };
 };
 
@@ -36,17 +36,19 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   sessionId: metadata.sessionId,
   projectId: metadata.projectId,
   createdAt: metadata.createdAt,
-  ...(metadata.agentSessionId !== undefined ? { agentSessionId: metadata.agentSessionId } : {}),
-  ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : {}),
-  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : {}),
-  ...(metadata.provider !== undefined ? { provider: metadata.provider } : {}),
-  ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : {}),
-  ...(metadata.title !== undefined ? { title: metadata.title } : {}),
-  ...(metadata.archived !== undefined ? { archived: metadata.archived } : {}),
-  ...(metadata.updatedAt !== undefined ? { updatedAt: metadata.updatedAt } : {}),
+  ...(metadata.agentSessionId !== undefined
+    ? { agentSessionId: metadata.agentSessionId }
+    : undefined),
+  ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
+  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
+  ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
+  ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
+  ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
+  ...(metadata.archived !== undefined ? { archived: metadata.archived } : undefined),
+  ...(metadata.updatedAt !== undefined ? { updatedAt: metadata.updatedAt } : undefined),
   ...(metadata.historyAvailable !== undefined
     ? { historyAvailable: metadata.historyAvailable }
-    : {}),
+    : undefined),
 });
 
 /**

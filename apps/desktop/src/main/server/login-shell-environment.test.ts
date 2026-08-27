@@ -80,7 +80,7 @@ describe("resolveLoginShellEnvironment", () => {
   it("falls back to launchctl for PATH and proxy variables on darwin", async () => {
     const command = vi.fn<RunCommand>((file, args) => {
       if (file !== "/bin/launchctl") return Effect.fail(new Error("shell failed"));
-      const values: Record<string, string> = {
+      const values = {
         PATH: "/from/launchctl:/usr/bin",
         HTTPS_PROXY: "http://launchctl-proxy.test:8443",
       };

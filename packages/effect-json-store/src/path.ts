@@ -49,5 +49,5 @@ export const setAtPath = (
     return leaf;
   }
   const record = value as Record<string, unknown>;
-  return { ...record, [head]: setAtPath(record[head], rest, leaf) };
+  return Object.assign({}, record, { [head]: setAtPath(record[head], rest, leaf) });
 };

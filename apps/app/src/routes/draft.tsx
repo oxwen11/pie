@@ -46,14 +46,11 @@ type DraftSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const optional = <K extends string, V extends string>(key: K, value: V | undefined) =>
-  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
-
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
-    ...optional("projectId", asText(search.projectId)),
-    ...optional("provider", asText(search.provider)),
-    ...optional("modelId", asText(search.modelId)),
+    projectId: asText(search.projectId),
+    provider: asText(search.provider),
+    modelId: asText(search.modelId),
   }),
   component: DraftRoute,
 });
@@ -71,7 +68,7 @@ function DraftRoute() {
   const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
-      input: selected?.id ? { projectId: selected.id } : {},
+      input: selected?.id ? { projectId: selected.id } : undefined,
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
@@ -96,8 +93,8 @@ function DraftRoute() {
         projectId: selected.id,
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
-          : {}),
-        ...(worktree !== undefined ? { worktree } : {}),
+          : undefined),
+        ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
     },
@@ -158,7 +155,9 @@ function DraftRoute() {
       }
       startSession.mutate({
         text,
-        ...(draftWorktree.worktree !== undefined ? { worktree: draftWorktree.worktree } : {}),
+        ...(draftWorktree.worktree !== undefined
+          ? { worktree: draftWorktree.worktree }
+          : undefined),
       });
       return false;
     },

@@ -50,7 +50,11 @@ function parseReviewDiff(diff: GitFileDiff) {
   );
 }
 
-function itemIdFromInstance(instance: object): string | undefined {
+type PierrePostRenderInstance = {
+  readonly fileDiff?: { readonly name?: unknown } | null;
+};
+
+function itemIdFromInstance(instance: PierrePostRenderInstance): string | undefined {
   if (!("fileDiff" in instance)) return undefined;
   const fileDiff = instance.fileDiff;
   if (fileDiff === null || typeof fileDiff !== "object" || !("name" in fileDiff)) return undefined;

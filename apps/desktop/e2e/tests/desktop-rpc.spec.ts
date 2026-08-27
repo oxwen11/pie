@@ -125,7 +125,7 @@ test("renders in the background without taking focus and connects to the server"
   await expect(
     window.evaluate(() => {
       // Runs in the renderer, where `window` is the DOM window, not the Page.
-      const globals = window as unknown as Window & {
+      const globals = window as Window & {
         pie?: unknown;
         require?: unknown;
         process?: unknown;

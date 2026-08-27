@@ -43,12 +43,12 @@ function setup(idle = true) {
     dispatch,
     setInterval: ((fn: () => void) => {
       void fn;
-      return 1 as unknown as ReturnType<typeof setInterval>;
+      return 1 as ReturnType<typeof setInterval>;
     }) as typeof setInterval,
     clearInterval: () => undefined,
     setTimeout: ((fn: () => void) => {
       fn();
-      return 1 as unknown as ReturnType<typeof setTimeout>;
+      return 1 as ReturnType<typeof setTimeout>;
     }) as typeof setTimeout,
   });
   scheduler.startSession();

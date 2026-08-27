@@ -113,7 +113,9 @@ export const run = <A, E>(
             supportsSteering: false,
             supportsPermissions: false,
           }),
-          ...(opts.history !== undefined ? { getMessages: Effect.succeed(opts.history) } : {}),
+          ...(opts.history !== undefined
+            ? { getMessages: Effect.succeed(opts.history) }
+            : undefined),
           close: Effect.sync(() => {
             spy.close.push(sessionId);
           }).pipe(
@@ -164,7 +166,7 @@ export const run = <A, E>(
             ),
           ...(opts.coldHistory !== undefined
             ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
-            : {}),
+            : undefined),
           getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
         } satisfies PiAgentShape;
         const crypto = yield* Crypto.Crypto;

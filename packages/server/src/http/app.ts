@@ -62,8 +62,12 @@ export const makeRequestApp = (
                 status: response.status,
                 method: request.method,
                 path,
-                ...(request.headers.origin !== undefined ? { origin: request.headers.origin } : {}),
-                ...(request.headers.host !== undefined ? { host: request.headers.host } : {}),
+                ...(request.headers.origin !== undefined
+                  ? { origin: request.headers.origin }
+                  : undefined),
+                ...(request.headers.host !== undefined
+                  ? { host: request.headers.host }
+                  : undefined),
               };
               // A 404 off the API surface is the browser asking for something
               // it always asks for — `favicon.ico`, a source map — and warning
