@@ -379,11 +379,6 @@ export type SessionPendingQueue = {
   readonly followUp: ReadonlyArray<string>;
 };
 
-export const emptySessionPendingQueue: SessionPendingQueue = {
-  steering: [],
-  followUp: [],
-};
-
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;

@@ -7,7 +7,6 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
 } from "@getpie/contract";
-import { emptySessionPendingQueue } from "@getpie/contract";
 import type { UIMessage, UIMessageChunk } from "ai";
 
 import type { AgentResponse } from "./agent-requests";
@@ -87,7 +86,7 @@ export const makeChat = (options?: { onTerminated?: () => void }) => {
         activeTurn: null,
         activePrompt: null,
         pendingRequests: [],
-        pendingQueue: emptySessionPendingQueue,
+        pendingQueue: { steering: [], followUp: [] },
         cursor: 0,
         ...snapshot,
       },

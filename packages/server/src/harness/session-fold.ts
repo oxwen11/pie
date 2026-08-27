@@ -10,7 +10,6 @@ import type {
   SessionScopedEventBody,
   SessionStatus,
 } from "@getpie/contract";
-import { emptySessionPendingQueue } from "@getpie/contract";
 
 import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
 
@@ -84,6 +83,8 @@ export type SessionState = {
   readonly pendingQueue: SessionPendingQueue;
 };
 
+const emptyPendingQueue: SessionPendingQueue = { steering: [], followUp: [] };
+
 export const initialSessionState: SessionState = {
   seq: 0,
   cursor: 0,
@@ -91,7 +92,7 @@ export const initialSessionState: SessionState = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: new Map(),
-  pendingQueue: emptySessionPendingQueue,
+  pendingQueue: emptyPendingQueue,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -254,7 +255,7 @@ export const foldSessionEvent = (
         activeTurn: null,
         activePrompt: null,
         pendingRequests: new Map(),
-        pendingQueue: emptySessionPendingQueue,
+        pendingQueue: emptyPendingQueue,
       };
   }
 };

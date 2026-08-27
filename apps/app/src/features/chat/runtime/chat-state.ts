@@ -1,5 +1,4 @@
 import type { SessionPendingQueue } from "@getpie/contract";
-import { emptySessionPendingQueue } from "@getpie/contract";
 import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
@@ -13,6 +12,8 @@ import type { AgentRequest } from "./agent-requests";
 // the same fact to a reader: the transcript starts here, the agent's own
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
+
+const emptyPendingQueue: SessionPendingQueue = { steering: [], followUp: [] };
 
 // Each Chat owns its own store: messages + status + error + retryNotice +
 // pendingRequests + pendingQueue.
@@ -48,7 +49,7 @@ export class ChatState implements AiChatStateSlice {
       error: undefined,
       retryNotice: undefined,
       pendingRequests: [],
-      pendingQueue: emptySessionPendingQueue,
+      pendingQueue: emptyPendingQueue,
       historyStatus: "loading",
     }));
   }
@@ -137,6 +138,6 @@ export class ChatState implements AiChatStateSlice {
   };
 
   clearPendingQueue = () => {
-    this.store.setState({ pendingQueue: emptySessionPendingQueue });
+    this.store.setState({ pendingQueue: emptyPendingQueue });
   };
 }

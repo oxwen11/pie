@@ -1,5 +1,4 @@
 import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
-import { emptySessionPendingQueue } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +16,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
-  pendingQueue: emptySessionPendingQueue,
+  pendingQueue: { steering: [], followUp: [] },
   cursor: 0,
 };
 

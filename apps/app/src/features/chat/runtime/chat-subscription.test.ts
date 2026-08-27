@@ -1,5 +1,4 @@
 import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
-import { emptySessionPendingQueue } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import { RecoveringSubscription } from "./chat-subscription";
@@ -13,7 +12,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
-  pendingQueue: emptySessionPendingQueue,
+  pendingQueue: { steering: [], followUp: [] },
   cursor: 0,
 };
 
