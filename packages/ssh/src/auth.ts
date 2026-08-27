@@ -158,13 +158,18 @@ export const buildSshChildEnvironment = (
     const directory = yield* getDefaultSshAskpassDirectory(input.askpassDirectory);
     const sshAskpass = yield* ensureSshAskpassHelpers(directory);
 
-    return {
+    const environment: NodeJS.ProcessEnv = {
       ...baseEnv,
       SSH_ASKPASS: sshAskpass,
       SSH_ASKPASS_REQUIRE: "force",
-      ...(input.authSecret === undefined ? {} : { PIE_SSH_AUTH_SECRET: input.authSecret ?? "" }),
-      ...(platform === "win32" || baseEnv.DISPLAY ? {} : { DISPLAY: "pie" }),
     };
+    if (input.authSecret !== undefined) {
+      environment.PIE_SSH_AUTH_SECRET = input.authSecret ?? "";
+    }
+    if (platform !== "win32" && !baseEnv.DISPLAY) {
+      environment.DISPLAY = "pie";
+    }
+    return environment;
   });
 
 export function isSshAuthFailure(error: unknown): boolean {

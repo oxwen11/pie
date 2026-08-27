@@ -4,7 +4,11 @@ import path from "node:path";
 import { Duration, Effect, FileSystem, Option, Scope, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import { buildSshChildEnvironment, type SshAuthOptions } from "./auth";
+import {
+  buildSshChildEnvironment,
+  type SshAuthOptions,
+  type SshChildEnvironmentOptions,
+} from "./auth";
 import { SshClientMissingError, SshCommandError, SshInvalidTargetError } from "./errors";
 import {
   buildSshHostSpecEffect,
@@ -228,11 +232,14 @@ const runSshCommandInScope = (
   Effect.gen(function* () {
     const hostSpec = yield* buildSshHostSpecEffect(target);
     const sshCommand = yield* requireSshCommand();
-    const environment = yield* buildSshChildEnvironment({
-      baseEnv: sshSpawnEnv(),
-      ...(input.interactiveAuth === undefined ? {} : { interactiveAuth: input.interactiveAuth }),
-      ...(input.authSecret === undefined ? {} : { authSecret: input.authSecret }),
-    }).pipe(
+    let childEnvironment: SshChildEnvironmentOptions = { baseEnv: sshSpawnEnv() };
+    if (input.interactiveAuth !== undefined) {
+      childEnvironment = { ...childEnvironment, interactiveAuth: input.interactiveAuth };
+    }
+    if (input.authSecret !== undefined) {
+      childEnvironment = { ...childEnvironment, authSecret: input.authSecret };
+    }
+    const environment = yield* buildSshChildEnvironment(childEnvironment).pipe(
       Effect.mapError(
         (cause) =>
           new SshCommandError({

@@ -8,7 +8,7 @@ import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { LOCAL_ENVIRONMENT_ID, type PlatformSsh } from "@/platform";
 import { PlatformProvider } from "@/platform-provider";
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { BASE_UI_ANIMATIONS_DISABLED?: boolean }).BASE_UI_ANIMATIONS_DISABLED = true;
 
 if (typeof PointerEvent === "undefined") {

@@ -7,7 +7,7 @@ import { AddSshHostDialog } from "@/features/connections/add-ssh-host-dialog";
 import { LOCAL_ENVIRONMENT_ID, type PlatformSsh } from "@/platform";
 import { PlatformProvider } from "@/platform-provider";
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
