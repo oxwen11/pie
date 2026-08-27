@@ -1,20 +1,20 @@
 import { agentContract } from "./agent";
+import { automationContract } from "./automation";
 import { fsContract } from "./fs";
 import { gitContract } from "./git";
 import { projectContract } from "./project";
-import { scheduleContract } from "./schedule";
 import { sessionContract } from "./session";
 
 export * from "./domain";
 export * from "./project";
-export * from "./schedule";
+export * from "./automation";
 
 export const contract = {
   agent: agentContract,
   project: projectContract,
   fs: fsContract,
   git: gitContract,
-  schedule: scheduleContract,
+  automation: automationContract,
 };
 export type Contract = typeof contract;
 
@@ -23,6 +23,6 @@ export {
   fsContract,
   gitContract,
   projectContract,
-  scheduleContract,
+  automationContract,
   sessionContract,
 };

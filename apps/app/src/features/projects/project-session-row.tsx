@@ -34,10 +34,10 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="truncate">{session.title ?? "New chat"}</span>
-        {session.scheduleId !== undefined ? (
+        {session.automationId !== undefined ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
-            title="Created by a schedule"
+            title="Created by an automation"
           >
             <Clock aria-hidden className="size-3.5 opacity-70" />
           </span>

@@ -1,5 +1,5 @@
-import type { Project, Schedule, ScheduleSpec } from "@getpie/contract";
-import { MAX_SCHEDULE_NAME_CHARS, MAX_SCHEDULE_PROMPT_CHARS } from "@getpie/contract";
+import type { Project, Automation, AutomationSpec } from "@getpie/contract";
+import { MAX_AUTOMATION_NAME_CHARS, MAX_AUTOMATION_PROMPT_CHARS } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -16,37 +16,37 @@ import { useState } from "react";
 
 import {
   CADENCE_OPTIONS,
-  type ScheduleFormValues,
+  type AutomationFormValues,
   WEEKDAY_OPTIONS,
   defaultOnceLocal,
-  defaultScheduleForm,
+  defaultAutomationForm,
   formFromSpec,
-  isScheduleCadence,
+  isAutomationCadence,
   specFromForm,
 } from "./cadence";
 
-export type ScheduleFormSubmit = {
+export type AutomationFormSubmit = {
   readonly name: string;
   readonly projectId: string;
   readonly prompt: string;
-  readonly spec: ScheduleSpec;
+  readonly spec: AutomationSpec;
   readonly worktree: boolean;
 };
 
-export type ScheduleFormProps = {
+export type AutomationFormProps = {
   readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
-  readonly initial?: Schedule;
+  readonly initial?: Automation;
   readonly submitting?: boolean;
-  readonly onSubmit: (value: ScheduleFormSubmit) => void;
+  readonly onSubmit: (value: AutomationFormSubmit) => void;
   readonly onCancel: () => void;
 };
 
-function formFromSchedule(
+function formFromAutomation(
   projects: ReadonlyArray<Pick<Project, "id" | "name">>,
-  initial?: Schedule,
-): ScheduleFormValues {
+  initial?: Automation,
+): AutomationFormValues {
   const projectId = initial?.projectId ?? projects[0]?.id ?? "";
-  const base = defaultScheduleForm(projectId);
+  const base = defaultAutomationForm(projectId);
   if (initial === undefined) return base;
   return {
     ...base,
@@ -57,14 +57,14 @@ function formFromSchedule(
   };
 }
 
-export function ScheduleForm({
+export function AutomationForm({
   projects,
   initial,
   submitting = false,
   onSubmit,
   onCancel,
-}: ScheduleFormProps) {
-  const [form, setForm] = useState(() => formFromSchedule(projects, initial));
+}: AutomationFormProps) {
+  const [form, setForm] = useState(() => formFromAutomation(projects, initial));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = initial !== undefined;
   const canSubmit =
@@ -102,17 +102,17 @@ export function ScheduleForm({
       }}
     >
       <Field>
-        <FieldLabel htmlFor="schedule-name">Name</FieldLabel>
+        <FieldLabel htmlFor="automation-name">Name</FieldLabel>
         <Input
-          id="schedule-name"
-          maxLength={MAX_SCHEDULE_NAME_CHARS}
+          id="automation-name"
+          maxLength={MAX_AUTOMATION_NAME_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
           required
           value={form.name}
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
+        <FieldLabel htmlFor="automation-project">Project</FieldLabel>
         <Select
           disabled={projectLocked || projects.length === 0}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
@@ -123,7 +123,7 @@ export function ScheduleForm({
           }}
           value={form.projectId === "" ? null : form.projectId}
         >
-          <SelectTrigger id="schedule-project">
+          <SelectTrigger id="automation-project">
             <SelectValue placeholder="Select a project" />
           </SelectTrigger>
           <SelectContent>
@@ -136,10 +136,10 @@ export function ScheduleForm({
         </Select>
       </Field>
       <Field>
-        <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
+        <FieldLabel htmlFor="automation-prompt">Prompt</FieldLabel>
         <Textarea
-          id="schedule-prompt"
-          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
+          id="automation-prompt"
+          maxLength={MAX_AUTOMATION_PROMPT_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
           required
           rows={5}
@@ -151,7 +151,7 @@ export function ScheduleForm({
         <Select
           items={CADENCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
           onValueChange={(next) => {
-            if (typeof next !== "string" || !isScheduleCadence(next)) return;
+            if (typeof next !== "string" || !isAutomationCadence(next)) return;
             setForm((current) => ({
               ...current,
               cadence: next,
@@ -174,9 +174,9 @@ export function ScheduleForm({
       </Field>
       {form.cadence === "daily" || form.cadence === "weekdays" || form.cadence === "weekly" ? (
         <Field>
-          <FieldLabel htmlFor="schedule-time">Time</FieldLabel>
+          <FieldLabel htmlFor="automation-time">Time</FieldLabel>
           <Input
-            id="schedule-time"
+            id="automation-time"
             onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}
             type="time"
             value={form.time}
@@ -185,7 +185,7 @@ export function ScheduleForm({
       ) : null}
       {form.cadence === "weekly" ? (
         <Field>
-          <FieldLabel htmlFor="schedule-weekday">Weekday</FieldLabel>
+          <FieldLabel htmlFor="automation-weekday">Weekday</FieldLabel>
           <Select
             items={WEEKDAY_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
             onValueChange={(next) => {
@@ -195,7 +195,7 @@ export function ScheduleForm({
             }}
             value={form.weekday}
           >
-            <SelectTrigger id="schedule-weekday">
+            <SelectTrigger id="automation-weekday">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -210,9 +210,9 @@ export function ScheduleForm({
       ) : null}
       {form.cadence === "once" ? (
         <Field>
-          <FieldLabel htmlFor="schedule-once">Run at</FieldLabel>
+          <FieldLabel htmlFor="automation-once">Run at</FieldLabel>
           <Input
-            id="schedule-once"
+            id="automation-once"
             onChange={(event) => setForm((current) => ({ ...current, runAt: event.target.value }))}
             required
             type="datetime-local"
@@ -222,9 +222,9 @@ export function ScheduleForm({
       ) : null}
       {form.cadence === "cron" ? (
         <Field>
-          <FieldLabel htmlFor="schedule-cron">Cron</FieldLabel>
+          <FieldLabel htmlFor="automation-cron">Cron</FieldLabel>
           <Input
-            id="schedule-cron"
+            id="automation-cron"
             onChange={(event) => setForm((current) => ({ ...current, cron: event.target.value }))}
             placeholder="0 9 * * 1-5"
             required
@@ -234,10 +234,10 @@ export function ScheduleForm({
       ) : null}
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
-          <FieldLabel htmlFor="schedule-worktree">Isolated worktree</FieldLabel>
+          <FieldLabel htmlFor="automation-worktree">Isolated worktree</FieldLabel>
           <Switch
             checked={form.worktree}
-            id="schedule-worktree"
+            id="automation-worktree"
             onCheckedChange={(checked) => setForm((current) => ({ ...current, worktree: checked }))}
           />
         </div>

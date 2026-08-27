@@ -1,34 +1,34 @@
-import { ScheduleSchema, type Schedule } from "@getpie/contract";
+import { AutomationSchema, type Automation } from "@getpie/contract";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Context, Effect, FileSystem, Layer, Option } from "effect";
 
 import { Paths } from "../config/paths";
-import { ScheduleNotFound, StoreReadError, StoreWriteError } from "../errors";
+import { AutomationNotFound, StoreReadError, StoreWriteError } from "../errors";
 
-export class ScheduleRepository extends Context.Service<
-  ScheduleRepository,
+export class AutomationRepository extends Context.Service<
+  AutomationRepository,
   {
-    readonly list: () => Effect.Effect<ReadonlyArray<Schedule>, StoreReadError>;
-    readonly read: (id: string) => Effect.Effect<Schedule, StoreReadError | ScheduleNotFound>;
-    readonly write: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
+    readonly list: () => Effect.Effect<ReadonlyArray<Automation>, StoreReadError>;
+    readonly read: (id: string) => Effect.Effect<Automation, StoreReadError | AutomationNotFound>;
+    readonly write: (automation: Automation) => Effect.Effect<void, StoreWriteError>;
     readonly remove: (id: string) => Effect.Effect<void, StoreWriteError>;
   }
->()("ScheduleRepository") {}
+>()("AutomationRepository") {}
 
 const isSafeId = (id: string): boolean =>
   id.length > 0 && !/[/\\]/.test(id) && id !== "." && id !== "..";
 
-export const ScheduleRepositoryLayer: Layer.Layer<
-  ScheduleRepository,
+export const AutomationRepositoryLayer: Layer.Layer<
+  AutomationRepository,
   never,
   Paths | FileSystem.FileSystem
 > = Layer.effect(
-  ScheduleRepository,
+  AutomationRepository,
   Effect.gen(function* () {
     const paths = yield* Paths;
-    const schedules = yield* makeJsonCollection({
-      dir: paths.schedulesDir,
-      schema: ScheduleSchema,
+    const automations = yield* makeJsonCollection({
+      dir: paths.automationsDir,
+      schema: AutomationSchema,
     });
     const asReadError = (error: JsonStoreLoadError) =>
       new StoreReadError({ file: error.file, cause: error });
@@ -37,24 +37,25 @@ export const ScheduleRepositoryLayer: Layer.Layer<
 
     return {
       list: () =>
-        schedules.list().pipe(
+        automations.list().pipe(
           Effect.map((entries) => entries.map((entry) => entry.data)),
           Effect.mapError(asReadError),
         ),
       read: (id) =>
         !isSafeId(id)
-          ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
-          : schedules.get(id).pipe(
+          ? Effect.fail(new AutomationNotFound({ automationId: id }))
+          : automations.get(id).pipe(
               Effect.mapError(asReadError),
               Effect.flatMap((found) =>
                 Option.isSome(found)
                   ? Effect.succeed(found.value)
-                  : Effect.fail(new ScheduleNotFound({ scheduleId: id })),
+                  : Effect.fail(new AutomationNotFound({ automationId: id })),
               ),
             ),
-      write: (schedule) => schedules.put(schedule.id, schedule).pipe(Effect.mapError(asWriteError)),
+      write: (automation) =>
+        automations.put(automation.id, automation).pipe(Effect.mapError(asWriteError)),
       remove: (id) =>
-        !isSafeId(id) ? Effect.void : schedules.remove(id).pipe(Effect.mapError(asWriteError)),
+        !isSafeId(id) ? Effect.void : automations.remove(id).pipe(Effect.mapError(asWriteError)),
     };
   }),
 );

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defaultOnceLocal,
-  defaultScheduleForm,
+  defaultAutomationForm,
   formatNextRun,
   formatSpec,
   formFromSpec,
@@ -11,7 +11,7 @@ import {
 
 describe("specFromForm", () => {
   it("builds daily and weekday cron from a time picker", () => {
-    const base = defaultScheduleForm("proj");
+    const base = defaultAutomationForm("proj");
     expect(specFromForm({ ...base, cadence: "daily", time: "09:30" })).toEqual({
       kind: "cron",
       expr: "30 9 * * *",
@@ -31,7 +31,7 @@ describe("specFromForm", () => {
   });
 
   it("round-trips preset cron expressions", () => {
-    const base = defaultScheduleForm("proj");
+    const base = defaultAutomationForm("proj");
     const specs = [
       specFromForm({ ...base, cadence: "hourly" }),
       specFromForm({ ...base, cadence: "daily", time: "09:00" }),
@@ -56,7 +56,7 @@ describe("formatSpec", () => {
 });
 
 describe("formatNextRun", () => {
-  it("labels paused and manual schedules", () => {
+  it("labels paused and manual automations", () => {
     expect(formatNextRun("2026-08-27T09:00:00.000Z", false)).toBe("Paused");
     expect(formatNextRun(null, true)).toBe("Run now only");
   });

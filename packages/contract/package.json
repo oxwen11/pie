@@ -12,7 +12,7 @@
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts",
-    "./schedule": "./src/schedule.ts"
+    "./automation": "./src/automation.ts"
   },
   "scripts": {
     "test": "vitest run",

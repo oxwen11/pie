@@ -1,11 +1,11 @@
 import { os } from "@orpc/server";
 
 import { agentRouter } from "./agent";
+import { automationRouter } from "./automation";
 import type { RpcContext } from "./context";
 import { fsRouter } from "./fs";
 import { gitRouter } from "./git";
 import { projectRouter } from "./project";
-import { scheduleRouter } from "./schedule";
 
 const orpc = os.$context<RpcContext>();
 
@@ -14,6 +14,6 @@ export const router = orpc.router({
   project: projectRouter,
   fs: fsRouter,
   git: gitRouter,
-  schedule: scheduleRouter,
+  automation: automationRouter,
 });
 export type Router = typeof router;

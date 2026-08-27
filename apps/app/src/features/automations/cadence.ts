@@ -1,6 +1,6 @@
-import type { ScheduleSpec } from "@getpie/contract";
+import type { AutomationSpec } from "@getpie/contract";
 
-export type ScheduleCadence =
+export type AutomationCadence =
   | "manual"
   | "hourly"
   | "daily"
@@ -10,7 +10,7 @@ export type ScheduleCadence =
   | "cron";
 
 export const CADENCE_OPTIONS: ReadonlyArray<{
-  readonly value: ScheduleCadence;
+  readonly value: AutomationCadence;
   readonly label: string;
 }> = [
   { value: "manual", label: "Manual" },
@@ -32,15 +32,15 @@ export const WEEKDAY_OPTIONS: ReadonlyArray<{ readonly value: string; readonly l
   { value: "0", label: "Sunday" },
 ];
 
-export function isScheduleCadence(value: string): value is ScheduleCadence {
+export function isAutomationCadence(value: string): value is AutomationCadence {
   return CADENCE_OPTIONS.some((option) => option.value === value);
 }
 
-export type ScheduleFormValues = {
+export type AutomationFormValues = {
   readonly name: string;
   readonly projectId: string;
   readonly prompt: string;
-  readonly cadence: ScheduleCadence;
+  readonly cadence: AutomationCadence;
   readonly time: string;
   readonly weekday: string;
   readonly cron: string;
@@ -50,7 +50,7 @@ export type ScheduleFormValues = {
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
-export function defaultScheduleForm(projectId: string): ScheduleFormValues {
+export function defaultAutomationForm(projectId: string): AutomationFormValues {
   return {
     name: "",
     projectId,
@@ -98,7 +98,7 @@ function parseTime(time: string): ClockTime {
   return { hour, minute };
 }
 
-export function specFromForm(form: ScheduleFormValues): ScheduleSpec {
+export function specFromForm(form: AutomationFormValues): AutomationSpec {
   if (form.cadence === "manual") return { kind: "manual" };
   if (form.cadence === "once") return { kind: "once", runAt: localDateTimeToIso(form.runAt) };
   if (form.cadence === "cron") return { kind: "cron", expr: form.cron.trim() };
@@ -110,9 +110,9 @@ export function specFromForm(form: ScheduleFormValues): ScheduleSpec {
 }
 
 export function formFromSpec(
-  spec: ScheduleSpec,
-  base: ScheduleFormValues,
-): Pick<ScheduleFormValues, "cadence" | "time" | "weekday" | "cron" | "runAt"> {
+  spec: AutomationSpec,
+  base: AutomationFormValues,
+): Pick<AutomationFormValues, "cadence" | "time" | "weekday" | "cron" | "runAt"> {
   if (spec.kind === "manual") {
     return {
       cadence: "manual",
@@ -168,10 +168,10 @@ export function formFromSpec(
   return { cadence: "cron", time: base.time, weekday: base.weekday, cron: expr, runAt: "" };
 }
 
-export function formatSpec(spec: ScheduleSpec): string {
+export function formatSpec(spec: AutomationSpec): string {
   if (spec.kind === "manual") return "Manual";
   if (spec.kind === "once") return `Once at ${new Date(spec.runAt).toLocaleString()}`;
-  const matched = formFromSpec(spec, defaultScheduleForm(""));
+  const matched = formFromSpec(spec, defaultAutomationForm(""));
   if (matched.cadence === "hourly") return "Hourly";
   if (matched.cadence === "daily") return `Daily at ${matched.time}`;
   if (matched.cadence === "weekdays") return `Weekdays at ${matched.time}`;

@@ -69,9 +69,9 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
-  const schedulesRoute =
+  const automationsRoute =
     useMatch({
-      from: "/schedules",
+      from: "/automations",
       shouldThrow: false,
     }) ?? null;
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
@@ -92,9 +92,9 @@ function RootLayout() {
       console.error("Failed to open a new chat", error);
     });
   };
-  const handleSchedules = () => {
-    navigate({ to: "/schedules" }).catch((error: unknown) => {
-      console.error("Failed to open schedules", error);
+  const handleAutomations = () => {
+    navigate({ to: "/automations" }).catch((error: unknown) => {
+      console.error("Failed to open automations", error);
     });
   };
 
@@ -106,20 +106,20 @@ function RootLayout() {
             <AppSidebar
               isSessionActive={isSessionActive}
               onNewChat={handleNewChat}
-              onSchedules={handleSchedules}
-              schedulesActive={schedulesRoute !== null}
+              onAutomations={handleAutomations}
+              automationsActive={automationsRoute !== null}
             />
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
               heading={
-                schedulesRoute !== null
-                  ? "Schedules"
+                automationsRoute !== null
+                  ? "Automations"
                   : sessionRef === null
                     ? "New chat"
                     : (sessionTitle ?? "New chat")
               }
-              supportingText={schedulesRoute !== null ? undefined : project?.name}
+              supportingText={automationsRoute !== null ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>

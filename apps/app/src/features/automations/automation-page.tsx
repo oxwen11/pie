@@ -1,5 +1,5 @@
-import type { Project, Schedule } from "@getpie/contract";
-import { MAX_SCHEDULES } from "@getpie/contract";
+import type { Project, Automation } from "@getpie/contract";
+import { MAX_AUTOMATIONS } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
   Dialog,
@@ -26,49 +26,49 @@ import { toast } from "sonner";
 
 import Loader from "@/components/loader";
 
+import { AutomationForm, type AutomationFormSubmit } from "./automation-form";
 import { formatNextRun, formatSpec } from "./cadence";
-import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
 
-export type SchedulePageProps = {
+export type AutomationPageProps = {
   readonly projects: ReadonlyArray<Project>;
   readonly projectsReady: boolean;
 };
 
 type EditorState =
   | { readonly mode: "create" }
-  | { readonly mode: "edit"; readonly schedule: Schedule };
+  | { readonly mode: "edit"; readonly automation: Automation };
 
-function lastRunLabel(schedule: Schedule): string | null {
-  if (schedule.lastRunStatus === undefined || schedule.lastRunAt === undefined) return null;
-  const when = new Date(schedule.lastRunAt).toLocaleString();
-  if (schedule.lastRunStatus === "started") return `Last run ${when}`;
-  if (schedule.lastRunStatus === "skipped") {
-    const reason = schedule.runs[0]?.skipReason;
+function lastRunLabel(automation: Automation): string | null {
+  if (automation.lastRunStatus === undefined || automation.lastRunAt === undefined) return null;
+  const when = new Date(automation.lastRunAt).toLocaleString();
+  if (automation.lastRunStatus === "started") return `Last run ${when}`;
+  if (automation.lastRunStatus === "skipped") {
+    const reason = automation.runs[0]?.skipReason;
     return reason === undefined ? `Skipped ${when}` : `Skipped (${reason}) ${when}`;
   }
-  return schedule.lastError === undefined
+  return automation.lastError === undefined
     ? `Failed ${when}`
-    : `Failed ${when}: ${schedule.lastError}`;
+    : `Failed ${when}: ${automation.lastError}`;
 }
 
-export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
+export function AutomationPage({ projects, projectsReady }: AutomationPageProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [deleting, setDeleting] = useState<Schedule | null>(null);
+  const [deleting, setDeleting] = useState<Automation | null>(null);
 
-  const schedules = useQuery(orpcQueryUtils.schedule.list.queryOptions());
+  const automations = useQuery(orpcQueryUtils.automation.list.queryOptions());
 
   const invalidate = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() }),
+      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() }),
       queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() }),
     ]);
 
   const create = useMutation({
-    mutationFn: (value: ScheduleFormSubmit) =>
-      orpcQueryUtils.schedule.create.call({
+    mutationFn: (value: AutomationFormSubmit) =>
+      orpcQueryUtils.automation.create.call({
         name: value.name,
         projectId: value.projectId,
         prompt: value.prompt,
@@ -79,16 +79,16 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
       setEditor(null);
       return invalidate();
     },
-    onError: (error) => toast.error(`Failed to create schedule: ${error.message}`),
+    onError: (error) => toast.error(`Failed to create automation: ${error.message}`),
   });
 
   const update = useMutation({
     mutationFn: (
-      input: { readonly id: string } & Partial<ScheduleFormSubmit> & {
+      input: { readonly id: string } & Partial<AutomationFormSubmit> & {
           readonly enabled?: boolean;
         },
     ) =>
-      orpcQueryUtils.schedule.update.call({
+      orpcQueryUtils.automation.update.call({
         id: input.id,
         ...(input.name !== undefined ? { name: input.name } : undefined),
         ...(input.prompt !== undefined ? { prompt: input.prompt } : undefined),
@@ -98,22 +98,22 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
       }),
     onSuccess: () => {
       setEditor(null);
-      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
+      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
     },
-    onError: (error) => toast.error(`Failed to update schedule: ${error.message}`),
+    onError: (error) => toast.error(`Failed to update automation: ${error.message}`),
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => orpcQueryUtils.schedule.delete.call({ id }),
+    mutationFn: (id: string) => orpcQueryUtils.automation.delete.call({ id }),
     onSuccess: () => {
       setDeleting(null);
-      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
+      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
     },
-    onError: (error) => toast.error(`Failed to delete schedule: ${error.message}`),
+    onError: (error) => toast.error(`Failed to delete automation: ${error.message}`),
   });
 
   const runNow = useMutation({
-    mutationFn: (id: string) => orpcQueryUtils.schedule.runNow.call({ id }),
+    mutationFn: (id: string) => orpcQueryUtils.automation.runNow.call({ id }),
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
@@ -122,35 +122,35 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
           params: { sessionId: result.ref.sessionId },
           search: { projectId: result.ref.projectId },
         }).catch((error: unknown) => {
-          console.error("Failed to open the scheduled session", error);
+          console.error("Failed to open the automation session", error);
         });
         return;
       }
-      if (result.schedule.lastRunStatus === "skipped") {
-        toast.error("Schedule did not start a session (skipped).");
+      if (result.automation.lastRunStatus === "skipped") {
+        toast.error("Automation did not start a session (skipped).");
         return;
       }
-      if (result.schedule.lastRunStatus === "failed") {
-        toast.error(result.schedule.lastError ?? "Schedule failed to start a session.");
+      if (result.automation.lastRunStatus === "failed") {
+        toast.error(result.automation.lastError ?? "Automation failed to start a session.");
       }
     },
-    onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
+    onError: (error) => toast.error(`Failed to run automation: ${error.message}`),
   });
 
-  const items = schedules.data ?? [];
-  const atLimit = items.length >= MAX_SCHEDULES;
+  const items = automations.data ?? [];
+  const atLimit = items.length >= MAX_AUTOMATIONS;
   const canCreate = projectsReady && projects.length > 0 && !atLimit;
 
-  if (!projectsReady || schedules.isPending) {
+  if (!projectsReady || automations.isPending) {
     return <Loader />;
   }
 
-  if (schedules.isError) {
+  if (automations.isError) {
     return (
       <Empty>
         <EmptyHeader>
-          <EmptyTitle>Could not load schedules</EmptyTitle>
-          <EmptyDescription>{schedules.error.message}</EmptyDescription>
+          <EmptyTitle>Could not load automations</EmptyTitle>
+          <EmptyDescription>{automations.error.message}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -169,11 +169,11 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
             projects.length === 0
               ? "Import a project first"
               : atLimit
-                ? `You can have at most ${MAX_SCHEDULES} schedules`
+                ? `You can have at most ${MAX_AUTOMATIONS} automations`
                 : undefined
           }
         >
-          New schedule
+          New automation
         </Button>
       </div>
 
@@ -183,61 +183,61 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
             <EmptyMedia variant="icon">
               <Clock aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>No schedules yet</EmptyTitle>
+            <EmptyTitle>No automations yet</EmptyTitle>
             <EmptyDescription>
               {projects.length === 0
-                ? "Import a project from the sidebar, then create a schedule to start a session later."
-                : "A schedule creates a new session in a project and sends the prompt when it is due."}
+                ? "Import a project from the sidebar, then create an automation to start a session later."
+                : "An automation creates a new session in a project and sends the prompt when it is due."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
-          {items.map((schedule) => {
-            const project = projects.find((item) => item.id === schedule.projectId);
-            const lastRun = lastRunLabel(schedule);
+          {items.map((automation) => {
+            const project = projects.find((item) => item.id === automation.projectId);
+            const lastRun = lastRunLabel(automation);
             return (
               <li
                 className="border-border bg-card flex flex-col gap-3 rounded-xl border p-4"
-                key={schedule.id}
+                key={automation.id}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{schedule.name}</div>
+                    <div className="truncate font-medium">{automation.name}</div>
                     <div className="text-muted-foreground truncate text-sm">
-                      {project?.name ?? "Unknown project"} · {formatSpec(schedule.spec)}
+                      {project?.name ?? "Unknown project"} · {formatSpec(automation.spec)}
                     </div>
                     <div className="text-muted-foreground text-sm">
-                      {formatNextRun(schedule.nextRunAt, schedule.enabled)}
+                      {formatNextRun(automation.nextRunAt, automation.enabled)}
                     </div>
                     {lastRun !== null ? (
                       <div className="text-muted-foreground text-sm">{lastRun}</div>
                     ) : null}
                   </div>
                   <Switch
-                    aria-label={schedule.enabled ? "Pause schedule" : "Enable schedule"}
-                    checked={schedule.enabled}
+                    aria-label={automation.enabled ? "Pause automation" : "Enable automation"}
+                    checked={automation.enabled}
                     disabled={update.isPending}
-                    onCheckedChange={(enabled) => update.mutate({ id: schedule.id, enabled })}
+                    onCheckedChange={(enabled) => update.mutate({ id: automation.id, enabled })}
                   />
                 </div>
                 <div className="flex flex-wrap justify-end gap-1">
                   <Button
                     disabled={runNow.isPending}
-                    onClick={() => runNow.mutate(schedule.id)}
+                    onClick={() => runNow.mutate(automation.id)}
                     size="sm"
                     variant="ghost"
                   >
                     Run now
                   </Button>
                   <Button
-                    onClick={() => setEditor({ mode: "edit", schedule })}
+                    onClick={() => setEditor({ mode: "edit", automation })}
                     size="sm"
                     variant="ghost"
                   >
                     Edit
                   </Button>
-                  <Button onClick={() => setDeleting(schedule)} size="sm" variant="ghost">
+                  <Button onClick={() => setDeleting(automation)} size="sm" variant="ghost">
                     Delete
                   </Button>
                 </div>
@@ -257,22 +257,22 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
           <DialogPopup className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
-                {editor.mode === "create" ? "New schedule" : "Edit schedule"}
+                {editor.mode === "create" ? "New automation" : "Edit automation"}
               </DialogTitle>
               <DialogDescription>
                 When this is due, pie creates a new session in the project and sends the prompt.
               </DialogDescription>
             </DialogHeader>
             <DialogPanel>
-              <ScheduleForm
-                initial={editor.mode === "edit" ? editor.schedule : undefined}
+              <AutomationForm
+                initial={editor.mode === "edit" ? editor.automation : undefined}
                 onCancel={() => setEditor(null)}
                 onSubmit={(value) => {
                   if (editor.mode === "create") {
                     create.mutate(value);
                     return;
                   }
-                  update.mutate({ id: editor.schedule.id, ...value });
+                  update.mutate({ id: editor.automation.id, ...value });
                 }}
                 projects={projects}
                 submitting={create.isPending || update.isPending}
@@ -291,7 +291,7 @@ export function SchedulePage({ projects, projectsReady }: SchedulePageProps) {
         >
           <DialogPopup className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Delete schedule</DialogTitle>
+              <DialogTitle>Delete automation</DialogTitle>
               <DialogDescription>
                 {deleting.name} will stop creating sessions. Sessions it already created stay in the
                 sidebar.

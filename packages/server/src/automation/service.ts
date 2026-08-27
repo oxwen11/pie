@@ -1,21 +1,21 @@
 import type {
-  CreateScheduleInput,
+  CreateAutomationInput,
   CreateWorktreeInput,
-  Schedule,
-  ScheduleRun,
-  ScheduleRunReason,
-  ScheduleSkipReason,
+  Automation,
+  AutomationRun,
+  AutomationRunReason,
+  AutomationSkipReason,
   SessionRef,
-  UpdateScheduleInput,
+  UpdateAutomationInput,
 } from "@getpie/contract";
-import { MAX_SCHEDULES } from "@getpie/contract";
+import { MAX_AUTOMATIONS } from "@getpie/contract";
 import { Context, Crypto, Effect, Layer, Semaphore } from "effect";
 
 import {
-  InvalidSchedule,
+  InvalidAutomation,
   ProjectNotFound,
-  ScheduleLimitReached,
-  ScheduleNotFound,
+  AutomationLimitReached,
+  AutomationNotFound,
   type StoreReadError,
   type StoreWriteError,
 } from "../errors";
@@ -24,22 +24,22 @@ import { type CreatePiSessionInput, PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import { CronError } from "./cron";
 import { computeNextRunAt, iso, isStale, validateSpec } from "./next-run";
-import { ScheduleRepository } from "./repository";
+import { AutomationRepository } from "./repository";
 
-export type ScheduleStore = {
-  readonly list: () => Effect.Effect<ReadonlyArray<Schedule>, StoreReadError>;
-  readonly read: (id: string) => Effect.Effect<Schedule, StoreReadError | ScheduleNotFound>;
-  readonly write: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
+export type AutomationStore = {
+  readonly list: () => Effect.Effect<ReadonlyArray<Automation>, StoreReadError>;
+  readonly read: (id: string) => Effect.Effect<Automation, StoreReadError | AutomationNotFound>;
+  readonly write: (automation: Automation) => Effect.Effect<void, StoreWriteError>;
   readonly remove: (id: string) => Effect.Effect<void, StoreWriteError>;
 };
 
-export type ScheduleProjects = {
+export type AutomationProjects = {
   readonly findById: (
     id: string,
   ) => Effect.Effect<{ readonly path: string }, StoreReadError | ProjectNotFound>;
 };
 
-export type ScheduleSessions = {
+export type AutomationSessions = {
   readonly create: (
     input: CreatePiSessionInput,
   ) => Effect.Effect<
@@ -59,44 +59,44 @@ const MAX_RUNS = 20;
 const TITLE_CHARS = 60;
 
 export type FireResult = {
-  readonly schedule: Schedule;
+  readonly automation: Automation;
   readonly ref?: SessionRef;
 };
 
 type FireSessionOutcome =
   | { readonly kind: "started"; readonly ref: SessionRef }
-  | { readonly kind: "skipped"; readonly skipReason: ScheduleSkipReason }
+  | { readonly kind: "skipped"; readonly skipReason: AutomationSkipReason }
   | { readonly kind: "failed"; readonly error: string };
 
-export type ScheduleServiceShape = {
-  readonly list: () => Effect.Effect<ReadonlyArray<Schedule>, StoreReadError>;
-  readonly get: (id: string) => Effect.Effect<Schedule, StoreReadError | ScheduleNotFound>;
+export type AutomationServiceShape = {
+  readonly list: () => Effect.Effect<ReadonlyArray<Automation>, StoreReadError>;
+  readonly get: (id: string) => Effect.Effect<Automation, StoreReadError | AutomationNotFound>;
   readonly create: (
-    input: CreateScheduleInput,
+    input: CreateAutomationInput,
   ) => Effect.Effect<
-    Schedule,
-    StoreReadError | StoreWriteError | ProjectNotFound | InvalidSchedule | ScheduleLimitReached
+    Automation,
+    StoreReadError | StoreWriteError | ProjectNotFound | InvalidAutomation | AutomationLimitReached
   >;
   readonly update: (
-    input: UpdateScheduleInput,
+    input: UpdateAutomationInput,
   ) => Effect.Effect<
-    Schedule,
-    StoreReadError | StoreWriteError | ScheduleNotFound | InvalidSchedule
+    Automation,
+    StoreReadError | StoreWriteError | AutomationNotFound | InvalidAutomation
   >;
   readonly delete: (
     id: string,
-  ) => Effect.Effect<void, StoreReadError | StoreWriteError | ScheduleNotFound>;
+  ) => Effect.Effect<void, StoreReadError | StoreWriteError | AutomationNotFound>;
   readonly runNow: (
     id: string,
-  ) => Effect.Effect<FireResult, StoreReadError | StoreWriteError | ScheduleNotFound>;
+  ) => Effect.Effect<FireResult, StoreReadError | StoreWriteError | AutomationNotFound>;
   readonly tick: () => Effect.Effect<void, StoreReadError | StoreWriteError>;
 };
 
-export class ScheduleService extends Context.Service<ScheduleService, ScheduleServiceShape>()(
-  "ScheduleService",
+export class AutomationService extends Context.Service<AutomationService, AutomationServiceShape>()(
+  "AutomationService",
 ) {}
 
-const compareSchedules = (a: Schedule, b: Schedule): number => {
+const compareAutomations = (a: Automation, b: Automation): number => {
   if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
   if (a.nextRunAt === null && b.nextRunAt === null) return a.name.localeCompare(b.name);
   if (a.nextRunAt === null) return 1;
@@ -105,7 +105,7 @@ const compareSchedules = (a: Schedule, b: Schedule): number => {
   return byRun !== 0 ? byRun : a.name.localeCompare(b.name);
 };
 
-const compareDue = (a: Schedule, b: Schedule): number => {
+const compareDue = (a: Automation, b: Automation): number => {
   const an = a.nextRunAt ?? "";
   const bn = b.nextRunAt ?? "";
   if (an !== bn) return an.localeCompare(bn);
@@ -115,47 +115,50 @@ const compareDue = (a: Schedule, b: Schedule): number => {
 const titleFromName = (name: string): string =>
   name.length > TITLE_CHARS ? name.slice(0, TITLE_CHARS) : name;
 
-const appendRun = (schedule: Schedule, run: ScheduleRun, nowIso: string): Schedule => ({
-  ...schedule,
+const appendRun = (automation: Automation, run: AutomationRun, nowIso: string): Automation => ({
+  ...automation,
   updatedAt: nowIso,
   lastRunAt: run.startedAt,
   lastRunStatus: run.status,
   ...(run.sessionId !== undefined ? { lastSessionId: run.sessionId } : undefined),
   ...(run.status === "failed" && run.error !== undefined ? { lastError: run.error } : undefined),
-  runs: [run, ...schedule.runs].slice(0, MAX_RUNS),
+  runs: [run, ...automation.runs].slice(0, MAX_RUNS),
 });
 
-const tryValidate = (spec: Schedule["spec"], now: number): Effect.Effect<void, InvalidSchedule> =>
+const tryValidate = (
+  spec: Automation["spec"],
+  now: number,
+): Effect.Effect<void, InvalidAutomation> =>
   Effect.try({
     try: () => validateSpec(spec, now),
     catch: (error) =>
-      new InvalidSchedule({
+      new InvalidAutomation({
         reason:
           error instanceof CronError || error instanceof Error ? error.message : String(error),
       }),
   });
 
 const tryNextRun = (
-  spec: Schedule["spec"],
+  spec: Automation["spec"],
   id: string,
   now: number,
-): Effect.Effect<number | null, InvalidSchedule> =>
+): Effect.Effect<number | null, InvalidAutomation> =>
   Effect.try({
     try: () => computeNextRunAt(spec, id, now),
     catch: (error) =>
-      new InvalidSchedule({
+      new InvalidAutomation({
         reason:
           error instanceof CronError || error instanceof Error ? error.message : String(error),
       }),
   });
 
-export const makeScheduleService = (deps: {
-  readonly repo: ScheduleStore;
-  readonly projects: ScheduleProjects;
-  readonly sessions: ScheduleSessions;
+export const makeAutomationService = (deps: {
+  readonly repo: AutomationStore;
+  readonly projects: AutomationProjects;
+  readonly sessions: AutomationSessions;
   readonly newId: Effect.Effect<string>;
   readonly now: () => number;
-}): ScheduleServiceShape => {
+}): AutomationServiceShape => {
   const { repo, projects, sessions, newId, now } = deps;
   const tickGate = Semaphore.makeUnsafe(1);
   const inFlight = new Set<string>();
@@ -168,22 +171,22 @@ export const makeScheduleService = (deps: {
       );
 
   const fireSession = (
-    schedule: Schedule,
+    automation: Automation,
   ): Effect.Effect<
     SessionRef,
     ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
   > =>
     Effect.gen(function* () {
-      const project = yield* projects.findById(schedule.projectId);
+      const project = yield* projects.findById(automation.projectId);
       const created = yield* sessions.create({
-        projectId: schedule.projectId,
+        projectId: automation.projectId,
         cwd: project.path,
-        title: titleFromName(schedule.name),
-        scheduleId: schedule.id,
-        ...(schedule.provider !== undefined && schedule.modelId !== undefined
-          ? { model: { provider: schedule.provider, modelId: schedule.modelId } }
+        title: titleFromName(automation.name),
+        automationId: automation.id,
+        ...(automation.provider !== undefined && automation.modelId !== undefined
+          ? { model: { provider: automation.provider, modelId: automation.modelId } }
           : undefined),
-        ...(schedule.worktree !== undefined ? { worktree: schedule.worktree } : undefined),
+        ...(automation.worktree !== undefined ? { worktree: automation.worktree } : undefined),
       });
       // The session is already durable. Kick the prompt off the fire path so a
       // slow or wedged Pi cannot stall runNow or the tick. Failures are logged;
@@ -191,14 +194,14 @@ export const makeScheduleService = (deps: {
       yield* sessions
         .prompt({
           ref: created.ref,
-          parts: [{ type: "text", text: schedule.prompt }],
+          parts: [{ type: "text", text: automation.prompt }],
         })
         .pipe(
           Effect.catch((error) =>
-            Effect.logWarning("schedule prompt failed").pipe(
+            Effect.logWarning("automation prompt failed").pipe(
               Effect.annotateLogs({
-                event: "schedule.prompt_failed",
-                scheduleId: schedule.id,
+                event: "automation.prompt_failed",
+                automationId: automation.id,
                 sessionId: created.ref.sessionId,
                 error: String(error),
               }),
@@ -209,28 +212,37 @@ export const makeScheduleService = (deps: {
       return created.ref;
     });
 
-  const persistAdvance = (schedule: Schedule, firedAt: number, disableOnce: boolean) =>
-    tryNextRun(schedule.spec, schedule.id, firedAt).pipe(
+  const persistAdvance = (automation: Automation, firedAt: number, disableOnce: boolean) =>
+    tryNextRun(automation.spec, automation.id, firedAt).pipe(
       Effect.map((next) => ({
-        ...schedule,
-        enabled: disableOnce ? false : schedule.enabled,
+        ...automation,
+        enabled: disableOnce ? false : automation.enabled,
         nextRunAt: disableOnce ? null : iso(next),
       })),
-      Effect.catchTag("InvalidSchedule", () =>
+      Effect.catchTag("InvalidAutomation", () =>
         Effect.succeed({
-          ...schedule,
+          ...automation,
           enabled: false,
           nextRunAt: null,
         }),
       ),
     );
 
-  const record = (schedule: Schedule, run: ScheduleRun, firedAt: number, disableOnce: boolean) =>
-    persistAdvance(appendRun(schedule, run, new Date(firedAt).toISOString()), firedAt, disableOnce);
+  const record = (
+    automation: Automation,
+    run: AutomationRun,
+    firedAt: number,
+    disableOnce: boolean,
+  ) =>
+    persistAdvance(
+      appendRun(automation, run, new Date(firedAt).toISOString()),
+      firedAt,
+      disableOnce,
+    );
 
   const fire = (
-    schedule: Schedule,
-    reason: ScheduleRunReason,
+    automation: Automation,
+    reason: AutomationRunReason,
     options: { readonly skipIfLive: boolean },
   ): Effect.Effect<FireResult, StoreReadError | StoreWriteError> =>
     Effect.gen(function* () {
@@ -238,9 +250,9 @@ export const makeScheduleService = (deps: {
       const runId = yield* newId;
       const startedIso = new Date(startedAt).toISOString();
 
-      if (inFlight.has(schedule.id)) {
+      if (inFlight.has(automation.id)) {
         const skipped = yield* record(
-          schedule,
+          automation,
           {
             id: runId,
             startedAt: startedIso,
@@ -252,14 +264,14 @@ export const makeScheduleService = (deps: {
           false,
         );
         yield* repo.write(skipped);
-        return { schedule: skipped };
+        return { automation: skipped };
       }
 
-      if (options.skipIfLive && schedule.lastSessionId !== undefined) {
-        const live = yield* isLive(schedule.lastSessionId, schedule.projectId);
+      if (options.skipIfLive && automation.lastSessionId !== undefined) {
+        const live = yield* isLive(automation.lastSessionId, automation.projectId);
         if (live) {
           const skipped = yield* record(
-            schedule,
+            automation,
             {
               id: runId,
               startedAt: startedIso,
@@ -271,12 +283,12 @@ export const makeScheduleService = (deps: {
             false,
           );
           yield* repo.write(skipped);
-          return { schedule: skipped };
+          return { automation: skipped };
         }
       }
 
-      inFlight.add(schedule.id);
-      const outcome: FireSessionOutcome = yield* fireSession(schedule).pipe(
+      inFlight.add(automation.id);
+      const outcome: FireSessionOutcome = yield* fireSession(automation).pipe(
         Effect.map(
           (ref): FireSessionOutcome => ({
             kind: "started",
@@ -295,12 +307,12 @@ export const makeScheduleService = (deps: {
             error: error instanceof Error ? error.message : String(error),
           } satisfies FireSessionOutcome),
         ),
-        Effect.ensuring(Effect.sync(() => inFlight.delete(schedule.id))),
+        Effect.ensuring(Effect.sync(() => inFlight.delete(automation.id))),
       );
 
       if (outcome.kind === "skipped") {
         const skipped = yield* record(
-          schedule,
+          automation,
           {
             id: runId,
             startedAt: startedIso,
@@ -312,12 +324,12 @@ export const makeScheduleService = (deps: {
           false,
         );
         yield* repo.write(skipped);
-        return { schedule: skipped };
+        return { automation: skipped };
       }
 
       if (outcome.kind === "failed") {
         const failed = yield* record(
-          schedule,
+          automation,
           {
             id: runId,
             startedAt: startedIso,
@@ -326,14 +338,14 @@ export const makeScheduleService = (deps: {
             error: outcome.error,
           },
           startedAt,
-          schedule.spec.kind === "once",
+          automation.spec.kind === "once",
         );
         yield* repo.write(failed);
-        return { schedule: failed };
+        return { automation: failed };
       }
 
       const started = yield* record(
-        schedule,
+        automation,
         {
           id: runId,
           startedAt: startedIso,
@@ -342,23 +354,25 @@ export const makeScheduleService = (deps: {
           sessionId: outcome.ref.sessionId,
         },
         startedAt,
-        schedule.spec.kind === "once",
+        automation.spec.kind === "once",
       );
       yield* repo.write(started);
-      yield* Effect.logInfo("schedule fired").pipe(
+      yield* Effect.logInfo("automation fired").pipe(
         Effect.annotateLogs({
-          event: "schedule.fired",
-          scheduleId: schedule.id,
+          event: "automation.fired",
+          automationId: automation.id,
           sessionId: outcome.ref.sessionId,
           reason,
         }),
       );
-      return { schedule: started, ref: outcome.ref };
+      return { automation: started, ref: outcome.ref };
     });
 
   return {
     list: () =>
-      repo.list().pipe(Effect.map((schedules) => Array.from(schedules).sort(compareSchedules))),
+      repo
+        .list()
+        .pipe(Effect.map((automations) => Array.from(automations).sort(compareAutomations))),
 
     get: (id) => repo.read(id),
 
@@ -368,14 +382,14 @@ export const makeScheduleService = (deps: {
         const createdAt = now();
         yield* tryValidate(input.spec, createdAt);
         const existing = yield* repo.list();
-        if (existing.length >= MAX_SCHEDULES) {
-          return yield* Effect.fail(new ScheduleLimitReached({ limit: MAX_SCHEDULES }));
+        if (existing.length >= MAX_AUTOMATIONS) {
+          return yield* Effect.fail(new AutomationLimitReached({ limit: MAX_AUTOMATIONS }));
         }
         const id = yield* newId;
         const next = yield* tryNextRun(input.spec, id, createdAt);
         const createdIso = new Date(createdAt).toISOString();
         const worktree: CreateWorktreeInput | undefined = input.worktree;
-        const schedule: Schedule = {
+        const automation: Automation = {
           id,
           name: input.name,
           projectId: input.projectId,
@@ -390,11 +404,11 @@ export const makeScheduleService = (deps: {
           ...(input.provider !== undefined ? { provider: input.provider } : undefined),
           ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
         };
-        yield* repo.write(schedule);
-        yield* Effect.logInfo("schedule created").pipe(
-          Effect.annotateLogs({ event: "schedule.created", scheduleId: id }),
+        yield* repo.write(automation);
+        yield* Effect.logInfo("automation created").pipe(
+          Effect.annotateLogs({ event: "automation.created", automationId: id }),
         );
-        return schedule;
+        return automation;
       }),
 
     update: (input) =>
@@ -407,7 +421,7 @@ export const makeScheduleService = (deps: {
         const worktree = input.worktree ?? current.worktree;
         const provider = input.provider ?? current.provider;
         const modelId = input.modelId ?? current.modelId;
-        const updated: Schedule = {
+        const updated: Automation = {
           ...current,
           name: input.name ?? current.name,
           prompt: input.prompt ?? current.prompt,
@@ -429,8 +443,8 @@ export const makeScheduleService = (deps: {
         .pipe(
           Effect.andThen(repo.remove(id)),
           Effect.andThen(
-            Effect.logInfo("schedule deleted").pipe(
-              Effect.annotateLogs({ event: "schedule.deleted", scheduleId: id }),
+            Effect.logInfo("automation deleted").pipe(
+              Effect.annotateLogs({ event: "automation.deleted", automationId: id }),
             ),
           ),
         ),
@@ -438,31 +452,31 @@ export const makeScheduleService = (deps: {
     runNow: (id) =>
       repo
         .read(id)
-        .pipe(Effect.flatMap((schedule) => fire(schedule, "manual", { skipIfLive: false }))),
+        .pipe(Effect.flatMap((automation) => fire(automation, "manual", { skipIfLive: false }))),
 
     tick: () =>
       tickGate.withPermit(
         Effect.gen(function* () {
           const tickedAt = now();
-          const schedules = yield* repo.list();
-          const due = schedules
+          const automations = yield* repo.list();
+          const due = automations
             .filter(
-              (schedule) =>
-                schedule.enabled &&
-                schedule.nextRunAt !== null &&
-                Date.parse(schedule.nextRunAt) <= tickedAt,
+              (automation) =>
+                automation.enabled &&
+                automation.nextRunAt !== null &&
+                Date.parse(automation.nextRunAt) <= tickedAt,
             )
             .sort(compareDue);
 
           yield* Effect.forEach(
             due,
-            (schedule) =>
+            (automation) =>
               Effect.gen(function* () {
-                const nextRunMs = Date.parse(schedule.nextRunAt!);
+                const nextRunMs = Date.parse(automation.nextRunAt!);
                 if (isStale(nextRunMs, tickedAt)) {
                   const runId = yield* newId;
                   const skipped = yield* record(
-                    schedule,
+                    automation,
                     {
                       id: runId,
                       startedAt: new Date(tickedAt).toISOString(),
@@ -471,14 +485,14 @@ export const makeScheduleService = (deps: {
                       skipReason: "stale",
                     },
                     tickedAt,
-                    schedule.spec.kind === "once",
+                    automation.spec.kind === "once",
                   );
                   yield* repo.write(skipped);
                   return;
                 }
-                const reason: ScheduleRunReason =
+                const reason: AutomationRunReason =
                   tickedAt - nextRunMs > 60_000 ? "catch_up" : "scheduled";
-                yield* fire(schedule, reason, { skipIfLive: true });
+                yield* fire(automation, reason, { skipIfLive: true });
               }),
             { concurrency: 1, discard: true },
           );
@@ -487,24 +501,26 @@ export const makeScheduleService = (deps: {
   };
 };
 
-export const ScheduleServiceLayer: Layer.Layer<
-  ScheduleService,
+export const AutomationServiceLayer: Layer.Layer<
+  AutomationService,
   never,
-  ScheduleRepository | ProjectService | PiAgentSessionService | Crypto.Crypto
+  AutomationRepository | ProjectService | PiAgentSessionService | Crypto.Crypto
 > = Layer.effect(
-  ScheduleService,
+  AutomationService,
   Effect.gen(function* () {
-    const repo = yield* ScheduleRepository;
+    const repo = yield* AutomationRepository;
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
     const crypto = yield* Crypto.Crypto;
-    return makeScheduleService({
+    return makeAutomationService({
       repo,
       projects,
       sessions,
       newId: crypto.randomUUIDv4.pipe(
         Effect.catchTag("PlatformError", (cause) =>
-          Effect.die(new Error("invariant: platform RNG failed minting a schedule id", { cause })),
+          Effect.die(
+            new Error("invariant: platform RNG failed minting an automation id", { cause }),
+          ),
         ),
       ),
       now: () => Date.now(),

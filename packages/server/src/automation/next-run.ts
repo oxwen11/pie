@@ -1,10 +1,10 @@
-import type { ScheduleSpec } from "@getpie/contract";
+import type { AutomationSpec } from "@getpie/contract";
 
 import { applyOneShotJitter, applyRecurringJitter, parseCron, parseRunAt } from "./cron";
 
 export const CATCH_UP_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function validateSpec(spec: ScheduleSpec, now: number): void {
+export function validateSpec(spec: AutomationSpec, now: number): void {
   if (spec.kind === "cron") {
     parseCron(spec.expr);
     return;
@@ -17,7 +17,7 @@ export function validateSpec(spec: ScheduleSpec, now: number): void {
   }
 }
 
-export function computeNextRunAt(spec: ScheduleSpec, id: string, now: number): number | null {
+export function computeNextRunAt(spec: AutomationSpec, id: string, now: number): number | null {
   if (spec.kind === "manual") return null;
   if (spec.kind === "once") {
     const runAt = parseRunAt(spec.runAt);

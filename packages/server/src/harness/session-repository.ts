@@ -17,7 +17,7 @@ const SessionSchema = Schema.Struct({
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
   historyAvailable: Schema.optionalKey(Schema.Boolean),
-  scheduleId: Schema.optionalKey(Schema.String),
+  automationId: Schema.optionalKey(Schema.String),
 });
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
@@ -50,7 +50,7 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   ...(metadata.historyAvailable !== undefined
     ? { historyAvailable: metadata.historyAvailable }
     : undefined),
-  ...(metadata.scheduleId !== undefined ? { scheduleId: metadata.scheduleId } : undefined),
+  ...(metadata.automationId !== undefined ? { automationId: metadata.automationId } : undefined),
 });
 
 /**

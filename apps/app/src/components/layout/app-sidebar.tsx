@@ -25,13 +25,13 @@ import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 export function AppSidebar({
   isSessionActive,
   onNewChat,
-  onSchedules,
-  schedulesActive,
+  onAutomations,
+  automationsActive,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onNewChat: () => void;
-  readonly onSchedules: () => void;
-  readonly schedulesActive: boolean;
+  readonly onAutomations: () => void;
+  readonly automationsActive: boolean;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
@@ -77,9 +77,9 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={schedulesActive} onClick={onSchedules}>
+                <SidebarMenuButton isActive={automationsActive} onClick={onAutomations}>
                   <Clock />
-                  <span>Schedules</span>
+                  <span>Automations</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

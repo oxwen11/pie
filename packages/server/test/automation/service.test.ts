@@ -1,17 +1,17 @@
-import type { CreateScheduleInput, Schedule } from "@getpie/contract";
+import type { CreateAutomationInput, Automation } from "@getpie/contract";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { ProjectNotFound, ScheduleNotFound, StoreWriteError } from "../../src/errors";
 import {
-  makeScheduleService,
-  type ScheduleSessions,
-  type ScheduleStore,
-} from "../../src/schedule/service";
+  makeAutomationService,
+  type AutomationSessions,
+  type AutomationStore,
+} from "../../src/automation/service";
+import { ProjectNotFound, AutomationNotFound, StoreWriteError } from "../../src/errors";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 
-const cronInput = (overrides: Partial<CreateScheduleInput> = {}): CreateScheduleInput => ({
+const cronInput = (overrides: Partial<CreateAutomationInput> = {}): CreateAutomationInput => ({
   name: "Morning review",
   projectId: PROJECT_ID,
   prompt: "Review yesterday's commits.",
@@ -21,19 +21,21 @@ const cronInput = (overrides: Partial<CreateScheduleInput> = {}): CreateSchedule
 
 const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
 
-function memoryStore(initial: ReadonlyArray<Schedule> = []): ScheduleStore {
-  const store = new Map<string, Schedule>(initial.map((schedule) => [schedule.id, schedule]));
+function memoryStore(initial: ReadonlyArray<Automation> = []): AutomationStore {
+  const store = new Map<string, Automation>(
+    initial.map((automation) => [automation.id, automation]),
+  );
   return {
     list: () => Effect.succeed(Array.from(store.values())),
     read: (id) => {
       const found = store.get(id);
       return found === undefined
-        ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
+        ? Effect.fail(new AutomationNotFound({ automationId: id }))
         : Effect.succeed(found);
     },
-    write: (schedule) =>
+    write: (automation) =>
       Effect.sync(() => {
-        store.set(schedule.id, schedule);
+        store.set(automation.id, automation);
       }),
     remove: (id) =>
       Effect.sync(() => {
@@ -43,34 +45,34 @@ function memoryStore(initial: ReadonlyArray<Schedule> = []): ScheduleStore {
 }
 
 function setup(opts: { readonly live?: boolean; readonly missingProject?: boolean } = {}) {
-  const store = new Map<string, Schedule>();
+  const store = new Map<string, Automation>();
   let next = 1;
   let clock = Date.parse("2026-08-27T08:00:00.000Z");
-  const created: Array<{ title?: string; scheduleId?: string; projectId: string }> = [];
-  const repo: ScheduleStore = {
+  const created: Array<{ title?: string; automationId?: string; projectId: string }> = [];
+  const repo: AutomationStore = {
     list: () => Effect.succeed(Array.from(store.values())),
     read: (id) => {
       const found = store.get(id);
       return found === undefined
-        ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
+        ? Effect.fail(new AutomationNotFound({ automationId: id }))
         : Effect.succeed(found);
     },
-    write: (schedule) =>
+    write: (automation) =>
       Effect.sync(() => {
-        store.set(schedule.id, schedule);
+        store.set(automation.id, automation);
       }),
     remove: (id) =>
       Effect.sync(() => {
         store.delete(id);
       }),
   };
-  const sessions: ScheduleSessions = {
+  const sessions: AutomationSessions = {
     create: (input) =>
       Effect.sync(() => {
         created.push({
           projectId: input.projectId,
           ...(input.title !== undefined ? { title: input.title } : undefined),
-          ...(input.scheduleId !== undefined ? { scheduleId: input.scheduleId } : undefined),
+          ...(input.automationId !== undefined ? { automationId: input.automationId } : undefined),
         });
         return {
           ref: { projectId: input.projectId, sessionId: `sess-${created.length}` },
@@ -80,7 +82,7 @@ function setup(opts: { readonly live?: boolean; readonly missingProject?: boolea
     prompt: () => Effect.succeed({ turnId: "turn-1" }),
     getStatus: () => Effect.succeed({ phase: opts.live === true ? "running" : "idle" }),
   };
-  const service = makeScheduleService({
+  const service = makeAutomationService({
     repo,
     projects: {
       findById: (id) =>
@@ -106,8 +108,8 @@ function setup(opts: { readonly live?: boolean; readonly missingProject?: boolea
   };
 }
 
-describe("ScheduleService", () => {
-  it("creates a cron schedule with a future nextRunAt", async () => {
+describe("AutomationService", () => {
+  it("creates a cron automation with a future nextRunAt", async () => {
     const h = setup();
     const created = await run(h.service.create(cronInput()));
     expect(created.name).toBe("Morning review");
@@ -120,7 +122,7 @@ describe("ScheduleService", () => {
     const h = setup();
     await expect(
       run(h.service.create(cronInput({ spec: { kind: "cron", expr: "not-a-cron" } }))),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
+    ).rejects.toMatchObject({ _tag: "InvalidAutomation" });
   });
 
   it("runNow creates a session and records a started run", async () => {
@@ -128,15 +130,15 @@ describe("ScheduleService", () => {
     const created = await run(h.service.create(cronInput()));
     const fired = await run(h.service.runNow(created.id));
     expect(h.created).toEqual([
-      { projectId: PROJECT_ID, title: "Morning review", scheduleId: created.id },
+      { projectId: PROJECT_ID, title: "Morning review", automationId: created.id },
     ]);
     expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-1" });
-    expect(fired.schedule.lastRunStatus).toBe("started");
-    expect(fired.schedule.runs[0]?.reason).toBe("manual");
+    expect(fired.automation.lastRunStatus).toBe("started");
+    expect(fired.automation.runs[0]?.reason).toBe("manual");
   });
 
   it("runNow returns after create even if prompt never settles", async () => {
-    const hanging = makeScheduleService({
+    const hanging = makeAutomationService({
       repo: memoryStore(),
       projects: {
         findById: () => Effect.succeed({ path: "/tmp/app" }),
@@ -156,10 +158,10 @@ describe("ScheduleService", () => {
     const created = await run(hanging.create(cronInput()));
     const fired = await run(hanging.runNow(created.id));
     expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-hang" });
-    expect(fired.schedule.lastRunStatus).toBe("started");
+    expect(fired.automation.lastRunStatus).toBe("started");
   });
 
-  it("tick fires a due schedule and advances nextRunAt", async () => {
+  it("tick fires a due automation and advances nextRunAt", async () => {
     const h = setup();
     const created = await run(
       h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" } })),
@@ -181,8 +183,8 @@ describe("ScheduleService", () => {
       h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" } })),
     );
     const first = await run(h.service.runNow(created.id));
-    expect(first.schedule.lastSessionId).toBe("sess-1");
-    h.setNow(first.schedule.nextRunAt!);
+    expect(first.automation.lastSessionId).toBe("sess-1");
+    h.setNow(first.automation.nextRunAt!);
     await run(h.service.tick());
     const after = h.store.get(created.id);
     expect(h.created).toHaveLength(1);
@@ -208,7 +210,7 @@ describe("ScheduleService", () => {
     expect(h.created).toHaveLength(1);
   });
 
-  it("does not fire a paused schedule", async () => {
+  it("does not fire a paused automation", async () => {
     const h = setup();
     const created = await run(
       h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" }, enabled: false })),
@@ -239,8 +241,8 @@ describe("ScheduleService", () => {
     const later = setup({ missingProject: true });
     later.store.set(created.id, created);
     const fired = await run(later.service.runNow(created.id));
-    expect(fired.schedule.lastRunStatus).toBe("skipped");
-    expect(fired.schedule.runs[0]?.skipReason).toBe("project_missing");
+    expect(fired.automation.lastRunStatus).toBe("skipped");
+    expect(fired.automation.runs[0]?.skipReason).toBe("project_missing");
   });
 
   it("rejects a one-shot in the past", async () => {
@@ -249,15 +251,15 @@ describe("ScheduleService", () => {
       run(
         h.service.create(cronInput({ spec: { kind: "once", runAt: "2026-08-01T09:00:00.000Z" } })),
       ),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
+    ).rejects.toMatchObject({ _tag: "InvalidAutomation" });
   });
 
   it("surfaces a write failure", async () => {
-    const failing = makeScheduleService({
+    const failing = makeAutomationService({
       repo: {
         ...memoryStore(),
         write: () =>
-          Effect.fail(new StoreWriteError({ file: "schedules", cause: new Error("full") })),
+          Effect.fail(new StoreWriteError({ file: "automations", cause: new Error("full") })),
       },
       projects: {
         findById: () => Effect.succeed({ path: "/tmp/app" }),

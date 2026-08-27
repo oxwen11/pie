@@ -7,6 +7,7 @@ import { createRouterClient } from "@orpc/server";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { describe, expect, it } from "vitest";
 
+import { AutomationRepositoryLayer, AutomationServiceLayer } from "../src/automation";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
@@ -23,7 +24,6 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
-import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -106,8 +106,8 @@ async function setup() {
     Layer.provide(NodeServices.layer),
   );
 
-  const scheduleServiceLayer = ScheduleServiceLayer.pipe(
-    Layer.provide(ScheduleRepositoryLayer),
+  const automationServiceLayer = AutomationServiceLayer.pipe(
+    Layer.provide(AutomationRepositoryLayer),
     Layer.provide(projectServiceLayer),
     Layer.provide(harnessSessionLayer),
     Layer.provide(pathsLayer),
@@ -117,7 +117,7 @@ async function setup() {
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
-    scheduleServiceLayer,
+    automationServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),

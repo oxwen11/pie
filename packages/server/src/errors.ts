@@ -6,15 +6,15 @@ export class ProjectNotFound extends Data.TaggedError("ProjectNotFound")<{
   readonly projectId: string;
 }> {}
 
-export class ScheduleNotFound extends Data.TaggedError("ScheduleNotFound")<{
-  readonly scheduleId: string;
+export class AutomationNotFound extends Data.TaggedError("AutomationNotFound")<{
+  readonly automationId: string;
 }> {}
 
-export class ScheduleLimitReached extends Data.TaggedError("ScheduleLimitReached")<{
+export class AutomationLimitReached extends Data.TaggedError("AutomationLimitReached")<{
   readonly limit: number;
 }> {}
 
-export class InvalidSchedule extends Data.TaggedError("InvalidSchedule")<{
+export class InvalidAutomation extends Data.TaggedError("InvalidAutomation")<{
   readonly reason: string;
 }> {}
 
