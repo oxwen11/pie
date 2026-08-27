@@ -250,7 +250,9 @@ describe("createPiTransform", () => {
 
   it("treats queue_update as skipped bookkeeping", () => {
     const t = createPiTransform("s1");
-    expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual([]);
+    expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual(
+      [],
+    );
   });
 
   it("ignores bookkeeping events and user-message echoes", () => {
