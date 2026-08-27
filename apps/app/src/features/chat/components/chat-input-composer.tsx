@@ -34,9 +34,11 @@ export function ChatInputComposer({
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
+  const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const status = useStore(store, (s) => s.status);
   const canInterrupt = status === "streaming";
   const turnInProgressRef = useLatestRef(turnInProgress);
+  const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
     // Order is a hard constraint: base extensions first, submit keymap last —
@@ -47,8 +49,8 @@ export function ChatInputComposer({
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      // Turn in progress: don't send, don't clear.
-      if (turnInProgressRef.current) return false;
+      // Turn in progress or missing workspace: don't send, don't clear.
+      if (turnInProgressRef.current || workspaceUnavailableRef.current) return false;
       prompt(text);
       return undefined;
     },
@@ -74,7 +76,7 @@ export function ChatInputComposer({
             <PromptInputTools>{toolbar}</PromptInputTools>
             <PromptInputSubmit
               aria-label={canInterrupt ? "Stop generating" : "Send message"}
-              disabled={!canInterrupt && (!hasContent || turnInProgress)}
+              disabled={!canInterrupt && (!hasContent || turnInProgress || workspaceUnavailable)}
               onClick={canInterrupt ? () => void interrupt() : undefined}
               status={status}
               type={canInterrupt ? "button" : "submit"}
@@ -83,7 +85,7 @@ export function ChatInputComposer({
         </ChatInputProvider>
       </Card>
       <CardFrameFooter className="py-2">
-        {branch.data?.current ? (
+        {branch.data?.kind === "repository" && branch.data.current ? (
           <span
             className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs"
             title="Current git branch"
@@ -91,6 +93,12 @@ export function ChatInputComposer({
             <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="truncate">{branch.data.current}</span>
           </span>
+        ) : null}
+        {branch.data?.kind === "not-repository" ? (
+          <span className="text-muted-foreground px-3 text-xs">Not a Git repository</span>
+        ) : null}
+        {workspaceUnavailable ? (
+          <span className="text-destructive px-3 text-xs">Workspace unavailable</span>
         ) : null}
       </CardFrameFooter>
     </CardFrame>

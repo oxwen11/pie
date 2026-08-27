@@ -1,4 +1,5 @@
 import type { CreateWorktreeInput, Project } from "@getpie/contract";
+import { isGitRepositoryBranch } from "@getpie/contract/git";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
@@ -23,21 +24,25 @@ export function useDraftWorktree(selected: Project | null) {
     ...orpcQueryUtils.git.branch.queryOptions({
       input: selected === null ? skipToken : { cwd: selected.path },
     }),
-    // Non-git folders fail on purpose — don't retry or toast-on-focus.
+    // Repository availability is an explicit result; only unexpected failures reach error state.
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  const gitAvailable = gitBranch.isSuccess;
+  const branchData = gitBranch.data;
+  const repositoryBranch = isGitRepositoryBranch(branchData) ? branchData : undefined;
+  const gitAvailable = repositoryBranch !== undefined;
   const mode: DraftWorkspaceMode = gitAvailable ? draft.mode : "project";
   const worktreeBase =
-    mode === "worktree" ? (draft.baseOverride ?? defaultWorktreeBase(gitBranch.data)) : null;
+    mode === "worktree" ? (draft.baseOverride ?? defaultWorktreeBase(repositoryBranch)) : null;
   const worktree: CreateWorktreeInput | undefined =
     mode === "worktree" && worktreeBase !== null ? { base: worktreeBase } : undefined;
 
   return {
     gitAvailable,
     gitBranch,
+    gitState: branchData?.kind,
+    repositoryBranch,
     mode,
     setMode: (next: DraftWorkspaceMode) => {
       setDraft((current) => ({

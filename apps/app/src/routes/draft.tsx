@@ -158,6 +158,10 @@ function DraftRoute() {
         toast.error("Pick a project before sending.");
         return false;
       }
+      if (draftWorktree.gitState === "workspace-unavailable") {
+        toast.error("The selected project folder is unavailable.");
+        return false;
+      }
       if (startSession.isPending) return false;
       if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
         toast.error("Pick a base branch for the worktree.");
@@ -246,6 +250,12 @@ function DraftRoute() {
               projects={projects.data}
               value={selected?.id ?? null}
             />
+            {draftWorktree.gitState === "not-repository" ? (
+              <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
+            ) : null}
+            {draftWorktree.gitState === "workspace-unavailable" ? (
+              <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
+            ) : null}
             {draftWorktree.gitAvailable ? (
               <>
                 <DraftWorkspaceSelect
@@ -255,12 +265,8 @@ function DraftRoute() {
                 />
                 {draftWorktree.mode === "worktree" ? (
                   <DraftWorktreeBaseSelect
-                    branch={draftWorktree.gitBranch.data}
-                    disabled={
-                      startSession.isPending ||
-                      selected === null ||
-                      draftWorktree.gitBranch.isPending
-                    }
+                    branch={draftWorktree.repositoryBranch}
+                    disabled={startSession.isPending || selected === null}
                     onValueChange={draftWorktree.setWorktreeBaseOverride}
                     value={draftWorktree.worktreeBase}
                   />
@@ -302,6 +308,7 @@ function DraftRoute() {
                 disabled={
                   !hasContent ||
                   !selected ||
+                  draftWorktree.gitState === "workspace-unavailable" ||
                   startSession.isPending ||
                   (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }

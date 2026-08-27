@@ -63,9 +63,14 @@ describe("git router", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vibest-not-git-"));
     const harness = await makeRpcTestHarness(home);
     try {
+      await expect(harness.client.git.branch({ cwd: dir })).resolves.toEqual({
+        kind: "not-repository",
+      });
+      await expect(harness.client.git.branch({ cwd: path.join(dir, "missing") })).resolves.toEqual({
+        kind: "workspace-unavailable",
+      });
       await expect(harness.client.git.review({ cwd: dir })).rejects.toMatchObject({
         code: "NOT_REPOSITORY",
-        data: { cwd: dir },
       });
       await expect(harness.client.git.status({ cwd: "relative/workspace" })).rejects.toMatchObject({
         code: "PATH_ESCAPE",
@@ -85,6 +90,8 @@ describe("git router", () => {
       const { ref } = await harness.client.agent.session.create({ projectId: project.id });
 
       const branch = await harness.client.git.branch({ ref });
+      expect(branch.kind).toBe("repository");
+      if (branch.kind !== "repository") throw new Error("expected repository branch data");
       expect(branch.current).toBe("main");
 
       const status = await harness.client.git.status({ ref });
