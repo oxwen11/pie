@@ -10,5 +10,25 @@
   "experimentalTailwindcss": {
     "functions": ["cn", "clsx", "cva", "tw"]
   },
-  "ignorePatterns": ["**/routeTree.gen.ts", ".conductor", "**/dist/**", "**/node_modules/**"]
+  "ignorePatterns": [
+    "**/routeTree.gen.ts",
+    ".conductor",
+    "**/dist/**",
+    "**/node_modules/**",
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".factory/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**",
+    "tools/oxlint/anti-slop/**",
+    "tools/oxlint/anti-slop.mjs",
+    "tools/oxlint/anti-slop-effect.mjs"
+  ]
 }

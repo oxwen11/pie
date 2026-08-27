@@ -7,9 +7,11 @@ export type ChatNodeTextSerializer = (node: JSONContent) => string;
 export function getChatText(editor: Editor): string {
   const serializers: Record<string, ChatNodeTextSerializer> = {};
   for (const extension of editor.extensionManager.extensions) {
-    const storage = (
-      editor.storage as unknown as Record<string, { serializeText?: unknown } | undefined>
-    )[extension.name];
+    const storage =
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- TipTap Storage has no string index
+      (editor.storage as unknown as Record<string, { serializeText?: unknown } | undefined>)[
+        extension.name
+      ];
     if (typeof storage?.serializeText === "function") {
       serializers[extension.name] = storage.serializeText as ChatNodeTextSerializer;
     }

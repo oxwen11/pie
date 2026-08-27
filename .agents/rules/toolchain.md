@@ -11,7 +11,14 @@
 - **Lint:** `lint:check` runs `--deny-warnings`, so the whole `suspicious`
   category fails CI while only warning locally. oxfmt reorders imports.
   Custom JS plugins live in `tools/oxlint/` (`pie`, `pie-boundaries`,
-  `pie-query`). Plugin RuleTester files are `@getpie/oxlint`'s `test`
+  `pie-query`, vendored `anti-slop` / `anti-slop-effect`). The anti-slop
+  TypeScript is bundled to `anti-slop.mjs` / `anti-slop-effect.mjs`
+  (`pnpm --filter @getpie/oxlint bundle:anti-slop`) so oxlint can load it
+  on Node versions that cannot import `.ts`. Effect service types keep the
+  `Shape` suffix (`Context.Service<Self, Shape>`), so
+  `anti-slop/no-shape-in-symbol-names` is off. Composition roots still call
+  `make*` constructors, so `anti-slop-effect/no-service-constructor-imports`
+  is off. Plugin RuleTester files are `@getpie/oxlint`'s `test`
   script, so they run with the rest of the repo under `pnpm test` — not
   via `lint:check`.
 - **Commits rewrite files:** pre-commit runs lint-staged (`oxlint --fix` + `oxfmt`)

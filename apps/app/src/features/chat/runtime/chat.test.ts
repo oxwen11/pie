@@ -37,7 +37,7 @@ class FakeTransport implements ChatSessionTransport {
     messageId: string;
     parts: ReadonlyArray<PromptPart>;
   }> = [];
-  promptError: unknown = null;
+  promptError: Error | null = null;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
   // (a dropped socket queues it until the link reconnects).
   promptGate: Promise<void> | null = null;

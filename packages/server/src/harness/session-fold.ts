@@ -109,8 +109,8 @@ export const toWireBody = (
         type: "session.turn.ended",
         turnId: event.turnId,
         outcome: event.outcome,
-        ...(event.usage !== undefined ? { usage: event.usage } : {}),
-        ...(event.error !== undefined ? { error: event.error } : {}),
+        ...(event.usage !== undefined ? { usage: event.usage } : undefined),
+        ...(event.error !== undefined ? { error: event.error } : undefined),
       };
     case "session.request.asked":
       return { type: "session.request.asked", request: event.request };
@@ -120,7 +120,7 @@ export const toWireBody = (
       return {
         type: "session.request.rejected",
         requestId: event.requestId,
-        ...(event.reason !== undefined ? { reason: event.reason } : {}),
+        ...(event.reason !== undefined ? { reason: event.reason } : undefined),
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
@@ -247,7 +247,7 @@ export const toStatus = (state: SessionState): SessionStatus => ({
   phase: state.phase,
   ...(state.activeTurn && !state.activeTurn.complete
     ? { activeTurnId: state.activeTurn.turnId }
-    : {}),
+    : undefined),
 });
 
 export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntimeSnapshot => ({

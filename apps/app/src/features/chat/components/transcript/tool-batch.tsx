@@ -15,10 +15,7 @@ import { ToolPart } from "./tool-part";
 import type { BucketKey } from "./tool/bucket";
 import type { IndexedBatchPart } from "./use-tool-batches";
 
-const BUCKET_PHRASES: Record<
-  BucketKey,
-  { done: (count: number) => string; active: (count: number) => string }
-> = {
+const BUCKET_PHRASES = {
   files: {
     done: (n) => `Read ${n} ${plural(n, "file")}`,
     active: (n) => `Reading ${n} ${plural(n, "file")}`,
@@ -39,7 +36,10 @@ const BUCKET_PHRASES: Record<
     done: (n) => `Ran ${n} ${plural(n, "command")}`,
     active: (n) => `Running ${n} ${plural(n, "command")}`,
   },
-};
+} satisfies Record<
+  BucketKey,
+  { done: (count: number) => string; active: (count: number) => string }
+>;
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
   return count === 1 ? singular : pluralForm;

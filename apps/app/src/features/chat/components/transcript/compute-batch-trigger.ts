@@ -32,7 +32,7 @@ function toToolParts(parts: readonly BatchPart[]): ToolUIPart[] {
   return parts.filter((p): p is ToolUIPart => !isReasoningUIPart(p) && isToolUIPart(p));
 }
 
-function emptyIdentities(): Record<BucketKey, Set<string>> {
+function emptyIdentities() {
   return {
     files: new Set(),
     lists: new Set(),

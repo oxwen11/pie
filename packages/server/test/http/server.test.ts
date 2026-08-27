@@ -228,7 +228,7 @@ describe("createServer staged startup", () => {
   /** Records its disposal so a test can assert it ran, and ran exactly once. */
   function fakeRuntime(released: string[]): RpcRuntime {
     return {
-      context: { "effect/context": Context.empty() } as unknown as RpcRuntime["context"],
+      context: { "effect/context": Context.empty() } as RpcRuntime["context"],
       run: () => Promise.reject(new Error("fake runtime cannot run effects")),
       dispose: async () => {
         released.push("rpcRuntime");

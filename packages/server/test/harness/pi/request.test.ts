@@ -27,7 +27,10 @@ const input: PiUiRequest = {
 };
 
 const answer = (questionId: string, values: string[], other?: string) =>
-  ({ type: "question", answers: [{ questionId, values, ...(other ? { other } : {}) }] }) as const;
+  ({
+    type: "question",
+    answers: [{ questionId, values, ...(other ? { other } : undefined) }],
+  }) as const;
 
 describe("pi request mapping", () => {
   it("builds a question AgentRequest carrying the native wire request", () => {

@@ -58,16 +58,18 @@ type ServeInput = {
   readonly allowedHost: ReadonlyArray<string>;
 };
 
+type ServeConfig = {
+  readonly port: number;
+  readonly corsOrigins: readonly string[];
+  readonly allowedHosts: readonly string[];
+};
+
 /**
  * Resolve the effective port and CORS origins from parsed flags, falling back
  * to `PIE_*` env and finally the defaults — precedence flag > env > default.
  * Pure so the precedence can be tested without booting a server.
  */
-export function resolveServeConfig(input: ServeInput): {
-  readonly port: number;
-  readonly corsOrigins: readonly string[];
-  readonly allowedHosts: readonly string[];
-} {
+export function resolveServeConfig(input: ServeInput): ServeConfig {
   return {
     port: Option.getOrElse(input.port, portFromEnv),
     corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),

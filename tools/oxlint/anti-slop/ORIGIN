@@ -1,0 +1,9 @@
+Vendored from https://github.com/dmmulroy/anti-slop
+commit 6d538555cb151d4121ed51a27db81890eacf8ae9
+
+TypeScript source stays in this directory. Oxlint loads the bundled
+`tools/oxlint/anti-slop.mjs` and `tools/oxlint/anti-slop-effect.mjs` files so
+plugins work on Node versions that cannot import `.ts` (this repo's Cloud
+Agent image is Node 22.14; CI uses Node 24).
+
+Rebuild with `pnpm --filter @getpie/oxlint bundle:anti-slop`.

@@ -9,10 +9,15 @@ import {
   SelectValue,
 } from "@getpie/ui/components/select";
 
+type SplitRefs = {
+  local: string[];
+  remote: string[];
+};
+
 function splitBranchRefs(
   branches: ReadonlyArray<string>,
   remotes: ReadonlyArray<string>,
-): { local: string[]; remote: string[] } {
+): SplitRefs {
   const remoteSet = new Set(remotes);
   const local: string[] = [];
   const remote: string[] = [];

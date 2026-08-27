@@ -71,8 +71,8 @@ export const sessionRouter = orpc.router({
         sessions.create({
           projectId: input.projectId,
           cwd: project.path,
-          ...(model !== undefined ? { model } : {}),
-          ...(input.worktree !== undefined ? { worktree: input.worktree } : {}),
+          ...(model !== undefined ? { model } : undefined),
+          ...(input.worktree !== undefined ? { worktree: input.worktree } : undefined),
         }),
       ),
       Effect.catchTags({
