@@ -32,8 +32,9 @@ describe("automation router", () => {
 
       const fired = await h.client.automation.runNow({ id: created.id });
       expect(fired.ref?.projectId).toBe(project.id);
-      expect(fired.automation.lastRunStatus).toBe("started");
+      expect(["running", "succeeded"]).toContain(fired.automation.lastRunStatus);
       expect(fired.automation.runs[0]?.reason).toBe("manual");
+      expect(fired.automation.runs[0]?.snapshot?.prompt).toBe("Summarize what changed yesterday.");
 
       const sessions = await h.client.agent.session.list({
         projectId: project.id,

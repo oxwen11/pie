@@ -26,6 +26,11 @@ describe("nextOccurrence", () => {
     expect(next).toBeGreaterThan(after);
     expect(new Date(next).getSeconds()).toBe(0);
   });
+
+  it("evaluates a daily cron in UTC", () => {
+    const after = Date.parse("2026-08-27T00:00:00.000Z");
+    expect(nextOccurrence("0 9 * * *", after, "UTC")).toBe(Date.parse("2026-08-27T09:00:00.000Z"));
+  });
 });
 
 describe("parseRunAt", () => {

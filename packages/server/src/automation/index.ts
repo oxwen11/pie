@@ -1,6 +1,14 @@
-export { CronError, parseCron, nextOccurrence, parseRunAt } from "./cron";
+export { CronError, parseCron, nextOccurrence, parseRunAt, assertTimeZone } from "./cron";
 export { runAutomationLoop, AUTOMATION_TICK_INTERVAL } from "./daemon";
-export { CATCH_UP_MS, computeNextRunAt } from "./next-run";
+export {
+  CATCH_UP_MS,
+  LATE_MS,
+  MIN_WAKE_MS,
+  MAX_WAKE_MS,
+  computeNextRunAt,
+  countMissedSlots,
+  nextWakeDelayMs,
+} from "./next-run";
 export { AutomationRepository, AutomationRepositoryLayer } from "./repository";
 export {
   makeAutomationService,

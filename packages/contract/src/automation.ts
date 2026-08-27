@@ -13,11 +13,16 @@ const base = oc.errors(serverErrors);
 export const MAX_AUTOMATION_NAME_CHARS = 80;
 export const MAX_AUTOMATION_PROMPT_CHARS = 25_000;
 export const MAX_AUTOMATIONS = 50;
+export const MIN_AUTOMATION_EVERY_MS = 60_000;
+export const MAX_AUTOMATION_EVERY_MS = 365 * 24 * 60 * 60 * 1000;
+export const AUTOMATION_CIRCUIT_FAILURES = 3;
 
 export const AutomationCronSpecSchema = Schema.Struct({
   kind: Schema.Literal("cron"),
-  /** 5-field cron in the server's local timezone: minute hour day-of-month month day-of-week. */
+  /** 5-field cron: minute hour day-of-month month day-of-week. */
   expr: Schema.NonEmptyString,
+  /** IANA timezone. Absent means the server's local timezone. */
+  timeZone: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type AutomationCronSpec = typeof AutomationCronSpecSchema.Type;
 
@@ -28,6 +33,15 @@ export const AutomationOnceSpecSchema = Schema.Struct({
 });
 export type AutomationOnceSpec = typeof AutomationOnceSpecSchema.Type;
 
+export const AutomationEverySpecSchema = Schema.Struct({
+  kind: Schema.Literal("every"),
+  everyMs: Schema.Number.check(
+    Schema.isGreaterThanOrEqualTo(MIN_AUTOMATION_EVERY_MS),
+    Schema.isLessThanOrEqualTo(MAX_AUTOMATION_EVERY_MS),
+  ),
+});
+export type AutomationEverySpec = typeof AutomationEverySpecSchema.Type;
+
 export const AutomationManualSpecSchema = Schema.Struct({
   kind: Schema.Literal("manual"),
 });
@@ -36,31 +50,73 @@ export type AutomationManualSpec = typeof AutomationManualSpecSchema.Type;
 export const AutomationSpecSchema = Schema.Union([
   AutomationCronSpecSchema,
   AutomationOnceSpecSchema,
+  AutomationEverySpecSchema,
   AutomationManualSpecSchema,
 ]);
 export type AutomationSpec = typeof AutomationSpecSchema.Type;
 
-export const AutomationRunReasonSchema = Schema.Literals(["scheduled", "catch_up", "manual"]);
+export const AutomationOutputModeSchema = Schema.Literals(["independent", "merged"]);
+export type AutomationOutputMode = typeof AutomationOutputModeSchema.Type;
+
+export const AutomationPauseReasonSchema = Schema.Literals([
+  "manual",
+  "expired",
+  "failureCircuit",
+  "project_missing",
+  "invalid_spec",
+]);
+export type AutomationPauseReason = typeof AutomationPauseReasonSchema.Type;
+
+export const AutomationRunReasonSchema = Schema.Literals([
+  "scheduled",
+  "catch_up",
+  "manual",
+  "missed_recovery",
+]);
 export type AutomationRunReason = typeof AutomationRunReasonSchema.Type;
 
-export const AutomationRunStatusSchema = Schema.Literals(["started", "failed", "skipped"]);
+export const AutomationRunStatusSchema = Schema.Literals([
+  "running",
+  "succeeded",
+  "failed",
+  "skipped",
+  "missed",
+  "interrupted",
+]);
 export type AutomationRunStatus = typeof AutomationRunStatusSchema.Type;
 
 export const AutomationSkipReasonSchema = Schema.Literals([
   "in_progress",
   "stale",
   "project_missing",
+  "queue_overflow",
+  "expired",
 ]);
 export type AutomationSkipReason = typeof AutomationSkipReasonSchema.Type;
+
+export const AutomationRunSnapshotSchema = Schema.Struct({
+  name: Schema.String,
+  prompt: Schema.String,
+  projectId: Schema.String,
+  spec: AutomationSpecSchema,
+  outputMode: AutomationOutputModeSchema,
+  worktree: Schema.optionalKey(CreateWorktreeInputSchema),
+  provider: Schema.optionalKey(Schema.NonEmptyString),
+  modelId: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type AutomationRunSnapshot = typeof AutomationRunSnapshotSchema.Type;
 
 export const AutomationRunSchema = Schema.Struct({
   id: Schema.String,
   startedAt: Schema.String,
   reason: AutomationRunReasonSchema,
   status: AutomationRunStatusSchema,
+  finishedAt: Schema.optionalKey(Schema.String),
   sessionId: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.String),
   skipReason: Schema.optionalKey(AutomationSkipReasonSchema),
+  missedCount: Schema.optionalKey(Schema.Number),
+  snapshot: Schema.optionalKey(AutomationRunSnapshotSchema),
 });
 export type AutomationRun = typeof AutomationRunSchema.Type;
 
@@ -71,6 +127,11 @@ export const AutomationSchema = Schema.Struct({
   prompt: Schema.String,
   spec: AutomationSpecSchema,
   enabled: Schema.Boolean,
+  outputMode: Schema.optionalKey(AutomationOutputModeSchema),
+  expiresAt: Schema.optionalKey(Schema.String),
+  pauseReason: Schema.optionalKey(AutomationPauseReasonSchema),
+  consecutiveFailures: Schema.optionalKey(Schema.Number),
+  mergedSessionId: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
@@ -103,6 +164,8 @@ export const CreateAutomationInputSchema = Schema.Struct({
   prompt: automationPrompt,
   spec: AutomationSpecSchema,
   enabled: Schema.optionalKey(Schema.Boolean),
+  outputMode: Schema.optionalKey(AutomationOutputModeSchema),
+  expiresAt: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
@@ -115,6 +178,8 @@ export const UpdateAutomationInputSchema = Schema.Struct({
   prompt: Schema.optionalKey(automationPrompt),
   spec: Schema.optionalKey(AutomationSpecSchema),
   enabled: Schema.optionalKey(Schema.Boolean),
+  outputMode: Schema.optionalKey(AutomationOutputModeSchema),
+  expiresAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),

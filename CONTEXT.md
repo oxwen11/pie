@@ -24,7 +24,7 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
 
 **Automation**:
-An application-level job stored under `$PIE_HOME/storage/automations/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon ticks the collection; when an Automation is due it creates a new Session in the Automation's Project and sends the stored prompt. Specs are `cron` (5-field, local timezone), `once` (timezone-aware ISO), or `manual` (run now only).
+An application-level job stored under `$PIE_HOME/storage/automations/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When an Automation is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Optional `expiresAt`, `outputMode` (`independent` | `merged`), and a failure circuit after three consecutive settle failures.
 _Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, schedule (the old name), cron (as the domain noun — it is one spec kind)
 
 **Workspace path**:

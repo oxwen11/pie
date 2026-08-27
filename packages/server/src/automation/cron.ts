@@ -84,34 +84,103 @@ function fill(min: number, max: number, step: number): Set<number> {
   return values;
 }
 
-function matchesDomDow(expr: CronExpr, date: Date): boolean {
-  const domMatch = expr.dom.values.has(date.getDate());
-  const dowMatch = expr.dow.values.has(date.getDay());
+export type WallClock = {
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  readonly weekday: number;
+};
+
+const WEEKDAY_INDEX = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+} as const;
+
+export function assertTimeZone(timeZone: string): void {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format();
+  } catch {
+    throw new CronError("INVALID_TIMEZONE", `unknown time zone: ${timeZone}`);
+  }
+}
+
+export function partsInTimeZone(ms: number, timeZone: string): WallClock {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  const value = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const weekdayName = value("weekday");
+  const weekday =
+    weekdayName in WEEKDAY_INDEX
+      ? WEEKDAY_INDEX[weekdayName as keyof typeof WEEKDAY_INDEX]
+      : undefined;
+  if (weekday === undefined) {
+    throw new CronError("INVALID_TIMEZONE", `could not read weekday in ${timeZone}`);
+  }
+  return {
+    month: Number(value("month")),
+    day: Number(value("day")),
+    hour: Number(value("hour")),
+    minute: Number(value("minute")),
+    weekday,
+  };
+}
+
+function wallClock(ms: number, timeZone?: string): WallClock {
+  if (timeZone !== undefined) return partsInTimeZone(ms, timeZone);
+  const d = new Date(ms);
+  return {
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+    weekday: d.getDay(),
+  };
+}
+
+function matchesWall(expr: CronExpr, wall: WallClock): boolean {
+  const domMatch = expr.dom.values.has(wall.day);
+  const dowMatch = expr.dow.values.has(wall.weekday);
   if (!expr.dom.any && !expr.dow.any) return domMatch || dowMatch;
   if (!expr.dom.any) return domMatch;
   if (!expr.dow.any) return dowMatch;
   return true;
 }
 
-export function nextOccurrence(cron: string, afterMs: number): number {
+export function nextOccurrence(cron: string, afterMs: number, timeZone?: string): number {
+  if (timeZone !== undefined) assertTimeZone(timeZone);
   const expr = parseCron(cron);
   let t = nextMinuteBoundary(afterMs);
   const end = t + 5 * 366 * 24 * 60 * 60 * 1000;
   while (t <= end) {
-    const d = new Date(t);
-    if (!expr.month.values.has(d.getMonth() + 1)) {
-      t = startOfNextMonth(d);
+    const wall = wallClock(t, timeZone);
+    if (!expr.month.values.has(wall.month)) {
+      t = timeZone === undefined ? startOfNextMonth(new Date(t)) : t + 24 * 60 * 60 * 1000;
       continue;
     }
-    if (!matchesDomDow(expr, d)) {
-      t = startOfNextDay(d);
+    if (!matchesWall(expr, wall)) {
+      t = timeZone === undefined ? startOfNextDay(new Date(t)) : t + 24 * 60 * 60 * 1000;
       continue;
     }
-    if (!expr.hour.values.has(d.getHours())) {
-      t = startOfNextHour(d);
+    if (!expr.hour.values.has(wall.hour)) {
+      t = timeZone === undefined ? startOfNextHour(new Date(t)) : t + 60 * 60 * 1000;
       continue;
     }
-    if (!expr.minute.values.has(d.getMinutes())) {
+    if (!expr.minute.values.has(wall.minute)) {
       t += 60_000;
       continue;
     }
@@ -120,25 +189,30 @@ export function nextOccurrence(cron: string, afterMs: number): number {
   throw new CronError("INVALID_CRON", `no next occurrence for ${cron}`);
 }
 
-export function previousOccurrence(cron: string, beforeMs: number): number | null {
+export function previousOccurrence(
+  cron: string,
+  beforeMs: number,
+  timeZone?: string,
+): number | null {
+  if (timeZone !== undefined) assertTimeZone(timeZone);
   const expr = parseCron(cron);
   let t = previousMinuteBoundary(beforeMs);
   const start = t - 5 * 366 * 24 * 60 * 60 * 1000;
   while (t >= start) {
-    const d = new Date(t);
-    if (!expr.month.values.has(d.getMonth() + 1)) {
-      t = endOfPreviousMonth(d);
+    const wall = wallClock(t, timeZone);
+    if (!expr.month.values.has(wall.month)) {
+      t = timeZone === undefined ? endOfPreviousMonth(new Date(t)) : t - 24 * 60 * 60 * 1000;
       continue;
     }
-    if (!matchesDomDow(expr, d)) {
-      t = endOfPreviousDay(d);
+    if (!matchesWall(expr, wall)) {
+      t = timeZone === undefined ? endOfPreviousDay(new Date(t)) : t - 24 * 60 * 60 * 1000;
       continue;
     }
-    if (!expr.hour.values.has(d.getHours())) {
-      t = endOfPreviousHour(d);
+    if (!expr.hour.values.has(wall.hour)) {
+      t = timeZone === undefined ? endOfPreviousHour(new Date(t)) : t - 60 * 60 * 1000;
       continue;
     }
-    if (!expr.minute.values.has(d.getMinutes())) {
+    if (!expr.minute.values.has(wall.minute)) {
       t -= 60_000;
       continue;
     }
@@ -212,9 +286,14 @@ export function stableHash(text: string): number {
   return hash;
 }
 
-export function applyRecurringJitter(cron: string, taskId: string, afterMs: number): number {
-  const nominal = nextOccurrence(cron, afterMs);
-  const previous = previousOccurrence(cron, nominal);
+export function applyRecurringJitter(
+  cron: string,
+  taskId: string,
+  afterMs: number,
+  timeZone?: string,
+): number {
+  const nominal = nextOccurrence(cron, afterMs, timeZone);
+  const previous = previousOccurrence(cron, nominal, timeZone);
   const gapMs = previous == null ? 60_000 : nominal - previous;
   const maxJitterMs = Math.min(THIRTY_MIN_MS, Math.floor(gapMs / 2));
   const offsetMs = maxJitterMs <= 0 ? 0 : stableHash(taskId) % maxJitterMs;

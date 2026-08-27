@@ -2,7 +2,8 @@ import { Effect } from "effect";
 
 import { AutomationService } from "./service";
 
-export const AUTOMATION_TICK_INTERVAL = "15 seconds" as const;
+/** Upper bound for the daemon sleep. Actual delay is `nextWakeDelay` (1s–60s). */
+export const AUTOMATION_TICK_INTERVAL = "60 seconds" as const;
 
 /**
  * Process-lifetime loop. The daemon — not any Session — is the clock:
@@ -12,6 +13,16 @@ export const runAutomationLoop = Effect.gen(function* () {
   const automations = yield* AutomationService;
   yield* Effect.logInfo("automation daemon started").pipe(
     Effect.annotateLogs({ event: "automation.daemon_started" }),
+  );
+  yield* automations.recover().pipe(
+    Effect.catch((error) =>
+      Effect.logWarning("automation recover failed").pipe(
+        Effect.annotateLogs({
+          event: "automation.recover_failed",
+          error: String(error),
+        }),
+      ),
+    ),
   );
   yield* Effect.forever(
     automations.tick().pipe(
@@ -23,7 +34,8 @@ export const runAutomationLoop = Effect.gen(function* () {
           }),
         ),
       ),
-      Effect.andThen(Effect.sleep(AUTOMATION_TICK_INTERVAL)),
+      Effect.andThen(automations.nextWakeDelay()),
+      Effect.flatMap((ms) => Effect.sleep(`${ms} millis`)),
     ),
   );
 });
