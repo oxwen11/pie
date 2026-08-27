@@ -1,6 +1,6 @@
 import module from "node:module";
 
-import { definePlugin, defineRule } from "@oxlint/plugins";
+import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
 const { isBuiltin } = module;
@@ -49,7 +49,7 @@ const canonicalNames = (declarations: BuiltinImport[]): ((source: string) => str
   };
 };
 
-const nodeImportStyleRule = defineRule({
+export const nodeImportStyleRule = defineRule({
   create(context) {
     const declarations: BuiltinImport[] = [];
 
@@ -94,12 +94,5 @@ const nodeImportStyleRule = defineRule({
         }
       },
     };
-  },
-});
-
-export default definePlugin({
-  meta: { name: "pie" },
-  rules: {
-    "node-import-style": nodeImportStyleRule,
   },
 });
