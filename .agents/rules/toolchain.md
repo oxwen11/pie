@@ -12,50 +12,9 @@
   ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
   oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
   whole `suspicious` category fails CI while only warning locally. oxfmt
-  reorders imports and stays a root-only script.   Custom plugins live in
+  reorders imports and stays a root-only script. Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
-  `anti-slop` / `anti-slop-effect`) as TypeScript.   Native `import` and
-  `promise` plugins are on; `promise/always-return` is off because
-  fire-and-forget `.then()` is house style. `eqeqeq` is on with
-  `null: ignore` so `== null` stays. Unicorn cherry-picks include
-  `prefer-string-slice`, `prefer-string-starts-ends-with`,
-  `prefer-string-trim-start-end`, `prefer-array-flat` / `some` /
-  `find` / `index-of`, `explicit-length-check`, and
-  `consistent-assert` (`assert.ok`, not bare `assert()`), plus
-  constraint-only unicorn / vitest / promise / import / eslint / oxc /
-  react / type-aware extras (`no-misused-promises`, `no-promise-executor-return`,
-  `prefer-optional-chain`, `prefer-expect-resolves`, `no-focused-tests`,
-  `no-identical-title`, `await-thenable`, `no-eval`, `import/named`, …).
-  Leave off floods and false positives: `no-null`, `no-array-reduce`,
-  `filename-case`, `prefer-number-properties`, `no-useless-undefined`,
-  `prefer-strict-equal`, `prefer-expect-assertions`,
-  `no-array-method-this-argument` (`Effect.forEach`),
-  `only-throw-error` (`throw redirect()`), `no-await-in-loop`
-  (sequential I/O), `prefer-query-selector` (`getElementById`
-  is the right id lookup), `no-unnecessary-condition` (Electron/optional
-  APIs), `require-await` (test stubs), `no-invalid-void-type`
-  (`void` in optional-callback unions), `prefer-nullish-coalescing`
-  (`||` for empty string), `no-bitwise` (auth hash / flags),
-  `import/export` (intentional `export *` plus named re-exports),
-  `import/first` (imports after `vi.mock`), and
-  `consistent-type-specifier-style` (inline `type` specifiers).
-  Do not enable the `restriction`,
-  `style`, `pedantic`, or `nursery` categories wholesale —
-  cherry-pick.
-  Type-aware linting is on (`options.typeAware`, `oxlint-tsgolint`).
-  `typescript/no-floating-promises` is error; ignore with `.catch` or
-  `await`, not `void` (that operator stays banned once `no-void` lands).
-  `typescript/no-unsafe-type-assertion`,
-  `typescript/no-unnecessary-type-assertion`,
-  `typescript/consistent-return`, and
-  `typescript/no-unnecessary-type-parameters` stay off — the first
-  three flood and overlap anti-slop; the last flags inference-only
-  generics on oRPC error maps. Vendored UI also turns off
-  `no-floating-promises`, `unbound-method`,
-  `no-useless-default-assignment`, `no-misused-promises`,
-  `unicorn/prefer-string-slice`, `unicorn/explicit-length-check`,
-  `react/jsx-no-constructed-context-values`, and
-  `no-promise-executor-return`. `@getpie/oxlint#build`
+  `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
   emits them to `dist/`; the root `.oxlintrc.json` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is
