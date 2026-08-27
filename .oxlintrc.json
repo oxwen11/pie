@@ -6,10 +6,10 @@
     "./tools/oxlint/feature-boundaries.mjs",
     "./tools/oxlint/query-policy.mjs",
     "eslint-plugin-react-you-might-not-need-an-effect",
-    { "name": "anti-slop", "specifier": "./tools/oxlint/anti-slop.mjs" },
+    { "name": "anti-slop", "specifier": "./tools/oxlint/dist/anti-slop.mjs" },
     {
       "name": "anti-slop-effect",
-      "specifier": "./tools/oxlint/anti-slop-effect.mjs"
+      "specifier": "./tools/oxlint/dist/anti-slop-effect.mjs"
     }
   ],
   "categories": {
@@ -127,8 +127,6 @@
     ".pi/**",
     ".roo/**",
     ".windsurf/**",
-    "tools/oxlint/anti-slop/**",
-    "tools/oxlint/anti-slop.mjs",
-    "tools/oxlint/anti-slop-effect.mjs"
+    "tools/oxlint/anti-slop/**"
   ]
 }

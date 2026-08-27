@@ -7,8 +7,8 @@ Turborepo, TypeScript everywhere.
 ## Commands
 
 Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
-`test`, and `typecheck` all declare `dependsOn: ["^build"]`, so bypassing turbo
-skips the upstream tsdown build.
+`test`, `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing
+turbo skips the upstream tsdown build (including the anti-slop oxlint plugins).
 
 |                                               |                                                      |
 | --------------------------------------------- | ---------------------------------------------------- |
@@ -16,9 +16,10 @@ skips the upstream tsdown build.
 | `pnpm check`                                  | lint:check + format:check + typecheck — **no tests** |
 | `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
 
-`lint` and `format` are root-only (oxlint/oxfmt) and not turbo tasks. `test` and
-`typecheck` are cached, so re-run with `--force` after changing something
-outside their hash inputs. `pnpm clean` runs `turbo run clean` then
+`format` is root-only (oxfmt) and not a turbo task. `lint` / `lint:check` go
+through turbo so they wait on `@getpie/oxlint#build` (the anti-slop tsdown
+plugins). `test` and `typecheck` are cached, so re-run with `--force` after
+changing something outside their hash inputs. `pnpm clean` runs `turbo run clean` then
 `git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.
 Runtime UI checks use `.agents/skills/verify` (launch the vite app plus server,
 then drive the page).

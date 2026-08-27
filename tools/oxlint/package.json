@@ -4,14 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsdown",
+    "lint": "oxlint --fix ../..",
+    "lint:check": "oxlint --deny-warnings ../..",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bundle:anti-slop": "node ./bundle-anti-slop.mjs",
-    "clean": "git clean -xdf node_modules .turbo"
+    "clean": "git clean -xdf node_modules dist .turbo"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.80.0",
     "oxlint": "^1.80.0",
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   }
 }

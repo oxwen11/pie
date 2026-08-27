@@ -29,6 +29,14 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
+    "lint": {
+      "cache": false,
+      "dependsOn": ["@getpie/oxlint#build"]
+    },
+    "lint:check": {
+      "cache": false,
+      "dependsOn": ["@getpie/oxlint#build"]
+    },
     "clean": {
       "cache": false
     },
