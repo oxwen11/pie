@@ -16,7 +16,9 @@
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
   `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
   emits them to `dist/`; the root `.oxlintrc.json` loads them as
-  `@getpie/oxlint/<plugin>` (root depends on the workspace package). Effect service
+  `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
+  sources including vendored anti-slop are linted and formatted; `dist/` is
+  ignored as generated output. Effect service
   types keep the `Shape` suffix (`Context.Service<Self, Shape>`), so
   `anti-slop/no-shape-in-symbol-names` is off. Composition roots still call
   `make*` constructors, so `anti-slop-effect/no-service-constructor-imports`
