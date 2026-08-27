@@ -78,7 +78,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       # `build` / `test` / `typecheck` / `lint:check` all go through turbo.
-      # `lint:check` depends on `@getpie/oxlint#build` so the anti-slop
+      # `lint:check` depends on `@getpie/oxlint#build` so the oxlint
       # plugins exist before oxlint loads them. Format only needs
       # node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format

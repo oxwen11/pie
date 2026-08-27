@@ -8,7 +8,7 @@ Turborepo, TypeScript everywhere.
 
 Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
 `test`, `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing
-turbo skips the upstream tsdown build (including the anti-slop oxlint plugins).
+turbo skips the upstream tsdown build (including the oxlint plugins).
 
 |                                               |                                                      |
 | --------------------------------------------- | ---------------------------------------------------- |
@@ -17,7 +17,7 @@ turbo skips the upstream tsdown build (including the anti-slop oxlint plugins).
 | `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
 
 `format` is root-only (oxfmt) and not a turbo task. `lint` / `lint:check` go
-through turbo so they wait on `@getpie/oxlint#build` (the anti-slop tsdown
+through turbo so they wait on `@getpie/oxlint#build` (the oxlint tsdown
 plugins). `test` and `typecheck` are cached, so re-run with `--force` after
 changing something outside their hash inputs. `pnpm clean` runs `turbo run clean` then
 `git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.

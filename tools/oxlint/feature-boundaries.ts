@@ -1,10 +1,13 @@
+import { definePlugin, defineRule } from "@oxlint/plugins";
+import type { ESTree } from "@oxlint/plugins";
+
 // Enforces frontend-state and package boundary rules documented in
 // .agents/rules/frontend-state.md and .agents/rules/architecture.md.
 
 const FEATURES_ROOT = "apps/app/src/features/";
 const APP_ROOT = "apps/app/";
 
-const featureNameFromFilename = (filename) => {
+const featureNameFromFilename = (filename: string): string | null => {
   const normalized = filename.replaceAll("\\", "/");
   const idx = normalized.indexOf(FEATURES_ROOT);
   if (idx === -1) return null;
@@ -12,20 +15,22 @@ const featureNameFromFilename = (filename) => {
   return rest.split("/")[0] ?? null;
 };
 
-const isAppFile = (filename) => filename.replaceAll("\\", "/").includes(APP_ROOT);
+const isAppFile = (filename: string): boolean => filename.replaceAll("\\", "/").includes(APP_ROOT);
 
-const crossFeatureImport = (source, featureName) => {
-  if (typeof source !== "string") return null;
+const exportName = (imported: ESTree.ModuleExportName): string =>
+  imported.type === "Identifier" ? imported.name : imported.value;
+
+const crossFeatureImport = (source: string, featureName: string): string | null => {
   const match = source.match(/^@\/features\/([^/]+)/);
-  if (!match || match[1] === featureName) return null;
-  return match[1];
+  const other = match?.[1];
+  if (other === undefined || other === featureName) return null;
+  return other;
 };
 
-const featureNoRouteMatch = {
+const featureNoRouteMatchRule = defineRule({
   create(context) {
-    const filename = context.filename ?? context.getFilename?.() ?? "";
-    const featureName = featureNameFromFilename(filename);
-    if (!featureName) return {};
+    const featureName = featureNameFromFilename(context.filename);
+    if (featureName === null) return {};
 
     return {
       ImportDeclaration(node) {
@@ -33,8 +38,8 @@ const featureNoRouteMatch = {
         for (const specifier of node.specifiers) {
           if (
             specifier.type === "ImportSpecifier" &&
-            specifier.imported.name === "useMatch" &&
-            specifier.importKind !== "type"
+            specifier.importKind !== "type" &&
+            exportName(specifier.imported) === "useMatch"
           ) {
             context.report({
               node: specifier,
@@ -46,18 +51,17 @@ const featureNoRouteMatch = {
       },
     };
   },
-};
+});
 
-const featureNoCrossImport = {
+const featureNoCrossImportRule = defineRule({
   create(context) {
-    const filename = context.filename ?? context.getFilename?.() ?? "";
-    const featureName = featureNameFromFilename(filename);
-    if (!featureName) return {};
+    const featureName = featureNameFromFilename(context.filename);
+    if (featureName === null) return {};
 
     return {
       ImportDeclaration(node) {
         const other = crossFeatureImport(node.source.value, featureName);
-        if (!other) return;
+        if (other === null) return;
         context.report({
           node: node.source,
           message: `Features must not import each other. Move shared needs to a composition root instead of importing from @/features/${other}.`,
@@ -65,17 +69,15 @@ const featureNoCrossImport = {
       },
     };
   },
-};
+});
 
-const appNoServerImport = {
+const appNoServerImportRule = defineRule({
   create(context) {
-    const filename = context.filename ?? context.getFilename?.() ?? "";
-    if (!isAppFile(filename)) return {};
+    if (!isAppFile(context.filename)) return {};
 
     return {
       ImportDeclaration(node) {
         const source = node.source.value;
-        if (typeof source !== "string") return;
         if (source === "@getpie/server" || source.startsWith("@getpie/server/")) {
           context.report({
             node: node.source,
@@ -86,13 +88,13 @@ const appNoServerImport = {
       },
     };
   },
-};
+});
 
-export default {
+export default definePlugin({
   meta: { name: "pie-boundaries" },
   rules: {
-    "feature-no-route-match": featureNoRouteMatch,
-    "feature-no-cross-import": featureNoCrossImport,
-    "app-no-server-import": appNoServerImport,
+    "feature-no-route-match": featureNoRouteMatchRule,
+    "feature-no-cross-import": featureNoCrossImportRule,
+    "app-no-server-import": appNoServerImportRule,
   },
-};
+});

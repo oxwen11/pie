@@ -1,7 +1,7 @@
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
 
-import { noQueryClientDefaultOverrides } from "./query-policy.mjs";
+import { noQueryClientDefaultOverrides } from "./query-policy";
 
 RuleTester.describe = describe;
 RuleTester.it = it;

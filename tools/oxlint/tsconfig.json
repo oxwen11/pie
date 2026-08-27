@@ -1,0 +1,4 @@
+{
+  "extends": "@getpie/typescript/node.json",
+  "include": ["*.ts"]
+}

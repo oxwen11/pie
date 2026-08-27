@@ -9,12 +9,16 @@
     "lint:check": "oxlint --deny-warnings \"$(cd ../.. && pwd)\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "devDependencies": {
+    "@getpie/typescript": "workspace:*",
     "@oxlint/plugins": "1.80.0",
+    "@types/node": "catalog:",
     "oxlint": "^1.80.0",
     "tsdown": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

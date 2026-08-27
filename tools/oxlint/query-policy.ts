@@ -1,3 +1,6 @@
+import { definePlugin, defineRule } from "@oxlint/plugins";
+import type { ESTree } from "@oxlint/plugins";
+
 // Enforces TanStack Query cache-policy conventions in
 // .agents/rules/frontend-state.md: do not repeat QueryClient defaults.
 // Per-query capabilities (select, enabled, retry, placeholderData, or a
@@ -12,12 +15,12 @@ const QUERY_HOOKS = new Set([
   "useInfiniteQuery",
 ]);
 
-const isAppSrc = (filename) => filename.replaceAll("\\", "/").includes(APP_SRC);
+const isAppSrc = (filename: string): boolean => filename.replaceAll("\\", "/").includes(APP_SRC);
 
-const isTestFile = (filename) =>
+const isTestFile = (filename: string): boolean =>
   /\.(test|spec)\.[cm]?[jt]sx?$/.test(filename.replaceAll("\\", "/"));
 
-const calleeName = (node) => {
+const calleeName = (node: ESTree.Expression): string | null => {
   if (node.type === "Identifier") return node.name;
   if (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier") {
     return node.property.name;
@@ -25,41 +28,45 @@ const calleeName = (node) => {
   return null;
 };
 
-const unwrap = (node) => {
-  let current = node;
+const unwrap = (node: ESTree.Node): ESTree.Node => {
+  let current: ESTree.Node = node;
   while (
-    current &&
-    (current.type === "TSAsExpression" ||
-      current.type === "TSSatisfiesExpression" ||
-      current.type === "TSNonNullExpression" ||
-      current.type === "ChainExpression")
+    current.type === "TSAsExpression" ||
+    current.type === "TSSatisfiesExpression" ||
+    current.type === "TSNonNullExpression" ||
+    current.type === "ChainExpression"
   ) {
     current = current.expression;
   }
   return current;
 };
 
-const propertyKey = (prop) => {
-  if (prop.type !== "Property" || prop.computed) return null;
-  if (prop.key.type === "Identifier") return prop.key.name;
-  if (prop.key.type === "Literal") return prop.key.value;
+const propertyKey = (node: ESTree.Node): string | number | boolean | null => {
+  if (node.type !== "Property" || node.computed) return null;
+  const { key } = node;
+  if (key.type === "Identifier") return key.name;
+  if (key.type === "Literal") {
+    const { value } = key;
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? value
+      : null;
+  }
   return null;
 };
 
-const isInfinity = (node) => {
+const isInfinity = (node: ESTree.Node): boolean => {
   const value = unwrap(node);
-  return value?.type === "Identifier" && value.name === "Infinity";
+  return value.type === "Identifier" && value.name === "Infinity";
 };
 
-const isAlways = (node) => {
+const isAlways = (node: ESTree.Node): boolean => {
   const value = unwrap(node);
-  return value?.type === "Literal" && value.value === "always";
+  return value.type === "Literal" && value.value === "always";
 };
 
-const noQueryClientDefaultOverrides = {
+export const noQueryClientDefaultOverrides = defineRule({
   create(context) {
-    const filename = context.filename ?? context.getFilename?.() ?? "";
-    if (!isAppSrc(filename) || isTestFile(filename)) return {};
+    if (!isAppSrc(context.filename) || isTestFile(context.filename)) return {};
 
     let queryCallDepth = 0;
 
@@ -75,6 +82,7 @@ const noQueryClientDefaultOverrides = {
       Property(node) {
         if (queryCallDepth === 0) return;
         const key = propertyKey(node);
+        if (!("value" in node)) return;
         if (key === "staleTime" && isInfinity(node.value)) {
           context.report({
             node,
@@ -92,13 +100,11 @@ const noQueryClientDefaultOverrides = {
       },
     };
   },
-};
+});
 
-export { noQueryClientDefaultOverrides };
-
-export default {
+export default definePlugin({
   meta: { name: "pie-query" },
   rules: {
     "no-query-client-default-overrides": noQueryClientDefaultOverrides,
   },
-};
+});
