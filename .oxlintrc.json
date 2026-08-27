@@ -1,16 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "react",
-    "typescript",
-    "unicorn",
-    "oxc",
-    "jsx-a11y",
-    "vitest",
-    "vue",
-    "import",
-    "promise"
-  ],
+  "plugins": ["react", "typescript", "unicorn", "oxc", "jsx-a11y", "vitest", "import", "promise"],
   "jsPlugins": [
     {
       "name": "pie",
