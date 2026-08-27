@@ -10,6 +10,8 @@ import {
   buildRemoteNodeEnvScript,
   buildRemotePieRunnerScript,
   DEFAULT_NODE_ENGINE_RANGE,
+  DEFAULT_PIE_PACKAGE_SPEC,
+  resolveRemotePiePackageSpec,
 } from "./scripts";
 
 const posix = process.platform !== "win32";
@@ -64,12 +66,19 @@ describe("remote launch scripts", () => {
     expect(script).not.toContain("@@PIE_");
   });
 
-  it("prefers a PATH pie, then npx @getpie/cli@0.0.0", () => {
-    const runner = buildRemotePieRunnerScript();
+  it("prefers a PATH pie, then npx @getpie/cli@latest", () => {
+    const runner = buildRemotePieRunnerScript({ packageSpec: DEFAULT_PIE_PACKAGE_SPEC });
     expect(runner).toContain("command -v pie");
-    expect(runner).toContain("@getpie/cli@0.0.0");
+    expect(runner).toContain("@getpie/cli@latest");
     expect(runner).toContain("ensure_remote_node_path");
     expect(runner).toContain(DEFAULT_NODE_ENGINE_RANGE);
+  });
+
+  it("embeds an explicit package spec for remote npx", () => {
+    const runner = buildRemotePieRunnerScript({
+      packageSpec: "https://pkg.pr.new/oxwen11/pie/@getpie/cli@deadbeef",
+    });
+    expect(runner).toContain("https://pkg.pr.new/oxwen11/pie/@getpie/cli@deadbeef");
   });
 
   it("embeds the Node 24 engine check", () => {
@@ -80,6 +89,18 @@ describe("remote launch scripts", () => {
     expect(script).toContain("NVM_NO_USE");
     expect(script).toContain("node-versions");
     expect(script).toContain("pie needs Node 24");
+  });
+});
+
+describe("resolveRemotePiePackageSpec", () => {
+  it("prefers an explicit spec, then PIE_SSH_CLI_PACKAGE, then latest", () => {
+    expect(resolveRemotePiePackageSpec("@getpie/cli@0.0.0", { PIE_SSH_CLI_PACKAGE: "x" })).toBe(
+      "@getpie/cli@0.0.0",
+    );
+    expect(resolveRemotePiePackageSpec("  ", { PIE_SSH_CLI_PACKAGE: " @getpie/cli@next " })).toBe(
+      "@getpie/cli@next",
+    );
+    expect(resolveRemotePiePackageSpec(undefined, {})).toBe("@getpie/cli@latest");
   });
 });
 
@@ -113,10 +134,14 @@ nvm() { :; }
       );
       await writeExecutable(fnmNode, nodeShim("v24.18.0"));
 
+      const pieBin = path.join(home, ".local", "bin", "pie");
+      await writeExecutable(pieBin, "#!/bin/sh\necho pie-ok\n");
+
       const result = await runEnsure(home, `${brewBin}:/usr/bin:/bin`);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("v24.18.0");
       expect(result.stdout).toContain(`${path.dirname(fnmNode)}/node`);
+      expect(result.stdout.split("\n")[0]).toContain("/.local/bin");
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }
