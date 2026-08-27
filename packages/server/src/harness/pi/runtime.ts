@@ -19,6 +19,7 @@ import type {
   CreateSessionInput,
   PromptReceipt,
   ResumeSessionInput,
+  RuntimePromptReceipt,
   UserInput,
 } from "../session-io";
 import { entriesToUIMessages } from "./history";
@@ -56,7 +57,10 @@ export type PiAgentRuntime = {
   readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
   readonly prompt: (
     input: UserInput,
-  ) => Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>;
+  ) => Effect.Effect<
+    RuntimePromptReceipt,
+    SessionClosed | TurnAlreadyRunning | AgentOperationError
+  >;
   readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     requestId: string,
@@ -181,7 +185,11 @@ export const makePiAgentRuntime = (
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
           const prompt = yield* process.session
-            .prompt({ sessionId, text: toPromptText(input) })
+            .prompt({
+              sessionId,
+              text: toPromptText(input),
+              ...(input.delivery !== undefined ? { delivery: input.delivery } : {}),
+            })
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning
@@ -201,8 +209,16 @@ export const makePiAgentRuntime = (
 
           const finished = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
-          const pump = Stream.runForEach(prompt.output, (chunk) =>
-            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
+          const pump = Stream.runForEach(prompt.output, (chunk) => {
+            if (chunk.type === "data-queue") {
+              return emit({
+                type: "session.queue.updated",
+                sessionId,
+                steering: chunk.data.steering,
+                followUp: chunk.data.followUp,
+              });
+            }
+            return (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
               Effect.andThen(emit(chunk)),
               Effect.andThen(
                 chunk.type === "finish"
@@ -225,8 +241,8 @@ export const makePiAgentRuntime = (
                     )
                   : Effect.void,
               ),
-            ),
-          ).pipe(
+            );
+          }).pipe(
             Effect.flatMap(() => Ref.get(finished)),
             Effect.flatMap((didFinish) =>
               prompt.started && !didFinish

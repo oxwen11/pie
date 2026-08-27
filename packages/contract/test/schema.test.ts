@@ -113,6 +113,26 @@ describe("PromptInput", () => {
       }),
     ).toBe(true);
   });
+
+  it("accepts an optional followUp delivery", () => {
+    expect(
+      accepts(PromptInputSchema, {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        delivery: "followUp",
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects an unknown delivery", () => {
+    expect(
+      accepts(PromptInputSchema, {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        delivery: "later",
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("SubscribeInput scope", () => {

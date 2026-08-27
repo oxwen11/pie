@@ -26,6 +26,9 @@ import type { PiUIMessageChunk } from "./ui-message";
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
+//   • queue_update → transient `data-queue` (Pi's native message queue; the
+//     runtime intercepts this and emits `session.queue.updated`, never a
+//     transcript chunk)
 //   • agent_start/agent_settled → `start`/`finish`; a retry re-emits
 //     agent_start, so `start` is guarded to fire once per turn.
 
@@ -215,6 +218,14 @@ export function createPiTransform(
         }
         break;
 
+      case "queue_update":
+        yield {
+          type: "data-queue",
+          transient: true,
+          data: { steering: event.steering, followUp: event.followUp },
+        };
+        break;
+
       // Everything else is bookkeeping, an echo of our own input, or a payload
       // with no `data-*` part on the chunk track. The satisfies keeps the
       // skip-list explicit: a new AgentSessionEvent arm fails typecheck until
@@ -225,7 +236,6 @@ export function createPiTransform(
           | "tool_execution_update"
           | "turn_start"
           | "turn_end"
-          | "queue_update"
           | "entry_appended"
           | "session_info_changed"
           | "thinking_level_changed"

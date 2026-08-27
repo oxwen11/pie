@@ -1,6 +1,6 @@
 # Session 消息队列调研
 
-> 对照：Pi 0.84.2 RPC（`@earendil-works/pi-coding-agent`）、Pi TUI *Message Queue*、Cursor 式 follow-up 队列。
+> 对照：Pi 0.84.2 RPC（`@earendil-works/pi-coding-agent`）、Pi TUI _Message Queue_、Cursor 式 follow-up 队列。
 > 相关：`docs/adr/0003-pi-history-role-segmentation.md`、`docs/design/pi-history-read-design.md` §6.1、`docs/design/multi-client-sync-improvements.md` P1-1。
 
 ---
@@ -17,7 +17,7 @@
 4. Stop 与 Send 拆开：streaming 时两者同时可用。
 5. 单条撤销 / abort 还原进输入框 **不做**——RPC 没有 `clear_queue`（SDK 有 `clearQueue()`，TUI Escape 走的就是它）。
 
-否决：客户端本地排队等到 `turn.ended` 再发；`SessionRuntime` 内存收件箱（那是给 *没有* 原生队列的 harness 的，见下文 P1-1）。
+否决：客户端本地排队等到 `turn.ended` 再发；`SessionRuntime` 内存收件箱（那是给 _没有_ 原生队列的 harness 的，见下文 P1-1）。
 
 ---
 
@@ -25,10 +25,10 @@
 
 产品语义就是 Pi TUI 已经写进 `docs/usage.md` 的 **Message Queue**：agent 还在跑时用户可以继续提交。两条投递通道：
 
-| 通道 | 何时投递 | Pi TUI | 适合 |
-| ---- | -------- | ------ | ---- |
-| **steer** | 当前 assistant 这一跳的工具跑完、下一次 LLM 调用之前 | Enter（streaming 时） | 「停下，改做这个」 |
-| **follow-up** | agent 不再有工具调用、也不再有 steering 时；实现上在 outer loop `continue`、`agent_end` 之前，**同一轮 `runAgent` 延长，不开新 run** | Alt+Enter | 「做完这件事后再做那个」——Cursor 式队列 |
+| 通道          | 何时投递                                                                                                                             | Pi TUI                | 适合                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------- | --------------------------------------- |
+| **steer**     | 当前 assistant 这一跳的工具跑完、下一次 LLM 调用之前                                                                                 | Enter（streaming 时） | 「停下，改做这个」                      |
+| **follow-up** | agent 不再有工具调用、也不再有 steering 时；实现上在 outer loop `continue`、`agent_end` 之前，**同一轮 `runAgent` 延长，不开新 run** | Alt+Enter             | 「做完这件事后再做那个」——Cursor 式队列 |
 
 `steeringMode` / `followUpMode` 默认都是 **`one-at-a-time`**：每个边界只吐一条。连发三条，后两条继续排，不会一次灌进去。
 
@@ -72,7 +72,7 @@ Cursor Cloud 的 follow-up 队列更接近 **follow-up**，不是 steer：用户
 ### 和旧设计稿的关系
 
 - **ADR 0003 / history 设计**：steer 和 follow-up 投递后都是普通 `user` entry；live transform 已在 `message_start role=user`（且本 run 已有 assistant 输出）处切段。**投递之后的 transcript 路径已经通了**，缺的是投递之前。
-- **`multi-client-sync-improvements.md` P1-1**：给 *不支持* steer 的 harness 做内存收件箱，`turn.ended` 再 promote。Pi 不是这个情况。给 Pi 再做一条 inbox 会和 `queue_update` 双写、时序对不齐（follow-up 在 `agent_end` 前投递，不是 `turn.ended` 后）。P1-1 仍然只适用于将来若接回「硬拒」的 harness。
+- **`multi-client-sync-improvements.md` P1-1**：给 _不支持_ steer 的 harness 做内存收件箱，`turn.ended` 再 promote。Pi 不是这个情况。给 Pi 再做一条 inbox 会和 `queue_update` 双写、时序对不齐（follow-up 在 `agent_end` 前投递，不是 `turn.ended` 后）。P1-1 仍然只适用于将来若接回「硬拒」的 harness。
 - **`map.md` out of scope 的 steer 勘误**：代码早已 steer；文档说过，这里不再重议。
 
 ---
@@ -99,7 +99,11 @@ Cursor Cloud 的 follow-up 队列更接近 **follow-up**，不是 steer：用户
 `queue_update`：
 
 ```json
-{ "type": "queue_update", "steering": ["Focus on error handling"], "followUp": ["After that, summarize"] }
+{
+  "type": "queue_update",
+  "steering": ["Focus on error handling"],
+  "followUp": ["After that, summarize"]
+}
 ```
 
 整表替换，不是 diff。条目是 **纯字符串**，没有 id。Pi 投递时按 `contentText` 做 `indexOf` 删第一条匹配——重复文本会对错行，这是上游限制，pie 不要发明 id 装成能点对点撤销。
@@ -151,7 +155,7 @@ composer ──prompt({ delivery })──► session-service
 `PromptInput` 增加可选：
 
 ```ts
-delivery: Schema.optionalKey(Schema.Literals(["steer", "followUp"]))
+delivery: Schema.optionalKey(Schema.Literals(["steer", "followUp"]));
 ```
 
 省略 = 今天的行为：idle 开新轮，active 当 steer（兼容现有测试与任何没改的客户端）。新 UI 在 `turnInProgress` 时显式传 `followUp`（默认）或 `steer`。
@@ -167,10 +171,10 @@ delivery: Schema.optionalKey(Schema.Literals(["steer", "followUp"]))
 snapshot 增加：
 
 ```ts
-pendingQueue: { steering: string[]; followUp: string[] } | null
+pendingQueue: { steering: string[]; followUp: string[] }
 ```
 
-`null` = 从未见过 `queue_update`（进程刚起来）；空数组 = 明确为空。中途加入的客户端从 snapshot 水合，不靠重放全部 `queue_update`。
+始终存在：空数组 = 队列为空（含进程刚起来、从未见过 `queue_update`）。中途加入的客户端从 snapshot 水合，不靠重放全部 `queue_update`。
 
 `session.prompt.submitted` **不要**用于排队条目。它的语义是「这条已经是 transcript 里的 user 消息」（`activePrompt` 给中途加入者补气泡）。排队条目只活在 `pendingQueue`。投递后由 live chunk / 历史读进入 messages。
 
@@ -183,7 +187,7 @@ pendingQueue: { steering: string[]; followUp: string[] } | null
 - `Active` + `steer`（或省略 delivery，保持兼容）→ 现有 `steer`。
 - `Finishing` → 仍 Wait，再 suspend。跟在 Pi 自己的队列后面再发，避免和 `queue_update` 打架。
 
-runtime 的事件泵：`queue_update` 不进 UI chunk 流（transform 继续 skip），另外 `emit({ type: "session.queue.updated", steering, followUp })`。fold 写入 `pendingQueue`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort / crash 同样等 Pi 的事件；crash 可把 `pendingQueue` 置空，因为子进程没了。
+runtime 的事件泵：transform 把 `queue_update` 收成 transient `data-queue`，泵拦截后 `emit({ type: "session.queue.updated", steering, followUp })`，不进 transcript chunk。fold 写入 `pendingQueue`。turn 结束 **不要**清这个字段——Pi 会在真正变空时再发 `queue_update`。abort 不清队列（跟 Pi）；crash 把 `pendingQueue` 置空，因为子进程没了。
 
 `TurnAlreadyRunning` 对 Pi 路径继续不出现（能力位已是 true）。不要把排队失败映射成 `CONFLICT`，那是「硬拒、用户输入丢了」。
 
@@ -200,9 +204,8 @@ runtime 的事件泵：`queue_update` 不进 UI chunk 流（transform 继续 ski
 
 - 去掉「进行中 return false」。
 - **Stop 与 Send 拆开**：有内容就能发；streaming 时另有 Stop。今天把 Submit 变成 Stop，是队列功能的主障碍。
-- Enter = follow-up（streaming 时）/ 新轮（idle 时）。Alt+Enter（或工具栏「Steer」）= steer。这是 **有意不抄 Pi TUI**（TUI 是 Enter=steer）：web 用户更熟 Cursor，「回车 = 排到做完之后」。在 PR / UI 文案里写一句，避免从 TUI 过来的人以为 Enter 会改道当前轮。
-
-排队条画在 composer 上方，compound 组件，例如 `ChatQueue`：`Root` + `Item`（只读文本 + 通道标签 Steering / Follow-up）。v1 没有叉按钮。数据从 Chat store 的 `pendingQueue` 来，fold 自事件 + snapshot，不要 `useEffect` 同步。
+- Enter = follow-up（streaming 时）/ 新轮（idle 时）。Steer 修饰键本期不做。
+- 会话 composer 套 `CardFrame`（与 draft 相同）：有队列时 `CardFrameHeader` 一行一条截断文本（steering 在前、follow-up 在后）；空队列不渲染 header。v1 没有叉按钮。数据从 Chat store 的 `pendingQueue` 来，fold 自事件 + snapshot，不要 `useEffect` 同步。
 
 多客户端：A 排队，B 的订阅会收到 `session.queue.updated`。不要第二条乐观路径。
 
@@ -225,15 +228,15 @@ live：`message_start role=user` 且本 run 已有 assistant → transform 切�
 
 ## 6. 否决与不在本期
 
-| 方案 | 为何否决 |
-| ---- | -------- |
-| Chat 本地队列，`turn.ended` 再 `prompt` | 丢掉 Pi 的投递时机（follow-up 在 `agent_end` 前）；多端不同步；刷新丢失 |
-| `SessionRuntime.pendingPrompts` 收件箱（P1-1） | 为无原生队列的 harness 而写；Pi 会双写、跟 `queue_update` 漂移 |
-| active 继续只 steer、只把 UI 解开 | 回车变成改道当前轮，不是「消息队列」 |
-| wire 上给队列条目造 id / 单条删除 | Pi 只有 `string[]` + `indexOf`；装出来的 id 对不上撤销 |
-| v1 做 Escape 还原 | 无 `clear_queue` RPC |
-| 改 transform 切段 | 投递路径已对，见 ADR 0003 |
-| 为队列引入 SQLite / json-store | 队列跟 Pi 子进程走；进程死了队列本来就该没。和「transcript 地板在 harness」一致 |
+| 方案                                           | 为何否决                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------- |
+| Chat 本地队列，`turn.ended` 再 `prompt`        | 丢掉 Pi 的投递时机（follow-up 在 `agent_end` 前）；多端不同步；刷新丢失         |
+| `SessionRuntime.pendingPrompts` 收件箱（P1-1） | 为无原生队列的 harness 而写；Pi 会双写、跟 `queue_update` 漂移                  |
+| active 继续只 steer、只把 UI 解开              | 回车变成改道当前轮，不是「消息队列」                                            |
+| wire 上给队列条目造 id / 单条删除              | Pi 只有 `string[]` + `indexOf`；装出来的 id 对不上撤销                          |
+| v1 做 Escape 还原                              | 无 `clear_queue` RPC                                                            |
+| 改 transform 切段                              | 投递路径已对，见 ADR 0003                                                       |
+| 为队列引入 SQLite / json-store                 | 队列跟 Pi 子进程走；进程死了队列本来就该没。和「transcript 地板在 harness」一致 |
 
 后话（有意不做进 v1）：slash 在 streaming 时走 `prompt`；图片入队；暴露 steering/followUp mode；上游补 `clear_queue` 之后的撤销 / abort 还原；P1-1 给别的 harness。
 
@@ -269,13 +272,13 @@ live：`message_start role=user` 且本 run 已有 assistant → transform 切�
 
 ## 9. 关键代码索引
 
-| 层 | 位置 | 现状 |
-| -- | ---- | ---- |
-| Pi RPC 命令 | `pi-coding-agent` `rpc-types.d.ts` / `docs/rpc.md` | `steer` / `follow_up` / `queue_update` / 无 `clear_queue` |
-| turn 分流 | `packages/server/src/harness/pi/process.ts` | Active → 只 `steer` |
-| 事件变换 | `packages/server/src/harness/pi/transform.ts` | `queue_update` skip |
-| 投递切段 | 同上 + ADR 0003 | 已处理 `message_start role=user` |
-| fold / snapshot | `packages/server/src/harness/session-fold.ts`、`packages/contract/src/domain.ts` | 无队列字段；`activePrompt` 只留最新一条 |
-| 能力 | `packages/server/src/harness/pi/runtime.ts` | `supportsSteering: true` |
-| composer | `apps/app/src/features/chat/components/chat-input-composer.tsx` | 进行中拒发；Submit=Stop |
-| Chat | `apps/app/src/features/chat/runtime/chat.ts` | prompt 总是 `pushMessage` |
+| 层              | 位置                                                                             | 现状                                                      |
+| --------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Pi RPC 命令     | `pi-coding-agent` `rpc-types.d.ts` / `docs/rpc.md`                               | `steer` / `follow_up` / `queue_update` / 无 `clear_queue` |
+| turn 分流       | `packages/server/src/harness/pi/process.ts`                                      | Active → 只 `steer`                                       |
+| 事件变换        | `packages/server/src/harness/pi/transform.ts`                                    | `queue_update` skip                                       |
+| 投递切段        | 同上 + ADR 0003                                                                  | 已处理 `message_start role=user`                          |
+| fold / snapshot | `packages/server/src/harness/session-fold.ts`、`packages/contract/src/domain.ts` | 无队列字段；`activePrompt` 只留最新一条                   |
+| 能力            | `packages/server/src/harness/pi/runtime.ts`                                      | `supportsSteering: true`                                  |
+| composer        | `apps/app/src/features/chat/components/chat-input-composer.tsx`                  | 进行中拒发；Submit=Stop                                   |
+| Chat            | `apps/app/src/features/chat/runtime/chat.ts`                                     | prompt 总是 `pushMessage`                                 |

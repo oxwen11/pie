@@ -1,4 +1,5 @@
 import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
+import { emptySessionPendingQueue } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +17,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
+  pendingQueue: emptySessionPendingQueue,
   cursor: 0,
 };
 
@@ -322,5 +324,32 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
     });
     expect(receipt.turnId).toBe("turn-9");
     expect(calls).toEqual([{ ref, parts: [{ type: "text", text: "hi" }], messageId: "message-1" }]);
+  });
+
+  it("forwards followUp delivery on the prompt RPC", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        prompt: async (input: unknown) => {
+          calls.push(input);
+          return { turnId: "turn-9" };
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+    await transport.prompt({
+      messageId: "message-2",
+      parts: [{ type: "text", text: "later" }],
+      delivery: "followUp",
+    });
+    expect(calls).toEqual([
+      {
+        ref,
+        parts: [{ type: "text", text: "later" }],
+        messageId: "message-2",
+        delivery: "followUp",
+      },
+    ]);
   });
 });

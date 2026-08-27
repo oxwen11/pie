@@ -26,6 +26,10 @@ export type PiDataTypes = {
     attempt?: number;
     maxAttempts?: number;
   };
+  queue: {
+    steering: string[];
+    followUp: string[];
+  };
 };
 
 export type PiUIMessage = UIMessage<PiMetadata, PiDataTypes, PiTools>;

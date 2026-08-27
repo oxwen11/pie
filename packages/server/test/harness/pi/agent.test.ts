@@ -52,7 +52,13 @@ rl.on("line", (line) => {
   }
   if (msg.type === "steer") {
     send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering: [msg.message], followUp: [] });
     if (holding) { holding = false; settle(); }
+    return;
+  }
+  if (msg.type === "follow_up") {
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering: [], followUp: [msg.message] });
     return;
   }
   if (msg.type === "abort") {
@@ -239,6 +245,35 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(first.output);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("queues a follow-up on an active turn instead of starting a new one", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold" });
+      assert.equal(first.started, true);
+
+      const second = yield* agent.session.prompt({
+        sessionId,
+        text: "later",
+        delivery: "followUp",
+      });
+      assert.equal(second.started, false);
+      assert.equal(second.turnId, first.turnId);
+
+      yield* agent.session.abort(sessionId);
+      const chunks = Array.from(yield* Stream.runCollect(first.output));
+      assert.equal(
+        chunks.some(
+          (chunk) =>
+            chunk.type === "data-queue" &&
+            Array.isArray(chunk.data.followUp) &&
+            chunk.data.followUp[0] === "later",
+        ),
+        true,
+      );
     }),
   );
 

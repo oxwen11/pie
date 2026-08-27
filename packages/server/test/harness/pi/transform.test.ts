@@ -248,6 +248,17 @@ describe("createPiTransform", () => {
     expect([...t(e({ type: "summarization_retry_finished" }))]).toEqual([]);
   });
 
+  it("projects queue_update as a transient data-queue chunk", () => {
+    const t = createPiTransform("s1");
+    expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual([
+      {
+        type: "data-queue",
+        transient: true,
+        data: { steering: ["steer"], followUp: ["later"] },
+      },
+    ]);
+  });
+
   it("ignores bookkeeping events and user-message echoes", () => {
     const t = createPiTransform("s1");
     for (const event of [
@@ -255,7 +266,6 @@ describe("createPiTransform", () => {
       { type: "turn_end", message: assistant(), toolResults: [] },
       { type: "message_start", message: { role: "user", content: "hi", timestamp: 0 } },
       { type: "message_end", message: { role: "user", content: "hi", timestamp: 0 } },
-      { type: "queue_update", steering: [], followUp: [] },
       { type: "session_info_changed", name: "n" },
       { type: "thinking_level_changed", level: "high" },
       {

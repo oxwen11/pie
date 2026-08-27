@@ -34,8 +34,8 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
       return "ready";
     case "crashed":
       return "error";
-    // requires_action keeps "streaming": the turn is still open, the composer
-    // stays blocked either way.
+    // requires_action keeps "streaming": the turn is still open. Send still
+    // queues a follow-up; Stop remains available.
     default:
       return "streaming";
   }
@@ -154,7 +154,7 @@ export class Chat {
       case "session.message.chunk":
         this.#observeChunk(event.chunk);
         // Retry is UI status, not transcript — keep it out of the message fold.
-        if (event.chunk.type === "data-retry") break;
+        if (event.chunk.type === "data-retry" || event.chunk.type === "data-queue") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
           this.#turnFold(event.turnId).enqueue(event.chunk);
@@ -171,6 +171,9 @@ export class Chat {
           this.#state.retryNotice = undefined;
           this.#state.error = undefined;
         }
+        // Idle race: a follow-up the UI queued became a real prompt. Drop the
+        // optimistic queue line so it doesn't sit there with no queue_update.
+        this.#removeFollowUpText(event.parts.find((part) => part.type === "text")?.text);
         break;
       // The server rejected a prompt whose submitted event already broadcast:
       // drop the phantom user message (the sender's optimistic copy included).
@@ -211,12 +214,19 @@ export class Chat {
       case "session.request.rejected":
         this.#state.removePendingRequest(event.requestId);
         break;
+      case "session.queue.updated":
+        this.#state.setPendingQueue({
+          steering: event.steering,
+          followUp: event.followUp,
+        });
+        break;
       case "session.crashed":
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
         // The server projection drops its pending requests on crash; a card
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
+        this.#state.clearPendingQueue();
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -251,6 +261,7 @@ export class Chat {
     // so stop rendering a spinner that would never resolve.
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
+    this.#state.clearPendingQueue();
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -333,6 +344,7 @@ export class Chat {
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
+    this.#state.setPendingQueue(snapshot.pendingQueue);
 
     const activeTurn = snapshot.activeTurn;
 
@@ -444,7 +456,7 @@ export class Chat {
       return;
     }
     for (const chunk of chunks) {
-      if (chunk.type === "data-retry") continue;
+      if (chunk.type === "data-retry" || chunk.type === "data-queue") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
       this.#turnFold(activeTurn.turnId).enqueue(chunk);
     }
@@ -464,6 +476,7 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   #observeChunk(chunk: UIMessageChunk): void {
+    if (chunk.type === "data-queue") return;
     const retryNotice = retryNoticeFrom(chunk);
     if (retryNotice !== undefined) {
       this.#state.error = undefined;
@@ -482,6 +495,17 @@ export class Chat {
     if (this.#state.messages.some((message) => message.id === messageId)) return false;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     return true;
+  }
+
+  #removeFollowUpText(text: string | undefined): void {
+    if (text === undefined || text.length === 0) return;
+    const current = this.#state.pendingQueue;
+    const index = current.followUp.indexOf(text);
+    if (index === -1) return;
+    this.#state.setPendingQueue({
+      steering: current.steering,
+      followUp: current.followUp.filter((_, i) => i !== index),
+    });
   }
 
   // Policy, not transport: an empty plan carries nothing to review, so it is
@@ -577,13 +601,38 @@ export class Chat {
   // Public surface
   // ---------------------------------------------------------------------
 
-  // Fire-and-forget: push the optimistic user message, submit the RPC, and
-  // let the subscription carry the reply back like any other client's turn.
+  // Fire-and-forget: idle prompts push an optimistic user message; a turn
+  // already in flight queues as a Pi follow-up (no transcript bubble until
+  // Pi delivers it). The subscription carries the reply back either way.
   prompt = async (text: string): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
     this.#state.retryNotice = undefined;
     this.#state.error = undefined;
+
+    const busy = this.#state.status === "submitted" || this.#state.status === "streaming";
+    if (busy) {
+      const previous = this.#state.pendingQueue;
+      this.#state.setPendingQueue({
+        steering: previous.steering,
+        followUp: [...previous.followUp, text],
+      });
+      try {
+        await this.#transport.prompt({
+          messageId,
+          parts,
+          delivery: "followUp",
+        });
+      } catch (promptError) {
+        this.#state.setPendingQueue(previous);
+        this.#state.error =
+          promptError instanceof Error ? promptError : new Error(String(promptError));
+        this.#setStatus("error");
+        throw promptError;
+      }
+      return;
+    }
+
     this.#state.pushMessage(toUserMessage(messageId, parts));
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;

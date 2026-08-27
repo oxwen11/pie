@@ -45,7 +45,7 @@ import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
-import type { PromptReceipt, UserInput } from "./session-io";
+import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
 import type { PiAgentSessionManagerShape } from "./session-manager";
 import { PiAgentSessionManager } from "./session-manager";
 import {
@@ -63,12 +63,18 @@ const deriveTitle = (parts: PromptInput["parts"]): string | undefined => {
 
 const toUserInput = (
   parts: PromptInput["parts"],
+  delivery: PromptInput["delivery"],
 ): Effect.Effect<UserInput, UnsupportedPromptPart> =>
   Effect.forEach(parts, (part) =>
     part.type === "file"
       ? Effect.fail(new UnsupportedPromptPart({ kind: "file" }))
       : Effect.succeed(part),
-  ).pipe(Effect.map((userParts) => ({ parts: userParts })));
+  ).pipe(
+    Effect.map((userParts) => ({
+      parts: userParts,
+      ...(delivery !== undefined ? { delivery } : {}),
+    })),
+  );
 
 type SessionWithCwd = Session & { readonly cwd: string };
 
@@ -294,7 +300,7 @@ export const makePiAgentSessionService = (deps: {
     ref: SessionRef,
     userInput: UserInput,
   ): Effect.Effect<
-    void,
+    RuntimePromptReceipt,
     | ResumeSessionError
     | StoreReadError
     | StoreWriteError
@@ -307,7 +313,7 @@ export const makePiAgentSessionService = (deps: {
     Effect.gen(function* () {
       const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
       const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
-      yield* runtime.prompt(userInput).pipe(Effect.asVoid);
+      return yield* runtime.prompt(userInput);
     });
 
   const readHistory = (
@@ -584,16 +590,18 @@ export const makePiAgentSessionService = (deps: {
 
     prompt: (input) =>
       Effect.gen(function* () {
-        const userInput = yield* toUserInput(input.parts);
+        const queued = input.delivery !== undefined;
+        const userInput = yield* toUserInput(input.parts, input.delivery);
         yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
         const messageId = input.messageId ?? (yield* newSessionId);
         const turnId = yield* newSessionId;
 
-        yield* manager.emit(input.ref, {
-          type: "session.prompt.submitted",
-          messageId,
-          parts: input.parts,
-        });
+        const submitted = () =>
+          manager.emit(input.ref, {
+            type: "session.prompt.submitted",
+            messageId,
+            parts: input.parts,
+          });
 
         const reject = (reason: string) =>
           manager.emit(input.ref, {
@@ -602,9 +610,15 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
+        // Queued messages are not transcript bubbles until Pi delivers them.
+        // Skip `submitted` unless the harness actually started a new turn
+        // (idle race: the UI thought the session was busy).
+        if (!queued) yield* submitted();
+
         yield* deliverPrompt(input.ref, userInput).pipe(
+          Effect.flatMap((receipt) => (queued && receipt.started ? submitted() : Effect.void)),
           Effect.catch((error: unknown) =>
-            reject(error instanceof Error ? error.message : String(error)),
+            queued ? Effect.void : reject(error instanceof Error ? error.message : String(error)),
           ),
           Effect.forkDetach,
         );

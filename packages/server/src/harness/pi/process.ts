@@ -98,9 +98,12 @@ export interface PiProcess {
       readonly sessionId: string;
       readonly cwd?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
+    // When the session is already running: `followUp` queues after the current
+    // run's tools; omitted/`steer` injects before the next LLM call.
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
+      readonly delivery?: "steer" | "followUp";
     }) => Effect.Effect<
       {
         readonly turnId: string;
@@ -515,13 +518,15 @@ export const makePiProcessWithDependencies = <R>(
                     return yield* Effect.suspend(prepareTurn);
                   }
                   if (decision._tag === "Steer") {
-                    const steered = yield* restore(
-                      session.transport.command({ type: "steer", message: input.text }),
-                    ).pipe(
+                    const command =
+                      input.delivery === "followUp"
+                        ? ({ type: "follow_up", message: input.text } as const)
+                        : ({ type: "steer", message: input.text } as const);
+                    const queued = yield* restore(session.transport.command(command)).pipe(
                       Effect.as(true),
                       Effect.catch(() => Effect.succeed(false)),
                     );
-                    if (steered) {
+                    if (queued) {
                       return {
                         turnId: decision.turn.turnId,
                         started: false,

@@ -2,6 +2,7 @@ import type {
   AgentRequest,
   PromptPart,
   SessionMessageChunkEvent,
+  SessionPendingQueue,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -9,6 +10,7 @@ import type {
   SessionScopedEventBody,
   SessionStatus,
 } from "@getpie/contract";
+import { emptySessionPendingQueue } from "@getpie/contract";
 
 import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
 
@@ -17,7 +19,7 @@ import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./e
  * Harness agents stream native-`sessionId`-keyed drafts; this module turns a
  * draft into the wire {@link SessionScopedEvent} body and folds that event into
  * {@link SessionState} — the phase machine, the active-turn buffer, the pending
- * requests, and the cursor that snapshot/status read.
+ * requests, the Pi message queue, and the cursor that snapshot/status read.
  *
  * Everything here is synchronous and total: no Effect, no clock, no I/O. The
  * stamping, publishing and locking that surround it belong to the caller.
@@ -79,6 +81,7 @@ export type SessionState = {
   readonly activeTurn: ActiveTurn | null;
   readonly activePrompt: ActivePrompt | null;
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
+  readonly pendingQueue: SessionPendingQueue;
 };
 
 export const initialSessionState: SessionState = {
@@ -88,6 +91,7 @@ export const initialSessionState: SessionState = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: new Map(),
+  pendingQueue: emptySessionPendingQueue,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -121,6 +125,12 @@ export const toWireBody = (
         type: "session.request.rejected",
         requestId: event.requestId,
         ...(event.reason !== undefined ? { reason: event.reason } : undefined),
+      };
+    case "session.queue.updated":
+      return {
+        type: "session.queue.updated",
+        steering: event.steering,
+        followUp: event.followUp,
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
@@ -232,6 +242,11 @@ export const foldSessionEvent = (
         pendingRequests.size > 0 ? "requires_action" : current.activeTurn ? "running" : "idle";
       return { ...base, phase, pendingRequests };
     }
+    case "session.queue.updated":
+      return {
+        ...base,
+        pendingQueue: { steering: event.steering, followUp: event.followUp },
+      };
     case "session.crashed":
       return {
         ...base,
@@ -239,6 +254,7 @@ export const foldSessionEvent = (
         activeTurn: null,
         activePrompt: null,
         pendingRequests: new Map(),
+        pendingQueue: emptySessionPendingQueue,
       };
   }
 };
@@ -254,6 +270,7 @@ export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntime
   ref,
   status: toStatus(state),
   pendingRequests: [...state.pendingRequests.values()],
+  pendingQueue: state.pendingQueue,
   activeTurn: state.activeTurn
     ? {
         turnId: state.activeTurn.turnId,

@@ -1,14 +1,15 @@
 import type { SessionRef } from "@getpie/contract";
 import {
   PromptInput,
+  PromptInputButton,
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
-import { Card, CardFrame, CardFrameFooter } from "@getpie/ui/components/card";
+import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { GitBranchIcon } from "lucide-react";
+import { GitBranchIcon, SquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
@@ -22,8 +23,12 @@ import { createSubmitKeymap } from "./input/extensions/keymaps";
 import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
-// Live-session input bar: Enter sends (submit keymap), Shift+Enter breaks the
-// line. The CardFrame footer shows the session workspace's current git branch.
+// Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
+// handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
+// turn queues the send as a Pi follow-up instead of blocking. prompt comes
+// from ChatSessionProvider — not props. The CardFrame header lists queued
+// prompts; the footer shows the session workspace's git availability and
+// current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -34,11 +39,12 @@ export function ChatInputComposer({
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
   const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
-  const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
+  const { prompt, interrupt, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
+  const pendingQueue = useStore(store, (s) => s.pendingQueue);
   const canInterrupt = status === "streaming";
-  const turnInProgressRef = useLatestRef(turnInProgress);
+  const queueLines = [...pendingQueue.steering, ...pendingQueue.followUp];
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
@@ -50,8 +56,9 @@ export function ChatInputComposer({
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      // Turn in progress or missing workspace: don't send, don't clear.
-      if (turnInProgressRef.current || workspaceUnavailableRef.current) return false;
+      // Missing workspace: don't send, don't clear. A running turn still
+      // accepts the send — it becomes a Pi follow-up.
+      if (workspaceUnavailableRef.current) return false;
       prompt(text);
       return undefined;
     },
@@ -61,6 +68,21 @@ export function ChatInputComposer({
 
   return (
     <CardFrame>
+      {queueLines.length > 0 ? (
+        <CardFrameHeader className="min-w-0 grid-rows-none gap-1 py-2">
+          <ul aria-label="Queued messages" className="flex w-full min-w-0 flex-col gap-1">
+            {queueLines.map((text, index) => (
+              <li
+                className="text-muted-foreground truncate text-sm"
+                key={`${index}:${text}`}
+                title={text}
+              >
+                {text}
+              </li>
+            ))}
+          </ul>
+        </CardFrameHeader>
+      ) : null}
       <Card
         render={
           <PromptInput
@@ -75,13 +97,21 @@ export function ChatInputComposer({
           <ChatInput />
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
-            <PromptInputSubmit
-              aria-label={canInterrupt ? "Stop generating" : "Send message"}
-              disabled={!canInterrupt && (!hasContent || turnInProgress || workspaceUnavailable)}
-              onClick={canInterrupt ? () => void interrupt() : undefined}
-              status={status}
-              type={canInterrupt ? "button" : "submit"}
-            />
+            <div className="flex items-center gap-1">
+              {canInterrupt ? (
+                <PromptInputButton
+                  aria-label="Stop generating"
+                  onClick={() => void interrupt()}
+                  variant="ghost"
+                >
+                  <SquareIcon className="size-4" />
+                </PromptInputButton>
+              ) : null}
+              <PromptInputSubmit
+                aria-label="Send message"
+                disabled={!hasContent || workspaceUnavailable}
+              />
+            </div>
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>

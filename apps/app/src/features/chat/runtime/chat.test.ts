@@ -7,6 +7,7 @@ import type {
   SessionScopedEvent,
   SessionScopedEventBody,
 } from "@getpie/contract";
+import { emptySessionPendingQueue } from "@getpie/contract";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { describe, expect, it } from "vitest";
 
@@ -40,6 +41,7 @@ class FakeTransport implements ChatSessionTransport {
   promptCalls: Array<{
     messageId: string;
     parts: ReadonlyArray<PromptPart>;
+    delivery?: "steer" | "followUp";
   }> = [];
   promptError: Error | null = null;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
@@ -54,7 +56,11 @@ class FakeTransport implements ChatSessionTransport {
       this.disposed += 1;
     };
   }
-  prompt = async (input: { messageId: string; parts: ReadonlyArray<PromptPart> }) => {
+  prompt = async (input: {
+    messageId: string;
+    parts: ReadonlyArray<PromptPart>;
+    delivery?: "steer" | "followUp";
+  }) => {
     this.promptCalls.push(input);
     if (this.promptGate) await this.promptGate;
     if (this.promptError) throw this.promptError;
@@ -86,6 +92,7 @@ const makeChat = (options?: { onTerminated?: () => void }) => {
         activeTurn: null,
         activePrompt: null,
         pendingRequests: [],
+        pendingQueue: emptySessionPendingQueue,
         cursor: 0,
         ...snapshot,
       },
@@ -469,6 +476,75 @@ describe("Chat prompting", () => {
     expect(chat.store.getState().status).toBe("submitted");
     live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
     expect(chat.store.getState().status).toBe("streaming");
+  });
+
+  it("queues a follow-up while streaming instead of pushing a transcript bubble", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    await chat.prompt("hello there");
+    live(1, {
+      type: "session.prompt.submitted",
+      messageId: transport.promptCalls[0]!.messageId,
+      parts: [{ type: "text", text: "hello there" }],
+      phase: "idle",
+    });
+    live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+
+    await chat.prompt("and then this");
+    expect(transport.promptCalls[1]).toMatchObject({
+      parts: [{ type: "text", text: "and then this" }],
+      delivery: "followUp",
+    });
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().pendingQueue.followUp).toEqual(["and then this"]);
+    expect(chat.store.getState().status).toBe("streaming");
+  });
+
+  it("replaces the pending queue from session.queue.updated", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+    live(1, {
+      type: "session.queue.updated",
+      steering: ["steer me"],
+      followUp: ["later"],
+      phase: "running",
+    });
+    expect(chat.store.getState().pendingQueue).toEqual({
+      steering: ["steer me"],
+      followUp: ["later"],
+    });
+  });
+
+  it("hydrates the pending queue from a snapshot", async () => {
+    const { chat, attach } = makeChat();
+    await attach({
+      pendingQueue: { steering: [], followUp: ["held"] },
+      status: { phase: "running" },
+      cursor: 4,
+    });
+    expect(chat.store.getState().pendingQueue.followUp).toEqual(["held"]);
+  });
+
+  it("drops an optimistic follow-up that raced to a real prompt", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    await chat.prompt("hello there");
+    live(1, {
+      type: "session.prompt.submitted",
+      messageId: transport.promptCalls[0]!.messageId,
+      parts: [{ type: "text", text: "hello there" }],
+      phase: "idle",
+    });
+    live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    await chat.prompt("and then this");
+    live(3, {
+      type: "session.prompt.submitted",
+      messageId: transport.promptCalls[1]!.messageId,
+      parts: [{ type: "text", text: "and then this" }],
+      phase: "running",
+    });
+    expect(chat.store.getState().messages).toHaveLength(2);
+    expect(chat.store.getState().pendingQueue.followUp).toEqual([]);
   });
 
   it("appends another client's prompt from the broadcast", async () => {
