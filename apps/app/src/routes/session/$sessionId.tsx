@@ -1,4 +1,4 @@
-import type { PrepareSessionOutput } from "@getpie/contract";
+import type { PrepareSessionOutput, SessionRef } from "@getpie/contract";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -19,13 +19,19 @@ export const Route = createFileRoute("/session/$sessionId")({
   loaderDeps: ({ search }) => search,
   loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
     const { session } = context.orpcQueryUtils.agent;
+    const prepareWithBranch = (ref: SessionRef) => {
+      void context.queryClient.prefetchQuery(
+        context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
+      );
+      return session.prepare.call({ ref });
+    };
 
     if (deps.projectId !== undefined) {
       const hinted = {
         projectId: deps.projectId,
         sessionId: params.sessionId,
       };
-      const prepared = await session.prepare.call({ ref: hinted }).catch((error: unknown) => {
+      const prepared = await prepareWithBranch(hinted).catch((error: unknown) => {
         console.warn("Preparing the URL's ref failed, falling back to lookup", error);
         return undefined;
       });
@@ -39,7 +45,7 @@ export const Route = createFileRoute("/session/$sessionId")({
         toast.error(`Session ${params.sessionId} could not be found.`);
         throw redirect({ to: "/draft" });
       });
-    return session.prepare.call({ ref }).catch((error: unknown) => {
+    return prepareWithBranch(ref).catch((error: unknown) => {
       console.error("Failed to prepare session", error);
       toast.error(
         `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,
