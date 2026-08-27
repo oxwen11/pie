@@ -30,8 +30,10 @@ export function ProjectSelect({
     >
       {/* The name is only the folder's basename, so two projects can share one —
           the path is what actually tells them apart. */}
+      {/* The draft header row owns the edge bleed (-mx-5.5) for every pick; a
+          trigger-level margin would stack with it and poke past the card. */}
       <SelectTrigger
-        className="hover:bg-accent -mx-5.5 w-auto min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+        className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"
         title={selected?.path}
       >
