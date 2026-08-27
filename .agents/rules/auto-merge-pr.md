@@ -6,6 +6,8 @@ Eligible only if all hold: repo `oxwen11/pie`; base `main`; author `oxwen11`; no
 
 Merge with `gh pr merge <n> --squash --delete-branch` only. No merge commit, rebase merge, `--admin`, or force-push.
 
+When auto-merge is skipped or ineligible, **do not post a PR comment or review**. Exit silently.
+
 ## Allowed
 
 - Docs, CI, tooling, agent rules.
@@ -16,4 +18,3 @@ Merge with `gh pr merge <n> --squash --delete-branch` only. No merge commit, reb
 ## Never
 
 feat / fix / perf / refactor of product behavior; desktop / Dock / sidebar; CSS / visual tweaks; runtime dep upgrades; tests that also change product control flow; `packages/ui/src/components/**` except oxfmt/import reorder.
-
