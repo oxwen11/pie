@@ -2,22 +2,12 @@ import type { Project, Automation } from "@getpie/contract";
 import { MAX_AUTOMATIONS } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "@getpie/ui/components/dialog";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { Switch } from "@getpie/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
@@ -26,49 +16,33 @@ import { toast } from "sonner";
 
 import Loader from "@/components/loader";
 
-import { AutomationForm, type AutomationFormSubmit } from "./automation-form";
-import { formatNextRun, formatRunStatus, formatSkipReason, formatSpec } from "./cadence";
+import { AutomationCard } from "./automation-card";
+import { AutomationDeleteDialog } from "./automation-delete-dialog";
+import { AutomationEditorDialog, type AutomationEditorState } from "./automation-editor-dialog";
+import type { AutomationFormSubmit } from "./automation-form";
+import { AutomationRunHistory } from "./automation-run-history";
 
 export type AutomationPageProps = {
   readonly projects: ReadonlyArray<Project>;
   readonly projectsReady: boolean;
 };
 
-type EditorState =
-  | { readonly mode: "create" }
-  | { readonly mode: "edit"; readonly automation: Automation };
-
-function lastRunLabel(automation: Automation): string | null {
-  if (automation.lastRunStatus === undefined || automation.lastRunAt === undefined) return null;
-  const when = new Date(automation.lastRunAt).toLocaleString();
-  if (automation.lastRunStatus === "running") return `Running since ${when}`;
-  if (automation.lastRunStatus === "succeeded") return `Last run ${when}`;
-  if (automation.lastRunStatus === "interrupted") return `Interrupted ${when}`;
-  if (automation.lastRunStatus === "missed") {
-    const missed = automation.runs[0]?.missedCount;
-    return missed !== undefined && missed > 0
-      ? `Missed ${missed} run${missed === 1 ? "" : "s"} ${when}`
-      : `Missed ${when}`;
-  }
-  if (automation.lastRunStatus === "skipped") {
-    const reason = automation.runs[0]?.skipReason;
-    return reason === undefined
-      ? `Skipped ${when}`
-      : `Skipped (${formatSkipReason(reason)}) ${when}`;
-  }
-  return automation.lastError === undefined
-    ? `Failed ${when}`
-    : `Failed ${when}: ${automation.lastError}`;
-}
-
 export function AutomationPage({ projects, projectsReady }: AutomationPageProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [editor, setEditor] = useState<EditorState | null>(null);
+  const [editor, setEditor] = useState<AutomationEditorState | null>(null);
   const [deleting, setDeleting] = useState<Automation | null>(null);
+  const [history, setHistory] = useState<Automation | null>(null);
 
-  const automations = useQuery(orpcQueryUtils.automation.list.queryOptions());
+  const automations = useQuery({
+    ...orpcQueryUtils.automation.list.queryOptions(),
+    refetchInterval: (query) => {
+      const items = query.state.data;
+      if (items === undefined) return false;
+      return items.some((item) => item.lastRunStatus === "running") ? 2_000 : 10_000;
+    },
+  });
 
   const invalidate = () =>
     Promise.all([
@@ -152,6 +126,8 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
   });
 
   const items = automations.data ?? [];
+  const historyAutomation =
+    history === null ? null : (items.find((item) => item.id === history.id) ?? history);
   const atLimit = items.length >= MAX_AUTOMATIONS;
   const canCreate = projectsReady && projects.length > 0 && !atLimit;
 
@@ -207,146 +183,71 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         </Empty>
       ) : (
         <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
-          {items.map((automation) => {
-            const project = projects.find((item) => item.id === automation.projectId);
-            const lastRun = lastRunLabel(automation);
-            return (
-              <li
-                className="border-border bg-card flex flex-col gap-3 rounded-xl border p-4"
-                key={automation.id}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{automation.name}</div>
-                    <div className="text-muted-foreground truncate text-sm">
-                      {project?.name ?? "Unknown project"} · {formatSpec(automation.spec)}
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                      {formatNextRun(
-                        automation.nextRunAt,
-                        automation.enabled,
-                        automation.pauseReason,
-                      )}
-                    </div>
-                    {lastRun !== null ? (
-                      <div className="text-muted-foreground text-sm">{lastRun}</div>
-                    ) : null}
-                    {automation.runs.length > 0 ? (
-                      <ol className="text-muted-foreground mt-1 flex flex-col gap-0.5 text-xs">
-                        {automation.runs.slice(0, 3).map((run) => (
-                          <li key={run.id}>
-                            {formatRunStatus(run.status)}
-                            {run.skipReason !== undefined
-                              ? ` (${formatSkipReason(run.skipReason)})`
-                              : ""}
-                            {` · ${new Date(run.startedAt).toLocaleString()}`}
-                          </li>
-                        ))}
-                      </ol>
-                    ) : null}
-                  </div>
-                  <Switch
-                    aria-label={automation.enabled ? "Pause automation" : "Enable automation"}
-                    checked={automation.enabled}
-                    disabled={update.isPending}
-                    onCheckedChange={(enabled) => update.mutate({ id: automation.id, enabled })}
-                  />
-                </div>
-                <div className="flex flex-wrap justify-end gap-1">
-                  <Button
-                    disabled={runNow.isPending}
-                    onClick={() => runNow.mutate(automation.id)}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Run now
-                  </Button>
-                  <Button
-                    onClick={() => setEditor({ mode: "edit", automation })}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Edit
-                  </Button>
-                  <Button onClick={() => setDeleting(automation)} size="sm" variant="ghost">
-                    Delete
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
+          {items.map((automation) => (
+            <AutomationCard
+              automation={automation}
+              key={automation.id}
+              onDelete={() => setDeleting(automation)}
+              onEdit={() => setEditor({ mode: "edit", automation })}
+              onHistory={() => setHistory(automation)}
+              onRunNow={() => runNow.mutate(automation.id)}
+              onToggle={(enabled) => update.mutate({ id: automation.id, enabled })}
+              projectName={
+                projects.find((item) => item.id === automation.projectId)?.name ?? "Unknown project"
+              }
+              running={runNow.isPending}
+              updating={update.isPending}
+            />
+          ))}
         </ul>
       )}
 
       {editor !== null ? (
-        <Dialog
-          onOpenChange={(open) => {
-            if (!open && !create.isPending && !update.isPending) setEditor(null);
+        <AutomationEditorDialog
+          editor={editor}
+          onClose={() => setEditor(null)}
+          onSubmit={(value) => {
+            if (editor.mode === "create") {
+              create.mutate(value);
+              return;
+            }
+            update.mutate({ id: editor.automation.id, ...value });
           }}
-          open
-        >
-          <DialogPopup className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>
-                {editor.mode === "create" ? "New automation" : "Edit automation"}
-              </DialogTitle>
-              <DialogDescription>
-                When this is due, pie starts a session in the project and sends the prompt.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogPanel>
-              <AutomationForm
-                initial={editor.mode === "edit" ? editor.automation : undefined}
-                onCancel={() => setEditor(null)}
-                onSubmit={(value) => {
-                  if (editor.mode === "create") {
-                    create.mutate(value);
-                    return;
-                  }
-                  update.mutate({ id: editor.automation.id, ...value });
-                }}
-                projects={projects}
-                submitting={create.isPending || update.isPending}
-              />
-            </DialogPanel>
-          </DialogPopup>
-        </Dialog>
+          projects={projects}
+          submitting={create.isPending || update.isPending}
+        />
+      ) : null}
+
+      {historyAutomation !== null ? (
+        <AutomationRunHistory
+          automation={historyAutomation}
+          nowMs={Date.now()}
+          onClose={() => setHistory(null)}
+          onOpenSession={(sessionId) => {
+            const projectId = historyAutomation.projectId;
+            setHistory(null);
+            navigate({
+              to: "/session/$sessionId",
+              params: { sessionId },
+              search: { projectId },
+            }).catch((error: unknown) => {
+              console.error("Failed to open the automation session", error);
+            });
+          }}
+          projectName={
+            projects.find((item) => item.id === historyAutomation.projectId)?.name ??
+            "Unknown project"
+          }
+        />
       ) : null}
 
       {deleting !== null ? (
-        <Dialog
-          onOpenChange={(open) => {
-            if (!open && !remove.isPending) setDeleting(null);
-          }}
-          open
-        >
-          <DialogPopup className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete automation</DialogTitle>
-              <DialogDescription>
-                {deleting.name} will stop creating sessions. Sessions it already created stay in the
-                sidebar.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                disabled={remove.isPending}
-                onClick={() => setDeleting(null)}
-                type="button"
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(deleting.id)}
-                variant="destructive"
-              >
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogPopup>
-        </Dialog>
+        <AutomationDeleteDialog
+          name={deleting.name}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => remove.mutate(deleting.id)}
+          pending={remove.isPending}
+        />
       ) : null}
     </div>
   );

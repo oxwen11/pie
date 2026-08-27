@@ -3,12 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   defaultOnceLocal,
   defaultAutomationForm,
+  formatLastRun,
   formatNextRun,
+  formatRunDuration,
+  formatRunReason,
   formatRunStatus,
+  formatRunSummary,
   formatSkipReason,
   formatSpec,
   formFromSpec,
   specFromForm,
+  summarizeRuns,
 } from "./cadence";
 
 describe("specFromForm", () => {
@@ -110,6 +115,55 @@ describe("formatRunStatus", () => {
     expect(formatRunStatus("succeeded")).toBe("Succeeded");
     expect(formatRunStatus("missed")).toBe("Missed");
     expect(formatSkipReason("queue_overflow")).toBe("already running");
+  });
+});
+
+describe("run history labels", () => {
+  it("labels fire reasons and durations", () => {
+    expect(formatRunReason("manual")).toBe("Run now");
+    expect(formatRunReason("scheduled")).toBe("Scheduled");
+    expect(formatRunReason("missed_recovery")).toBe("Missed recovery");
+    expect(formatRunDuration("2026-08-27T09:00:00.000Z", "2026-08-27T09:00:02.400Z", 0)).toBe("2s");
+    expect(
+      formatRunDuration(
+        "2026-08-27T09:00:00.000Z",
+        undefined,
+        Date.parse("2026-08-27T09:01:30.000Z"),
+      ),
+    ).toBe("1m 30s");
+  });
+
+  it("summarizes stored run statuses in one pass", () => {
+    expect(
+      formatRunSummary(
+        summarizeRuns([
+          { status: "succeeded" },
+          { status: "succeeded" },
+          { status: "failed" },
+          { status: "missed" },
+          { status: "running" },
+        ]),
+      ),
+    ).toBe("1 running · 2 succeeded · 1 failed · 1 missed");
+    expect(formatRunSummary(summarizeRuns([]))).toBeNull();
+  });
+
+  it("labels the latest run on the card", () => {
+    expect(
+      formatLastRun({
+        lastRunStatus: "skipped",
+        lastRunAt: "2026-08-27T09:00:00.000Z",
+        runs: [{ skipReason: "expired" }],
+      }),
+    ).toBe(`Skipped (expired) ${new Date("2026-08-27T09:00:00.000Z").toLocaleString()}`);
+    expect(
+      formatLastRun({
+        lastRunStatus: "failed",
+        lastRunAt: "2026-08-27T09:00:00.000Z",
+        lastError: "session crashed",
+        runs: [],
+      }),
+    ).toBe(`Failed ${new Date("2026-08-27T09:00:00.000Z").toLocaleString()}: session crashed`);
   });
 });
 

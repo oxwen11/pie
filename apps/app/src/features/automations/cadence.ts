@@ -1,5 +1,6 @@
 import type {
   AutomationPauseReason,
+  AutomationRunReason,
   AutomationRunStatus,
   AutomationSkipReason,
   AutomationSpec,
@@ -341,4 +342,97 @@ export function formatSkipReason(reason: AutomationSkipReason): string {
   if (reason === "project_missing") return "project missing";
   if (reason === "queue_overflow") return "already running";
   return "expired";
+}
+
+export function formatRunReason(reason: AutomationRunReason): string {
+  if (reason === "manual") return "Run now";
+  if (reason === "missed_recovery") return "Missed recovery";
+  if (reason === "catch_up") return "Catch-up";
+  return "Scheduled";
+}
+
+export type AutomationRunSummary = {
+  readonly running: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly skipped: number;
+  readonly missed: number;
+  readonly interrupted: number;
+};
+
+export function summarizeRuns(
+  runs: ReadonlyArray<{ readonly status: AutomationRunStatus }>,
+): AutomationRunSummary {
+  const summary = {
+    running: 0,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+    missed: 0,
+    interrupted: 0,
+  };
+  for (const run of runs) {
+    summary[run.status] += 1;
+  }
+  return summary;
+}
+
+export function formatRunSummary(summary: AutomationRunSummary): string | null {
+  const parts: string[] = [];
+  if (summary.running > 0) parts.push(`${summary.running} running`);
+  if (summary.succeeded > 0) parts.push(`${summary.succeeded} succeeded`);
+  if (summary.failed > 0) parts.push(`${summary.failed} failed`);
+  if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
+  if (summary.missed > 0) parts.push(`${summary.missed} missed`);
+  if (summary.interrupted > 0) parts.push(`${summary.interrupted} interrupted`);
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+export function formatLastRun(automation: {
+  readonly lastRunStatus?: AutomationRunStatus;
+  readonly lastRunAt?: string;
+  readonly lastError?: string;
+  readonly runs: ReadonlyArray<{
+    readonly missedCount?: number;
+    readonly skipReason?: AutomationSkipReason;
+  }>;
+}): string | null {
+  if (automation.lastRunStatus === undefined || automation.lastRunAt === undefined) return null;
+  const when = new Date(automation.lastRunAt).toLocaleString();
+  if (automation.lastRunStatus === "running") return `Running since ${when}`;
+  if (automation.lastRunStatus === "succeeded") return `Last run ${when}`;
+  if (automation.lastRunStatus === "interrupted") return `Interrupted ${when}`;
+  if (automation.lastRunStatus === "missed") {
+    const missed = automation.runs[0]?.missedCount;
+    return missed !== undefined && missed > 0
+      ? `Missed ${missed} run${missed === 1 ? "" : "s"} ${when}`
+      : `Missed ${when}`;
+  }
+  if (automation.lastRunStatus === "skipped") {
+    const reason = automation.runs[0]?.skipReason;
+    return reason === undefined
+      ? `Skipped ${when}`
+      : `Skipped (${formatSkipReason(reason)}) ${when}`;
+  }
+  return automation.lastError === undefined
+    ? `Failed ${when}`
+    : `Failed ${when}: ${automation.lastError}`;
+}
+
+export function formatRunDuration(
+  startedAt: string,
+  finishedAt: string | undefined,
+  nowMs: number,
+): string | null {
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return null;
+  const end = finishedAt === undefined ? nowMs : Date.parse(finishedAt);
+  if (Number.isNaN(end) || end < start) return null;
+  const ms = end - start;
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder === 0 ? `${minutes}m` : `${minutes}m ${remainder}s`;
 }
