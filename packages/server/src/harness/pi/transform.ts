@@ -222,7 +222,10 @@ export function createPiTransform(
         yield {
           type: "data-queue",
           transient: true,
-          data: { steering: event.steering, followUp: event.followUp },
+          data: {
+            steering: Array.from(event.steering),
+            followUp: Array.from(event.followUp),
+          },
         };
         break;
 

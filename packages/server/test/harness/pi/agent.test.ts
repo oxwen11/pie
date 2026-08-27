@@ -254,6 +254,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       const first = yield* agent.session.prompt({ sessionId, text: "hold" });
       assert.equal(first.started, true);
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
 
       const second = yield* agent.session.prompt({
         sessionId,
@@ -263,8 +264,9 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       assert.equal(second.started, false);
       assert.equal(second.turnId, first.turnId);
 
-      yield* agent.session.abort(sessionId);
-      const chunks = Array.from(yield* Stream.runCollect(first.output));
+      yield* agent.session.interrupt(sessionId);
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.equal(chunks.at(-1)?.type, "finish");
       assert.equal(
         chunks.some(
           (chunk) =>
@@ -274,6 +276,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         ),
         true,
       );
+      yield* agent.session.abort(sessionId);
     }),
   );
 
