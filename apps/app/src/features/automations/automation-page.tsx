@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import Loader from "@/components/loader";
 
 import { AutomationForm, type AutomationFormSubmit } from "./automation-form";
-import { formatNextRun, formatSpec } from "./cadence";
+import { formatNextRun, formatRunStatus, formatSkipReason, formatSpec } from "./cadence";
 
 export type AutomationPageProps = {
   readonly projects: ReadonlyArray<Project>;
@@ -41,10 +41,20 @@ type EditorState =
 function lastRunLabel(automation: Automation): string | null {
   if (automation.lastRunStatus === undefined || automation.lastRunAt === undefined) return null;
   const when = new Date(automation.lastRunAt).toLocaleString();
-  if (automation.lastRunStatus === "started") return `Last run ${when}`;
+  if (automation.lastRunStatus === "running") return `Running since ${when}`;
+  if (automation.lastRunStatus === "succeeded") return `Last run ${when}`;
+  if (automation.lastRunStatus === "interrupted") return `Interrupted ${when}`;
+  if (automation.lastRunStatus === "missed") {
+    const missed = automation.runs[0]?.missedCount;
+    return missed !== undefined && missed > 0
+      ? `Missed ${missed} run${missed === 1 ? "" : "s"} ${when}`
+      : `Missed ${when}`;
+  }
   if (automation.lastRunStatus === "skipped") {
     const reason = automation.runs[0]?.skipReason;
-    return reason === undefined ? `Skipped ${when}` : `Skipped (${reason}) ${when}`;
+    return reason === undefined
+      ? `Skipped ${when}`
+      : `Skipped (${formatSkipReason(reason)}) ${when}`;
   }
   return automation.lastError === undefined
     ? `Failed ${when}`
@@ -73,6 +83,8 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         projectId: value.projectId,
         prompt: value.prompt,
         spec: value.spec,
+        outputMode: value.outputMode,
+        ...(value.expiresAt !== null ? { expiresAt: value.expiresAt } : undefined),
         ...(value.worktree ? { worktree: {} } : undefined),
       }),
     onSuccess: () => {
@@ -94,6 +106,8 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         ...(input.prompt !== undefined ? { prompt: input.prompt } : undefined),
         ...(input.spec !== undefined ? { spec: input.spec } : undefined),
         ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
+        ...(input.outputMode !== undefined ? { outputMode: input.outputMode } : undefined),
+        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
         ...(input.worktree === true ? { worktree: {} } : undefined),
       }),
     onSuccess: () => {
@@ -160,7 +174,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-start justify-between gap-3 px-6 py-4">
         <p className="text-muted-foreground text-sm">
-          Create a new session on a cadence. These live on the server, not inside a chat.
+          Create a session on a cadence. These live on the server, not inside a chat.
         </p>
         <Button
           disabled={!canCreate}
@@ -208,10 +222,27 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
                       {project?.name ?? "Unknown project"} · {formatSpec(automation.spec)}
                     </div>
                     <div className="text-muted-foreground text-sm">
-                      {formatNextRun(automation.nextRunAt, automation.enabled)}
+                      {formatNextRun(
+                        automation.nextRunAt,
+                        automation.enabled,
+                        automation.pauseReason,
+                      )}
                     </div>
                     {lastRun !== null ? (
                       <div className="text-muted-foreground text-sm">{lastRun}</div>
+                    ) : null}
+                    {automation.runs.length > 0 ? (
+                      <ol className="text-muted-foreground mt-1 flex flex-col gap-0.5 text-xs">
+                        {automation.runs.slice(0, 3).map((run) => (
+                          <li key={run.id}>
+                            {formatRunStatus(run.status)}
+                            {run.skipReason !== undefined
+                              ? ` (${formatSkipReason(run.skipReason)})`
+                              : ""}
+                            {` · ${new Date(run.startedAt).toLocaleString()}`}
+                          </li>
+                        ))}
+                      </ol>
                     ) : null}
                   </div>
                   <Switch
@@ -260,7 +291,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
                 {editor.mode === "create" ? "New automation" : "Edit automation"}
               </DialogTitle>
               <DialogDescription>
-                When this is due, pie creates a new session in the project and sends the prompt.
+                When this is due, pie starts a session in the project and sends the prompt.
               </DialogDescription>
             </DialogHeader>
             <DialogPanel>

@@ -1,7 +1,7 @@
 import type { Project, Automation, AutomationSpec } from "@getpie/contract";
 import { MAX_AUTOMATION_NAME_CHARS, MAX_AUTOMATION_PROMPT_CHARS } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
-import { Field, FieldError, FieldLabel } from "@getpie/ui/components/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
 import {
   Select,
@@ -16,12 +16,16 @@ import { useState } from "react";
 
 import {
   CADENCE_OPTIONS,
+  EVERY_UNIT_OPTIONS,
   type AutomationFormValues,
   WEEKDAY_OPTIONS,
   defaultOnceLocal,
   defaultAutomationForm,
   formFromSpec,
+  isoToLocalDateTime,
   isAutomationCadence,
+  isAutomationEveryUnit,
+  localDateTimeToIso,
   specFromForm,
 } from "./cadence";
 
@@ -31,6 +35,8 @@ export type AutomationFormSubmit = {
   readonly prompt: string;
   readonly spec: AutomationSpec;
   readonly worktree: boolean;
+  readonly outputMode: "independent" | "merged";
+  readonly expiresAt: string | null;
 };
 
 export type AutomationFormProps = {
@@ -53,6 +59,8 @@ function formFromAutomation(
     name: initial.name,
     prompt: initial.prompt,
     worktree: initial.worktree !== undefined,
+    reuseSession: initial.outputMode === "merged",
+    expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     ...formFromSpec(initial.spec, base),
   };
 }
@@ -67,13 +75,15 @@ export function AutomationForm({
   const [form, setForm] = useState(() => formFromAutomation(projects, initial));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = initial !== undefined;
+  const everyAmount = Number(form.everyAmount);
   const canSubmit =
     !submitting &&
     form.name.trim().length > 0 &&
     form.projectId.length > 0 &&
     form.prompt.trim().length > 0 &&
     (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0);
+    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
+    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1));
 
   return (
     <form
@@ -95,6 +105,8 @@ export function AutomationForm({
             prompt: form.prompt.trim(),
             spec,
             worktree: form.worktree,
+            outputMode: form.reuseSession ? "merged" : "independent",
+            expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -172,6 +184,49 @@ export function AutomationForm({
           </SelectContent>
         </Select>
       </Field>
+      {form.cadence === "every" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Field>
+            <FieldLabel htmlFor="automation-every-amount">Every</FieldLabel>
+            <Input
+              id="automation-every-amount"
+              min={1}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, everyAmount: event.target.value }))
+              }
+              required
+              type="number"
+              value={form.everyAmount}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="automation-every-unit">Unit</FieldLabel>
+            <Select
+              items={EVERY_UNIT_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.value,
+              }))}
+              onValueChange={(next) => {
+                if (typeof next === "string" && isAutomationEveryUnit(next)) {
+                  setForm((current) => ({ ...current, everyUnit: next }));
+                }
+              }}
+              value={form.everyUnit}
+            >
+              <SelectTrigger id="automation-every-unit">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EVERY_UNIT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      ) : null}
       {form.cadence === "daily" || form.cadence === "weekdays" || form.cadence === "weekly" ? (
         <Field>
           <FieldLabel htmlFor="automation-time">Time</FieldLabel>
@@ -221,17 +276,60 @@ export function AutomationForm({
         </Field>
       ) : null}
       {form.cadence === "cron" ? (
-        <Field>
-          <FieldLabel htmlFor="automation-cron">Cron</FieldLabel>
-          <Input
-            id="automation-cron"
-            onChange={(event) => setForm((current) => ({ ...current, cron: event.target.value }))}
-            placeholder="0 9 * * 1-5"
-            required
-            value={form.cron}
-          />
-        </Field>
+        <>
+          <Field>
+            <FieldLabel htmlFor="automation-cron">Cron</FieldLabel>
+            <Input
+              id="automation-cron"
+              onChange={(event) => setForm((current) => ({ ...current, cron: event.target.value }))}
+              placeholder="0 9 * * 1-5"
+              required
+              value={form.cron}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="automation-timezone">Timezone</FieldLabel>
+            <Input
+              id="automation-timezone"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, timeZone: event.target.value }))
+              }
+              placeholder="Leave empty for the server's local timezone"
+              value={form.timeZone}
+            />
+            <FieldDescription>IANA name, for example UTC or America/New_York.</FieldDescription>
+          </Field>
+        </>
       ) : null}
+      <Field>
+        <FieldLabel htmlFor="automation-expires">Expires</FieldLabel>
+        <Input
+          id="automation-expires"
+          onChange={(event) =>
+            setForm((current) => ({ ...current, expiresAt: event.target.value }))
+          }
+          type="datetime-local"
+          value={form.expiresAt}
+        />
+        <FieldDescription>Optional. After this time the automation pauses itself.</FieldDescription>
+      </Field>
+      <Field>
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="min-w-0">
+            <FieldLabel htmlFor="automation-reuse">Reuse one session</FieldLabel>
+            <FieldDescription>
+              Keep sending prompts to the same chat instead of creating a new one.
+            </FieldDescription>
+          </div>
+          <Switch
+            checked={form.reuseSession}
+            id="automation-reuse"
+            onCheckedChange={(checked) =>
+              setForm((current) => ({ ...current, reuseSession: checked }))
+            }
+          />
+        </div>
+      </Field>
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
           <FieldLabel htmlFor="automation-worktree">Isolated worktree</FieldLabel>
