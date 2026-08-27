@@ -1,14 +1,15 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  // Named entries become `dist/<name>.mjs` (Node + ESM + fixedExtension).
-  // Oxlint loads those paths from the repo root `.oxlintrc.json`.
+  // Entry names are the oxlint plugin names and the package.json export
+  // subpaths (`@getpie/oxlint/pie`, …). Dist files stay gitignored; the
+  // repo-root `.oxlintrc.json` loads them through those exports.
   entry: {
+    pie: "./node-import-style.ts",
+    "pie-boundaries": "./feature-boundaries.ts",
+    "pie-query": "./query-policy.ts",
     "anti-slop": "./anti-slop/index.ts",
     "anti-slop-effect": "./anti-slop/effect/index.ts",
-    "node-import-style": "./node-import-style.ts",
-    "feature-boundaries": "./feature-boundaries.ts",
-    "query-policy": "./query-policy.ts",
   },
   platform: "node",
   format: ["esm"],

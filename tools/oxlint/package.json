@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./pie": "./dist/pie.mjs",
+    "./pie-boundaries": "./dist/pie-boundaries.mjs",
+    "./pie-query": "./dist/pie-query.mjs",
+    "./anti-slop": "./dist/anti-slop.mjs",
+    "./anti-slop-effect": "./dist/anti-slop-effect.mjs"
+  },
   "scripts": {
     "build": "tsdown",
     "lint": "oxlint --fix \"$(cd ../.. && pwd)\"",

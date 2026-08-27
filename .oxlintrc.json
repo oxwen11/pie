@@ -2,18 +2,12 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "unicorn", "oxc", "jsx-a11y", "vitest", "vue"],
   "jsPlugins": [
-    { "name": "pie", "specifier": "./tools/oxlint/dist/node-import-style.mjs" },
-    {
-      "name": "pie-boundaries",
-      "specifier": "./tools/oxlint/dist/feature-boundaries.mjs"
-    },
-    { "name": "pie-query", "specifier": "./tools/oxlint/dist/query-policy.mjs" },
+    { "name": "pie", "specifier": "@getpie/oxlint/pie" },
+    { "name": "pie-boundaries", "specifier": "@getpie/oxlint/pie-boundaries" },
+    { "name": "pie-query", "specifier": "@getpie/oxlint/pie-query" },
     "eslint-plugin-react-you-might-not-need-an-effect",
-    { "name": "anti-slop", "specifier": "./tools/oxlint/dist/anti-slop.mjs" },
-    {
-      "name": "anti-slop-effect",
-      "specifier": "./tools/oxlint/dist/anti-slop-effect.mjs"
-    }
+    { "name": "anti-slop", "specifier": "@getpie/oxlint/anti-slop" },
+    { "name": "anti-slop-effect", "specifier": "@getpie/oxlint/anti-slop-effect" }
   ],
   "categories": {
     "correctness": "error",

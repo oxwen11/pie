@@ -9,13 +9,14 @@
   changing versions. `packages/server` pins the Claude SDK as a literal while
   `packages/pie` uses `catalog:` — bump both together.
 - **Lint:** `lint` / `lint:check` are turbo tasks (`dependsOn:
-  ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist in
-  `tools/oxlint/dist/` before oxlint loads them. `lint:check` still runs
-  `--deny-warnings`, so the whole `suspicious` category fails CI while only
-  warning locally. oxfmt reorders imports and stays a root-only script.
-  Custom plugins live in `tools/oxlint/` (`pie`, `pie-boundaries`,
-  `pie-query`, vendored `anti-slop` / `anti-slop-effect`) as TypeScript and
-  are emitted to `tools/oxlint/dist/` by `@getpie/oxlint#build`. Effect service
+  ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
+  oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
+  whole `suspicious` category fails CI while only warning locally. oxfmt
+  reorders imports and stays a root-only script. Custom plugins live in
+  `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
+  `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
+  emits them to `dist/`; the root `.oxlintrc.json` loads them as
+  `@getpie/oxlint/<plugin>` (root depends on the workspace package). Effect service
   types keep the `Shape` suffix (`Context.Service<Self, Shape>`), so
   `anti-slop/no-shape-in-symbol-names` is off. Composition roots still call
   `make*` constructors, so `anti-slop-effect/no-service-constructor-imports`
