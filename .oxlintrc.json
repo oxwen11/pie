@@ -16,7 +16,7 @@
   "rules": {
     "unicorn/prefer-node-protocol": "error",
     "pie/node-import-style": "error",
-    "pie/no-void-expression": "error",
+    "no-void": "error",
     "pie-boundaries/feature-no-route-match": "error",
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",

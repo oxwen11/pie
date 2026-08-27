@@ -5,7 +5,7 @@ export default defineConfig({
   // subpaths (`@getpie/oxlint/pie`, …). Dist files stay gitignored; the
   // repo-root `.oxlintrc.json` loads them through those exports.
   entry: {
-    pie: "./pie.ts",
+    pie: "./node-import-style.ts",
     "pie-boundaries": "./feature-boundaries.ts",
     "pie-query": "./query-policy.ts",
     "anti-slop": "./anti-slop/index.ts",
