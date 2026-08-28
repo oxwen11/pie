@@ -18,6 +18,7 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
+import { SettingsRepositoryLayer, SettingsServiceLayer } from "../src/settings";
 
 export async function makeRpcTestHarness(home: string) {
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
@@ -44,6 +45,10 @@ export async function makeRpcTestHarness(home: string) {
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsServiceLayer = SettingsServiceLayer.pipe(
+    Layer.provide(SettingsRepositoryLayer),
+    Layer.provide(pathsLayer),
+  );
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -64,6 +69,7 @@ export async function makeRpcTestHarness(home: string) {
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    settingsServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),

@@ -17,6 +17,7 @@ import {
   SessionScopedEventTypes,
   SubscribeInputSchema,
 } from "../src/domain";
+import { SettingsSchema } from "../src/settings";
 
 const UUID = "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61";
 const ref = { projectId: UUID, sessionId: "s1" };
@@ -153,5 +154,18 @@ describe("event partition", () => {
 describe("server error map", () => {
   it("exposes every stable code as an oRPC error entry", () => {
     for (const code of ServerErrorCodes) expect(serverErrors).toHaveProperty(code);
+  });
+});
+
+describe("Settings", () => {
+  it("accepts system, light, and dark themes", () => {
+    expect(accepts(SettingsSchema, { appearance: { theme: "system" } })).toBe(true);
+    expect(accepts(SettingsSchema, { appearance: { theme: "light" } })).toBe(true);
+    expect(accepts(SettingsSchema, { appearance: { theme: "dark" } })).toBe(true);
+  });
+
+  it("rejects a missing appearance table or an unknown theme", () => {
+    expect(accepts(SettingsSchema, {})).toBe(false);
+    expect(accepts(SettingsSchema, { appearance: { theme: "sepia" } })).toBe(false);
   });
 });

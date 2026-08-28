@@ -8,12 +8,15 @@ import { Context, Layer } from "effect";
  * so tests can point it at a temp dir instead of `~/.pie`.
  *
  * `projects.json` lives under `storage/` (a data collection).
+ * `config.toml` lives at the home root (operator-facing settings).
  */
 export class Paths extends Context.Service<
   Paths,
   {
     readonly home: string;
     readonly projectsFile: string;
+    /** `$PIE_HOME/config.toml` — operator settings, not a storage collection. */
+    readonly configFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
     /** `worktrees/` — git worktree checkouts, grouped per repository. */
@@ -26,6 +29,8 @@ export class Paths extends Context.Service<
 /** Owner-only, matching `daemon.pid`. Shared by the log layer and the launcher. */
 export const LOGS_DIRECTORY_MODE = 0o700;
 export const LOG_FILE_MODE = 0o600;
+/** Owner-only, matching log files — `config.toml` may grow secrets later. */
+export const CONFIG_FILE_MODE = 0o600;
 
 export const PIE_LOG_FILE = "pie.log";
 export const DAEMON_STDIO_LOG_FILE = "daemon-stdio.log";
@@ -33,6 +38,7 @@ export const DAEMON_STDIO_LOG_FILE = "daemon-stdio.log";
 const resolve = (home: string) => ({
   home,
   projectsFile: path.join(home, "storage", "projects.json"),
+  configFile: configFilePath(home),
   sessionsDir: path.join(home, "storage", "sessions"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
@@ -99,6 +105,9 @@ export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): Dae
 export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): string {
   return resolveDaemonLocation(env).daemonDir;
 }
+
+/** `$PIE_HOME/config.toml` — operator settings. */
+export const configFilePath = (home: string): string => path.join(home, "config.toml");
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
