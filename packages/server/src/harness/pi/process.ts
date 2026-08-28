@@ -15,13 +15,13 @@ import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
-import type { PiExecutable } from "./resolve-executable";
+import { resolvePiExecutable, type PiExecutable } from "./resolve-executable";
 import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
 
-// Pi facade: one `pi --mode rpc` child per session (pi's RPC mode hosts a
-// single session), unlike codex's shared app-server with thread demuxing.
+// Pi facade: one pie-owned Pi process per session (AgentSessionRuntime in a
+// child), unlike a shared app-server with thread demuxing.
 // Crash isolation therefore comes for free — a dead child only takes down its
 // own session — and there is no transport-generation bookkeeping.
 
@@ -668,8 +668,8 @@ export const makePiProcess = (
   makePiProcessWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
-        ...(options.executable ? { executable: options.executable } : undefined),
-        ...(options.args ? { args: options.args } : undefined),
+        executable: options.executable ?? resolvePiExecutable(),
+        ...(options.args ? { args: options.args } : {}),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : undefined),
       }),

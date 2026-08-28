@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, type Page } from "@playwright/test";
 
-import { expect, stopDaemonFor, test } from "./fixtures.js";
+import { expect, hasPiAuth, stopDaemonFor, test } from "./fixtures.js";
 
 function appPid(electronApp: ElectronApplication): number {
   const pid = electronApp.process().pid;
@@ -214,10 +214,8 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
   }
 });
 
-test("chats through Claude Agent SDK and the fake Claude executable", async ({
-  e2ePaths,
-  window,
-}) => {
+test("chats through the pie Pi process and a real model", async ({ window }) => {
+  test.skip(!hasPiAuth(), "Pi auth is required for a real-model turn");
   // The app lands on /draft, the new-session surface: picking the seeded
   // project and typing the first message creates the session and navigates
   // into it. There is no default project — the composer blocks until one is
@@ -228,20 +226,13 @@ test("chats through Claude Agent SDK and the fake Claude executable", async ({
   await window.getByRole("option", { name: /e2e-workspace/ }).click();
 
   const input = window.locator("[contenteditable='true']");
-  await input.fill("Desktop SDK E2E");
+  await input.fill("Reply with exactly: PONG");
   await input.press("Enter");
 
   await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
-  // Scoped to the transcript: the prompt text also becomes the session's
-  // optimistic title in the sidebar.
   const transcript = window.getByRole("log");
-  await expect(transcript.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
-  await expect(transcript.getByText("Desktop fake Claude reply", { exact: true })).toBeVisible();
-  await expect
-    .poll(() =>
-      fs.existsSync(e2ePaths.fakeClaudeLog) ? fs.readFileSync(e2ePaths.fakeClaudeLog, "utf8") : "",
-    )
-    .toContain('"type":"user","text":"Desktop SDK E2E"');
+  await expect(transcript.getByText("Reply with exactly: PONG", { exact: true })).toBeVisible();
+  await expect(transcript.getByText(/PONG/i)).toBeVisible({ timeout: 120_000 });
 });
 
 test("reports a server crash and recovers on the pinned connection", async ({

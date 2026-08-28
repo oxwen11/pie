@@ -10,8 +10,11 @@ import {
 } from "../errors";
 import type { CreateSessionInput, ResumeSessionInput } from "../session-io";
 import type { PiProcess } from "./process";
-import { checkPiAvailability } from "./resolve-executable";
-import type { PiExecutable } from "./resolve-executable";
+import {
+  checkPiAvailability,
+  resolvePiExecutable,
+  type PiExecutable,
+} from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime, type PiAgentRuntime } from "./runtime";
 import type { AvailabilityResult, SessionInfoResult } from "./types";
 
@@ -63,7 +66,7 @@ export const makePiAgent = (
   options: { readonly executable?: PiExecutable } = {},
 ): PiAgentShape => {
   const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
+    availability: checkPiAvailability(options.executable ?? resolvePiExecutable()),
     create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(process, input)),
     resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(process, input)),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),

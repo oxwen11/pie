@@ -1,7 +1,10 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/node/cli.ts"],
+  entry: {
+    cli: "src/node/cli.ts",
+    "pi-process": "../server/src/harness/pi/process-host/main.ts",
+  },
   platform: "node",
   deps: {
     // The private server/harness/contract packages are compiled into the CLI.

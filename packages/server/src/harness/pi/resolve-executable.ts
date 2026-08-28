@@ -5,31 +5,31 @@ import { Effect, FileSystem } from "effect";
 
 import { findExecutable } from "../executable";
 
-/** How the server spawns `pi --mode rpc`. */
+/** How the server spawns the pie-owned Pi process. */
 export type PiExecutable = {
   readonly command: string;
   readonly prefixArgs: ReadonlyArray<string>;
 };
 
+const here = path.dirname(url.fileURLToPath(import.meta.url));
+
 /**
- * Resolve the npm-shipped Pi CLI when `@earendil-works/pi-coding-agent` is on
- * disk next to the running server (desktop asar or global `pie` install).
+ * Built `pi-process.mjs` only. Sibling of this module when we are already in
+ * `dist/` (bundled `server.mjs` / `cli.mjs`); otherwise the server package
+ * dist — never the TypeScript source, never a PATH `pi`.
  */
-export function resolveBundledPiCli(): string | undefined {
-  try {
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    return path.join(path.dirname(indexPath), "cli.js");
-  } catch {
-    return undefined;
+export function resolvePiProcessEntry(): string {
+  if (path.basename(here) === "dist") {
+    return path.join(here, "pi-process.mjs");
   }
+  return path.resolve(here, "../../../dist/pi-process.mjs");
 }
 
 /**
- * Pick the Pi binary for this process. Priority:
- * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1`
+ * Pick the Pi process for this server. Priority:
+ * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1` (unit-test fake scripts)
  * 2. `PIE_PI_EXECUTABLE`
- * 3. bundled `@earendil-works/pi-coding-agent` via Node (`process.execPath`)
- * 4. bare `pi` on PATH
+ * 3. pie-owned `pi-process` via Node (`process.execPath`)
  */
 export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExecutable {
   if (env.PIE_E2E === "1" && env.PIE_E2E_PI_EXECUTABLE) {
@@ -41,17 +41,12 @@ export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExe
     return { command: explicit, prefixArgs: [] };
   }
 
-  const bundled = resolveBundledPiCli();
-  if (bundled) {
-    return { command: process.execPath, prefixArgs: [bundled] };
-  }
-
-  return { command: "pi", prefixArgs: [] };
+  return { command: process.execPath, prefixArgs: [resolvePiProcessEntry()] };
 }
 
 /** What `availability` should stat or PATH-search. */
 export function piAvailabilityTarget(executable: PiExecutable): string {
-  return executable.prefixArgs[0] ?? executable.command;
+  return executable.prefixArgs.at(-1) ?? executable.command;
 }
 
 export const checkPiAvailability = (
@@ -62,15 +57,15 @@ export const checkPiAvailability = (
   FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
-    // Bundled Pi is a .js entry run under Node — npm does not mark it +x.
+    // Node-run scripts (`pi-process.mjs`) are not marked +x.
     if (executable.prefixArgs.length > 0) {
-      const script = executable.prefixArgs[0]!;
-      const fs = yield* FileSystem.FileSystem;
-      const info = yield* fs.stat(script).pipe(Effect.option);
+      const script = executable.prefixArgs.at(-1)!;
+      const fsService = yield* FileSystem.FileSystem;
+      const info = yield* fsService.stat(script).pipe(Effect.option);
       if (info._tag === "Some" && info.value.type === "File") {
         return { available: true };
       }
-      return { available: false, reason: "Bundled Pi is missing." };
+      return { available: false, reason: "Pie Pi process is missing." };
     }
 
     const found = yield* findExecutable(executable.command);

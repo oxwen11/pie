@@ -1,0 +1,32 @@
+// UPSTREAM @earendil-works/pi-coding-agent@0.84.2 dist/modes/json-event.js
+import type { AgentSessionEvent, JsonAgentSessionEvent } from "@earendil-works/pi-coding-agent";
+
+export type { JsonAgentSessionEvent };
+
+type MessageUpdateEvent = Extract<AgentSessionEvent, { type: "message_update" }>;
+type JsonMessageUpdateEvent = Extract<JsonAgentSessionEvent, { type: "message_update" }>;
+
+/**
+ * Remove cumulative assistant snapshots from streaming wire events.
+ * `message_start` provides the initial message, deltas build it, and
+ * `message_end` provides the final authoritative message. Cumulative usage
+ * remains available because its size is constant.
+ */
+export function toJsonEvent(event: MessageUpdateEvent): JsonMessageUpdateEvent;
+export function toJsonEvent(event: AgentSessionEvent): JsonAgentSessionEvent;
+export function toJsonEvent(event: AgentSessionEvent): JsonAgentSessionEvent {
+  if (event.type !== "message_update") {
+    return event;
+  }
+  if (event.message.role !== "assistant") {
+    throw new Error("message_update message is not an assistant message");
+  }
+
+  const assistantMessageEvent = event.assistantMessageEvent;
+  if (!("partial" in assistantMessageEvent)) {
+    return { type: "message_update", usage: event.message.usage, assistantMessageEvent };
+  }
+
+  const { partial: _partial, ...deltaEvent } = assistantMessageEvent;
+  return { type: "message_update", usage: event.message.usage, assistantMessageEvent: deltaEvent };
+}

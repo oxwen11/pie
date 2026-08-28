@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import {
@@ -10,6 +11,12 @@ import {
 
 /** The one seeded project's id — the contract validates projectId as a UUID. */
 export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+
+/** Pi credentials live under `~/.pi/agent`, not the isolated `$PIE_HOME`. */
+export function hasPiAuth(): boolean {
+  if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) return true;
+  return fs.existsSync(path.join(os.homedir(), ".pi/agent/auth.json"));
+}
 
 /**
  * Seed one project into a per-test `$PIE_HOME`: a fresh home renders the
@@ -60,7 +67,6 @@ export async function stopDaemonFor(pieHome: string): Promise<void> {
  */
 export const test = base.extend<{
   e2ePaths: {
-    fakePiLog: string;
     userData: string;
     pieHome: string;
   };
@@ -75,7 +81,6 @@ export const test = base.extend<{
     fs.mkdirSync(pieHome, { recursive: true });
     seedProject(pieHome, path.join(output, "workspace"));
     await use({
-      fakePiLog: path.join(output, "fake-pi.jsonl"),
       userData: path.join(output, "user-data"),
       pieHome,
     });
@@ -86,7 +91,6 @@ export const test = base.extend<{
   // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
   electronApp: async ({ e2ePaths }, use) => {
     const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
-    const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
 
     const app = await electron.launch({
       args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
@@ -94,9 +98,6 @@ export const test = base.extend<{
         ...process.env,
         NODE_ENV: "test",
         PIE_E2E: "1",
-        PIE_E2E_PI_EXECUTABLE: fakePiPath,
-        PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
-        PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
         PIE_HOME: e2ePaths.pieHome,
       },
     });

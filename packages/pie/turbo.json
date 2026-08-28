@@ -2,6 +2,7 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
+      "dependsOn": ["@getpie/server#build"],
       "passThroughEnv": [
         "AWS_*",
         "AZURE_*",

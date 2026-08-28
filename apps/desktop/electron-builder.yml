@@ -17,8 +17,9 @@ files:
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
 asarUnpack:
   - resources/**
-  # Pi is spawned as `node <cli.js> --mode rpc`; its dist assets must be real files.
+  # Pi process: spawn `node <pi-process.mjs>`; Pi's dist assets must be real files.
   - "**/node_modules/@earendil-works/pi-coding-agent/dist/**"
+  - "**/node_modules/@getpie/server/dist/pi-process.mjs"
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns
