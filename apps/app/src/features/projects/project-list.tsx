@@ -18,9 +18,11 @@ import { useProjects } from "@/features/projects/use-projects";
 
 /** Every imported project, each rendering its own session list. */
 export function ProjectList({
+  automationSessionIds,
   isSessionActive,
   onImport,
 }: {
+  readonly automationSessionIds: ReadonlySet<string>;
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onImport: () => void;
 }) {
@@ -49,6 +51,7 @@ export function ProjectList({
             {(projects.data ?? []).map((project) => (
               <ProjectSessionsGroup
                 key={project.id}
+                automationSessionIds={automationSessionIds}
                 isSessionActive={isSessionActive}
                 project={project}
               />

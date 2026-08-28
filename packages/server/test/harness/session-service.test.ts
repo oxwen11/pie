@@ -51,14 +51,13 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
-  it("create persists an optional title and automation origin", async () => {
+  it("create persists an optional title", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
         const created = yield* fixture.service.create({
           projectId: "proj-a",
           cwd: "/tmp/pie-app",
           title: "Morning review",
-          automationId: "auto-1",
         });
         const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
         const listed = yield* fixture.service.list("proj-a", false);
@@ -67,11 +66,11 @@ describe("PiAgentSessionService", () => {
     );
 
     expect(result.stored.title).toBe("Morning review");
-    expect(result.stored.automation).toBe(true);
-    expect(result.stored.automationId).toBe("auto-1");
+    expect(result.stored).not.toHaveProperty("automation");
+    expect(result.stored).not.toHaveProperty("automationId");
     expect(result.listed[0]?.title).toBe("Morning review");
-    expect(result.listed[0]?.automation).toBe(true);
-    expect(result.listed[0]?.automationId).toBe("auto-1");
+    expect(result.listed[0]).not.toHaveProperty("automation");
+    expect(result.listed[0]).not.toHaveProperty("automationId");
   });
 
   it("create succeeds without opening Pi even when the agent is unavailable", async () => {

@@ -1,0 +1,48 @@
+import type { Automation } from "@getpie/contract";
+import { describe, expect, it } from "vitest";
+
+import { collectFiredSessionIds } from "./fired-session-ids";
+
+const base = {
+  name: "Morning review",
+  projectId: "00000000-0000-0000-0000-000000000001",
+  prompt: "Review.",
+  spec: { kind: "manual" as const },
+  enabled: true,
+  createdAt: "2026-08-28T00:00:00.000Z",
+  updatedAt: "2026-08-28T00:00:00.000Z",
+  nextRunAt: null,
+  runs: [],
+};
+
+describe("collectFiredSessionIds", () => {
+  it("collects last, merged, and run session ids", () => {
+    const automations: ReadonlyArray<Automation> = [
+      {
+        ...base,
+        id: "00000000-0000-0000-0000-0000000000aa",
+        lastSessionId: "sess-last",
+        mergedSessionId: "sess-merged",
+        runs: [
+          {
+            id: "run-1",
+            startedAt: "2026-08-28T00:00:00.000Z",
+            reason: "manual",
+            status: "succeeded",
+            sessionId: "sess-run",
+          },
+        ],
+      },
+    ];
+    expect(collectFiredSessionIds(automations)).toEqual(
+      new Set(["sess-last", "sess-merged", "sess-run"]),
+    );
+  });
+
+  it("returns an empty set when no session ids are recorded", () => {
+    const automations: ReadonlyArray<Automation> = [
+      { ...base, id: "00000000-0000-0000-0000-0000000000bb" },
+    ];
+    expect(collectFiredSessionIds(automations).size).toBe(0);
+  });
+});

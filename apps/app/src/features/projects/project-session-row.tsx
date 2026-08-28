@@ -9,10 +9,12 @@ import { SessionStatusIndicator } from "@/features/projects/session-status-indic
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
   active,
+  createdByAutomation,
   isActive,
   session,
 }: {
   readonly active: boolean;
+  readonly createdByAutomation: boolean;
   readonly isActive: () => boolean;
   readonly session: SessionSummary;
 }) {
@@ -34,7 +36,7 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="truncate">{session.title ?? "New chat"}</span>
-        {session.automation === true || session.automationId !== undefined ? (
+        {createdByAutomation ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
             title="Created by an automation"

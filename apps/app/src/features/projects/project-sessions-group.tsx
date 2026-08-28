@@ -33,9 +33,11 @@ const selectNewestFirst = (
  * grouping and fetching; each row composes its own navigation and actions.
  */
 export function ProjectSessionsGroup({
+  automationSessionIds,
   isSessionActive,
   project,
 }: {
+  readonly automationSessionIds: ReadonlySet<string>;
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly project: Project;
 }) {
@@ -91,6 +93,7 @@ export function ProjectSessionsGroup({
                 <ProjectSessionRow
                   key={session.sessionId}
                   active={isSessionActive(session)}
+                  createdByAutomation={automationSessionIds.has(session.sessionId)}
                   isActive={() => isSessionActive(session)}
                   session={session}
                 />

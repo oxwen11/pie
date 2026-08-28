@@ -12,15 +12,20 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { Clock, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import { collectFiredSessionIds } from "@/features/automations/fired-session-ids";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
+
+const EMPTY_FIRED_SESSION_IDS: ReadonlySet<string> = new Set();
 
 export function AppSidebar({
   isSessionActive,
@@ -34,6 +39,12 @@ export function AppSidebar({
   readonly automationsActive: boolean;
 }) {
   const [importOpen, setImportOpen] = useState(false);
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const firedSessionIds = useQuery({
+    ...orpcQueryUtils.automation.list.queryOptions(),
+    select: collectFiredSessionIds,
+    refetchInterval: 10_000,
+  });
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
@@ -86,7 +97,11 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
+        <ProjectList
+          automationSessionIds={firedSessionIds.data ?? EMPTY_FIRED_SESSION_IDS}
+          isSessionActive={isSessionActive}
+          onImport={() => setImportOpen(true)}
+        />
       </SidebarContent>
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}

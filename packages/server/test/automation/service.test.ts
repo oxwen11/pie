@@ -87,7 +87,7 @@ function setup(
   const store = new Map<string, Automation>();
   let next = 1;
   let clock = Date.parse("2026-08-27T08:00:00.000Z");
-  const created: Array<{ title?: string; automationId?: string; projectId: string }> = [];
+  const created: Array<{ title?: string; projectId: string }> = [];
   const prompted: Array<string> = [];
   const repo: AutomationStore = {
     list: () => Effect.succeed(Array.from(store.values())),
@@ -112,7 +112,6 @@ function setup(
         created.push({
           projectId: input.projectId,
           ...(input.title !== undefined ? { title: input.title } : undefined),
-          ...(input.automationId !== undefined ? { automationId: input.automationId } : undefined),
         });
         return {
           ref: { projectId: input.projectId, sessionId: `sess-${created.length}` },
@@ -185,16 +184,17 @@ describe("AutomationService", () => {
     const h = setup();
     const created = await run(h.service.create(cronInput()));
     const fired = await run(h.service.runNow(created.id));
-    expect(h.created).toEqual([
-      { projectId: PROJECT_ID, title: "Morning review", automationId: created.id },
-    ]);
+    expect(h.created).toEqual([{ projectId: PROJECT_ID, title: "Morning review" }]);
     expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-1" });
     expect(fired.automation.lastRunStatus).toBe("running");
+    expect(fired.automation.lastSessionId).toBe("sess-1");
     expect(fired.automation.runs[0]?.reason).toBe("manual");
+    expect(fired.automation.runs[0]?.sessionId).toBe("sess-1");
     expect(fired.automation.runs[0]?.snapshot?.prompt).toBe("Review yesterday's commits.");
     const stored = h.store.get(created.id);
     expect(stored?.lastRunStatus).toBe("succeeded");
     expect(stored?.runs[0]?.status).toBe("succeeded");
+    expect(stored?.lastSessionId).toBe("sess-1");
     expect(h.prompted).toEqual(["Review yesterday's commits."]);
   });
 

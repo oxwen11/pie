@@ -380,7 +380,6 @@ export const makeAutomationService = (deps: {
 
   const fireSession = (
     snapshot: AutomationRunSnapshot,
-    automationId: string,
     mergedSessionId: string | undefined,
   ): Effect.Effect<
     SessionRef,
@@ -399,7 +398,6 @@ export const makeAutomationService = (deps: {
         projectId: snapshot.projectId,
         cwd: project.path,
         title: titleFromName(snapshot.name),
-        automationId,
         ...(snapshot.provider !== undefined && snapshot.modelId !== undefined
           ? { model: { provider: snapshot.provider, modelId: snapshot.modelId } }
           : undefined),
@@ -484,7 +482,6 @@ export const makeAutomationService = (deps: {
       inFlight.add(automation.id);
       const outcome: FireSessionOutcome = yield* fireSession(
         snapshot,
-        automation.id,
         automation.mergedSessionId,
       ).pipe(
         Effect.map((ref): FireSessionOutcome => ({ kind: "ready", ref })),

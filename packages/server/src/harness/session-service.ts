@@ -82,10 +82,8 @@ export type CreatePiSessionInput = {
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
   readonly worktree?: CreateWorktreeInput;
-  /** Display title written at create so an automation session is named before the first prompt. */
+  /** Display title written at create so the sidebar can name the row before the first prompt. */
   readonly title?: string;
-  /** Application-level Automation that created this session. */
-  readonly automationId?: string;
 };
 
 export type PiAgentSessionServiceShape = {
@@ -411,9 +409,6 @@ export const makePiAgentSessionService = (deps: {
                   ? { provider: input.model.provider, modelId: input.model.modelId }
                   : undefined),
                 ...(input.title !== undefined ? { title: input.title } : undefined),
-                ...(input.automationId !== undefined
-                  ? { automation: true, automationId: input.automationId }
-                  : undefined),
                 archived: false,
               };
               return repo.write(metadata).pipe(
@@ -558,12 +553,6 @@ export const makePiAgentSessionService = (deps: {
                       ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
                       ...(metadata.updatedAt !== undefined
                         ? { updatedAt: metadata.updatedAt }
-                        : undefined),
-                      ...(metadata.automation === true || metadata.automationId !== undefined
-                        ? { automation: true }
-                        : undefined),
-                      ...(metadata.automationId !== undefined
-                        ? { automationId: metadata.automationId }
                         : undefined),
                       ...(status !== undefined ? { status } : undefined),
                     }) satisfies SessionSummary,

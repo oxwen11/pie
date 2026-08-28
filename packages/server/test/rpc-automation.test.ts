@@ -41,9 +41,11 @@ describe("automation router", () => {
         archived: false,
       });
       expect(sessions).toHaveLength(1);
-      expect(sessions[0]?.automation).toBe(true);
-      expect(sessions[0]?.automationId).toBe(created.id);
+      expect(sessions[0]).not.toHaveProperty("automation");
+      expect(sessions[0]).not.toHaveProperty("automationId");
       expect(sessions[0]?.title).toBe("Daily review");
+      expect(fired.automation.lastSessionId).toBe(sessions[0]?.sessionId);
+      expect(fired.automation.runs[0]?.sessionId).toBe(sessions[0]?.sessionId);
       const sessionFile = path.join(
         home,
         "storage",
@@ -52,10 +54,10 @@ describe("automation router", () => {
         `${sessions[0]?.sessionId}.json`,
       );
       const stored = JSON.parse(fs.readFileSync(sessionFile, "utf8")) as {
-        readonly data: { readonly automation?: boolean; readonly automationId?: string };
+        readonly data: Record<string, unknown>;
       };
-      expect(stored.data.automation).toBe(true);
-      expect(stored.data.automationId).toBe(created.id);
+      expect(stored.data).not.toHaveProperty("automation");
+      expect(stored.data).not.toHaveProperty("automationId");
 
       await h.client.automation.delete({ id: created.id });
       await expect(h.client.automation.list()).resolves.toEqual([]);
