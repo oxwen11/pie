@@ -1,5 +1,6 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
+import { motion } from "motion/react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef } from "react";
 import {
   Group,
@@ -12,10 +13,12 @@ import {
   usePanelRef,
 } from "react-resizable-panels";
 
+import { SIDEBAR_DEFAULT_SIZE } from "@/components/layout/sidebar-drawer";
+import { useSidebarDrawer } from "@/components/layout/use-sidebar-drawer";
+
 /** Resizable sidebar | chat | content-panel columns. */
 
 const SHELL_LAYOUT_ID = "pie:shell-layout";
-const SIDEBAR_DEFAULT_SIZE = "16rem";
 
 const PANEL_IDS = {
   content: "content",
@@ -126,27 +129,34 @@ function useCollapsedBinding(
 export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactNode {
   const { open, setOpen } = useSidebar();
   const panelRef = usePanelRef();
-  const onResize = useCollapsedBinding(
-    panelRef,
-    !open,
-    (collapsed) => setOpen(!collapsed),
-    SIDEBAR_DEFAULT_SIZE,
-  );
+  const drawer = useSidebarDrawer({ open, panelRef, setOpen });
 
   return (
     <Panel
-      className="flex min-w-0 flex-col overflow-hidden md:py-1.5 md:ps-1.5"
+      className="flex min-w-0 flex-col md:py-1.5 md:ps-1.5"
       collapsedSize={0}
       collapsible
       defaultSize={SIDEBAR_DEFAULT_SIZE}
       groupResizeBehavior="preserve-pixel-size"
       id={PANEL_IDS.sidebar}
       maxSize="30rem"
-      minSize="12rem"
-      onResize={onResize}
+      minSize={drawer.minSize}
+      onResize={drawer.onResize}
       panelRef={panelRef}
+      style={{ overflow: "hidden" }}
     >
-      {children}
+      <motion.div
+        className={cn(
+          "flex h-full min-h-0 flex-col will-change-transform",
+          drawer.fillPanel ? "w-full" : "shrink-0",
+        )}
+        data-slot="sidebar-drawer"
+        data-state={open ? "open" : "closed"}
+        inert={!open}
+        style={drawer.fillPanel ? undefined : drawer.style}
+      >
+        {children}
+      </motion.div>
     </Panel>
   );
 }
