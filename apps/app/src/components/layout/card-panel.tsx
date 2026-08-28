@@ -40,7 +40,6 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
           "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
           desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
         )}
-        layoutRoot
       >
         <div className="flex min-w-0 flex-1 items-center">
           {isMobile ? (
