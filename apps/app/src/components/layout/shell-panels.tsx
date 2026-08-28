@@ -1,7 +1,7 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { motion } from "motion/react";
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   Group,
   Panel,
@@ -13,12 +13,11 @@ import {
   usePanelRef,
 } from "react-resizable-panels";
 
-import { SIDEBAR_DEFAULT_SIZE } from "@/components/layout/sidebar-drawer";
-import { useSidebarDrawer } from "@/components/layout/use-sidebar-drawer";
-
 /** Resizable sidebar | chat | content-panel columns. */
 
 const SHELL_LAYOUT_ID = "pie:shell-layout";
+const SIDEBAR_DEFAULT_SIZE = "16rem";
+const SIDEBAR_MIN_SIZE = "12rem";
 
 const PANEL_IDS = {
   content: "content",
@@ -129,31 +128,49 @@ function useCollapsedBinding(
 export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactNode {
   const { open, setOpen } = useSidebar();
   const panelRef = usePanelRef();
-  const drawer = useSidebarDrawer({ open, panelRef, setOpen });
+  const reduceMotion = useReducedMotion() === true;
+  const [panelOpen, setPanelOpen] = useState(open);
+
+  // Hold the column open until the slide-out finishes. Opening sets this during
+  // render so the slot exists on the same turn Motion starts translating in.
+  if (open && !panelOpen) {
+    setPanelOpen(true);
+  }
+
+  const onResize = useCollapsedBinding(
+    panelRef,
+    !(open || panelOpen),
+    (collapsed) => {
+      setPanelOpen(!collapsed);
+      setOpen(!collapsed);
+    },
+    SIDEBAR_DEFAULT_SIZE,
+  );
 
   return (
     <Panel
-      className="flex min-w-0 flex-col md:py-1.5 md:ps-1.5"
+      className="flex min-w-0 flex-col overflow-hidden md:py-1.5 md:ps-1.5"
       collapsedSize={0}
       collapsible
       defaultSize={SIDEBAR_DEFAULT_SIZE}
       groupResizeBehavior="preserve-pixel-size"
       id={PANEL_IDS.sidebar}
       maxSize="30rem"
-      minSize={drawer.minSize}
-      onResize={drawer.onResize}
+      minSize={SIDEBAR_MIN_SIZE}
+      onResize={onResize}
       panelRef={panelRef}
-      style={{ overflow: "hidden" }}
     >
       <motion.div
-        className={cn(
-          "flex h-full min-h-0 flex-col will-change-transform",
-          drawer.fillPanel ? "w-full" : "shrink-0",
-        )}
+        animate={{ x: open ? "0%" : "-100%" }}
+        className="flex h-full min-h-0 w-full min-w-0 flex-col"
         data-slot="sidebar-drawer"
         data-state={open ? "open" : "closed"}
         inert={!open}
-        style={drawer.fillPanel ? undefined : drawer.style}
+        initial={false}
+        onAnimationComplete={() => {
+          if (!open) setPanelOpen(false);
+        }}
+        transition={reduceMotion ? { duration: 0 } : undefined}
       >
         {children}
       </motion.div>
