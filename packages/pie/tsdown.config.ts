@@ -7,6 +7,7 @@ export default defineConfig({
     // The private server/harness/contract packages are compiled into the CLI.
     // Whitelist their bundled runtime dependencies so additions fail closed.
     // `simple-git` (and its tree) is pulled in by GitService on the serve path.
+    // `smol-toml` is pulled in by operator settings (`$PIE_HOME/config.toml`).
     onlyBundle: [
       "effect",
       "@effect/platform-node-shared",
@@ -20,6 +21,7 @@ export default defineConfig({
       "ms",
       "supports-color",
       "has-flag",
+      "smol-toml",
     ],
   },
   dts: false,
