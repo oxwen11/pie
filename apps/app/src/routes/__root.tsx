@@ -71,6 +71,11 @@ function RootLayout() {
   });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
+  const settingsRoute =
+    useMatch({
+      from: "/settings",
+      shouldThrow: false,
+    }) ?? null;
   // Mutations can settle after navigation. Read the router's current match at
   // call time instead of capturing a render-time `active` boolean.
   const router = useRouter();
@@ -87,18 +92,35 @@ function RootLayout() {
       console.error("Failed to open a new chat", error);
     });
   };
+  const handleOpenSettings = () => {
+    navigate({ to: "/settings" }).catch((error: unknown) => {
+      console.error("Failed to open settings", error);
+    });
+  };
+
+  const heading =
+    settingsRoute !== null
+      ? "Settings"
+      : sessionRef === null
+        ? "New chat"
+        : (sessionTitle ?? "New chat");
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            <AppSidebar
+              isSessionActive={isSessionActive}
+              isSettingsActive={settingsRoute !== null}
+              onNewChat={handleNewChat}
+              onOpenSettings={handleOpenSettings}
+            />
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
-              heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
-              supportingText={project?.name}
+              heading={heading}
+              supportingText={settingsRoute !== null ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>

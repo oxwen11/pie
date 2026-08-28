@@ -16,6 +16,13 @@ export class StoreWriteError extends Data.TaggedError("StoreWriteError")<{
   readonly cause: unknown;
 }> {}
 
+/** `$PIE_HOME/config.toml` exists but is not valid TOML or fails the settings schema. */
+export class SettingsCorrupt extends Data.TaggedError("SettingsCorrupt")<{
+  readonly file: string;
+  readonly reason: "syntax" | "schema";
+  readonly cause: unknown;
+}> {}
+
 export class GitError extends Data.TaggedError("GitError")<{
   readonly cwd: string;
   readonly cause: unknown;
