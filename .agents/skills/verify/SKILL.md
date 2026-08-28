@@ -26,11 +26,9 @@ mise trust
 # From the repository root, inspect the active worktree values first.
 bash scripts/dev-scope.sh --print
 
-# Run the full workspace in the background. Use a surface-specific command
-# when only one UI is needed.
+# Run the full workspace in the background. This is the single root-level
+# development entry point.
 pnpm dev
-pnpm dev:app
-pnpm dev:desktop
 ```
 
 For non-interactive automation, use `mise exec -- pnpm dev` so the project
