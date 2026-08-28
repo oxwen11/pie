@@ -1,10 +1,9 @@
-import { os } from "@orpc/server";
-
 import { agentRouter } from "./agent";
 import { automationRouter } from "./automation";
 import type { RpcContext } from "./context";
 import { fsRouter } from "./fs";
 import { gitRouter } from "./git";
+import { os } from "./orpc";
 import { projectRouter } from "./project";
 
 const orpc = os.$context<RpcContext>();
