@@ -71,8 +71,8 @@ export function ShellSeparator({ className, disabled, ...props }: SeparatorProps
     <Separator
       className={cn(
         "relative w-1.5 bg-transparent [-webkit-app-region:no-drag] md:my-1.5",
-        "after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:transition-[width]",
-        "hover:after:via-foreground/20 data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 data-[separator=active]:after:w-0.5",
+        "after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width]",
+        "hover:after:via-foreground/20 data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 hover:after:opacity-100 data-[separator=active]:after:w-0.5 data-[separator=active]:after:opacity-100 data-[separator=focus]:after:opacity-100",
         disabled && "w-0 after:hidden",
         className,
       )}
