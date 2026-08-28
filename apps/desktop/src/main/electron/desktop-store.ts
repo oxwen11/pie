@@ -93,8 +93,16 @@ export function decodeDesktopSettings(raw: unknown): DesktopSettings {
   return Schema.decodeUnknownSync(DesktopSettingsSchema)(overlayWindowDefaults(raw));
 }
 
-function windowForToml(window: DesktopWindowState): DesktopWindowState {
-  const document: DesktopWindowState = {
+type TomlWindow = {
+  width: number;
+  height: number;
+  maximized: boolean;
+  x?: number;
+  y?: number;
+};
+
+function windowForToml(window: DesktopWindowState): TomlWindow {
+  const document: TomlWindow = {
     width: window.width,
     height: window.height,
     maximized: window.maximized,
