@@ -50,7 +50,10 @@ const defaultModelPerProvider: DefaultModelPerProvider = {
   "xiaomi-token-plan-sgp": "mimo-v2.5-pro",
 };
 
-/** Mirrors Pi `findInitialModel` for a fresh session (no CLI args, no scoped models). */
+/**
+ * Mirrors Pi `findInitialModel` for a fresh session (no CLI args, no scoped models).
+ * Startup defaults come from Pi settings — written by `persistDefaultPiModel`.
+ */
 export async function resolveDefaultPiModel(
   services: AgentSessionServices,
 ): Promise<AgentModel | undefined> {
