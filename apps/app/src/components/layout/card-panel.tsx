@@ -38,35 +38,24 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
         className={cn(
           SHELL_TITLEBAR_HEADER_CLASS,
           "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
+          desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
         )}
-        initial={false}
-        animate={
-          desktop
-            ? { paddingInlineStart: collapsedDesktop ? "var(--shell-titlebar-content-left)" : 16 }
-            : undefined
-        }
-        transition={chromeTransition}
+        layoutRoot
       >
         <div className="flex min-w-0 flex-1 items-center">
           {isMobile ? (
             <SidebarTrigger className="-ms-0.5 me-2 [-webkit-app-region:no-drag]" />
-          ) : desktop ? null : (
-            <motion.div
-              className="flex items-center overflow-hidden"
-              initial={false}
-              animate={{
-                opacity: webCollapsedChrome ? 1 : 0,
-                paddingInlineEnd: webCollapsedChrome ? 8 : 0,
-                width: webCollapsedChrome ? "auto" : 0,
-              }}
-              inert={!webCollapsedChrome}
-              transition={chromeTransition}
-            >
+          ) : webCollapsedChrome ? (
+            <div className="me-2 flex items-center">
               <BrandMark className="shrink-0" />
               <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
-            </motion.div>
-          )}
-          <div className={SHELL_TITLEBAR_LABEL_CLASS}>
+            </div>
+          ) : null}
+          <motion.div
+            className={SHELL_TITLEBAR_LABEL_CLASS}
+            layout={reduceMotion ? false : "position"}
+            transition={chromeTransition}
+          >
             <span className="min-w-0 truncate font-medium" title={heading}>
               {heading}
             </span>
@@ -78,7 +67,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
                 {supportingText}
               </span>
             )}
-          </div>
+          </motion.div>
         </div>
         <ContentPanelToggle className="ms-auto [-webkit-app-region:no-drag]" />
       </motion.header>
