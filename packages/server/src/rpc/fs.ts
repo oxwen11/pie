@@ -1,14 +1,13 @@
-import "@orpc/experimental-effect/extensions/effect";
 import os from "node:os";
 import path from "node:path";
 
 import { fsContract } from "@getpie/contract/fs";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 import { FileSystem } from "effect/FileSystem";
 
 import { FileSystemService } from "../fs";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
 
 const orpc = implement(fsContract).$context<RpcContext>();

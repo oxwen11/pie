@@ -1,5 +1,5 @@
 import type { ListSessionsOutput, ServerEvent } from "@getpie/contract";
-import { isSessionScopedEvent } from "@getpie/contract";
+import { isSessionScopedEvent } from "@getpie/contract/session-events";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
 type SessionRow = ListSessionsOutput[number];

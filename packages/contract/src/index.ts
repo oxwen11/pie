@@ -5,6 +5,7 @@ import { projectContract } from "./project";
 import { sessionContract } from "./session";
 
 export * from "./domain";
+export { toStandardSchema } from "./orpc";
 export * from "./project";
 
 export const contract = {

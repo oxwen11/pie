@@ -1,9 +1,6 @@
 import type { UIMessage, UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
-export const toStandardSchema = <S extends Schema.ConstraintDecoder<unknown>>(schema: S) =>
-  Schema.toStandardJSONSchemaV1(Schema.toStandardSchemaV1(schema));
-
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
