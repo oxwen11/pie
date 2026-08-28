@@ -235,10 +235,10 @@ function DraftRoute() {
   return (
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl before:bg-transparent">
-        {/* Keep the original frame/header/card hierarchy; only shorten the
-            muted header layer to the width of its picks. */}
-        <CardFrameHeader className="bg-muted/72 w-fit max-w-[calc(100%-1rem)] self-start rounded-tl-[calc(var(--radius-2xl)-1px)] rounded-r-xl px-0 py-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-0">
+        {/* Keep the original frame/header/card hierarchy; the muted header
+            stays fluid and is shortened evenly from both sides. */}
+        <CardFrameHeader className="bg-muted/72 mx-2 rounded-b-xl py-2">
+          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
             <ProjectSelect
               onChange={(next) => {
                 navigate({
