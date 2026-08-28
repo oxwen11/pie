@@ -27,6 +27,10 @@ The server-owned recovery record for a session: which Project, which Pi agent se
 The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. The session layer only deals in `cwd`; worktree creation runs inside create (not a git RPC, not the first prompt) and is never stored as a pending flag. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
 _Avoid_: cwd (in session APIs)
 
+**Settings** (`$PIE_HOME/config.toml`):
+Operator-facing pie preferences (appearance today), a plain TOML document. Distinct from Project/Session JSON under `storage/` and from Pi's own settings files. Named only in `packages/server/src/config/paths.ts` (`configFile`).
+_Avoid_: putting operator prefs in `projects.json`; wrapping this file in the JSON store `{ version, data }` envelope; writing Pi's settings files
+
 ## Server Session Services
 
 The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: `PiAgent` knows how to get in, Manager knows who is alive, `PiAgentRuntime` is the live child, Service is the outward face.
