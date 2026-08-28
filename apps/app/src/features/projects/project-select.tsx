@@ -30,8 +30,8 @@ export function ProjectSelect({
     >
       {/* The name is only the folder's basename, so two projects can share one —
           the path is what actually tells them apart. */}
-      {/* Sits in the draft composer's embedded picks row: the row's padding
-          provides the card inset, so the trigger keeps only its own padding. */}
+      {/* The draft frame header hugs its picks, so the trigger keeps only its
+          own padding instead of adding width outside the muted layer. */}
       <SelectTrigger
         className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
         size="sm"

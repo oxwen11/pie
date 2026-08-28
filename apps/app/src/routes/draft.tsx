@@ -6,7 +6,7 @@ import {
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
-import { Card, CardFrame } from "@getpie/ui/components/card";
+import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
 import {
   Empty,
   EmptyContent,
@@ -234,7 +234,49 @@ function DraftRoute() {
 
   return (
     <div className="flex h-full items-center justify-center p-4">
-      <CardFrame className="w-full max-w-2xl">
+      <CardFrame className="w-full max-w-2xl before:bg-transparent">
+        {/* Keep the original frame/header/card hierarchy; only shorten the
+            muted header layer to the width of its picks. */}
+        <CardFrameHeader className="bg-muted/72 w-fit max-w-[calc(100%-1rem)] self-start rounded-tl-[calc(var(--radius-2xl)-1px)] rounded-r-xl px-0 py-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-0">
+            <ProjectSelect
+              onChange={(next) => {
+                navigate({
+                  to: "/draft",
+                  search: { projectId: next },
+                  replace: true,
+                }).catch((error: unknown) => {
+                  console.error("Failed to select draft project", error);
+                });
+              }}
+              projects={projects.data}
+              value={selected?.id ?? null}
+            />
+            {draftWorktree.gitState === "not-repository" ? (
+              <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
+            ) : null}
+            {draftWorktree.gitState === "workspace-unavailable" ? (
+              <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
+            ) : null}
+            {draftWorktree.gitAvailable ? (
+              <>
+                <DraftWorkspaceSelect
+                  disabled={startSession.isPending || selected === null}
+                  mode={draftWorktree.mode}
+                  onModeChange={draftWorktree.setMode}
+                />
+                {draftWorktree.mode === "worktree" ? (
+                  <DraftWorktreeBaseSelect
+                    branch={draftWorktree.repositoryBranch}
+                    disabled={startSession.isPending || selected === null}
+                    onValueChange={draftWorktree.setWorktreeBaseOverride}
+                    value={draftWorktree.worktreeBase}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        </CardFrameHeader>
         <Card
           render={
             <PromptInput
@@ -246,50 +288,7 @@ function DraftRoute() {
           }
         >
           <ChatInputProvider controller={controller}>
-            {/* Keep the frame header's muted surface, but inset it as a
-                content-hugging row inside the composer. The wrapper preserves
-                the single divider between the editor and toolbar. */}
-            <div>
-              <div className="bg-muted/72 mx-2 mt-2 flex w-fit max-w-[calc(100%-1rem)] min-w-0 flex-wrap items-center gap-0 rounded-xl py-1">
-                <ProjectSelect
-                  onChange={(next) => {
-                    navigate({
-                      to: "/draft",
-                      search: { projectId: next },
-                      replace: true,
-                    }).catch((error: unknown) => {
-                      console.error("Failed to select draft project", error);
-                    });
-                  }}
-                  projects={projects.data}
-                  value={selected?.id ?? null}
-                />
-                {draftWorktree.gitState === "not-repository" ? (
-                  <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
-                ) : null}
-                {draftWorktree.gitState === "workspace-unavailable" ? (
-                  <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
-                ) : null}
-                {draftWorktree.gitAvailable ? (
-                  <>
-                    <DraftWorkspaceSelect
-                      disabled={startSession.isPending || selected === null}
-                      mode={draftWorktree.mode}
-                      onModeChange={draftWorktree.setMode}
-                    />
-                    {draftWorktree.mode === "worktree" ? (
-                      <DraftWorktreeBaseSelect
-                        branch={draftWorktree.repositoryBranch}
-                        disabled={startSession.isPending || selected === null}
-                        onValueChange={draftWorktree.setWorktreeBaseOverride}
-                        value={draftWorktree.worktreeBase}
-                      />
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
-              <ChatInput />
-            </div>
+            <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
                 <DraftModelSelect
