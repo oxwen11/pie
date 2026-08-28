@@ -40,6 +40,8 @@ export interface Session {
   readonly updatedAt?: string;
   /** Whether the backend still has the transcript. Reserved — not written yet. */
   readonly historyAvailable?: boolean;
+  /** True when an application-level Automation created this session. */
+  readonly automation?: boolean;
   /** Application-level Automation that created this session, if any. */
   readonly automationId?: string;
 }

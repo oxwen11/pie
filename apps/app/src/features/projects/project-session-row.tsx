@@ -34,7 +34,7 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="truncate">{session.title ?? "New chat"}</span>
-        {session.automationId !== undefined ? (
+        {session.automation === true || session.automationId !== undefined ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
             title="Created by an automation"

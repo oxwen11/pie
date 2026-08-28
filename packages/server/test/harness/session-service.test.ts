@@ -51,7 +51,7 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
-  it("create persists an optional title and automationId", async () => {
+  it("create persists an optional title and automation origin", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
         const created = yield* fixture.service.create({
@@ -67,8 +67,10 @@ describe("PiAgentSessionService", () => {
     );
 
     expect(result.stored.title).toBe("Morning review");
+    expect(result.stored.automation).toBe(true);
     expect(result.stored.automationId).toBe("auto-1");
     expect(result.listed[0]?.title).toBe("Morning review");
+    expect(result.listed[0]?.automation).toBe(true);
     expect(result.listed[0]?.automationId).toBe("auto-1");
   });
 

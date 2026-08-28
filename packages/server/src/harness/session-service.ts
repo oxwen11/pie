@@ -412,7 +412,7 @@ export const makePiAgentSessionService = (deps: {
                   : undefined),
                 ...(input.title !== undefined ? { title: input.title } : undefined),
                 ...(input.automationId !== undefined
-                  ? { automationId: input.automationId }
+                  ? { automation: true, automationId: input.automationId }
                   : undefined),
                 archived: false,
               };
@@ -558,6 +558,9 @@ export const makePiAgentSessionService = (deps: {
                       ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
                       ...(metadata.updatedAt !== undefined
                         ? { updatedAt: metadata.updatedAt }
+                        : undefined),
+                      ...(metadata.automation === true || metadata.automationId !== undefined
+                        ? { automation: true }
                         : undefined),
                       ...(metadata.automationId !== undefined
                         ? { automationId: metadata.automationId }

@@ -570,6 +570,8 @@ export type SessionSummary = {
   readonly updatedAt?: string;
   readonly historyAvailable: boolean;
   readonly status?: SessionStatus;
+  /** True when an application-level Automation created this session. */
+  readonly automation?: boolean;
   /** Present when this session was created by an application-level Automation. */
   readonly automationId?: string;
 };

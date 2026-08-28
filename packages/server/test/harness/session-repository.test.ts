@@ -126,6 +126,58 @@ describe("SessionRepository", () => {
     expect(raw.data).not.toHaveProperty("version");
   });
 
+  it("persists automation: true and backfills it from automationId-only records", async () => {
+    const written = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write({
+          ...meta("sess-auto", "proj-a"),
+          automation: true,
+          automationId: "auto-1",
+        });
+        return yield* repo.read("proj-a", "sess-auto");
+      }),
+    );
+    expect(written.automation).toBe(true);
+    expect(written.automationId).toBe("auto-1");
+
+    const file = path.join(home, "storage", "sessions", "proj-a", "sess-auto.json");
+    const raw = JSON.parse(await fs.readFile(file, "utf8")) as {
+      readonly data: Record<string, unknown>;
+    };
+    expect(raw.data.automation).toBe(true);
+    expect(raw.data.automationId).toBe("auto-1");
+
+    const legacy = path.join(home, "storage", "sessions", "proj-a", "sess-legacy-auto.json");
+    await fs.writeFile(
+      legacy,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "sess-legacy-auto",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+          automationId: "auto-old",
+        },
+      }),
+    );
+    const backfilled = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        const loaded = yield* repo.read("proj-a", "sess-legacy-auto");
+        yield* repo.write(loaded);
+        return loaded;
+      }),
+    );
+    expect(backfilled.automation).toBe(true);
+    expect(backfilled.automationId).toBe("auto-old");
+    const rewritten = JSON.parse(await fs.readFile(legacy, "utf8")) as {
+      readonly data: Record<string, unknown>;
+    };
+    expect(rewritten.data.automation).toBe(true);
+    expect(rewritten.data.automationId).toBe("auto-old");
+  });
+
   it("lists all sessions of a project", async () => {
     const listed = await run(
       Effect.gen(function* () {

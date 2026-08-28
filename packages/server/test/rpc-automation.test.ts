@@ -41,8 +41,21 @@ describe("automation router", () => {
         archived: false,
       });
       expect(sessions).toHaveLength(1);
+      expect(sessions[0]?.automation).toBe(true);
       expect(sessions[0]?.automationId).toBe(created.id);
       expect(sessions[0]?.title).toBe("Daily review");
+      const sessionFile = path.join(
+        home,
+        "storage",
+        "sessions",
+        project.id,
+        `${sessions[0]?.sessionId}.json`,
+      );
+      const stored = JSON.parse(fs.readFileSync(sessionFile, "utf8")) as {
+        readonly data: { readonly automation?: boolean; readonly automationId?: string };
+      };
+      expect(stored.data.automation).toBe(true);
+      expect(stored.data.automationId).toBe(created.id);
 
       await h.client.automation.delete({ id: created.id });
       await expect(h.client.automation.list()).resolves.toEqual([]);
