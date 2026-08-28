@@ -25,7 +25,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
   return (
     <SidebarInset
       className={cn(
-        "border-border/70 flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-lg/15",
+        "border-border/70 flex min-h-0 flex-col overflow-hidden border [-webkit-app-region:no-drag] md:rounded-xl md:shadow-[0_0_16px_-4px_--theme(--color-black/15%)]",
         // Drop the top border when collapsed so the card header lines up with
         // the viewport-fixed titlebar row.
         collapsedDesktop && desktop && "border-t-0",
