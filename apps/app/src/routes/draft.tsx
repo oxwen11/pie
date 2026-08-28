@@ -246,11 +246,11 @@ function DraftRoute() {
           }
         >
           <ChatInputProvider controller={controller}>
-            {/* Picks row embedded in the card: hugs its content, aligned with
-                the toolbar below. Wrapped with the editor in one block so the
-                form's divide-y never draws a rule between picks and text. */}
+            {/* Keep the frame header's muted surface, but inset it as a
+                content-hugging row inside the composer. The wrapper preserves
+                the single divider between the editor and toolbar. */}
             <div>
-              <div className="flex min-w-0 flex-wrap items-center gap-0 px-2 pt-2">
+              <div className="bg-muted/72 mx-2 mt-2 flex w-fit max-w-[calc(100%-1rem)] min-w-0 flex-wrap items-center gap-0 rounded-xl py-1">
                 <ProjectSelect
                   onChange={(next) => {
                     navigate({
