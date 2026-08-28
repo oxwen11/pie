@@ -53,6 +53,7 @@ set_dev_values() {
   server_port="${PIE_DEV_SERVER_PORT:-$base_port}"
   app_port="${PIE_DEV_APP_PORT:-$((base_port + 1))}"
   desktop_port="${PIE_DEV_DESKTOP_PORT:-$((base_port + 2))}"
+  desktop_server_port="${PIE_DEV_DESKTOP_SERVER_PORT:-$((base_port + 3))}"
   cors_origins="${PIE_DEV_CORS_ORIGINS:-}"
   allowed_hosts="${PIE_DEV_ALLOWED_HOSTS:-}"
 }
@@ -62,6 +63,7 @@ print_export() {
 }
 
 print_shell() {
+  print_export ELECTRON_RUN_AS_NODE ""
   print_export NODE_ENV development
   print_export PIE_DEV_SCOPE "$scope"
   print_export PIE_HOME "$home"
@@ -69,6 +71,7 @@ print_shell() {
   print_export PIE_PORT "$server_port"
   print_export PIE_APP_PORT "$app_port"
   print_export PIE_DESKTOP_PORT "$desktop_port"
+  print_export PIE_DESKTOP_SERVER_PORT "$desktop_server_port"
   print_export PIE_CORS_ORIGINS "$cors_origins"
   print_export PIE_ALLOWED_HOSTS "$allowed_hosts"
 }
@@ -82,9 +85,11 @@ daemon_dir=$daemon_dir
 server_url=http://127.0.0.1:$server_port
 app_url=http://localhost:$app_port
 desktop_url=http://localhost:$desktop_port
+desktop_server_url=http://127.0.0.1:$desktop_server_port
 PIE_PORT=$server_port
 PIE_APP_PORT=$app_port
 PIE_DESKTOP_PORT=$desktop_port
+PIE_DESKTOP_SERVER_PORT=$desktop_server_port
 EOF
 }
 

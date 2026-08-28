@@ -7,10 +7,12 @@ description: "Build/launch/drive recipe for verifying pie web changes at runtime
 
 ## Build + launch
 
-Dev is **two processes**: Vite serves the app, the pie server serves the API,
-and Vite proxies `/api` + `/ws/rpc` across so the browser stays same-origin.
-Turborepo owns both long-running tasks; the app's package configuration uses a
-`with` sidecar so filtering to `@getpie/app` still launches `@getpie/cli#dev`.
+Web dev is **two processes**: Vite serves the app, the pie server serves the
+API, and Vite proxies `/api` + `/ws/rpc` across so the browser stays
+same-origin. Turborepo owns both long-running tasks; the app's package
+configuration uses a `with` sidecar so filtering to `@getpie/app` still
+launches `@getpie/cli#dev`. Root `pnpm dev` runs the full workspace, including
+the Electron app and package watchers.
 
 The project `mise.toml` sources `scripts/dev-env.sh` when the worktree becomes
 active. That Bash script derives the scope and exports it into the current shell
@@ -24,9 +26,11 @@ mise trust
 # From the repository root, inspect the active worktree values first.
 bash scripts/dev-scope.sh --print
 
-# Run in the background. The package script is a plain Turbo command; Turbo
-# launches and supervises the API + Vite processes together.
-pnpm dev # `pnpm dev:web` is the explicit alias
+# Run the full workspace in the background. Use a surface-specific command
+# when only one UI is needed.
+pnpm dev
+pnpm dev:app
+pnpm dev:desktop
 ```
 
 For non-interactive automation, use `mise exec -- pnpm dev` so the project
@@ -49,16 +53,15 @@ Pi already separates its session files by the child process cwd. Agents
 launched from Pie inherit the installed app's values; reusing them is the data
 leak this setup prevents. Use the dev-only overrides `PIE_DEV_SCOPE_OVERRIDE`,
 `PIE_DEV_HOME`, `PIE_DEV_SERVER_PORT`, `PIE_DEV_APP_PORT`,
-`PIE_DEV_DESKTOP_PORT`, `PIE_DEV_CORS_ORIGINS`, and
+`PIE_DEV_DESKTOP_PORT`, `PIE_DEV_DESKTOP_SERVER_PORT`, `PIE_DEV_CORS_ORIGINS`, and
 `PIE_DEV_ALLOWED_HOSTS` before mise activation when customization is
 intentional. Ambient `PIE_CORS_ORIGINS` and `PIE_ALLOWED_HOSTS` are cleared so
 an installed Pie configuration cannot widen the unauthenticated dev server.
-The root `dev` and `watch` commands intentionally target the web app; use
-`pnpm dev:desktop` for Electron. Do not run an unfiltered `turbo run dev`
-that mixes Web and Desktop, because they use different server lifecycles and
-must not write the same scoped storage concurrently. Do not point the API at
-**4000**: that is the daemon's port, which the desktop
-app spawns and guards with an auth token. If the app loads but shows no data,
+When Web and Desktop run together, Desktop uses the printed desktop-server port
+and stores its server data under the worktree home's `desktop/` namespace. This
+keeps its authenticated daemon lifecycle separate from the Web foreground
+server. Do not point the Web API at **4000**: that is the packaged daemon's
+default port and is guarded by an auth token. If the app loads but shows no data,
 check which process owns the printed proxy target first:
 `lsof -nP -iTCP:<PIE_PORT> -sTCP:LISTEN`.
 

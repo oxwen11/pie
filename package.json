@@ -2,10 +2,10 @@
   "name": "pie",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev --filter=@getpie/app",
-    "dev:web": "turbo run dev --filter=@getpie/app",
+    "dev": "turbo run dev",
+    "dev:app": "turbo run dev --filter=@getpie/app",
     "dev:desktop": "turbo run dev --filter=@getpie/desktop",
-    "watch": "turbo watch dev --filter=@getpie/app",
+    "watch": "turbo watch dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
