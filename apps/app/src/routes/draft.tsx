@@ -89,9 +89,7 @@ function DraftRoute() {
       if (!selected) throw new Error("No project selected");
       const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
-        ...(hasExplicitPick
-          ? { provider: pickedProvider, modelId: pickedModelId }
-          : undefined),
+        ...(hasExplicitPick ? { provider: pickedProvider, modelId: pickedModelId } : undefined),
         ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
