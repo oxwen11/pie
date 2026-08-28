@@ -1,6 +1,6 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { motion, useReducedMotion } from "motion/react";
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   Group,
@@ -125,27 +125,123 @@ function useCollapsedBinding(
   };
 }
 
+/**
+ * Toggle springs the column width; the rail's `x` is `width - expanded` so the
+ * contents slide as a drawer instead of squashing. Drag-resize stays a snap.
+ * `minSize` is 0 while the spring is in flight — the panel group otherwise
+ * refuses any `resize()` below 12rem.
+ */
+function useSidebarDrawer(
+  open: boolean,
+  setOpen: (open: boolean) => void,
+  panelRef: RefObject<PanelImperativeHandle | null>,
+) {
+  const reduceMotion = useReducedMotion() === true;
+  const laidOut = useRef(false);
+  const skip = useRef(false);
+  const flying = useRef(false);
+  const expanded = useMotionValue(256);
+  const width = useMotionValue(open ? 256 : 0);
+  const x = useTransform(() => width.get() - expanded.get());
+  const [minSize, setMinSize] = useState<0 | typeof SIDEBAR_MIN_SIZE>(open ? SIDEBAR_MIN_SIZE : 0);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setMinSize(0);
+  }
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (panel === null || !laidOut.current) return;
+
+    const settle = (): void => {
+      flying.current = false;
+      setMinSize(open ? SIDEBAR_MIN_SIZE : 0);
+    };
+
+    if (skip.current) {
+      skip.current = false;
+      width.jump(open ? expanded.get() : 0);
+      // Spring/drag lifetime — minSize is not an external store.
+      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription
+      settle();
+      return;
+    }
+
+    if (reduceMotion) {
+      width.jump(open ? expanded.get() : 0);
+      if (open) {
+        panel.expand();
+        panel.resize(expanded.get());
+      } else if (!panel.isCollapsed()) {
+        panel.collapse();
+      }
+      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription
+      settle();
+      return;
+    }
+
+    flying.current = true;
+    const controls = animate(width, open ? expanded.get() : 0, {
+      onComplete: settle,
+      onUpdate(value) {
+        if (value <= 0.5) {
+          if (!panel.isCollapsed()) panel.collapse();
+          return;
+        }
+        panel.resize(value);
+      },
+    });
+    return () => {
+      flying.current = false;
+      controls.stop();
+    };
+  }, [expanded, open, panelRef, reduceMotion, width]);
+
+  const onResize: OnPanelResize = (size) => {
+    const panel = panelRef.current;
+    if (!laidOut.current) {
+      laidOut.current = true;
+      if (size.inPixels > 0) {
+        expanded.set(size.inPixels);
+        if (open) width.set(size.inPixels);
+      }
+      if (panel === null) return;
+      if (!open && !panel.isCollapsed()) panel.collapse();
+      if (open && panel.isCollapsed()) {
+        panel.expand();
+        if (panel.isCollapsed()) panel.resize(expanded.get());
+      }
+      return;
+    }
+
+    if (flying.current) return;
+
+    if (size.inPixels > 0) {
+      expanded.set(size.inPixels);
+      width.set(size.inPixels);
+    }
+
+    const collapsed = size.inPixels === 0;
+    if (collapsed === open) {
+      skip.current = true;
+      setOpen(!collapsed);
+    }
+  };
+
+  return {
+    fill: open && minSize === SIDEBAR_MIN_SIZE,
+    minSize,
+    onResize,
+    style: { width, x },
+  };
+}
+
 export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactNode {
   const { open, setOpen } = useSidebar();
   const panelRef = usePanelRef();
-  const reduceMotion = useReducedMotion() === true;
-  const [panelOpen, setPanelOpen] = useState(open);
-
-  // Hold the column open until the slide-out finishes. Opening sets this during
-  // render so the slot exists on the same turn Motion starts translating in.
-  if (open && !panelOpen) {
-    setPanelOpen(true);
-  }
-
-  const onResize = useCollapsedBinding(
-    panelRef,
-    !(open || panelOpen),
-    (collapsed) => {
-      setPanelOpen(!collapsed);
-      setOpen(!collapsed);
-    },
-    SIDEBAR_DEFAULT_SIZE,
-  );
+  const drawer = useSidebarDrawer(open, setOpen, panelRef);
 
   return (
     <Panel
@@ -156,21 +252,16 @@ export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactN
       groupResizeBehavior="preserve-pixel-size"
       id={PANEL_IDS.sidebar}
       maxSize="30rem"
-      minSize={SIDEBAR_MIN_SIZE}
-      onResize={onResize}
+      minSize={drawer.minSize}
+      onResize={drawer.onResize}
       panelRef={panelRef}
     >
       <motion.div
-        animate={{ x: open ? "0%" : "-100%" }}
-        className="flex h-full min-h-0 w-full min-w-0 flex-col"
+        className={cn("flex h-full min-h-0 flex-col", drawer.fill ? "w-full" : "shrink-0")}
         data-slot="sidebar-drawer"
         data-state={open ? "open" : "closed"}
         inert={!open}
-        initial={false}
-        onAnimationComplete={() => {
-          if (!open) setPanelOpen(false);
-        }}
-        transition={reduceMotion ? { duration: 0 } : undefined}
+        style={drawer.fill ? undefined : drawer.style}
       >
         {children}
       </motion.div>
