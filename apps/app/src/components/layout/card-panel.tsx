@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
@@ -21,6 +22,8 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
+  const reduceMotion = useReducedMotion() === true;
+  const chromeTransition = reduceMotion ? { duration: 0 } : undefined;
 
   return (
     <SidebarInset
@@ -31,22 +34,38 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
         collapsedDesktop && desktop && "border-t-0",
       )}
     >
-      <header
+      <motion.header
         className={cn(
           SHELL_TITLEBAR_HEADER_CLASS,
           "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
           collapsedDesktop && desktop && "ps-[var(--shell-titlebar-content-left)]",
         )}
+        layoutRoot
       >
         {isMobile ? (
           <SidebarTrigger className="-ms-0.5 [-webkit-app-region:no-drag]" />
-        ) : webCollapsedChrome ? (
-          <>
-            <BrandMark />
-            <SidebarTrigger className="-ms-px -translate-y-px [-webkit-app-region:no-drag]" />
-          </>
-        ) : null}
-        <div className={SHELL_TITLEBAR_LABEL_CLASS}>
+        ) : (
+          <AnimatePresence initial={false}>
+            {webCollapsedChrome ? (
+              <motion.div
+                key="web-collapsed-chrome"
+                className="flex items-center gap-2 overflow-hidden"
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={chromeTransition}
+              >
+                <BrandMark className="shrink-0" />
+                <SidebarTrigger className="-ms-px shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        )}
+        <motion.div
+          className={SHELL_TITLEBAR_LABEL_CLASS}
+          layout="position"
+          transition={chromeTransition}
+        >
           <span className="min-w-0 truncate font-medium" title={heading}>
             {heading}
           </span>
@@ -58,9 +77,9 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
               {supportingText}
             </span>
           )}
-        </div>
+        </motion.div>
         <ContentPanelToggle className="ms-auto [-webkit-app-region:no-drag]" />
-      </header>
+      </motion.header>
       {/*
        * Always the Outlet, never a router-state-driven swap: `isLoading` flips
        * on *every* navigation, including a same-route search-param change like

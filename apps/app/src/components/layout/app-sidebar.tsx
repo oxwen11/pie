@@ -13,6 +13,7 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { SquarePen } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -34,6 +35,7 @@ export function AppSidebar({
   const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
   const expanded = !isMobile && state === "expanded";
+  const reduceMotion = useReducedMotion() === true;
   // Web: always (offcanvas on mobile). Desktop: spacer row while expanded so
   // content clears the viewport-fixed toggle; collapsed panel width is 0.
   const showHeader = desktop ? expanded : true;
@@ -45,7 +47,12 @@ export function AppSidebar({
       collapsible={isMobile ? "offcanvas" : "none"}
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
-      {showHeader ? (
+      <motion.div
+        className="overflow-hidden"
+        initial={false}
+        animate={{ height: showHeader ? "auto" : 0 }}
+        transition={reduceMotion ? { duration: 0 } : undefined}
+      >
         <SidebarHeader
           className={cn(
             SHELL_TITLEBAR_HEADER_CLASS,
@@ -60,7 +67,7 @@ export function AppSidebar({
             <SidebarTrigger className="[-webkit-app-region:no-drag]" />
           ) : null}
         </SidebarHeader>
-      ) : null}
+      </motion.div>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
         <SidebarGroup>
