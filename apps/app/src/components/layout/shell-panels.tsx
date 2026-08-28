@@ -234,7 +234,7 @@ function useSidebarDrawer(
     fill: open && minSize === SIDEBAR_MIN_SIZE,
     minSize,
     onResize,
-    style: { width, x },
+    style: { width: expanded, x },
   };
 }
 
