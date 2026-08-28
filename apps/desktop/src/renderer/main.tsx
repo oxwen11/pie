@@ -1,3 +1,4 @@
+import { applyBootAppearance } from "@getpie/app";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ErrorBoundary } from "react-error-boundary";
@@ -7,6 +8,8 @@ import { createDesktopHost } from "./desktop-host";
 import { waitForDesktopPort } from "./desktop-port";
 import { DesktopRoot } from "./desktop-root";
 import { StartupFailure } from "./startup-failure";
+
+applyBootAppearance();
 
 const rootElement = document.getElementById("root")!;
 if (!rootElement) throw new Error("Root element not found");

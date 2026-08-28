@@ -87,11 +87,14 @@ export function createAppClients(server?: ServerConnection): AppClients {
     staleTime: 30_000,
   });
 
-  // These queries render their own error state in the workspace panels.
+  // These queries render their own error state (workspace panels, Settings).
+  // settings.get also runs on every page for appearance, so a corrupt file
+  // must not toast globally.
   for (const key of [
     orpcQueryUtils.git.review.key(),
     orpcQueryUtils.git.diff.key(),
     orpcQueryUtils.fs.readTree.key(),
+    orpcQueryUtils.settings.get.key(),
   ]) {
     queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
   }
