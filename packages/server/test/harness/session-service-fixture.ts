@@ -26,7 +26,6 @@ export type Spy = {
   open: Array<{ cwd: string }>;
   resume: Array<{ sessionId: string; cwd: string | undefined }>;
   close: Array<string>;
-  persistDefaultModel: Array<{ cwd: string; provider: string; modelId: string }>;
 };
 
 export type Fixture = {
@@ -73,7 +72,7 @@ export const run = <A, E>(
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const spy: Spy = { open: [], resume: [], close: [], persistDefaultModel: [] };
+        const spy: Spy = { open: [], resume: [], close: [] };
         let opened = 0;
         const turnEvents = (sessionId: string) => {
           if (opts.turn === undefined) return Stream.empty;
@@ -206,10 +205,6 @@ export const run = <A, E>(
                 projectId === "proj-a"
                   ? Effect.succeed("/tmp/pie-app")
                   : Effect.fail(new ProjectNotFound({ projectId })),
-              persistDefaultModel: (cwd, model) =>
-                Effect.sync(() => {
-                  spy.persistDefaultModel.push({ cwd, ...model });
-                }),
             });
             return { service, repo, bus, spy, restart: build };
           });

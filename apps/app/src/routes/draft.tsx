@@ -18,7 +18,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
@@ -78,29 +78,19 @@ function DraftRoute() {
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
-
-  useEffect(() => {
-    if (!defaultModel || search.provider || search.modelId) return;
-    navigate({
-      to: "/draft",
-      search: (prev) => ({
-        ...prev,
-        provider: defaultModel.provider,
-        modelId: defaultModel.modelId,
-      }),
-      replace: true,
-    }).catch((error: unknown) => {
-      console.error("Failed to apply default draft model", error);
-    });
-  }, [defaultModel, navigate, search.modelId, search.provider]);
+  const pickedProvider = search.provider;
+  const pickedModelId = search.modelId;
+  const hasExplicitPick = pickedProvider !== undefined && pickedModelId !== undefined;
+  const displayProvider = hasExplicitPick ? pickedProvider : defaultModel?.provider;
+  const displayModelId = hasExplicitPick ? pickedModelId : defaultModel?.modelId;
 
   const startSession = useMutation({
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       if (!selected) throw new Error("No project selected");
       const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
-        ...(search.provider && search.modelId
-          ? { provider: search.provider, modelId: search.modelId }
+        ...(hasExplicitPick
+          ? { provider: pickedProvider, modelId: pickedModelId }
           : undefined),
         ...(worktree !== undefined ? { worktree } : undefined),
       });
@@ -291,8 +281,8 @@ function DraftRoute() {
               <PromptInputTools>
                 <DraftModelSelect
                   projectId={selected?.id}
-                  providerId={search.provider}
-                  modelId={search.modelId}
+                  providerId={displayProvider}
+                  modelId={displayModelId}
                   onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",

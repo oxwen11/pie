@@ -33,20 +33,15 @@ import {
 import { ProjectService } from "../project/service";
 import type { Session } from "../types";
 import type {
+  AgentOperationError,
   HarnessSessionNotFound,
   ResumeSessionError,
   SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import {
-  AgentOperationError,
-  AgentRequestUnavailable,
-  CapabilityUnsupported,
-  SessionNotResumable,
-} from "./errors";
+import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
 import type { PiAgentShape } from "./pi/agent";
 import { PiAgent } from "./pi/agent";
-import { persistDefaultPiModel } from "./pi/persist-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -231,17 +226,8 @@ export const makePiAgentSessionService = (deps: {
   readonly projectPathFor: (
     projectId: string,
   ) => Effect.Effect<string, ProjectNotFound | StoreReadError>;
-  /**
-   * Remember the user's model pick as Pi's startup default. Best-effort —
-   * a failed write must not fail the session mutation.
-   */
-  readonly persistDefaultModel?: (
-    cwd: string,
-    model: { readonly provider: string; readonly modelId: string },
-  ) => Effect.Effect<void>;
 }): PiAgentSessionServiceShape => {
   const { manager, pi, repo, bus, worktrees, newSessionId, projectPathFor } = deps;
-  const persistDefaultModel = deps.persistDefaultModel ?? (() => Effect.void);
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -433,11 +419,6 @@ export const makePiAgentSessionService = (deps: {
                   logLifecycle("session.created", "session created", {
                     cwd: sessionWorkspace.cwd,
                   }),
-                ),
-                Effect.andThen(
-                  input.model === undefined
-                    ? Effect.void
-                    : persistDefaultModel(input.cwd, input.model),
                 ),
                 Effect.as({ ref, workspace: sessionWorkspace }),
               );
@@ -683,24 +664,19 @@ export const makePiAgentSessionService = (deps: {
       withMetadataMutation(
         ref,
         readMetadata(ref).pipe(
-          Effect.flatMap((metadata) =>
-            ensureCwd(metadata).pipe(
-              Effect.flatMap((resolved) => {
-                const persistModel = repo.write({
-                  ...resolved,
-                  provider: model.provider,
-                  modelId: model.modelId,
-                });
-                const remember = persistDefaultModel(resolved.cwd, model);
-                if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
-                  return persistModel.pipe(
-                    Effect.andThen(remember),
-                    Effect.as(model satisfies AgentModelState),
-                  );
-                }
-                const agentSessionId = metadata.agentSessionId;
-                return persistModel.pipe(
-                  Effect.andThen(remember),
+          Effect.flatMap((metadata) => {
+            const persistModel = repo.write({
+              ...metadata,
+              provider: model.provider,
+              modelId: model.modelId,
+            });
+            if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+              return persistModel.pipe(Effect.as(model satisfies AgentModelState));
+            }
+            const agentSessionId = metadata.agentSessionId;
+            return ensureCwd(metadata).pipe(
+              Effect.flatMap((resolved) =>
+                persistModel.pipe(
                   Effect.andThen(
                     withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
                       runtime.setModel
@@ -708,10 +684,10 @@ export const makePiAgentSessionService = (deps: {
                         : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
                     ),
                   ),
-                );
-              }),
-            ),
-          ),
+                ),
+              ),
+            );
+          }),
         ),
       ).pipe(inSession(ref)),
 
@@ -779,25 +755,6 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
       ),
       projectPathFor: (projectId) =>
         projects.findById(projectId).pipe(Effect.map((project) => project.path)),
-      persistDefaultModel: (cwd, model) =>
-        Effect.tryPromise({
-          try: () => persistDefaultPiModel(cwd, model),
-          catch: (cause) =>
-            new AgentOperationError({
-              sessionId: "",
-              operation: "persist-default-model",
-              cause,
-            }),
-        }).pipe(
-          Effect.catchTag("AgentOperationError", (error) =>
-            Effect.logWarning("failed to persist Pi default model").pipe(
-              Effect.annotateLogs({
-                event: "model.default.persist_failed",
-                message: error.message,
-              }),
-            ),
-          ),
-        ),
     });
   }),
 );

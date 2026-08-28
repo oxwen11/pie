@@ -18,6 +18,6 @@ export async function listAvailablePiModels(cwd: string): Promise<PiModelCatalog
   const services = await createAgentSessionServices({ cwd });
   const available = await services.modelRuntime.getAvailable();
   const models = available.map(toAgentModel);
-  const defaultModel = await resolveDefaultPiModel(services);
+  const defaultModel = resolveDefaultPiModel(models, services.settingsManager);
   return { models, defaultModel };
 }

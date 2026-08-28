@@ -40,21 +40,6 @@ export const agentRouter = orpc.router({
       }),
     );
   }),
-  setDefaultModel: orpc.setDefaultModel.effect(function* ({ input, errors }) {
-    const agent = yield* PiAgentService;
-    const cwd = yield* catalogCwd(input.projectId, errors);
-
-    return yield* agent
-      .setDefaultModel(cwd, {
-        provider: input.provider,
-        modelId: input.modelId,
-      })
-      .pipe(
-        Effect.catchTags({
-          AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        }),
-      );
-  }),
   session: sessionRouter,
 });
 
