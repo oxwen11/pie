@@ -23,8 +23,8 @@ describe("persistDefaultPiModel", () => {
     await fs.rm(agentDir, { recursive: true, force: true });
   });
 
-  it("writes defaultProvider/defaultModel into Pi global settings", () => {
-    persistDefaultPiModel(agentDir, {
+  it("writes defaultProvider/defaultModel into Pi global settings", async () => {
+    await persistDefaultPiModel(agentDir, {
       provider: "anthropic",
       modelId: "claude-sonnet-4-5",
     });

@@ -29,9 +29,9 @@ export const makePiAgentService = (): PiAgentServiceShape => ({
         }),
     }),
   setDefaultModel: (cwd, model) =>
-    Effect.try({
-      try: () => {
-        persistDefaultPiModel(cwd, model);
+    Effect.tryPromise({
+      try: async () => {
+        await persistDefaultPiModel(cwd, model);
         return model satisfies AgentModelState;
       },
       catch: (cause) =>

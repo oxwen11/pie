@@ -780,7 +780,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
       projectPathFor: (projectId) =>
         projects.findById(projectId).pipe(Effect.map((project) => project.path)),
       persistDefaultModel: (cwd, model) =>
-        Effect.try({
+        Effect.tryPromise({
           try: () => persistDefaultPiModel(cwd, model),
           catch: (cause) =>
             new AgentOperationError({
@@ -789,7 +789,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
               cause,
             }),
         }).pipe(
-          Effect.catchAll((error) =>
+          Effect.catchTag("AgentOperationError", (error) =>
             Effect.logWarning("failed to persist Pi default model").pipe(
               Effect.annotateLogs({
                 event: "model.default.persist_failed",
