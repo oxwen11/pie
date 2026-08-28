@@ -183,7 +183,7 @@ export class ContentPanel<View = unknown> {
     const nextId = panelId(definition, payload);
     const session = this.#sessionOf(sessionRef);
     const currentIndex = session.panels.findIndex((panel) => panel.id === currentId);
-    if (currentIndex < 0) return this.open(sessionRef, definition, ...payloadArgs);
+    if (currentIndex === -1) return this.open(sessionRef, definition, ...payloadArgs);
 
     if (currentId === nextId) {
       this.#writeSession(sessionRef, {
@@ -254,7 +254,7 @@ export class ContentPanel<View = unknown> {
   close(sessionRef: SessionRef, id: string): void {
     const session = this.#sessionOf(sessionRef);
     const index = session.panels.findIndex((panel) => panel.id === id);
-    if (index < 0) return;
+    if (index === -1) return;
     this.#disposeInstance(sessionRef, id);
     const panels = session.panels.filter((panel) => panel.id !== id);
     // Closing the active tab lands on its neighbour, the way an editor does.
@@ -336,7 +336,7 @@ export class ContentPanel<View = unknown> {
     if (records.length === 0) return NO_PANELS;
     const sessionKey = sessionRefKey(sessionRef);
     const cached = this.#tabs.get(sessionKey);
-    if (cached && cached.records === records && cached.registryVersion === registryVersion) {
+    if (cached?.records === records && cached.registryVersion === registryVersion) {
       return cached.panels;
     }
     const panels: OpenPanel<View>[] = [];

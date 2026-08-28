@@ -13,7 +13,9 @@ function stubServer(handler: (res: http.ServerResponse) => void): Promise<http.S
     res.statusCode = 404;
     res.end();
   });
-  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve(server));
+  });
 }
 
 function addressOf(server: http.Server): string {
@@ -35,7 +37,7 @@ describe("healthy", () => {
 
   it("is true when /api/health answers ok", async () => {
     server = await stubServer((res) => res.end("ok"));
-    expect(await Effect.runPromise(healthy(addressOf(server)))).toBe(true);
+    await expect(Effect.runPromise(healthy(addressOf(server)))).resolves.toBe(true);
   });
 
   it("is false on a non-ok status", async () => {
@@ -43,16 +45,16 @@ describe("healthy", () => {
       res.statusCode = 500;
       res.end("ok");
     });
-    expect(await Effect.runPromise(healthy(addressOf(server)))).toBe(false);
+    await expect(Effect.runPromise(healthy(addressOf(server)))).resolves.toBe(false);
   });
 
   it("is false when the body is not ok", async () => {
     server = await stubServer((res) => res.end("nope"));
-    expect(await Effect.runPromise(healthy(addressOf(server)))).toBe(false);
+    await expect(Effect.runPromise(healthy(addressOf(server)))).resolves.toBe(false);
   });
 
   it("is false when nothing is listening", async () => {
-    expect(await Effect.runPromise(healthy("http://127.0.0.1:1"))).toBe(false);
+    await expect(Effect.runPromise(healthy("http://127.0.0.1:1"))).resolves.toBe(false);
   });
 
   it("times out instead of hanging on a wedged server that never responds", async () => {
@@ -64,7 +66,7 @@ describe("healthy", () => {
     try {
       const port = (wedged.address() as AddressInfo).port;
       const started = Date.now();
-      expect(await Effect.runPromise(healthy(`http://127.0.0.1:${port}`))).toBe(false);
+      await expect(Effect.runPromise(healthy(`http://127.0.0.1:${port}`))).resolves.toBe(false);
       expect(Date.now() - started).toBeLessThan(5_000);
     } finally {
       wedged.close();

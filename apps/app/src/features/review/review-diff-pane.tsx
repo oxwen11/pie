@@ -23,7 +23,7 @@ export function ReviewDiffPane({
   path?: string;
   locateRequest: number;
 }) {
-  if (review.data !== undefined && review.data.files.length === 0) {
+  if (review.data?.files.length === 0) {
     return (
       <ReviewState prominentIcon title="No changes to review">
         {emptyReviewMessage(review.data)}

@@ -173,7 +173,10 @@ importers:
         version: 0.58.0(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
       oxlint:
         specifier: ^1.80.0
-        version: 1.80.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+        version: 1.80.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+      oxlint-tsgolint:
+        specifier: 7.0.2001
+        version: 7.0.2001
       publint:
         specifier: ^0.3.23
         version: 0.3.23
@@ -318,13 +321,13 @@ importers:
         version: 2.0.8(@opencode-ai/sdk@1.18.3)(supports-color@10.2.2)
       react-doctor:
         specifier: ^0.9.12
-        version: 0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@0.24.0)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+        version: 0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@7.0.2001)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
       react-grab:
         specifier: ^0.1.50
         version: 0.1.50(react@19.2.8)
       react-scan:
         specifier: 'catalog:'
-        version: 0.5.7(patch_hash=40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(esbuild@0.28.1)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@0.24.0)(preact-render-to-string@6.6.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.57.1)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+        version: 0.5.7(patch_hash=40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(esbuild@0.28.1)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@7.0.2001)(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.57.1)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
   apps/desktop:
     dependencies:
@@ -450,6 +453,9 @@ importers:
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
+      '@orpc/experimental-effect':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)(effect@4.0.0-rc.110)
       ai:
         specifier: 'catalog:'
         version: 7.0.66(zod@4.4.3)
@@ -514,13 +520,13 @@ importers:
         version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.4.3))(supports-color@10.2.2)(ws@8.21.3)(zod@4.4.3)
       '@effect/platform-node':
         specifier: 4.0.0-rc.110
-        version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.0))
+        version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@orpc/contract':
         specifier: catalog:orpc
-        version: 2.0.0-beta.28(@opentelemetry/api@1.9.0)
+        version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
       '@orpc/server':
         specifier: catalog:orpc
-        version: 2.0.0-beta.28(@opentelemetry/api@1.9.0)
+        version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
       ai:
         specifier: 'catalog:'
         version: 7.0.66(zod@4.4.3)
@@ -706,7 +712,7 @@ importers:
         version: 24.13.3
       oxlint:
         specifier: ^1.80.0
-        version: 1.80.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+        version: 1.80.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(oxc-resolver@11.24.2)(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)
@@ -2405,8 +2411,18 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  '@oxlint-tsgolint/darwin-arm64@7.0.2001':
+    resolution: {integrity: sha512-CUJEdbSZ54+Xy9OXqOhWLTKZKV0BBiV7C2i/ygyVmXtkUNXx5YCzN8DpSSshTAKktoL7S+tnQ/ftFG/i7X896w==}
+    cpu: [arm64]
+    os: [darwin]
+
   '@oxlint-tsgolint/darwin-x64@0.24.0':
     resolution: {integrity: sha512-Wgvt/1lRbDxmoNqWQKKcL+UIiqLmdJ+EWLpQa1qzoNVAfNB0PJpa82/8dH1twT/3rSs4zrP5TXPWl4juB71WuQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@oxlint-tsgolint/darwin-x64@7.0.2001':
+    resolution: {integrity: sha512-pXfBb5BqONCcgrXQNUZWXgiYmRSWJzd97S8i41VVOh6ut0tyo+cJ5FKFpczDHxiVNfj/3e7c9B4MtztNdpIVCw==}
     cpu: [x64]
     os: [darwin]
 
@@ -2415,8 +2431,18 @@ packages:
     cpu: [arm64]
     os: [linux]
 
+  '@oxlint-tsgolint/linux-arm64@7.0.2001':
+    resolution: {integrity: sha512-roP7zujb/QDPzDwEKsFFpzNHHy91/Y7oX9vQXk78ekyZtcQj1QXDIMH33gjDdHBfRl4K9pZ36xhRgrP4Zr+R8A==}
+    cpu: [arm64]
+    os: [linux]
+
   '@oxlint-tsgolint/linux-x64@0.24.0':
     resolution: {integrity: sha512-xcz3CxKmjTQLREtE/UShh+ruWmm9nAb7UM9zKcD65BStiuYgOakAKkPHl4YS5DztpVcDrE0+HqbOolTlRKYWmw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@oxlint-tsgolint/linux-x64@7.0.2001':
+    resolution: {integrity: sha512-UDezNqdECVmngu2TPnjaS1YoAmcTaBoI5lV9vk3VahBxoi+I5r9k3iJTT7qZoYWOXTD/7T7bNcwRgrocR6BscQ==}
     cpu: [x64]
     os: [linux]
 
@@ -2425,8 +2451,18 @@ packages:
     cpu: [arm64]
     os: [win32]
 
+  '@oxlint-tsgolint/win32-arm64@7.0.2001':
+    resolution: {integrity: sha512-uJZhqB6pdXLuN+AD1F5082byyQti/NPmJA77GtcFlmT2HzRelqbNls3SaIqxpjdFgvSBF9g0yOKGBkGFg7kX8Q==}
+    cpu: [arm64]
+    os: [win32]
+
   '@oxlint-tsgolint/win32-x64@0.24.0':
     resolution: {integrity: sha512-0ZbGd9qRB6zs82moekaKdEvncRANq49EAwfNX62JpTS46feXUhKAuoyVDvZMj6Rywejylrmmu79Wo6faYCo4Ew==}
+    cpu: [x64]
+    os: [win32]
+
+  '@oxlint-tsgolint/win32-x64@7.0.2001':
+    resolution: {integrity: sha512-FkDRm8hx9OwzGQqyWG1tO5QrTLRApff9DzSgpz9QZau37BR8d1VYKOxMLGf6shPZntJFoTwIIJYT68VndYDCog==}
     cpu: [x64]
     os: [win32]
 
@@ -3552,6 +3588,13 @@ packages:
     resolution: {integrity: sha512-jx1+rPhY/5Ympkktd656HBWEBLxP7dH06losBLjjf5vgCODXvi9KhtftWcMIwTFIDqBr7cRnQkdLnAG+IOlGvQ==}
     engines: {node: '>=14.0.0'}
     cpu: [wasm32]
+    bundledDependencies:
+      - '@napi-rs/wasm-runtime'
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+      - '@tybys/wasm-util'
+      - '@emnapi/wasi-threads'
+      - tslib
 
   '@tailwindcss/oxide-win32-arm64-msvc@4.3.3':
     resolution: {integrity: sha512-3rc292Ca2ceK6Ulcc/bAVnTs/3nDtoPhyEKlgPv+yQJQi/JS/AMJlqzxvlDacL1nekbrcf6bTqp/jV4qgnPxNQ==}
@@ -6520,6 +6563,10 @@ packages:
     resolution: {integrity: sha512-giCk5sEvG02d5tzPmFMX3hem8ndzEEu1xvGYS5OwNfO2WGl6ZVxt5LjE0yiMDoz94INI7XkXwgFAQiydPvVHDw==}
     hasBin: true
 
+  oxlint-tsgolint@7.0.2001:
+    resolution: {integrity: sha512-KjK/XLcXr1DSyonKhsuFqJRiuKqcyG9j3LJ8nkOsrLzGvodBPqzHOKauy10asLMDI0sUpvb+1sxlzff3udZvfg==}
+    hasBin: true
+
   oxlint@1.72.0:
     resolution: {integrity: sha512-1rhdZIP/EvoI91ABIwNU5Q8+bWf8mjrS5UzIOZld4d4bXxJvtlUhlQvaoTogIGin/qdErMOrwaIJvCSIAKTLhA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -8819,17 +8866,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.0))':
-    dependencies:
-      '@effect/platform-node-shared': 4.0.0-rc.110(effect@4.0.0-rc.110)
-      effect: 4.0.0-rc.110
-      mime: 4.1.0
-      redis: 6.2.1(@opentelemetry/api@1.9.0)
-      undici: 8.7.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
   '@effect/platform-node@4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
       '@effect/platform-node-shared': 4.0.0-rc.110(effect@4.0.0-rc.110)
@@ -9142,7 +9178,6 @@ snapshots:
   '@eslint/core@1.2.1':
     dependencies:
       '@types/json-schema': 7.0.15
-      json-schema: 0.4.0
 
   '@eslint/object-schema@3.0.5': {}
 
@@ -9459,29 +9494,12 @@ snapshots:
 
   '@opentelemetry/semantic-conventions@1.43.0': {}
 
-  '@orpc/client@2.0.0-beta.28(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@orpc/shared': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@standardserver/core': 0.8.0
-      '@standardserver/fetch': 0.8.0
-      '@standardserver/peer': 0.8.0
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
   '@orpc/client@2.0.0-beta.28(@opentelemetry/api@1.9.1)':
     dependencies:
       '@orpc/shared': 2.0.0-beta.28(@opentelemetry/api@1.9.1)
       '@standardserver/core': 0.8.0
       '@standardserver/fetch': 0.8.0
       '@standardserver/peer': 0.8.0
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
-  '@orpc/contract@2.0.0-beta.28(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@orpc/client': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@orpc/shared': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@standard-schema/spec': 1.1.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
@@ -9534,21 +9552,6 @@ snapshots:
       - crossws
       - fastify
 
-  '@orpc/server@2.0.0-beta.28(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@orpc/client': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@orpc/contract': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@orpc/shared': 2.0.0-beta.28(@opentelemetry/api@1.9.0)
-      '@standardserver/aws-lambda': 0.8.0
-      '@standardserver/core': 0.8.0
-      '@standardserver/fastify': 0.8.0
-      '@standardserver/fetch': 0.8.0
-      '@standardserver/node': 0.8.0
-      '@standardserver/peer': 0.8.0
-      cookie: 2.0.1
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
   '@orpc/server@2.0.0-beta.28(@opentelemetry/api@1.9.1)':
     dependencies:
       '@orpc/client': 2.0.0-beta.28(@opentelemetry/api@1.9.1)
@@ -9563,14 +9566,6 @@ snapshots:
       cookie: 2.0.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
-
-  '@orpc/shared@2.0.0-beta.28(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@standardserver/shared': 0.8.0
-      radash: 12.1.1
-      type-fest: 5.8.0
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.0
 
   '@orpc/shared@2.0.0-beta.28(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -9840,19 +9835,37 @@ snapshots:
   '@oxlint-tsgolint/darwin-arm64@0.24.0':
     optional: true
 
+  '@oxlint-tsgolint/darwin-arm64@7.0.2001':
+    optional: true
+
   '@oxlint-tsgolint/darwin-x64@0.24.0':
+    optional: true
+
+  '@oxlint-tsgolint/darwin-x64@7.0.2001':
     optional: true
 
   '@oxlint-tsgolint/linux-arm64@0.24.0':
     optional: true
 
+  '@oxlint-tsgolint/linux-arm64@7.0.2001':
+    optional: true
+
   '@oxlint-tsgolint/linux-x64@0.24.0':
+    optional: true
+
+  '@oxlint-tsgolint/linux-x64@7.0.2001':
     optional: true
 
   '@oxlint-tsgolint/win32-arm64@0.24.0':
     optional: true
 
+  '@oxlint-tsgolint/win32-arm64@7.0.2001':
+    optional: true
+
   '@oxlint-tsgolint/win32-x64@0.24.0':
+    optional: true
+
+  '@oxlint-tsgolint/win32-x64@7.0.2001':
     optional: true
 
   '@oxlint/binding-android-arm-eabi@1.72.0':
@@ -10106,10 +10119,10 @@ snapshots:
 
   '@preact/signals-core@1.14.4': {}
 
-  '@preact/signals@2.9.3(preact@10.29.7)':
+  '@preact/signals@2.9.3(preact@10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)))':
     dependencies:
       '@preact/signals-core': 1.14.4
-      preact: 10.29.7(preact-render-to-string@6.6.5)
+      preact: 10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -10161,19 +10174,9 @@ snapshots:
       prompts: 2.4.2
       tinyexec: 1.3.0
 
-  '@redis/bloom@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))':
-    dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.0)
-
   '@redis/bloom@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
-
-  '@redis/client@6.2.1(@opentelemetry/api@1.9.0)':
-    dependencies:
-      cluster-key-slot: 1.1.2
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.0
 
   '@redis/client@6.2.1(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -10181,25 +10184,13 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
 
-  '@redis/json@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))':
-    dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.0)
-
   '@redis/json@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
 
-  '@redis/search@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))':
-    dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.0)
-
   '@redis/search@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
       '@redis/client': 6.2.1(@opentelemetry/api@1.9.1)
-
-  '@redis/time-series@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))':
-    dependencies:
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.0)
 
   '@redis/time-series@6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
@@ -14321,6 +14312,15 @@ snapshots:
       '@oxlint-tsgolint/win32-x64': 0.24.0
     optional: true
 
+  oxlint-tsgolint@7.0.2001:
+    optionalDependencies:
+      '@oxlint-tsgolint/darwin-arm64': 7.0.2001
+      '@oxlint-tsgolint/darwin-x64': 7.0.2001
+      '@oxlint-tsgolint/linux-arm64': 7.0.2001
+      '@oxlint-tsgolint/linux-x64': 7.0.2001
+      '@oxlint-tsgolint/win32-arm64': 7.0.2001
+      '@oxlint-tsgolint/win32-x64': 7.0.2001
+
   oxlint@1.72.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.72.0
@@ -14346,7 +14346,7 @@ snapshots:
       vite-plus: 0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)
     optional: true
 
-  oxlint@1.77.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
+  oxlint@1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.77.0
       '@oxlint/binding-android-arm64': 1.77.0
@@ -14367,10 +14367,10 @@ snapshots:
       '@oxlint/binding-win32-arm64-msvc': 1.77.0
       '@oxlint/binding-win32-ia32-msvc': 1.77.0
       '@oxlint/binding-win32-x64-msvc': 1.77.0
-      oxlint-tsgolint: 0.24.0
+      oxlint-tsgolint: 7.0.2001
       vite-plus: 0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)
 
-  oxlint@1.80.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
+  oxlint@1.80.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.80.0
       '@oxlint/binding-android-arm64': 1.80.0
@@ -14391,7 +14391,7 @@ snapshots:
       '@oxlint/binding-win32-arm64-msvc': 1.80.0
       '@oxlint/binding-win32-ia32-msvc': 1.80.0
       '@oxlint/binding-win32-x64-msvc': 1.80.0
-      oxlint-tsgolint: 0.24.0
+      oxlint-tsgolint: 7.0.2001
       vite-plus: 0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)
 
   p-cancelable@2.1.1: {}
@@ -14542,7 +14542,7 @@ snapshots:
     dependencies:
       preact: 11.0.0-beta.0
 
-  preact@10.29.7(preact-render-to-string@6.6.5):
+  preact@10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)):
     optionalDependencies:
       preact-render-to-string: 6.6.5(preact@11.0.0-beta.0)
 
@@ -14741,7 +14741,7 @@ snapshots:
       date-fns-jalali: 4.1.0-0
       react: 19.2.8
 
-  react-doctor@0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@0.24.0)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
+  react-doctor@0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@7.0.2001)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0)):
     dependencies:
       '@astrojs/compiler': 4.0.0
       '@sentry/node': 10.65.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(supports-color@10.2.2)
@@ -14753,7 +14753,7 @@ snapshots:
       jiti: 2.7.0
       magicast: 0.5.3
       oxc-resolver: 11.24.2
-      oxlint: 1.77.0(oxlint-tsgolint@0.24.0)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+      oxlint: 1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
       oxlint-plugin-react-doctor: 0.9.12
       prompts: 2.4.2
       typescript: 5.9.3
@@ -14803,19 +14803,19 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  react-scan@0.5.7(patch_hash=40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(esbuild@0.28.1)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@0.24.0)(preact-render-to-string@6.6.5)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.57.1)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)):
+  react-scan@0.5.7(patch_hash=40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(esbuild@0.28.1)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@7.0.2001)(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.57.1)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)):
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/types': 7.29.7
-      '@preact/signals': 2.9.3(preact@10.29.7)
+      '@preact/signals': 2.9.3(preact@10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)))
       '@rollup/pluginutils': 5.3.0(rollup@4.57.1)
       bippy: 0.5.43(react@19.2.8)
       commander: 14.0.3
       picocolors: 1.1.1
-      preact: 10.29.7(preact-render-to-string@6.6.5)
+      preact: 10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
       prompts: 2.4.2
       react: 19.2.8
-      react-doctor: 0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@0.24.0)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
+      react-doctor: 0.9.12(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint-tsgolint@7.0.2001)(supports-color@10.2.2)(vite-plus@0.2.4(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@26.1.0(supports-color@10.2.2))(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))(yaml@2.9.0))
       react-dom: 19.2.8(react@19.2.8)
       react-grab: 0.2.0(react@19.2.8)
     optionalDependencies:
@@ -14864,17 +14864,6 @@ snapshots:
       util-deprecate: 1.0.2
 
   readdirp@5.0.0: {}
-
-  redis@6.2.1(@opentelemetry/api@1.9.0):
-    dependencies:
-      '@redis/bloom': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))
-      '@redis/client': 6.2.1(@opentelemetry/api@1.9.0)
-      '@redis/json': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))
-      '@redis/search': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))
-      '@redis/time-series': 6.2.1(@redis/client@6.2.1(@opentelemetry/api@1.9.0))
-    transitivePeerDependencies:
-      - '@node-rs/xxhash'
-      - '@opentelemetry/api'
 
   redis@6.2.1(@opentelemetry/api@1.9.1):
     dependencies:

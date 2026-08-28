@@ -1,4 +1,4 @@
-import type { GitBranch } from "@getpie/contract/git";
+import type { GitRepositoryBranch } from "@getpie/contract/git";
 import {
   Select,
   SelectContent,
@@ -34,7 +34,7 @@ export function DraftWorktreeBaseSelect({
   onValueChange,
   disabled,
 }: {
-  branch: GitBranch | undefined;
+  branch: GitRepositoryBranch | undefined;
   value: string | null;
   onValueChange: (base: string) => void;
   disabled?: boolean;

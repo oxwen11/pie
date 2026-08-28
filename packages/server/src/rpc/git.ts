@@ -1,8 +1,6 @@
-import "@orpc/experimental-effect/extensions/effect";
 import type { WorkspaceQuery } from "@getpie/contract";
 import type { GitDiffQuery, GitReviewQuery } from "@getpie/contract/git";
 import { gitContract } from "@getpie/contract/git";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import {
@@ -19,6 +17,7 @@ import {
 } from "../errors";
 import { GitService } from "../git";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
 
 const orpc = implement(gitContract).$context<RpcContext>();
@@ -43,6 +42,20 @@ const mapGitCwdErrors = <
       Effect.fail(errors.GIT_FAILED({ data: { cwd } })),
     GitNotRepository: (error: GitNotRepository) =>
       Effect.fail(errors.NOT_REPOSITORY({ data: { cwd: error.cwd } })),
+    GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+  });
+
+const mapGitBranchErrors = <
+  E extends {
+    PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
+    GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
+  },
+>(
+  errors: E,
+) =>
+  Effect.catchTags({
+    WorkspacePathEscape: (error: WorkspacePathEscape) =>
+      Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
     GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
   });
 
@@ -73,7 +86,7 @@ export const gitRouter = orpc.router({
   branch: orpc.branch.effect(function* ({ input, errors }) {
     const git = yield* GitService;
     const cwd = yield* resolveCwd(input, errors);
-    return yield* git.branch(cwd).pipe(mapGitCwdErrors(cwd, errors));
+    return yield* git.branch(cwd).pipe(mapGitBranchErrors(errors));
   }),
   review: orpc.review.effect(function* ({ input, errors }) {
     const git = yield* GitService;

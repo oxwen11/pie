@@ -81,7 +81,7 @@ function DraftRoute() {
 
   useEffect(() => {
     if (!defaultModel || search.provider || search.modelId) return;
-    void navigate({
+    navigate({
       to: "/draft",
       search: (prev) => ({
         ...prev,
@@ -89,6 +89,8 @@ function DraftRoute() {
         modelId: defaultModel.modelId,
       }),
       replace: true,
+    }).catch((error: unknown) => {
+      console.error("Failed to apply default draft model", error);
     });
   }, [defaultModel, navigate, search.modelId, search.provider]);
 
@@ -131,10 +133,12 @@ function DraftRoute() {
           console.error("Failed to start session prompt", error);
         });
 
-      void navigate({
+      navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
+      }).catch((error: unknown) => {
+        console.error("Failed to open the new session", error);
       });
     },
     onError: (error) => {
@@ -152,6 +156,10 @@ function DraftRoute() {
     onSubmit: (text) => {
       if (!selected) {
         toast.error("Pick a project before sending.");
+        return false;
+      }
+      if (draftWorktree.gitState === "workspace-unavailable") {
+        toast.error("The selected project folder is unavailable.");
         return false;
       }
       if (startSession.isPending) return false;
@@ -209,9 +217,15 @@ function DraftRoute() {
         {importOpen && (
           <ImportProjectDialog
             onClose={() => setImportOpen(false)}
-            onImported={(project) =>
-              navigate({ to: "/draft", search: { projectId: project.id }, replace: true })
-            }
+            onImported={(project) => {
+              navigate({
+                to: "/draft",
+                search: { projectId: project.id },
+                replace: true,
+              }).catch((error: unknown) => {
+                console.error("Failed to open the imported project", error);
+              });
+            }}
           />
         )}
       </Empty>
@@ -229,11 +243,19 @@ function DraftRoute() {
                   to: "/draft",
                   search: { projectId: next },
                   replace: true,
+                }).catch((error: unknown) => {
+                  console.error("Failed to select draft project", error);
                 });
               }}
               projects={projects.data}
               value={selected?.id ?? null}
             />
+            {draftWorktree.gitState === "not-repository" ? (
+              <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
+            ) : null}
+            {draftWorktree.gitState === "workspace-unavailable" ? (
+              <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
+            ) : null}
             {draftWorktree.gitAvailable ? (
               <>
                 <DraftWorkspaceSelect
@@ -243,12 +265,8 @@ function DraftRoute() {
                 />
                 {draftWorktree.mode === "worktree" ? (
                   <DraftWorktreeBaseSelect
-                    branch={draftWorktree.gitBranch.data}
-                    disabled={
-                      startSession.isPending ||
-                      selected === null ||
-                      draftWorktree.gitBranch.isPending
-                    }
+                    branch={draftWorktree.repositoryBranch}
+                    disabled={startSession.isPending || selected === null}
                     onValueChange={draftWorktree.setWorktreeBaseOverride}
                     value={draftWorktree.worktreeBase}
                   />
@@ -275,19 +293,22 @@ function DraftRoute() {
                   projectId={selected?.id}
                   providerId={search.provider}
                   modelId={search.modelId}
-                  onChange={(provider, modelId) =>
+                  onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
                       search: (prev) => ({ ...prev, provider, modelId }),
                       replace: true,
-                    })
-                  }
+                    }).catch((error: unknown) => {
+                      console.error("Failed to set the draft model", error);
+                    });
+                  }}
                 />
               </PromptInputTools>
               <PromptInputSubmit
                 disabled={
                   !hasContent ||
                   !selected ||
+                  draftWorktree.gitState === "workspace-unavailable" ||
                   startSession.isPending ||
                   (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }

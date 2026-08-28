@@ -123,10 +123,12 @@ const route = (
       return withCors(HttpServerResponse.text("ok"));
     }
 
-    if (options.authToken !== undefined && pathname.startsWith("/api/")) {
-      if (!tokensMatch(options.authToken, bearerToken(request.headers.authorization))) {
-        return withCors(unauthorized);
-      }
+    if (
+      options.authToken !== undefined &&
+      pathname.startsWith("/api/") &&
+      !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+    ) {
+      return withCors(unauthorized);
     }
 
     if (request.method === "POST" && pathname === "/api/ws-ticket") {

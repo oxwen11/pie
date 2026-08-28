@@ -6,6 +6,7 @@ describe("defaultWorktreeBase", () => {
   it("prefers defaultBranch over current", () => {
     expect(
       defaultWorktreeBase({
+        kind: "repository",
         current: "feature",
         defaultBranch: "main",
         branches: ["main", "feature"],
@@ -17,6 +18,7 @@ describe("defaultWorktreeBase", () => {
   it("falls back to current when defaultBranch is null", () => {
     expect(
       defaultWorktreeBase({
+        kind: "repository",
         current: "feature",
         defaultBranch: null,
         branches: ["feature"],
@@ -25,7 +27,9 @@ describe("defaultWorktreeBase", () => {
     ).toBe("feature");
   });
 
-  it("returns null when branch info is missing", () => {
+  it("returns null when branch info is missing or the workspace is not a repository", () => {
     expect(defaultWorktreeBase(undefined)).toBeNull();
+    expect(defaultWorktreeBase({ kind: "not-repository" })).toBeNull();
+    expect(defaultWorktreeBase({ kind: "workspace-unavailable" })).toBeNull();
   });
 });

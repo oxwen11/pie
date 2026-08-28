@@ -8,9 +8,9 @@ import type {
   SessionRuntimeSnapshot,
   SessionStatus,
   SessionSummary,
+  SessionCapabilities,
   SessionWorkspace,
 } from "@getpie/contract";
-import type { SessionCapabilities } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
@@ -57,7 +57,7 @@ const MAX_TITLE_CHARS = 60;
 const deriveTitle = (parts: PromptInput["parts"]): string | undefined => {
   const text = parts.find((part) => part.type === "text")?.text.trim();
   if (!text) return undefined;
-  const collapsed = text.replace(/\s+/g, " ");
+  const collapsed = text.replaceAll(/\s+/g, " ");
   return collapsed.length > MAX_TITLE_CHARS ? collapsed.slice(0, MAX_TITLE_CHARS) : collapsed;
 };
 

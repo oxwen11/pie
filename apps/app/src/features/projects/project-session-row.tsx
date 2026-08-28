@@ -21,13 +21,15 @@ export function ProjectSessionRow({
     <SidebarMenuItem>
       <SidebarMenuButton
         isActive={active}
-        onClick={() =>
+        onClick={() => {
           navigate({
             to: "/session/$sessionId",
             params: { sessionId: session.sessionId },
             search: { projectId: session.projectId },
-          })
-        }
+          }).catch((error: unknown) => {
+            console.error("Failed to open session", error);
+          });
+        }}
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="truncate">{session.title ?? "New chat"}</span>

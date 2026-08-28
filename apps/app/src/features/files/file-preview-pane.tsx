@@ -20,7 +20,7 @@ export function FilePreviewPane({
   refreshing,
   onRefresh,
 }: {
-  file: UseQueryResult<string, Error>;
+  file: UseQueryResult<string>;
   path: string;
   line?: number;
   navigationRequest: number;

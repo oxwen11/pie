@@ -1,6 +1,4 @@
-import "@orpc/experimental-effect/extensions/effect";
 import { sessionContract } from "@getpie/contract/session";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import {
@@ -19,6 +17,7 @@ import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { openScopedSubscription } from "./session-stream";
 import { streamToAsyncGenerator } from "./stream";
 

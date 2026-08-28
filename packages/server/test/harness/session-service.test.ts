@@ -311,7 +311,7 @@ describe("PiAgentSessionService", () => {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
         yield* Effect.sleep("50 millis");
-        yield* waitForTurn(fixture, ref, (turn) => turn !== null && turn.complete);
+        yield* waitForTurn(fixture, ref, (turn) => turn?.complete === true);
         return yield* fixture.service.getMessages(ref);
       }),
     );
@@ -655,7 +655,7 @@ describe("PiAgentSessionService", () => {
     expect(created?.annotations.projectId).toBe("proj-a");
     // Every line carries the id, so one session's whole life greps out of a
     // file holding many.
-    expect(typeof sessionId).toBe("string");
+    expect(sessionId).toBeTypeOf("string");
     expect(records.every((r) => r.annotations.sessionId === sessionId)).toBe(true);
   });
 

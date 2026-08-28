@@ -31,8 +31,8 @@ testLayer(NodePlatformLayer, { excludeTestServices: true })("observability loggi
 
       const logs = yield* fs.stat(logsDir);
       const file = yield* fs.stat(pieLogPath(logsDir));
-      assert.equal((Number(logs.mode) & 0o777).toString(8), "700");
-      assert.equal((Number(file.mode) & 0o777).toString(8), "600");
+      assert.equal(((logs.mode ?? 0) & 0o777).toString(8), "700");
+      assert.equal(((file.mode ?? 0) & 0o777).toString(8), "600");
 
       const content = yield* fs.readFileString(pieLogPath(logsDir));
       const lines = content.trim().split("\n");
