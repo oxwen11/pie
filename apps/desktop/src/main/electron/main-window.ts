@@ -2,11 +2,20 @@ import path from "node:path";
 
 import { is } from "@electron-toolkit/utils";
 import { Context, Effect, Layer, Scope } from "effect";
-import { BrowserWindow, shell, type WebContents } from "electron";
+import { BrowserWindow, screen, shell, type WebContents } from "electron";
 
 import icon from "../../../resources/icon.png?asset";
 import { DesktopConfig } from "../desktop-config";
 import { APP_ORIGIN, registerAppProtocol } from "./app-protocol";
+import {
+  type DesktopStore,
+  type DesktopWindowState,
+  makeDesktopStore,
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  placementFromWindowState,
+  windowStateFromBounds,
+} from "./desktop-store";
 import { RendererChannel } from "./renderer-channel";
 
 export class MainWindow extends Context.Service<
@@ -20,7 +29,11 @@ export class MainWindow extends Context.Service<
 export type MainWindowOptions = {
   readonly devUrl: string | undefined;
   readonly connectRenderer: (webContents: WebContents) => () => Promise<void>;
+  readonly windowState: DesktopWindowState;
+  readonly persistWindow: DesktopStore["setWindow"];
 };
+
+const WINDOW_STATE_DEBOUNCE_MS = 400;
 
 function canOpenExternal(href: string): boolean {
   try {
@@ -31,12 +44,29 @@ function canOpenExternal(href: string): boolean {
   }
 }
 
+function workAreaForState(state: DesktopWindowState) {
+  if (state.x === undefined || state.y === undefined) return undefined;
+  return screen.getDisplayMatching({
+    x: state.x,
+    y: state.y,
+    width: state.width,
+    height: state.height,
+  }).workArea;
+}
+
+function snapshotWindow(window: BrowserWindow): DesktopWindowState {
+  const maximized = window.isMaximized();
+  const bounds = maximized ? window.getNormalBounds() : window.getBounds();
+  return windowStateFromBounds(bounds, maximized);
+}
+
 export function makeMainWindow(
   options: MainWindowOptions,
 ): Effect.Effect<MainWindow["Service"], never, Scope.Scope> {
   return Effect.gen(function* () {
     let mainWindow: BrowserWindow | undefined;
     let disconnectRenderer: (() => Promise<void>) | undefined;
+    let persistTimer: ReturnType<typeof setTimeout> | undefined;
     const isE2E = process.env["PIE_E2E"] === "1";
 
     const disconnectCurrentRenderer = (): void => {
@@ -45,14 +75,38 @@ export function makeMainWindow(
       if (disconnect) void disconnect();
     };
 
+    const persistNow = (window: BrowserWindow): void => {
+      if (persistTimer !== undefined) {
+        clearTimeout(persistTimer);
+        persistTimer = undefined;
+      }
+      if (window.isDestroyed()) return;
+      Effect.runFork(options.persistWindow(snapshotWindow(window)));
+    };
+
+    const persistSoon = (window: BrowserWindow): void => {
+      if (persistTimer !== undefined) clearTimeout(persistTimer);
+      persistTimer = setTimeout(() => {
+        persistTimer = undefined;
+        persistNow(window);
+      }, WINDOW_STATE_DEBOUNCE_MS);
+    };
+
     const target = is.dev && options.devUrl ? options.devUrl : `${APP_ORIGIN}/`;
+    const placement = placementFromWindowState(
+      options.windowState,
+      workAreaForState(options.windowState),
+    );
 
     const createWindow = (): BrowserWindow => {
       const window = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        minWidth: 800,
-        minHeight: 600,
+        width: placement.width,
+        height: placement.height,
+        minWidth: MIN_WINDOW_WIDTH,
+        minHeight: MIN_WINDOW_HEIGHT,
+        ...(placement.x !== undefined && placement.y !== undefined
+          ? { x: placement.x, y: placement.y }
+          : undefined),
         show: false,
         autoHideMenuBar: true,
         titleBarStyle: "hiddenInset",
@@ -70,12 +124,18 @@ export function makeMainWindow(
       mainWindow = window;
 
       window.on("ready-to-show", () => {
+        if (options.windowState.maximized) window.maximize();
         if (!isE2E) window.show();
       });
       window.webContents.on("did-finish-load", () => {
         disconnectCurrentRenderer();
         disconnectRenderer = options.connectRenderer(window.webContents);
       });
+      window.on("resize", () => persistSoon(window));
+      window.on("move", () => persistSoon(window));
+      window.on("maximize", () => persistSoon(window));
+      window.on("unmaximize", () => persistSoon(window));
+      window.on("close", () => persistNow(window));
       window.on("closed", () => {
         disconnectCurrentRenderer();
         if (mainWindow === window) mainWindow = undefined;
@@ -104,6 +164,10 @@ export function makeMainWindow(
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
+        if (persistTimer !== undefined) {
+          clearTimeout(persistTimer);
+          persistTimer = undefined;
+        }
         disconnectCurrentRenderer();
         mainWindow?.destroy();
         mainWindow = undefined;
@@ -143,10 +207,14 @@ export const MainWindowLive = Layer.effect(
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
     const channel = yield* RendererChannel;
+    const store = yield* makeDesktopStore(config.desktopConfigFile);
+    const settings = yield* store.get;
     yield* registerAppProtocol(rendererRoot());
     return yield* makeMainWindow({
       devUrl: config.devUrl,
       connectRenderer: channel.connect,
+      windowState: settings.window,
+      persistWindow: store.setWindow,
     });
   }),
 );

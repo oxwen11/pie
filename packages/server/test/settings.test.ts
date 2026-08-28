@@ -85,6 +85,19 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
     }),
   );
 
+  it.effect("leaves Desktop.toml alone when saving operator settings", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const desktopFile = path.join(home, "Desktop.toml");
+      const desktop = "[window]\nwidth = 1400\nheight = 900\nmaximized = false\n";
+      yield* fs.writeFileString(desktopFile, desktop);
+      const svc = yield* serviceIn(home);
+      yield* svc.update({ appearance: { theme: "dark" } });
+      assert.equal(yield* fs.readFileString(desktopFile), desktop);
+    }),
+  );
+
   it.effect("recovers after a corrupt file is fixed", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

@@ -28,8 +28,12 @@ The validated absolute directory handed to Pi when opening or resuming a session
 _Avoid_: cwd (in session APIs)
 
 **Settings** (`$PIE_HOME/config.toml`):
-Operator-facing pie preferences (appearance today), a plain TOML document. Distinct from Project/Session JSON under `storage/` and from Pi's own settings files. Named only in `packages/server/src/config/paths.ts` (`configFile`). The server is the only writer; CLI `serve` and desktop both reach it over RPC so they share one file. Electron `userData` is Chromium/instance-lock only — not a second settings home.
-_Avoid_: putting operator prefs in `projects.json`; wrapping this file in the JSON store `{ version, data }` envelope; writing Pi's settings files; a desktop-owned copy of `config.toml`
+Operator-facing pie preferences (appearance today), a plain TOML document. Distinct from Project/Session JSON under `storage/`, from Pi's own settings files, and from desktop host state. Named only in `packages/server/src/config/paths.ts` (`configFile`). The server is the only writer; CLI `serve` and desktop both reach it over RPC so they share one file.
+_Avoid_: putting operator prefs in `projects.json`; wrapping this file in the JSON store `{ version, data }` envelope; writing Pi's settings files; a `[desktop]` table in this file; a desktop-owned copy of `config.toml`
+
+**Desktop settings** (`$PIE_HOME/Desktop.toml`):
+Electron host state (window bounds today). Named as `desktopConfigFilePath` in `packages/server/src/config/paths.ts`; owned and read/written by desktop Main, not the server. `pie serve` does not use this file. Electron `userData` is Chromium/instance-lock only.
+_Avoid_: putting window bounds in `config.toml`; putting this file in Electron `userData`
 
 ## Server Session Services
 

@@ -9,6 +9,8 @@ import { Context, Layer } from "effect";
  *
  * `projects.json` lives under `storage/` (a data collection).
  * `config.toml` lives at the home root (operator-facing settings).
+ * `Desktop.toml` is named here but owned by the Electron shell, not the
+ * server — Main reads it before the daemon is up.
  */
 export class Paths extends Context.Service<
   Paths,
@@ -108,6 +110,14 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
 
 /** `$PIE_HOME/config.toml` — operator settings. */
 export const configFilePath = (home: string): string => path.join(home, "config.toml");
+
+/**
+ * `$PIE_HOME/Desktop.toml` — Electron host settings (window bounds today).
+ * Named here so the home has one naming site; the server never reads or
+ * writes this file. Desktop Main opens the window before the daemon is
+ * ready, so it must read the path itself rather than going through RPC.
+ */
+export const desktopConfigFilePath = (home: string): string => path.join(home, "Desktop.toml");
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");

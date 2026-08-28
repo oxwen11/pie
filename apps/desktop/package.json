@@ -24,13 +24,15 @@
     "@effect/platform-node": "catalog:effect",
     "@electron-toolkit/utils": "^4.0.0",
     "@getpie/app": "workspace:*",
+    "@getpie/effect-json-store": "workspace:*",
     "@getpie/server": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
     "effect": "catalog:effect",
-    "react-error-boundary": "catalog:"
+    "react-error-boundary": "catalog:",
+    "smol-toml": "^1.8.0"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",

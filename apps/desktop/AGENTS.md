@@ -99,7 +99,7 @@ ManagedRuntime.make(
 
 ## Window and port lifecycle
 
-- Open the window and mount the React startup shell while the local server is still starting. Server environment resolution and port readiness must stay inside the supervised fiber and must not block Layer construction or window creation.
+- Open the window and mount the React startup shell while the local server is still starting. Server environment resolution and port readiness must stay inside the supervised fiber and must not block Layer construction or window creation. Restore bounds from `$PIE_HOME/Desktop.toml` in Main (direct file I/O, not RPC) so this stays true.
 - The renderer awaits its one-time MessagePort and first successful server connection through nested React Suspense boundaries before mounting `AppInterface`. The app's WebSocket oRPC client still uses lazy `connect` for runtime reconnects, and Desktop HTTP is only for minting the single-use WebSocket ticket.
 - Create a fresh MessagePort for every renderer document after `did-finish-load`.
 - Close the previous port before attaching a replacement.

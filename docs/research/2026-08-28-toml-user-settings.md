@@ -7,18 +7,28 @@ page), and which parser should own read/write?
 
 ## Decision
 
-- **File:** `$PIE_HOME/config.toml` — named only in `packages/server/src/config/paths.ts`
-  (`configFile`). Not under `storage/`. One product home for CLI `serve` and
-  desktop; the server is the only writer. Electron `userData` is not a settings
-  home.
+- **Shared file:** `$PIE_HOME/config.toml` — named only in
+  `packages/server/src/config/paths.ts` (`configFile`). The **server** is the
+  only writer. CLI `serve` and the desktop renderer call `settings.get` /
+  `settings.update`. Theme and other operator prefs live here.
+- **Desktop file:** `$PIE_HOME/Desktop.toml` — named as `desktopConfigFilePath`
+  in the same `paths.ts`. Electron Main reads and writes it **directly**
+  (window bounds today) so the window can open before the daemon is up.
+  `pie serve` never reads this file. Prefix is the filename (`Desktop.toml`),
+  not a `[desktop]` table inside `config.toml`.
+- **Not Electron `userData`:** that directory stays Chromium / instance-lock
+  (`Pie` / `Pie Dev/<worktree>`).
 - **Format:** TOML 1.0 via `smol-toml` (`parse` / `stringify`).
-- **Validation:** Effect Schema after parse (`SettingsSchema` in `@getpie/contract`).
+- **Validation:** Effect Schema after parse (`SettingsSchema` in `@getpie/contract`
+  for `config.toml`; `DesktopSettingsSchema` in the desktop shell for
+  `Desktop.toml`).
 - **Writes:** canonical document + a short header comment; atomic tmp+rename;
   mode `0600`. Missing file is defaults in memory and is not seeded until the
-  first Settings save.
-- **Not used:** `@getpie/effect-json-store`. That envelope (`{ version, data }`)
-  is for machine-owned collections (`projects.json`, session records). A
-  human-edited settings file must stay a plain TOML document.
+  first save (`config.toml`: Settings page; `Desktop.toml`: a window
+  move/resize/close).
+- **Not used for either document:** `@getpie/effect-json-store`'s
+  `{ version, data }` envelope. Atomic write helper is reused; the files stay
+  plain TOML.
 
 ## Why TOML
 
@@ -67,24 +77,29 @@ Electron/Chromium internals; `~/.t3/userdata` is unaffected.
 Web vs desktop is a runtime mode on `ServerConfig` (`"web" | "desktop"`), not a
 second settings root.
 
-**What pie copies, what it does not.** Copy the home rule: `$PIE_HOME` is the
-single product directory (`resolvePieHome` in `packages/server/src/config/paths.ts`),
-already shared by CLI `serve`, the daemon, and desktop. Electron `userData`
-(`Pie` / `Pie Dev/<worktree>`) stays Chromium-only, same idea as T3.
+**What pie copies, what it does not.** Copy the _home_ rule: `$PIE_HOME` is the
+single product directory (`resolvePieHome` in `packages/server/src/config/paths.ts`).
+Copy the _owner split_ as two sibling files, not T3's three JSON documents and
+not Electron `userData`:
 
-Do **not** copy T3's three-file split for v1. pie's Settings page today is
-appearance that should follow the operator across `pie serve` in a browser and
-the desktop shell — both are clients of the same daemon. T3 treats theme-like
-prefs as _client-local_ (web `localStorage` vs desktop `client-settings.json`),
-so the two surfaces can diverge. pie rejects that for operator settings: the
-daemon owns `$PIE_HOME/config.toml`; the SPA and the desktop renderer only call
-`settings.get` / `settings.update`. Desktop must not write a second
-`config.toml`.
+| File           | Owner         | Contents                                                   |
+| -------------- | ------------- | ---------------------------------------------------------- |
+| `config.toml`  | server        | Operator prefs (appearance). Web and desktop both use RPC. |
+| `Desktop.toml` | Electron Main | Host-only (window bounds). Direct file I/O, no RPC.        |
 
-A later Electron-host-only key (window bounds, auto-update channel) can be a
-sibling file under the same `$PIE_HOME` (T3's `desktop-settings.json` pattern)
-or stay in `userData`. It does not belong in `config.toml` and it does not
-justify a second pie home.
+Do **not** put `[desktop]` inside `config.toml`. The Settings page rewrites a
+canonical document and drops unknown keys, so a shared file would wipe host
+state. Two writers on one TOML file are a race. The window must restore before
+the daemon answers RPC.
+
+T3 keeps theme-like prefs client-local (web `localStorage` vs desktop
+`client-settings.json`). pie does not: appearance follows the operator across
+`pie serve` and the desktop shell.
+
+Electron `userData` (`Pie` / `Pie Dev/<worktree>`) stays Chromium-only — not
+where `Desktop.toml` lives. That was the alternative (electron-store's default
+path); we kept the product home instead and used `Desktop` as the filename
+prefix.
 
 ## Parser
 
@@ -118,7 +133,8 @@ wrapping the file in JSON.
 
 ```text
 $PIE_HOME/
-  config.toml          ← operator settings (this design)
+  config.toml          ← operator settings (server)
+  Desktop.toml         ← desktop host settings (Electron Main)
   storage/projects.json
   storage/sessions/…
   worktrees/…
@@ -134,6 +150,16 @@ $PIE_HOME/
 theme = "system" # system | light | dark
 ```
 
+```toml
+# pie desktop host settings. Not used by pie serve.
+# Saving from the desktop shell rewrites the file and does not keep comments.
+
+[window]
+width = 1200
+height = 800
+maximized = false
+```
+
 ## Rejected
 
 - **JSON document in `effect-json-store`:** right engine for projects/sessions;
@@ -144,8 +170,15 @@ theme = "system" # system | light | dark
   client. Theme may _apply_ from settings after connect; it must not live only
   in the browser. (T3's web client-settings live in localStorage; pie does not
   follow that for operator settings.)
-- **A second `config.toml` written by desktop:** desktop is a client of the
-  same daemon. Two writers on two paths would split theme (and later keys)
-  between `pie serve` and the Electron app. Electron `userData` is not a pie
-  settings home.
+- **A `[desktop]` table inside `config.toml`:** the Settings page rewrites a
+  canonical document and drops unknown keys. Host state would vanish on save.
+  The window also has to restore before the daemon is up, so Main must read a
+  file the server does not own.
+- **Electron `userData` / electron-store's default `config.json`:** the typical
+  Electron Store path. Rejected so desktop host state sits next to
+  `config.toml` under `$PIE_HOME`, with `Desktop` as the filename prefix.
+  `userData` remains Chromium / instance-lock only.
+- **A second `config.toml` written by desktop:** that would split _operator_
+  prefs (theme) between `pie serve` and the Electron app. Host state uses
+  `Desktop.toml`, not a second copy of the operator file.
 - **Writing Pi's settings files:** those belong to Pi.
