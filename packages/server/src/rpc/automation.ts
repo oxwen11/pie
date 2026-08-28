@@ -1,10 +1,9 @@
-import "@orpc/experimental-effect/extensions/effect";
 import { automationContract } from "@getpie/contract/automation";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import { AutomationService } from "../automation";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 
 const orpc = implement(automationContract).$context<RpcContext>();
 

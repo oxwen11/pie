@@ -1,12 +1,7 @@
-import { oc } from "@orpc/contract";
 import { Schema, SchemaGetter } from "effect";
 
-import {
-  CreateWorktreeInputSchema,
-  serverErrors,
-  SessionRefSchema,
-  toStandardSchema,
-} from "./domain";
+import { CreateWorktreeInputSchema, serverErrors, SessionRefSchema } from "./domain";
+import { oc } from "./orpc";
 
 const base = oc.errors(serverErrors);
 
@@ -209,18 +204,10 @@ export const RunAutomationOutputSchema = Schema.Struct({
 export type RunAutomationOutput = typeof RunAutomationOutputSchema.Type;
 
 export const automationContract = {
-  list: base.output(toStandardSchema(Schema.Array(AutomationSchema))),
-  get: base
-    .input(toStandardSchema(AutomationIdInputSchema))
-    .output(toStandardSchema(AutomationSchema)),
-  create: base
-    .input(toStandardSchema(CreateAutomationInputSchema))
-    .output(toStandardSchema(AutomationSchema)),
-  update: base
-    .input(toStandardSchema(UpdateAutomationInputSchema))
-    .output(toStandardSchema(AutomationSchema)),
-  delete: base.input(toStandardSchema(AutomationIdInputSchema)),
-  runNow: base
-    .input(toStandardSchema(AutomationIdInputSchema))
-    .output(toStandardSchema(RunAutomationOutputSchema)),
+  list: base.output(Schema.Array(AutomationSchema)),
+  get: base.input(AutomationIdInputSchema).output(AutomationSchema),
+  create: base.input(CreateAutomationInputSchema).output(AutomationSchema),
+  update: base.input(UpdateAutomationInputSchema).output(AutomationSchema),
+  delete: base.input(AutomationIdInputSchema),
+  runNow: base.input(AutomationIdInputSchema).output(RunAutomationOutputSchema),
 };
