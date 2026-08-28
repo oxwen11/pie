@@ -1,13 +1,6 @@
 "use client";
 
 import { Button } from "@getpie/ui/components/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@getpie/ui/components/select";
 import { Textarea } from "@getpie/ui/components/textarea";
 import { cn } from "@getpie/ui/lib/utils";
 import type { ChatStatus } from "ai";
@@ -160,13 +153,3 @@ export const PromptInputSubmit = ({
     </Button>
   );
 };
-
-export const PromptInputModelSelect = Select;
-
-export const PromptInputModelSelectTrigger = SelectTrigger;
-
-export const PromptInputModelSelectValue = SelectValue;
-
-export const PromptInputModelSelectContent = SelectContent;
-
-export const PromptInputModelSelectItem = SelectItem;

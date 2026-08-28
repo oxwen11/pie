@@ -1,13 +1,13 @@
-import { oc, type } from "@orpc/contract";
+import { type } from "@orpc/contract";
 import { Schema } from "effect";
 
 import {
   BrowseInputSchema,
   BrowseResultSchema,
-  toStandardSchema,
   withWorkspaceQuery,
   WorkspaceQuerySchema,
 } from "./domain";
+import { oc, toStandardSchema } from "./orpc";
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
@@ -70,18 +70,12 @@ const readTreeErrors = {
  * directory names only.
  */
 export const fsContract = {
-  readFileString: oc
-    .input(toStandardSchema(FsReadFileInputSchema))
-    .errors(readFileErrors)
-    .output(type<string>()),
+  readFileString: oc.input(FsReadFileInputSchema).errors(readFileErrors).output(type<string>()),
   /** Recursively index a workspace for the read-only Content Panel Explorer. */
-  readTree: oc
-    .input(toStandardSchema(WorkspaceQuerySchema))
-    .errors(readTreeErrors)
-    .output(toStandardSchema(WorkspaceTreeResultSchema)),
+  readTree: oc.input(WorkspaceQuerySchema).errors(readTreeErrors).output(WorkspaceTreeResultSchema),
   /** Browse immediate subdirectories of `path` (default: the home directory). Hidden directories are opt-in. */
   browse: oc
-    .input(toStandardSchema(BrowseInputSchema))
+    .input(BrowseInputSchema)
     .errors({ READ_FAILED: { data: pathData } })
-    .output(toStandardSchema(BrowseResultSchema)),
+    .output(BrowseResultSchema),
 };

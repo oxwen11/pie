@@ -13,6 +13,7 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
 import { MessageView } from "./transcript/message-view";
+import { ModelErrorCard } from "./transcript/model-error-card";
 // What an empty transcript means, in one place: nothing until the settled
 // history floor has landed, so an unread session shows the read rather than a
 // verdict about the conversation. "settled" renders nothing — a session with no
@@ -66,7 +67,7 @@ function ChatTranscriptView({
         {snapshot.retryNotice && (
           <div className="text-muted-foreground text-xs">{snapshot.retryNotice}</div>
         )}
-        {snapshot.error && <div className="text-destructive text-xs">{snapshot.error.message}</div>}
+        {snapshot.error && <ModelErrorCard error={snapshot.error} />}
         {snapshot.pendingRequests.map((request) => (
           <AgentRequestView key={request.id} request={request} onRespond={onRespond} />
         ))}
