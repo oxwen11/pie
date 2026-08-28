@@ -9,15 +9,16 @@ import { useControllableState } from "@getpie/ui/hooks/use-controllable-state";
 import { cn } from "@getpie/ui/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
-import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 
+import { thinkingTriggerLabel } from "./reasoning.logic";
 import { Response } from "./response";
 
 type ReasoningContextValue = {
   isStreaming: boolean;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  duration: number;
+  duration: number | undefined;
 };
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
@@ -57,25 +58,30 @@ export const Reasoning = memo(
       defaultProp: defaultOpen,
       onChange: onOpenChange,
     });
-    const [duration, setDuration] = useControllableState({
+    const [duration, setDuration] = useControllableState<number | undefined>({
       prop: durationProp,
-      defaultProp: 0,
+      defaultProp: undefined,
     });
 
     const [hasAutoClosedRef, setHasAutoClosedRef] = useState(false);
-    const [startTime, setStartTime] = useState<number | null>(null);
+    const startTimeRef = useRef<number | null>(null);
 
-    // Track duration when streaming starts and ends
+    // Measure elapsed thinking only when this instance actually streamed. A
+    // block that mounts already done (history, or start+end in one batch)
+    // leaves duration unset so the trigger can say "a few seconds" instead of
+    // treating 0 as "still thinking".
     useEffect(() => {
       if (isStreaming) {
-        if (startTime === null) {
-          setStartTime(Date.now());
+        if (startTimeRef.current === null) {
+          startTimeRef.current = Date.now();
         }
-      } else if (startTime !== null) {
-        setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
-        setStartTime(null);
+        return;
       }
-    }, [isStreaming, startTime, setDuration]);
+      if (startTimeRef.current === null) return;
+      const elapsedMs = Date.now() - startTimeRef.current;
+      startTimeRef.current = null;
+      setDuration(Math.max(1, Math.ceil(elapsedMs / MS_IN_S)));
+    }, [isStreaming, setDuration]);
 
     // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {
@@ -93,7 +99,7 @@ export const Reasoning = memo(
     }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosedRef]);
 
     const contextValue = useMemo<ReasoningContextValue>(
-      () => ({ isStreaming, isOpen: isOpen ?? false, setIsOpen, duration: duration ?? 0 }),
+      () => ({ isStreaming, isOpen: isOpen ?? false, setIsOpen, duration }),
       [isStreaming, isOpen, setIsOpen, duration],
     );
 
@@ -125,13 +131,7 @@ export const ReasoningTrigger = memo(({ className, children, ...props }: Reasoni
       {children ?? (
         <>
           <BrainIcon className="size-4" />
-          {isStreaming || duration === 0 ? (
-            <p>Thinking...</p>
-          ) : (
-            <p>
-              Thought for {duration} {duration === 1 ? "second" : "seconds"}
-            </p>
-          )}
+          <p>{thinkingTriggerLabel(isStreaming, duration)}</p>
           <ChevronDownIcon
             className={cn(
               "text-muted-foreground size-4 transition-transform",
