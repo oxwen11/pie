@@ -35,15 +35,14 @@ function triggerText(el: HTMLDivElement): string {
 }
 
 describe("Reasoning trigger", () => {
-  it("does not stay on Thinking when a finished block mounts without a duration", async () => {
+  it("does not stay on Thinking when a finished block mounts", async () => {
     const el = await render(
       <Reasoning isStreaming={false} defaultOpen={false}>
         <ReasoningTrigger />
       </Reasoning>,
     );
 
-    expect(triggerText(el)).toBe("Thought for a few seconds");
-    expect(triggerText(el)).not.toContain("Thinking");
+    expect(triggerText(el)).toBe("Thought");
   });
 
   it("switches off Thinking when the block finishes streaming", async () => {
@@ -62,8 +61,7 @@ describe("Reasoning trigger", () => {
       );
     });
 
-    expect(triggerText(el)).toMatch(/^Thought for /);
-    expect(triggerText(el)).not.toContain("Thinking");
+    expect(triggerText(el)).toBe("Thought");
   });
 
   it("uses a provided duration after streaming ends", async () => {
