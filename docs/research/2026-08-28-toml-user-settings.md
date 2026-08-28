@@ -8,7 +8,9 @@ page), and which parser should own read/write?
 ## Decision
 
 - **File:** `$PIE_HOME/config.toml` — named only in `packages/server/src/config/paths.ts`
-  (`configFile`). Not under `storage/`.
+  (`configFile`). Not under `storage/`. One product home for CLI `serve` and
+  desktop; the server is the only writer. Electron `userData` is not a settings
+  home.
 - **Format:** TOML 1.0 via `smol-toml` (`parse` / `stringify`).
 - **Validation:** Effect Schema after parse (`SettingsSchema` in `@getpie/contract`).
 - **Writes:** canonical document + a short header comment; atomic tmp+rename;
@@ -33,6 +35,56 @@ already train that habit: Cargo, Helix, Alacritty, Codex (`config.toml`).
 
 Pi's own settings stay in Pi's files. This document is pie UI/operator state
 (appearance today). Do not proxy Pi model defaults through `config.toml`.
+
+## T3 Code (inspected at `78f462c4`)
+
+The first pass of this note compared TOML vs JSON/YAML and parsers. It did
+**not** look at T3 Code. T3 is the closest product shape we have (Node server +
+Electron shell + shared web UI), so the _home_ question is independent of the
+format choice.
+
+T3 does **not** use TOML for its own settings. Format is JSON. The interesting
+part is _where_ files live, not the codec.
+
+**One product home, not Electron `userData`.** Server paths come from
+`deriveServerPaths` in `apps/server/src/config.ts`: `settingsPath` is
+`{stateDir}/settings.json`, next to sqlite, logs, keybindings, secrets.
+`stateDir` is `{baseDir}/userdata` (or `{baseDir}/dev` when a Vite `devUrl` is
+set and `baseDir` is not explicit). `baseDir` is `T3CODE_HOME` / `~/.t3`.
+Electron `userData` (`t3code` / `t3code-dev`) is Chromium and the
+single-instance lock only — T3 PR #607: the `userData` directory is purely for
+Electron/Chromium internals; `~/.t3/userdata` is unaffected.
+
+**Files split _inside_ that home, by owner — not a second home.** Desktop
+`DesktopEnvironment.ts` names siblings under the same `stateDir`:
+
+| File                    | Owner                 | Contents                                                                                                                                              |
+| ----------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.json`         | server                | Authoritative server config (providers, git fetch, observability). Web and desktop both talk to this via the server.                                  |
+| `client-settings.json`  | desktop renderer/main | UI prefs (fonts, glass opacity, timestamps, sidebar). Contract type `ClientSettings`. Web keeps the same schema in localStorage instead of this file. |
+| `desktop-settings.json` | Electron main         | Host-only: window bounds, WSL backend, update channel. Must not affect a browser attached to `t3 serve`.                                              |
+
+Web vs desktop is a runtime mode on `ServerConfig` (`"web" | "desktop"`), not a
+second settings root.
+
+**What pie copies, what it does not.** Copy the home rule: `$PIE_HOME` is the
+single product directory (`resolvePieHome` in `packages/server/src/config/paths.ts`),
+already shared by CLI `serve`, the daemon, and desktop. Electron `userData`
+(`Pie` / `Pie Dev/<worktree>`) stays Chromium-only, same idea as T3.
+
+Do **not** copy T3's three-file split for v1. pie's Settings page today is
+appearance that should follow the operator across `pie serve` in a browser and
+the desktop shell — both are clients of the same daemon. T3 treats theme-like
+prefs as _client-local_ (web `localStorage` vs desktop `client-settings.json`),
+so the two surfaces can diverge. pie rejects that for operator settings: the
+daemon owns `$PIE_HOME/config.toml`; the SPA and the desktop renderer only call
+`settings.get` / `settings.update`. Desktop must not write a second
+`config.toml`.
+
+A later Electron-host-only key (window bounds, auto-update channel) can be a
+sibling file under the same `$PIE_HOME` (T3's `desktop-settings.json` pattern)
+or stay in `userData`. It does not belong in `config.toml` and it does not
+justify a second pie home.
 
 ## Parser
 
@@ -90,5 +142,10 @@ theme = "system" # system | light | dark
   JSON. A second codec would fork the package for one file.
 - **localStorage as source of truth:** the daemon is the owner; the SPA is a
   client. Theme may _apply_ from settings after connect; it must not live only
-  in the browser.
+  in the browser. (T3's web client-settings live in localStorage; pie does not
+  follow that for operator settings.)
+- **A second `config.toml` written by desktop:** desktop is a client of the
+  same daemon. Two writers on two paths would split theme (and later keys)
+  between `pie serve` and the Electron app. Electron `userData` is not a pie
+  settings home.
 - **Writing Pi's settings files:** those belong to Pi.

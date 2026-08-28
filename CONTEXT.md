@@ -28,8 +28,8 @@ The validated absolute directory handed to Pi when opening or resuming a session
 _Avoid_: cwd (in session APIs)
 
 **Settings** (`$PIE_HOME/config.toml`):
-Operator-facing pie preferences (appearance today), a plain TOML document. Distinct from Project/Session JSON under `storage/` and from Pi's own settings files. Named only in `packages/server/src/config/paths.ts` (`configFile`).
-_Avoid_: putting operator prefs in `projects.json`; wrapping this file in the JSON store `{ version, data }` envelope; writing Pi's settings files
+Operator-facing pie preferences (appearance today), a plain TOML document. Distinct from Project/Session JSON under `storage/` and from Pi's own settings files. Named only in `packages/server/src/config/paths.ts` (`configFile`). The server is the only writer; CLI `serve` and desktop both reach it over RPC so they share one file. Electron `userData` is Chromium/instance-lock only — not a second settings home.
+_Avoid_: putting operator prefs in `projects.json`; wrapping this file in the JSON store `{ version, data }` envelope; writing Pi's settings files; a desktop-owned copy of `config.toml`
 
 ## Server Session Services
 
