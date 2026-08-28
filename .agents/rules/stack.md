@@ -11,11 +11,16 @@ These differ from what the library names suggest.
   factory so each reconnect fetches a fresh ticket (browsers can't set headers on
   a WS upgrade, hence `POST /api/ws-ticket`). Server handlers are Effect-native
   through a side-effect import — `import "@orpc/experimental-effect/extensions/effect"`
-  is what puts `.effect()` on procedures; delete it and the router stops compiling.
+  in `packages/server/src/rpc/orpc.ts` (and the desktop equivalent) is what puts
+  `.effect()` on procedures; delete it and the router stops compiling.
   Effect `Stream` → oRPC event iterator has one seam: `packages/server/src/rpc/stream.ts`.
-- **`@getpie/contract` uses Effect Schema, not zod**, bridged through a local
-  `toStandardSchema`. Chunk/message-shaped outputs deliberately use `type<T>()`
-  and are not validated on the wire.
+- **`@getpie/contract` uses Effect Schema, not zod.** Procedure `.input()` /
+  `.output()` take Effect Schema directly via
+  `@orpc/experimental-effect/extensions/input-output` (imported from
+  `packages/contract/src/orpc.ts`). Error-map `data` still goes through the
+  official `toStandardSchema` — the extension does not patch `.errors()`.
+  Chunk/message-shaped outputs deliberately use `type<T>()` and are not
+  validated on the wire.
 - **`packages/ui` sits on Base UI, not Radix** — compose with `render={<Button/>}`,
   not `asChild`.
 - **TypeScript is 7.x, the native compiler.** `noEmit` everywhere; packages export

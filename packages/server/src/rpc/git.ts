@@ -1,8 +1,6 @@
-import "@orpc/experimental-effect/extensions/effect";
 import type { WorkspaceQuery } from "@getpie/contract";
 import type { GitDiffQuery, GitReviewQuery } from "@getpie/contract/git";
 import { gitContract } from "@getpie/contract/git";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import {
@@ -19,6 +17,7 @@ import {
 } from "../errors";
 import { GitService } from "../git";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
 
 const orpc = implement(gitContract).$context<RpcContext>();

@@ -1,13 +1,12 @@
-import "@orpc/experimental-effect/extensions/effect";
 import os from "node:os";
 
 import { agentContract } from "@getpie/contract/agent";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import { PiAgentService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { sessionRouter } from "./session";
 
 const orpc = implement(agentContract).$context<RpcContext>();

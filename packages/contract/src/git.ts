@@ -1,7 +1,7 @@
-import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { toStandardSchema, withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
+import { withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
+import { oc, toStandardSchema } from "./orpc";
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
@@ -123,20 +123,8 @@ const diffErrors = {
  * `session.create` when that request includes `worktree`.
  */
 export const gitContract = {
-  status: oc
-    .input(toStandardSchema(WorkspaceQuerySchema))
-    .errors(cwdErrors)
-    .output(toStandardSchema(GitStatusSchema)),
-  branch: oc
-    .input(toStandardSchema(WorkspaceQuerySchema))
-    .errors(cwdErrors)
-    .output(toStandardSchema(GitBranchSchema)),
-  review: oc
-    .input(toStandardSchema(GitReviewQuerySchema))
-    .errors(reviewErrors)
-    .output(toStandardSchema(GitReviewSchema)),
-  diff: oc
-    .input(toStandardSchema(GitDiffQuerySchema))
-    .errors(diffErrors)
-    .output(toStandardSchema(GitFileDiffSchema)),
+  status: oc.input(WorkspaceQuerySchema).errors(cwdErrors).output(GitStatusSchema),
+  branch: oc.input(WorkspaceQuerySchema).errors(cwdErrors).output(GitBranchSchema),
+  review: oc.input(GitReviewQuerySchema).errors(reviewErrors).output(GitReviewSchema),
+  diff: oc.input(GitDiffQuerySchema).errors(diffErrors).output(GitFileDiffSchema),
 };
