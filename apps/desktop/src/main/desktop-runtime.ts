@@ -60,10 +60,11 @@ export function startDesktopRuntime(): void {
   } else if (is.dev && !isE2E) {
     // Give dev its own userData so its single-instance lock is independent of an
     // installed build (which on macOS keeps holding the lock after its window
-    // closes). Key it on the git worktree so parallel dev instances from
-    // different worktrees don't collide. E2E is excluded — it passes its own
-    // --user-data-dir.
-    app.setPath("userData", devUserDataPath(Effect.runSync(devWorktreeSlug)));
+    // closes). The mise dev environment supplies the same hashed worktree scope used for
+    // data and ports; derive the same identity for direct Electron invocations
+    // outside the package script. E2E supplies its own --user-data-dir.
+    const worktreeScope = process.env["PIE_DEV_SCOPE"] ?? Effect.runSync(devWorktreeSlug);
+    app.setPath("userData", devUserDataPath(worktreeScope));
   }
 
   let runtime: ReturnType<typeof makeRuntime> | undefined;

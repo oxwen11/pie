@@ -9,6 +9,7 @@ import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
+const DESKTOP_PORT = Number(process.env.PIE_DESKTOP_PORT ?? 5173);
 
 // The dev overlays (react-grab, react-scan) reach outside the origin on boot,
 // which the shipped CSP rejects. Production eliminates both overlays, so the
@@ -80,6 +81,10 @@ export default defineConfig({
   },
   renderer: {
     root: url.fileURLToPath(new URL("./src/renderer/", import.meta.url)),
+    server: {
+      port: DESKTOP_PORT,
+      strictPort: true,
+    },
     experimental: {
       bundledDev: true,
     },

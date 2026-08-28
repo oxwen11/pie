@@ -1,3 +1,6 @@
 [tools]
 node = "24"
 pnpm = "11.24.0"
+
+[env]
+_.source = { path = "scripts/dev-env.sh", cacheable = false }
