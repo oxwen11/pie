@@ -8,12 +8,13 @@ export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase
   switch (phase) {
     case "running":
       return (
-        <span className={SLOT_CLASS} data-slot="session-status" data-state="loading">
-          <Spinner
-            className="size-3"
-            aria-label="A turn is running in this session"
-            title="A turn is running in this session"
-          />
+        <span
+          className={SLOT_CLASS}
+          data-slot="session-status"
+          data-state="loading"
+          title="A turn is running in this session"
+        >
+          <Spinner className="size-3" aria-label="A turn is running in this session" />
         </span>
       );
     case "requires_action":
