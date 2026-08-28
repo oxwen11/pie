@@ -7,7 +7,7 @@ import type { ChatStoreState } from "@/features/chat/runtime/chat-state";
 export type ChatSessionValue = {
   sessionId: string;
   store: StoreApi<ChatStoreState>;
-  prompt: (text: string) => void;
+  prompt: (text: string, delivery?: "steer" | "followUp") => void;
   interrupt: () => Promise<void>;
   respondToRequest: (requestId: string, response: AgentResponse) => void;
   turnInProgress: boolean;

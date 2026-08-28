@@ -587,9 +587,10 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   // Fire-and-forget: idle prompts push an optimistic user message; a turn
-  // already in flight is a Pi follow-up (no transcript bubble, no local
-  // queue write — `session.queue.updated` is the only writer).
-  prompt = async (text: string): Promise<void> => {
+  // already in flight is a Pi queue write (no transcript bubble — only
+  // `session.queue.updated` updates `pendingPrompt`). Default delivery is
+  // follow-up; the composer can pass `steer` after the user arms that mode.
+  prompt = async (text: string, delivery?: "steer" | "followUp"): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
     this.#state.retryNotice = undefined;
@@ -601,7 +602,7 @@ export class Chat {
         await this.#transport.prompt({
           messageId,
           parts,
-          delivery: "followUp",
+          delivery: delivery ?? "followUp",
         });
       } catch (promptError) {
         this.#state.error =

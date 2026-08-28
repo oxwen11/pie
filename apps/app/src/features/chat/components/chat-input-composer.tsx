@@ -9,8 +9,8 @@ import {
 import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { GitBranchIcon, SquareIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { GitBranchIcon, NavigationIcon, SquareIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
@@ -25,10 +25,10 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
 // handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
-// turn queues the send as a Pi follow-up instead of blocking. prompt comes
-// from ChatSessionProvider — not props. The CardFrame header lists queued
-// prompts; the footer shows the session workspace's git availability and
-// current branch.
+// turn queues the send as a Pi follow-up unless Steer is armed, then it
+// injects before the next LLM call. prompt comes from ChatSessionProvider —
+// not props. The CardFrame header lists queued prompts (steering first);
+// the footer shows the session workspace's git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -44,7 +44,12 @@ export function ChatInputComposer({
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const canInterrupt = status === "streaming";
-  const queueLines = [...pendingPrompt.steering, ...pendingPrompt.followUp];
+  const [steerArmed, setSteerArmed] = useState(false);
+  // Steer only applies while a turn is running; leaving streaming drops the
+  // mode so the next turn starts as follow-up again.
+  if (!canInterrupt && steerArmed) setSteerArmed(false);
+  const steering = canInterrupt && steerArmed;
+  const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
@@ -57,9 +62,9 @@ export function ChatInputComposer({
     ],
     onSubmit: (text) => {
       // Missing workspace: don't send, don't clear. A running turn still
-      // accepts the send — it becomes a Pi follow-up.
+      // accepts the send — it becomes a Pi follow-up or steer.
       if (workspaceUnavailableRef.current) return false;
-      prompt(text);
+      prompt(text, canInterrupt ? (steerArmed ? "steer" : "followUp") : undefined);
       return undefined;
     },
   });
@@ -68,19 +73,10 @@ export function ChatInputComposer({
 
   return (
     <CardFrame>
-      {queueLines.length > 0 ? (
+      {hasQueued ? (
         <CardFrameHeader className="min-w-0 grid-rows-none gap-1 py-2">
-          <ul aria-label="Queued messages" className="flex w-full min-w-0 flex-col gap-1">
-            {queueLines.map((text, index) => (
-              <li
-                className="text-muted-foreground truncate text-sm"
-                key={`${index}:${text}`}
-                title={text}
-              >
-                {text}
-              </li>
-            ))}
-          </ul>
+          <QueueLines items={pendingPrompt.steering} kind="steer" label="Steering" />
+          <QueueLines items={pendingPrompt.followUp} kind="followUp" label="Queued follow-ups" />
         </CardFrameHeader>
       ) : null}
       <Card
@@ -99,16 +95,27 @@ export function ChatInputComposer({
             <PromptInputTools>{toolbar}</PromptInputTools>
             <div className="flex items-center gap-1">
               {canInterrupt ? (
-                <PromptInputButton
-                  aria-label="Stop generating"
-                  onClick={() => void interrupt()}
-                  variant="ghost"
-                >
-                  <SquareIcon className="size-4" />
-                </PromptInputButton>
+                <>
+                  <PromptInputButton
+                    aria-label="Steer"
+                    aria-pressed={steering}
+                    onClick={() => setSteerArmed((armed) => !armed)}
+                    variant={steering ? "secondary" : "ghost"}
+                  >
+                    <NavigationIcon className="size-4" />
+                    Steer
+                  </PromptInputButton>
+                  <PromptInputButton
+                    aria-label="Stop generating"
+                    onClick={() => void interrupt()}
+                    variant="ghost"
+                  >
+                    <SquareIcon className="size-4" />
+                  </PromptInputButton>
+                </>
               ) : null}
               <PromptInputSubmit
-                aria-label="Send message"
+                aria-label={steering ? "Steer message" : "Send message"}
                 disabled={!hasContent || workspaceUnavailable}
               />
             </div>
@@ -135,5 +142,33 @@ export function ChatInputComposer({
         </span>
       </CardFrameFooter>
     </CardFrame>
+  );
+}
+
+function QueueLines({
+  items,
+  kind,
+  label,
+}: {
+  items: readonly string[];
+  kind: "steer" | "followUp";
+  label: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <ul aria-label={label} className="flex w-full min-w-0 flex-col gap-1">
+      {items.map((text, index) => (
+        <li
+          className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-sm"
+          key={`${kind}:${index}:${text}`}
+          title={text}
+        >
+          {kind === "steer" ? (
+            <span className="text-foreground shrink-0 text-xs font-medium">Steer</span>
+          ) : null}
+          <span className="truncate">{text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -25,6 +25,27 @@ describe("Chat pending prompt", () => {
     expect(chat.store.getState().status).toBe("streaming");
   });
 
+  it("sends a steer while streaming when the caller asks for that delivery", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    await chat.prompt("hello there");
+    live(1, {
+      type: "session.prompt.submitted",
+      messageId: transport.promptCalls[0]!.messageId,
+      parts: [{ type: "text", text: "hello there" }],
+      phase: "idle",
+    });
+    live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+
+    await chat.prompt("do this instead", "steer");
+    expect(transport.promptCalls[1]).toMatchObject({
+      parts: [{ type: "text", text: "do this instead" }],
+      delivery: "steer",
+    });
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().pendingPrompt.steering).toEqual([]);
+  });
+
   it("replaces the pending prompt from session.queue.updated", async () => {
     const { chat, attach, live } = makeChat();
     await attach({});
