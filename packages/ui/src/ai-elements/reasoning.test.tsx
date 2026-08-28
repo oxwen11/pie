@@ -73,4 +73,14 @@ describe("Reasoning trigger", () => {
 
     expect(triggerText(el)).toBe("Thought for 4 seconds");
   });
+
+  it("treats a zero duration as unknown", async () => {
+    const el = await render(
+      <Reasoning isStreaming={false} duration={0} defaultOpen={false}>
+        <ReasoningTrigger />
+      </Reasoning>,
+    );
+
+    expect(triggerText(el)).toBe("Thought");
+  });
 });
