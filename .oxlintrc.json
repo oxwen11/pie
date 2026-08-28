@@ -336,7 +336,11 @@
     "import/no-unassigned-import": [
       "error",
       {
-        "allow": ["**/*.css", "@orpc/experimental-effect/extensions/effect"]
+        "allow": [
+          "**/*.css",
+          "@orpc/experimental-effect/extensions/effect",
+          "@orpc/experimental-effect/extensions/input-output"
+        ]
       }
     ],
     "promise/always-return": "off",

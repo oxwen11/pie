@@ -453,6 +453,9 @@ importers:
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)
+      '@orpc/experimental-effect':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.28(@opentelemetry/api@1.9.1)(effect@4.0.0-rc.110)
       ai:
         specifier: 'catalog:'
         version: 7.0.66(zod@4.4.3)

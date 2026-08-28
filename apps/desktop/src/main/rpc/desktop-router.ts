@@ -1,10 +1,10 @@
-import "@orpc/experimental-effect/extensions/effect";
 import type { WithEffectContext } from "@orpc/experimental-effect";
-import { implement, streamToAsyncIteratorObject } from "@orpc/server";
+import { streamToAsyncIteratorObject } from "@orpc/server";
 import { Effect, Stream } from "effect";
 
 import { desktopContract } from "../../shared/desktop-rpc";
 import type { DesktopApplication } from "../application/desktop-application";
+import { implement } from "./orpc";
 
 export type DesktopRpcContext = WithEffectContext<never>;
 

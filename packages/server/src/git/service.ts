@@ -109,6 +109,8 @@ export type GitFailure =
   | GitNotRepository
   | GitError;
 
+type GitBranchFailure = WorkspacePathEscape | GitError;
+
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
 type GitDiffFailure =
@@ -136,7 +138,7 @@ export class GitService extends Context.Service<
   GitService,
   {
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
-    readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
+    readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitBranchFailure>;
     readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
     readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
@@ -426,12 +428,19 @@ export const GitServiceLayer: Layer.Layer<
           const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
           const listed = yield* listRefs(realRoot);
           return {
+            kind: "repository" as const,
             current,
             defaultBranch,
             branches: listed.all,
             remotes: listed.remotes,
           };
-        }),
+        }).pipe(
+          Effect.catchTags({
+            GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
+            WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+            WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+          }),
+        ),
 
       review: (query) =>
         Effect.gen(function* () {

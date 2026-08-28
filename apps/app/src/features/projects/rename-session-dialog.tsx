@@ -1,4 +1,5 @@
-import { MAX_SESSION_TITLE_CHARS, type SessionSummary } from "@getpie/contract";
+import type { SessionSummary } from "@getpie/contract";
+import { MAX_SESSION_TITLE_CHARS } from "@getpie/contract/domain";
 import { Button } from "@getpie/ui/components/button";
 import {
   Dialog,

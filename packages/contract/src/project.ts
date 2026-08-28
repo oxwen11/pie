@@ -1,11 +1,9 @@
-import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { CreateProjectInputSchema, ProjectSchema, toStandardSchema } from "./domain";
+import { CreateProjectInputSchema, ProjectSchema } from "./domain";
+import { oc } from "./orpc";
 
 export const projectContract = {
-  list: oc.output(toStandardSchema(Schema.Array(ProjectSchema))),
-  create: oc
-    .input(toStandardSchema(CreateProjectInputSchema))
-    .output(toStandardSchema(ProjectSchema)),
+  list: oc.output(Schema.Array(ProjectSchema)),
+  create: oc.input(CreateProjectInputSchema).output(ProjectSchema),
 };

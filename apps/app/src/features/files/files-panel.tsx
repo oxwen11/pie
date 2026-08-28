@@ -64,7 +64,8 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
 
   const workspaceName = projectName ?? "Workspace";
   const workspacePath = tree.data?.cwd ?? "";
-  const gitBranch = branch.data?.current ?? undefined;
+  const gitBranch =
+    branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
 
   const treePane = (
     <WorkspaceTreePane
