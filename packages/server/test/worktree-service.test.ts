@@ -45,6 +45,8 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
       assert.match(created.path, /[\\/][a-z0-9]{4}$/);
 
       const branch = yield* git.branch(created.path);
+      assert.equal(branch.kind, "repository");
+      if (branch.kind !== "repository") return;
       assert.equal(branch.current, created.branch);
 
       const status = yield* git.status(dir);
@@ -69,6 +71,8 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
       assert.match(created.branch, /^pie\/[a-f0-9]{8}$/);
 
       const branch = yield* git.branch(created.path);
+      assert.equal(branch.kind, "repository");
+      if (branch.kind !== "repository") return;
       assert.equal(branch.current, created.branch);
 
       const featureContents = yield* Effect.promise(async () => {

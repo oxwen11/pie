@@ -5,6 +5,13 @@ import { toast } from "sonner";
 
 import type { ServerConnection } from "@/server-connection";
 
+declare module "@tanstack/react-query" {
+  interface Register {
+    /** Queries with inline error UI do not also raise the global error toast. */
+    queryMeta: { errorMode?: "inline" };
+  }
+}
+
 export type AppClients = {
   orpcClient: PieClient;
   queryClient: QueryClient;
@@ -33,7 +40,8 @@ function createQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: queryDefaults },
     queryCache: new QueryCache({
-      onError: (error) => {
+      onError: (error, query) => {
+        if (query.meta?.errorMode === "inline") return;
         toast.error(`Error: ${error.message}`, {
           action: {
             label: "retry",
@@ -78,6 +86,15 @@ export function createAppClients(server?: ServerConnection): AppClients {
   queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
     staleTime: 30_000,
   });
+
+  // These queries render their own error state in the workspace panels.
+  for (const key of [
+    orpcQueryUtils.git.review.key(),
+    orpcQueryUtils.git.diff.key(),
+    orpcQueryUtils.fs.readTree.key(),
+  ]) {
+    queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
+  }
 
   return { orpcClient, queryClient, orpcQueryUtils };
 }

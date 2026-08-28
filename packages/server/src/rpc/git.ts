@@ -45,6 +45,20 @@ const mapGitCwdErrors = <
     GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
   });
 
+const mapGitBranchErrors = <
+  E extends {
+    PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
+    GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
+  },
+>(
+  errors: E,
+) =>
+  Effect.catchTags({
+    WorkspacePathEscape: (error: WorkspacePathEscape) =>
+      Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
+    GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+  });
+
 const resolveCwd = (
   input: WorkspaceQuery,
   errors: Parameters<typeof catchWorkspaceResolveErrors>[0],
@@ -72,7 +86,7 @@ export const gitRouter = orpc.router({
   branch: orpc.branch.effect(function* ({ input, errors }) {
     const git = yield* GitService;
     const cwd = yield* resolveCwd(input, errors);
-    return yield* git.branch(cwd).pipe(mapGitCwdErrors(cwd, errors));
+    return yield* git.branch(cwd).pipe(mapGitBranchErrors(errors));
   }),
   review: orpc.review.effect(function* ({ input, errors }) {
     const git = yield* GitService;

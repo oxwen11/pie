@@ -33,11 +33,13 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
-  const currentBranch = branch.data?.current;
+  const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
+  const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const status = useStore(store, (s) => s.status);
   const canInterrupt = status === "streaming";
   const turnInProgressRef = useLatestRef(turnInProgress);
+  const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
     // Order is a hard constraint: base extensions first, submit keymap last —
@@ -48,8 +50,8 @@ export function ChatInputComposer({
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      // Turn in progress: don't send, don't clear.
-      if (turnInProgressRef.current) return false;
+      // Turn in progress or missing workspace: don't send, don't clear.
+      if (turnInProgressRef.current || workspaceUnavailableRef.current) return false;
       prompt(text);
       return undefined;
     },
@@ -75,7 +77,7 @@ export function ChatInputComposer({
             <PromptInputTools>{toolbar}</PromptInputTools>
             <PromptInputSubmit
               aria-label={canInterrupt ? "Stop generating" : "Send message"}
-              disabled={!canInterrupt && (!hasContent || turnInProgress)}
+              disabled={!canInterrupt && (!hasContent || turnInProgress || workspaceUnavailable)}
               onClick={canInterrupt ? () => void interrupt() : undefined}
               status={status}
               type={canInterrupt ? "button" : "submit"}
@@ -84,17 +86,21 @@ export function ChatInputComposer({
         </ChatInputProvider>
       </Card>
       <CardFrameFooter className="px-3 py-2">
-        <span
-          className="text-muted-foreground flex h-4 min-w-0 items-center gap-1.5 text-xs"
-          title={currentBranch ? "Current git branch" : undefined}
-        >
+        <span className="flex h-4 min-w-0 items-center text-xs">
           {branch.isPending ? (
             <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />
           ) : currentBranch ? (
-            <>
+            <span
+              className="text-muted-foreground flex min-w-0 items-center gap-1.5"
+              title="Current git branch"
+            >
               <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
               <span className="truncate">{currentBranch}</span>
-            </>
+            </span>
+          ) : branch.data?.kind === "not-repository" ? (
+            <span className="text-muted-foreground">Not a Git repository</span>
+          ) : workspaceUnavailable ? (
+            <span className="text-destructive">Workspace unavailable</span>
           ) : null}
         </span>
       </CardFrameFooter>
