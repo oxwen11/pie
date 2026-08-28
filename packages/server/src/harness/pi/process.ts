@@ -669,7 +669,7 @@ export const makePiProcess = (
     makeTransport: (config) =>
       makePiTransport({
         executable: options.executable ?? resolvePiExecutable(),
-        ...(options.args ? { args: options.args } : {}),
+        ...(options.args ? { args: options.args } : undefined),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : undefined),
       }),

@@ -37,14 +37,17 @@ describe("live HTTP/WebSocket session", () => {
       previousHome = process.env.PIE_HOME;
       process.env.PIE_HOME = home;
 
-      server = await createServer({ effectContext: await discardContext() });
-      await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
-      const { port } = server.address() as AddressInfo;
+      const live = await createServer({ effectContext: await discardContext() });
+      server = live;
+      await new Promise<void>((resolve) => {
+        live.listen(0, "127.0.0.1", resolve);
+      });
+      const { port } = live.address() as AddressInfo;
       const base = `http://127.0.0.1:${port}`;
 
       const health = await fetch(`${base}/api/health`);
       expect(health.status).toBe(200);
-      expect(await health.text()).toBe("ok");
+      await expect(health.text()).resolves.toBe("ok");
 
       const link = new WebSocketRPCLink({
         connect: async () => new WebSocket(`ws://127.0.0.1:${port}/ws/rpc`, "pie"),
@@ -52,7 +55,7 @@ describe("live HTTP/WebSocket session", () => {
       const client: RouterContractClient<Contract> = createORPCClient(link);
 
       const project = await client.project.create({ path: workspace });
-      const ref = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.agent.session.create({ projectId: project.id });
       const events = await client.agent.session.subscribe({
         scope: { kind: "session", ref },
       });

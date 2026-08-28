@@ -1,5 +1,4 @@
 import path from "node:path";
-import url from "node:url";
 
 import {
   type CreateAgentSessionRuntimeFactory,
@@ -46,8 +45,8 @@ export function parsePiProcessArgs(argv: string[]): PiProcessArgs | { error: str
   if (!sessionId) return { error: PI_PROCESS_USAGE };
   return {
     sessionId,
-    ...(provider ? { provider } : {}),
-    ...(modelId ? { modelId } : {}),
+    ...(provider ? { provider } : undefined),
+    ...(modelId ? { modelId } : undefined),
   };
 }
 
@@ -101,17 +100,18 @@ export async function startPiProcess(args: PiProcessArgs): Promise<void> {
 }
 
 const invoked =
-  process.argv[1] !== undefined &&
-  url.fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+  process.argv[1] !== undefined && import.meta.filename === path.resolve(process.argv[1]);
 
 if (invoked) {
   const parsed = parsePiProcessArgs(process.argv.slice(2));
   if ("error" in parsed) {
     console.error(parsed.error);
+    // oxlint-disable-next-line unicorn/no-process-exit -- child-process entry owns process lifetime
     process.exit(1);
   } else {
     void startPiProcess(parsed).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error);
+      // oxlint-disable-next-line unicorn/no-process-exit -- child-process entry owns process lifetime
       process.exit(1);
     });
   }

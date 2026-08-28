@@ -1,5 +1,4 @@
 import path from "node:path";
-import url from "node:url";
 
 import { Effect, FileSystem } from "effect";
 
@@ -11,7 +10,7 @@ export type PiExecutable = {
   readonly prefixArgs: ReadonlyArray<string>;
 };
 
-const here = path.dirname(url.fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 
 /**
  * Built `pi-process.mjs` only. Sibling of this module when we are already in

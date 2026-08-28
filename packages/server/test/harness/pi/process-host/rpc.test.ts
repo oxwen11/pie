@@ -70,7 +70,9 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     expect(messageEndEvents.length).toBeGreaterThanOrEqual(2); // user + assistant
 
     // Wait for file writes
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 200);
+    });
 
     // Verify session file
     const sessionsPath = join(sessionDir, "sessions");
@@ -81,9 +83,11 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
 
     const cwdSessionDir = join(sessionsPath, sessionDirs[0]!);
     const sessionFiles = readdirSync(cwdSessionDir).filter((f) => f.endsWith(".jsonl"));
-    expect(sessionFiles.length).toBe(1);
+    expect(sessionFiles).toHaveLength(1);
+    const sessionFile = sessionFiles.at(0);
+    expect(sessionFile).toBeDefined();
 
-    const sessionContent = readFileSync(join(cwdSessionDir, sessionFiles[0]!), "utf8");
+    const sessionContent = readFileSync(join(cwdSessionDir, sessionFile!), "utf8");
     const entries = sessionContent
       .trim()
       .split("\n")
@@ -113,21 +117,24 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     expect(result.tokensBefore).toBeGreaterThan(0);
 
     // Wait for file writes
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 200);
+    });
 
     // Verify compaction in session file
     const sessionsPath = join(sessionDir, "sessions");
     const sessionDirs = readdirSync(sessionsPath);
     const cwdSessionDir = join(sessionsPath, sessionDirs[0]!);
-    const sessionFiles = readdirSync(cwdSessionDir).filter((f) => f.endsWith(".jsonl"));
-    const sessionContent = readFileSync(join(cwdSessionDir, sessionFiles[0]!), "utf8");
+    const sessionFile = readdirSync(cwdSessionDir).find((f) => f.endsWith(".jsonl"));
+    expect(sessionFile).toBeDefined();
+    const sessionContent = readFileSync(join(cwdSessionDir, sessionFile!), "utf8");
     const entries = sessionContent
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
 
     const compactionEntries = entries.filter((e: { type: string }) => e.type === "compaction");
-    expect(compactionEntries.length).toBe(1);
+    expect(compactionEntries).toHaveLength(1);
     expect(compactionEntries[0].summary).toBeDefined();
   }, 120000);
 
@@ -151,14 +158,17 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     await client.bash(`echo ${uniqueValue}`);
 
     // Wait for file writes
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 200);
+    });
 
     // Verify bash message in session
     const sessionsPath = join(sessionDir, "sessions");
     const sessionDirs = readdirSync(sessionsPath);
     const cwdSessionDir = join(sessionsPath, sessionDirs[0]!);
-    const sessionFiles = readdirSync(cwdSessionDir).filter((f) => f.endsWith(".jsonl"));
-    const sessionContent = readFileSync(join(cwdSessionDir, sessionFiles[0]!), "utf8");
+    const sessionFile = readdirSync(cwdSessionDir).find((f) => f.endsWith(".jsonl"));
+    expect(sessionFile).toBeDefined();
+    const sessionContent = readFileSync(join(cwdSessionDir, sessionFile!), "utf8");
     const entries = sessionContent
       .trim()
       .split("\n")
@@ -168,7 +178,7 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
       (e: { type: string; message?: { role: string } }) =>
         e.type === "message" && e.message?.role === "bashExecution",
     );
-    expect(bashMessages.length).toBe(1);
+    expect(bashMessages).toHaveLength(1);
     expect(bashMessages[0].message.output).toContain(uniqueValue);
   }, 90000);
 
@@ -257,7 +267,7 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
       expect(model.provider).toBeDefined();
       expect(model.id).toBeDefined();
       expect(model.contextWindow).toBeGreaterThan(0);
-      expect(typeof model.reasoning).toBe("boolean");
+      expect(model.reasoning).toBeTypeOf("boolean");
     }
   }, 30000);
 
@@ -330,7 +340,7 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     for (const entry of entries) {
       expect(entry.id).toBeDefined();
     }
-    expect(leafId).toBe(entries[entries.length - 1]!.id);
+    expect(leafId).toBe(entries.at(-1)!.id);
 
     // since cursor returns only entries strictly after the given id
     const since = await client.getEntries(entries[0]!.id);
@@ -351,14 +361,14 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     expect(treeLeafId).toBe(leafId);
 
     // Single root whose chain matches the entries
-    expect(tree.length).toBe(1);
+    expect(tree).toHaveLength(1);
     const chainIds: string[] = [];
     let nodes = tree;
     while (nodes.length === 1) {
       chainIds.push(nodes[0]!.entry.id);
       nodes = nodes[0]!.children;
     }
-    expect(nodes.length).toBe(0);
+    expect(nodes).toHaveLength(0);
     expect(chainIds).toEqual(entries.map((e) => e.id));
   }, 90000);
 
@@ -396,21 +406,24 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     expect(state.sessionName).toBe("my-test-session");
 
     // Wait for file writes
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 200);
+    });
 
     // Verify session_info entry in session file
     const sessionsPath = join(sessionDir, "sessions");
     const sessionDirs = readdirSync(sessionsPath);
     const cwdSessionDir = join(sessionsPath, sessionDirs[0]!);
-    const sessionFiles = readdirSync(cwdSessionDir).filter((f) => f.endsWith(".jsonl"));
-    const sessionContent = readFileSync(join(cwdSessionDir, sessionFiles[0]!), "utf8");
+    const sessionFile = readdirSync(cwdSessionDir).find((f) => f.endsWith(".jsonl"));
+    expect(sessionFile).toBeDefined();
+    const sessionContent = readFileSync(join(cwdSessionDir, sessionFile!), "utf8");
     const entries = sessionContent
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
 
     const sessionInfoEntries = entries.filter((e: { type: string }) => e.type === "session_info");
-    expect(sessionInfoEntries.length).toBe(1);
+    expect(sessionInfoEntries).toHaveLength(1);
     expect(sessionInfoEntries[0].name).toBe("my-test-session");
   }, 60000);
 });

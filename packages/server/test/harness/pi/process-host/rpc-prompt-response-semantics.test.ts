@@ -1,6 +1,6 @@
 // UPSTREAM @earendil-works/pi-coding-agent@0.84.2
 // packages/coding-agent/test/rpc-prompt-response-semantics.test.ts
-/* oxlint-disable pie/node-import-style, vitest/require-mock-type-parameters */
+/* oxlint-disable pie/node-import-style, vitest/require-mock-type-parameters, anti-slop/no-module-mocking */
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -117,7 +117,9 @@ function getPromptResponses(outputLines: string[], id: string): ParsedOutputLine
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function createRuntimeHost(options: {
@@ -179,6 +181,7 @@ async function createRuntimeHost(options: {
     resourceLoader: createTestResourceLoader(),
   });
 
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- fake implements the methods this test exercises
   const runtimeHost = {
     session,
     newSession: vi.fn(async () => ({ cancelled: true })),

@@ -10,11 +10,7 @@ import {
 } from "../errors";
 import type { CreateSessionInput, ResumeSessionInput } from "../session-io";
 import type { PiProcess } from "./process";
-import {
-  checkPiAvailability,
-  resolvePiExecutable,
-  type PiExecutable,
-} from "./resolve-executable";
+import { checkPiAvailability, resolvePiExecutable, type PiExecutable } from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime, type PiAgentRuntime } from "./runtime";
 import type { AvailabilityResult, SessionInfoResult } from "./types";
 

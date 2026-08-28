@@ -8,9 +8,8 @@ export async function openSessionManager(options: {
   sessionId: string;
   sessionDir?: string;
 }): Promise<SessionManager> {
-  const existing = (await SessionManager.list(options.cwd, options.sessionDir)).find(
-    (session) => session.id === options.sessionId,
-  );
+  const listed = await SessionManager.list(options.cwd, options.sessionDir);
+  const existing = listed.find((session) => session.id === options.sessionId);
   if (existing) return SessionManager.open(existing.path, options.sessionDir);
   return SessionManager.create(options.cwd, options.sessionDir, { id: options.sessionId });
 }

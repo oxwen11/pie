@@ -66,14 +66,14 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   let unsubscribe: (() => void) | undefined;
   let unsubscribeBackpressure: (() => void) | undefined;
 
-  const output = (obj: RpcResponse | RpcExtensionUIRequest | object) => {
-    writeRawStdout(serializeJsonLine(obj));
+  const output = (record: unknown) => {
+    writeRawStdout(serializeJsonLine(record));
   };
 
   const success = <T extends RpcCommand["type"]>(
     id: string | undefined,
     command: T,
-    data?: object | null,
+    data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
       return { id, type: "response", command, success: true } as RpcResponse;
@@ -436,9 +436,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
               }
             },
           })
-          .catch((e) => {
+          .catch((e: unknown) => {
             if (!preflightSucceeded) {
-              output(error(id, "prompt", e.message));
+              const message = e instanceof Error ? e.message : String(e);
+              output(error(id, "prompt", message));
             }
           });
         return undefined;
@@ -759,6 +760,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
   async function shutdown(exitCode = 0, signal?: NodeJS.Signals): Promise<never> {
     if (shuttingDown) {
+      // oxlint-disable-next-line unicorn/no-process-exit -- RPC child shutdown is process lifetime
       process.exit(exitCode);
     }
     shuttingDown = true;
@@ -773,6 +775,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     if (signal !== "SIGTERM") {
       await flushRawStdout();
     }
+    // oxlint-disable-next-line unicorn/no-process-exit -- RPC child shutdown is process lifetime
     process.exit(exitCode);
   }
 
