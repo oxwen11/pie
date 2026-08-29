@@ -61,54 +61,17 @@
       background-position: -200% 0;
     }
   }
-  /* Pie mark: one of four 2×2 dot squares is kicked out; the kick walks the corners. */
-  --animate-pie-dot-se: pie-dot-se 1.6s infinite both;
-  --animate-pie-dot-ne: pie-dot-ne 1.6s infinite both;
-  --animate-pie-dot-nw: pie-dot-nw 1.6s infinite both;
-  --animate-pie-dot-sw: pie-dot-sw 1.6s infinite both;
-  @keyframes pie-dot-se {
+  /* Pie mark: fixed 16-dot logo pose; dots pulse in a left-to-right wave. */
+  --animate-pie-dot-wave: pie-dot-wave 1.2s ease-in-out infinite both;
+  @keyframes pie-dot-wave {
     0%,
-    24.999% {
-      translate: var(--pie-kick) var(--pie-kick);
-    }
-    25%,
     100% {
-      translate: 0 0;
+      opacity: 0.2;
+      scale: 0.62;
     }
-  }
-  @keyframes pie-dot-ne {
-    0%,
-    24.999%,
-    50%,
-    100% {
-      translate: 0 0;
-    }
-    25%,
-    49.999% {
-      translate: var(--pie-kick) calc(var(--pie-kick) * -1);
-    }
-  }
-  @keyframes pie-dot-nw {
-    0%,
-    49.999%,
-    75%,
-    100% {
-      translate: 0 0;
-    }
-    50%,
-    74.999% {
-      translate: calc(var(--pie-kick) * -1) calc(var(--pie-kick) * -1);
-    }
-  }
-  @keyframes pie-dot-sw {
-    0%,
-    74.999%,
-    100% {
-      translate: 0 0;
-    }
-    75%,
-    99.999% {
-      translate: calc(var(--pie-kick) * -1) var(--pie-kick);
+    50% {
+      opacity: 1;
+      scale: 1;
     }
   }
   --animate-caret-blink: 1s ease-out infinite caret-blink;

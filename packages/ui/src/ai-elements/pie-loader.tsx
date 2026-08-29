@@ -1,23 +1,56 @@
 import { cn } from "@getpie/ui/lib/utils";
 import type { CSSProperties, HTMLAttributes } from "react";
 
-const CORNERS = [
-  { corner: "nw", animation: "animate-pie-dot-nw" },
-  { corner: "ne", animation: "animate-pie-dot-ne" },
-  { corner: "sw", animation: "animate-pie-dot-sw" },
-  { corner: "se", animation: "animate-pie-dot-se" },
+const CLUSTERS = [
+  {
+    corner: "nw",
+    cells: [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ],
+  },
+  {
+    corner: "ne",
+    cells: [
+      [2, 0],
+      [3, 0],
+      [2, 1],
+      [3, 1],
+    ],
+  },
+  {
+    corner: "sw",
+    cells: [
+      [0, 2],
+      [1, 2],
+      [0, 3],
+      [1, 3],
+    ],
+  },
+  {
+    corner: "se",
+    cells: [
+      [2, 2],
+      [3, 2],
+      [2, 3],
+      [3, 3],
+    ],
+  },
 ] as const;
 
-const DOTS = [0, 1, 2, 3] as const;
+/** Locked pie-mark kick — the max offset that reads at the logo scale. */
+const KICK_RATIO = 0.28;
 
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   /** Outer mark size, including room for the kicked-out square. */
   size?: number;
 };
 
-/** Four 2×2 dot squares in the pie-mark layout. One square stays offset, cycling SE → NE → NW → SW. */
+/** Sixteen dots in the pie-mark layout. Shape is fixed; brightness travels left to right. */
 export function PieLoader({ className, size = 24, style, ...props }: PieLoaderProps) {
-  const kick = size * 0.12;
+  const kick = size * KICK_RATIO;
   const hidden = props["aria-hidden"] === true || props["aria-hidden"] === "true";
   return (
     <span
@@ -38,21 +71,25 @@ export function PieLoader({ className, size = 24, style, ...props }: PieLoaderPr
       }
       {...props}
     >
-      {CORNERS.map(({ corner, animation }) => (
+      {CLUSTERS.map(({ corner, cells }) => (
         <span
           key={corner}
           aria-hidden
           data-slot="pie-cluster"
           data-corner={corner}
           className={cn(
-            "grid size-full grid-cols-2 grid-rows-2 motion-reduce:animate-none",
-            animation,
-            corner === "se" && "motion-reduce:[translate:var(--pie-kick)_var(--pie-kick)]",
+            "grid size-full grid-cols-2 grid-rows-2",
+            corner === "se" && "[translate:var(--pie-kick)_var(--pie-kick)]",
           )}
           style={{ gap: Math.max(1, size * 0.04) }}
         >
-          {DOTS.map((dot) => (
-            <span key={dot} data-slot="pie-dot" className="size-full rounded-full bg-current" />
+          {cells.map(([x, y]) => (
+            <span
+              key={`${x}-${y}`}
+              data-slot="pie-dot"
+              className="animate-pie-dot-wave size-full rounded-full bg-current motion-reduce:scale-100 motion-reduce:animate-none motion-reduce:opacity-100"
+              style={{ animationDelay: `${x * (1.2 / 6)}s` }}
+            />
           ))}
         </span>
       ))}
