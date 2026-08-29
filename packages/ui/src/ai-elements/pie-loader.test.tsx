@@ -30,27 +30,27 @@ async function render(ui: ReactElement): Promise<HTMLDivElement> {
   return container;
 }
 
+const SE_DOTS = new Set(["11", "12", "15", "16"]);
+
 describe("PieLoader", () => {
-  it("renders a 3×3 morphing dot grid", async () => {
+  it("renders a 4×4 even grid and kicks the southeast four", async () => {
     const el = await render(<PieLoader />);
     const mark = el.querySelector("[data-slot=pie-loader]");
-    const dots = el.querySelectorAll("[data-slot=pie-dot]");
+    const dots = el.querySelectorAll<SVGCircleElement>("[data-slot=pie-dot]");
 
     expect(mark).not.toBeNull();
     expect(mark?.getAttribute("role")).toBe("status");
     expect(mark?.getAttribute("aria-label")).toBe("Thinking");
-    expect(dots).toHaveLength(9);
-    expect([...dots].map((dot) => dot.dataset.dotIndex)).toEqual([
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-    ]);
+    expect(dots).toHaveLength(16);
+    expect([...dots].map((dot) => dot.dataset.dotIndex)).toEqual(
+      Array.from({ length: 16 }, (_, index) => String(index + 1)),
+    );
+
+    for (const dot of dots) {
+      const kicked = SE_DOTS.has(dot.dataset.dotIndex ?? "");
+      expect(dot.dataset.kick).toBe(kicked ? "se" : undefined);
+      expect(dot.hasAttribute("transform")).toBe(kicked);
+    }
   });
 
   it("merges a caller className last", async () => {

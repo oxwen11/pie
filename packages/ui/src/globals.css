@@ -61,7 +61,7 @@
       background-position: -200% 0;
     }
   }
-  /* 3×3 dot-grid morph: each cell fades on/off through a frame sequence. */
+  /* 4×4 even grid: connected L→R on/off band. Off dots are opacity 0. */
   --animate-pie-dot-grid-1: pie-dot-grid-1 1.4s linear infinite;
   --animate-pie-dot-grid-2: pie-dot-grid-2 1.4s linear infinite;
   --animate-pie-dot-grid-3: pie-dot-grid-3 1.4s linear infinite;
@@ -71,177 +71,115 @@
   --animate-pie-dot-grid-7: pie-dot-grid-7 1.4s linear infinite;
   --animate-pie-dot-grid-8: pie-dot-grid-8 1.4s linear infinite;
   --animate-pie-dot-grid-9: pie-dot-grid-9 1.4s linear infinite;
+  --animate-pie-dot-grid-10: pie-dot-grid-10 1.4s linear infinite;
+  --animate-pie-dot-grid-11: pie-dot-grid-11 1.4s linear infinite;
+  --animate-pie-dot-grid-12: pie-dot-grid-12 1.4s linear infinite;
+  --animate-pie-dot-grid-13: pie-dot-grid-13 1.4s linear infinite;
+  --animate-pie-dot-grid-14: pie-dot-grid-14 1.4s linear infinite;
+  --animate-pie-dot-grid-15: pie-dot-grid-15 1.4s linear infinite;
+  --animate-pie-dot-grid-16: pie-dot-grid-16 1.4s linear infinite;
   @keyframes pie-dot-grid-1 {
     0%,
-    8.75% {
+    28.3333% {
+      opacity: 1;
+    }
+    33.3333%,
+    78.3333% {
       opacity: 0;
     }
-    12.5%,
-    21.25% {
-      opacity: 1;
-    }
-    25%,
-    33.75% {
-      opacity: 0;
-    }
-    37.5%,
-    46.25% {
-      opacity: 1;
-    }
-    50%,
-    83.75% {
-      opacity: 1;
-    }
-    87.5%,
+    83.3333%,
     100% {
-      opacity: 0;
+      opacity: 1;
     }
   }
   @keyframes pie-dot-grid-2 {
     0%,
-    33.75% {
+    61.6667% {
       opacity: 1;
     }
-    37.5%,
-    46.25% {
+    66.6667%,
+    95% {
       opacity: 0;
     }
-    50%,
-    58.75% {
-      opacity: 1;
-    }
-    62.5%,
-    71.25% {
-      opacity: 0;
-    }
-    75%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-3 {
     0%,
-    8.75% {
+    11.6667% {
       opacity: 0;
     }
-    12.5%,
-    21.25% {
+    16.6667%,
+    78.3333% {
       opacity: 1;
     }
-    25%,
-    33.75% {
-      opacity: 0;
-    }
-    37.5%,
-    71.25% {
-      opacity: 1;
-    }
-    75%,
-    83.75% {
-      opacity: 0;
-    }
-    87.5%,
-    96.25% {
-      opacity: 1;
-    }
+    83.3333%,
     100% {
       opacity: 0;
     }
   }
   @keyframes pie-dot-grid-4 {
     0%,
-    33.75% {
-      opacity: 1;
-    }
-    37.5%,
-    58.75% {
+    45% {
       opacity: 0;
     }
-    62.5%,
-    83.75% {
+    50%,
+    95% {
       opacity: 1;
-    }
-    87.5%,
-    96.25% {
-      opacity: 0;
     }
     100% {
-      opacity: 1;
+      opacity: 0;
     }
   }
   @keyframes pie-dot-grid-5 {
     0%,
-    8.75% {
+    28.3333% {
       opacity: 1;
     }
-    12.5%,
-    21.25% {
+    33.3333%,
+    78.3333% {
       opacity: 0;
     }
-    25%,
+    83.3333%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-6 {
     0%,
-    33.75% {
+    61.6667% {
       opacity: 1;
     }
-    37.5%,
-    58.75% {
+    66.6667%,
+    95% {
       opacity: 0;
     }
-    62.5%,
-    71.25% {
-      opacity: 1;
-    }
-    75%,
-    83.75% {
-      opacity: 0;
-    }
-    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-7 {
     0%,
-    21.25% {
-      opacity: 1;
-    }
-    25%,
-    33.75% {
+    11.6667% {
       opacity: 0;
     }
-    37.5%,
-    100% {
+    16.6667%,
+    78.3333% {
       opacity: 1;
+    }
+    83.3333%,
+    100% {
+      opacity: 0;
     }
   }
   @keyframes pie-dot-grid-8 {
     0%,
-    8.75% {
-      opacity: 0;
-    }
-    12.5%,
-    33.75% {
-      opacity: 1;
-    }
-    37.5%,
-    46.25% {
+    45% {
       opacity: 0;
     }
     50%,
-    58.75% {
-      opacity: 1;
-    }
-    62.5%,
-    71.25% {
-      opacity: 0;
-    }
-    75%,
-    96.25% {
+    95% {
       opacity: 1;
     }
     100% {
@@ -250,16 +188,110 @@
   }
   @keyframes pie-dot-grid-9 {
     0%,
-    21.25% {
+    28.3333% {
       opacity: 1;
     }
-    25%,
-    33.75% {
+    33.3333%,
+    78.3333% {
       opacity: 0;
     }
-    37.5%,
+    83.3333%,
     100% {
       opacity: 1;
+    }
+  }
+  @keyframes pie-dot-grid-10 {
+    0%,
+    61.6667% {
+      opacity: 1;
+    }
+    66.6667%,
+    95% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes pie-dot-grid-11 {
+    0%,
+    11.6667% {
+      opacity: 0;
+    }
+    16.6667%,
+    78.3333% {
+      opacity: 1;
+    }
+    83.3333%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes pie-dot-grid-12 {
+    0%,
+    45% {
+      opacity: 0;
+    }
+    50%,
+    95% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes pie-dot-grid-13 {
+    0%,
+    28.3333% {
+      opacity: 1;
+    }
+    33.3333%,
+    78.3333% {
+      opacity: 0;
+    }
+    83.3333%,
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes pie-dot-grid-14 {
+    0%,
+    61.6667% {
+      opacity: 1;
+    }
+    66.6667%,
+    95% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes pie-dot-grid-15 {
+    0%,
+    11.6667% {
+      opacity: 0;
+    }
+    16.6667%,
+    78.3333% {
+      opacity: 1;
+    }
+    83.3333%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes pie-dot-grid-16 {
+    0%,
+    45% {
+      opacity: 0;
+    }
+    50%,
+    95% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
     }
   }
   --animate-caret-blink: 1s ease-out infinite caret-blink;

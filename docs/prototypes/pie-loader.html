@@ -60,7 +60,7 @@
       .lede {
         margin: 0;
         color: var(--muted);
-        max-width: 44rem;
+        max-width: 46rem;
       }
 
       button {
@@ -81,8 +81,7 @@
         border-color: transparent;
       }
 
-      .hero,
-      .sizes {
+      .hero {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 16px;
@@ -159,6 +158,7 @@
       .mark {
         color: var(--fg);
         display: block;
+        overflow: visible;
       }
 
       .mark circle {
@@ -170,11 +170,11 @@
 
       .mark.still circle {
         animation: none;
+        opacity: 1;
       }
 
       @media (max-width: 720px) {
-        .hero,
-        .sizes {
+        .hero {
           grid-template-columns: 1fr;
         }
       }
@@ -187,8 +187,9 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            3×3 点阵，按帧亮灭变阵。熄灭是 opacity 0，和你贴的
-            <code>ui-dot-grid</code> 同一套机制。
+            机制和你贴的 Cursor <code>ui-dot-grid</code> 一样：每点自己的关键帧，灭是 opacity
+            0。布局是 16 点均匀 4×4，右下四个偏
+            3%。亮点是从左到右连成的一列波，不会对角线满格同时亮。
           </p>
         </div>
         <button type="button" id="theme" aria-pressed="false">Dark</button>
@@ -196,23 +197,30 @@
 
       <div class="hero">
         <section class="card">
-          <h2>64px</h2>
+          <h2>64px · 4×4 左→右波</h2>
           <div class="live">
             <svg
               class="mark"
-              data-mark
+              data-mark="pie"
               width="64"
               height="64"
-              viewBox="0 0 10.5 10.5"
+              viewBox="0 0 16 16"
               aria-label="Thinking"
             ></svg>
             <span class="thinking">Thinking…</span>
           </div>
         </section>
         <section class="card">
-          <h2>xs · 10px</h2>
+          <h2>Cursor 原版 3×3</h2>
           <div class="stage">
-            <svg class="mark" data-mark width="10" height="10" viewBox="0 0 10.5 10.5"></svg>
+            <svg
+              class="mark"
+              data-mark="cursor"
+              width="64"
+              height="64"
+              viewBox="0 0 10.5 10.5"
+              aria-hidden="true"
+            ></svg>
           </div>
         </section>
       </div>
@@ -220,14 +228,21 @@
       <section class="transcript">
         <svg
           class="mark"
-          data-mark
+          data-mark="pie"
           width="16"
           height="16"
-          viewBox="0 0 10.5 10.5"
+          viewBox="0 0 16 16"
           aria-hidden="true"
         ></svg>
         <span class="thinking">Thinking…</span>
         <span style="margin-left: auto; color: var(--muted); font-size: 12px">transcript 尺寸</span>
+      </section>
+
+      <section class="card" style="margin-bottom: 16px">
+        <h2>静止 · 看 4×4 偏移</h2>
+        <div class="stage" style="min-height: 120px">
+          <svg class="mark still" data-mark="pie" width="64" height="64" viewBox="0 0 16 16"></svg>
+        </div>
       </section>
 
       <section class="controls">
@@ -241,7 +256,17 @@
     </main>
 
     <script>
-      const FRAMES = [
+      const PIE_COLS = [
+        [1, 1, 0, 0],
+        [1, 1, 1, 0],
+        [0, 1, 1, 0],
+        [0, 1, 1, 1],
+        [0, 0, 1, 1],
+        [1, 0, 0, 1],
+      ];
+      const PIE_FRAMES = PIE_COLS.map((cols) => [...cols, ...cols, ...cols, ...cols]);
+
+      const CURSOR_FRAMES = [
         [0, 1, 0, 1, 1, 1, 1, 0, 1],
         [1, 1, 1, 1, 0, 1, 1, 1, 1],
         [0, 1, 0, 1, 1, 1, 0, 1, 0],
@@ -251,37 +276,63 @@
         [1, 1, 0, 1, 1, 0, 1, 1, 1],
         [0, 1, 1, 0, 1, 1, 1, 1, 1],
       ];
-      const POS = [1.25, 5.25, 9.25];
 
-      function keyframes() {
-        const n = FRAMES.length;
+      function keyframes(name, frames, count) {
+        const n = frames.length;
         const slot = 100 / n;
         const hold = slot * 0.7;
         let css = "";
-        for (let d = 0; d < 9; d++) {
-          css += `@keyframes pie-dot-grid-${d + 1}{`;
+        for (let d = 0; d < count; d++) {
+          css += `@keyframes ${name}-${d + 1}{`;
           for (let f = 0; f < n; f++) {
             const start = f * slot;
             const holdEnd = start + hold;
-            const op = FRAMES[f][d];
-            css += `${start.toFixed(3)}%,${holdEnd.toFixed(3)}%{opacity:${op}}`;
+            css += `${start.toFixed(3)}%,${holdEnd.toFixed(3)}%{opacity:${frames[f][d]}}`;
           }
-          css += `100%{opacity:${FRAMES[0][d]}}}`;
+          css += `100%{opacity:${frames[0][d]}}}`;
         }
-        document.getElementById("frames").textContent = css;
+        return css;
       }
 
-      keyframes();
+      document.getElementById("frames").textContent =
+        keyframes("pie-dot-grid", PIE_FRAMES, 16) + keyframes("cursor-dot-grid", CURSOR_FRAMES, 9);
 
-      const svgDots = POS.flatMap((cy, row) =>
-        POS.map(
-          (cx, col) =>
-            `<circle cx="${cx}" cy="${cy}" r="1.125" style="animation-name:pie-dot-grid-${row * 3 + col + 1}" />`,
-        ),
-      ).join("");
+      const GRID = 4;
+      const STEP = 3.5;
+      const ORIGIN = 1.75;
+      const RADIUS = 1.35;
+      const KICK = 16 * 0.03;
+      const CURSOR_POS = [1.25, 5.25, 9.25];
 
+      function pieDots() {
+        const pieces = [];
+        for (let i = 0; i < 16; i++) {
+          const col = i % GRID;
+          const row = Math.floor(i / GRID);
+          const cx = ORIGIN + col * STEP;
+          const cy = ORIGIN + row * STEP;
+          const kick = col >= 2 && row >= 2;
+          const transform = kick ? ` transform="translate(${KICK} ${KICK})"` : "";
+          pieces.push(
+            `<circle data-dot-index="${i + 1}" cx="${cx}" cy="${cy}" r="${RADIUS}" style="animation-name:pie-dot-grid-${i + 1}"${transform} />`,
+          );
+        }
+        return pieces.join("");
+      }
+
+      function cursorDots() {
+        return CURSOR_POS.flatMap((cy, row) =>
+          CURSOR_POS.map(
+            (cx, col) =>
+              `<circle data-dot-index="${row * 3 + col + 1}" cx="${cx}" cy="${cy}" r="1.125" style="animation-name:cursor-dot-grid-${row * 3 + col + 1}" />`,
+          ),
+        ).join("");
+      }
+
+      const pieHtml = pieDots();
+      const cursorHtml = cursorDots();
       for (const mark of document.querySelectorAll("[data-mark]")) {
-        mark.innerHTML = svgDots;
+        mark.innerHTML = mark.dataset.mark === "cursor" ? cursorHtml : pieHtml;
       }
 
       const root = document.documentElement;
