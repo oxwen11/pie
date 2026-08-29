@@ -40,8 +40,10 @@ const CLUSTERS = [
   },
 ] as const;
 
-/** Locked pie-mark kick — the max offset that reads at the logo scale. */
-const KICK_RATIO = 0.28;
+/** Inner inset that keeps the 16-dot mark at the size that reads. */
+const PAD_RATIO = 0.28;
+/** SE cluster offset — a light logo kick, not a full-cell jump. */
+const KICK_RATIO = 0.06;
 
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   /** Outer mark size, including room for the kicked-out square. */
@@ -50,6 +52,7 @@ export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
 
 /** Sixteen dots in the pie-mark layout. Shape is fixed; brightness travels left to right. */
 export function PieLoader({ className, size = 24, style, ...props }: PieLoaderProps) {
+  const pad = size * PAD_RATIO;
   const kick = size * KICK_RATIO;
   const hidden = props["aria-hidden"] === true || props["aria-hidden"] === "true";
   return (
@@ -64,7 +67,7 @@ export function PieLoader({ className, size = 24, style, ...props }: PieLoaderPr
           width: size,
           height: size,
           gap: size * 0.08,
-          padding: kick,
+          padding: pad,
           "--pie-kick": `${kick}px`,
           ...style,
         } as CSSProperties

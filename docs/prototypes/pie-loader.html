@@ -12,7 +12,8 @@
         --bg: #f7f7f6;
         --card: #fff;
         --duration: 1.2s;
-        --kick-ratio: 0.28;
+        --pad-ratio: 0.28;
+        --kick-ratio: 0.06;
         --dot-radius: 999px;
         --wave: x;
       }
@@ -213,6 +214,7 @@
 
       .mark {
         --size: 128px;
+        --pad: calc(var(--size) * var(--pad-ratio));
         --kick: calc(var(--size) * var(--kick-ratio));
         width: var(--size);
         height: var(--size);
@@ -220,7 +222,7 @@
         grid-template-columns: 1fr 1fr;
         grid-template-rows: 1fr 1fr;
         gap: calc(var(--size) * 0.08);
-        padding: var(--kick);
+        padding: var(--pad);
         color: var(--fg);
       }
 
@@ -284,8 +286,7 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            形状锁死：16 个点、四个 2×2，右下整块按最大偏离固定。动画改成 dot-ui 那种明暗 +
-            缩放波，格子本身不再跑。
+            点的大小仍按最大那档留白；右下只轻轻偏一点，贴近 logo。动画还是 dot-ui 的明暗波。
           </p>
         </div>
         <div class="toolbar">
@@ -326,7 +327,7 @@
         <div class="phase-grid">
           <div class="phase">
             <span data-mark class="mark still" style="--size: 96px"></span>
-            <small>静止构图 · 右下偏满</small>
+            <small>静止构图 · 右下轻偏</small>
           </div>
           <div class="phase">
             <span data-mark class="mark" style="--size: 96px"></span>
@@ -341,6 +342,11 @@
           周期
           <input id="duration" type="range" min="0.6" max="2.4" step="0.1" value="1.2" />
           <span id="duration-val">1.2s</span>
+        </label>
+        <label class="control">
+          偏离
+          <input id="kick" type="range" min="0.02" max="0.28" step="0.01" value="0.06" />
+          <span id="kick-val">6%</span>
         </label>
       </section>
     </main>
@@ -400,6 +406,8 @@
       const wave = document.getElementById("wave");
       const duration = document.getElementById("duration");
       const durationVal = document.getElementById("duration-val");
+      const kick = document.getElementById("kick");
+      const kickVal = document.getElementById("kick-val");
 
       theme.addEventListener("click", () => {
         const dark = root.getAttribute("data-theme") !== "dark";
@@ -427,6 +435,11 @@
       duration.addEventListener("input", () => {
         root.style.setProperty("--duration", `${duration.value}s`);
         durationVal.textContent = `${Number(duration.value).toFixed(1)}s`;
+      });
+
+      kick.addEventListener("input", () => {
+        root.style.setProperty("--kick-ratio", kick.value);
+        kickVal.textContent = `${Math.round(Number(kick.value) * 100)}%`;
       });
     </script>
   </body>
