@@ -11,11 +11,10 @@
         --line: color-mix(in srgb, #000 8%, transparent);
         --bg: #f7f7f6;
         --card: #fff;
-        --duration: 1.2s;
+        --duration: 1.6s;
         --pad-ratio: 0.28;
-        --kick-ratio: 0.06;
+        --kick-ratio: 0.03;
         --dot-radius: 999px;
-        --wave: x;
       }
 
       html[data-theme="dark"] {
@@ -246,29 +245,26 @@
         height: 100%;
         border-radius: var(--dot-radius);
         background: currentColor;
-        animation: pie-dot-wave var(--duration) ease-in-out infinite both;
-        animation-delay: calc(var(--wave-i) * (var(--duration) / 6));
-      }
-
-      html[data-wave="diag"] .dot {
-        animation-delay: calc(var(--wave-d) * (var(--duration) / 8));
+        animation: pie-dot-chase var(--duration) linear infinite;
+        animation-delay: calc(var(--dot-i) * (var(--duration) / 16));
       }
 
       .still .dot {
         animation: none;
         opacity: 1;
-        scale: 1;
       }
 
-      @keyframes pie-dot-wave {
+      @keyframes pie-dot-chase {
         0%,
-        100% {
-          opacity: 0.2;
-          scale: 0.62;
-        }
-        50% {
+        12.5% {
           opacity: 1;
-          scale: 1;
+        }
+        20% {
+          opacity: 0.45;
+        }
+        28%,
+        100% {
+          opacity: 0.22;
         }
       }
 
@@ -285,14 +281,11 @@
       <header>
         <div>
           <h1>Pie loader</h1>
-          <p class="lede">
-            点的大小仍按最大那档留白；右下只轻轻偏一点，贴近 logo。动画还是 dot-ui 的明暗波。
-          </p>
+          <p class="lede">偏离 3%。形状一直在，亮点在 16 个点上追逐，不再整表缩放。</p>
         </div>
         <div class="toolbar">
           <button type="button" id="theme" aria-pressed="false">Dark</button>
           <button type="button" id="shape" aria-pressed="false">方块点</button>
-          <button type="button" id="wave" aria-pressed="false">对角波</button>
         </div>
       </header>
 
@@ -308,7 +301,7 @@
           </div>
         </section>
         <section class="card">
-          <h2>Loading · wave</h2>
+          <h2>Loading · chase</h2>
           <div class="live">
             <span data-mark class="mark" role="status" aria-label="Thinking"></span>
             <span class="thinking">Thinking…</span>
@@ -331,7 +324,7 @@
           </div>
           <div class="phase">
             <span data-mark class="mark" style="--size: 96px"></span>
-            <small>同一构图 · 点阵波</small>
+            <small>同一构图 · 追逐</small>
           </div>
         </div>
       </section>
@@ -340,13 +333,13 @@
         <h2>调参</h2>
         <label class="control">
           周期
-          <input id="duration" type="range" min="0.6" max="2.4" step="0.1" value="1.2" />
-          <span id="duration-val">1.2s</span>
+          <input id="duration" type="range" min="0.8" max="2.8" step="0.1" value="1.6" />
+          <span id="duration-val">1.6s</span>
         </label>
         <label class="control">
           偏离
-          <input id="kick" type="range" min="0.02" max="0.28" step="0.01" value="0.06" />
-          <span id="kick-val">6%</span>
+          <input id="kick" type="range" min="0.01" max="0.12" step="0.01" value="0.03" />
+          <span id="kick-val">3%</span>
         </label>
       </section>
     </main>
@@ -395,7 +388,7 @@
         mark.innerHTML = CLUSTERS.map(
           ({ corner, cells }) =>
             `<span class="cluster cluster-${corner}">${cells
-              .map(([x, y]) => `<i class="dot" style="--wave-i:${x};--wave-d:${x + y}"></i>`)
+              .map(([x, y]) => `<i class="dot" style="--dot-i:${y * 4 + x}"></i>`)
               .join("")}</span>`,
         ).join("");
       }
@@ -403,7 +396,6 @@
       const root = document.documentElement;
       const theme = document.getElementById("theme");
       const shape = document.getElementById("shape");
-      const wave = document.getElementById("wave");
       const duration = document.getElementById("duration");
       const durationVal = document.getElementById("duration-val");
       const kick = document.getElementById("kick");
@@ -422,14 +414,6 @@
         shape.setAttribute("aria-pressed", String(square));
         root.style.setProperty("--dot-radius", square ? "18%" : "999px");
         shape.textContent = square ? "圆点" : "方块点";
-      });
-
-      wave.addEventListener("click", () => {
-        const diag = wave.getAttribute("aria-pressed") !== "true";
-        wave.setAttribute("aria-pressed", String(diag));
-        if (diag) root.setAttribute("data-wave", "diag");
-        else root.removeAttribute("data-wave");
-        wave.textContent = diag ? "左右波" : "对角波";
       });
 
       duration.addEventListener("input", () => {

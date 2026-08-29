@@ -42,15 +42,16 @@ const CLUSTERS = [
 
 /** Inner inset that keeps the 16-dot mark at the size that reads. */
 const PAD_RATIO = 0.28;
-/** SE cluster offset — a light logo kick, not a full-cell jump. */
-const KICK_RATIO = 0.06;
+/** SE cluster offset — a light logo kick. */
+const KICK_RATIO = 0.03;
+const CHASE_DURATION_S = 1.6;
 
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   /** Outer mark size, including room for the kicked-out square. */
   size?: number;
 };
 
-/** Sixteen dots in the pie-mark layout. Shape is fixed; brightness travels left to right. */
+/** Sixteen dots in the pie-mark layout. Shape is fixed; a highlight chases the grid. */
 export function PieLoader({ className, size = 24, style, ...props }: PieLoaderProps) {
   const pad = size * PAD_RATIO;
   const kick = size * KICK_RATIO;
@@ -90,8 +91,8 @@ export function PieLoader({ className, size = 24, style, ...props }: PieLoaderPr
             <span
               key={`${x}-${y}`}
               data-slot="pie-dot"
-              className="animate-pie-dot-wave size-full rounded-full bg-current motion-reduce:scale-100 motion-reduce:animate-none motion-reduce:opacity-100"
-              style={{ animationDelay: `${x * (1.2 / 6)}s` }}
+              className="animate-pie-dot-chase size-full rounded-full bg-current motion-reduce:animate-none motion-reduce:opacity-100"
+              style={{ animationDelay: `${(y * 4 + x) * (CHASE_DURATION_S / 16)}s` }}
             />
           ))}
         </span>

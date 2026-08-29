@@ -61,17 +61,19 @@
       background-position: -200% 0;
     }
   }
-  /* Pie mark: fixed 16-dot logo pose; dots pulse in a left-to-right wave. */
-  --animate-pie-dot-wave: pie-dot-wave 1.2s ease-in-out infinite both;
-  @keyframes pie-dot-wave {
+  /* Pie mark: fixed 16-dot logo pose; a lit pair chases through the grid. */
+  --animate-pie-dot-chase: pie-dot-chase 1.6s linear infinite;
+  @keyframes pie-dot-chase {
     0%,
-    100% {
-      opacity: 0.2;
-      scale: 0.62;
-    }
-    50% {
+    12.5% {
       opacity: 1;
-      scale: 1;
+    }
+    20% {
+      opacity: 0.45;
+    }
+    28%,
+    100% {
+      opacity: 0.22;
     }
   }
   --animate-caret-blink: 1s ease-out infinite caret-blink;
