@@ -155,6 +155,88 @@
         accent-color: var(--fg);
       }
 
+      [data-slot="pie-loader"] {
+        color: var(--fg);
+        display: inline-grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        container-type: size;
+        overflow: visible;
+        flex-shrink: 0;
+      }
+
+      [data-slot="pie-loader"] > [data-slot="pie-dot"] {
+        place-self: center;
+        width: 70%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background-color: currentColor;
+        animation-duration: var(--duration);
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+      }
+
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(1) {
+        animation-name: pie-dot-grid-1;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(2) {
+        animation-name: pie-dot-grid-2;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(3) {
+        animation-name: pie-dot-grid-3;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(4) {
+        animation-name: pie-dot-grid-4;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(5) {
+        animation-name: pie-dot-grid-5;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(6) {
+        animation-name: pie-dot-grid-6;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(7) {
+        animation-name: pie-dot-grid-7;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(8) {
+        animation-name: pie-dot-grid-8;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(9) {
+        animation-name: pie-dot-grid-9;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(10) {
+        animation-name: pie-dot-grid-10;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11) {
+        animation-name: pie-dot-grid-11;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12) {
+        animation-name: pie-dot-grid-12;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(13) {
+        animation-name: pie-dot-grid-13;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(14) {
+        animation-name: pie-dot-grid-14;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15) {
+        animation-name: pie-dot-grid-15;
+      }
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
+        animation-name: pie-dot-grid-16;
+      }
+
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11),
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12),
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15),
+      [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
+        translate: 3cqw 3cqh;
+      }
+
+      [data-slot="pie-loader"].still > [data-slot="pie-dot"] {
+        animation: none;
+        opacity: 1;
+      }
+
       .mark {
         color: var(--fg);
         display: block;
@@ -166,11 +248,6 @@
         animation-duration: var(--duration);
         animation-timing-function: linear;
         animation-iteration-count: infinite;
-      }
-
-      .mark.still circle {
-        animation: none;
-        opacity: 1;
       }
 
       @media (max-width: 720px) {
@@ -187,10 +264,8 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            你贴的是
-            <code>animation-name: ui-dot-grid-3-…-dot-N</code
-            >：每个点一条关键帧，同一列不会齐亮。灭是 opacity 0。布局仍是 16 点均匀 4×4，右下四个偏
-            3%。亮点连成斜波从左往右走。
+            <code>PieLoader</code> 只挂 16 个点。格子、右下 3% 偏移、每点关键帧全在
+            CSS（<code>nth-child</code>），组件里不再算坐标。
           </p>
         </div>
         <button type="button" id="theme" aria-pressed="false">Dark</button>
@@ -200,14 +275,12 @@
         <section class="card">
           <h2>64px · 每点独立关键帧</h2>
           <div class="live">
-            <svg
-              class="mark"
+            <span
+              data-slot="pie-loader"
               data-mark="pie"
-              width="64"
-              height="64"
-              viewBox="0 0 16 16"
+              style="width: 64px; height: 64px"
               aria-label="Thinking"
-            ></svg>
+            ></span>
             <span class="thinking">Thinking…</span>
           </div>
         </section>
@@ -227,14 +300,12 @@
       </div>
 
       <section class="transcript">
-        <svg
-          class="mark"
+        <span
+          data-slot="pie-loader"
           data-mark="pie"
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
+          style="width: 16px; height: 16px"
           aria-hidden="true"
-        ></svg>
+        ></span>
         <span class="thinking">Thinking…</span>
         <span style="margin-left: auto; color: var(--muted); font-size: 12px">transcript 尺寸</span>
       </section>
@@ -242,7 +313,12 @@
       <section class="card" style="margin-bottom: 16px">
         <h2>静止 · 看 4×4 偏移</h2>
         <div class="stage" style="min-height: 120px">
-          <svg class="mark still" data-mark="pie" width="64" height="64" viewBox="0 0 16 16"></svg>
+          <span
+            class="still"
+            data-slot="pie-loader"
+            data-mark="pie"
+            style="width: 64px; height: 64px"
+          ></span>
         </div>
       </section>
 
@@ -299,27 +375,10 @@
       document.getElementById("frames").textContent =
         keyframes("pie-dot-grid", PIE_FRAMES, 16) + keyframes("cursor-dot-grid", CURSOR_FRAMES, 9);
 
-      const GRID = 4;
-      const STEP = 3.5;
-      const ORIGIN = 1.75;
-      const RADIUS = 1.35;
-      const KICK = 16 * 0.03;
       const CURSOR_POS = [1.25, 5.25, 9.25];
 
       function pieDots() {
-        const pieces = [];
-        for (let i = 0; i < 16; i++) {
-          const col = i % GRID;
-          const row = Math.floor(i / GRID);
-          const cx = ORIGIN + col * STEP;
-          const cy = ORIGIN + row * STEP;
-          const kick = col >= 2 && row >= 2;
-          const transform = kick ? ` transform="translate(${KICK} ${KICK})"` : "";
-          pieces.push(
-            `<circle data-dot-index="${i + 1}" cx="${cx}" cy="${cy}" r="${RADIUS}" style="animation-name:pie-dot-grid-${i + 1}"${transform} />`,
-          );
-        }
-        return pieces.join("");
+        return Array.from({ length: 16 }, () => `<span data-slot="pie-dot"></span>`).join("");
       }
 
       function cursorDots() {
