@@ -1,7 +1,7 @@
 import type { SessionPhase } from "@getpie/contract";
 import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 
-const SLOT_CLASS = "me-2 inline-flex size-[1em] shrink-0 items-center justify-center";
+const SLOT_CLASS = "inline-flex size-[1em] shrink-0 items-center justify-center";
 
 /** Server-derived session phase before the title; slot is 1em so it matches the title. */
 export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase | undefined }) {
@@ -21,17 +21,26 @@ export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase
       return (
         <span
           className={SLOT_CLASS}
-          aria-hidden
+          aria-label="Waiting for your action"
           data-slot="session-status"
           data-state="requires-action"
+          role="img"
+          title="Waiting for your action"
         >
-          <span className="bg-warning size-2 rounded-full" title="Waiting for your action" />
+          <span className="bg-warning size-2 rounded-full" aria-hidden />
         </span>
       );
     case "crashed":
       return (
-        <span className={SLOT_CLASS} aria-hidden data-slot="session-status" data-state="crashed">
-          <span className="bg-destructive size-2 rounded-full" title="Session crashed" />
+        <span
+          className={SLOT_CLASS}
+          aria-label="Session crashed"
+          data-slot="session-status"
+          data-state="crashed"
+          role="img"
+          title="Session crashed"
+        >
+          <span className="bg-destructive size-2 rounded-full" aria-hidden />
         </span>
       );
     case "idle":
