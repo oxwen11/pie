@@ -924,7 +924,7 @@
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12),
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15),
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
-    translate: 6cqw 6cqh;
+    translate: 10cqw 10cqh;
   }
 
   @media (prefers-reduced-motion: reduce) {
