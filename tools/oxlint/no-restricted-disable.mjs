@@ -11,7 +11,7 @@ const PROTECTED_RULES = new Set([
   "vibest/no-restricted-disable",
 ]);
 
-const PROTECTED_PREFIXES = ["react-you-might-not-need-an-effect/"] ;
+const PROTECTED_PREFIXES = ["react-you-might-not-need-an-effect/"];
 
 const isProtectedRule = (rule) =>
   PROTECTED_RULES.has(rule) || PROTECTED_PREFIXES.some((prefix) => rule.startsWith(prefix));
