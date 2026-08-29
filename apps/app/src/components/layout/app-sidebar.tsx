@@ -34,9 +34,6 @@ export function AppSidebar({
   const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
   const expanded = !isMobile && state === "expanded";
-  // Web: always (offcanvas on mobile). Desktop: spacer row while expanded so
-  // content clears the viewport-fixed toggle; collapsed panel width is 0.
-  const showHeader = desktop ? expanded : true;
 
   return (
     <Sidebar
@@ -45,22 +42,15 @@ export function AppSidebar({
       collapsible={isMobile ? "offcanvas" : "none"}
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
-      {showHeader ? (
-        <SidebarHeader
-          className={cn(
-            SHELL_TITLEBAR_HEADER_CLASS,
-            desktop && "px-0",
-            "[-webkit-app-region:drag]",
-          )}
-        >
-          {isDesktopMacosHost(platform) ? null : (
-            <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
-          )}
-          {!desktop && expanded ? (
-            <SidebarTrigger className="[-webkit-app-region:no-drag]" />
-          ) : null}
-        </SidebarHeader>
-      ) : null}
+      {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
+      <SidebarHeader
+        className={cn(SHELL_TITLEBAR_HEADER_CLASS, desktop && "px-0", "[-webkit-app-region:drag]")}
+      >
+        {isDesktopMacosHost(platform) ? null : (
+          <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
+        )}
+        {!desktop && expanded ? <SidebarTrigger className="[-webkit-app-region:no-drag]" /> : null}
+      </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
         <SidebarGroup>
