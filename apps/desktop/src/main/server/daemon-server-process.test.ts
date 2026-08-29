@@ -8,8 +8,21 @@ import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
 import { describe, expect, it as test } from "vitest";
 
-import { makeDaemonServerProcess, resolveServerRuntimeExecutable } from "./daemon-server-process";
+import {
+  makeDaemonServerProcess,
+  preferredDaemonPort,
+  resolveServerRuntimeExecutable,
+} from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
+
+describe("preferredDaemonPort", () => {
+  test("uses a valid PIE_PORT for the initial daemon launch", () => {
+    expect(preferredDaemonPort({ PIE_PORT: "27313" })).toBe(27313);
+    expect(preferredDaemonPort({})).toBeUndefined();
+    expect(preferredDaemonPort({ PIE_PORT: "invalid" })).toBeUndefined();
+    expect(preferredDaemonPort({ PIE_PORT: "65536" })).toBeUndefined();
+  });
+});
 
 describe("resolveServerRuntimeExecutable", () => {
   test("uses Electron's LSUIElement helper for a macOS app bundle", () => {

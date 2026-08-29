@@ -13,14 +13,16 @@ import { defineConfig } from "vite";
  * same-origin with the RPC, the way it is when the server serves the built
  * bundle. Add a prefix here whenever the server grows one.
  *
- * 4180/4190 rather than 4000/5173, which are taken: 4000 is the daemon's
- * default, spawned by the desktop app and guarded by an auth token this browser
- * cannot present — proxying there answers `/api/health` but 401s the ws-ticket,
- * so the app loads and silently never connects. 5173 is `apps/desktop`'s
- * electron-vite renderer. 4180/4190 are claimed by no common dev tool. Open
- * 4190: 4180 serves the last *built* bundle, so it works but shows stale UI.
+ * The default ports are 4180/4190 rather than 4000/5173, which are taken:
+ * 4000 is the daemon's default, spawned by the desktop app and guarded by an
+ * auth token this browser cannot present — proxying there answers `/api/health`
+ * but 401s the ws-ticket, so the app loads and silently never connects. 5173
+ * is `apps/desktop`'s electron-vite renderer. The mise dev environment replaces
+ * these defaults with stable per-worktree ports. Open the printed app URL:
+ * the server port serves the last *built* bundle and can show stale UI.
  */
 const SERVER_PORT = Number(process.env.PIE_PORT ?? 4180);
+const APP_PORT = Number(process.env.PIE_APP_PORT ?? 4190);
 const serverTarget = `http://127.0.0.1:${SERVER_PORT}`;
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
 
@@ -35,7 +37,7 @@ export default defineConfig({
     // Strict, so a taken port fails the boot instead of silently drifting to
     // the next one — that drift is how you end up reading someone else's dev
     // server at the URL you expected to be ours.
-    port: 4190,
+    port: APP_PORT,
     strictPort: true,
     // Vite rejects any Host it doesn't recognise, which is every name a tunnel
     // puts in front of it (tailnet MagicDNS, ngrok, …). Opt in per run —

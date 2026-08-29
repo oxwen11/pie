@@ -20,6 +20,13 @@ export type DaemonServerProcessOptions = {
   readonly pollIntervalMs?: number;
 };
 
+export function preferredDaemonPort(environment: NodeJS.ProcessEnv): number | undefined {
+  const raw = environment.PIE_PORT;
+  if (raw === undefined) return undefined;
+  const port = Number.parseInt(raw, 10);
+  return Number.isInteger(port) && port >= 0 && port <= 65_535 ? port : undefined;
+}
+
 /**
  * The desktop daemon's process.execPath is reused for bundled Pi children.
  * Electron's main macOS bundle has regular activation policy, so those children
@@ -85,9 +92,9 @@ export function makeDaemonServerProcess(
         const handle = yield* resolveOrSpawnDaemon({
           ...resolveDaemonLocation(config.environment),
           serverArgv: [resolveServerRuntimeExecutable(), config.entry],
-          // 0 means "no preference" on the first attempt; afterwards the
-          // supervisor pins the port it saw, which we pass as preferred.
-          port: port === 0 ? undefined : port,
+          // On the first attempt, prefer this worktree's configured server
+          // port. Afterwards the supervisor pins the port it actually saw.
+          port: port === 0 ? preferredDaemonPort(environment) : port,
           environment,
           autoRespawn: port !== 0,
         }).pipe(

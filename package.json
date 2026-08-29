@@ -3,7 +3,6 @@
   "private": true,
   "scripts": {
     "dev": "turbo run dev",
-    "watch": "turbo watch dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",

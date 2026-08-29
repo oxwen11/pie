@@ -1,26 +1,6 @@
 {
   "extends": ["//"],
   "tasks": {
-    "dev": {
-      "passThroughEnv": [
-        "AWS_*",
-        "AZURE_*",
-        "GOOGLE_*",
-        "VERTEX_*",
-        "CLOUD_ML_*",
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "NO_PROXY",
-        "http_proxy",
-        "https_proxy",
-        "no_proxy",
-        "NODE_EXTRA_CA_CERTS",
-        "SSL_CERT_FILE",
-        "SSL_CERT_DIR",
-        "PIE_HOME",
-        "PIE_DAEMON_DIR"
-      ]
-    },
     "start": {
       "cache": false,
       "persistent": true,

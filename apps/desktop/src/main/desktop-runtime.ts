@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
@@ -16,6 +18,19 @@ import { MainWindow, MainWindowLive } from "./electron/main-window";
 import { devUserDataPath, devWorktreeSlug, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
+
+function isolateDesktopDevRuntime(): void {
+  if (!process.env["PIE_DEV_SCOPE"]) return;
+
+  const home = process.env["PIE_HOME"];
+  if (home) process.env["PIE_HOME"] = path.join(home, "desktop");
+
+  const daemonDir = process.env["PIE_DAEMON_DIR"];
+  if (daemonDir) process.env["PIE_DAEMON_DIR"] = path.join(daemonDir, "desktop");
+
+  const serverPort = process.env["PIE_DESKTOP_SERVER_PORT"];
+  if (serverPort) process.env["PIE_PORT"] = serverPort;
+}
 
 function makeRuntime(devUrl: string | undefined) {
   // The Node platform services: the daemon launcher's file state and token
@@ -50,6 +65,7 @@ function makeRuntime(devUrl: string | undefined) {
 export function startDesktopRuntime(): void {
   const isE2E = process.env["PIE_E2E"] === "1";
   if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
+  if (is.dev && !isE2E) isolateDesktopDevRuntime();
 
   // Opt-in CDP remote debugging (agent-browser); isolated userData avoids the
   // single-instance lock.
@@ -60,10 +76,11 @@ export function startDesktopRuntime(): void {
   } else if (is.dev && !isE2E) {
     // Give dev its own userData so its single-instance lock is independent of an
     // installed build (which on macOS keeps holding the lock after its window
-    // closes). Key it on the git worktree so parallel dev instances from
-    // different worktrees don't collide. E2E is excluded — it passes its own
-    // --user-data-dir.
-    app.setPath("userData", devUserDataPath(Effect.runSync(devWorktreeSlug)));
+    // closes). The mise dev environment supplies the same hashed worktree scope used for
+    // data and ports; derive the same identity for direct Electron invocations
+    // outside the package script. E2E supplies its own --user-data-dir.
+    const worktreeScope = process.env["PIE_DEV_SCOPE"] ?? Effect.runSync(devWorktreeSlug);
+    app.setPath("userData", devUserDataPath(worktreeScope));
   }
 
   let runtime: ReturnType<typeof makeRuntime> | undefined;
