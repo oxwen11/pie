@@ -61,84 +61,205 @@
       background-position: -200% 0;
     }
   }
-  /* Per-dot on/off sequences. Applied from [data-slot=pie-loader] nth-child rules. */
+  /* Cursor ui-dot-grid: 8 hard 12.5% slots. Off is --dot-grid-off-opacity. */
   @keyframes pie-dot-grid-1 {
     0%,
-    33.75% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
       opacity: 1;
     }
     37.5%,
-    71.25% {
-      opacity: 0;
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    50%,
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-2 {
     0%,
-    58.75% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
       opacity: 1;
     }
     62.5%,
-    96.25% {
-      opacity: 0;
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
+    75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    87.5%,
     100% {
-      opacity: 1;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-3 {
     0%,
-    21.25% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    12.5%,
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     25%,
-    83.75% {
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
       opacity: 1;
     }
     87.5%,
     100% {
-      opacity: 0;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-4 {
     0%,
-    8.75% {
+    12.4999% {
       opacity: 1;
     }
     12.5%,
-    46.25% {
-      opacity: 0;
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    25%,
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    37.5%,
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-5 {
     0%,
-    8.75% {
+    12.4999% {
       opacity: 1;
     }
     12.5%,
-    58.75% {
-      opacity: 0;
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    25%,
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    37.5%,
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    50%,
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-6 {
     0%,
-    33.75% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
       opacity: 1;
     }
     37.5%,
-    83.75% {
-      opacity: 0;
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    50%,
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     87.5%,
     100% {
@@ -147,139 +268,342 @@
   }
   @keyframes pie-dot-grid-7 {
     0%,
-    8.75% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     12.5%,
-    58.75% {
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
       opacity: 1;
     }
     62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    87.5%,
     100% {
-      opacity: 0;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-8 {
     0%,
-    33.75% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    12.5%,
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    25%,
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     37.5%,
-    83.75% {
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
       opacity: 1;
     }
     87.5%,
     100% {
-      opacity: 0;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-9 {
     0%,
-    46.25% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    12.5%,
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    25%,
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    37.5%,
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     50%,
-    96.25% {
+    62.4999% {
       opacity: 1;
     }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
-      opacity: 0;
+      opacity: 1;
     }
   }
   @keyframes pie-dot-grid-10 {
     0%,
-    21.25% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
       opacity: 1;
     }
     25%,
-    71.25% {
-      opacity: 0;
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    37.5%,
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    50%,
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-11 {
     0%,
-    46.25% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
       opacity: 1;
     }
     50%,
-    96.25% {
-      opacity: 0;
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
     }
+    62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    87.5%,
     100% {
-      opacity: 1;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-12 {
     0%,
-    21.25% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    12.5%,
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     25%,
-    71.25% {
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
       opacity: 1;
     }
     75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    87.5%,
     100% {
-      opacity: 0;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-13 {
     0%,
-    21.25% {
-      opacity: 0;
+    12.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    12.5%,
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     25%,
-    83.75% {
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
       opacity: 1;
     }
     87.5%,
     100% {
-      opacity: 0;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
   @keyframes pie-dot-grid-14 {
     0%,
-    8.75% {
+    12.4999% {
       opacity: 1;
     }
     12.5%,
-    46.25% {
-      opacity: 0;
+    24.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    25%,
+    37.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    37.5%,
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     50%,
+    62.4999% {
+      opacity: 1;
+    }
+    62.5%,
+    74.9999% {
+      opacity: 1;
+    }
+    75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-15 {
     0%,
-    33.75% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
       opacity: 1;
     }
     37.5%,
-    71.25% {
-      opacity: 0;
+    49.9999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    50%,
+    62.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    62.5%,
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
     75%,
+    87.4999% {
+      opacity: 1;
+    }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-16 {
     0%,
-    58.75% {
+    12.4999% {
+      opacity: 1;
+    }
+    12.5%,
+    24.9999% {
+      opacity: 1;
+    }
+    25%,
+    37.4999% {
+      opacity: 1;
+    }
+    37.5%,
+    49.9999% {
+      opacity: 1;
+    }
+    50%,
+    62.4999% {
       opacity: 1;
     }
     62.5%,
-    96.25% {
-      opacity: 0;
+    74.9999% {
+      opacity: var(--dot-grid-off-opacity);
     }
+    75%,
+    87.4999% {
+      opacity: var(--dot-grid-off-opacity);
+    }
+    87.5%,
     100% {
-      opacity: 1;
+      opacity: var(--dot-grid-off-opacity);
     }
   }
 
@@ -489,6 +813,7 @@
 
 @layer components {
   [data-slot="pie-loader"] {
+    --dot-grid-off-opacity: 0;
     display: inline-grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);

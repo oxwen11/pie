@@ -156,6 +156,7 @@
       }
 
       [data-slot="pie-loader"] {
+        --dot-grid-off-opacity: 0;
         color: var(--fg);
         display: inline-grid;
         grid-template-columns: repeat(4, 1fr);
@@ -238,6 +239,7 @@
       }
 
       .mark {
+        --dot-grid-off-opacity: 0;
         color: var(--fg);
         display: block;
         overflow: visible;
@@ -264,8 +266,9 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            <code>PieLoader</code> 只挂 16 个点。格子、右下 3% 偏移、每点关键帧全在
-            CSS（<code>nth-child</code>），组件里不再算坐标。
+            关键帧按你贴的 Cursor 写法：8 段各 12.5%，用
+            <code>12.4999%</code> 硬切，灭是 <code>var(--dot-grid-off-opacity)</code>。组件只挂 16
+            个点，格子和偏移在 CSS。
           </p>
         </div>
         <button type="button" id="theme" aria-pressed="false">Dark</button>
@@ -355,19 +358,27 @@
         [0, 1, 1, 0, 1, 1, 1, 1, 1],
       ];
 
+      const SLOTS = [
+        ["0%", "12.4999%"],
+        ["12.5%", "24.9999%"],
+        ["25%", "37.4999%"],
+        ["37.5%", "49.9999%"],
+        ["50%", "62.4999%"],
+        ["62.5%", "74.9999%"],
+        ["75%", "87.4999%"],
+        ["87.5%", "100%"],
+      ];
+
       function keyframes(name, frames, count) {
-        const n = frames.length;
-        const slot = 100 / n;
-        const hold = slot * 0.7;
         let css = "";
         for (let d = 0; d < count; d++) {
           css += `@keyframes ${name}-${d + 1}{`;
-          for (let f = 0; f < n; f++) {
-            const start = f * slot;
-            const holdEnd = start + hold;
-            css += `${start.toFixed(3)}%,${holdEnd.toFixed(3)}%{opacity:${frames[f][d]}}`;
+          for (let f = 0; f < SLOTS.length; f++) {
+            const [start, end] = SLOTS[f];
+            const opacity = frames[f][d] ? "1" : "var(--dot-grid-off-opacity)";
+            css += `${start},${end}{opacity:${opacity}}`;
           }
-          css += `100%{opacity:${frames[0][d]}}}`;
+          css += "}";
         }
         return css;
       }
