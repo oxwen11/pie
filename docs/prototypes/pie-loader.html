@@ -11,10 +11,7 @@
         --line: color-mix(in srgb, #000 8%, transparent);
         --bg: #f7f7f6;
         --card: #fff;
-        --duration: 1.6s;
-        --pad-ratio: 0.28;
-        --kick-ratio: 0.03;
-        --dot-radius: 999px;
+        --duration: 1400ms;
       }
 
       html[data-theme="dark"] {
@@ -66,12 +63,6 @@
         max-width: 44rem;
       }
 
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
       button {
         appearance: none;
         border: 1px solid var(--line);
@@ -90,15 +81,15 @@
         border-color: transparent;
       }
 
-      .hero {
+      .hero,
+      .sizes {
         display: grid;
-        grid-template-columns: 1fr 1.2fr;
+        grid-template-columns: 1fr 1fr;
         gap: 16px;
         margin-bottom: 16px;
       }
 
       .card,
-      .phases,
       .transcript,
       .controls {
         background: var(--card);
@@ -116,69 +107,23 @@
         color: var(--muted);
       }
 
-      .stage,
+      .stage {
+        min-height: 180px;
+        display: grid;
+        place-items: center;
+      }
+
       .live {
-        min-height: 220px;
+        min-height: 180px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 16px;
       }
 
-      .logo {
-        width: 128px;
-        height: 128px;
-      }
-
-      .logo svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-
       .thinking {
         font-size: 20px;
-        background: linear-gradient(
-          90deg,
-          color-mix(in srgb, var(--muted) 70%, var(--fg)) 20%,
-          var(--muted) 50%,
-          color-mix(in srgb, var(--muted) 70%, var(--fg)) 80%
-        );
-        background-size: 200% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        animation: shimmer 2s linear infinite;
-      }
-
-      @keyframes shimmer {
-        to {
-          background-position: -200% 0;
-        }
-      }
-
-      .phases {
-        margin-bottom: 16px;
-      }
-
-      .phase-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-
-      .phase {
-        display: grid;
-        justify-items: center;
-        gap: 12px;
-        padding: 22px 8px 16px;
-        border-radius: 12px;
-        background: var(--bg);
-      }
-
-      .phase small {
         color: var(--muted);
-        font-size: 12px;
       }
 
       .transcript {
@@ -199,7 +144,7 @@
 
       .control {
         display: grid;
-        grid-template-columns: 92px 1fr 48px;
+        grid-template-columns: 92px 1fr 64px;
         gap: 12px;
         align-items: center;
         font-size: 13px;
@@ -212,194 +157,137 @@
       }
 
       .mark {
-        --size: 128px;
-        --pad: calc(var(--size) * var(--pad-ratio));
-        --kick: calc(var(--size) * var(--kick-ratio));
-        width: var(--size);
-        height: var(--size);
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
-        gap: calc(var(--size) * 0.08);
-        padding: var(--pad);
         color: var(--fg);
+        display: block;
       }
 
-      .mark.sm {
-        --size: 24px;
+      .mark circle {
+        fill: currentColor;
+        animation-duration: var(--duration);
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
       }
 
-      .cluster {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
-        gap: calc(var(--size) * 0.03);
-      }
-
-      .cluster-se {
-        translate: var(--kick) var(--kick);
-      }
-
-      .dot {
-        width: 100%;
-        height: 100%;
-        border-radius: var(--dot-radius);
-        background: currentColor;
-        animation: pie-dot-chase var(--duration) linear infinite;
-        animation-delay: calc(var(--dot-i) * (var(--duration) / 16));
-      }
-
-      .still .dot {
+      .mark.still circle {
         animation: none;
-        opacity: 1;
-      }
-
-      @keyframes pie-dot-chase {
-        0%,
-        12.5% {
-          opacity: 1;
-        }
-        20% {
-          opacity: 0.45;
-        }
-        28%,
-        100% {
-          opacity: 0.22;
-        }
       }
 
       @media (max-width: 720px) {
         .hero,
-        .phase-grid {
+        .sizes {
           grid-template-columns: 1fr;
         }
       }
     </style>
+    <style id="frames"></style>
   </head>
   <body>
     <main>
       <header>
         <div>
           <h1>Pie loader</h1>
-          <p class="lede">偏离 3%。形状一直在，亮点在 16 个点上追逐，不再整表缩放。</p>
+          <p class="lede">
+            3×3 点阵，按帧亮灭变阵。熄灭是 opacity 0，和你贴的
+            <code>ui-dot-grid</code> 同一套机制。
+          </p>
         </div>
-        <div class="toolbar">
-          <button type="button" id="theme" aria-pressed="false">Dark</button>
-          <button type="button" id="shape" aria-pressed="false">方块点</button>
-        </div>
+        <button type="button" id="theme" aria-pressed="false">Dark</button>
       </header>
 
       <div class="hero">
         <section class="card">
-          <h2>Logo</h2>
-          <div class="stage">
-            <div class="logo" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="currentColor">
-                <path d="M8 8H31V31H8ZM32 8H55V31H32ZM8 32H31V55H8ZM33 33H56V56H33Z" />
-              </svg>
-            </div>
+          <h2>64px</h2>
+          <div class="live">
+            <svg
+              class="mark"
+              data-mark
+              width="64"
+              height="64"
+              viewBox="0 0 10.5 10.5"
+              aria-label="Thinking"
+            ></svg>
+            <span class="thinking">Thinking…</span>
           </div>
         </section>
         <section class="card">
-          <h2>Loading · chase</h2>
-          <div class="live">
-            <span data-mark class="mark" role="status" aria-label="Thinking"></span>
-            <span class="thinking">Thinking…</span>
+          <h2>xs · 10px</h2>
+          <div class="stage">
+            <svg class="mark" data-mark width="10" height="10" viewBox="0 0 10.5 10.5"></svg>
           </div>
         </section>
       </div>
 
       <section class="transcript">
-        <span data-mark class="mark sm" aria-hidden="true"></span>
+        <svg
+          class="mark"
+          data-mark
+          width="16"
+          height="16"
+          viewBox="0 0 10.5 10.5"
+          aria-hidden="true"
+        ></svg>
         <span class="thinking">Thinking…</span>
         <span style="margin-left: auto; color: var(--muted); font-size: 12px">transcript 尺寸</span>
-      </section>
-
-      <section class="phases">
-        <h2>固定形状</h2>
-        <div class="phase-grid">
-          <div class="phase">
-            <span data-mark class="mark still" style="--size: 96px"></span>
-            <small>静止构图 · 右下轻偏</small>
-          </div>
-          <div class="phase">
-            <span data-mark class="mark" style="--size: 96px"></span>
-            <small>同一构图 · 追逐</small>
-          </div>
-        </div>
       </section>
 
       <section class="controls">
         <h2>调参</h2>
         <label class="control">
           周期
-          <input id="duration" type="range" min="0.8" max="2.8" step="0.1" value="1.6" />
-          <span id="duration-val">1.6s</span>
-        </label>
-        <label class="control">
-          偏离
-          <input id="kick" type="range" min="0.01" max="0.12" step="0.01" value="0.03" />
-          <span id="kick-val">3%</span>
+          <input id="duration" type="range" min="800" max="2400" step="100" value="1400" />
+          <span id="duration-val">1400ms</span>
         </label>
       </section>
     </main>
 
     <script>
-      const CLUSTERS = [
-        {
-          corner: "nw",
-          cells: [
-            [0, 0],
-            [1, 0],
-            [0, 1],
-            [1, 1],
-          ],
-        },
-        {
-          corner: "ne",
-          cells: [
-            [2, 0],
-            [3, 0],
-            [2, 1],
-            [3, 1],
-          ],
-        },
-        {
-          corner: "sw",
-          cells: [
-            [0, 2],
-            [1, 2],
-            [0, 3],
-            [1, 3],
-          ],
-        },
-        {
-          corner: "se",
-          cells: [
-            [2, 2],
-            [3, 2],
-            [2, 3],
-            [3, 3],
-          ],
-        },
+      const FRAMES = [
+        [0, 1, 0, 1, 1, 1, 1, 0, 1],
+        [1, 1, 1, 1, 0, 1, 1, 1, 1],
+        [0, 1, 0, 1, 1, 1, 0, 1, 0],
+        [1, 0, 1, 0, 1, 0, 1, 0, 1],
+        [1, 1, 1, 0, 1, 0, 1, 1, 1],
+        [1, 0, 1, 1, 1, 1, 1, 0, 1],
+        [1, 1, 0, 1, 1, 0, 1, 1, 1],
+        [0, 1, 1, 0, 1, 1, 1, 1, 1],
       ];
+      const POS = [1.25, 5.25, 9.25];
+
+      function keyframes() {
+        const n = FRAMES.length;
+        const slot = 100 / n;
+        const hold = slot * 0.7;
+        let css = "";
+        for (let d = 0; d < 9; d++) {
+          css += `@keyframes pie-dot-grid-${d + 1}{`;
+          for (let f = 0; f < n; f++) {
+            const start = f * slot;
+            const holdEnd = start + hold;
+            const op = FRAMES[f][d];
+            css += `${start.toFixed(3)}%,${holdEnd.toFixed(3)}%{opacity:${op}}`;
+          }
+          css += `100%{opacity:${FRAMES[0][d]}}}`;
+        }
+        document.getElementById("frames").textContent = css;
+      }
+
+      keyframes();
+
+      const svgDots = POS.flatMap((cy, row) =>
+        POS.map(
+          (cx, col) =>
+            `<circle cx="${cx}" cy="${cy}" r="1.125" style="animation-name:pie-dot-grid-${row * 3 + col + 1}" />`,
+        ),
+      ).join("");
 
       for (const mark of document.querySelectorAll("[data-mark]")) {
-        mark.innerHTML = CLUSTERS.map(
-          ({ corner, cells }) =>
-            `<span class="cluster cluster-${corner}">${cells
-              .map(([x, y]) => `<i class="dot" style="--dot-i:${y * 4 + x}"></i>`)
-              .join("")}</span>`,
-        ).join("");
+        mark.innerHTML = svgDots;
       }
 
       const root = document.documentElement;
       const theme = document.getElementById("theme");
-      const shape = document.getElementById("shape");
       const duration = document.getElementById("duration");
       const durationVal = document.getElementById("duration-val");
-      const kick = document.getElementById("kick");
-      const kickVal = document.getElementById("kick-val");
 
       theme.addEventListener("click", () => {
         const dark = root.getAttribute("data-theme") !== "dark";
@@ -409,21 +297,9 @@
         theme.textContent = dark ? "Light" : "Dark";
       });
 
-      shape.addEventListener("click", () => {
-        const square = shape.getAttribute("aria-pressed") !== "true";
-        shape.setAttribute("aria-pressed", String(square));
-        root.style.setProperty("--dot-radius", square ? "18%" : "999px");
-        shape.textContent = square ? "圆点" : "方块点";
-      });
-
       duration.addEventListener("input", () => {
-        root.style.setProperty("--duration", `${duration.value}s`);
-        durationVal.textContent = `${Number(duration.value).toFixed(1)}s`;
-      });
-
-      kick.addEventListener("input", () => {
-        root.style.setProperty("--kick-ratio", kick.value);
-        kickVal.textContent = `${Math.round(Number(kick.value) * 100)}%`;
+        root.style.setProperty("--duration", `${duration.value}ms`);
+        durationVal.textContent = `${duration.value}ms`;
       });
     </script>
   </body>

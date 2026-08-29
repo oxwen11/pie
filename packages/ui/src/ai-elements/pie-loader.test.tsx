@@ -31,22 +31,26 @@ async function render(ui: ReactElement): Promise<HTMLDivElement> {
 }
 
 describe("PieLoader", () => {
-  it("renders sixteen dots as four pie-mark squares", async () => {
+  it("renders a 3×3 morphing dot grid", async () => {
     const el = await render(<PieLoader />);
     const mark = el.querySelector("[data-slot=pie-loader]");
-    const clusters = el.querySelectorAll("[data-slot=pie-cluster]");
     const dots = el.querySelectorAll("[data-slot=pie-dot]");
 
     expect(mark).not.toBeNull();
     expect(mark?.getAttribute("role")).toBe("status");
     expect(mark?.getAttribute("aria-label")).toBe("Thinking");
-    expect([...clusters].map((cluster) => cluster.dataset.corner)).toEqual([
-      "nw",
-      "ne",
-      "sw",
-      "se",
+    expect(dots).toHaveLength(9);
+    expect([...dots].map((dot) => dot.dataset.dotIndex)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
     ]);
-    expect(dots).toHaveLength(16);
   });
 
   it("merges a caller className last", async () => {
