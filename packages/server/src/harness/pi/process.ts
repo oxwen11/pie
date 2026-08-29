@@ -2,7 +2,7 @@ import type {
   AgentRequest,
   AgentResponse,
   AgentModelState,
-  SessionPendingQueue,
+  SessionPendingPrompt,
 } from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
@@ -74,7 +74,7 @@ type SessionState = {
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
   readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
-  readonly queueUpdates: Queue.Queue<SessionPendingQueue, Cause.Done>;
+  readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
   readonly requestGate: Semaphore.Semaphore;
   readonly turnState: Ref.Ref<PiTurnState>;
@@ -132,7 +132,7 @@ export interface PiProcess {
     /** Pi `queue_update` events — not a transcript chunk. One consumer (the runtime). */
     readonly queueUpdates: (
       sessionId: string,
-    ) => Stream.Stream<SessionPendingQueue, HarnessSessionNotFound>;
+    ) => Stream.Stream<SessionPendingPrompt, HarnessSessionNotFound>;
     readonly awaitTermination: (
       sessionId: string,
     ) => Effect.Effect<never, HarnessSessionNotFound | PiSessionFailure>;
@@ -415,7 +415,7 @@ export const makePiProcessWithDependencies = <R>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
-            queueUpdates: yield* Queue.dropping<SessionPendingQueue, Cause.Done>(
+            queueUpdates: yield* Queue.dropping<SessionPendingPrompt, Cause.Done>(
               SESSION_QUEUE_CAPACITY,
             ),
             pending: yield* Ref.make<ReadonlyMap<string, PendingRequest>>(new Map()),

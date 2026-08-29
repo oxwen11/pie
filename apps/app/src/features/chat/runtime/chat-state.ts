@@ -1,4 +1,4 @@
-import type { SessionPendingQueue } from "@getpie/contract";
+import type { SessionPendingPrompt } from "@getpie/contract";
 import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
@@ -13,7 +13,7 @@ import type { AgentRequest } from "./agent-requests";
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
 
-const emptyPendingPrompt: SessionPendingQueue = { steering: [], followUp: [] };
+const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
 
 // Each Chat owns its own store: messages + status + error + retryNotice +
 // pendingRequests + pendingPrompt.
@@ -25,7 +25,7 @@ export type ChatStoreState = {
   // successful retry must not leave a destructive banner behind.
   retryNotice?: string;
   pendingRequests: AgentRequest[];
-  pendingPrompt: SessionPendingQueue;
+  pendingPrompt: SessionPendingPrompt;
   historyStatus: HistoryStatus;
 };
 
@@ -89,7 +89,7 @@ export class ChatState implements AiChatStateSlice {
     this.store.setState({ retryNotice });
   }
 
-  get pendingPrompt(): SessionPendingQueue {
+  get pendingPrompt(): SessionPendingPrompt {
     return this.store.getState().pendingPrompt;
   }
 
@@ -133,7 +133,7 @@ export class ChatState implements AiChatStateSlice {
     this.store.setState({ pendingRequests: [] });
   };
 
-  setPendingPrompt = (pendingPrompt: SessionPendingQueue) => {
+  setPendingPrompt = (pendingPrompt: SessionPendingPrompt) => {
     this.store.setState({ pendingPrompt });
   };
 

@@ -374,7 +374,7 @@ export type ActivePromptSnapshot = {
 // Pi's in-memory message queue as this server last saw it. Always present
 // (empty arrays when idle). Not persisted — a server restart drops it; a
 // browser refresh hydrates it from the live snapshot while the Pi child lives.
-export type SessionPendingQueue = {
+export type SessionPendingPrompt = {
   readonly steering: ReadonlyArray<string>;
   readonly followUp: ReadonlyArray<string>;
 };
@@ -383,7 +383,7 @@ export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;
   readonly pendingRequests: ReadonlyArray<AgentRequest>;
-  readonly pendingPrompt: SessionPendingQueue;
+  readonly pendingPrompt: SessionPendingPrompt;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.

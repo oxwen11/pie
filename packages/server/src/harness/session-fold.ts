@@ -2,7 +2,7 @@ import type {
   AgentRequest,
   PromptPart,
   SessionMessageChunkEvent,
-  SessionPendingQueue,
+  SessionPendingPrompt,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -80,10 +80,10 @@ export type SessionState = {
   readonly activeTurn: ActiveTurn | null;
   readonly activePrompt: ActivePrompt | null;
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
-  readonly pendingPrompt: SessionPendingQueue;
+  readonly pendingPrompt: SessionPendingPrompt;
 };
 
-const emptyPendingPrompt: SessionPendingQueue = { steering: [], followUp: [] };
+const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
 
 export const initialSessionState: SessionState = {
   seq: 0,
