@@ -1,7 +1,8 @@
 import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Outlet } from "@tanstack/react-router";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
+import * as m from "motion/react-m";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
@@ -34,7 +35,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
         collapsedDesktop && desktop && "border-t-0",
       )}
     >
-      <motion.header
+      <header
         className={cn(
           SHELL_TITLEBAR_HEADER_CLASS,
           "shadow-[inset_0_-1px_0_var(--color-border)] [-webkit-app-region:drag]",
@@ -50,7 +51,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
               <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
             </div>
           ) : null}
-          <motion.div
+          <m.div
             className={SHELL_TITLEBAR_LABEL_CLASS}
             layout={reduceMotion ? false : "position"}
             transition={chromeTransition}
@@ -66,10 +67,10 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
                 {supportingText}
               </span>
             )}
-          </motion.div>
+          </m.div>
         </div>
         <ContentPanelToggle className="ms-auto [-webkit-app-region:no-drag]" />
-      </motion.header>
+      </header>
       {/*
        * Always the Outlet, never a router-state-driven swap: `isLoading` flips
        * on *every* navigation, including a same-route search-param change like

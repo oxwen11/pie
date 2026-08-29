@@ -1,6 +1,7 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { animate, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import * as m from "motion/react-m";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   Group,
@@ -143,13 +144,15 @@ function useSidebarDrawer(
   const expanded = useMotionValue(256);
   const width = useMotionValue(open ? 256 : 0);
   const x = useTransform(() => width.get() - expanded.get());
-  const [minSize, setMinSize] = useState<0 | typeof SIDEBAR_MIN_SIZE>(open ? SIDEBAR_MIN_SIZE : 0);
+  const [inFlight, setInFlight] = useState(false);
   const [prevOpen, setPrevOpen] = useState(open);
 
   if (open !== prevOpen) {
     setPrevOpen(open);
-    setMinSize(0);
+    setInFlight(true);
   }
+
+  const minSize = open && !inFlight ? SIDEBAR_MIN_SIZE : 0;
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -157,14 +160,14 @@ function useSidebarDrawer(
 
     const settle = (): void => {
       flying.current = false;
-      setMinSize(open ? SIDEBAR_MIN_SIZE : 0);
+      setInFlight(false);
     };
 
     if (skip.current) {
       skip.current = false;
       width.jump(open ? expanded.get() : 0);
-      // Spring/drag lifetime — minSize is not an external store.
-      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription
+      // Spring/drag lifetime — inFlight is not a store or a prop mirror.
+      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
       settle();
       return;
     }
@@ -177,7 +180,8 @@ function useSidebarDrawer(
       } else if (!panel.isCollapsed()) {
         panel.collapse();
       }
-      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription
+      // Spring/drag lifetime — inFlight is not a store or a prop mirror.
+      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
       settle();
       return;
     }
@@ -231,7 +235,7 @@ function useSidebarDrawer(
   };
 
   return {
-    fill: open && minSize === SIDEBAR_MIN_SIZE,
+    fill: open && !inFlight,
     minSize,
     onResize,
     style: { width: expanded, x },
@@ -256,7 +260,7 @@ export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactN
       onResize={drawer.onResize}
       panelRef={panelRef}
     >
-      <motion.div
+      <m.div
         className={cn("flex h-full min-h-0 flex-col", drawer.fill ? "w-full" : "shrink-0")}
         data-slot="sidebar-drawer"
         data-state={open ? "open" : "closed"}
@@ -264,7 +268,7 @@ export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactN
         style={drawer.fill ? undefined : drawer.style}
       >
         {children}
-      </motion.div>
+      </m.div>
     </Panel>
   );
 }
