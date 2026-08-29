@@ -1,6 +1,6 @@
 import { LoadingBox } from "@getpie/ui/ai-elements/loading-box";
+import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
-import { Skeleton } from "@getpie/ui/components/skeleton";
 import { useStore } from "zustand";
 
 import {
@@ -22,7 +22,8 @@ import { ModelErrorCard } from "./transcript/model-error-card";
 function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
   if (historyStatus === "loading") {
     return (
-      <LoadingBox>
+      <LoadingBox className="flex items-center gap-2.5">
+        <PieLoader aria-hidden size={16} />
         <Shimmer className="text-sm">Loading earlier messages…</Shimmer>
       </LoadingBox>
     );
@@ -69,13 +70,15 @@ function ChatTranscriptView({
           />
         ))}
         {snapshot.status === "submitted" && (
-          <LoadingBox>
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            className="text-muted-foreground my-2 flex items-center gap-2.5"
+          >
+            <PieLoader aria-hidden />
             <Shimmer className="text-sm">Thinking…</Shimmer>
-            <div className="mt-2.5 flex flex-col gap-1.5" aria-hidden="true">
-              <Skeleton className="h-2.5 w-4/5" />
-              <Skeleton className="h-2.5 w-3/5" />
-            </div>
-          </LoadingBox>
+          </div>
         )}
         {snapshot.retryNotice && (
           <div className="text-muted-foreground text-xs">{snapshot.retryNotice}</div>
