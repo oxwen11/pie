@@ -38,18 +38,26 @@ describe("SessionStatusIndicator", () => {
     expect(spinner?.getAttribute("aria-label")).toBe("A turn is running in this session");
   });
 
-  it("shows an amber dot while waiting for user action", () => {
+  it("shows an accessible amber dot while waiting for user action", () => {
     const node = renderIndicator("requires_action");
-    const dot = node.querySelector<HTMLSpanElement>("span > span");
+    const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
+    const dot = slot?.querySelector<HTMLSpanElement>("span");
+    expect(slot?.getAttribute("role")).toBe("img");
+    expect(slot?.getAttribute("aria-label")).toBe("Waiting for your action");
+    expect(slot?.getAttribute("title")).toBe("Waiting for your action");
     expect(dot?.className).toContain("bg-warning");
-    expect(dot?.getAttribute("title")).toBe("Waiting for your action");
+    expect(dot?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("shows a red dot when the session crashed", () => {
+  it("shows an accessible red dot when the session crashed", () => {
     const node = renderIndicator("crashed");
-    const dot = node.querySelector<HTMLSpanElement>("span > span");
+    const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
+    const dot = slot?.querySelector<HTMLSpanElement>("span");
+    expect(slot?.getAttribute("role")).toBe("img");
+    expect(slot?.getAttribute("aria-label")).toBe("Session crashed");
+    expect(slot?.getAttribute("title")).toBe("Session crashed");
     expect(dot?.className).toContain("bg-destructive");
-    expect(dot?.getAttribute("title")).toBe("Session crashed");
+    expect(dot?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("reserves a fixed slot for idle or missing status", () => {
@@ -57,7 +65,7 @@ describe("SessionStatusIndicator", () => {
       const node = renderIndicator(phase);
       const slot = node.querySelector("span");
       expect(slot?.className).toContain("size-3");
-      expect(slot?.className).toContain("me-2");
+      expect(slot?.className).toContain("shrink-0");
       expect(slot?.querySelector("span")).toBeNull();
     }
   });
