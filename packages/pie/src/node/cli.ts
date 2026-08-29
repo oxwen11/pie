@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import "zod/compile";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {

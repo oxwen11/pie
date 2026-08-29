@@ -339,7 +339,8 @@
         "allow": [
           "**/*.css",
           "@orpc/experimental-effect/extensions/effect",
-          "@orpc/experimental-effect/extensions/input-output"
+          "@orpc/experimental-effect/extensions/input-output",
+          "zod/compile"
         ]
       }
     ],
