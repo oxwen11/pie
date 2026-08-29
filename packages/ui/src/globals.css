@@ -833,13 +833,17 @@
     --dot-grid-dot-16-initial-opacity: 1;
     --dot-grid-animation-duration: 1400ms;
     --dot-grid-animation-delay: -538ms;
+    --dot-grid-kick: 10%;
+    box-sizing: border-box;
     display: inline-grid;
     width: var(--dot-grid-size);
     height: var(--dot-grid-size);
+    padding-inline-end: var(--dot-grid-kick);
+    padding-block-end: var(--dot-grid-kick);
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
     container-type: size;
-    overflow: visible;
+    overflow: clip;
   }
 
   [data-slot="pie-loader"] > [data-slot="pie-dot"] {
