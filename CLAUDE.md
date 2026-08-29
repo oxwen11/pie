@@ -42,6 +42,16 @@ merge-commit / rebase merges in the repo. Squash rewrites the branch tip out
 of `main`'s history, so deleting the local feature branch needs `git branch -D`
 — the changes are already on `main`, so it's safe.
 
+## Cursor Cloud specific instructions
+
+Repo-managed Cloud Agent setup lives in `.cursor/environment.json` and
+overrides any dashboard personal/team environment. `install` is mise (Node
+24 + pnpm from `mise.toml`) then `pnpm install --frozen-lockfile`.
+
+The environment starts two terminals: pie server on `:4180` and Vite on
+`:4190`. Drive `http://localhost:4190/` — not 4180 (built bundle / 503) and
+not 4000 (daemon). See `.agents/skills/verify`.
+
 ## Going deeper
 
 - `CONTEXT.md` — glossary. Read it before naming anything in the session domain;
