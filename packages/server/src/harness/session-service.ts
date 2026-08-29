@@ -1,6 +1,8 @@
 import type {
   AgentModelState,
   AgentResponse,
+  AgentThinkingLevel,
+  AgentThinkingState,
   CreateSessionOutput,
   CreateWorktreeInput,
   PromptInput,
@@ -81,6 +83,7 @@ export type CreatePiSessionInput = {
   readonly projectId: string;
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
+  readonly thinkingLevel?: AgentThinkingLevel;
   readonly worktree?: CreateWorktreeInput;
 };
 
@@ -191,6 +194,33 @@ export type PiAgentSessionServiceShape = {
     | SessionClosed
     | AgentOperationError
   >;
+  readonly getThinkingState: (
+    ref: SessionRef,
+  ) => Effect.Effect<
+    AgentThinkingState,
+    | SessionNotFound
+    | ProjectNotFound
+    | StoreReadError
+    | StoreWriteError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
+  readonly setThinkingLevel: (
+    ref: SessionRef,
+    level: AgentThinkingLevel,
+  ) => Effect.Effect<
+    AgentThinkingState,
+    | SessionNotFound
+    | ProjectNotFound
+    | StoreReadError
+    | StoreWriteError
+    | ResumeSessionError
+    | CapabilityUnsupported
+    | SessionClosed
+    | AgentOperationError
+  >;
   readonly getSessionInfo: (
     ref: SessionRef,
   ) => Effect.Effect<
@@ -249,6 +279,11 @@ export const makePiAgentSessionService = (deps: {
     ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   });
 
+  const thinkingStateFromMetadata = (metadata: Session): AgentThinkingState => ({
+    ...(metadata.thinkingLevel !== undefined ? { level: metadata.thinkingLevel } : undefined),
+    availableLevels: [],
+  });
+
   const ensureCwd = (
     metadata: Session,
   ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | StoreWriteError> =>
@@ -277,6 +312,9 @@ export const makePiAgentSessionService = (deps: {
             cwd: metadata.cwd,
             ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
             ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
+            ...(metadata.thinkingLevel !== undefined
+              ? { thinkingLevel: metadata.thinkingLevel }
+              : undefined),
           },
           ref,
         );
@@ -405,6 +443,9 @@ export const makePiAgentSessionService = (deps: {
                   : undefined),
                 ...(input.model !== undefined
                   ? { provider: input.model.provider, modelId: input.model.modelId }
+                  : undefined),
+                ...(input.thinkingLevel !== undefined
+                  ? { thinkingLevel: input.thinkingLevel }
                   : undefined),
                 archived: false,
               };
@@ -602,7 +643,7 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
-        yield* deliverPrompt(input.ref, userInput).pipe(
+        yield* withMetadataMutation(input.ref, deliverPrompt(input.ref, userInput)).pipe(
           Effect.catch((error: unknown) =>
             reject(error instanceof Error ? error.message : String(error)),
           ),
@@ -665,26 +706,91 @@ export const makePiAgentSessionService = (deps: {
         ref,
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) => {
-            const persistModel = repo.write({
-              ...metadata,
+            const { thinkingLevel: _previousThinkingLevel, ...withoutThinkingLevel } = metadata;
+            const requested = {
+              ...withoutThinkingLevel,
               provider: model.provider,
               modelId: model.modelId,
-            });
+            };
             if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
-              return persistModel.pipe(Effect.as(model satisfies AgentModelState));
+              return repo.write(requested).pipe(Effect.as(model satisfies AgentModelState));
             }
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(
               Effect.flatMap((resolved) =>
-                persistModel.pipe(
-                  Effect.andThen(
-                    withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
-                      runtime.setModel
-                        ? runtime.setModel(model)
-                        : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
-                    ),
-                  ),
+                withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
+                  Effect.gen(function* () {
+                    if (!runtime.setModel) {
+                      return yield* Effect.fail(
+                        new CapabilityUnsupported({ capability: "setModel" }),
+                      );
+                    }
+                    const modelState = yield* runtime.setModel(model);
+                    const thinkingState = runtime.getThinkingState
+                      ? yield* runtime.getThinkingState
+                      : undefined;
+                    return { modelState, thinkingState };
+                  }),
                 ),
+              ),
+              Effect.flatMap(({ modelState, thinkingState }) =>
+                repo
+                  .write({
+                    ...requested,
+                    ...(thinkingState?.level !== undefined
+                      ? { thinkingLevel: thinkingState.level }
+                      : undefined),
+                  })
+                  .pipe(Effect.as(modelState)),
+              ),
+            );
+          }),
+        ),
+      ).pipe(inSession(ref)),
+
+    getThinkingState: (ref) =>
+      readMetadata(ref).pipe(
+        Effect.flatMap((metadata) => {
+          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+            return Effect.succeed(thinkingStateFromMetadata(metadata));
+          }
+          const agentSessionId = metadata.agentSessionId;
+          return ensureCwd(metadata).pipe(
+            Effect.flatMap((resolved) =>
+              withLiveRuntime(
+                ref,
+                agentSessionId,
+                resolved.cwd,
+                (runtime) =>
+                  runtime.getThinkingState ??
+                  Effect.fail(new CapabilityUnsupported({ capability: "getThinkingState" })),
+              ),
+            ),
+          );
+        }),
+        inSession(ref),
+      ),
+
+    setThinkingLevel: (ref, level) =>
+      withMetadataMutation(
+        ref,
+        readMetadata(ref).pipe(
+          Effect.flatMap((metadata) => {
+            const requested = { ...metadata, thinkingLevel: level };
+            if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+              return repo.write(requested).pipe(Effect.as(thinkingStateFromMetadata(requested)));
+            }
+            const agentSessionId = metadata.agentSessionId;
+            return ensureCwd(metadata).pipe(
+              Effect.flatMap((resolved) =>
+                withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
+                  runtime.setThinkingLevel
+                    ? runtime.setThinkingLevel(level)
+                    : Effect.fail(new CapabilityUnsupported({ capability: "setThinkingLevel" })),
+                ),
+              ),
+              Effect.tap((state) =>
+                repo.write({ ...metadata, thinkingLevel: state.level ?? level }),
               ),
             );
           }),

@@ -2,6 +2,7 @@ import { eventIterator, type } from "@orpc/contract";
 
 import {
   AgentModelStateSchema,
+  AgentThinkingStateSchema,
   ArchiveSessionInputSchema,
   CreateSessionInputSchema,
   CreateSessionOutputSchema,
@@ -16,6 +17,7 @@ import {
   ResolveRefInputSchema,
   RespondToAgentRequestInputSchema,
   SetAgentModelInputSchema,
+  SetAgentThinkingLevelInputSchema,
   type SessionMessages,
   SessionRefSchema,
   type SessionRuntimeSnapshot,
@@ -47,6 +49,8 @@ export const sessionContract = {
 
   getModelState: base.input(RefInputSchema).output(AgentModelStateSchema),
   setModel: base.input(SetAgentModelInputSchema).output(AgentModelStateSchema),
+  getThinkingState: base.input(RefInputSchema).output(AgentThinkingStateSchema),
+  setThinkingLevel: base.input(SetAgentThinkingLevelInputSchema).output(AgentThinkingStateSchema),
 
   subscribe: base.input(SubscribeInputSchema).output(eventIterator(type<SubscribeStreamEvent>())),
 };

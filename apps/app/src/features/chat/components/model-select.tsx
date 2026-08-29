@@ -36,11 +36,13 @@ export function ModelSelect({
   models,
   providerId,
   modelId,
+  disabled = false,
   onChange,
 }: {
   models: ReadonlyArray<AgentModel>;
   providerId: string | undefined;
   modelId: string | undefined;
+  disabled?: boolean;
   onChange: (providerId: string, modelId: string) => void;
 }) {
   const filter = useComboboxFilter();
@@ -86,6 +88,7 @@ export function ModelSelect({
   return (
     <Combobox
       autoHighlight
+      disabled={disabled}
       filter={matchesQuery}
       items={groups}
       onValueChange={(option) => {

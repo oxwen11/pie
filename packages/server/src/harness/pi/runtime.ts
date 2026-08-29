@@ -1,4 +1,10 @@
-import type { AgentResponse, AgentModelState, SessionCapabilities } from "@getpie/contract";
+import type {
+  AgentModelState,
+  AgentResponse,
+  AgentThinkingLevel,
+  AgentThinkingState,
+  SessionCapabilities,
+} from "@getpie/contract";
 import { SessionCapabilitiesSchema } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
@@ -75,6 +81,13 @@ export type PiAgentRuntime = {
     readonly provider: string;
     readonly modelId: string;
   }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly getThinkingState?: Effect.Effect<
+    AgentThinkingState,
+    SessionClosed | AgentOperationError
+  >;
+  readonly setThinkingLevel?: (
+    level: AgentThinkingLevel,
+  ) => Effect.Effect<AgentThinkingState, SessionClosed | AgentOperationError>;
   readonly close: Effect.Effect<void>;
 };
 
@@ -273,6 +286,21 @@ export const makePiAgentRuntime = (
             .setModel(sessionId, model)
             .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
         }),
+      getThinkingState: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* process.session
+          .getThinkingState(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "get-thinking-state", cause)));
+      }),
+      setThinkingLevel: (level) =>
+        Effect.gen(function* () {
+          if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          return yield* process.session
+            .setThinkingLevel(sessionId, level)
+            .pipe(
+              Effect.mapError((cause) => operationError(sessionId, "set-thinking-level", cause)),
+            );
+        }),
       close,
     } satisfies PiAgentRuntime;
   });
@@ -286,6 +314,7 @@ export const createPiAgentRuntime = (
       cwd: input.cwd,
       ...(input.provider ? { provider: input.provider } : undefined),
       ...(input.modelId ? { modelId: input.modelId } : undefined),
+      ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel } : undefined),
     })
     .pipe(
       Effect.mapError((cause) => new AgentOpenError({ cause })),
