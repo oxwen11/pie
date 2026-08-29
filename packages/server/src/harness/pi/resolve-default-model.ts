@@ -1,11 +1,8 @@
 import type { AgentModel } from "@getpie/contract";
 
 /**
- * Pi stores the startup default in SettingsManager
- * (`getDefaultProvider` / `getDefaultModel` — `~/.pi/agent/settings.json`,
- * project `.pi/settings.json` can override). `findInitialModel` is not on
- * the package public API; this is the public GET for that store, resolved
- * against the catalogue already built from `ModelRuntime.getAvailable()`.
+ * Pick `listModels.defaultModel`: the SettingsManager pair if it is in the
+ * catalogue, otherwise the first available row.
  */
 export type PiDefaultSettings = {
   readonly getDefaultProvider: () => string | undefined;

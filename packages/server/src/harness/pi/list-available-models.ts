@@ -10,9 +10,8 @@ export type PiModelCatalog = {
 };
 
 /**
- * Cold model catalogue: same source as `pi --list-models` and RPC
- * `get_available_models` (`ModelRuntime.getAvailable()`), without spawning
- * `pi --mode rpc` or opening a live AgentSession.
+ * Available models plus Pi's startup default, from one
+ * `createAgentSessionServices` load. No RPC child.
  */
 export async function listAvailablePiModels(cwd: string): Promise<PiModelCatalog> {
   const services = await createAgentSessionServices({ cwd });

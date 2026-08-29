@@ -78,18 +78,19 @@ function DraftRoute() {
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
-  const pickedProvider = search.provider;
-  const pickedModelId = search.modelId;
-  const hasExplicitPick = pickedProvider !== undefined && pickedModelId !== undefined;
-  const displayProvider = hasExplicitPick ? pickedProvider : defaultModel?.provider;
-  const displayModelId = hasExplicitPick ? pickedModelId : defaultModel?.modelId;
+  const draftModel =
+    search.provider !== undefined && search.modelId !== undefined
+      ? { provider: search.provider, modelId: search.modelId }
+      : defaultModel;
 
   const startSession = useMutation({
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       if (!selected) throw new Error("No project selected");
       const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
-        ...(hasExplicitPick ? { provider: pickedProvider, modelId: pickedModelId } : undefined),
+        ...(draftModel !== undefined
+          ? { provider: draftModel.provider, modelId: draftModel.modelId }
+          : undefined),
         ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
@@ -279,8 +280,8 @@ function DraftRoute() {
               <PromptInputTools>
                 <DraftModelSelect
                   projectId={selected?.id}
-                  providerId={displayProvider}
-                  modelId={displayModelId}
+                  providerId={draftModel?.provider}
+                  modelId={draftModel?.modelId}
                   onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
