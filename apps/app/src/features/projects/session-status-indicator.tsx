@@ -1,9 +1,9 @@
 import type { SessionPhase } from "@getpie/contract";
-import { Spinner } from "@getpie/ui/components/spinner";
+import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 
-const SLOT_CLASS = "me-2 inline-flex size-3 shrink-0 items-center justify-center";
+const SLOT_CLASS = "me-2 inline-flex size-[1em] shrink-0 items-center justify-center";
 
-/** Server-derived session phase before the title; slot width is fixed when idle. */
+/** Server-derived session phase before the title; slot is 1em so it matches the title. */
 export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase | undefined }) {
   switch (phase) {
     case "running":
@@ -14,7 +14,7 @@ export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase
           data-state="loading"
           title="A turn is running in this session"
         >
-          <Spinner className="size-3" aria-label="A turn is running in this session" />
+          <PieLoader aria-label="A turn is running in this session" />
         </span>
       );
     case "requires_action":
