@@ -9,22 +9,29 @@ page), and which parser should own read/write?
 
 - **One file:** `$PIE_HOME/config.toml` — named only in
   `packages/server/src/config/paths.ts` (`configFile`).
-- **`[ui]` namespace:** UI state lives under `ui.*`. v1:
-  - `ui.theme` — operator appearance (`system` | `light` | `dark`). Server
+- **Three owner tables** (T3's three-file split, as namespaces in one TOML
+  document):
+  - `[ui]` — SPA prefs. v1: `ui.theme` (`system` | `light` | `dark`). Server
     owned. CLI `serve` and the desktop renderer call `settings.get` /
     `settings.update`.
-  - `ui.window` — Electron host bounds. Desktop Main reads and writes it
-    **directly** so the window can open before the daemon is up. Not on the
-    RPC `Settings` type; `pie serve` does not interpret it.
-- **Merge on write:** each writer overlays its slice and leaves sibling keys
-  in place. Settings save must not wipe `ui.window`; a window resize must not
-  wipe `ui.theme`. Unknown tables are preserved. Comments are not.
+  - `[desktop]` — Electron host. v1: `desktop.window` (bounds). Desktop Main
+    reads and writes it **directly** so the window can open before the
+    daemon is up. Not on the RPC `Settings` type; `pie serve` does not
+    interpret it. Leftover `ui.window` is read until the next save
+    relocates it.
+  - `[agent]` — pie-owned operator prefs about the agent. No keys in v1; do
+    not write an empty table, and do not proxy Pi's own files through this
+    namespace.
+- **Merge on write:** each writer overlays its slice and leaves sibling
+  tables in place. Settings save must not wipe `desktop.window`; a window
+  resize must not wipe `ui.theme`. Unknown tables are preserved. Comments
+  are not.
 - **Not Electron `userData`:** that directory stays Chromium / instance-lock
   (`Pie` / `Pie Dev/<worktree>`).
 - **Format:** TOML 1.0 via `smol-toml` (`parse` / `stringify`).
 - **Validation:** Effect Schema after parse (`SettingsSchema` in
-  `@getpie/contract` for the operator slice; `DesktopWindowStateSchema` in the
-  desktop shell for `ui.window`).
+  `@getpie/contract` for the `[ui]` RPC slice; `DesktopWindowStateSchema` in
+  the desktop shell for `desktop.window`).
 - **Writes:** header comment + atomic tmp+rename; mode `0600`. Missing file is
   defaults in memory and is not seeded until the first save (Settings page for
   theme; a window move/resize/close for bounds).
@@ -81,16 +88,18 @@ second settings root.
 **What pie copies, what it does not.** Copy the _home_ rule: `$PIE_HOME` is the
 single product directory (`resolvePieHome` in `packages/server/src/config/paths.ts`).
 Do **not** copy T3's three JSON documents. pie keeps one `config.toml` and
-splits _tables_ by owner under `[ui]`:
+splits _tables_ by owner the same way T3 splits files:
 
-| Key         | Owner         | How                                                                |
-| ----------- | ------------- | ------------------------------------------------------------------ |
-| `ui.theme`  | server        | RPC `settings.get` / `settings.update`. Shared by web and desktop. |
-| `ui.window` | Electron Main | Direct file I/O. Not on the wire. `pie serve` ignores it.          |
+| Table / key        | T3 file                 | Owner         | How                                                                |
+| ------------------ | ----------------------- | ------------- | ------------------------------------------------------------------ |
+| `[ui]` `ui.theme`  | `client-settings.json`  | server        | RPC `settings.get` / `settings.update`. Shared by web and desktop. |
+| `[desktop.window]` | `desktop-settings.json` | Electron Main | Direct file I/O. Not on the wire. `pie serve` ignores it.          |
+| `[agent]`          | `settings.json`         | server        | Empty in v1. Pie-owned operator prefs about the agent, not Pi's.   |
 
 T3 keeps theme-like prefs client-local (web `localStorage` vs desktop
 `client-settings.json`). pie does not: appearance follows the operator across
-`pie serve` and the desktop shell.
+`pie serve` and the desktop shell, so `[ui]` is server-owned rather than
+renderer-local.
 
 Electron `userData` (`Pie` / `Pie Dev/<worktree>`) stays Chromium-only.
 
@@ -132,7 +141,7 @@ as `ui.theme` and rewritten under `[ui]` on the next save.
 
 ```text
 $PIE_HOME/
-  config.toml          ← [ui] theme + window
+  config.toml          ← [ui] / [desktop] / [agent]
   storage/projects.json
   storage/sessions/…
   worktrees/…
@@ -142,12 +151,12 @@ $PIE_HOME/
 
 ```toml
 # pie settings. Edit this file or use the Settings page.
-# Saving rewrites the file and does not keep comments.
+# Tables: [ui] SPA, [desktop] host, [agent] operator. Saving does not keep comments.
 
 [ui]
 theme = "system" # system | light | dark
 
-[ui.window]
+[desktop.window]
 width = 1200
 height = 800
 maximized = false
@@ -164,11 +173,15 @@ maximized = false
   in the browser. (T3's web client-settings live in localStorage; pie does not
   follow that for operator settings.)
 - **`$PIE_HOME/Desktop.toml`:** a second file next to `config.toml`. Rejected
-  so UI state stays in one document under `[ui]`. Window restore still happens
-  in Main via direct I/O of `config.toml`, not RPC.
+  so UI, host, and agent state stay in one document under three owner tables.
+  Window restore still happens in Main via direct I/O of `config.toml`, not RPC.
 - **A canonical rewrite of only the operator slice:** that would wipe
-  `ui.window` on Settings save. Merge-on-write is the requirement that makes
-  one file safe.
+  `desktop.window` on Settings save. Merge-on-write is the requirement that
+  makes one file safe.
+- **Putting window bounds under `[ui]`:** the first `config.toml` layout used
+  `ui.window`. Rejected so the three owner tables match T3's three files
+  (`client-settings` → `[ui]`, `desktop-settings` → `[desktop]`, `settings` →
+  `[agent]`). Leftover `ui.window` is still read and relocated on save.
 - **Electron `userData` / electron-store's default `config.json`:** the typical
   Electron Store path. Rejected so host state sits in the product home.
   `userData` remains Chromium / instance-lock only.

@@ -8,15 +8,16 @@ import { Context, Layer } from "effect";
  * so tests can point it at a temp dir instead of `~/.pie`.
  *
  * `projects.json` lives under `storage/` (a data collection).
- * `config.toml` lives at the home root (operator-facing settings under `[ui]`).
- * Desktop Main reads `ui.window` from that file before the daemon is up.
+ * `config.toml` lives at the home root (three owner tables: `[ui]` SPA,
+ * `[desktop]` host, `[agent]` operator). Desktop Main reads `desktop.window`
+ * from that file before the daemon is up.
  */
 export class Paths extends Context.Service<
   Paths,
   {
     readonly home: string;
     readonly projectsFile: string;
-    /** `$PIE_HOME/config.toml` — operator settings, not a storage collection. */
+    /** `$PIE_HOME/config.toml` — `[ui]` / `[desktop]` / `[agent]`, not a storage collection. */
     readonly configFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
@@ -107,7 +108,7 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
   return resolveDaemonLocation(env).daemonDir;
 }
 
-/** `$PIE_HOME/config.toml` — operator settings (`[ui]`). */
+/** `$PIE_HOME/config.toml` — `[ui]` / `[desktop]` / `[agent]`. */
 export const configFilePath = (home: string): string => path.join(home, "config.toml");
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */

@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const SETTINGS_FILE_HEADER = `# pie settings. Edit this file or use the Settings page.
-# Saving rewrites the file and does not keep comments.
+# Tables: [ui] SPA, [desktop] host, [agent] operator. Saving does not keep comments.
 
 `;
 
@@ -19,7 +19,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * decoded operator slice so an older pie can still read a newer file. A
  * present-but-wrong `ui` table is left as-is so schema decode fails instead
  * of silently resetting it. `appearance.theme` is accepted when `ui.theme`
- * is absent (pre-`[ui]` documents).
+ * is absent (pre-`[ui]` documents). `[desktop]` and `[agent]` are not part
+ * of this slice.
  */
 export function overlaySettingsDefaults(raw: unknown) {
   if (!isRecord(raw)) return raw;
@@ -47,15 +48,48 @@ export function decodeSettings(raw: unknown): Settings {
 }
 
 /**
- * Overlay `ui.theme` onto an existing document so sibling keys (`ui.window`,
- * unknown tables) survive a Settings save. Drops the pre-`[ui]` `appearance`
- * table once theme lives under `ui`.
+ * Move leftover `ui.window` onto `desktop.window` when the host table is
+ * absent. Does not overwrite an existing `desktop.window`.
+ */
+function relocateUiWindowToDesktop(document: Record<string, unknown>): void {
+  if (!isRecord(document.ui) || !("window" in document.ui)) {
+    return;
+  }
+  const ui = { ...document.ui };
+  const leftover = ui.window;
+  delete ui.window;
+  if (Object.keys(ui).length === 0) {
+    delete document.ui;
+  } else {
+    document.ui = ui;
+  }
+  if (!isRecord(leftover)) {
+    return;
+  }
+  const desktop: Record<string, unknown> = isRecord(document.desktop)
+    ? { ...document.desktop }
+    : {};
+  document.desktop = desktop;
+  if (!("window" in desktop)) {
+    desktop.window = leftover;
+  }
+}
+
+/**
+ * Overlay `ui.theme` onto an existing document so sibling tables (`[desktop]`,
+ * `[agent]`, unknown keys) survive a Settings save. Relocates leftover
+ * `ui.window` to `desktop.window`. Drops the pre-`[ui]` `appearance` table
+ * once theme lives under `ui`.
  */
 export function assignUiTheme(raw: unknown, theme: Theme): Record<string, unknown> {
   if (isRecord(raw) && raw.ui !== undefined && !isRecord(raw.ui)) {
     throw new Error("ui must be a table");
   }
+  if (isRecord(raw) && raw.desktop !== undefined && !isRecord(raw.desktop)) {
+    throw new Error("desktop must be a table");
+  }
   const document: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
+  relocateUiWindowToDesktop(document);
   const ui: Record<string, unknown> = isRecord(document.ui) ? { ...document.ui } : {};
   ui.theme = theme;
   document.ui = ui;

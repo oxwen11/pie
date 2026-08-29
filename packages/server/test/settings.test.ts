@@ -47,6 +47,8 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       const text = yield* fs.readFileString(saved.path);
       assert.match(text, /\[ui\]/);
       assert.match(text, /theme = "dark"/);
+      assert.doesNotMatch(text, /\[desktop/);
+      assert.doesNotMatch(text, /\[agent/);
 
       const loaded = yield* svc.get();
       assert.deepEqual(loaded.settings, saved.settings);
@@ -101,7 +103,27 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
     }),
   );
 
-  it.effect("leaves ui.window in place when saving theme", () =>
+  it.effect("leaves desktop.window in place when saving theme", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const file = path.join(home, "config.toml");
+      yield* fs.writeFileString(
+        file,
+        '[ui]\ntheme = "system"\n\n[desktop.window]\nwidth = 1400\nheight = 900\nmaximized = false\n',
+      );
+      const svc = yield* serviceIn(home);
+      yield* svc.update({ ui: { theme: "dark" } });
+      const text = yield* fs.readFileString(file);
+      assert.match(text, /theme = "dark"/);
+      assert.match(text, /\[desktop\.window\]/);
+      assert.match(text, /width = 1400/);
+      assert.match(text, /height = 900/);
+      assert.doesNotMatch(text, /\[ui\.window\]/);
+    }),
+  );
+
+  it.effect("relocates leftover ui.window to desktop.window when saving theme", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* tempHome;
@@ -114,8 +136,24 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       yield* svc.update({ ui: { theme: "dark" } });
       const text = yield* fs.readFileString(file);
       assert.match(text, /theme = "dark"/);
+      assert.match(text, /\[desktop\.window\]/);
       assert.match(text, /width = 1400/);
-      assert.match(text, /height = 900/);
+      assert.doesNotMatch(text, /\[ui\.window\]/);
+    }),
+  );
+
+  it.effect("leaves [agent] in place when saving theme", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const file = path.join(home, "config.toml");
+      yield* fs.writeFileString(file, '[ui]\ntheme = "system"\n\n[agent]\nfoo = 1\n');
+      const svc = yield* serviceIn(home);
+      yield* svc.update({ ui: { theme: "dark" } });
+      const text = yield* fs.readFileString(file);
+      assert.match(text, /theme = "dark"/);
+      assert.match(text, /\[agent\]/);
+      assert.match(text, /foo = 1/);
     }),
   );
 

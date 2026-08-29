@@ -6,13 +6,20 @@ import { oc } from "./orpc";
 export const ThemeSchema = Schema.Literals(["system", "light", "dark"]);
 export type Theme = typeof ThemeSchema.Type;
 
-/** Operator UI prefs. Host-only keys such as `ui.window` are not on this wire type. */
+/**
+ * Operator UI prefs (`[ui]`). Host `[desktop]` and operator `[agent]` stay off
+ * this wire type until the Settings page edits a key in those tables.
+ */
 export const SettingsUiSchema = Schema.Struct({
   theme: ThemeSchema,
 });
 export type SettingsUi = typeof SettingsUiSchema.Type;
 
-/** Operator slice of `$PIE_HOME/config.toml` (`[ui]`). */
+/**
+ * Operator slice of `$PIE_HOME/config.toml`. On disk the file has three owner
+ * tables — `[ui]` SPA, `[desktop]` Electron host, `[agent]` operator — but
+ * this RPC type is only the `[ui]` slice the Settings page edits.
+ */
 export const SettingsSchema = Schema.Struct({
   ui: SettingsUiSchema,
 });

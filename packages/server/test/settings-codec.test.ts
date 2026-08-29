@@ -72,7 +72,7 @@ describe("decodeSettings", () => {
 });
 
 describe("assignUiTheme", () => {
-  it("preserves ui.window and drops appearance", () => {
+  it("relocates leftover ui.window to desktop.window and drops appearance", () => {
     expect(
       assignUiTheme(
         {
@@ -82,7 +82,30 @@ describe("assignUiTheme", () => {
         "dark",
       ),
     ).toEqual({
-      ui: { theme: "dark", window: { width: 1400, height: 900, maximized: false } },
+      ui: { theme: "dark" },
+      desktop: { window: { width: 1400, height: 900, maximized: false } },
+    });
+  });
+
+  it("does not overwrite an existing desktop.window", () => {
+    expect(
+      assignUiTheme(
+        {
+          ui: { theme: "system", window: { width: 1, height: 1, maximized: true } },
+          desktop: { window: { width: 1400, height: 900, maximized: false } },
+        },
+        "dark",
+      ),
+    ).toEqual({
+      ui: { theme: "dark" },
+      desktop: { window: { width: 1400, height: 900, maximized: false } },
+    });
+  });
+
+  it("preserves an [agent] table", () => {
+    expect(assignUiTheme({ ui: { theme: "system" }, agent: { foo: 1 } }, "dark")).toEqual({
+      ui: { theme: "dark" },
+      agent: { foo: 1 },
     });
   });
 });
@@ -93,6 +116,7 @@ describe("stringifySettingsToml", () => {
     expect(text.startsWith("# pie settings.")).toBe(true);
     expect(text).toContain("[ui]");
     expect(text).toContain('theme = "dark"');
+    expect(text).toContain("[ui] SPA, [desktop] host, [agent] operator");
     expect(text.endsWith("\n")).toBe(true);
   });
 

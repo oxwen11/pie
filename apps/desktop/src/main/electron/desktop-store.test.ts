@@ -9,7 +9,7 @@ import { describe, expect, it as test } from "vitest";
 
 import {
   DEFAULT_DESKTOP_SETTINGS,
-  assignUiWindow,
+  assignDesktopWindow,
   decodeDesktopSettings,
   isRectVisibleOnWorkArea,
   makeDesktopStore,
@@ -24,7 +24,19 @@ describe("decodeDesktopSettings", () => {
     expect(decodeDesktopSettings(parseDesktopToml(""))).toEqual(DEFAULT_DESKTOP_SETTINGS);
   });
 
-  test("keeps a complete ui.window table", () => {
+  test("keeps a complete desktop.window table", () => {
+    expect(
+      decodeDesktopSettings(
+        parseDesktopToml(
+          "[desktop.window]\nwidth = 1400\nheight = 900\nx = 12\ny = 40\nmaximized = true\n",
+        ),
+      ),
+    ).toEqual({
+      window: { width: 1400, height: 900, x: 12, y: 40, maximized: true },
+    });
+  });
+
+  test("reads leftover ui.window when desktop.window is absent", () => {
     expect(
       decodeDesktopSettings(
         parseDesktopToml(
@@ -36,15 +48,27 @@ describe("decodeDesktopSettings", () => {
     });
   });
 
+  test("prefers desktop.window over leftover ui.window", () => {
+    expect(
+      decodeDesktopSettings(
+        parseDesktopToml(
+          "[desktop.window]\nwidth = 1400\nheight = 900\nmaximized = false\n\n[ui.window]\nwidth = 800\nheight = 600\nmaximized = true\n",
+        ),
+      ),
+    ).toEqual({
+      window: { width: 1400, height: 900, maximized: false },
+    });
+  });
+
   test("uses the default size when the stored size is below the minimum", () => {
     expect(
-      decodeDesktopSettings(parseDesktopToml("[ui.window]\nwidth = 100\nheight = 100\n")),
+      decodeDesktopSettings(parseDesktopToml("[desktop.window]\nwidth = 100\nheight = 100\n")),
     ).toEqual(DEFAULT_DESKTOP_SETTINGS);
   });
 
   test("rejects a present-but-wrong maximized value", () => {
     expect(() =>
-      decodeDesktopSettings(parseDesktopToml('[ui.window]\nmaximized = "yes"\n')),
+      decodeDesktopSettings(parseDesktopToml('[desktop.window]\nmaximized = "yes"\n')),
     ).toThrow(/boolean|maximized/i);
   });
 });
@@ -52,18 +76,31 @@ describe("decodeDesktopSettings", () => {
 describe("stringifyDesktopToml", () => {
   test("omits unset coordinates", () => {
     const text = stringifyDesktopToml(DEFAULT_DESKTOP_SETTINGS);
-    expect(text).toMatch(/\[ui\.window\]/);
+    expect(text).toMatch(/\[desktop\.window\]/);
     expect(text).toMatch(/width = 1200/);
     expect(text).not.toMatch(/\bx = /);
     expect(text).not.toMatch(/\by = /);
+    expect(text).not.toMatch(/\[ui\.window\]/);
   });
 });
 
-describe("assignUiWindow", () => {
-  test("preserves ui.theme", () => {
-    expect(assignUiWindow({ ui: { theme: "dark" } }, DEFAULT_DESKTOP_SETTINGS.window)).toEqual({
-      ui: {
-        theme: "dark",
+describe("assignDesktopWindow", () => {
+  test("preserves ui.theme and strips leftover ui.window", () => {
+    expect(
+      assignDesktopWindow(
+        {
+          ui: {
+            theme: "dark",
+            window: { width: 800, height: 600, maximized: true },
+          },
+          agent: { foo: 1 },
+        },
+        DEFAULT_DESKTOP_SETTINGS.window,
+      ),
+    ).toEqual({
+      ui: { theme: "dark" },
+      agent: { foo: 1 },
+      desktop: {
         window: { width: 1200, height: 800, maximized: false },
       },
     });
@@ -127,7 +164,7 @@ layer(platform)("makeDesktopStore", (it) => {
     }),
   );
 
-  it.effect("writes ui.window on the first window save and reads it back", () =>
+  it.effect("writes desktop.window on the first window save and reads it back", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
@@ -136,9 +173,10 @@ layer(platform)("makeDesktopStore", (it) => {
       const window = { width: 1400, height: 900, x: 24, y: 48, maximized: false };
       yield* store.setWindow(window);
       const text = yield* fs.readFileString(file);
-      assert.match(text, /\[ui\.window\]/);
+      assert.match(text, /\[desktop\.window\]/);
       assert.match(text, /width = 1400/);
       assert.match(text, /x = 24/);
+      assert.doesNotMatch(text, /\[ui\.window\]/);
       assert.deepEqual((yield* store.get).window, window);
     }),
   );
@@ -153,7 +191,28 @@ layer(platform)("makeDesktopStore", (it) => {
       yield* store.setWindow({ width: 1400, height: 900, maximized: false });
       const text = yield* fs.readFileString(file);
       assert.match(text, /theme = "dark"/);
+      assert.match(text, /\[desktop\.window\]/);
       assert.match(text, /width = 1400/);
+      assert.doesNotMatch(text, /\[ui\.window\]/);
+    }),
+  );
+
+  it.effect("relocates leftover ui.window on the next window save", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
+      const file = path.join(home, "config.toml");
+      yield* fs.writeFileString(
+        file,
+        '[ui]\ntheme = "dark"\n\n[ui.window]\nwidth = 1000\nheight = 700\nmaximized = false\n',
+      );
+      const store = yield* makeDesktopStore(file);
+      yield* store.setWindow({ width: 1400, height: 900, maximized: false });
+      const text = yield* fs.readFileString(file);
+      assert.match(text, /theme = "dark"/);
+      assert.match(text, /\[desktop\.window\]/);
+      assert.match(text, /width = 1400/);
+      assert.doesNotMatch(text, /\[ui\.window\]/);
     }),
   );
 

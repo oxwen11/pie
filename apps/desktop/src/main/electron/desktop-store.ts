@@ -13,7 +13,7 @@ export const DESKTOP_CONFIG_FILE_MODE = 0o600;
 
 /** Keep in sync with `SETTINGS_FILE_HEADER` in `packages/server/src/settings/codec.ts`. */
 export const DESKTOP_CONFIG_FILE_HEADER = `# pie settings. Edit this file or use the Settings page.
-# Saving rewrites the file and does not keep comments.
+# Tables: [ui] SPA, [desktop] host, [agent] operator. Saving does not keep comments.
 
 `;
 
@@ -62,12 +62,26 @@ type OverlayWindow = {
   maximized: unknown;
 };
 
+function windowTableFromConfig(raw: Record<string, unknown>) {
+  const desktop = isRecord(raw.desktop) ? raw.desktop : {};
+  if ("window" in desktop) {
+    return desktop.window;
+  }
+  const ui = isRecord(raw.ui) ? raw.ui : {};
+  if ("window" in ui) {
+    return ui.window;
+  }
+  return {};
+}
+
 function overlayWindowDefaults(raw: unknown) {
   if (!isRecord(raw)) return raw;
+  if (raw.desktop !== undefined && !isRecord(raw.desktop)) return raw;
   if (raw.ui !== undefined && !isRecord(raw.ui)) return raw;
-  const ui = isRecord(raw.ui) ? raw.ui : {};
-  if (ui.window !== undefined && !isRecord(ui.window)) return raw;
-  const window = isRecord(ui.window) ? ui.window : {};
+
+  const windowRaw = windowTableFromConfig(raw);
+  if (windowRaw !== undefined && !isRecord(windowRaw)) return raw;
+  const window = isRecord(windowRaw) ? windowRaw : {};
 
   const overlaySize = (key: "width" | "height", fallback: number, min: number) => {
     if (!(key in window)) return fallback;
@@ -116,22 +130,40 @@ function windowForToml(window: DesktopWindowState): TomlWindow {
 }
 
 /**
- * Overlay `ui.window` onto an existing document so sibling keys (`ui.theme`,
- * unknown tables) survive a window save.
+ * Overlay `desktop.window` onto an existing document so sibling tables
+ * (`[ui]`, `[agent]`, unknown keys) survive a window save. Strips leftover
+ * `ui.window`.
  */
-export function assignUiWindow(raw: unknown, window: DesktopWindowState): Record<string, unknown> {
+export function assignDesktopWindow(
+  raw: unknown,
+  window: DesktopWindowState,
+): Record<string, unknown> {
+  if (isRecord(raw) && raw.desktop !== undefined && !isRecord(raw.desktop)) {
+    throw new Error("desktop must be a table");
+  }
   if (isRecord(raw) && raw.ui !== undefined && !isRecord(raw.ui)) {
     throw new Error("ui must be a table");
   }
   const document: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
-  const ui: Record<string, unknown> = isRecord(document.ui) ? { ...document.ui } : {};
-  ui.window = windowForToml(window);
-  document.ui = ui;
+  const desktop: Record<string, unknown> = isRecord(document.desktop)
+    ? { ...document.desktop }
+    : {};
+  desktop.window = windowForToml(window);
+  document.desktop = desktop;
+  if (isRecord(document.ui)) {
+    const ui = { ...document.ui };
+    delete ui.window;
+    if (Object.keys(ui).length === 0) {
+      delete document.ui;
+    } else {
+      document.ui = ui;
+    }
+  }
   return document;
 }
 
 export function stringifyDesktopToml(settings: DesktopSettings): string {
-  return stringifyConfigToml(assignUiWindow({}, settings.window));
+  return stringifyConfigToml(assignDesktopWindow({}, settings.window));
 }
 
 function stringifyConfigToml(document: unknown): string {
@@ -186,11 +218,12 @@ export type DesktopStore = {
 };
 
 /**
- * Read/write `$PIE_HOME/config.toml` `[ui.window]`. Methods are R-free:
+ * Read/write `$PIE_HOME/config.toml` `[desktop.window]`. Methods are R-free:
  * FileSystem is bound at construction so Electron event handlers can
  * `Effect.runFork` them. A missing or corrupt file is defaults in memory
  * and is not rewritten until the next successful save — a bad file must
- * not block the window. Writes merge `ui.window` and leave sibling keys.
+ * not block the window. Writes merge `desktop.window` and leave sibling
+ * tables. Leftover `ui.window` is read until the next save relocates it.
  */
 export function makeDesktopStore(
   file: string,
@@ -227,7 +260,7 @@ export function makeDesktopStore(
       readExisting.pipe(
         Effect.flatMap((text) =>
           Effect.try({
-            try: () => stringifyConfigToml(assignUiWindow(parseDesktopToml(text), window)),
+            try: () => stringifyConfigToml(assignDesktopWindow(parseDesktopToml(text), window)),
             catch: (cause) => cause,
           }),
         ),
