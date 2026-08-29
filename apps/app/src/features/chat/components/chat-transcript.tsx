@@ -23,7 +23,7 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
   if (historyStatus === "loading") {
     return (
       <LoadingBox className="flex items-center gap-2.5">
-        <PieLoader aria-hidden size={16} />
+        <PieLoader aria-hidden />
         <Shimmer className="text-sm">Loading earlier messages…</Shimmer>
       </LoadingBox>
     );

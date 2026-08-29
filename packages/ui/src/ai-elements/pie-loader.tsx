@@ -8,14 +8,16 @@ const CORNERS = [
   { corner: "se", animation: "animate-pie-dot-se" },
 ] as const;
 
+const DOTS = [0, 1, 2, 3] as const;
+
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
-  /** Outer mark size, including room for the kicked-out dot. */
+  /** Outer mark size, including room for the kicked-out square. */
   size?: number;
 };
 
-/** Four dots in the pie-mark layout: one corner stays offset, cycling SE → NE → NW → SW. */
-export function PieLoader({ className, size = 20, style, ...props }: PieLoaderProps) {
-  const kick = size * 0.16;
+/** Four 2×2 dot squares in the pie-mark layout. One square stays offset, cycling SE → NE → NW → SW. */
+export function PieLoader({ className, size = 24, style, ...props }: PieLoaderProps) {
+  const kick = size * 0.12;
   const hidden = props["aria-hidden"] === true || props["aria-hidden"] === "true";
   return (
     <span
@@ -28,7 +30,7 @@ export function PieLoader({ className, size = 20, style, ...props }: PieLoaderPr
         {
           width: size,
           height: size,
-          gap: size * 0.1,
+          gap: size * 0.08,
           padding: kick,
           "--pie-kick": `${kick}px`,
           ...style,
@@ -40,14 +42,19 @@ export function PieLoader({ className, size = 20, style, ...props }: PieLoaderPr
         <span
           key={corner}
           aria-hidden
-          data-slot="pie-dot"
+          data-slot="pie-cluster"
           data-corner={corner}
           className={cn(
-            "size-full rounded-full bg-current motion-reduce:animate-none",
+            "grid size-full grid-cols-2 grid-rows-2 motion-reduce:animate-none",
             animation,
             corner === "se" && "motion-reduce:[translate:var(--pie-kick)_var(--pie-kick)]",
           )}
-        />
+          style={{ gap: Math.max(1, size * 0.04) }}
+        >
+          {DOTS.map((dot) => (
+            <span key={dot} data-slot="pie-dot" className="size-full rounded-full bg-current" />
+          ))}
+        </span>
       ))}
     </span>
   );

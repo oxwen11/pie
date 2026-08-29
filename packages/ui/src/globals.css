@@ -61,7 +61,7 @@
       background-position: -200% 0;
     }
   }
-  /* Pie mark: one of four dots is kicked out; the kick walks the four corners. */
+  /* Pie mark: one of four 2×2 dot squares is kicked out; the kick walks the corners. */
   --animate-pie-dot-se: pie-dot-se 1.6s infinite both;
   --animate-pie-dot-ne: pie-dot-ne 1.6s infinite both;
   --animate-pie-dot-nw: pie-dot-nw 1.6s infinite both;

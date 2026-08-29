@@ -12,7 +12,7 @@
         --bg: #f7f7f6;
         --card: #fff;
         --duration: 1.6s;
-        --kick-ratio: 0.16;
+        --kick-ratio: 0.12;
         --dot-radius: 999px;
       }
 
@@ -71,8 +71,7 @@
         gap: 8px;
       }
 
-      button,
-      label.chip {
+      button {
         appearance: none;
         border: 1px solid var(--line);
         background: var(--card);
@@ -84,21 +83,10 @@
         cursor: pointer;
       }
 
-      button[aria-pressed="true"],
-      label.chip:has(input:checked) {
+      button[aria-pressed="true"] {
         background: var(--fg);
         color: var(--bg);
         border-color: transparent;
-      }
-
-      label.chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      label.chip input {
-        accent-color: currentColor;
       }
 
       .hero {
@@ -154,7 +142,6 @@
 
       .thinking {
         font-size: 20px;
-        color: var(--muted);
         background: linear-gradient(
           90deg,
           color-mix(in srgb, var(--muted) 70%, var(--fg)) 20%,
@@ -236,13 +223,37 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-template-rows: 1fr 1fr;
-        gap: calc(var(--size) * 0.1);
+        gap: calc(var(--size) * 0.08);
         padding: var(--kick);
         color: var(--fg);
       }
 
       .mark.sm {
-        --size: 20px;
+        --size: 24px;
+      }
+
+      .cluster {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: calc(var(--size) * 0.03);
+        animation-duration: var(--duration);
+        animation-iteration-count: infinite;
+        animation-fill-mode: both;
+        animation-delay: var(--anim-delay, 0s);
+      }
+
+      .cluster-se {
+        animation-name: pie-dot-se;
+      }
+      .cluster-ne {
+        animation-name: pie-dot-ne;
+      }
+      .cluster-nw {
+        animation-name: pie-dot-nw;
+      }
+      .cluster-sw {
+        animation-name: pie-dot-sw;
       }
 
       .dot {
@@ -250,26 +261,9 @@
         height: 100%;
         border-radius: var(--dot-radius);
         background: currentColor;
-        animation-duration: var(--duration);
-        animation-iteration-count: infinite;
-        animation-fill-mode: both;
-        animation-delay: var(--anim-delay, 0s);
       }
 
-      .dot-se {
-        animation-name: pie-dot-se;
-      }
-      .dot-ne {
-        animation-name: pie-dot-ne;
-      }
-      .dot-nw {
-        animation-name: pie-dot-nw;
-      }
-      .dot-sw {
-        animation-name: pie-dot-sw;
-      }
-
-      .paused .dot {
+      .paused .cluster {
         animation-play-state: paused;
       }
 
@@ -333,7 +327,7 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            Logo 是四个方块，右下角偏出去一点。Loading 用四个点表示同一构图，偏离的那个点按 SE → NE
+            Logo 四个方块，右下角偏出去。每个方块用 2×2 个点表示（共 16 点），偏离的那一块按 SE → NE
             → NW → SW 切换。
           </p>
         </div>
@@ -355,26 +349,16 @@
           </div>
         </section>
         <section class="card">
-          <h2>Loading</h2>
+          <h2>Loading · 16 dots</h2>
           <div class="live">
-            <span class="mark" role="status" aria-label="Thinking">
-              <i class="dot dot-nw"></i>
-              <i class="dot dot-ne"></i>
-              <i class="dot dot-sw"></i>
-              <i class="dot dot-se"></i>
-            </span>
+            <span data-mark class="mark" role="status" aria-label="Thinking"></span>
             <span class="thinking">Thinking…</span>
           </div>
         </section>
       </div>
 
       <section class="transcript">
-        <span class="mark sm" aria-hidden="true">
-          <i class="dot dot-nw"></i>
-          <i class="dot dot-ne"></i>
-          <i class="dot dot-sw"></i>
-          <i class="dot dot-se"></i>
-        </span>
+        <span data-mark class="mark sm" aria-hidden="true"></span>
         <span class="thinking">Thinking…</span>
         <span style="margin-left: auto; color: var(--muted); font-size: 12px">transcript 尺寸</span>
       </section>
@@ -383,39 +367,19 @@
         <h2>四个方向 · 定格</h2>
         <div class="phase-grid">
           <div class="phase paused" style="--anim-delay: 0s">
-            <span class="mark" style="--size: 88px">
-              <i class="dot dot-nw"></i>
-              <i class="dot dot-ne"></i>
-              <i class="dot dot-sw"></i>
-              <i class="dot dot-se"></i>
-            </span>
+            <span data-mark class="mark" style="--size: 88px"></span>
             <small>SE · logo 静止态</small>
           </div>
           <div class="phase paused" style="--anim-delay: -0.4s">
-            <span class="mark" style="--size: 88px">
-              <i class="dot dot-nw"></i>
-              <i class="dot dot-ne"></i>
-              <i class="dot dot-sw"></i>
-              <i class="dot dot-se"></i>
-            </span>
+            <span data-mark class="mark" style="--size: 88px"></span>
             <small>NE</small>
           </div>
           <div class="phase paused" style="--anim-delay: -0.8s">
-            <span class="mark" style="--size: 88px">
-              <i class="dot dot-nw"></i>
-              <i class="dot dot-ne"></i>
-              <i class="dot dot-sw"></i>
-              <i class="dot dot-se"></i>
-            </span>
+            <span data-mark class="mark" style="--size: 88px"></span>
             <small>NW</small>
           </div>
           <div class="phase paused" style="--anim-delay: -1.2s">
-            <span class="mark" style="--size: 88px">
-              <i class="dot dot-nw"></i>
-              <i class="dot dot-ne"></i>
-              <i class="dot dot-sw"></i>
-              <i class="dot dot-se"></i>
-            </span>
+            <span data-mark class="mark" style="--size: 88px"></span>
             <small>SW</small>
           </div>
         </div>
@@ -430,13 +394,22 @@
         </label>
         <label class="control">
           偏离
-          <input id="kick" type="range" min="0.08" max="0.32" step="0.01" value="0.16" />
-          <span id="kick-val">16%</span>
+          <input id="kick" type="range" min="0.06" max="0.28" step="0.01" value="0.12" />
+          <span id="kick-val">12%</span>
         </label>
       </section>
     </main>
 
     <script>
+      const CORNERS = ["nw", "ne", "sw", "se"];
+
+      for (const mark of document.querySelectorAll("[data-mark]")) {
+        mark.innerHTML = CORNERS.map(
+          (corner) =>
+            `<span class="cluster cluster-${corner}">${"<i class='dot'></i>".repeat(4)}</span>`,
+        ).join("");
+      }
+
       const root = document.documentElement;
       const theme = document.getElementById("theme");
       const shape = document.getElementById("shape");
