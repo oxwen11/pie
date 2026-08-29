@@ -3,6 +3,8 @@ import module from "node:module";
 import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
+import { noRestrictedDisable } from "./no-restricted-disable.ts";
+
 const { isBuiltin } = module;
 
 // Enforces the repo convention for Node builtin imports:
@@ -101,5 +103,6 @@ export default definePlugin({
   meta: { name: "pie" },
   rules: {
     "node-import-style": nodeImportStyleRule,
+    "no-restricted-disable": noRestrictedDisable,
   },
 });
