@@ -1,4 +1,4 @@
-import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import type { Project, SessionSummary } from "@getpie/contract";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -11,7 +11,7 @@ import {
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
@@ -32,16 +32,7 @@ const selectNewestFirst = (
  * panel is open (two icon entities, not a rotation). This component owns only
  * grouping and fetching; each row composes its own navigation and actions.
  */
-export function ProjectSessionsGroup({
-  automationSessionIds,
-  isSessionActive,
-  project,
-}: {
-  readonly automationSessionIds: ReadonlySet<string>;
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly project: Project;
-}) {
-  const navigate = useNavigate();
+export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
@@ -71,13 +62,7 @@ export function ProjectSessionsGroup({
         </SidebarGroupLabel>
         <SidebarGroupAction
           className="top-1 right-1"
-          onClick={() => {
-            navigate({ to: "/draft", search: { projectId: project.id } }).catch(
-              (error: unknown) => {
-                console.error("Failed to start a draft chat", error);
-              },
-            );
-          }}
+          render={<Link to="/draft" search={{ projectId: project.id }} />}
           title={`New chat in ${project.name}`}
         >
           <SquarePen />
@@ -90,13 +75,7 @@ export function ProjectSessionsGroup({
           <SidebarGroupContent>
             <SidebarMenu>
               {rows.map((session) => (
-                <ProjectSessionRow
-                  key={session.sessionId}
-                  active={isSessionActive(session)}
-                  createdByAutomation={automationSessionIds.has(session.sessionId)}
-                  isActive={() => isSessionActive(session)}
-                  session={session}
-                />
+                <ProjectSessionRow key={session.sessionId} session={session} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

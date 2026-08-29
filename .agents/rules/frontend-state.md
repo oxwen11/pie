@@ -32,9 +32,11 @@ for per-agent tool rendering.
 - **Only composition roots may combine features**: `routes/`,
   `app-interface.tsx`, and the app shell in `components/layout/`. Those four
   files are the whole allow-list today. `routes/__root.tsx` is the shell's one
-  route-identity seam: it reads the authoritative session-route loader ref and
-  composes the project sidebar, card heading, and `ContentPanelSessionProvider`
-  binding from it. `AppShell` owns `SidebarProvider`, its viewport wrapper, and
+  route-identity seam for the card: it reads the authoritative session-route
+  loader ref and binds the card heading and `ContentPanelSessionProvider`.
+  Sidebar modules (`AppSidebar` and the project/automation entries it composes)
+  read the route and navigate themselves — do not thread route callbacks or
+  active flags into them. `AppShell` owns `SidebarProvider`, its viewport wrapper, and
   sidebar persistence because those are shell implementation details; the
   session-bound content provider is composed beneath it around `AppShellBody`.
   The body stays structural through `AppShellSidebar`/`AppShellMain` children;

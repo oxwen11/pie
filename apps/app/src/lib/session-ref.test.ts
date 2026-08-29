@@ -1,7 +1,7 @@
 import type { SessionRef } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
-import { sameSessionRef, sessionRefKey } from "./session-ref";
+import { sameSessionRef, sessionRefFromRouterMatches, sessionRefKey } from "./session-ref";
 
 const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "11111111-1111-4111-8111-111111111111",
@@ -24,5 +24,15 @@ describe("SessionRef identity", () => {
     expect(sessionRefKey(ref())).not.toBe(
       sessionRefKey(ref({ projectId: "22222222-2222-4222-8222-222222222222" })),
     );
+  });
+
+  it("reads the session-route loader ref from router matches", () => {
+    expect(
+      sessionRefFromRouterMatches([
+        { routeId: "__root__" },
+        { routeId: "/session/$sessionId", loaderData: { ref: ref() } },
+      ]),
+    ).toEqual(ref());
+    expect(sessionRefFromRouterMatches([{ routeId: "/draft" }])).toBeUndefined();
   });
 });

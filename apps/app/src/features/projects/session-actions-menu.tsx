@@ -2,23 +2,19 @@ import type { SessionSummary } from "@getpie/contract";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
+import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 /** Session mutations live behind one actions-menu capability boundary. */
-export function SessionActionsMenu({
-  isActive,
-  session,
-}: {
-  readonly isActive: () => boolean;
-  readonly session: SessionSummary;
-}) {
+export function SessionActionsMenu({ session }: { readonly session: SessionSummary }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
   const title = session.title ?? "New chat";
@@ -42,7 +38,7 @@ export function SessionActionsMenu({
         queryClient.invalidateQueries({ queryKey: listKey(true) }),
       ]);
 
-      if (archived && isActive()) {
+      if (archived && sameSessionRef(session, sessionRefFromRouterMatches(router.state.matches))) {
         return Promise.all([
           refreshLists,
           navigate({ to: "/draft", search: { projectId: session.projectId } }),
