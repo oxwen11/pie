@@ -32,7 +32,7 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       const loaded = yield* svc.get();
 
       assert.equal(loaded.path, path.join(home, "config.toml"));
-      assert.deepEqual(loaded.settings, { appearance: { theme: "system" } });
+      assert.deepEqual(loaded.settings, { ui: { theme: "system" } });
       assert.equal(yield* fs.exists(loaded.path), false);
     }),
   );
@@ -41,10 +41,11 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const svc = yield* settings;
-      const saved = yield* svc.update({ appearance: { theme: "dark" } });
-      assert.deepEqual(saved.settings.appearance.theme, "dark");
+      const saved = yield* svc.update({ ui: { theme: "dark" } });
+      assert.deepEqual(saved.settings.ui.theme, "dark");
 
       const text = yield* fs.readFileString(saved.path);
+      assert.match(text, /\[ui\]/);
       assert.match(text, /theme = "dark"/);
 
       const loaded = yield* svc.get();
@@ -57,9 +58,24 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* tempHome;
       const file = path.join(home, "config.toml");
-      yield* fs.writeFileString(file, "[appearance]\n");
+      yield* fs.writeFileString(file, "[ui]\n");
       const svc = yield* serviceIn(home);
-      assert.deepEqual((yield* svc.get()).settings, { appearance: { theme: "system" } });
+      assert.deepEqual((yield* svc.get()).settings, { ui: { theme: "system" } });
+    }),
+  );
+
+  it.effect("reads a pre-[ui] appearance table as ui.theme", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const file = path.join(home, "config.toml");
+      yield* fs.writeFileString(file, '[appearance]\ntheme = "light"\n');
+      const svc = yield* serviceIn(home);
+      assert.equal((yield* svc.get()).settings.ui.theme, "light");
+      yield* svc.update({ ui: { theme: "dark" } });
+      const text = yield* fs.readFileString(file);
+      assert.match(text, /\[ui\]/);
+      assert.doesNotMatch(text, /\[appearance\]/);
     }),
   );
 
@@ -78,23 +94,28 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* tempHome;
-      yield* fs.writeFileString(path.join(home, "config.toml"), '[appearance]\ntheme = "sepia"\n');
+      yield* fs.writeFileString(path.join(home, "config.toml"), '[ui]\ntheme = "sepia"\n');
       const svc = yield* serviceIn(home);
       const error = yield* Effect.flip(svc.get());
       assert.equal(error._tag, "SettingsDecodeError");
     }),
   );
 
-  it.effect("leaves Desktop.toml alone when saving operator settings", () =>
+  it.effect("leaves ui.window in place when saving theme", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* tempHome;
-      const desktopFile = path.join(home, "Desktop.toml");
-      const desktop = "[window]\nwidth = 1400\nheight = 900\nmaximized = false\n";
-      yield* fs.writeFileString(desktopFile, desktop);
+      const file = path.join(home, "config.toml");
+      yield* fs.writeFileString(
+        file,
+        '[ui]\ntheme = "system"\n\n[ui.window]\nwidth = 1400\nheight = 900\nmaximized = false\n',
+      );
       const svc = yield* serviceIn(home);
-      yield* svc.update({ appearance: { theme: "dark" } });
-      assert.equal(yield* fs.readFileString(desktopFile), desktop);
+      yield* svc.update({ ui: { theme: "dark" } });
+      const text = yield* fs.readFileString(file);
+      assert.match(text, /theme = "dark"/);
+      assert.match(text, /width = 1400/);
+      assert.match(text, /height = 900/);
     }),
   );
 
@@ -107,8 +128,8 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       const svc = yield* serviceIn(home);
       assert.equal((yield* Effect.flip(svc.get()))._tag, "SettingsParseError");
 
-      yield* fs.writeFileString(file, '[appearance]\ntheme = "light"\n');
-      assert.equal((yield* svc.get()).settings.appearance.theme, "light");
+      yield* fs.writeFileString(file, '[ui]\ntheme = "light"\n');
+      assert.equal((yield* svc.get()).settings.ui.theme, "light");
     }),
   );
 });

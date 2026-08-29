@@ -1,6 +1,6 @@
 export {
   type DaemonLocation,
-  desktopConfigFilePath,
+  configFilePath,
   resolveDaemonDirectory,
   resolveDaemonLocation,
   resolvePieHome,

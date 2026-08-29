@@ -18,7 +18,10 @@ export class SettingsService extends Context.Service<
     >;
     readonly update: (
       settings: Settings,
-    ) => Effect.Effect<GetSettingsOutput, StoreWriteError | SettingsDecodeError>;
+    ) => Effect.Effect<
+      GetSettingsOutput,
+      StoreReadError | StoreWriteError | SettingsParseError | SettingsDecodeError
+    >;
   }
 >()("SettingsService") {}
 

@@ -11,8 +11,9 @@ export const DEFAULT_WINDOW_HEIGHT = 800;
 /** Owner-only, matching `$PIE_HOME/config.toml`. */
 export const DESKTOP_CONFIG_FILE_MODE = 0o600;
 
-export const DESKTOP_CONFIG_FILE_HEADER = `# pie desktop host settings. Not used by pie serve.
-# Saving from the desktop shell rewrites the file and does not keep comments.
+/** Keep in sync with `SETTINGS_FILE_HEADER` in `packages/server/src/settings/codec.ts`. */
+export const DESKTOP_CONFIG_FILE_HEADER = `# pie settings. Edit this file or use the Settings page.
+# Saving rewrites the file and does not keep comments.
 
 `;
 
@@ -63,8 +64,10 @@ type OverlayWindow = {
 
 function overlayWindowDefaults(raw: unknown) {
   if (!isRecord(raw)) return raw;
-  if (raw.window !== undefined && !isRecord(raw.window)) return raw;
-  const window = isRecord(raw.window) ? raw.window : {};
+  if (raw.ui !== undefined && !isRecord(raw.ui)) return raw;
+  const ui = isRecord(raw.ui) ? raw.ui : {};
+  if (ui.window !== undefined && !isRecord(ui.window)) return raw;
+  const window = isRecord(ui.window) ? ui.window : {};
 
   const overlaySize = (key: "width" | "height", fallback: number, min: number) => {
     if (!(key in window)) return fallback;
@@ -112,8 +115,27 @@ function windowForToml(window: DesktopWindowState): TomlWindow {
   return document;
 }
 
+/**
+ * Overlay `ui.window` onto an existing document so sibling keys (`ui.theme`,
+ * unknown tables) survive a window save.
+ */
+export function assignUiWindow(raw: unknown, window: DesktopWindowState): Record<string, unknown> {
+  if (isRecord(raw) && raw.ui !== undefined && !isRecord(raw.ui)) {
+    throw new Error("ui must be a table");
+  }
+  const document: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
+  const ui: Record<string, unknown> = isRecord(document.ui) ? { ...document.ui } : {};
+  ui.window = windowForToml(window);
+  document.ui = ui;
+  return document;
+}
+
 export function stringifyDesktopToml(settings: DesktopSettings): string {
-  const body = stringify({ window: windowForToml(settings.window) });
+  return stringifyConfigToml(assignUiWindow({}, settings.window));
+}
+
+function stringifyConfigToml(document: unknown): string {
+  const body = stringify(document);
   const withNewline = body.endsWith("\n") ? body : `${body}\n`;
   return `${DESKTOP_CONFIG_FILE_HEADER}${withNewline}`;
 }
@@ -164,10 +186,11 @@ export type DesktopStore = {
 };
 
 /**
- * Read/write `$PIE_HOME/Desktop.toml`. Methods are R-free: FileSystem is
- * bound at construction so Electron event handlers can `Effect.runFork`
- * them. A missing or corrupt file is defaults in memory and is not rewritten
- * until the next successful save — a bad file must not block the window.
+ * Read/write `$PIE_HOME/config.toml` `[ui.window]`. Methods are R-free:
+ * FileSystem is bound at construction so Electron event handlers can
+ * `Effect.runFork` them. A missing or corrupt file is defaults in memory
+ * and is not rewritten until the next successful save — a bad file must
+ * not block the window. Writes merge `ui.window` and leave sibling keys.
  */
 export function makeDesktopStore(
   file: string,
@@ -176,10 +199,15 @@ export function makeDesktopStore(
     const ctx = yield* Effect.context<FileSystem.FileSystem>();
     const fs = yield* FileSystem.FileSystem;
 
-    const get = fs.readFileString(file).pipe(
-      Effect.catch((error) =>
-        error.reason._tag === "NotFound" ? Effect.succeed("") : Effect.fail(error),
-      ),
+    const readExisting = fs
+      .readFileString(file)
+      .pipe(
+        Effect.catch((error) =>
+          error.reason._tag === "NotFound" ? Effect.succeed("") : Effect.fail(error),
+        ),
+      );
+
+    const get = readExisting.pipe(
       Effect.flatMap((text) =>
         Effect.try({
           try: () => decodeDesktopSettings(parseDesktopToml(text)),
@@ -196,9 +224,18 @@ export function makeDesktopStore(
     );
 
     const setWindow = (window: DesktopWindowState) =>
-      writeFileAtomic(fs, file, stringifyDesktopToml({ window }), {
-        mode: DESKTOP_CONFIG_FILE_MODE,
-      }).pipe(
+      readExisting.pipe(
+        Effect.flatMap((text) =>
+          Effect.try({
+            try: () => stringifyConfigToml(assignUiWindow(parseDesktopToml(text), window)),
+            catch: (cause) => cause,
+          }),
+        ),
+        Effect.flatMap((body) =>
+          writeFileAtomic(fs, file, body, {
+            mode: DESKTOP_CONFIG_FILE_MODE,
+          }),
+        ),
         Effect.catchCause((cause) =>
           Effect.logWarning("Could not write desktop host settings", cause).pipe(
             Effect.annotateLogs({ file }),

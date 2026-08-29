@@ -42,12 +42,20 @@ export const settingsRouter = orpc.router({
     const settings = yield* SettingsService;
     return yield* settings.update(input).pipe(
       Effect.catchTags({
+        SettingsParseError: (error: SettingsParseError) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({
+              message: `${error.file}: ${describeCause(error.cause)}`,
+            }),
+          ),
         SettingsDecodeError: (error: SettingsDecodeError) =>
           Effect.fail(
             errors.INVALID_ARGUMENT({
               message: `${error.file}: ${describeCause(error.cause)}`,
             }),
           ),
+        StoreReadError: (error: StoreReadError) =>
+          Effect.fail(errors.INTERNAL({ message: `failed to read ${error.file}` })),
         StoreWriteError: (error: StoreWriteError) =>
           Effect.fail(errors.INTERNAL({ message: `failed to write ${error.file}` })),
       }),

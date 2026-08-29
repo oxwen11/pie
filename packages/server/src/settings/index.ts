@@ -8,6 +8,7 @@ export { SettingsRepository, SettingsRepositoryLayer } from "./repository";
 export { SettingsService, SettingsServiceLayer } from "./service";
 export {
   DEFAULT_SETTINGS,
+  assignUiTheme,
   decodeSettings,
   overlaySettingsDefaults,
   parseSettingsToml,

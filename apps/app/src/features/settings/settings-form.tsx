@@ -1,4 +1,4 @@
-import type { GetSettingsOutput, Settings } from "@getpie/contract";
+import type { GetSettingsOutput, Settings, Theme } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
   Card,
@@ -44,8 +44,8 @@ export function SettingsForm() {
     },
   });
 
-  const applyTheme = (next: GetSettingsOutput, theme: Settings["appearance"]["theme"]) => {
-    const settings: Settings = { appearance: { theme } };
+  const applyTheme = (next: GetSettingsOutput, theme: Theme) => {
+    const settings: Settings = { ui: { theme } };
     queryClient.setQueryData(getOptions.queryKey, { ...next, settings });
     save.mutate(settings);
   };
@@ -93,13 +93,13 @@ export function SettingsForm() {
           </CardHeader>
           <CardPanel>
             <RadioGroup
-              value={settings.appearance.theme}
+              value={settings.ui.theme}
               onValueChange={(value) => {
                 if (isTheme(value)) applyTheme(query.data, value);
               }}
             >
               {THEME_OPTIONS.map((option) => {
-                const id = `appearance-theme-${option.value}`;
+                const id = `ui-theme-${option.value}`;
                 return (
                   <div
                     key={option.value}

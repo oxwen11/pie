@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_SETTINGS,
+  assignUiTheme,
   decodeSettings,
   overlaySettingsDefaults,
   parseSettingsToml,
@@ -14,9 +15,9 @@ describe("parseSettingsToml", () => {
     expect(parseSettingsToml("  \n  ")).toEqual({});
   });
 
-  it("parses an appearance table", () => {
-    expect(parseSettingsToml('[appearance]\ntheme = "dark"\n')).toEqual({
-      appearance: { theme: "dark" },
+  it("parses a ui table", () => {
+    expect(parseSettingsToml('[ui]\ntheme = "dark"\n')).toEqual({
+      ui: { theme: "dark" },
     });
   });
 
@@ -28,22 +29,35 @@ describe("parseSettingsToml", () => {
 describe("overlaySettingsDefaults", () => {
   it("fills a missing theme from defaults", () => {
     expect(overlaySettingsDefaults({})).toEqual(DEFAULT_SETTINGS);
+    expect(overlaySettingsDefaults({ ui: {} })).toEqual(DEFAULT_SETTINGS);
     expect(overlaySettingsDefaults({ appearance: {} })).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("prefers ui.theme over a leftover appearance table", () => {
+    expect(
+      overlaySettingsDefaults({
+        ui: { theme: "dark" },
+        appearance: { theme: "light" },
+      }),
+    ).toEqual({ ui: { theme: "dark" } });
+  });
+
   it("keeps an explicit theme so decode can reject invalid values", () => {
+    expect(overlaySettingsDefaults({ ui: { theme: "sepia" } })).toEqual({
+      ui: { theme: "sepia" },
+    });
     expect(overlaySettingsDefaults({ appearance: { theme: "sepia" } })).toEqual({
-      appearance: { theme: "sepia" },
+      ui: { theme: "sepia" },
     });
   });
 
   it("drops unknown keys so a newer file still loads", () => {
     expect(
       overlaySettingsDefaults({
-        appearance: { theme: "light", extra: true },
+        ui: { theme: "light", extra: true, window: { width: 1400 } },
         experimental: { foo: 1 },
       }),
-    ).toEqual({ appearance: { theme: "light" } });
+    ).toEqual({ ui: { theme: "light" } });
   });
 });
 
@@ -53,21 +67,37 @@ describe("decodeSettings", () => {
   });
 
   it("rejects an invalid theme", () => {
-    expect(() => decodeSettings({ appearance: { theme: "sepia" } })).toThrow(/Expected/);
+    expect(() => decodeSettings({ ui: { theme: "sepia" } })).toThrow(/Expected/);
+  });
+});
+
+describe("assignUiTheme", () => {
+  it("preserves ui.window and drops appearance", () => {
+    expect(
+      assignUiTheme(
+        {
+          appearance: { theme: "light" },
+          ui: { theme: "system", window: { width: 1400, height: 900, maximized: false } },
+        },
+        "dark",
+      ),
+    ).toEqual({
+      ui: { theme: "dark", window: { width: 1400, height: 900, maximized: false } },
+    });
   });
 });
 
 describe("stringifySettingsToml", () => {
-  it("writes a header and an appearance table", () => {
-    const text = stringifySettingsToml({ appearance: { theme: "dark" } });
-    expect(text.startsWith("# pie operator settings.")).toBe(true);
-    expect(text).toContain("[appearance]");
+  it("writes a header and a ui table", () => {
+    const text = stringifySettingsToml({ ui: { theme: "dark" } });
+    expect(text.startsWith("# pie settings.")).toBe(true);
+    expect(text).toContain("[ui]");
     expect(text).toContain('theme = "dark"');
     expect(text.endsWith("\n")).toBe(true);
   });
 
   it("round-trips a decoded document", () => {
-    const original = { appearance: { theme: "light" as const } };
+    const original = { ui: { theme: "light" as const } };
     expect(decodeSettings(parseSettingsToml(stringifySettingsToml(original)))).toEqual(original);
   });
 });

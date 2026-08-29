@@ -159,13 +159,13 @@ describe("server error map", () => {
 
 describe("Settings", () => {
   it("accepts system, light, and dark themes", () => {
-    expect(accepts(SettingsSchema, { appearance: { theme: "system" } })).toBe(true);
-    expect(accepts(SettingsSchema, { appearance: { theme: "light" } })).toBe(true);
-    expect(accepts(SettingsSchema, { appearance: { theme: "dark" } })).toBe(true);
+    expect(accepts(SettingsSchema, { ui: { theme: "system" } })).toBe(true);
+    expect(accepts(SettingsSchema, { ui: { theme: "light" } })).toBe(true);
+    expect(accepts(SettingsSchema, { ui: { theme: "dark" } })).toBe(true);
   });
 
-  it("rejects a missing appearance table or an unknown theme", () => {
+  it("rejects a missing ui table or an unknown theme", () => {
     expect(accepts(SettingsSchema, {})).toBe(false);
-    expect(accepts(SettingsSchema, { appearance: { theme: "sepia" } })).toBe(false);
+    expect(accepts(SettingsSchema, { ui: { theme: "sepia" } })).toBe(false);
   });
 });

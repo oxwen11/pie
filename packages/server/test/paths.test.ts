@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import {
   configFilePath,
   daemonStdioLogPath,
-  desktopConfigFilePath,
   logsDirectory,
   resolveDaemonDirectory,
   resolvePieHome,
@@ -47,12 +46,6 @@ describe("logsDirectory", () => {
 describe("configFilePath", () => {
   it("is $PIE_HOME/config.toml, not under storage/", () => {
     expect(configFilePath("/tmp/data")).toBe(path.join("/tmp/data", "config.toml"));
-  });
-});
-
-describe("desktopConfigFilePath", () => {
-  it("is $PIE_HOME/Desktop.toml, a sibling of config.toml", () => {
-    expect(desktopConfigFilePath("/tmp/data")).toBe(path.join("/tmp/data", "Desktop.toml"));
   });
 });
 

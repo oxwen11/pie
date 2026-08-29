@@ -6,14 +6,15 @@ import { oc } from "./orpc";
 export const ThemeSchema = Schema.Literals(["system", "light", "dark"]);
 export type Theme = typeof ThemeSchema.Type;
 
-export const SettingsAppearanceSchema = Schema.Struct({
+/** Operator UI prefs. Host-only keys such as `ui.window` are not on this wire type. */
+export const SettingsUiSchema = Schema.Struct({
   theme: ThemeSchema,
 });
-export type SettingsAppearance = typeof SettingsAppearanceSchema.Type;
+export type SettingsUi = typeof SettingsUiSchema.Type;
 
-/** On-disk / wire document for `$PIE_HOME/config.toml`. */
+/** Operator slice of `$PIE_HOME/config.toml` (`[ui]`). */
 export const SettingsSchema = Schema.Struct({
-  appearance: SettingsAppearanceSchema,
+  ui: SettingsUiSchema,
 });
 export type Settings = typeof SettingsSchema.Type;
 

@@ -3,7 +3,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
-import { desktopConfigFilePath, resolvePieHome } from "@getpie/server/daemon";
+import { configFilePath, resolvePieHome } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
@@ -32,7 +32,7 @@ function makeRuntime(devUrl: string | undefined) {
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     devUrl,
-    desktopConfigFile: desktopConfigFilePath(resolvePieHome()),
+    configFile: configFilePath(resolvePieHome()),
   });
 
   return ManagedRuntime.make(

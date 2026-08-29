@@ -9,7 +9,7 @@ import {
   StoreReadError,
   StoreWriteError,
 } from "../errors";
-import { decodeSettings, parseSettingsToml, stringifySettingsToml } from "./codec";
+import { assignUiTheme, decodeSettings, parseSettingsToml, stringifySettingsToml } from "./codec";
 
 export class SettingsRepository extends Context.Service<
   SettingsRepository,
@@ -20,7 +20,10 @@ export class SettingsRepository extends Context.Service<
     >;
     readonly write: (
       settings: Settings,
-    ) => Effect.Effect<GetSettingsOutput, StoreWriteError | SettingsDecodeError>;
+    ) => Effect.Effect<
+      GetSettingsOutput,
+      StoreReadError | StoreWriteError | SettingsParseError | SettingsDecodeError
+    >;
   }
 >()("SettingsRepository") {}
 
@@ -48,27 +51,42 @@ export const SettingsRepositoryLayer: Layer.Layer<
         ),
       );
 
-    return {
-      read: () =>
-        fs.readFileString(file).pipe(
+    const readExisting = () =>
+      fs
+        .readFileString(file)
+        .pipe(
           Effect.catch((error) =>
             error.reason._tag === "NotFound"
               ? Effect.succeed("")
               : Effect.fail(new StoreReadError({ file, cause: error })),
           ),
+        );
+
+    return {
+      read: () =>
+        readExisting().pipe(
           Effect.flatMap(decodeFile),
           Effect.map((settings) => ({ path: file, settings })),
         ),
       write: (settings) =>
-        Schema.encodeEffect(SettingsSchema)(settings).pipe(
-          Effect.mapError((cause) => new SettingsDecodeError({ file, cause })),
-          Effect.flatMap(() =>
-            writeFileAtomic(fs, file, stringifySettingsToml(settings), {
-              mode: CONFIG_FILE_MODE,
-            }).pipe(Effect.mapError((cause) => new StoreWriteError({ file, cause }))),
-          ),
-          Effect.as({ path: file, settings }),
-        ),
+        Effect.gen(function* () {
+          yield* Schema.encodeEffect(SettingsSchema)(settings).pipe(
+            Effect.mapError((cause) => new SettingsDecodeError({ file, cause })),
+          );
+          const text = yield* readExisting();
+          const raw = yield* Effect.try({
+            try: () => parseSettingsToml(text),
+            catch: (cause) => new SettingsParseError({ file, cause }),
+          });
+          const body = yield* Effect.try({
+            try: () => stringifySettingsToml(assignUiTheme(raw, settings.ui.theme)),
+            catch: (cause) => new SettingsDecodeError({ file, cause }),
+          });
+          yield* writeFileAtomic(fs, file, body, { mode: CONFIG_FILE_MODE }).pipe(
+            Effect.mapError((cause) => new StoreWriteError({ file, cause })),
+          );
+          return { path: file, settings };
+        }),
     };
   }),
 );

@@ -207,7 +207,7 @@ export const MainWindowLive = Layer.effect(
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
     const channel = yield* RendererChannel;
-    const store = yield* makeDesktopStore(config.desktopConfigFile);
+    const store = yield* makeDesktopStore(config.configFile);
     const settings = yield* store.get;
     yield* registerAppProtocol(rendererRoot());
     return yield* makeMainWindow({

@@ -24,7 +24,7 @@ export function useResolvedAppearance(
 ): "light" | "dark" {
   const query = useQuery(orpcQueryUtils.settings.get.queryOptions());
   const prefersDark = useSyncExternalStore(subscribePrefersDark, getPrefersDark, getPrefersDark);
-  const theme: Theme = query.data?.settings.appearance.theme ?? "system";
+  const theme: Theme = query.data?.settings.ui.theme ?? "system";
   const resolved = resolveAppearance(theme, prefersDark);
 
   useLayoutEffect(() => {

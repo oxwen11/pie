@@ -14,12 +14,12 @@ describe("settings router", () => {
       const missing = await h.client.settings.get();
       expect(missing).toEqual({
         path: path.join(home, "config.toml"),
-        settings: { appearance: { theme: "system" } },
+        settings: { ui: { theme: "system" } },
       });
       expect(fs.existsSync(missing.path)).toBe(false);
 
-      const saved = await h.client.settings.update({ appearance: { theme: "dark" } });
-      expect(saved.settings.appearance.theme).toBe("dark");
+      const saved = await h.client.settings.update({ ui: { theme: "dark" } });
+      expect(saved.settings.ui.theme).toBe("dark");
       expect(fs.readFileSync(saved.path, "utf8")).toContain('theme = "dark"');
 
       await expect(h.client.settings.get()).resolves.toEqual(saved);
@@ -30,7 +30,7 @@ describe("settings router", () => {
 
   it("maps an invalid theme in the file to INVALID_ARGUMENT", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
-    fs.writeFileSync(path.join(home, "config.toml"), '[appearance]\ntheme = "sepia"\n');
+    fs.writeFileSync(path.join(home, "config.toml"), '[ui]\ntheme = "sepia"\n');
     const h = await makeRpcTestHarness(home);
     try {
       await expect(h.client.settings.get()).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
