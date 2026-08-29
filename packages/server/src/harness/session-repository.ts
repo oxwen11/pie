@@ -17,14 +17,11 @@ const SessionSchema = Schema.Struct({
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
   historyAvailable: Schema.optionalKey(Schema.Boolean),
-  // Older writes stored origin on the session. Accepted on read, never written back.
-  automation: Schema.optionalKey(Schema.Boolean),
-  automationId: Schema.optionalKey(Schema.String),
 });
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, automation: _automation, automationId: _automationId, ...rest } = parsed;
+  const { agentSessionId, ...rest } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId

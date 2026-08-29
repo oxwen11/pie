@@ -126,39 +126,6 @@ describe("SessionRepository", () => {
     expect(raw.data).not.toHaveProperty("version");
   });
 
-  it("drops leftover automation origin fields on read and write", async () => {
-    const legacy = path.join(home, "storage", "sessions", "proj-a", "sess-legacy-auto.json");
-    await fs.mkdir(path.dirname(legacy), { recursive: true });
-    await fs.writeFile(
-      legacy,
-      JSON.stringify({
-        version: 1,
-        data: {
-          sessionId: "sess-legacy-auto",
-          projectId: "proj-a",
-          createdAt: "2026-07-16T00:00:00.000Z",
-          automation: true,
-          automationId: "auto-old",
-        },
-      }),
-    );
-    const loaded = await run(
-      Effect.gen(function* () {
-        const repo = yield* SessionRepository;
-        const session = yield* repo.read("proj-a", "sess-legacy-auto");
-        yield* repo.write(session);
-        return session;
-      }),
-    );
-    expect(loaded).not.toHaveProperty("automation");
-    expect(loaded).not.toHaveProperty("automationId");
-    const rewritten = JSON.parse(await fs.readFile(legacy, "utf8")) as {
-      readonly data: Record<string, unknown>;
-    };
-    expect(rewritten.data).not.toHaveProperty("automation");
-    expect(rewritten.data).not.toHaveProperty("automationId");
-  });
-
   it("lists all sessions of a project", async () => {
     const listed = await run(
       Effect.gen(function* () {
