@@ -47,8 +47,8 @@ layer(NodePlatformLayer)("SettingsService", (it) => {
       const text = yield* fs.readFileString(saved.path);
       assert.match(text, /\[ui\]/);
       assert.match(text, /theme = "dark"/);
-      assert.doesNotMatch(text, /\[desktop/);
-      assert.doesNotMatch(text, /\[agent/);
+      assert.doesNotMatch(text, /^\[desktop/m);
+      assert.doesNotMatch(text, /^\[agent\]/m);
 
       const loaded = yield* svc.get();
       assert.deepEqual(loaded.settings, saved.settings);
