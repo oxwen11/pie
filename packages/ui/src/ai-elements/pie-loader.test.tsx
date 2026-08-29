@@ -49,4 +49,13 @@ describe("PieLoader", () => {
 
     expect(mark?.className).toContain("text-muted-foreground");
   });
+
+  it("maps size to --dot-grid-size", async () => {
+    const el = await render(<PieLoader size={12} />);
+    const mark = el.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
+
+    expect(mark?.style.getPropertyValue("--dot-grid-size")).toBe("12px");
+    expect(mark?.style.width).toBe("12px");
+    expect(mark?.style.height).toBe("12px");
+  });
 });

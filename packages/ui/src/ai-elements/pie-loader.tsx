@@ -1,8 +1,8 @@
 import { cn } from "@getpie/ui/lib/utils";
-import type { HTMLAttributes } from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
 
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
-  /** Outer mark size. Layout, kick, and motion are CSS. */
+  /** Outer mark size. Maps to `--dot-grid-size`. */
   size?: number;
 };
 
@@ -15,8 +15,10 @@ export function PieLoader({ className, size = 16, style, ...props }: PieLoaderPr
       aria-label={hidden ? undefined : "Thinking"}
       aria-live={hidden ? undefined : "polite"}
       data-slot="pie-loader"
-      className={cn("size-4 shrink-0 text-current", className)}
-      style={{ width: size, height: size, ...style }}
+      className={cn("shrink-0 text-current", className)}
+      style={
+        { "--dot-grid-size": `${size}px`, width: size, height: size, ...style } as CSSProperties
+      }
       {...props}
     >
       <span data-slot="pie-dot" />

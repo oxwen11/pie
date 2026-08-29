@@ -11,7 +11,8 @@
         --line: color-mix(in srgb, #000 8%, transparent);
         --bg: #f7f7f6;
         --card: #fff;
-        --duration: 1400ms;
+        --dot-grid-animation-duration: 1400ms;
+        --dot-grid-animation-delay: -538ms;
       }
 
       html[data-theme="dark"] {
@@ -157,8 +158,27 @@
 
       [data-slot="pie-loader"] {
         --dot-grid-off-opacity: 0;
+        --dot-grid-size: 16px;
+        --dot-grid-dot-1-initial-opacity: 1;
+        --dot-grid-dot-2-initial-opacity: 1;
+        --dot-grid-dot-3-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-4-initial-opacity: 1;
+        --dot-grid-dot-5-initial-opacity: 1;
+        --dot-grid-dot-6-initial-opacity: 1;
+        --dot-grid-dot-7-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-8-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-9-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-10-initial-opacity: 1;
+        --dot-grid-dot-11-initial-opacity: 1;
+        --dot-grid-dot-12-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-13-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-14-initial-opacity: 1;
+        --dot-grid-dot-15-initial-opacity: 1;
+        --dot-grid-dot-16-initial-opacity: 1;
         color: var(--fg);
         display: inline-grid;
+        width: var(--dot-grid-size);
+        height: var(--dot-grid-size);
         grid-template-columns: repeat(4, 1fr);
         grid-template-rows: repeat(4, 1fr);
         container-type: size;
@@ -172,57 +192,75 @@
         aspect-ratio: 1;
         border-radius: 50%;
         background-color: currentColor;
-        animation-duration: var(--duration);
+        animation-duration: var(--dot-grid-animation-duration);
+        animation-delay: var(--dot-grid-animation-delay);
         animation-timing-function: linear;
         animation-iteration-count: infinite;
+        animation-fill-mode: both;
       }
 
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(1) {
+        opacity: var(--dot-grid-dot-1-initial-opacity);
         animation-name: pie-dot-grid-1;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(2) {
+        opacity: var(--dot-grid-dot-2-initial-opacity);
         animation-name: pie-dot-grid-2;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(3) {
+        opacity: var(--dot-grid-dot-3-initial-opacity);
         animation-name: pie-dot-grid-3;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(4) {
+        opacity: var(--dot-grid-dot-4-initial-opacity);
         animation-name: pie-dot-grid-4;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(5) {
+        opacity: var(--dot-grid-dot-5-initial-opacity);
         animation-name: pie-dot-grid-5;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(6) {
+        opacity: var(--dot-grid-dot-6-initial-opacity);
         animation-name: pie-dot-grid-6;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(7) {
+        opacity: var(--dot-grid-dot-7-initial-opacity);
         animation-name: pie-dot-grid-7;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(8) {
+        opacity: var(--dot-grid-dot-8-initial-opacity);
         animation-name: pie-dot-grid-8;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(9) {
+        opacity: var(--dot-grid-dot-9-initial-opacity);
         animation-name: pie-dot-grid-9;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(10) {
+        opacity: var(--dot-grid-dot-10-initial-opacity);
         animation-name: pie-dot-grid-10;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11) {
+        opacity: var(--dot-grid-dot-11-initial-opacity);
         animation-name: pie-dot-grid-11;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12) {
+        opacity: var(--dot-grid-dot-12-initial-opacity);
         animation-name: pie-dot-grid-12;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(13) {
+        opacity: var(--dot-grid-dot-13-initial-opacity);
         animation-name: pie-dot-grid-13;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(14) {
+        opacity: var(--dot-grid-dot-14-initial-opacity);
         animation-name: pie-dot-grid-14;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15) {
+        opacity: var(--dot-grid-dot-15-initial-opacity);
         animation-name: pie-dot-grid-15;
       }
       [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
+        opacity: var(--dot-grid-dot-16-initial-opacity);
         animation-name: pie-dot-grid-16;
       }
 
@@ -240,6 +278,16 @@
 
       .mark {
         --dot-grid-off-opacity: 0;
+        --dot-grid-size: 10px;
+        --dot-grid-dot-1-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-2-initial-opacity: 1;
+        --dot-grid-dot-3-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-4-initial-opacity: 1;
+        --dot-grid-dot-5-initial-opacity: 1;
+        --dot-grid-dot-6-initial-opacity: 1;
+        --dot-grid-dot-7-initial-opacity: 1;
+        --dot-grid-dot-8-initial-opacity: var(--dot-grid-off-opacity);
+        --dot-grid-dot-9-initial-opacity: 1;
         color: var(--fg);
         display: block;
         overflow: visible;
@@ -247,9 +295,39 @@
 
       .mark circle {
         fill: currentColor;
-        animation-duration: var(--duration);
+        animation-duration: var(--dot-grid-animation-duration);
+        animation-delay: var(--dot-grid-animation-delay);
         animation-timing-function: linear;
         animation-iteration-count: infinite;
+        animation-fill-mode: both;
+      }
+
+      .mark circle:nth-child(1) {
+        opacity: var(--dot-grid-dot-1-initial-opacity);
+      }
+      .mark circle:nth-child(2) {
+        opacity: var(--dot-grid-dot-2-initial-opacity);
+      }
+      .mark circle:nth-child(3) {
+        opacity: var(--dot-grid-dot-3-initial-opacity);
+      }
+      .mark circle:nth-child(4) {
+        opacity: var(--dot-grid-dot-4-initial-opacity);
+      }
+      .mark circle:nth-child(5) {
+        opacity: var(--dot-grid-dot-5-initial-opacity);
+      }
+      .mark circle:nth-child(6) {
+        opacity: var(--dot-grid-dot-6-initial-opacity);
+      }
+      .mark circle:nth-child(7) {
+        opacity: var(--dot-grid-dot-7-initial-opacity);
+      }
+      .mark circle:nth-child(8) {
+        opacity: var(--dot-grid-dot-8-initial-opacity);
+      }
+      .mark circle:nth-child(9) {
+        opacity: var(--dot-grid-dot-9-initial-opacity);
       }
 
       @media (max-width: 720px) {
@@ -266,9 +344,10 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            关键帧按你贴的 Cursor 写法：8 段各 12.5%，用
-            <code>12.4999%</code> 硬切，灭是 <code>var(--dot-grid-off-opacity)</code>。组件只挂 16
-            个点，格子和偏移在 CSS。
+            变量也按
+            Cursor：<code>--dot-grid-size</code>、<code>--dot-grid-dot-N-initial-opacity</code>、<code
+              >--dot-grid-animation-duration: 1400ms</code
+            >、整格共用 <code>--dot-grid-animation-delay: -538ms</code>。
           </p>
         </div>
         <button type="button" id="theme" aria-pressed="false">Dark</button>
@@ -281,7 +360,7 @@
             <span
               data-slot="pie-loader"
               data-mark="pie"
-              style="width: 64px; height: 64px"
+              style="--dot-grid-size: 64px"
               aria-label="Thinking"
             ></span>
             <span class="thinking">Thinking…</span>
@@ -306,7 +385,7 @@
         <span
           data-slot="pie-loader"
           data-mark="pie"
-          style="width: 16px; height: 16px"
+          style="--dot-grid-size: 16px"
           aria-hidden="true"
         ></span>
         <span class="thinking">Thinking…</span>
@@ -320,7 +399,7 @@
             class="still"
             data-slot="pie-loader"
             data-mark="pie"
-            style="width: 64px; height: 64px"
+            style="--dot-grid-size: 64px"
           ></span>
         </div>
       </section>
@@ -421,7 +500,7 @@
       });
 
       duration.addEventListener("input", () => {
-        root.style.setProperty("--duration", `${duration.value}ms`);
+        root.style.setProperty("--dot-grid-animation-duration", `${duration.value}ms`);
         durationVal.textContent = `${duration.value}ms`;
       });
     </script>

@@ -814,7 +814,28 @@
 @layer components {
   [data-slot="pie-loader"] {
     --dot-grid-off-opacity: 0;
+    --dot-grid-size: 16px;
+    --dot-grid-dot-1-initial-opacity: 1;
+    --dot-grid-dot-2-initial-opacity: 1;
+    --dot-grid-dot-3-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-4-initial-opacity: 1;
+    --dot-grid-dot-5-initial-opacity: 1;
+    --dot-grid-dot-6-initial-opacity: 1;
+    --dot-grid-dot-7-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-8-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-9-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-10-initial-opacity: 1;
+    --dot-grid-dot-11-initial-opacity: 1;
+    --dot-grid-dot-12-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-13-initial-opacity: var(--dot-grid-off-opacity);
+    --dot-grid-dot-14-initial-opacity: 1;
+    --dot-grid-dot-15-initial-opacity: 1;
+    --dot-grid-dot-16-initial-opacity: 1;
+    --dot-grid-animation-duration: 1400ms;
+    --dot-grid-animation-delay: -538ms;
     display: inline-grid;
+    width: var(--dot-grid-size);
+    height: var(--dot-grid-size);
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
     container-type: size;
@@ -827,57 +848,75 @@
     aspect-ratio: 1;
     border-radius: 50%;
     background-color: currentColor;
-    animation-duration: 1.4s;
+    animation-duration: var(--dot-grid-animation-duration);
+    animation-delay: var(--dot-grid-animation-delay);
     animation-timing-function: linear;
     animation-iteration-count: infinite;
+    animation-fill-mode: both;
   }
 
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(1) {
+    opacity: var(--dot-grid-dot-1-initial-opacity);
     animation-name: pie-dot-grid-1;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(2) {
+    opacity: var(--dot-grid-dot-2-initial-opacity);
     animation-name: pie-dot-grid-2;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(3) {
+    opacity: var(--dot-grid-dot-3-initial-opacity);
     animation-name: pie-dot-grid-3;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(4) {
+    opacity: var(--dot-grid-dot-4-initial-opacity);
     animation-name: pie-dot-grid-4;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(5) {
+    opacity: var(--dot-grid-dot-5-initial-opacity);
     animation-name: pie-dot-grid-5;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(6) {
+    opacity: var(--dot-grid-dot-6-initial-opacity);
     animation-name: pie-dot-grid-6;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(7) {
+    opacity: var(--dot-grid-dot-7-initial-opacity);
     animation-name: pie-dot-grid-7;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(8) {
+    opacity: var(--dot-grid-dot-8-initial-opacity);
     animation-name: pie-dot-grid-8;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(9) {
+    opacity: var(--dot-grid-dot-9-initial-opacity);
     animation-name: pie-dot-grid-9;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(10) {
+    opacity: var(--dot-grid-dot-10-initial-opacity);
     animation-name: pie-dot-grid-10;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11) {
+    opacity: var(--dot-grid-dot-11-initial-opacity);
     animation-name: pie-dot-grid-11;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12) {
+    opacity: var(--dot-grid-dot-12-initial-opacity);
     animation-name: pie-dot-grid-12;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(13) {
+    opacity: var(--dot-grid-dot-13-initial-opacity);
     animation-name: pie-dot-grid-13;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(14) {
+    opacity: var(--dot-grid-dot-14-initial-opacity);
     animation-name: pie-dot-grid-14;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15) {
+    opacity: var(--dot-grid-dot-15-initial-opacity);
     animation-name: pie-dot-grid-15;
   }
   [data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
+    opacity: var(--dot-grid-dot-16-initial-opacity);
     animation-name: pie-dot-grid-16;
   }
 
