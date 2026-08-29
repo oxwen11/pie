@@ -61,7 +61,7 @@
       background-position: -200% 0;
     }
   }
-  /* 4×4 even grid: connected L→R on/off band. Off dots are opacity 0. */
+  /* 4×4: each dot has its own on/off keyframes, like Cursor ui-dot-grid. */
   --animate-pie-dot-grid-1: pie-dot-grid-1 1.4s linear infinite;
   --animate-pie-dot-grid-2: pie-dot-grid-2 1.4s linear infinite;
   --animate-pie-dot-grid-3: pie-dot-grid-3 1.4s linear infinite;
@@ -80,25 +80,25 @@
   --animate-pie-dot-grid-16: pie-dot-grid-16 1.4s linear infinite;
   @keyframes pie-dot-grid-1 {
     0%,
-    28.3333% {
+    33.75% {
       opacity: 1;
     }
-    33.3333%,
-    78.3333% {
+    37.5%,
+    71.25% {
       opacity: 0;
     }
-    83.3333%,
+    75%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-2 {
     0%,
-    61.6667% {
+    58.75% {
       opacity: 1;
     }
-    66.6667%,
-    95% {
+    62.5%,
+    96.25% {
       opacity: 0;
     }
     100% {
@@ -107,193 +107,198 @@
   }
   @keyframes pie-dot-grid-3 {
     0%,
-    11.6667% {
+    21.25% {
       opacity: 0;
     }
-    16.6667%,
-    78.3333% {
+    25%,
+    83.75% {
       opacity: 1;
     }
-    83.3333%,
+    87.5%,
     100% {
       opacity: 0;
     }
   }
   @keyframes pie-dot-grid-4 {
     0%,
-    45% {
+    8.75% {
+      opacity: 1;
+    }
+    12.5%,
+    46.25% {
       opacity: 0;
     }
     50%,
-    95% {
-      opacity: 1;
-    }
     100% {
-      opacity: 0;
+      opacity: 1;
     }
   }
   @keyframes pie-dot-grid-5 {
     0%,
-    28.3333% {
+    8.75% {
       opacity: 1;
     }
-    33.3333%,
-    78.3333% {
+    12.5%,
+    58.75% {
       opacity: 0;
     }
-    83.3333%,
+    62.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-6 {
     0%,
-    61.6667% {
+    33.75% {
       opacity: 1;
     }
-    66.6667%,
-    95% {
+    37.5%,
+    83.75% {
       opacity: 0;
     }
+    87.5%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-7 {
     0%,
-    11.6667% {
+    8.75% {
       opacity: 0;
     }
-    16.6667%,
-    78.3333% {
+    12.5%,
+    58.75% {
       opacity: 1;
     }
-    83.3333%,
+    62.5%,
     100% {
       opacity: 0;
     }
   }
   @keyframes pie-dot-grid-8 {
     0%,
-    45% {
+    33.75% {
       opacity: 0;
     }
-    50%,
-    95% {
+    37.5%,
+    83.75% {
       opacity: 1;
     }
+    87.5%,
     100% {
       opacity: 0;
     }
   }
   @keyframes pie-dot-grid-9 {
     0%,
-    28.3333% {
-      opacity: 1;
-    }
-    33.3333%,
-    78.3333% {
+    46.25% {
       opacity: 0;
     }
-    83.3333%,
-    100% {
+    50%,
+    96.25% {
       opacity: 1;
+    }
+    100% {
+      opacity: 0;
     }
   }
   @keyframes pie-dot-grid-10 {
     0%,
-    61.6667% {
+    21.25% {
       opacity: 1;
     }
-    66.6667%,
-    95% {
+    25%,
+    71.25% {
       opacity: 0;
     }
+    75%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-11 {
     0%,
-    11.6667% {
-      opacity: 0;
-    }
-    16.6667%,
-    78.3333% {
+    46.25% {
       opacity: 1;
     }
-    83.3333%,
-    100% {
+    50%,
+    96.25% {
       opacity: 0;
+    }
+    100% {
+      opacity: 1;
     }
   }
   @keyframes pie-dot-grid-12 {
     0%,
-    45% {
+    21.25% {
       opacity: 0;
     }
-    50%,
-    95% {
+    25%,
+    71.25% {
       opacity: 1;
     }
+    75%,
     100% {
       opacity: 0;
     }
   }
   @keyframes pie-dot-grid-13 {
     0%,
-    28.3333% {
-      opacity: 1;
-    }
-    33.3333%,
-    78.3333% {
+    21.25% {
       opacity: 0;
     }
-    83.3333%,
-    100% {
+    25%,
+    83.75% {
       opacity: 1;
+    }
+    87.5%,
+    100% {
+      opacity: 0;
     }
   }
   @keyframes pie-dot-grid-14 {
     0%,
-    61.6667% {
+    8.75% {
       opacity: 1;
     }
-    66.6667%,
-    95% {
+    12.5%,
+    46.25% {
       opacity: 0;
     }
+    50%,
     100% {
       opacity: 1;
     }
   }
   @keyframes pie-dot-grid-15 {
     0%,
-    11.6667% {
-      opacity: 0;
-    }
-    16.6667%,
-    78.3333% {
+    33.75% {
       opacity: 1;
     }
-    83.3333%,
-    100% {
+    37.5%,
+    71.25% {
       opacity: 0;
+    }
+    75%,
+    100% {
+      opacity: 1;
     }
   }
   @keyframes pie-dot-grid-16 {
     0%,
-    45% {
-      opacity: 0;
-    }
-    50%,
-    95% {
+    58.75% {
       opacity: 1;
     }
-    100% {
+    62.5%,
+    96.25% {
       opacity: 0;
     }
+    100% {
+      opacity: 1;
+    }
   }
+
   --animate-caret-blink: 1s ease-out infinite caret-blink;
   --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
   --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);

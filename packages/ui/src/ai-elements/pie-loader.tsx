@@ -25,7 +25,7 @@ export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   size?: number;
 };
 
-/** Sixteen even dots, SE four kicked. A connected on/off band travels left to right. */
+/** Sixteen even dots, SE four kicked. Each dot has its own on/off sequence (Cursor ui-dot-grid). */
 export function PieLoader({ className, size = 16, style, ...props }: PieLoaderProps) {
   const hidden = props["aria-hidden"] === true || props["aria-hidden"] === "true";
   return (

@@ -187,9 +187,10 @@
         <div>
           <h1>Pie loader</h1>
           <p class="lede">
-            机制和你贴的 Cursor <code>ui-dot-grid</code> 一样：每点自己的关键帧，灭是 opacity
-            0。布局是 16 点均匀 4×4，右下四个偏
-            3%。亮点是从左到右连成的一列波，不会对角线满格同时亮。
+            你贴的是
+            <code>animation-name: ui-dot-grid-3-…-dot-N</code
+            >：每个点一条关键帧，同一列不会齐亮。灭是 opacity 0。布局仍是 16 点均匀 4×4，右下四个偏
+            3%。亮点连成斜波从左往右走。
           </p>
         </div>
         <button type="button" id="theme" aria-pressed="false">Dark</button>
@@ -197,7 +198,7 @@
 
       <div class="hero">
         <section class="card">
-          <h2>64px · 4×4 左→右波</h2>
+          <h2>64px · 每点独立关键帧</h2>
           <div class="live">
             <svg
               class="mark"
@@ -256,15 +257,16 @@
     </main>
 
     <script>
-      const PIE_COLS = [
-        [1, 1, 0, 0],
-        [1, 1, 1, 0],
-        [0, 1, 1, 0],
-        [0, 1, 1, 1],
-        [0, 0, 1, 1],
-        [1, 0, 0, 1],
+      const PIE_FRAMES = [
+        [1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1],
+        [1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1],
+        [1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1],
+        [0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1],
+        [0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1],
+        [0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+        [1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0],
+        [1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0],
       ];
-      const PIE_FRAMES = PIE_COLS.map((cols) => [...cols, ...cols, ...cols, ...cols]);
 
       const CURSOR_FRAMES = [
         [0, 1, 0, 1, 1, 1, 1, 0, 1],
