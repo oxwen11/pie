@@ -1,4 +1,5 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
+import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
@@ -90,8 +91,10 @@ export function AppShell({ children }: AppShellProps) {
       defaultOpen={readSidebarCookie()}
       style={shellProviderStyle(platform)}
     >
-      {children}
-      <ShellSidebarToggle />
+      <LazyMotion features={domMax}>
+        {children}
+        <ShellSidebarToggle />
+      </LazyMotion>
     </SidebarProvider>
   );
 }
