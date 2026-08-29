@@ -1,8 +1,14 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { animate, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import {
+  animate,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useTransform,
+} from "motion/react";
 import * as m from "motion/react-m";
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   Group,
   Panel,
@@ -126,6 +132,11 @@ function useCollapsedBinding(
   };
 }
 
+/** True while the drawer width has not reached the `open` target. */
+function sidebarDrawerInFlight(open: boolean, px: number, expandedPx: number): boolean {
+  return open ? px < expandedPx - 0.5 : px > 0.5;
+}
+
 /**
  * Toggle springs the column width; the rail's `x` is `width - expanded` so the
  * contents slide as a drawer instead of squashing. Drag-resize stays a snap.
@@ -144,13 +155,17 @@ function useSidebarDrawer(
   const expanded = useMotionValue(256);
   const width = useMotionValue(open ? 256 : 0);
   const x = useTransform(() => width.get() - expanded.get());
-  const [inFlight, setInFlight] = useState(false);
-  const [prevOpen, setPrevOpen] = useState(open);
+  const sync = useReducer((n: number) => n + 1, 0)[1];
+  const inFlight = sidebarDrawerInFlight(open, width.get(), expanded.get());
 
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    setInFlight(true);
-  }
+  // Re-render when the spring or jump crosses the settle threshold so `inFlight`
+  // (and therefore `minSize` / fill) can be derived again. The effect that
+  // drives `animate` / `jump` must not `setState`.
+  useMotionValueEvent(width, "change", (value) => {
+    if (sidebarDrawerInFlight(open, value, expanded.get()) !== inFlight) {
+      sync();
+    }
+  });
 
   const minSize = open && !inFlight ? SIDEBAR_MIN_SIZE : 0;
 
@@ -158,17 +173,10 @@ function useSidebarDrawer(
     const panel = panelRef.current;
     if (panel === null || !laidOut.current) return;
 
-    const settle = (): void => {
-      flying.current = false;
-      setInFlight(false);
-    };
-
     if (skip.current) {
       skip.current = false;
       width.jump(open ? expanded.get() : 0);
-      // Spring/drag lifetime — inFlight is not a store or a prop mirror.
-      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-      settle();
+      flying.current = false;
       return;
     }
 
@@ -180,15 +188,15 @@ function useSidebarDrawer(
       } else if (!panel.isCollapsed()) {
         panel.collapse();
       }
-      // Spring/drag lifetime — inFlight is not a store or a prop mirror.
-      // eslint-disable-next-line react-you-might-not-need-an-effect/no-external-store-subscription, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-      settle();
+      flying.current = false;
       return;
     }
 
     flying.current = true;
     const controls = animate(width, open ? expanded.get() : 0, {
-      onComplete: settle,
+      onComplete() {
+        flying.current = false;
+      },
       onUpdate(value) {
         if (value <= 0.5) {
           if (!panel.isCollapsed()) panel.collapse();
