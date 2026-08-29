@@ -1,3 +1,41 @@
+@theme inline {
+  --dot-grid-off-opacity: 0;
+  --dot-grid-animation-duration: 2s;
+  --dot-grid-animation-delay: -538ms;
+  --animate-pie-dot-grid-1: pie-dot-grid-1 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-2: pie-dot-grid-2 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-3: pie-dot-grid-3 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-4: pie-dot-grid-4 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-5: pie-dot-grid-5 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-6: pie-dot-grid-6 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-7: pie-dot-grid-7 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-8: pie-dot-grid-8 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-9: pie-dot-grid-9 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-10: pie-dot-grid-10 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-11: pie-dot-grid-11 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-12: pie-dot-grid-12 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-13: pie-dot-grid-13 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-14: pie-dot-grid-14 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-15: pie-dot-grid-15 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+  --animate-pie-dot-grid-16: pie-dot-grid-16 var(--dot-grid-animation-duration) linear
+    var(--dot-grid-animation-delay) infinite both;
+}
+
 @keyframes pie-dot-grid-1 {
   0%,
   12.4999% {
@@ -540,159 +578,5 @@
   87.5%,
   100% {
     opacity: var(--dot-grid-off-opacity);
-  }
-}
-
-[data-slot="pie-loader"] {
-  /* Cursor ui-dot-grid: 8 hard 12.5% slots. Off is --dot-grid-off-opacity. */
-  --dot-grid-off-opacity: 0;
-  --dot-grid-animation-duration: 2s;
-  --dot-grid-animation-delay: -538ms;
-  --animate-pie-dot-grid-1: pie-dot-grid-1 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-2: pie-dot-grid-2 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-3: pie-dot-grid-3 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-4: pie-dot-grid-4 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-5: pie-dot-grid-5 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-6: pie-dot-grid-6 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-7: pie-dot-grid-7 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-8: pie-dot-grid-8 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-9: pie-dot-grid-9 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-10: pie-dot-grid-10 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-11: pie-dot-grid-11 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-12: pie-dot-grid-12 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-13: pie-dot-grid-13 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-14: pie-dot-grid-14 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-15: pie-dot-grid-15 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --animate-pie-dot-grid-16: pie-dot-grid-16 var(--dot-grid-animation-duration) linear
-    var(--dot-grid-animation-delay) infinite both;
-  --dot-grid-size: 1em;
-  --dot-grid-dot-1-initial-opacity: 1;
-  --dot-grid-dot-2-initial-opacity: 1;
-  --dot-grid-dot-3-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-4-initial-opacity: 1;
-  --dot-grid-dot-5-initial-opacity: 1;
-  --dot-grid-dot-6-initial-opacity: 1;
-  --dot-grid-dot-7-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-8-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-9-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-10-initial-opacity: 1;
-  --dot-grid-dot-11-initial-opacity: 1;
-  --dot-grid-dot-12-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-13-initial-opacity: var(--dot-grid-off-opacity);
-  --dot-grid-dot-14-initial-opacity: 1;
-  --dot-grid-dot-15-initial-opacity: 1;
-  --dot-grid-dot-16-initial-opacity: 1;
-  box-sizing: border-box;
-  display: inline-grid;
-  width: var(--dot-grid-size);
-  height: var(--dot-grid-size);
-  vertical-align: middle;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(4, 1fr);
-  container-type: size;
-  overflow: visible;
-}
-
-[data-slot="pie-loader"] > [data-slot="pie-dot"] {
-  place-self: center;
-  min-width: 0;
-  min-height: 0;
-  width: 70%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background-color: currentColor;
-}
-
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(1) {
-  opacity: var(--dot-grid-dot-1-initial-opacity);
-  animation: var(--animate-pie-dot-grid-1);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(2) {
-  opacity: var(--dot-grid-dot-2-initial-opacity);
-  animation: var(--animate-pie-dot-grid-2);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(3) {
-  opacity: var(--dot-grid-dot-3-initial-opacity);
-  animation: var(--animate-pie-dot-grid-3);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(4) {
-  opacity: var(--dot-grid-dot-4-initial-opacity);
-  animation: var(--animate-pie-dot-grid-4);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(5) {
-  opacity: var(--dot-grid-dot-5-initial-opacity);
-  animation: var(--animate-pie-dot-grid-5);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(6) {
-  opacity: var(--dot-grid-dot-6-initial-opacity);
-  animation: var(--animate-pie-dot-grid-6);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(7) {
-  opacity: var(--dot-grid-dot-7-initial-opacity);
-  animation: var(--animate-pie-dot-grid-7);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(8) {
-  opacity: var(--dot-grid-dot-8-initial-opacity);
-  animation: var(--animate-pie-dot-grid-8);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(9) {
-  opacity: var(--dot-grid-dot-9-initial-opacity);
-  animation: var(--animate-pie-dot-grid-9);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(10) {
-  opacity: var(--dot-grid-dot-10-initial-opacity);
-  animation: var(--animate-pie-dot-grid-10);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11) {
-  opacity: var(--dot-grid-dot-11-initial-opacity);
-  animation: var(--animate-pie-dot-grid-11);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12) {
-  opacity: var(--dot-grid-dot-12-initial-opacity);
-  animation: var(--animate-pie-dot-grid-12);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(13) {
-  opacity: var(--dot-grid-dot-13-initial-opacity);
-  animation: var(--animate-pie-dot-grid-13);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(14) {
-  opacity: var(--dot-grid-dot-14-initial-opacity);
-  animation: var(--animate-pie-dot-grid-14);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15) {
-  opacity: var(--dot-grid-dot-15-initial-opacity);
-  animation: var(--animate-pie-dot-grid-15);
-}
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
-  opacity: var(--dot-grid-dot-16-initial-opacity);
-  animation: var(--animate-pie-dot-grid-16);
-}
-
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(11),
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(12),
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(15),
-[data-slot="pie-loader"] > [data-slot="pie-dot"]:nth-child(16) {
-  translate: 10cqw 10cqh;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-slot="pie-loader"] > [data-slot="pie-dot"] {
-    animation: none;
-    opacity: 1;
   }
 }

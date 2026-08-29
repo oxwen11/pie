@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "sideEffects": [
-    "**/*.css"
-  ],
+  "sideEffects": false,
   "exports": {
     "./components/*": "./src/components/*.tsx",
     "./ai-elements/*": "./src/ai-elements/*.tsx",

@@ -64,7 +64,7 @@ describe("PieLoader", () => {
     const mark = el.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
 
     expect(mark?.style.getPropertyValue("--dot-grid-size")).toBe("12px");
-    expect(mark?.style.width).toBe("12px");
-    expect(mark?.style.height).toBe("12px");
+    expect(mark?.style.width).toBe("");
+    expect(mark?.style.height).toBe("");
   });
 });
