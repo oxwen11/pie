@@ -28,14 +28,15 @@ afterEach(() => {
 });
 
 describe("SessionStatusIndicator", () => {
-  it("shows a loading spinner while running", () => {
+  it("shows the pie loader while running", () => {
     const node = renderIndicator("running");
     const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
-    const spinner = node.querySelector<SVGElement>("[role=status]");
+    const loader = node.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
     expect(slot?.dataset.state).toBe("loading");
     expect(slot?.getAttribute("title")).toBe("A turn is running in this session");
-    expect(spinner?.classList.contains("animate-spin")).toBe(true);
-    expect(spinner?.getAttribute("aria-label")).toBe("A turn is running in this session");
+    expect(loader).not.toBeNull();
+    expect(loader?.getAttribute("role")).toBe("status");
+    expect(loader?.getAttribute("aria-label")).toBe("A turn is running in this session");
   });
 
   it("shows an amber dot while waiting for user action", () => {
