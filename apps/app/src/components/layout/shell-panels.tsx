@@ -1,6 +1,13 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { type ReactNode, type RefObject, useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Group,
   Panel,

@@ -18,9 +18,7 @@ const PROTECTED_PREFIXES = ["react-you-might-not-need-an-effect/"] as const;
 const isProtectedRule = (rule: string): boolean =>
   PROTECTED_RULES.has(rule) || PROTECTED_PREFIXES.some((prefix) => rule.startsWith(prefix));
 
-const parseDisableDirective = (
-  commentValue: string,
-): { rules: string[] | null } | null => {
+const parseDisableDirective = (commentValue: string): { rules: string[] | null } | null => {
   const match = DISABLE_DIRECTIVE.exec(commentValue.trim());
   if (match?.groups === undefined) return null;
   const rulePart = (match.groups.body ?? "").replace(/\s+--\s+[\s\S]*$/u, "").trim();

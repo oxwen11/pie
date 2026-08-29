@@ -3,7 +3,7 @@ import module from "node:module";
 import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-import { noRestrictedDisable } from "./no-restricted-disable.ts";
+import { noRestrictedDisable } from "./no-restricted-disable";
 
 const { isBuiltin } = module;
 
