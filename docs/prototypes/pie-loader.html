@@ -175,18 +175,16 @@
         --dot-grid-dot-14-initial-opacity: 1;
         --dot-grid-dot-15-initial-opacity: 1;
         --dot-grid-dot-16-initial-opacity: 1;
-        --dot-grid-kick: 10%;
         color: var(--fg);
         box-sizing: border-box;
         display: inline-grid;
         width: var(--dot-grid-size);
         height: var(--dot-grid-size);
-        padding-inline-end: var(--dot-grid-kick);
-        padding-block-end: var(--dot-grid-kick);
+        vertical-align: middle;
         grid-template-columns: repeat(4, 1fr);
         grid-template-rows: repeat(4, 1fr);
         container-type: size;
-        overflow: clip;
+        overflow: visible;
         flex-shrink: 0;
       }
 

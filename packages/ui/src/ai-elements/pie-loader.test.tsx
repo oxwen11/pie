@@ -50,6 +50,15 @@ describe("PieLoader", () => {
     expect(mark?.className).toContain("text-muted-foreground");
   });
 
+  it("leaves size to 1em when omitted", async () => {
+    const el = await render(<PieLoader />);
+    const mark = el.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
+
+    expect(mark?.style.getPropertyValue("--dot-grid-size")).toBe("");
+    expect(mark?.style.width).toBe("");
+    expect(mark?.style.height).toBe("");
+  });
+
   it("maps size to --dot-grid-size", async () => {
     const el = await render(<PieLoader size={12} />);
     const mark = el.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");

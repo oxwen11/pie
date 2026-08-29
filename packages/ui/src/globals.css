@@ -814,7 +814,7 @@
 @layer components {
   [data-slot="pie-loader"] {
     --dot-grid-off-opacity: 0;
-    --dot-grid-size: 16px;
+    --dot-grid-size: 1em;
     --dot-grid-dot-1-initial-opacity: 1;
     --dot-grid-dot-2-initial-opacity: 1;
     --dot-grid-dot-3-initial-opacity: var(--dot-grid-off-opacity);
@@ -833,21 +833,21 @@
     --dot-grid-dot-16-initial-opacity: 1;
     --dot-grid-animation-duration: 2s;
     --dot-grid-animation-delay: -538ms;
-    --dot-grid-kick: 10%;
     box-sizing: border-box;
     display: inline-grid;
     width: var(--dot-grid-size);
     height: var(--dot-grid-size);
-    padding-inline-end: var(--dot-grid-kick);
-    padding-block-end: var(--dot-grid-kick);
+    vertical-align: middle;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
     container-type: size;
-    overflow: clip;
+    overflow: visible;
   }
 
   [data-slot="pie-loader"] > [data-slot="pie-dot"] {
     place-self: center;
+    min-width: 0;
+    min-height: 0;
     width: 70%;
     aspect-ratio: 1;
     border-radius: 50%;

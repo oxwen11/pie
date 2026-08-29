@@ -57,7 +57,7 @@ describe("SessionStatusIndicator", () => {
     for (const phase of ["idle", undefined] as const) {
       const node = renderIndicator(phase);
       const slot = node.querySelector("span");
-      expect(slot?.className).toContain("size-3");
+      expect(slot?.className).toContain("size-[1em]");
       expect(slot?.className).toContain("me-2");
       expect(slot?.querySelector("span")).toBeNull();
     }
