@@ -32,7 +32,7 @@ describe("SessionStatusIndicator", () => {
     const node = renderIndicator("running");
     const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
     const spinner = node.querySelector<SVGElement>("[role=status]");
-    expect(slot?.getAttribute("data-state")).toBe("loading");
+    expect(slot?.dataset.state).toBe("loading");
     expect(slot?.getAttribute("title")).toBe("A turn is running in this session");
     expect(spinner?.classList.contains("animate-spin")).toBe(true);
     expect(spinner?.getAttribute("aria-label")).toBe("A turn is running in this session");
