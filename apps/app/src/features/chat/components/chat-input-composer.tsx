@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import type { SessionRecoverySnapshot } from "@vibest/contract";
 import {
   PromptInput,
@@ -6,7 +8,8 @@ import {
   PromptInputTools,
 } from "@vibest/ui/ai-elements/prompt-input";
 import { Button } from "@vibest/ui/components/button";
-import { Card, CardFrame, CardFrameHeader } from "@vibest/ui/components/card";
+import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@vibest/ui/components/card";
+import { GitBranchIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useStore } from "zustand";
 
@@ -130,7 +133,19 @@ function QueuedPromptList({
   );
 }
 
-export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
+export function ChatInputComposer({
+  cwd,
+  toolbar,
+}: {
+  /** Session workspace path, from the route. Used to probe the current branch. */
+  cwd: string | undefined;
+  toolbar?: ReactNode;
+}) {
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const branch = useQuery({
+    ...orpcQueryUtils.git.branch.queryOptions({ input: { cwd: cwd ?? "" } }),
+    enabled: cwd !== undefined,
+  });
   const { acknowledgeRecovery, prompt, steer, turnInProgress, store } = useChatSession();
   const status = useStore(store, (state) => state.session.status);
   const activeTurnId = useStore(store, (state) => state.session.activeTurnId);
@@ -219,6 +234,17 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>
+      {branch.data?.current ? (
+        <CardFrameFooter className="py-2">
+          <span
+            className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs"
+            title="Current git branch"
+          >
+            <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+            <span className="truncate">{branch.data.current}</span>
+          </span>
+        </CardFrameFooter>
+      ) : null}
     </CardFrame>
   );
 }
