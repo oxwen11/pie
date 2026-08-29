@@ -28,12 +28,14 @@ afterEach(() => {
 });
 
 describe("SessionStatusIndicator", () => {
-  it("shows a pulsing green dot while running", () => {
+  it("shows a loading spinner while running", () => {
     const node = renderIndicator("running");
-    const dot = node.querySelector<HTMLSpanElement>("span > span");
-    expect(dot?.className).toContain("animate-pulse");
-    expect(dot?.className).toContain("bg-emerald-500");
-    expect(dot?.getAttribute("title")).toBe("A turn is running in this session");
+    const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
+    const spinner = node.querySelector<SVGElement>("[role=status]");
+    expect(slot?.dataset.state).toBe("loading");
+    expect(slot?.getAttribute("title")).toBe("A turn is running in this session");
+    expect(spinner?.classList.contains("animate-spin")).toBe(true);
+    expect(spinner?.getAttribute("aria-label")).toBe("A turn is running in this session");
   });
 
   it("shows an amber dot while waiting for user action", () => {
@@ -54,7 +56,7 @@ describe("SessionStatusIndicator", () => {
     for (const phase of ["idle", undefined] as const) {
       const node = renderIndicator(phase);
       const slot = node.querySelector("span");
-      expect(slot?.className).toContain("size-2");
+      expect(slot?.className).toContain("size-3");
       expect(slot?.className).toContain("me-2");
       expect(slot?.querySelector("span")).toBeNull();
     }
