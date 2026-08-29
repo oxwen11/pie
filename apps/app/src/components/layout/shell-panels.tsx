@@ -180,6 +180,7 @@ export function ShellMainPanel({
     <Panel
       className={cn(
         "flex min-w-0 flex-col overflow-hidden md:py-1.5",
+        !collapsed && "md:overflow-visible!",
         !hasContentPanel && "md:pe-1.5",
       )}
       collapsedSize={0}
