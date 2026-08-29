@@ -11,7 +11,7 @@
         --line: color-mix(in srgb, #000 8%, transparent);
         --bg: #f7f7f6;
         --card: #fff;
-        --dot-grid-animation-duration: 1400ms;
+        --dot-grid-animation-duration: 2s;
         --dot-grid-animation-delay: -538ms;
       }
 
@@ -350,7 +350,7 @@
           <p class="lede">
             变量也按
             Cursor：<code>--dot-grid-size</code>、<code>--dot-grid-dot-N-initial-opacity</code>、<code
-              >--dot-grid-animation-duration: 1400ms</code
+              >--dot-grid-animation-duration: 2s</code
             >、整格共用 <code>--dot-grid-animation-delay: -538ms</code>。
           </p>
         </div>
@@ -412,8 +412,8 @@
         <h2>调参</h2>
         <label class="control">
           周期
-          <input id="duration" type="range" min="800" max="2400" step="100" value="1400" />
-          <span id="duration-val">1400ms</span>
+          <input id="duration" type="range" min="800" max="3000" step="100" value="2000" />
+          <span id="duration-val">2s</span>
         </label>
       </section>
     </main>
