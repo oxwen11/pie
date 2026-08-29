@@ -428,9 +428,6 @@ importers:
       tailwindcss:
         specifier: catalog:tailwind
         version: 4.3.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.5.2
       zustand:
         specifier: 'catalog:'
         version: 5.0.15(@types/react@19.2.18)(immer@11.1.3)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))

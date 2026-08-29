@@ -1,63 +1,55 @@
-import { asyncIteratorObject, oc } from "@orpc/contract";
-import { z } from "zod";
+import { asyncIteratorObject } from "@orpc/contract";
+import { Schema } from "effect";
 
-// Compile the final wire schemas so oRPC parse rides Zod 4.5's AOT fast path.
-// Derived schemas drop the compiled function — wrap the finished object, not
-// an intermediate. This module is only imported as a value from Main, where
-// `new Function` is available; the renderer CSP has no `unsafe-eval`.
+import { oc, toStandardSchema } from "./orpc";
 
-export const ServerStatusSchema = z.compile(
-  z.enum(["starting", "ready", "reconnecting", "failed"]),
-);
-export type ServerStatus = z.infer<typeof ServerStatusSchema>;
+// Value-imported from Main only. The renderer must `import type` from this
+// file so the Effect Schema runtime stays out of the window bundle.
 
-export const ServerStatusSnapshotSchema = z.compile(
-  z.object({
-    revision: z.number().int().nonnegative(),
-    status: ServerStatusSchema,
-  }),
-);
-export type ServerStatusSnapshot = z.infer<typeof ServerStatusSnapshotSchema>;
+export const ServerStatusSchema = Schema.Literals(["starting", "ready", "reconnecting", "failed"]);
+export type ServerStatus = typeof ServerStatusSchema.Type;
 
-export const ServerConnectionSchema = z.compile(
-  z.object({
-    httpBaseUrl: z.string(),
-    wsBaseUrl: z.string(),
-    token: z.string().min(1),
-  }),
-);
-export type ServerConnection = z.infer<typeof ServerConnectionSchema>;
+export const ServerStatusSnapshotSchema = Schema.Struct({
+  revision: Schema.Natural,
+  status: ServerStatusSchema,
+});
+export type ServerStatusSnapshot = typeof ServerStatusSnapshotSchema.Type;
+
+export const ServerConnectionSchema = Schema.Struct({
+  httpBaseUrl: Schema.String,
+  wsBaseUrl: Schema.String,
+  token: Schema.NonEmptyString,
+});
+export type ServerConnection = typeof ServerConnectionSchema.Type;
 
 /** The three desktop targets, normalized off `process.platform`. */
-export const DesktopOsSchema = z.compile(z.enum(["macos", "windows", "linux"]));
-export type DesktopOs = z.infer<typeof DesktopOsSchema>;
+export const DesktopOsSchema = Schema.Literals(["macos", "windows", "linux"]);
+export type DesktopOs = typeof DesktopOsSchema.Type;
 
-export const DesktopBootstrapSchema = z.compile(
-  z.object({
-    status: ServerStatusSchema,
-    statusRevision: z.number().int().nonnegative(),
-    os: DesktopOsSchema,
-  }),
-);
-export type DesktopBootstrap = z.infer<typeof DesktopBootstrapSchema>;
+export const DesktopBootstrapSchema = Schema.Struct({
+  status: ServerStatusSchema,
+  statusRevision: Schema.Natural,
+  os: DesktopOsSchema,
+});
+export type DesktopBootstrap = typeof DesktopBootstrapSchema.Type;
 
-export const StatusSubscribeInputSchema = z.compile(
-  z.object({ after: z.number().int().nonnegative() }),
-);
+export const StatusSubscribeInputSchema = Schema.Struct({
+  after: Schema.Natural,
+});
 
 export const desktopContract = {
   bootstrap: oc.output(DesktopBootstrapSchema),
   status: {
     subscribe: oc
       .input(StatusSubscribeInputSchema)
-      .output(asyncIteratorObject(ServerStatusSnapshotSchema)),
+      .output(asyncIteratorObject(toStandardSchema(ServerStatusSnapshotSchema))),
   },
   server: {
     connection: oc.output(ServerConnectionSchema),
-    retry: oc.output(z.void()),
+    retry: oc.output(Schema.Void),
   },
   app: {
-    quit: oc.output(z.void()),
+    quit: oc.output(Schema.Void),
   },
 };
 
