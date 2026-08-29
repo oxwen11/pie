@@ -1,6 +1,8 @@
 import { cn } from "@getpie/ui/lib/utils";
 import type { CSSProperties, HTMLAttributes } from "react";
 
+import "./pie-loader.css";
+
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   /** Outer mark size in px. Omit to follow the surrounding `1em` text size. */
   size?: number;
