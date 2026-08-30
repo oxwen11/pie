@@ -125,7 +125,7 @@ export function SettingsForm() {
           <CardHeader>
             <CardTitle>Config file</CardTitle>
             <CardDescription>
-              TOML on disk. pie writes this file when you change a setting.
+              JSON on disk. pie writes this file when a setting changes.
             </CardDescription>
           </CardHeader>
           <CardPanel className="flex items-center gap-2">

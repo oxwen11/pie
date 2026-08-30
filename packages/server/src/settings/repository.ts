@@ -9,7 +9,7 @@ import {
   StoreReadError,
   StoreWriteError,
 } from "../errors";
-import { assignUiTheme, decodeSettings, parseSettingsToml, stringifySettingsToml } from "./codec";
+import { assignUiTheme, decodeSettings, parseSettingsJson, stringifySettingsJson } from "./codec";
 
 export class SettingsRepository extends Context.Service<
   SettingsRepository,
@@ -40,7 +40,7 @@ export const SettingsRepositoryLayer: Layer.Layer<
 
     const decodeFile = (text: string) =>
       Effect.try({
-        try: () => parseSettingsToml(text),
+        try: () => parseSettingsJson(text),
         catch: (cause) => new SettingsParseError({ file, cause }),
       }).pipe(
         Effect.flatMap((raw) =>
@@ -75,11 +75,11 @@ export const SettingsRepositoryLayer: Layer.Layer<
           );
           const text = yield* readExisting();
           const raw = yield* Effect.try({
-            try: () => parseSettingsToml(text),
+            try: () => parseSettingsJson(text),
             catch: (cause) => new SettingsParseError({ file, cause }),
           });
           const body = yield* Effect.try({
-            try: () => stringifySettingsToml(assignUiTheme(raw, settings.ui.theme)),
+            try: () => stringifySettingsJson(assignUiTheme(raw, settings.ui.theme)),
             catch: (cause) => new SettingsDecodeError({ file, cause }),
           });
           yield* writeFileAtomic(fs, file, body, { mode: CONFIG_FILE_MODE }).pipe(

@@ -11,8 +11,8 @@ export {
   assignUiTheme,
   decodeSettings,
   overlaySettingsDefaults,
-  parseSettingsToml,
-  stringifySettingsToml,
+  parseSettingsJson,
+  stringifySettingsJson,
 } from "./codec";
 
 export const SettingsModuleLayer: Layer.Layer<

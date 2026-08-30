@@ -1,6 +1,5 @@
 import { writeFileAtomic } from "@getpie/effect-json-store";
 import { Effect, FileSystem, Schema } from "effect";
-import { parse, stringify } from "smol-toml";
 
 /** Matches BrowserWindow `minWidth` / `minHeight` in `main-window.ts`. */
 export const MIN_WINDOW_WIDTH = 800;
@@ -8,14 +7,8 @@ export const MIN_WINDOW_HEIGHT = 600;
 export const DEFAULT_WINDOW_WIDTH = 1200;
 export const DEFAULT_WINDOW_HEIGHT = 800;
 
-/** Owner-only, matching `$PIE_HOME/config.toml`. */
+/** Owner-only, matching `$PIE_HOME/config.json`. */
 export const DESKTOP_CONFIG_FILE_MODE = 0o600;
-
-/** Keep in sync with `SETTINGS_FILE_HEADER` in `packages/server/src/settings/codec.ts`. */
-export const DESKTOP_CONFIG_FILE_HEADER = `# pie settings. Edit this file or use the Settings page.
-# Tables: [ui] SPA, [desktop] host, [agent] operator. Saving does not keep comments.
-
-`;
 
 export type Rect = {
   readonly x: number;
@@ -101,9 +94,9 @@ function overlayWindowDefaults(raw: unknown) {
   return { window: overlaid };
 }
 
-/** Empty / whitespace-only files are an empty table, not a parse error. */
-export function parseDesktopToml(text: string): unknown {
-  return text.trim() === "" ? {} : parse(text);
+/** Empty / whitespace-only files are an empty object, not a parse error. */
+export function parseDesktopJson(text: string): unknown {
+  return text.trim() === "" ? {} : JSON.parse(text);
 }
 
 export function decodeDesktopSettings(raw: unknown): DesktopSettings {
@@ -130,8 +123,8 @@ function windowForToml(window: DesktopWindowState): TomlWindow {
 }
 
 /**
- * Overlay `desktop.window` onto an existing document so sibling tables
- * (`[ui]`, `[agent]`, unknown keys) survive a window save. Strips leftover
+ * Overlay `desktop.window` onto an existing document so sibling objects
+ * (`ui`, `agent`, unknown keys) survive a window save. Strips leftover
  * `ui.window`.
  */
 export function assignDesktopWindow(
@@ -139,10 +132,10 @@ export function assignDesktopWindow(
   window: DesktopWindowState,
 ): Record<string, unknown> {
   if (isRecord(raw) && raw.desktop !== undefined && !isRecord(raw.desktop)) {
-    throw new Error("desktop must be a table");
+    throw new Error("desktop must be an object");
   }
   if (isRecord(raw) && raw.ui !== undefined && !isRecord(raw.ui)) {
-    throw new Error("ui must be a table");
+    throw new Error("ui must be an object");
   }
   const document: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
   const desktop: Record<string, unknown> = isRecord(document.desktop)
@@ -162,14 +155,12 @@ export function assignDesktopWindow(
   return document;
 }
 
-export function stringifyDesktopToml(settings: DesktopSettings): string {
-  return stringifyConfigToml(assignDesktopWindow({}, settings.window));
+export function stringifyDesktopJson(settings: DesktopSettings): string {
+  return stringifyConfigJson(assignDesktopWindow({}, settings.window));
 }
 
-function stringifyConfigToml(document: unknown): string {
-  const body = stringify(document);
-  const withNewline = body.endsWith("\n") ? body : `${body}\n`;
-  return `${DESKTOP_CONFIG_FILE_HEADER}${withNewline}`;
+function stringifyConfigJson(document: unknown): string {
+  return `${JSON.stringify(document, null, 2)}\n`;
 }
 
 /**
@@ -218,12 +209,12 @@ export type DesktopStore = {
 };
 
 /**
- * Read/write `$PIE_HOME/config.toml` `[desktop.window]`. Methods are R-free:
+ * Read/write `$PIE_HOME/config.json` `desktop.window`. Methods are R-free:
  * FileSystem is bound at construction so Electron event handlers can
  * `Effect.runFork` them. A missing or corrupt file is defaults in memory
  * and is not rewritten until the next successful save — a bad file must
  * not block the window. Writes merge `desktop.window` and leave sibling
- * tables. Leftover `ui.window` is read until the next save relocates it.
+ * objects. Leftover `ui.window` is read until the next save relocates it.
  */
 export function makeDesktopStore(
   file: string,
@@ -243,7 +234,7 @@ export function makeDesktopStore(
     const get = readExisting.pipe(
       Effect.flatMap((text) =>
         Effect.try({
-          try: () => decodeDesktopSettings(parseDesktopToml(text)),
+          try: () => decodeDesktopSettings(parseDesktopJson(text)),
           catch: (cause) => cause,
         }),
       ),
@@ -260,7 +251,7 @@ export function makeDesktopStore(
       readExisting.pipe(
         Effect.flatMap((text) =>
           Effect.try({
-            try: () => stringifyConfigToml(assignDesktopWindow(parseDesktopToml(text), window)),
+            try: () => stringifyConfigJson(assignDesktopWindow(parseDesktopJson(text), window)),
             catch: (cause) => cause,
           }),
         ),

@@ -9,7 +9,7 @@ export class DesktopConfig extends Context.Service<
     readonly isPackaged: boolean;
     readonly devUrl: string | undefined;
     readonly serverEntry: string;
-    /** `$PIE_HOME/config.toml` — injected so this module stays server-free. */
+    /** `$PIE_HOME/config.json` — injected so this module stays server-free. */
     readonly configFile: string;
   }
 >()("desktop/DesktopConfig") {}

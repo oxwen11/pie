@@ -44,8 +44,8 @@ describe("logsDirectory", () => {
 });
 
 describe("configFilePath", () => {
-  it("is $PIE_HOME/config.toml, not under storage/", () => {
-    expect(configFilePath("/tmp/data")).toBe(path.join("/tmp/data", "config.toml"));
+  it("is $PIE_HOME/config.json, not under storage/", () => {
+    expect(configFilePath("/tmp/data")).toBe(path.join("/tmp/data", "config.json"));
   });
 });
 

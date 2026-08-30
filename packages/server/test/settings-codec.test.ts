@@ -5,24 +5,24 @@ import {
   assignUiTheme,
   decodeSettings,
   overlaySettingsDefaults,
-  parseSettingsToml,
-  stringifySettingsToml,
+  parseSettingsJson,
+  stringifySettingsJson,
 } from "../src/settings/codec";
 
-describe("parseSettingsToml", () => {
-  it("treats empty and whitespace-only files as an empty table", () => {
-    expect(parseSettingsToml("")).toEqual({});
-    expect(parseSettingsToml("  \n  ")).toEqual({});
+describe("parseSettingsJson", () => {
+  it("treats empty and whitespace-only files as an empty object", () => {
+    expect(parseSettingsJson("")).toEqual({});
+    expect(parseSettingsJson("  \n  ")).toEqual({});
   });
 
-  it("parses a ui table", () => {
-    expect(parseSettingsToml('[ui]\ntheme = "dark"\n')).toEqual({
+  it("parses a ui object", () => {
+    expect(parseSettingsJson('{"ui":{"theme":"dark"}}')).toEqual({
       ui: { theme: "dark" },
     });
   });
 
-  it("throws on invalid TOML", () => {
-    expect(() => parseSettingsToml("theme = [")).toThrow(/TOML|Unexpected|end of/i);
+  it("throws on invalid JSON", () => {
+    expect(() => parseSettingsJson("{")).toThrow(SyntaxError);
   });
 });
 
@@ -33,7 +33,7 @@ describe("overlaySettingsDefaults", () => {
     expect(overlaySettingsDefaults({ appearance: {} })).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("prefers ui.theme over a leftover appearance table", () => {
+  it("prefers ui.theme over a leftover appearance object", () => {
     expect(
       overlaySettingsDefaults({
         ui: { theme: "dark" },
@@ -102,7 +102,7 @@ describe("assignUiTheme", () => {
     });
   });
 
-  it("preserves an [agent] table", () => {
+  it("preserves an agent object", () => {
     expect(assignUiTheme({ ui: { theme: "system" }, agent: { foo: 1 } }, "dark")).toEqual({
       ui: { theme: "dark" },
       agent: { foo: 1 },
@@ -110,18 +110,16 @@ describe("assignUiTheme", () => {
   });
 });
 
-describe("stringifySettingsToml", () => {
-  it("writes a header and a ui table", () => {
-    const text = stringifySettingsToml({ ui: { theme: "dark" } });
-    expect(text.startsWith("# pie settings.")).toBe(true);
-    expect(text).toContain("[ui]");
-    expect(text).toContain('theme = "dark"');
-    expect(text).toContain("[ui] SPA, [desktop] host, [agent] operator");
+describe("stringifySettingsJson", () => {
+  it("writes pretty JSON with a trailing newline", () => {
+    const text = stringifySettingsJson({ ui: { theme: "dark" } });
+    expect(JSON.parse(text)).toEqual({ ui: { theme: "dark" } });
+    expect(text).toContain('\n  "ui"');
     expect(text.endsWith("\n")).toBe(true);
   });
 
   it("round-trips a decoded document", () => {
     const original = { ui: { theme: "light" as const } };
-    expect(decodeSettings(parseSettingsToml(stringifySettingsToml(original)))).toEqual(original);
+    expect(decodeSettings(parseSettingsJson(stringifySettingsJson(original)))).toEqual(original);
   });
 });

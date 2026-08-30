@@ -1,15 +1,9 @@
 import { type Theme, SettingsSchema, type Settings } from "@getpie/contract";
 import { Schema } from "effect";
-import { parse, stringify } from "smol-toml";
 
 export const DEFAULT_SETTINGS: Settings = {
   ui: { theme: "system" },
 };
-
-export const SETTINGS_FILE_HEADER = `# pie settings. Edit this file or use the Settings page.
-# Tables: [ui] SPA, [desktop] host, [agent] operator. Saving does not keep comments.
-
-`;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -17,10 +11,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /**
  * Fill missing known keys with defaults. Unknown keys are dropped from the
  * decoded operator slice so an older pie can still read a newer file. A
- * present-but-wrong `ui` table is left as-is so schema decode fails instead
+ * present-but-wrong `ui` object is left as-is so schema decode fails instead
  * of silently resetting it. `appearance.theme` is accepted when `ui.theme`
- * is absent (pre-`[ui]` documents). `[desktop]` and `[agent]` are not part
- * of this slice.
+ * is absent. `desktop` and `agent` are not part of this slice.
  */
 export function overlaySettingsDefaults(raw: unknown) {
   if (!isRecord(raw)) return raw;
@@ -38,9 +31,9 @@ export function overlaySettingsDefaults(raw: unknown) {
   };
 }
 
-/** Empty / whitespace-only files are treated as an empty table, not a parse error. */
-export function parseSettingsToml(text: string): unknown {
-  return text.trim() === "" ? {} : parse(text);
+/** Empty / whitespace-only files are treated as an empty object, not a parse error. */
+export function parseSettingsJson(text: string): unknown {
+  return text.trim() === "" ? {} : JSON.parse(text);
 }
 
 export function decodeSettings(raw: unknown): Settings {
@@ -48,7 +41,7 @@ export function decodeSettings(raw: unknown): Settings {
 }
 
 /**
- * Move leftover `ui.window` onto `desktop.window` when the host table is
+ * Move leftover `ui.window` onto `desktop.window` when the host object is
  * absent. Does not overwrite an existing `desktop.window`.
  */
 function relocateUiWindowToDesktop(document: Record<string, unknown>): void {
@@ -76,17 +69,17 @@ function relocateUiWindowToDesktop(document: Record<string, unknown>): void {
 }
 
 /**
- * Overlay `ui.theme` onto an existing document so sibling tables (`[desktop]`,
- * `[agent]`, unknown keys) survive a Settings save. Relocates leftover
- * `ui.window` to `desktop.window`. Drops the pre-`[ui]` `appearance` table
- * once theme lives under `ui`.
+ * Overlay `ui.theme` onto an existing document so sibling objects (`desktop`,
+ * `agent`, unknown keys) survive a Settings save. Relocates leftover
+ * `ui.window` to `desktop.window`. Drops a leftover `appearance` object once
+ * theme lives under `ui`.
  */
 export function assignUiTheme(raw: unknown, theme: Theme): Record<string, unknown> {
   if (isRecord(raw) && raw.ui !== undefined && !isRecord(raw.ui)) {
-    throw new Error("ui must be a table");
+    throw new Error("ui must be an object");
   }
   if (isRecord(raw) && raw.desktop !== undefined && !isRecord(raw.desktop)) {
-    throw new Error("desktop must be a table");
+    throw new Error("desktop must be an object");
   }
   const document: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
   relocateUiWindowToDesktop(document);
@@ -97,8 +90,6 @@ export function assignUiTheme(raw: unknown, theme: Theme): Record<string, unknow
   return document;
 }
 
-export function stringifySettingsToml(document: unknown): string {
-  const body = stringify(document);
-  const withNewline = body.endsWith("\n") ? body : `${body}\n`;
-  return `${SETTINGS_FILE_HEADER}${withNewline}`;
+export function stringifySettingsJson(document: unknown): string {
+  return `${JSON.stringify(document, null, 2)}\n`;
 }

@@ -13,22 +13,24 @@ import {
   decodeDesktopSettings,
   isRectVisibleOnWorkArea,
   makeDesktopStore,
-  parseDesktopToml,
+  parseDesktopJson,
   placementFromWindowState,
-  stringifyDesktopToml,
+  stringifyDesktopJson,
   windowStateFromBounds,
 } from "./desktop-store";
 
 describe("decodeDesktopSettings", () => {
   test("fills defaults for an empty document", () => {
-    expect(decodeDesktopSettings(parseDesktopToml(""))).toEqual(DEFAULT_DESKTOP_SETTINGS);
+    expect(decodeDesktopSettings(parseDesktopJson(""))).toEqual(DEFAULT_DESKTOP_SETTINGS);
   });
 
-  test("keeps a complete desktop.window table", () => {
+  test("keeps a complete desktop.window object", () => {
     expect(
       decodeDesktopSettings(
-        parseDesktopToml(
-          "[desktop.window]\nwidth = 1400\nheight = 900\nx = 12\ny = 40\nmaximized = true\n",
+        parseDesktopJson(
+          JSON.stringify({
+            desktop: { window: { width: 1400, height: 900, x: 12, y: 40, maximized: true } },
+          }),
         ),
       ),
     ).toEqual({
@@ -39,8 +41,10 @@ describe("decodeDesktopSettings", () => {
   test("reads leftover ui.window when desktop.window is absent", () => {
     expect(
       decodeDesktopSettings(
-        parseDesktopToml(
-          "[ui.window]\nwidth = 1400\nheight = 900\nx = 12\ny = 40\nmaximized = true\n",
+        parseDesktopJson(
+          JSON.stringify({
+            ui: { window: { width: 1400, height: 900, x: 12, y: 40, maximized: true } },
+          }),
         ),
       ),
     ).toEqual({
@@ -51,8 +55,11 @@ describe("decodeDesktopSettings", () => {
   test("prefers desktop.window over leftover ui.window", () => {
     expect(
       decodeDesktopSettings(
-        parseDesktopToml(
-          "[desktop.window]\nwidth = 1400\nheight = 900\nmaximized = false\n\n[ui.window]\nwidth = 800\nheight = 600\nmaximized = true\n",
+        parseDesktopJson(
+          JSON.stringify({
+            desktop: { window: { width: 1400, height: 900, maximized: false } },
+            ui: { window: { width: 800, height: 600, maximized: true } },
+          }),
         ),
       ),
     ).toEqual({
@@ -62,25 +69,27 @@ describe("decodeDesktopSettings", () => {
 
   test("uses the default size when the stored size is below the minimum", () => {
     expect(
-      decodeDesktopSettings(parseDesktopToml("[desktop.window]\nwidth = 100\nheight = 100\n")),
+      decodeDesktopSettings(
+        parseDesktopJson(JSON.stringify({ desktop: { window: { width: 100, height: 100 } } })),
+      ),
     ).toEqual(DEFAULT_DESKTOP_SETTINGS);
   });
 
   test("rejects a present-but-wrong maximized value", () => {
     expect(() =>
-      decodeDesktopSettings(parseDesktopToml('[desktop.window]\nmaximized = "yes"\n')),
+      decodeDesktopSettings(
+        parseDesktopJson(JSON.stringify({ desktop: { window: { maximized: "yes" } } })),
+      ),
     ).toThrow(/boolean|maximized/i);
   });
 });
 
-describe("stringifyDesktopToml", () => {
+describe("stringifyDesktopJson", () => {
   test("omits unset coordinates", () => {
-    const text = stringifyDesktopToml(DEFAULT_DESKTOP_SETTINGS);
-    expect(text).toMatch(/\[desktop\.window\]/);
-    expect(text).toMatch(/width = 1200/);
-    expect(text).not.toMatch(/\bx = /);
-    expect(text).not.toMatch(/\by = /);
-    expect(text).not.toMatch(/\[ui\.window\]/);
+    const document = JSON.parse(stringifyDesktopJson(DEFAULT_DESKTOP_SETTINGS));
+    expect(document).toEqual({
+      desktop: { window: { width: 1200, height: 800, maximized: false } },
+    });
   });
 });
 
@@ -153,14 +162,14 @@ describe("windowStateFromBounds", () => {
 const platform = Layer.mergeAll(NodeFileSystem.layer, Observability.discard);
 
 layer(platform)("makeDesktopStore", (it) => {
-  it.effect("returns defaults without creating config.toml", () =>
+  it.effect("returns defaults without creating config.json", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
-      const store = yield* makeDesktopStore(path.join(home, "config.toml"));
+      const store = yield* makeDesktopStore(path.join(home, "config.json"));
       const loaded = yield* store.get;
       assert.deepEqual(loaded, DEFAULT_DESKTOP_SETTINGS);
-      assert.equal(yield* fs.exists(path.join(home, "config.toml")), false);
+      assert.equal(yield* fs.exists(path.join(home, "config.json")), false);
     }),
   );
 
@@ -168,15 +177,13 @@ layer(platform)("makeDesktopStore", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
-      const file = path.join(home, "config.toml");
+      const file = path.join(home, "config.json");
       const store = yield* makeDesktopStore(file);
       const window = { width: 1400, height: 900, x: 24, y: 48, maximized: false };
       yield* store.setWindow(window);
-      const text = yield* fs.readFileString(file);
-      assert.match(text, /\[desktop\.window\]/);
-      assert.match(text, /width = 1400/);
-      assert.match(text, /x = 24/);
-      assert.doesNotMatch(text, /\[ui\.window\]/);
+      assert.deepEqual(JSON.parse(yield* fs.readFileString(file)), {
+        desktop: { window },
+      });
       assert.deepEqual((yield* store.get).window, window);
     }),
   );
@@ -185,15 +192,14 @@ layer(platform)("makeDesktopStore", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
-      const file = path.join(home, "config.toml");
-      yield* fs.writeFileString(file, '[ui]\ntheme = "dark"\n');
+      const file = path.join(home, "config.json");
+      yield* fs.writeFileString(file, JSON.stringify({ ui: { theme: "dark" } }));
       const store = yield* makeDesktopStore(file);
       yield* store.setWindow({ width: 1400, height: 900, maximized: false });
-      const text = yield* fs.readFileString(file);
-      assert.match(text, /theme = "dark"/);
-      assert.match(text, /\[desktop\.window\]/);
-      assert.match(text, /width = 1400/);
-      assert.doesNotMatch(text, /\[ui\.window\]/);
+      assert.deepEqual(JSON.parse(yield* fs.readFileString(file)), {
+        ui: { theme: "dark" },
+        desktop: { window: { width: 1400, height: 900, maximized: false } },
+      });
     }),
   );
 
@@ -201,18 +207,19 @@ layer(platform)("makeDesktopStore", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
-      const file = path.join(home, "config.toml");
+      const file = path.join(home, "config.json");
       yield* fs.writeFileString(
         file,
-        '[ui]\ntheme = "dark"\n\n[ui.window]\nwidth = 1000\nheight = 700\nmaximized = false\n',
+        JSON.stringify({
+          ui: { theme: "dark", window: { width: 1000, height: 700, maximized: false } },
+        }),
       );
       const store = yield* makeDesktopStore(file);
       yield* store.setWindow({ width: 1400, height: 900, maximized: false });
-      const text = yield* fs.readFileString(file);
-      assert.match(text, /theme = "dark"/);
-      assert.match(text, /\[desktop\.window\]/);
-      assert.match(text, /width = 1400/);
-      assert.doesNotMatch(text, /\[ui\.window\]/);
+      assert.deepEqual(JSON.parse(yield* fs.readFileString(file)), {
+        ui: { theme: "dark" },
+        desktop: { window: { width: 1400, height: 900, maximized: false } },
+      });
     }),
   );
 
@@ -220,11 +227,11 @@ layer(platform)("makeDesktopStore", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-desktop-store-" });
-      const file = path.join(home, "config.toml");
-      yield* fs.writeFileString(file, "window = [");
+      const file = path.join(home, "config.json");
+      yield* fs.writeFileString(file, "{");
       const store = yield* makeDesktopStore(file);
       assert.deepEqual(yield* store.get, DEFAULT_DESKTOP_SETTINGS);
-      assert.equal(yield* fs.readFileString(file), "window = [");
+      assert.equal(yield* fs.readFileString(file), "{");
     }),
   );
 });

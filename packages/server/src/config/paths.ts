@@ -8,8 +8,8 @@ import { Context, Layer } from "effect";
  * so tests can point it at a temp dir instead of `~/.pie`.
  *
  * `projects.json` lives under `storage/` (a data collection).
- * `config.toml` lives at the home root (three owner tables: `[ui]` SPA,
- * `[desktop]` host, `[agent]` operator). Desktop Main reads `desktop.window`
+ * `config.json` lives at the home root (three owner objects: `ui` SPA,
+ * `desktop` host, `agent` operator). Desktop Main reads `desktop.window`
  * from that file before the daemon is up.
  */
 export class Paths extends Context.Service<
@@ -17,7 +17,7 @@ export class Paths extends Context.Service<
   {
     readonly home: string;
     readonly projectsFile: string;
-    /** `$PIE_HOME/config.toml` — `[ui]` / `[desktop]` / `[agent]`, not a storage collection. */
+    /** `$PIE_HOME/config.json` — `ui` / `desktop` / `agent`, not a storage collection. */
     readonly configFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
@@ -31,7 +31,7 @@ export class Paths extends Context.Service<
 /** Owner-only, matching `daemon.pid`. Shared by the log layer and the launcher. */
 export const LOGS_DIRECTORY_MODE = 0o700;
 export const LOG_FILE_MODE = 0o600;
-/** Owner-only, matching log files — `config.toml` may grow secrets later. */
+/** Owner-only, matching log files — `config.json` may grow secrets later. */
 export const CONFIG_FILE_MODE = 0o600;
 
 export const PIE_LOG_FILE = "pie.log";
@@ -108,8 +108,8 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
   return resolveDaemonLocation(env).daemonDir;
 }
 
-/** `$PIE_HOME/config.toml` — `[ui]` / `[desktop]` / `[agent]`. */
-export const configFilePath = (home: string): string => path.join(home, "config.toml");
+/** `$PIE_HOME/config.json` — `ui` / `desktop` / `agent`. */
+export const configFilePath = (home: string): string => path.join(home, "config.json");
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");

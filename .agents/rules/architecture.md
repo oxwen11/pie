@@ -49,13 +49,13 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
   persistent roots: `resolvePieHome` for Projects and Sessions,
-  `configFile` for `$PIE_HOME/config.toml` (three owner tables: `[ui]` SPA,
-  `[desktop]` Electron host, `[agent]` operator; the server writes `ui.theme`
+  `configFile` for `$PIE_HOME/config.json` (three owner objects: `ui` SPA,
+  `desktop` Electron host, `agent` operator; the server writes `ui.theme`
   via `settings.get`/`settings.update`; desktop Main reads and writes
   `desktop.window` directly so the window can restore before the daemon is
   up, accepting leftover `ui.window` until the next save relocates it; both
-  merge their slice and leave sibling tables in place; do not write an empty
-  `[agent]` until a key exists; Electron `userData` is Chromium/instance-lock
+  merge their slice and leave sibling objects in place; do not write an empty
+  `agent` until a key exists; Electron `userData` is Chromium/instance-lock
   only),
   `resolveDaemonDirectory` for lifecycle state, and `logsDirectory` for
   `$PIE_HOME/logs`. The daemon directory holds only `daemon.pid`, `.lock`, and
