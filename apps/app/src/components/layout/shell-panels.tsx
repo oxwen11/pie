@@ -272,7 +272,7 @@ export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactN
 
   return (
     <Panel
-      className="flex min-w-0 flex-col overflow-hidden md:py-1 md:ps-1"
+      className="flex min-w-0 flex-col overflow-hidden! md:py-1 md:ps-1"
       collapsedSize={0}
       collapsible
       defaultSize={SIDEBAR_DEFAULT_SIZE}
