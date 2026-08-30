@@ -1,4 +1,4 @@
-import { resolveDaemonCompatibilityKey } from "@getpie/core/build-id";
+import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { defineConfig } from "tsdown";
 
 export default defineConfig({

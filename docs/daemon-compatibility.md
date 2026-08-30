@@ -8,7 +8,7 @@ prove daemon ownership before replacement signals a recorded pid.
 
 Current builds use `githash:<8-hex>`. Desktop Electron Vite, the standalone
 server tsdown config, and the CLI tsdown config each call the shared
-`@getpie/core/build-id` resolver and statically inject the complete
+`@getpie/core/compatibility` resolver and statically inject the complete
 `PIE_DAEMON_COMPATIBILITY_KEY` string into their output. Runtime code only
 validates that embedded value; there is no `dev` fallback.
 
@@ -37,6 +37,5 @@ canonical Git checkout path and uses `$PIE_HOME/daemons/<scope>` (or
 Session storage, application ports, and root development commands are
 unchanged. Packaged builds continue sharing `~/.pie/daemon/`.
 
-When cross-build compatibility becomes stable, key generation can switch to
-`protocol:<positive-integer>`. Record decoding and launcher matching remain
-exact and require no lifecycle changes.
+A future cross-build compatibility protocol can add a separate versioned key
+format. Current decoding deliberately accepts only `githash:<8-hex>`.

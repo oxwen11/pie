@@ -1,6 +1,6 @@
 import url from "node:url";
 
-import { resolveDaemonCompatibilityKey } from "@getpie/core/build-id";
+import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";

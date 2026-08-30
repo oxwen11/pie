@@ -17,6 +17,35 @@ export type UIApp = Effect.Effect<
 
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 
+const IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+const REVALIDATE_CACHE_CONTROL = "no-cache";
+const ERROR_CACHE_CONTROL = "no-store";
+
+/**
+ * Immutable caching is deliberately a narrow allowlist of Vite's literal
+ * emitted URLs. Encoded or normalized aliases revalidate instead of duplicating
+ * `HttpStaticServer`'s private path-resolution algorithm here.
+ */
+const VERSIONED_ASSET_PATH = /^\/assets\/[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9_.-]+$/;
+
+/** Apply the built-UI cache contract after the static handler resolves a response. */
+export const withStaticCacheControl = (
+  requestUrl: string,
+  response: HttpServerResponse.HttpServerResponse,
+): HttpServerResponse.HttpServerResponse => {
+  if (response.status !== 200 && response.status !== 206 && response.status !== 304) {
+    return HttpServerResponse.setHeader(response, "cache-control", ERROR_CACHE_CONTROL);
+  }
+
+  const queryIndex = requestUrl.indexOf("?");
+  const pathname = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
+  return HttpServerResponse.setHeader(
+    response,
+    "cache-control",
+    VERSIONED_ASSET_PATH.test(pathname) ? IMMUTABLE_ASSET_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
+  );
+};
+
 /** `node:url` has no Effect equivalent; the URLs below are all module-relative. */
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
@@ -25,16 +54,20 @@ const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, 
  * bundle as `client/`, while running from monorepo source falls back to
  * `apps/app/dist`.
  */
-const resolveStaticDir = (): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
+const resolveStaticDir = (
+  override: string | undefined,
+): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const candidates = [
-      "./client/", // packaged: dist/client next to dist/cli.js
-      "../../../../apps/app/dist/", // monorepo, from src/node
-      "../../../apps/app/dist/", // monorepo, from packages/pie/dist
-    ];
+    const candidates = override
+      ? [override]
+      : [
+          "./client/", // packaged: dist/client next to dist/cli.mjs
+          "../../../../apps/app/dist/", // monorepo, from src/node
+          "../../../apps/app/dist/", // monorepo, from packages/pie/dist
+        ];
     for (const candidate of candidates) {
-      const dir = path.resolve(fromModuleUrl(candidate));
+      const dir = override ? path.resolve(candidate) : path.resolve(fromModuleUrl(candidate));
       const built = yield* fs
         .exists(path.join(dir, "index.html"))
         .pipe(Effect.orElseSucceed(() => false));
@@ -50,7 +83,9 @@ const resolveStaticDir = (): Effect.Effect<string | undefined, never, FileSystem
  * proxies `/api` and `/ws/rpc` here, so this server serves files in every mode
  * and never hosts a bundler.
  */
-export const createUIHandler = (): Effect.Effect<
+export const createUIHandler = (
+  options: { readonly staticDir?: string } = {},
+): Effect.Effect<
   UIApp,
   never,
   // `Path` is not ours: `HttpStaticServer.make` asks for it. Our own path math
@@ -58,21 +93,24 @@ export const createUIHandler = (): Effect.Effect<
   FileSystem.FileSystem | HttpPlatform.HttpPlatform | Path.Path
 > =>
   Effect.gen(function* () {
-    const staticDir = yield* resolveStaticDir();
+    const staticDir = yield* resolveStaticDir(options.staticDir);
     if (!staticDir) {
       return Effect.succeed(
-        HttpServerResponse.text("Web UI not built. Run the @getpie/app build first.", {
-          status: 503,
-        }),
+        withStaticCacheControl(
+          "/",
+          HttpServerResponse.text("Web UI not built. Run the @getpie/app build first.", {
+            status: 503,
+          }),
+        ),
       );
     }
 
     // `spa: true` is the old `sirv(dir, { single: true })`: an unknown path
     // falls back to index.html so the client router owns deep links.
-    // No `cacheControl` here, despite the hashed asset names: the option is
-    // global, and `HttpStaticServer` reuses `serveFile` for the SPA fallback
-    // (`HttpStaticServer.js:104`), so `immutable` would pin `index.html` too
-    // and strand clients on a stale app. Per-asset headers need a wrapper.
+    // No `cacheControl` here: the option is global, and `HttpStaticServer`
+    // reuses `serveFile` for the SPA fallback. The wrapper below gives hashed
+    // assets a long immutable lifetime while index.html and deep-link
+    // fallbacks always revalidate.
     const assets = yield* HttpStaticServer.make({ root: staticDir, spa: true }).pipe(
       // `resolveStaticDir` just proved `index.html` exists here, so a platform
       // failure opening the same directory is a defect, not a served error.
@@ -89,14 +127,18 @@ export const createUIHandler = (): Effect.Effect<
     // side. `RouteNotFound` covers both a missing asset and a deep link the
     // SPA fallback declined (it only rewrites extensionless paths from a
     // client that accepts HTML — a browser navigation, never a fetch).
-    return assets.pipe(
-      Effect.catch((error) =>
-        error.reason._tag === "RouteNotFound"
-          ? Effect.succeed(notFound)
-          : Effect.as(
-              Effect.logError("static asset read failed", error),
-              HttpServerResponse.text("Internal Server Error", { status: 500 }),
-            ),
-      ),
-    );
+    return Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const response = yield* assets.pipe(
+        Effect.catch((error) =>
+          error.reason._tag === "RouteNotFound"
+            ? Effect.succeed(notFound)
+            : Effect.as(
+                Effect.logError("static asset read failed", error),
+                HttpServerResponse.text("Internal Server Error", { status: 500 }),
+              ),
+        ),
+      );
+      return withStaticCacheControl(request.url, response);
+    });
   });

@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveDaemonCompatibilityKey } from "./build-id";
+import { resolveDaemonCompatibilityKey } from "./compatibility";
 
 const temporaryDirectories: string[] = [];
 

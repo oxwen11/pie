@@ -4,7 +4,6 @@ import {
   decodeDaemonCompatibilityKey,
   embeddedDaemonCompatibilityKey,
   makeGitHashDaemonCompatibilityKey,
-  makeProtocolDaemonCompatibilityKey,
 } from "./compatibility";
 
 describe("daemon compatibility key", () => {
@@ -14,11 +13,6 @@ describe("daemon compatibility key", () => {
     );
     expect(makeGitHashDaemonCompatibilityKey("d1fb9004")).toBe("githash:d1fb9004");
     expect(decodeDaemonCompatibilityKey("githash:d1fb9004")).toBe("githash:d1fb9004");
-  });
-
-  it("constructs and decodes protocol keys with a positive safe integer version", () => {
-    expect(makeProtocolDaemonCompatibilityKey(1)).toBe("protocol:1");
-    expect(decodeDaemonCompatibilityKey("protocol:42")).toBe("protocol:42");
   });
 
   it("requires a statically embedded valid key", () => {
@@ -34,28 +28,10 @@ describe("daemon compatibility key", () => {
     },
   );
 
-  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
-    "rejects invalid protocol version %s",
-    (version) => {
-      expect(() => makeProtocolDaemonCompatibilityKey(version)).toThrow(/positive safe integer/);
-      expect(decodeDaemonCompatibilityKey(`protocol:${version}`)).toBeUndefined();
+  it.each([undefined, null, 1, "release-123", "dev", "D1FB9004", "d1fb9004", "protocol:1"])(
+    "rejects malformed persisted value %j",
+    (value) => {
+      expect(decodeDaemonCompatibilityKey(value)).toBeUndefined();
     },
   );
-
-  it.each([
-    undefined,
-    null,
-    1,
-    "release-123",
-    "dev",
-    "D1FB9004",
-    "d1fb9004",
-    "protocol:01",
-    "protocol:+1",
-    "protocol:1.0",
-    "protocol:1e2",
-    "protocol:9007199254740992",
-  ])("rejects malformed persisted value %j", (value) => {
-    expect(decodeDaemonCompatibilityKey(value)).toBeUndefined();
-  });
 });

@@ -5,10 +5,6 @@
   "description": "Shared core types and process identity for Pie",
   "type": "module",
   "exports": {
-    "./build-id": {
-      "types": "./dist/build-id.d.mts",
-      "default": "./dist/build-id.mjs"
-    },
     "./compatibility": {
       "types": "./dist/compatibility.d.mts",
       "default": "./dist/compatibility.mjs"

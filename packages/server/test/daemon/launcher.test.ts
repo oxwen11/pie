@@ -194,7 +194,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.ok(record);
         yield* fs.writeFileString(
           path.join(daemonDir, "daemon.pid"),
-          JSON.stringify({ ...record, compatibilityKey: "protocol:0" }),
+          JSON.stringify({ ...record, compatibilityKey: "protocol:1" }),
         );
 
         const replacement = yield* resolve({

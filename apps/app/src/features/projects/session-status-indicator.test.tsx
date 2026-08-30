@@ -37,6 +37,7 @@ describe("SessionStatusIndicator", () => {
     expect(loader).not.toBeNull();
     expect(loader?.getAttribute("role")).toBe("status");
     expect(loader?.getAttribute("aria-label")).toBe("A turn is running in this session");
+    expect(loader?.style.getPropertyValue("--dot-grid-size")).toBe("10px");
   });
 
   it("shows an accessible amber dot while waiting for user action", () => {

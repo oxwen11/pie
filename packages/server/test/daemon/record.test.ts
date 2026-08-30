@@ -78,7 +78,7 @@ layer(NodeServices.layer)("daemon record", (it) => {
 
       yield* fs.writeFileString(
         daemonRecordPath(daemonDir),
-        JSON.stringify({ ...record, compatibilityKey: "protocol:0" }),
+        JSON.stringify({ ...record, compatibilityKey: "protocol:1" }),
       );
       const { compatibilityKey: _, ...legacyRecord } = record;
       assert.deepEqual(yield* readRecord(daemonDir), legacyRecord);
