@@ -5,11 +5,6 @@ import { _electron as electron } from "@playwright/test";
 
 import { expect, test } from "./fixtures.js";
 
-const PNG_1X1 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXkAAAAASUVORK5CYII=",
-  "base64",
-);
-
 test.use({ fakePiResponse: "![E2E local image](e2e-image.png)" });
 
 test("decodes a live and replayed local Markdown image through a signed asset URL", async ({
@@ -17,7 +12,10 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
   electronApp,
   window,
 }, testInfo) => {
-  fs.writeFileSync(path.join(e2ePaths.workspace, "e2e-image.png"), PNG_1X1);
+  fs.copyFileSync(
+    path.join(import.meta.dirname, "../../resources/icon.png"),
+    path.join(e2ePaths.workspace, "e2e-image.png"),
+  );
 
   await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
     timeout: 30_000,
@@ -45,8 +43,8 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
     )
     .toMatchObject({
       complete: true,
-      naturalHeight: 1,
-      naturalWidth: 1,
+      naturalHeight: 512,
+      naturalWidth: 512,
       origin: "pie://app",
     });
 
@@ -110,7 +108,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
           };
         }),
       )
-      .toMatchObject({ complete: true, height: 1, origin: "pie://app", width: 1 });
+      .toMatchObject({ complete: true, height: 512, origin: "pie://app", width: 512 });
     const replayedSrc = await replayed.evaluate(
       (element) => (element as HTMLImageElement).currentSrc,
     );
