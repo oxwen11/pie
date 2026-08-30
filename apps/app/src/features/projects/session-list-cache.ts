@@ -1,4 +1,4 @@
-import type { ListSessionsOutput, ServerEvent } from "@getpie/contract";
+import type { ListSessionsOutput, ServerEvent, SessionRef } from "@getpie/contract";
 import { isSessionScopedEvent } from "@getpie/contract";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
@@ -77,6 +77,7 @@ export const applySessionListEvent = (
   listKeyFor: ListKeyFor,
   event: ServerEvent,
 ): void => {
+  if (event.type === "project.deleted") return;
   const listKeys = [listKeyFor(event.ref.projectId, false), listKeyFor(event.ref.projectId, true)];
   if (isSessionScopedEvent(event)) {
     const phase = event.phase;
@@ -140,7 +141,7 @@ export const applySessionListEvent = (
 export const reconcileSessionRenameSuccess = (
   queryClient: QueryClient,
   listKeyFor: ListKeyFor,
-  ref: ServerEvent["ref"],
+  ref: SessionRef,
   previousTitle: string | undefined,
   title: string,
 ): void => {

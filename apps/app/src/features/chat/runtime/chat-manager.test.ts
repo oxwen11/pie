@@ -47,6 +47,19 @@ describe("ChatManager", () => {
     expect(transports).toHaveLength(3);
   });
 
+  it("forgets every Chat owned by one Project", () => {
+    const { manager, transports } = makeManager();
+    const removed = manager.chatFor(refFor("session-1"));
+    manager.chatFor(refFor("session-2"));
+    const kept = manager.chatFor(refFor("session-3", { projectId: "project-2" }));
+
+    manager.forgetProject("project-1");
+
+    expect(transports.map((transport) => transport.disposed)).toEqual([1, 1, 0]);
+    expect(manager.chatFor(refFor("session-1"))).not.toBe(removed);
+    expect(manager.chatFor(refFor("session-3", { projectId: "project-2" }))).toBe(kept);
+  });
+
   it("evicts and unsubscribes a Chat once the session closes", () => {
     const { manager, transports } = makeManager();
     const chat = manager.chatFor(refFor("session-1"));

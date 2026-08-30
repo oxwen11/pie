@@ -93,6 +93,8 @@ export type PiAgentSessionShape = {
    */
   readonly snapshot: Effect.Effect<SessionRuntimeSnapshot>;
   readonly status: Effect.Effect<SessionStatus>;
+  /** Whether removing this Session would interrupt accepted work. */
+  readonly isBusy: Effect.Effect<boolean>;
   /**
    * Inject a server-originated wire event into the session's stream: it gets
    * the same contiguous seq stamping and bus fan-out as harness-driven events.
@@ -390,6 +392,14 @@ export const makePiAgentSession = (
       ref,
       snapshot: Ref.get(state).pipe(Effect.map((current) => toSnapshot(ref, current))),
       status: Ref.get(state).pipe(Effect.map(toStatus)),
+      isBusy: Ref.get(state).pipe(
+        Effect.map(
+          (current) =>
+            current.phase === "running" ||
+            current.phase === "requires_action" ||
+            (current.activePrompt !== null && current.activePrompt.seq === current.cursor),
+        ),
+      ),
       emit: (body) => applyWith(() => body),
       peekRuntime: Ref.get(lifecycle).pipe(Effect.map((current) => current.held?.runtime)),
       ensureRuntime,

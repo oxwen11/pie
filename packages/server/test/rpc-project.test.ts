@@ -23,4 +23,25 @@ describe("project router", () => {
       await h.dispose();
     }
   });
+
+  it("removes a project with no sessions", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const projectDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "pie-project-"));
+    const h = await makeRpcTestHarness(home);
+    try {
+      const project = await h.client.project.create({ path: projectDirectory });
+      const observer = await h.client.agent.session.subscribe({ scope: { kind: "global" } });
+
+      await h.client.project.remove({ projectId: project.id });
+
+      await expect(h.client.project.list()).resolves.toEqual([]);
+      for await (const item of observer) {
+        if (item.type !== "event" || item.event.type !== "project.deleted") continue;
+        expect(item.event.projectId).toBe(project.id);
+        break;
+      }
+    } finally {
+      await h.dispose();
+    }
+  });
 });

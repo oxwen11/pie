@@ -20,18 +20,25 @@
 - **`packages/server/src/harness/`** holds the session domain and the Pi
   implementation under `harness/pi/` (`process.ts`, `runtime.ts`, `agent.ts`,
   `transport.ts`, …). The folder name is legacy; the code is Pi-only.
-- **The session domain has four public roles** (no registry): `PiAgent`
+- **The session domain has five public roles** (no registry): `PiAgent`
   (Effect Context — create/resume/cold reads at the composition root),
   `PiAgentRuntime` (live child handle), `PiAgentSessionManager` (sole owner of
   live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
   and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
   translation, metadata persistence, wire vocabulary validation, collection
-  events). `session.ts`, `session-fold.ts` and `session-repository.ts` are
+  events), and `ProjectSessionRemoval` (the narrow cross-domain transaction for
+  rejecting busy Project removal and deleting Pie-owned Session data).
+  `session.ts`, `session-fold.ts` and `session-repository.ts` are
   private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
   optionally owns a runtime: observing a session costs no process until a prompt
   or history read acquires one. The RPC router contributes only `projectId →
 workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   never `projectId`.
+- **`ownership/project-lifecycle.ts`** is the neutral keyed coordinator shared
+  by Project registry/removal and the outward Session service. Session
+  operations acquire their Project permit at the service boundary; Session
+  creation is the one exception because `ProjectService.withProject` resolves
+  the path while already holding that same non-reentrant permit.
 - **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiProcessLayer`
   constructs `PiProcess`, `PiAgent` wraps it with `cachePiAgentAvailability` (one
   `--version` probe per server lifetime), then the session manager and service

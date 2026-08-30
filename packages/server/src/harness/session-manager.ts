@@ -93,6 +93,8 @@ export type PiAgentSessionManagerShape = {
    * all, not as a freshly idle one.
    */
   readonly liveStatus: (ref: SessionRef) => Effect.Effect<SessionStatus | undefined>;
+  /** True while deleting the Session would interrupt accepted work. */
+  readonly isBusy: (ref: SessionRef) => Effect.Effect<boolean>;
   /**
    * Inject a server-originated session event into the session's stream — same
    * seq counter and fan-out as harness events (see session `emit`). A write,
@@ -308,6 +310,7 @@ export const makePiAgentSessionManager = (
         withSession(ref, (session) => session.snapshot, toSnapshot(ref, initialSessionState)),
       liveStatus: (ref) =>
         withSession<SessionStatus | undefined>(ref, (session) => session.status, undefined),
+      isBusy: (ref) => withSession(ref, (session) => session.isBusy, false),
       emit: (ref, body) => sessionFor(ref).pipe(Effect.flatMap((session) => session.emit(body))),
     } satisfies PiAgentSessionManagerShape;
   });

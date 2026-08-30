@@ -1,5 +1,7 @@
+import path from "node:path";
+
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
-import { Effect, Option, Schema } from "effect";
+import { Effect, FileSystem, Option, Ref, Schema } from "effect";
 
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
@@ -54,6 +56,22 @@ export type PiAgentSessionRepositoryShape = {
   readonly write: (metadata: Session) => Effect.Effect<void, StoreWriteError>;
   /** Idempotent: removing an absent file succeeds. */
   readonly remove: (projectId: string, sessionId: string) => Effect.Effect<void, StoreWriteError>;
+  /**
+   * Atomically moves one Project's metadata aside on the same filesystem.
+   * Restore is idempotent until commit permanently removes the staged files.
+   */
+  readonly stageProjectRemoval: (
+    projectId: string,
+  ) => Effect.Effect<StagedProjectSessions, StoreWriteError>;
+  /** Recover durable staging directories left by an interrupted Project removal. */
+  readonly recoverProjectRemovals: (
+    registeredProjectIds: ReadonlySet<string>,
+  ) => Effect.Effect<void, StoreWriteError>;
+};
+
+export type StagedProjectSessions = {
+  readonly commit: Effect.Effect<void, StoreWriteError>;
+  readonly restore: Effect.Effect<void, StoreWriteError>;
 };
 
 /**
@@ -67,6 +85,7 @@ const isSafeId = (id: string): boolean =>
 
 export const makePiAgentSessionRepository = (sessionsDir: string) =>
   Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
     const sessions = yield* makeJsonCollection({
       dir: sessionsDir,
       schema: SessionSchema,
@@ -76,6 +95,8 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
       new StoreReadError({ file: error.file, cause: error });
     const asWriteError = (error: { readonly file: string }) =>
       new StoreWriteError({ file: error.file, cause: error });
+    const platformWriteError = (file: string) => (cause: unknown) =>
+      new StoreWriteError({ file, cause });
 
     return {
       list: (projectId) =>
@@ -123,5 +144,122 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
         !isSafeId(projectId) || !isSafeId(sessionId)
           ? Effect.void
           : sessions.remove(entryId(projectId, sessionId)).pipe(Effect.mapError(asWriteError)),
+
+      stageProjectRemoval: (projectId) =>
+        !isSafeId(projectId)
+          ? Effect.succeed({ commit: Effect.void, restore: Effect.void })
+          : Effect.gen(function* () {
+              const storageDirectory = path.dirname(sessionsDir);
+              yield* fs
+                .makeDirectory(storageDirectory, { recursive: true })
+                .pipe(Effect.mapError(platformWriteError(storageDirectory)));
+              const stagingDirectory = yield* fs
+                .makeTempDirectory({
+                  directory: storageDirectory,
+                  prefix: `sessions-removing-${projectId}-`,
+                })
+                .pipe(Effect.mapError(platformWriteError(storageDirectory)));
+              const source = path.join(sessionsDir, projectId);
+              const staged = path.join(stagingDirectory, "sessions");
+              const marker = path.join(stagingDirectory, `project-${projectId}`);
+              yield* fs
+                .writeFileString(marker, "")
+                .pipe(Effect.mapError(platformWriteError(marker)));
+              const moved = yield* fs.rename(source, staged).pipe(
+                Effect.as(true),
+                Effect.catch((error) =>
+                  error.reason._tag === "NotFound"
+                    ? Effect.succeed(false)
+                    : Effect.fail(platformWriteError(source)(error)),
+                ),
+              );
+              const state = yield* Ref.make<"committed" | "restored" | "staged">("staged");
+              const finish = (
+                next: "committed" | "restored",
+                action: Effect.Effect<void, StoreWriteError>,
+              ) =>
+                Ref.get(state).pipe(
+                  Effect.flatMap((current) =>
+                    current === "staged"
+                      ? action.pipe(Effect.andThen(Ref.set(state, next)))
+                      : Effect.void,
+                  ),
+                );
+              const removeStagingDirectory = fs
+                .remove(stagingDirectory, { force: true, recursive: true })
+                .pipe(Effect.mapError(platformWriteError(stagingDirectory)));
+              const restore = finish(
+                "restored",
+                moved
+                  ? fs
+                      .rename(staged, source)
+                      .pipe(
+                        Effect.mapError(platformWriteError(source)),
+                        Effect.andThen(removeStagingDirectory),
+                      )
+                  : removeStagingDirectory,
+              );
+
+              return {
+                commit: finish("committed", removeStagingDirectory),
+                restore,
+              } satisfies StagedProjectSessions;
+            }),
+
+      recoverProjectRemovals: (registeredProjectIds) =>
+        Effect.gen(function* () {
+          const storageDirectory = path.dirname(sessionsDir);
+          const entries = yield* fs
+            .readDirectory(storageDirectory)
+            .pipe(
+              Effect.catch((error) =>
+                error.reason._tag === "NotFound"
+                  ? Effect.succeed([])
+                  : Effect.fail(platformWriteError(storageDirectory)(error)),
+              ),
+            );
+          yield* Effect.forEach(
+            entries.filter((entry) => entry.startsWith("sessions-removing-")),
+            (entry) => {
+              const stagingDirectory = path.join(storageDirectory, entry);
+              return fs.readDirectory(stagingDirectory).pipe(
+                Effect.mapError(platformWriteError(stagingDirectory)),
+                Effect.flatMap((stagedEntries) => {
+                  const marker = stagedEntries.find((candidate) =>
+                    candidate.startsWith("project-"),
+                  );
+                  if (marker === undefined) {
+                    return fs
+                      .remove(stagingDirectory, { force: true, recursive: true })
+                      .pipe(Effect.mapError(platformWriteError(stagingDirectory)));
+                  }
+                  const projectId = marker.slice("project-".length);
+                  if (!isSafeId(projectId)) {
+                    return Effect.fail(
+                      platformWriteError(path.join(stagingDirectory, marker))(
+                        new Error("invalid staged Project id"),
+                      ),
+                    );
+                  }
+                  const source = path.join(sessionsDir, projectId);
+                  const staged = path.join(stagingDirectory, "sessions");
+                  const removeStagingDirectory = fs
+                    .remove(stagingDirectory, { force: true, recursive: true })
+                    .pipe(Effect.mapError(platformWriteError(stagingDirectory)));
+                  if (!registeredProjectIds.has(projectId)) return removeStagingDirectory;
+                  return fs.rename(staged, source).pipe(
+                    Effect.catch((error) =>
+                      error.reason._tag === "NotFound"
+                        ? Effect.void
+                        : Effect.fail(platformWriteError(source)(error)),
+                    ),
+                    Effect.andThen(removeStagingDirectory),
+                  );
+                }),
+              );
+            },
+            { discard: true },
+          );
+        }),
     } satisfies PiAgentSessionRepositoryShape;
   });

@@ -91,6 +91,18 @@ export class TurnAlreadyRunning extends Schema.TaggedError<TurnAlreadyRunning>()
   }
 }
 
+export class ProjectSessionsBusy extends Schema.TaggedError<ProjectSessionsBusy>()(
+  "ProjectSessionsBusy",
+  {
+    projectId: Schema.String,
+    sessionIds: Schema.Array(Schema.String),
+  },
+) {
+  override get message() {
+    return `Project '${this.projectId}' has sessions with accepted work.`;
+  }
+}
+
 export class AgentRequestUnavailable extends Schema.TaggedError<AgentRequestUnavailable>()(
   "AgentRequestUnavailable",
   {

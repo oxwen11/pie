@@ -6,6 +6,7 @@ import { Cause, Context, Crypto, Effect, Exit, FileSystem, Layer, PlatformError 
 
 import {
   layerPaths,
+  ProjectLifecycleLayer,
   ProjectRepositoryLayer,
   ProjectService,
   ProjectServiceLayer,
@@ -23,6 +24,7 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
     Layer.build(
       ProjectServiceLayer.pipe(
         Layer.provide(ProjectRepositoryLayer),
+        Layer.provide(ProjectLifecycleLayer),
         Layer.provide(layerPaths(home)),
         Layer.provide(NodePlatformLayer),
       ),
@@ -58,15 +60,6 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
       const svc = yield* projects;
       const error = yield* Effect.flip(svc.findById("nope"));
       assert.equal(error._tag, "ProjectNotFound");
-    }),
-  );
-
-  it.effect("removes a project", () =>
-    Effect.gen(function* () {
-      const svc = yield* projects;
-      const project = yield* svc.create({ name: "app", path: "/tmp/app" });
-      yield* svc.remove(project.id);
-      assert.equal((yield* svc.list()).length, 0);
     }),
   );
 
@@ -114,14 +107,6 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
       }),
   );
 
-  it.effect("remove fails with ProjectNotFound for an unknown id", () =>
-    Effect.gen(function* () {
-      const svc = yield* projects;
-      const error = yield* Effect.flip(svc.remove("nope"));
-      assert.equal(error._tag, "ProjectNotFound");
-    }),
-  );
-
   it.effect("an RNG failure minting a project id is a contextual defect, not a typed error", () =>
     Effect.gen(function* () {
       // The real Crypto with only `randomUUIDv4` broken: the service treats a
@@ -144,6 +129,7 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
       const svc = yield* Layer.build(
         ProjectServiceLayer.pipe(
           Layer.provide(ProjectRepositoryLayer),
+          Layer.provide(ProjectLifecycleLayer),
           Layer.provide(layerPaths(home)),
           Layer.provide(brokenCrypto),
           Layer.provide(NodePlatformLayer),

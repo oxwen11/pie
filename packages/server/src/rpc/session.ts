@@ -20,16 +20,19 @@ export const sessionRouter = orpc.router({
       input.provider && input.modelId
         ? { provider: input.provider, modelId: input.modelId }
         : undefined;
-    return yield* projects.findById(input.projectId).pipe(
-      Effect.flatMap((project) => sessions.create(input.projectId, project.path, model)),
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
+    return yield* projects
+      .withProject(input.projectId, (project) =>
+        sessions.create(input.projectId, project.path, model),
+      )
+      .pipe(
+        Effect.catchTags({
+          ProjectNotFound: (e) =>
+            Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+          AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+          ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+          AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        }),
+      );
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;

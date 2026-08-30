@@ -4,9 +4,8 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 /**
- * The one place that says how `project.list` is held. Its only writer is the
- * import dialog's create mutation, which invalidates on success, so nothing can
- * change it behind our back.
+ * The one place that says how `project.list` is held. Project mutations either
+ * invalidate it or reconcile their successful result into this exact query.
  */
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,

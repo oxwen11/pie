@@ -2,7 +2,7 @@ import type { SessionRef } from "@getpie/contract";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import { sessionRefKey } from "@/lib/session-ref";
+import { projectSessionRefKeyPrefix, sessionRefKey } from "@/lib/session-ref";
 
 import {
   type AnyPanelDefinition,
@@ -278,24 +278,32 @@ export class ContentPanel<View = unknown> {
     this.setPresentation(sessionRef, presentation === "hidden" ? "docked" : "hidden");
   }
 
-  /**
-   * Drops a session's panels and disposes their instances — for a deleted
-   * session. No caller yet: nothing in the app hard-deletes a session, and
-   * archiving is reversible, so forgetting there would lose a user's tabs.
-   */
+  /** Drops a deleted Session's persisted panels and live instances. */
   forget(sessionRef: SessionRef): void {
     const sessionKey = sessionRefKey(sessionRef);
-    const prefix = `${sessionKey}\0`;
+    this.#forgetWhere((candidate) => candidate === sessionKey);
+  }
+
+  /** Drops every deleted Session owned by a removed Project. */
+  forgetProject(projectId: string): void {
+    const prefix = projectSessionRefKeyPrefix(projectId);
+    this.#forgetWhere((sessionKey) => sessionKey.startsWith(prefix));
+  }
+
+  #forgetWhere(matches: (sessionKey: string) => boolean): void {
     for (const [key, instance] of this.#instances) {
-      if (!key.startsWith(prefix)) continue;
+      const separator = key.indexOf("\0");
+      if (separator === -1 || !matches(key.slice(0, separator))) continue;
       instance.dispose?.();
       this.#instances.delete(key);
     }
-    this.#tabs.delete(sessionKey);
+    for (const key of this.#tabs.keys()) {
+      if (matches(key)) this.#tabs.delete(key);
+    }
     this.store.setState((state) => {
-      if (!(sessionKey in state.bySessionKey)) return state;
-      const { [sessionKey]: _forgotten, ...bySessionKey } = state.bySessionKey;
-      return { bySessionKey };
+      const entries = Object.entries(state.bySessionKey);
+      const kept = entries.filter(([key]) => !matches(key));
+      return kept.length === entries.length ? state : { bySessionKey: Object.fromEntries(kept) };
     });
   }
 

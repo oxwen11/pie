@@ -25,9 +25,11 @@ import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 export function AppSidebar({
   isSessionActive,
   onNewChat,
+  onProjectRemoved,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onNewChat: () => void;
+  readonly onProjectRemoved: (projectId: string) => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
@@ -76,7 +78,11 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
+        <ProjectList
+          isSessionActive={isSessionActive}
+          onImport={() => setImportOpen(true)}
+          onProjectRemoved={onProjectRemoved}
+        />
       </SidebarContent>
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}

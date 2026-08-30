@@ -345,6 +345,30 @@ describe("ContentPanel", () => {
     expect(host.instanceFor(S, "disposable")).toBeUndefined();
   });
 
+  it("forgetProject drops only that Project's sessions", () => {
+    let disposed = 0;
+    const disposable = definePanel({
+      type: "disposable",
+      label: "Disposable",
+      create: () => ({ dispose: () => void disposed++ }),
+      view: null,
+    });
+    const host = withPanels(disposable);
+    const sameProject = ref({ sessionId: "session-2" });
+    const otherProject = ref({ projectId: "22222222-2222-4222-8222-222222222222" });
+    host.open(S, disposable);
+    host.open(sameProject, disposable);
+    host.open(otherProject, disposable);
+
+    host.forgetProject(S.projectId);
+
+    expect(disposed).toBe(2);
+    expect(snapshotOf(host)).toHaveProperty("panels", []);
+    expect(snapshotOf(host, sameProject)).toHaveProperty("panels", []);
+    expect(snapshotOf(host, otherProject).panels).toHaveLength(1);
+    expect(Object.keys(host.store.getState().bySessionKey)).toEqual([sessionRefKey(otherProject)]);
+  });
+
   it("no session means no panels", () => {
     const host = withPanels(diff);
     host.open(S, diff);

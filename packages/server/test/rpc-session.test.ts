@@ -15,11 +15,17 @@ import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
+  ProjectSessionRemovalLayer,
 } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
-import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import {
+  ProjectLifecycleLayer,
+  ProjectRemovalLayer,
+  ProjectRepositoryLayer,
+  ProjectServiceLayer,
+} from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
@@ -28,6 +34,7 @@ const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
+const holdTurn = __HOLD_TURN__;
 const sidIndex = process.argv.indexOf("--session-id");
 const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
 process.stdout.write("pi startup banner (not json)\\n");
@@ -47,24 +54,24 @@ rl.on("line", (line) => {
   upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
   upd({ type: "text_end", contentIndex: 0, content: "pong" });
   send({ type: "message_end", message: assistant() });
-  settle();
+  if (!holdTurn) settle();
 });
 `;
 
-function makeFake(): string {
+function makeFake(holdTurn: boolean): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-rpc-"));
   const file = path.join(dir, "fake-pi.js");
-  fs.writeFileSync(file, FAKE);
+  fs.writeFileSync(file, FAKE.replace("__HOLD_TURN__", String(holdTurn)));
   fs.chmodSync(file, 0o755);
   return file;
 }
 
-async function setup() {
+async function setup(options: { readonly holdTurn?: boolean } = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
+  const piExecutable = { command: makeFake(options.holdTurn ?? false), prefixArgs: [] as const };
   const piProcessLayer = Layer.effect(
     PiProcessTag,
     makePiProcess({ executable: piExecutable }),
@@ -77,15 +84,21 @@ async function setup() {
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
-  const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
-    Layer.provide(
-      PiAgentSessionManagerLayer.pipe(
-        Layer.provide(piAgentLayer),
-        Layer.provide(EventBusLayer),
-        Layer.provide(NodeServices.layer),
-      ),
-    ),
+  const sessionManagerLayer = PiAgentSessionManagerLayer.pipe(
     Layer.provide(piAgentLayer),
+    Layer.provide(EventBusLayer),
+    Layer.provide(NodeServices.layer),
+  );
+  const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
+    Layer.provide(sessionManagerLayer),
+    Layer.provide(piAgentLayer),
+    Layer.provide(EventBusLayer),
+    Layer.provide(pathsLayer),
+    Layer.provide(NodeServices.layer),
+    Layer.provide(ProjectLifecycleLayer),
+  );
+  const projectSessionRemovalLayer = ProjectSessionRemovalLayer.pipe(
+    Layer.provide(sessionManagerLayer),
     Layer.provide(EventBusLayer),
     Layer.provide(pathsLayer),
     Layer.provide(NodeServices.layer),
@@ -93,6 +106,15 @@ async function setup() {
   const projectServiceLayer = ProjectServiceLayer.pipe(
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
+    Layer.provide(ProjectLifecycleLayer),
+  );
+  const projectRemovalLayer = ProjectRemovalLayer.pipe(
+    Layer.provide(projectSessionRemovalLayer),
+    Layer.provide(EventBusLayer),
+    Layer.provide(ProjectRepositoryLayer),
+    Layer.provide(pathsLayer),
+    Layer.provide(NodeServices.layer),
+    Layer.provide(ProjectLifecycleLayer),
   );
 
   const appLayer = Layer.mergeAll(
@@ -100,6 +122,8 @@ async function setup() {
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    projectRemovalLayer,
+    ProjectLifecycleLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
@@ -116,6 +140,48 @@ async function setup() {
 }
 
 describe("agent.session router", () => {
+  it("removes archived Session metadata with its Project", async () => {
+    const { client, workspace: projectDirectory, dispose } = await setup();
+    try {
+      const project = await client.project.create({ path: projectDirectory });
+      const ref = await client.agent.session.create({ projectId: project.id });
+      await client.agent.session.archive({ ref, archived: true });
+
+      await client.project.remove({ projectId: project.id });
+
+      await expect(client.project.list()).resolves.toEqual([]);
+      await expect(
+        client.agent.session.resolveRef({ sessionId: ref.sessionId }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    } finally {
+      await dispose();
+    }
+  });
+
+  it("rejects removing a Project while one of its Sessions is running", async () => {
+    const { client, workspace: projectDirectory, dispose } = await setup({ holdTurn: true });
+    try {
+      const project = await client.project.create({ path: projectDirectory });
+      const ref = await client.agent.session.create({ projectId: project.id });
+      await client.agent.session.prompt({ ref, parts: [{ type: "text", text: "keep running" }] });
+      for (;;) {
+        const status = await client.agent.session.getStatus({ ref });
+        if (status.phase === "running") break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      await expect(client.project.remove({ projectId: project.id })).rejects.toMatchObject({
+        code: "CONFLICT",
+      });
+      await expect(client.project.list()).resolves.toEqual([project]);
+      await expect(client.agent.session.resolveRef({ sessionId: ref.sessionId })).resolves.toEqual(
+        ref,
+      );
+    } finally {
+      await dispose();
+    }
+  });
+
   it("creates a session from a project and streams its scoped events", async () => {
     const { client, workspace, dispose } = await setup();
     try {

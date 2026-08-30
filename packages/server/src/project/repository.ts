@@ -17,13 +17,14 @@ const ProjectsSchema = Schema.Array(ProjectSchema);
  * open failure surfaces per call as a typed error and the next call retries,
  * recovering as soon as the file is fixed.
  */
-export class ProjectRepository extends Context.Service<
-  ProjectRepository,
-  {
-    readonly list: () => Effect.Effect<ReadonlyArray<Project>, StoreReadError>;
-    readonly save: (projects: ReadonlyArray<Project>) => Effect.Effect<void, StoreWriteError>;
-  }
->()("ProjectRepository") {}
+export type ProjectRepositoryShape = {
+  readonly list: () => Effect.Effect<ReadonlyArray<Project>, StoreReadError>;
+  readonly save: (projects: ReadonlyArray<Project>) => Effect.Effect<void, StoreWriteError>;
+};
+
+export class ProjectRepository extends Context.Service<ProjectRepository, ProjectRepositoryShape>()(
+  "ProjectRepository",
+) {}
 
 export const ProjectRepositoryLayer: Layer.Layer<
   ProjectRepository,

@@ -191,6 +191,7 @@ export const CollectionEventTypes = [
   "session.archived",
   "session.deleted",
   "session.renamed",
+  "project.deleted",
 ] as const;
 export type CollectionEventType = (typeof CollectionEventTypes)[number];
 
@@ -254,7 +255,7 @@ export type SessionScopedEvent = {
   readonly phase?: SessionPhase;
 } & SessionScopedEventDraft;
 
-export type CollectionEvent = { readonly ref: SessionRef } & (
+export type SessionCollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.created" }
   // Self-owned display data changed on the server (currently the title, stamped
   // from the first prompt). Carries the new value so clients patch the row in
@@ -264,6 +265,13 @@ export type CollectionEvent = { readonly ref: SessionRef } & (
   | { readonly type: "session.deleted" }
   | { readonly type: "session.renamed"; readonly title: string }
 );
+
+export type ProjectCollectionEvent = {
+  readonly type: "project.deleted";
+  readonly projectId: string;
+};
+
+export type CollectionEvent = SessionCollectionEvent | ProjectCollectionEvent;
 
 export type ServerEvent = SessionScopedEvent | CollectionEvent;
 
@@ -481,6 +489,10 @@ export type Project = typeof ProjectSchema.Type;
 /** The project name is derived server-side from the folder's basename. */
 export const CreateProjectInputSchema = Schema.Struct({
   path: Schema.String,
+});
+
+export const RemoveProjectInputSchema = Schema.Struct({
+  projectId: Schema.String.check(Schema.isUUID()),
 });
 
 export const DirectoryEntrySchema = Schema.Struct({

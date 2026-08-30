@@ -20,6 +20,7 @@ import { browserPanel } from "@/components/layout/content-panel/panels/browser-p
 import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
 import { contentPanel } from "@/content-panel";
+import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
@@ -43,10 +44,8 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
-  // Keeps every `session.list` cache converged from the server's events
-  // (multi-tab / desktop), independent of which route is mounted.
-  useSessionListSync();
   const navigate = useNavigate();
+  const chatManager = useChatManager();
 
   // This is the shell's one route-identity seam: the content panel, active
   // sidebar row, and card heading all derive from the same authoritative ref.
@@ -84,13 +83,35 @@ function RootLayout() {
     [router],
   );
   const handleNewChat = () => navigate({ to: "/draft" });
+  const handleProjectRemoved = useCallback(
+    (projectId: string) => {
+      chatManager.forgetProject(projectId);
+      contentPanel.forgetProject(projectId);
+      const activeProjectId = router.state.matches.find(
+        (match) => match.routeId === "/session/$sessionId",
+      )?.loaderData?.projectId;
+      const currentDraftProjectId = router.state.matches.find((match) => match.routeId === "/draft")
+        ?.search.projectId;
+      if (activeProjectId === projectId || currentDraftProjectId === projectId) {
+        void navigate({ to: "/draft", replace: true });
+      }
+    },
+    [chatManager, navigate, router],
+  );
+  // Keeps Project and Session collection caches converged from the server's
+  // events (multi-tab / desktop), independent of which route is mounted.
+  useSessionListSync(handleProjectRemoved);
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            <AppSidebar
+              isSessionActive={isSessionActive}
+              onNewChat={handleNewChat}
+              onProjectRemoved={handleProjectRemoved}
+            />
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel

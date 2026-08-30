@@ -10,6 +10,7 @@ import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import { GitServiceLayer } from "../git";
 import {
+  ProjectSessionRemovalLayer,
   PiAgentSessionManagerLayer,
   PiAgentServiceLayer,
   PiAgentSessionServiceLayer,
@@ -17,7 +18,12 @@ import {
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
-import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
+import {
+  ProjectLifecycleLayer,
+  ProjectRemovalLayer,
+  ProjectRepositoryLayer,
+  ProjectServiceLayer,
+} from "../project";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -53,12 +59,30 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(EventBusLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
+  Layer.provide(ProjectLifecycleLayer),
+);
+
+const ProjectSessionRemovalProvided = ProjectSessionRemovalLayer.pipe(
+  Layer.provide(PiAgentSessionManagerProvided),
+  Layer.provide(EventBusLayer),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
 );
 
 const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(ProjectRepositoryLayer),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
+  Layer.provide(ProjectLifecycleLayer),
+);
+
+const ProjectRemovalProvided = ProjectRemovalLayer.pipe(
+  Layer.provide(ProjectSessionRemovalProvided),
+  Layer.provide(EventBusLayer),
+  Layer.provide(ProjectRepositoryLayer),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+  Layer.provide(ProjectLifecycleLayer),
 );
 
 const PiAgentServiceProvided = PiAgentServiceLayer;
@@ -68,6 +92,8 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
   ProjectServiceProvided,
+  ProjectRemovalProvided,
+  ProjectLifecycleLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

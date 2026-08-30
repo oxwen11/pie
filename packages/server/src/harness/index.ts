@@ -9,6 +9,7 @@ export * from "./event-manifest";
 export * from "./errors";
 export * from "./executable";
 export * from "./queue-stream";
+export * from "./project-session-removal";
 export * from "./session-io";
 export * from "./session-manager";
 export * from "./session-service";

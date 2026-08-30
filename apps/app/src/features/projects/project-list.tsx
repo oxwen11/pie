@@ -20,9 +20,11 @@ import { useProjects } from "@/features/projects/use-projects";
 export function ProjectList({
   isSessionActive,
   onImport,
+  onProjectRemoved,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onImport: () => void;
+  readonly onProjectRemoved: (projectId: string) => void;
 }) {
   const projects = useProjects();
 
@@ -50,6 +52,7 @@ export function ProjectList({
               <ProjectSessionsGroup
                 key={project.id}
                 isSessionActive={isSessionActive}
+                onRemoved={onProjectRemoved}
                 project={project}
               />
             ))}

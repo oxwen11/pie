@@ -4,16 +4,11 @@ import {
   CollapsiblePanel,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import {
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-} from "@getpie/ui/components/sidebar";
-import { useNavigate } from "@tanstack/react-router";
-import { Folder, FolderOpen, SquarePen } from "lucide-react";
+import { SidebarGroupContent, SidebarGroupLabel, SidebarMenu } from "@getpie/ui/components/sidebar";
+import { Folder, FolderOpen } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { ProjectActionsMenu } from "@/features/projects/project-actions-menu";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 import { useProjectSessions } from "@/features/projects/use-project-sessions";
 
@@ -27,12 +22,13 @@ const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
  */
 export function ProjectSessionsGroup({
   isSessionActive,
+  onRemoved,
   project,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
+  readonly onRemoved: (projectId: string) => void;
   readonly project: Project;
 }) {
-  const navigate = useNavigate();
   const sessions = useProjectSessions(project.id);
   const rows = sessions.data ?? EMPTY_SESSIONS;
 
@@ -54,15 +50,7 @@ export function ProjectSessionsGroup({
           <FolderOpen className="hidden size-4 shrink-0 group-data-[panel-open]/project:block" />
           <span className="truncate">{project.name}</span>
         </SidebarGroupLabel>
-        <SidebarGroupAction
-          className="top-1 right-1"
-          onClick={() => navigate({ to: "/draft", search: { projectId: project.id } })}
-          title={`New chat in ${project.name}`}
-        >
-          <SquarePen />
-          {/* Names the button per project: element content wins over `title` in the accessible-name computation, so a bare "New chat" would make every project's action announce identically. */}
-          <span className="sr-only">New chat in {project.name}</span>
-        </SidebarGroupAction>
+        <ProjectActionsMenu onRemoved={onRemoved} project={project} />
         {/* keepMounted: see panel-motion.ts — an unmounting panel makes every
             expand rebuild this project's whole session list. */}
         <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>

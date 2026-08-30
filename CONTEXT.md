@@ -29,13 +29,16 @@ _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
 
-The session domain (`packages/server/src/harness/`) has four public roles — Pi only, no registry. One-liner: `PiAgent` knows how to get in, Manager knows who is alive, `PiAgentRuntime` is the live child, Service is the outward face.
+The session domain (`packages/server/src/harness/`) has five public roles — Pi only, no registry. One-liner: `PiAgent` knows how to get in, Manager knows who is alive, `PiAgentRuntime` is the live child, Service is the ordinary outward face, and ProjectSessionRemoval is the narrow cross-domain deletion seam.
 
 **PiAgentSessionService** (`harness/session-service.ts`):
-The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself.
+The outward session service the RPC router calls, addressed by SessionRef: generates server sessionIds, persists metadata (private repository), translates SessionRef → `agentSessionId`, validates wire vocabulary (prompt parts), publishes collection events, and canonically coordinates operations against Project removal. Holds no live state. Receives the workspace path from the router; never resolves a projectId itself. Creation is called inside `ProjectService.withProject`, which already owns the same permit.
 
 **PiAgentSessionManager** (`harness/session-manager.ts`):
 The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.create`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.
+
+**ProjectSessionRemoval** (`harness/project-session-removal.ts`):
+The only Project→Session deletion boundary. It rejects removal before moving metadata when a Session owns accepted work, then stages and commits deletion of all Pie-owned Session data. Durable staging is recovered on startup according to whether the Project registry entry still exists. It alone wires the private Session repository for this cross-domain transaction; Project removal never consumes the repository or Session manager directly.
 
 **PiAgent** (`harness/pi/agent.ts`):
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.

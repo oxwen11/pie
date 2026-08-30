@@ -1,6 +1,6 @@
 import type { SessionRef } from "@getpie/contract";
 
-import { sessionRefKey } from "@/lib/session-ref";
+import { projectSessionRefKeyPrefix, sessionRefKey } from "@/lib/session-ref";
 
 import { Chat } from "./chat";
 import type { ChatSessionTransportFactory } from "./chat-transport-port";
@@ -9,6 +9,7 @@ import type { ChatSessionTransportFactory } from "./chat-transport-port";
 // (the session map, disposal) stay on the class.
 export interface ChatManagerApi {
   chatFor(sessionRef: SessionRef): Chat;
+  forgetProject(projectId: string): void;
 }
 
 // Owns the live Chat instances keyed by the complete SessionRef. Sessions survive
@@ -37,6 +38,13 @@ export class ChatManager implements ChatManagerApi {
     });
     this.#chats.set(key, chat);
     return chat;
+  }
+
+  forgetProject(projectId: string): void {
+    const prefix = projectSessionRefKeyPrefix(projectId);
+    for (const key of this.#chats.keys()) {
+      if (key.startsWith(prefix)) this.#evict(key);
+    }
   }
 
   // The server declared the stream over (archived, deleted — the Chat doesn't

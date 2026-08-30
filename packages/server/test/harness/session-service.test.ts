@@ -31,6 +31,7 @@ import {
   type PiAgentSessionServiceShape,
   makePiAgentSessionService,
 } from "../../src/harness/session-service";
+import { makeProjectLifecycle } from "../../src/ownership/project-lifecycle";
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
 
@@ -192,6 +193,7 @@ describe("PiAgentSessionService", () => {
                 pi,
                 repo,
                 bus,
+                projectLifecycle: makeProjectLifecycle(),
                 newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
               });
               return { service, repo, bus, spy, restart: build };

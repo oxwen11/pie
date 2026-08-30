@@ -20,6 +20,7 @@ import {
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus, type EventBusShape } from "../events/event-bus";
+import { ProjectLifecycle, type ProjectLifecycleShape } from "../ownership/project-lifecycle";
 import type { Session } from "../types";
 import type {
   AgentOperationError,
@@ -61,6 +62,7 @@ const toUserInput = (
   ).pipe(Effect.map((userParts) => ({ parts: userParts })));
 
 export type PiAgentSessionServiceShape = {
+  /** Called inside `ProjectService.withProject`, which already owns the lifecycle permit. */
   readonly create: (
     projectId: string,
     cwd: string,
@@ -174,14 +176,57 @@ export class PiAgentSessionService extends Context.Service<
   PiAgentSessionServiceShape
 >()("PiAgentSessionService") {}
 
+/**
+ * The canonical guard for Session operations that can read or mutate
+ * Project-owned state. `create` is the sole exception because its caller must
+ * resolve the Project path while holding the same non-reentrant permit.
+ */
+const coordinateProjectActivity = (
+  service: PiAgentSessionServiceShape,
+  lifecycle: ProjectLifecycleShape,
+): PiAgentSessionServiceShape => ({
+  ...service,
+  prepare: (ref, cwd) => lifecycle.withProject(ref.projectId, service.prepare(ref, cwd)),
+  close: (ref) => lifecycle.withProject(ref.projectId, service.close(ref)),
+  delete: (ref) => lifecycle.withProject(ref.projectId, service.delete(ref)),
+  rename: (ref, title) => lifecycle.withProject(ref.projectId, service.rename(ref, title)),
+  archive: (ref, archived) => lifecycle.withProject(ref.projectId, service.archive(ref, archived)),
+  list: (projectId, archived) =>
+    lifecycle.withProject(projectId, service.list(projectId, archived)),
+  getMessages: (ref, cwd) => lifecycle.withProject(ref.projectId, service.getMessages(ref, cwd)),
+  prompt: (input) => lifecycle.withProject(input.ref.projectId, service.prompt(input)),
+  interrupt: (ref) => lifecycle.withProject(ref.projectId, service.interrupt(ref)),
+  respondToAgentRequest: (ref, requestId, response) =>
+    lifecycle.withProject(ref.projectId, service.respondToAgentRequest(ref, requestId, response)),
+  getCapabilities: (ref) => lifecycle.withProject(ref.projectId, service.getCapabilities(ref)),
+  getModelState: (ref, cwd) =>
+    lifecycle.withProject(ref.projectId, service.getModelState(ref, cwd)),
+  setModel: (ref, cwd, model) =>
+    lifecycle.withProject(ref.projectId, service.setModel(ref, cwd, model)),
+  getSessionInfo: (ref) => lifecycle.withProject(ref.projectId, service.getSessionInfo(ref)),
+  getStatus: (ref) => lifecycle.withProject(ref.projectId, service.getStatus(ref)),
+  getSnapshot: (ref) => lifecycle.withProject(ref.projectId, service.getSnapshot(ref)),
+  // The first read discovers the Project lock. Re-read while holding it so a
+  // concurrent removal cannot move the metadata between lookup and return.
+  resolveRef: (sessionId) =>
+    service
+      .resolveRef(sessionId)
+      .pipe(
+        Effect.flatMap((ref) =>
+          lifecycle.withProject(ref.projectId, service.resolveRef(sessionId)),
+        ),
+      ),
+});
+
 export const makePiAgentSessionService = (deps: {
   readonly manager: PiAgentSessionManagerShape;
   readonly pi: PiAgentShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly newSessionId: Effect.Effect<string>;
+  readonly projectLifecycle: ProjectLifecycleShape;
 }): PiAgentSessionServiceShape => {
-  const { manager, pi, repo, bus, newSessionId } = deps;
+  const { manager, pi, repo, bus, newSessionId, projectLifecycle } = deps;
 
   const metadataMutationLocks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   const withMetadataMutation = <A, E, R>(
@@ -263,7 +308,7 @@ export const makePiAgentSessionService = (deps: {
   const logLifecycle = (event: string, message: string, extra: Record<string, unknown> = {}) =>
     Effect.logInfo(message).pipe(Effect.annotateLogs({ event, ...extra }));
 
-  return {
+  const service = {
     create: (projectId, cwd, model) =>
       newSessionId.pipe(
         Effect.flatMap((sessionId) => {
@@ -534,12 +579,19 @@ export const makePiAgentSessionService = (deps: {
         ),
       ),
   } satisfies PiAgentSessionServiceShape;
+  return coordinateProjectActivity(service, projectLifecycle);
 };
 
 export const PiAgentSessionServiceLayer: Layer.Layer<
   PiAgentSessionService,
   never,
-  PiAgentSessionManager | PiAgent | EventBus | Paths | Crypto.Crypto | FileSystem.FileSystem
+  | PiAgentSessionManager
+  | PiAgent
+  | EventBus
+  | Paths
+  | ProjectLifecycle
+  | Crypto.Crypto
+  | FileSystem.FileSystem
 > = Layer.effect(
   PiAgentSessionService,
   Effect.gen(function* () {
@@ -547,6 +599,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
     const pi = yield* PiAgent;
     const bus = yield* EventBus;
     const paths = yield* Paths;
+    const projectLifecycle = yield* ProjectLifecycle;
     const crypto = yield* Crypto.Crypto;
     const repo = yield* makePiAgentSessionRepository(paths.sessionsDir);
     return makePiAgentSessionService({
@@ -554,6 +607,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
       pi,
       repo,
       bus,
+      projectLifecycle,
       newSessionId: crypto.randomUUIDv4.pipe(
         Effect.catchTag("PlatformError", (cause) =>
           Effect.die(new Error("invariant: platform RNG failed minting a session id", { cause })),
