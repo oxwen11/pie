@@ -1,10 +1,6 @@
 import { Data, Effect } from "effect";
 
-import {
-  BROWSER_ACCESS_MIN_PROTOCOL_VERSION,
-  PIE_PROTOCOL_HEADER,
-  parseProtocolVersion,
-} from "../http/protocol";
+import { BROWSER_ACCESS_MIN_PROTOCOL_VERSION } from "../http/protocol";
 
 export type DaemonEndpoint = {
   readonly address: string;
@@ -12,7 +8,7 @@ export type DaemonEndpoint = {
 };
 
 export class DaemonClientError extends Data.TaggedError("DaemonClientError")<{
-  readonly operation: "health" | "websocket-access" | "browser-pairing";
+  readonly operation: "websocket-access" | "browser-pairing";
   readonly status?: number;
   readonly message: string;
 }> {}
@@ -69,27 +65,6 @@ function jsonRecord(
   });
 }
 
-export const inspectDaemonProtocol = (
-  endpoint: Pick<DaemonEndpoint, "address">,
-): Effect.Effect<number | undefined, DaemonClientError> =>
-  Effect.tryPromise({
-    try: () => fetch(new URL("/api/health", endpoint.address)),
-    catch: () =>
-      new DaemonClientError({ operation: "health", message: "Daemon health request failed" }),
-  }).pipe(
-    Effect.flatMap((response) =>
-      response.ok
-        ? Effect.succeed(parseProtocolVersion(response.headers.get(PIE_PROTOCOL_HEADER)))
-        : Effect.fail(
-            new DaemonClientError({
-              operation: "health",
-              status: response.status,
-              message: "Daemon health request was refused",
-            }),
-          ),
-    ),
-  );
-
 export const issueDaemonWebSocketAccess = (
   endpoint: DaemonEndpoint,
 ): Effect.Effect<{ readonly url: string }, DaemonClientError> =>
@@ -117,20 +92,18 @@ export const issueDaemonBrowserPairing = (
   DaemonClientError | DaemonProtocolUnsupportedError
 > =>
   Effect.gen(function* () {
-    const protocolVersion = yield* inspectDaemonProtocol(endpoint);
-    if (protocolVersion === undefined || protocolVersion < BROWSER_ACCESS_MIN_PROTOCOL_VERSION) {
-      return yield* Effect.fail(
-        new DaemonProtocolUnsupportedError({
-          requiredVersion: BROWSER_ACCESS_MIN_PROTOCOL_VERSION,
-          ...(protocolVersion === undefined ? undefined : { actualVersion: protocolVersion }),
-        }),
-      );
-    }
-
     const response = yield* postAuthenticated(
       endpoint,
       "/api/auth/pairing-grants",
       "browser-pairing",
+    ).pipe(
+      Effect.mapError((error) =>
+        error.status === 404
+          ? new DaemonProtocolUnsupportedError({
+              requiredVersion: BROWSER_ACCESS_MIN_PROTOCOL_VERSION,
+            })
+          : error,
+      ),
     );
     const body = yield* jsonRecord(response, "browser-pairing");
     if (

@@ -1,6 +1,10 @@
 import path from "node:path";
 
 import {
+  type DaemonCompatibilityKey,
+  embeddedDaemonCompatibilityKey,
+} from "@getpie/core/compatibility";
+import {
   type DaemonHandle,
   type DaemonPlatform,
   healthy,
@@ -18,6 +22,8 @@ const MAX_HEALTH_MISSES = 3;
 export type DaemonServerProcessOptions = {
   /** How often to probe the attached daemon's liveness. */
   readonly pollIntervalMs?: number;
+  /** Test/composition override; production uses this Main build's embedded ID. */
+  readonly requiredCompatibilityKey?: DaemonCompatibilityKey;
 };
 
 /**
@@ -68,6 +74,8 @@ export function makeDaemonServerProcess(
   options: DaemonServerProcessOptions = {},
 ): Effect.Effect<SpawnServer, never, DaemonPlatform> {
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const requiredCompatibilityKey =
+    options.requiredCompatibilityKey ?? embeddedDaemonCompatibilityKey();
 
   return Effect.gen(function* () {
     // The launcher's file state runs on the platform services; bind them once
@@ -84,6 +92,7 @@ export function makeDaemonServerProcess(
 
         const handle = yield* resolveOrSpawnDaemon({
           ...resolveDaemonLocation(config.environment),
+          requiredCompatibilityKey,
           serverArgv: [resolveServerRuntimeExecutable(), config.entry],
           // 0 means "no preference" on the first attempt; afterwards the
           // supervisor pins the port it saw, which we pass as preferred.

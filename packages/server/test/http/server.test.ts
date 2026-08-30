@@ -73,6 +73,27 @@ describe("createServer auth", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("invokes shutdown only through the authenticated daemon route", async () => {
+    let shutdown = false;
+    const base = await start({ authToken: TOKEN, shutdown: () => (shutdown = true) });
+    const unauthorized = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(unauthorized.status).toBe(401);
+    expect(shutdown).toBe(false);
+
+    const accepted = await fetch(`${base}/api/shutdown`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(accepted.status).toBe(202);
+    expect(shutdown).toBe(true);
+  });
+
+  it("does not expose shutdown in browser mode", async () => {
+    const base = await start({});
+    const response = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(response.status).toBe(404);
+  });
+
   it("requires no token at all when none is configured (browser mode)", async () => {
     const base = await start({});
     const response = await fetch(`${base}/api/ws-ticket`, { method: "POST" });
@@ -110,6 +131,18 @@ describe("createServer browser pairing", () => {
     expect(cookie).not.toContain("Secure");
     return cookie!.split(";", 1)[0]!;
   }
+
+  it("does not let a browser session stop the daemon", async () => {
+    let shutdown = false;
+    const base = await start({ authToken: TOKEN, shutdown: () => (shutdown = true) });
+    const cookie = await exchangeGrant(base, await issueGrant(base));
+    const response = await fetch(`${base}/api/shutdown`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    expect(response.status).toBe(403);
+    expect(shutdown).toBe(false);
+  });
 
   it("exchanges a one-time grant for a browser session cookie", async () => {
     const base = await start({ authToken: TOKEN });

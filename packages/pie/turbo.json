@@ -2,8 +2,14 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["@getpie/app#build"],
-      "outputs": ["dist/**"]
+      "cache": false,
+      "dependsOn": ["^build", "@getpie/app#build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "publint": {
+      "dependsOn": ["build"]
     },
     "dev": {
       "passThroughEnv": [

@@ -10,7 +10,6 @@ import {
   issueDaemonBrowserPairing,
   issueDaemonWebSocketAccess,
 } from "../../src/daemon/client";
-import { PIE_HTTP_PROTOCOL_VERSION, PIE_PROTOCOL_HEADER } from "../../src/http/protocol";
 
 let server: http.Server | undefined;
 
@@ -46,12 +45,7 @@ describe("privileged daemon client", () => {
   });
 
   it("mints a pairing URL only when the daemon advertises browser access", async () => {
-    const endpoint = await start((request, response) => {
-      if (request.url === "/api/health") {
-        response.setHeader(PIE_PROTOCOL_HEADER, String(PIE_HTTP_PROTOCOL_VERSION));
-        response.end("ok");
-        return;
-      }
+    const endpoint = await start((_request, response) => {
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ grant: "one-time-grant-marker", expiresInSeconds: 60 }));
     });
@@ -64,8 +58,11 @@ describe("privileged daemon client", () => {
     expect(pairing.expiresInSeconds).toBe(60);
   });
 
-  it("returns a typed restart-required error for a healthy legacy daemon", async () => {
-    const endpoint = await start((_request, response) => response.end("ok"));
+  it("returns a typed restart-required error when browser pairing is unsupported", async () => {
+    const endpoint = await start((_request, response) => {
+      response.statusCode = 404;
+      response.end("not found");
+    });
     const error = await Effect.runPromise(Effect.flip(issueDaemonBrowserPairing(endpoint)));
     expect(error).toBeInstanceOf(DaemonProtocolUnsupportedError);
   });

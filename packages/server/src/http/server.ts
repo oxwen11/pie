@@ -37,6 +37,8 @@ export type CreateServerOptions = {
   allowedHosts?: readonly string[] | undefined;
   /** The process Effect context. Unset in tests uses Effect defaults. */
   effectContext?: Context.Context<never> | undefined;
+  /** Authenticated daemon-only shutdown callback. */
+  shutdown?: (() => void) | undefined;
 };
 
 /** Startup failed for an operational reason: building the server or binding. */
@@ -232,6 +234,7 @@ const buildServer = (
       corsOrigins = [],
       allowedHosts = [],
       effectContext = Context.empty(),
+      shutdown,
     } = options;
     const runInContext = Effect.runForkWith(effectContext);
 
@@ -253,7 +256,7 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ access, corsOrigins, allowedHosts, ui }),
+        makeRequestApp({ access, corsOrigins, allowedHosts, shutdown, ui }),
         requestScope,
       ),
     );

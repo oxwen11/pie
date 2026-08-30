@@ -1,5 +1,6 @@
 export {
   type DaemonLocation,
+  developmentDaemonEnvironment,
   resolveDaemonDirectory,
   resolveDaemonLocation,
   resolvePieHome,
@@ -8,7 +9,6 @@ export {
   type DaemonEndpoint,
   DaemonClientError,
   DaemonProtocolUnsupportedError,
-  inspectDaemonProtocol,
   issueDaemonBrowserPairing,
   issueDaemonWebSocketAccess,
 } from "./client";

@@ -1,3 +1,7 @@
+import {
+  type DaemonCompatibilityKey,
+  decodeDaemonCompatibilityKey,
+} from "@getpie/core/compatibility";
 import { writeFileAtomic } from "@getpie/effect-json-store";
 import { Effect, FileSystem, type PlatformError } from "effect";
 
@@ -16,10 +20,10 @@ export type DaemonRecord = {
   readonly address: string;
   /** The auth token the daemon was started with; front-doors read it from here. */
   readonly token: string;
-  /** HTTP protocol capability reported by health; absent means legacy. */
-  readonly protocolVersion?: number;
   /** Epoch millis the record was written. */
   readonly startedAt: number;
+  /** Exact-match compatibility class; absent on legacy or malformed records. */
+  readonly compatibilityKey?: DaemonCompatibilityKey;
 };
 
 /** Read and validate the record, or `undefined` if missing/garbage. */
@@ -33,22 +37,24 @@ export const readRecord = (
       .pipe(Effect.orElseSucceed(() => undefined));
     if (raw === undefined) return undefined;
 
-    const parsed = yield* Effect.try(() => JSON.parse(raw) as Partial<DaemonRecord>).pipe(
+    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown).pipe(
       Effect.orElseSucceed(() => undefined),
     );
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+
+    const candidate = parsed as Record<string, unknown>;
     if (
-      typeof parsed?.pid === "number" &&
-      typeof parsed?.address === "string" &&
-      typeof parsed?.token === "string"
+      typeof candidate.pid === "number" &&
+      typeof candidate.address === "string" &&
+      typeof candidate.token === "string"
     ) {
+      const compatibilityKey = decodeDaemonCompatibilityKey(candidate.compatibilityKey);
       return {
-        pid: parsed.pid,
-        address: parsed.address,
-        token: parsed.token,
-        ...(typeof parsed.protocolVersion === "number"
-          ? { protocolVersion: parsed.protocolVersion }
-          : undefined),
-        startedAt: typeof parsed.startedAt === "number" ? parsed.startedAt : 0,
+        pid: candidate.pid,
+        address: candidate.address,
+        token: candidate.token,
+        startedAt: typeof candidate.startedAt === "number" ? candidate.startedAt : 0,
+        ...(compatibilityKey === undefined ? undefined : { compatibilityKey }),
       };
     }
     return undefined;

@@ -12,6 +12,8 @@ export type RequestAppOptions = {
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
+  /** Present only for authenticated daemon mode. Must return before shutdown starts. */
+  readonly shutdown: (() => void) | undefined;
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -183,6 +185,16 @@ const route = (
     if (request.method === "POST" && pathname === "/api/auth/pairing-grants") {
       const issued = options.access.issuePairingGrant(principal!);
       return withCors(issued === null ? forbidden : noStore(HttpServerResponse.jsonUnsafe(issued)));
+    }
+
+    if (
+      request.method === "POST" &&
+      pathname === "/api/shutdown" &&
+      options.shutdown !== undefined
+    ) {
+      if (principal?.kind !== "master") return withCors(forbidden);
+      options.shutdown();
+      return withCors(HttpServerResponse.text("shutting down", { status: 202 }));
     }
 
     if (request.method === "POST" && pathname === "/api/ws-ticket") {

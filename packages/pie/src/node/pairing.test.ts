@@ -13,7 +13,6 @@ const handle: DaemonHandle = {
   port: 4000,
   token: "master-value",
   pid: 1234,
-  protocolVersion: 2,
   reused: true,
 };
 

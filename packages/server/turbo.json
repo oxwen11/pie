@@ -3,11 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["@getpie/app#build"],
-      "outputs": ["dist/**"]
+      "cache": false,
+      "dependsOn": ["^build", "@getpie/app#build"]
     },
     "test": {
-      "dependsOn": ["@getpie/app#build"]
+      "dependsOn": ["^build", "@getpie/app#build"]
     }
   }
 }
