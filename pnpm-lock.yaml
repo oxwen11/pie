@@ -343,6 +343,9 @@ importers:
       '@getpie/app':
         specifier: workspace:*
         version: link:../app
+      '@getpie/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@getpie/server':
         specifier: workspace:*
         version: link:../../packages/server
@@ -482,6 +485,21 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-preview@4.1.10)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
+  packages/core:
+    devDependencies:
+      '@getpie/typescript':
+        specifier: workspace:*
+        version: link:../../tools/typescript
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(oxc-resolver@11.24.2)(publint@0.3.23)(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-preview@4.1.10)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
+
   packages/effect-json-store:
     dependencies:
       effect:
@@ -549,6 +567,9 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(vitest@4.1.10)
+      '@getpie/core':
+        specifier: workspace:*
+        version: link:../core
       '@getpie/server':
         specifier: workspace:*
         version: link:../server
@@ -570,6 +591,9 @@ importers:
       '@getpie/contract':
         specifier: workspace:*
         version: link:../contract
+      '@getpie/core':
+        specifier: workspace:*
+        version: link:../core
       '@getpie/effect-json-store':
         specifier: workspace:*
         version: link:../effect-json-store
