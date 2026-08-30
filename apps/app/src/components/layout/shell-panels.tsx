@@ -66,11 +66,17 @@ export function ShellGroup({
 }
 
 /** Inter-card gutter and resize handle. */
-export function ShellSeparator({ className, disabled, ...props }: SeparatorProps): ReactNode {
+export function ShellSeparator({
+  className,
+  disabled,
+  joined = false,
+  ...props
+}: SeparatorProps & { joined?: boolean }): ReactNode {
   return (
     <Separator
       className={cn(
-        "relative w-1.5 bg-transparent [-webkit-app-region:no-drag] md:my-1.5",
+        "relative bg-transparent [-webkit-app-region:no-drag] md:my-1",
+        joined ? "bg-border w-px" : "w-1",
         "after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width]",
         "hover:after:via-foreground/20 data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 hover:after:opacity-100 data-[separator=active]:after:w-0.5 data-[separator=active]:after:opacity-100 data-[separator=focus]:after:opacity-100",
         disabled && "w-0 after:hidden",
@@ -135,7 +141,7 @@ export function ShellSidebarPanel({ children }: { children: ReactNode }): ReactN
 
   return (
     <Panel
-      className="flex min-w-0 flex-col overflow-hidden md:py-1.5 md:ps-1.5"
+      className="flex min-w-0 flex-col overflow-hidden md:py-1 md:ps-1"
       collapsedSize={0}
       collapsible
       defaultSize={SIDEBAR_DEFAULT_SIZE}
@@ -172,9 +178,11 @@ export function ShellMainPanel({
   return (
     <Panel
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden md:py-1.5",
+        "flex min-w-0 flex-col overflow-hidden md:py-1",
         !collapsed && "md:overflow-visible!",
-        !hasContentPanel && "md:pe-1.5",
+        hasContentPanel
+          ? "md:[&_[data-slot=sidebar-inset]]:rounded-e-none md:[&_[data-slot=sidebar-inset]]:border-e-0"
+          : "md:pe-1",
       )}
       collapsedSize={0}
       collapsible={collapsible}
@@ -191,7 +199,7 @@ export function ShellMainPanel({
 export function ShellContentPanel({ children }: { children: ReactNode }): ReactNode {
   return (
     <Panel
-      className="flex min-w-0 flex-col overflow-hidden md:py-1.5 md:pe-1.5"
+      className="flex min-w-0 flex-col overflow-hidden md:py-1 md:pe-1"
       defaultSize="28rem"
       groupResizeBehavior="preserve-pixel-size"
       id={PANEL_IDS.content}

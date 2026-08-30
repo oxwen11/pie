@@ -127,7 +127,7 @@ export function AppShellBody({ children }: AppShellBodyProps) {
         {children}
         {hasVisibleContentPanel && (
           <>
-            <ShellSeparator />
+            <ShellSeparator joined />
             <ShellContentPanel>
               <ContentPanelOutlet />
             </ShellContentPanel>
