@@ -1,6 +1,36 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { issueBrowserWebSocketTicket } from "./browser-connection";
+import { createBrowserConnection, issueBrowserWebSocketTicket } from "./browser-connection";
+
+describe("createBrowserConnection", () => {
+  it("mints fresh cookie-authenticated access for every connection", async () => {
+    let issued = 0;
+    const opened: URL[] = [];
+    const connection = createBrowserConnection({
+      fetch: vi.fn<typeof fetch>(async () => {
+        issued += 1;
+        return Response.json({ ticket: `ticket-${issued}` });
+      }),
+      location: { origin: "http://127.0.0.1:4000" },
+      openWebSocket: (url) => {
+        opened.push(url);
+        return {} as WebSocket;
+      },
+    });
+
+    await connection.connectWebSocket();
+    await connection.connectWebSocket();
+
+    expect(opened).toHaveLength(2);
+    for (const url of opened) {
+      expect(url.protocol).toBe("ws:");
+      expect(url.host).toBe("127.0.0.1:4000");
+      expect(url.pathname).toBe("/ws/rpc");
+      expect(url.searchParams.has("ticket")).toBe(true);
+    }
+    expect(opened[0]!.search).not.toBe(opened[1]!.search);
+  });
+});
 
 describe("issueBrowserWebSocketTicket", () => {
   it("uses the HttpOnly browser session on every ticket request", async () => {

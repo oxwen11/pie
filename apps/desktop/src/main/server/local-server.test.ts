@@ -27,6 +27,8 @@ function makeHarness(
   initialSpawnFailure?: ServerSpawnError,
 ) {
   const processes: FakeProcess[] = [];
+  const brokeredEndpoints: ServerEndpoint[] = [];
+  let accessCounter = 0;
   const logs: Array<{ readonly message: unknown; readonly annotations: Record<string, unknown> }> =
     [];
   const scope = Effect.runSync(Scope.make());
@@ -97,9 +99,16 @@ function makeHarness(
 
   return {
     processes,
+    brokeredEndpoints,
     logs,
     server: Effect.runPromise(
-      makeLocalServer(config, spawnServer).pipe(Scope.provide(scope), Effect.provide(logContext)),
+      makeLocalServer(config, spawnServer, (endpoint) => {
+        brokeredEndpoints.push(endpoint);
+        accessCounter += 1;
+        return Effect.succeed({
+          url: `ws://127.0.0.1:${endpoint.port}/ws/rpc?ticket=fake-${accessCounter}`,
+        });
+      }).pipe(Scope.provide(scope), Effect.provide(logContext)),
     ),
     dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)),
   };
@@ -122,7 +131,7 @@ async function eventually(assertion: () => void | Promise<void>): Promise<void> 
 }
 
 describe("LocalServer", () => {
-  it("returns while starting, then exposes the fixed connection after ready", async () => {
+  it("returns while starting, then brokers access after ready", async () => {
     const h = makeHarness();
     const server = await h.server;
 
@@ -132,11 +141,10 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes[0]?.port).toBe(0));
     h.processes[0]!.becomeReady(56_789);
 
-    await expect(Effect.runPromise(server.connection)).resolves.toEqual({
-      httpBaseUrl: "http://127.0.0.1:56789",
-      wsBaseUrl: "ws://127.0.0.1:56789",
-      token: "daemon-token",
-    });
+    await expect(Effect.runPromise(server.ready)).resolves.toBeUndefined();
+    const access = await Effect.runPromise(server.webSocketAccess);
+    expect(new URL(access.url).host).toBe("127.0.0.1:56789");
+    expect(h.brokeredEndpoints).toEqual([{ port: 56_789, token: "daemon-token" }]);
     await expect(Effect.runPromise(server.snapshot)).resolves.toMatchObject({ status: "ready" });
     expect(h.processes[0]!.config.environment).toMatchObject({
       PATH: "/login/bin:/usr/bin",
@@ -159,7 +167,7 @@ describe("LocalServer", () => {
     Effect.runSync(Deferred.succeed(environment, { PATH: "/usr/bin" }));
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
-    await Effect.runPromise(server.connection);
+    await Effect.runPromise(server.ready);
     await h.dispose();
   });
 
@@ -204,32 +212,30 @@ describe("LocalServer", () => {
     expect(h.processes[1]!.port).toBe(0);
     h.processes[1]!.becomeReady(50_000);
 
-    await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
-      httpBaseUrl: "http://127.0.0.1:50000",
+    await expect(Effect.runPromise(server.webSocketAccess)).resolves.toMatchObject({
+      url: expect.stringContaining("127.0.0.1:50000"),
     });
     expect(JSON.stringify(h.logs)).not.toContain("sentinel-secret-token");
     await h.dispose();
   });
 
-  it("serves the latest endpoint after a restart hands back a new token", async () => {
+  it("brokers from the latest endpoint after a restart hands back a new token", async () => {
     const h = makeHarness();
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
     const server = await h.server;
-    await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
-      token: "daemon-token",
-    });
+    await Effect.runPromise(server.webSocketAccess);
+    expect(h.brokeredEndpoints.at(-1)).toEqual({ port: 50_000, token: "daemon-token" });
 
-    // A daemon respawn mints a fresh token — the connection must not be stale.
+    // A daemon respawn mints a fresh token — Main's broker must not be stale.
     h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
     h.processes[1]!.becomeReady(50_001, "rotated-token");
     await eventually(async () => {
-      await expect(Effect.runPromise(server.connection)).resolves.toEqual({
-        httpBaseUrl: "http://127.0.0.1:50001",
-        wsBaseUrl: "ws://127.0.0.1:50001",
-        token: "rotated-token",
+      await expect(Effect.runPromise(server.webSocketAccess)).resolves.toMatchObject({
+        url: expect.stringContaining("127.0.0.1:50001"),
       });
+      expect(h.brokeredEndpoints.at(-1)).toEqual({ port: 50_001, token: "rotated-token" });
     });
 
     await h.dispose();
@@ -240,14 +246,14 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000, "first-secret");
     const server = await h.server;
-    await Effect.runPromise(server.connection);
+    await Effect.runPromise(server.ready);
 
     h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
     h.processes[1]!.becomeReady(50_001, "replacement-secret");
     await eventually(async () => {
-      await expect(Effect.runPromise(server.connection)).resolves.toMatchObject({
-        httpBaseUrl: "http://127.0.0.1:50001",
+      await expect(Effect.runPromise(server.webSocketAccess)).resolves.toMatchObject({
+        url: expect.stringContaining("127.0.0.1:50001"),
       });
     });
 
@@ -269,7 +275,7 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
     const server = await h.server;
-    await Effect.runPromise(server.connection);
+    await Effect.runPromise(server.ready);
 
     h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
@@ -288,7 +294,7 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
     const server = await h.server;
-    await Effect.runPromise(server.connection);
+    await Effect.runPromise(server.ready);
 
     h.processes[0]!.exit();
     await eventually(() => expect(h.processes).toHaveLength(2));
@@ -321,7 +327,7 @@ describe("LocalServer", () => {
     await eventually(() => expect(h.processes).toHaveLength(1));
     h.processes[0]!.becomeReady(50_000);
     const server = await h.server;
-    await Effect.runPromise(server.connection);
+    await Effect.runPromise(server.ready);
 
     await h.dispose();
 

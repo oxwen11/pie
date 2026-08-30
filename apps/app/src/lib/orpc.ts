@@ -3,7 +3,7 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { issueBrowserWebSocketTicket } from "@/browser-connection";
+import { createBrowserConnection } from "@/browser-connection";
 import type { ServerConnection } from "@/server-connection";
 
 declare module "@tanstack/react-query" {
@@ -58,23 +58,8 @@ function createQueryClient(): QueryClient {
 }
 
 function createOrpcClient(server?: ServerConnection): PieClient {
-  if (!server) return createPieClient({ getTicket: issueBrowserWebSocketTicket });
-
-  const { httpBaseUrl, wsBaseUrl, token } = server;
-  return createPieClient({
-    url: `${wsBaseUrl}/ws/rpc`,
-    getTicket: async () => {
-      const response = await globalThis.fetch(`${httpBaseUrl}/api/ws-ticket`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
-      }
-      const body = (await response.json()) as { ticket: string };
-      return body.ticket;
-    },
-  });
+  const connection = server ?? createBrowserConnection();
+  return createPieClient({ connect: connection.connectWebSocket });
 }
 
 /** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */

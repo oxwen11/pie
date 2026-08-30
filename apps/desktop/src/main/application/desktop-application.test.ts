@@ -1,7 +1,7 @@
 import { Effect, Option, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
+import type { ServerStatusSnapshot } from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
 import { makeDesktopApplication } from "./desktop-application";
 
@@ -9,20 +9,17 @@ import { makeDesktopApplication } from "./desktop-application";
 // to the developer's OS and fail on a different CI runner.
 const anyOs = expect.stringMatching(/^(macos|windows|linux)$/);
 
-function makeHarness(
-  connection: Effect.Effect<ServerConnection> = Effect.succeed({
-    httpBaseUrl: "http://127.0.0.1:43123",
-    wsBaseUrl: "ws://127.0.0.1:43123",
-    token: "desktop-token",
-  }),
-) {
+function makeHarness(ready: Effect.Effect<void> = Effect.void) {
   const statusRef = Effect.runSync(
     SubscriptionRef.make<ServerStatusSnapshot>({ revision: 0, status: "ready" }),
   );
   let retries = 0;
   let quits = 0;
   const server: LocalServer["Service"] = {
-    connection,
+    ready,
+    webSocketAccess: Effect.succeed({
+      url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
+    }),
     snapshot: SubscriptionRef.get(statusRef),
     changes: SubscriptionRef.changes(statusRef),
     retry: Effect.sync(() => {
@@ -54,10 +51,9 @@ describe("DesktopApplication", () => {
       statusRevision: 0,
       os: anyOs,
     });
-    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual({
-      httpBaseUrl: "http://127.0.0.1:43123",
-      wsBaseUrl: "ws://127.0.0.1:43123",
-      token: "desktop-token",
+    await expect(Effect.runPromise(h.application.serverReady)).resolves.toBeUndefined();
+    await expect(Effect.runPromise(h.application.serverWebSocketAccess)).resolves.toEqual({
+      url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     });
 
     await Effect.runPromise(h.application.retryServer);
@@ -66,7 +62,7 @@ describe("DesktopApplication", () => {
     expect(h.quits()).toBe(1);
   });
 
-  it("bootstraps shell state without waiting for the server connection", async () => {
+  it("bootstraps shell state without waiting for server readiness", async () => {
     const h = makeHarness(Effect.never);
 
     await expect(Effect.runPromise(h.application.bootstrap)).resolves.toEqual({

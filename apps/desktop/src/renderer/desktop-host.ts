@@ -1,8 +1,9 @@
-import type { ServerStatusFeed, Platform } from "@getpie/app";
+import type { ServerConnection, ServerStatusFeed, Platform } from "@getpie/app";
 import { consumeEventIterator } from "@orpc/client";
 
-import type { ServerConnection, DesktopBootstrap } from "../shared/desktop-rpc";
+import type { DesktopBootstrap } from "../shared/desktop-rpc";
 import type { DesktopClient } from "./desktop-client";
+import { createDesktopConnection } from "./desktop-connection";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -10,26 +11,20 @@ function isAbortError(error: unknown): boolean {
 
 export type DesktopHost = {
   platform: Platform;
-  server: Promise<ServerConnection>;
-  /**
-   * Re-fetch the current connection. The daemon mints a fresh token (and can
-   * land on a new port) every time it respawns, so the startup connection goes
-   * stale on every server restart — consumers re-fetch when the status feed
-   * reports ready again.
-   */
-  refreshServer: () => Promise<ServerConnection>;
+  ready: Promise<void>;
+  connection: ServerConnection;
   status: ServerStatusFeed;
 };
 
 export function createDesktopHost(
   client: DesktopClient,
   bootstrap: DesktopBootstrap,
-  server: Promise<ServerConnection>,
+  ready: Promise<void>,
 ): DesktopHost {
   // AppInterface reads this promise only after the desktop shell is mounted.
   // Keep a rejection handler attached before that first read.
-  void server.catch((error: unknown) => {
-    if (!isAbortError(error)) console.error("Desktop server connection failed", error);
+  void ready.catch((error: unknown) => {
+    if (!isAbortError(error)) console.error("Desktop server readiness failed", error);
   });
 
   // The feed's snapshot. Every subscriber advances it, so it is tracked with
@@ -48,8 +43,8 @@ export function createDesktopHost(
       },
       os: bootstrap.os,
     },
-    server,
-    refreshServer: () => client.server.connection(),
+    ready,
+    connection: createDesktopConnection(client),
     status: {
       getSnapshot: () => status,
       subscribe: (listener) => {

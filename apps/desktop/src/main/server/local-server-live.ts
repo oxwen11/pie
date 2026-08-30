@@ -1,9 +1,10 @@
+import { issueDaemonWebSocketAccess } from "@getpie/server/daemon";
 import { Effect, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { DesktopConfig } from "../desktop-config";
 import { makeDaemonServerProcess } from "./daemon-server-process";
-import { LocalServer, makeLocalServer } from "./local-server";
+import { LocalServer, makeLocalServer, ServerAccessError } from "./local-server";
 import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
 
 export const LocalServerLive = Layer.effect(
@@ -23,6 +24,15 @@ export const LocalServerLive = Layer.effect(
         environment,
       },
       yield* makeDaemonServerProcess(),
+      (endpoint) =>
+        issueDaemonWebSocketAccess({
+          address: `http://127.0.0.1:${endpoint.port}`,
+          token: endpoint.token,
+        }).pipe(
+          Effect.mapError(
+            () => new ServerAccessError({ message: "Unable to obtain WebSocket access" }),
+          ),
+        ),
     );
   }),
 );

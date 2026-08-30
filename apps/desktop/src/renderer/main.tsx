@@ -14,7 +14,7 @@ if (!rootElement) throw new Error("Root element not found");
 const host = waitForDesktopPort().then(async (port) => {
   const client = createDesktopClient(port);
   const bootstrap = await client.bootstrap();
-  return createDesktopHost(client, bootstrap, client.server.connection());
+  return createDesktopHost(client, bootstrap, client.server.ready());
 });
 
 createRoot(rootElement).render(

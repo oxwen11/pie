@@ -43,10 +43,9 @@ function makeHarness(
   ) as Context.Context<never>;
 
   const server: LocalServer["Service"] = {
-    connection: Effect.succeed({
-      httpBaseUrl: "http://127.0.0.1:43123",
-      wsBaseUrl: "ws://127.0.0.1:43123",
-      token: "desktop-token",
+    ready: Effect.void,
+    webSocketAccess: Effect.succeed({
+      url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     }),
     snapshot: SubscriptionRef.get(statusRef),
     changes: SubscriptionRef.changes(statusRef).pipe(
@@ -116,11 +115,12 @@ describe("Desktop MessagePort RPC", () => {
         // Literal would pin this to the developer's OS; see desktop-application.test.ts.
         os: expect.stringMatching(/^(macos|windows|linux)$/),
       });
-      await expect(h.client.server.connection()).resolves.toEqual({
-        httpBaseUrl: "http://127.0.0.1:43123",
-        wsBaseUrl: "ws://127.0.0.1:43123",
-        token: "desktop-token",
+      await expect(h.client.server.ready()).resolves.toBeUndefined();
+      const access = await h.client.server.webSocketAccess();
+      expect(access).toEqual({
+        url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
       });
+      expect(JSON.stringify(access)).not.toContain("master-token");
 
       await h.client.server.retry();
       await h.client.app.quit();

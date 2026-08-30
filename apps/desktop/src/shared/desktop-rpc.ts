@@ -10,12 +10,10 @@ export const ServerStatusSnapshotSchema = z.object({
 });
 export type ServerStatusSnapshot = z.infer<typeof ServerStatusSnapshotSchema>;
 
-export const ServerConnectionSchema = z.object({
-  httpBaseUrl: z.string(),
-  wsBaseUrl: z.string(),
-  token: z.string().min(1),
+export const WebSocketAccessSchema = z.object({
+  url: z.string().url(),
 });
-export type ServerConnection = z.infer<typeof ServerConnectionSchema>;
+export type WebSocketAccess = z.infer<typeof WebSocketAccessSchema>;
 
 /** The three desktop targets, normalized off `process.platform`. */
 export const DesktopOsSchema = z.enum(["macos", "windows", "linux"]);
@@ -36,7 +34,8 @@ export const desktopContract = {
       .output(asyncIteratorObject(ServerStatusSnapshotSchema)),
   },
   server: {
-    connection: oc.output(ServerConnectionSchema),
+    ready: oc.output(z.void()),
+    webSocketAccess: oc.output(WebSocketAccessSchema),
     retry: oc.output(z.void()),
   },
   app: {

@@ -11,11 +11,7 @@ import {
   SubscriptionRef,
 } from "effect";
 
-import type {
-  ServerConnection,
-  ServerStatus,
-  ServerStatusSnapshot,
-} from "../../shared/desktop-rpc";
+import type { ServerStatus, ServerStatusSnapshot, WebSocketAccess } from "../../shared/desktop-rpc";
 
 const DEFAULTS = {
   initialRestartDelayMs: 500,
@@ -65,6 +61,14 @@ export type RunningServerProcess = {
   readonly awaitExit: Effect.Effect<ServerProcessExit, ServerSpawnError>;
 };
 
+export class ServerAccessError extends Data.TaggedError("ServerAccessError")<{
+  readonly message: string;
+}> {}
+
+export type RequestWebSocketAccess = (
+  endpoint: ServerEndpoint,
+) => Effect.Effect<WebSocketAccess, ServerAccessError>;
+
 export type SpawnServer = (
   config: ServerProcessConfig,
   port: number,
@@ -82,7 +86,8 @@ export type LocalServerConfig = Omit<ServerProcessConfig, "environment"> & {
 export class LocalServer extends Context.Service<
   LocalServer,
   {
-    readonly connection: Effect.Effect<ServerConnection>;
+    readonly ready: Effect.Effect<void>;
+    readonly webSocketAccess: Effect.Effect<WebSocketAccess, ServerAccessError>;
     readonly snapshot: Effect.Effect<ServerStatusSnapshot>;
     readonly changes: Stream.Stream<ServerStatusSnapshot>;
     readonly retry: Effect.Effect<void>;
@@ -136,6 +141,7 @@ function setStatus(ref: SubscriptionRef.SubscriptionRef<ServerStatusSnapshot>, n
 export function makeLocalServer(
   config: LocalServerConfig,
   spawnServer: SpawnServer,
+  requestWebSocketAccess: RequestWebSocketAccess,
 ): Effect.Effect<LocalServer["Service"], never, Scope.Scope> {
   return Effect.gen(function* () {
     const statusRef = yield* SubscriptionRef.make<ServerStatusSnapshot>({
@@ -143,11 +149,10 @@ export function makeLocalServer(
       status: "starting",
     });
     const retryQueue = yield* Queue.dropping<void>(1);
-    const initial = yield* Deferred.make<ServerConnection>();
+    const initial = yield* Deferred.make<ServerEndpoint>();
     // The daemon can come back with a fresh token (and, rarely, port) after a
-    // restart, so `connection` must serve the latest endpoint — the Deferred
-    // only gates "at least one ready happened".
-    const latest = yield* SubscriptionRef.make<ServerConnection | undefined>(undefined);
+    // restart. Keep the endpoint in Main and broker short-lived access from it.
+    const latest = yield* SubscriptionRef.make<ServerEndpoint | undefined>(undefined);
 
     const initialDelay = config.initialRestartDelayMs ?? DEFAULTS.initialRestartDelayMs;
     const maxDelay = config.maxRestartDelayMs ?? DEFAULTS.maxRestartDelayMs;
@@ -178,16 +183,9 @@ export function makeLocalServer(
               first = false;
             }
 
-            const connection: ServerConnection = {
-              httpBaseUrl: `http://127.0.0.1:${endpoint.port}`,
-              wsBaseUrl: `ws://127.0.0.1:${endpoint.port}`,
-              token: endpoint.token,
-            };
-            yield* SubscriptionRef.set(latest, connection);
+            yield* SubscriptionRef.set(latest, endpoint);
             yield* setStatus(statusRef, "ready");
-            if (wasFirst) {
-              yield* Deferred.succeed(initial, connection);
-            }
+            if (wasFirst) yield* Deferred.succeed(initial, endpoint);
             return yield* running.awaitExit;
           }),
         ).pipe(Effect.result);
@@ -254,11 +252,14 @@ export function makeLocalServer(
     yield* supervise.pipe(Effect.forkScoped);
     const snapshot = SubscriptionRef.get(statusRef);
 
+    const currentEndpoint = Effect.gen(function* () {
+      const firstEndpoint = yield* Deferred.await(initial);
+      return (yield* SubscriptionRef.get(latest)) ?? firstEndpoint;
+    });
+
     return {
-      connection: Effect.gen(function* () {
-        const firstConnection = yield* Deferred.await(initial);
-        return (yield* SubscriptionRef.get(latest)) ?? firstConnection;
-      }),
+      ready: Deferred.await(initial).pipe(Effect.asVoid),
+      webSocketAccess: currentEndpoint.pipe(Effect.flatMap(requestWebSocketAccess)),
       snapshot,
       changes: SubscriptionRef.changes(statusRef),
       retry: Effect.gen(function* () {
