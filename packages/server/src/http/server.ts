@@ -7,8 +7,8 @@ import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
 import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
+import { type AccessAuthority, createAccessAuthority } from "./access";
 import { makeRequestApp } from "./app";
-import { createTicketStore, type TicketStore } from "./auth";
 import { isAllowedOrigin, isLoopbackHost } from "./cors";
 import { createUIHandler, type UIApp } from "./ui";
 
@@ -77,10 +77,10 @@ type WiredServer = {
 };
 
 function wireServer(options: {
-  readonly authToken: string | undefined;
+  readonly requiresTicket: boolean;
+  readonly access: AccessAuthority;
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
-  readonly tickets: TicketStore;
   readonly wsHandler: (ws: WebSocket) => void;
   readonly handleRequest: RequestListener;
   /**
@@ -92,7 +92,7 @@ function wireServer(options: {
    */
   readonly runLog: (effect: Effect.Effect<void>) => void;
 }): WiredServer {
-  const { authToken, corsOrigins, allowedHosts, tickets, wsHandler, handleRequest, runLog } =
+  const { requiresTicket, access, corsOrigins, allowedHosts, wsHandler, handleRequest, runLog } =
     options;
 
   const server = http.createServer();
@@ -181,7 +181,10 @@ function wireServer(options: {
 
     // A WS handshake carries no Authorization header, so the renderer proves
     // itself with a single-use ticket minted over the authenticated HTTP link.
-    if (authToken !== undefined && !tickets.consume(requestUrl.searchParams.get("ticket"))) {
+    if (
+      requiresTicket &&
+      access.consumeWebSocketTicket(requestUrl.searchParams.get("ticket")) === null
+    ) {
       rejectUpgrade(socket, "401 Unauthorized", "invalid_ticket", {
         presented: requestUrl.searchParams.has("ticket"),
       });
@@ -237,7 +240,7 @@ const buildServer = (
       (runtime) => Effect.promise(() => runtime.dispose()),
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
-    const tickets = createTicketStore();
+    const access = createAccessAuthority({ masterToken: authToken });
 
     const ui = yield* Effect.promise(() => stages.createUI(rpcRuntime));
 
@@ -250,7 +253,7 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, ui }),
+        makeRequestApp({ access, corsOrigins, allowedHosts, ui }),
         requestScope,
       ),
     );
@@ -260,10 +263,10 @@ const buildServer = (
     const { server } = yield* Effect.acquireRelease(
       Effect.sync(() =>
         wireServer({
-          authToken,
+          requiresTicket: authToken !== undefined,
+          access,
           corsOrigins,
           allowedHosts,
-          tickets,
           wsHandler,
           handleRequest,
           runLog: (effect) => {

@@ -10,7 +10,7 @@ import {
   logsDirectory,
 } from "../config/paths";
 import { DaemonLaunchError, DaemonStoppedError } from "./errors";
-import { daemonAlive, healthy, pidAlive } from "./liveness";
+import { daemonAlive, pidAlive, probeHealth, type DaemonHealth } from "./liveness";
 import { lockExists, readLockPid, releaseLock, tryAcquireLock } from "./lock";
 import { reservePort } from "./port";
 import { type DaemonRecord, readRecord, removeRecord, writeRecord } from "./record";
@@ -27,6 +27,8 @@ export type DaemonHandle = {
   readonly port: number;
   readonly token: string;
   readonly pid: number;
+  /** HTTP protocol capability reported by health; absent means legacy. */
+  readonly protocolVersion?: number;
   /** True when an already-running daemon was attached to instead of spawned. */
   readonly reused: boolean;
 };
@@ -304,7 +306,8 @@ const spawnDaemon = (
     );
 
     const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
-    if (!(yield* waitHealthy(address, pid, timeoutMs))) {
+    const health = yield* waitHealthy(address, pid, timeoutMs);
+    if (health === undefined) {
       yield* killPid(pid);
       yield* removeRecord(options.daemonDir);
       return yield* Effect.fail(
@@ -313,7 +316,24 @@ const spawnDaemon = (
         }),
       );
     }
-    return attach(record, false);
+
+    const readyRecord: DaemonRecord =
+      health.protocolVersion === undefined
+        ? record
+        : { ...record, protocolVersion: health.protocolVersion };
+    if (readyRecord !== record) {
+      yield* writeRecord(options.daemonDir, readyRecord).pipe(
+        Effect.mapError(
+          (cause) =>
+            new DaemonLaunchError({
+              message: `Unable to record the pie daemon protocol: ${cause.message}`,
+              cause,
+            }),
+        ),
+        Effect.tapError(() => Effect.andThen(killPid(pid), removeRecord(options.daemonDir))),
+      );
+    }
+    return attach(readyRecord, false);
   });
 
 /**
@@ -386,15 +406,20 @@ function spawnDetached(options: ResolveDaemonOptions, port: number, token: strin
  * Two-signal readiness: the process must still be alive (a crash during boot
  * short-circuits the wait) and answer `/api/health`.
  */
-const waitHealthy = (address: string, pid: number, timeoutMs: number): Effect.Effect<boolean> =>
+const waitHealthy = (
+  address: string,
+  pid: number,
+  timeoutMs: number,
+): Effect.Effect<DaemonHealth | undefined> =>
   Effect.gen(function* () {
     const deadline = (yield* Clock.currentTimeMillis) + timeoutMs;
     while ((yield* Clock.currentTimeMillis) < deadline) {
-      if (!pidAlive(pid)) return false;
-      if (yield* healthy(address)) return true;
+      if (!pidAlive(pid)) return undefined;
+      const health = yield* probeHealth(address);
+      if (health.healthy) return health;
       yield* Effect.sleep(HEALTH_POLL_INTERVAL_MS);
     }
-    return false;
+    return undefined;
   });
 
 function attach(record: DaemonRecord, reused: boolean): DaemonHandle {
@@ -403,6 +428,9 @@ function attach(record: DaemonRecord, reused: boolean): DaemonHandle {
     port: Number(new URL(record.address).port),
     token: record.token,
     pid: record.pid,
+    ...(record.protocolVersion === undefined
+      ? undefined
+      : { protocolVersion: record.protocolVersion }),
     reused,
   };
 }

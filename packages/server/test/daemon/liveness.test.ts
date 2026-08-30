@@ -5,7 +5,8 @@ import type { AddressInfo } from "node:net";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { healthy, pidAlive } from "../../src/daemon/liveness";
+import { healthy, pidAlive, probeHealth } from "../../src/daemon/liveness";
+import { PIE_PROTOCOL_HEADER } from "../../src/http/protocol";
 
 function stubServer(handler: (res: http.ServerResponse) => void): Promise<http.Server> {
   const server = http.createServer((req, res) => {
@@ -38,6 +39,24 @@ describe("healthy", () => {
   it("is true when /api/health answers ok", async () => {
     server = await stubServer((res) => res.end("ok"));
     await expect(Effect.runPromise(healthy(addressOf(server)))).resolves.toBe(true);
+  });
+
+  it("reports an optional protocol version without changing legacy health", async () => {
+    server = await stubServer((res) => {
+      res.setHeader(PIE_PROTOCOL_HEADER, "2");
+      res.end("ok");
+    });
+    await expect(Effect.runPromise(probeHealth(addressOf(server)))).resolves.toEqual({
+      healthy: true,
+      protocolVersion: 2,
+    });
+  });
+
+  it("treats a missing protocol header as a healthy legacy daemon", async () => {
+    server = await stubServer((res) => res.end("ok"));
+    await expect(Effect.runPromise(probeHealth(addressOf(server)))).resolves.toEqual({
+      healthy: true,
+    });
   });
 
   it("is false on a non-ok status", async () => {

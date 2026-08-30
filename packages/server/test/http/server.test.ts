@@ -6,6 +6,7 @@ import { HttpServerResponse } from "effect/unstable/http";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 
+import { PIE_HTTP_PROTOCOL_VERSION, PIE_PROTOCOL_HEADER } from "../../src/http/protocol";
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";
 import type { RpcRuntime } from "../../src/rpc";
@@ -34,10 +35,12 @@ afterEach(async () => {
 });
 
 describe("createServer auth", () => {
-  it("serves /api/health without a token", async () => {
+  it("serves legacy-compatible health with a protocol capability header", async () => {
     const base = await start({ authToken: TOKEN });
     const response = await fetch(`${base}/api/health`);
     expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe("ok");
+    expect(response.headers.get(PIE_PROTOCOL_HEADER)).toBe(String(PIE_HTTP_PROTOCOL_VERSION));
   });
 
   it("does not expose an HTTP RPC endpoint", async () => {
@@ -66,13 +69,140 @@ describe("createServer auth", () => {
     });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { ticket: string };
-    expect(body.ticket).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body.ticket).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
   it("requires no token at all when none is configured (browser mode)", async () => {
     const base = await start({});
     const response = await fetch(`${base}/api/ws-ticket`, { method: "POST" });
     expect(response.status).toBe(200);
+  });
+});
+
+describe("createServer browser pairing", () => {
+  async function issueGrant(base: string): Promise<string> {
+    const response = await fetch(`${base}/api/auth/pairing-grants`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = (await response.json()) as { grant: string };
+    return body.grant;
+  }
+
+  async function exchangeGrant(base: string, grant: string): Promise<string> {
+    const response = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant }),
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const cookie = response.headers.get("set-cookie");
+    expect(cookie).toContain("pie_session=");
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Max-Age=");
+    expect(cookie).not.toContain("Domain=");
+    expect(cookie).not.toContain("Secure");
+    return cookie!.split(";", 1)[0]!;
+  }
+
+  it("exchanges a one-time grant for a browser session cookie", async () => {
+    const base = await start({ authToken: TOKEN });
+    const grant = await issueGrant(base);
+    const cookie = await exchangeGrant(base, grant);
+    const session = await fetch(`${base}/api/auth/session`, { headers: { cookie } });
+    expect(session.status).toBe(200);
+    expect(session.headers.get("cache-control")).toBe("no-store");
+    await expect(session.json()).resolves.toEqual({ authenticated: true });
+  });
+
+  it("rejects grant replay with the same response as an unknown grant", async () => {
+    const base = await start({ authToken: TOKEN });
+    const grant = await issueGrant(base);
+    await exchangeGrant(base, grant);
+    const replay = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant }),
+    });
+    const unknown = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant: "unknown" }),
+    });
+    expect([replay.status, await replay.text()]).toEqual([unknown.status, await unknown.text()]);
+  });
+
+  it("requires an exact same-origin loopback Origin for pairing exchange", async () => {
+    const base = await start({ authToken: TOKEN });
+    const grant = await issueGrant(base);
+    const missing = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ grant }),
+    });
+    const foreign = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://evil.example" },
+      body: JSON.stringify({ grant }),
+    });
+    expect(missing.status).toBe(403);
+    expect(foreign.status).toBe(403);
+  });
+
+  it("accepts only the strict small JSON grant shape", async () => {
+    const base = await start({ authToken: TOKEN });
+    const malformed = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant: "x", extra: true }),
+    });
+    const large = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant: "x".repeat(2_000) }),
+    });
+    expect(malformed.status).toBe(400);
+    expect(large.status).toBe(413);
+  });
+
+  it("does not include a refused grant in structured logs", async () => {
+    const records: Array<LogRecord> = [];
+    const effectContext = await Effect.runPromise(
+      Layer.build(
+        Logger.layer([
+          Logger.map(structured, (record) => {
+            records.push(record);
+          }),
+        ]),
+      ).pipe(Effect.scoped),
+    );
+    const base = await start({ authToken: TOKEN, effectContext });
+    const marker = "sensitive-grant-marker";
+    const response = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant: marker }),
+    });
+    expect(response.status).toBe(401);
+    expect(JSON.stringify(records)).not.toContain(marker);
+  });
+
+  it("lets a browser session mint a WS ticket but not a pairing grant", async () => {
+    const base = await start({ authToken: TOKEN });
+    const cookie = await exchangeGrant(base, await issueGrant(base));
+    const ticket = await fetch(`${base}/api/ws-ticket`, { method: "POST", headers: { cookie } });
+    expect(ticket.status).toBe(200);
+    const pairing = await fetch(`${base}/api/auth/pairing-grants`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    expect(pairing.status).toBe(403);
   });
 });
 
@@ -143,6 +273,29 @@ describe("createServer WebSocket ticket", () => {
     });
     const { ticket } = (await ticketResponse.json()) as { ticket: string };
     await expect(connect(base, `?ticket=${ticket}`)).resolves.toBe(200);
+  });
+
+  it("accepts a ticket issued to a browser session", async () => {
+    const base = await start({ authToken: TOKEN });
+    const grantResponse = await fetch(`${base}/api/auth/pairing-grants`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    const { grant } = (await grantResponse.json()) as { grant: string };
+    const sessionResponse = await fetch(`${base}/api/auth/browser-session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: base },
+      body: JSON.stringify({ grant }),
+    });
+    const cookie = sessionResponse.headers.get("set-cookie")!.split(";", 1)[0]!;
+    const ticketResponse = await fetch(`${base}/api/ws-ticket`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    const { ticket } = (await ticketResponse.json()) as { ticket: string };
+    await expect(connect(base, `?ticket=${ticket}`, "/ws/rpc", { origin: base })).resolves.toBe(
+      200,
+    );
   });
 
   it("rejects an upgrade with no ticket", async () => {

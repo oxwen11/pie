@@ -30,6 +30,15 @@ layer(NodeServices.layer)("daemon record", (it) => {
     }),
   );
 
+  it.effect("round-trips an optional protocol version", () =>
+    Effect.gen(function* () {
+      const daemonDir = yield* tempDaemonDir;
+      const versioned = { ...record, protocolVersion: 2 };
+      yield* writeRecord(daemonDir, versioned);
+      assert.deepEqual(yield* readRecord(daemonDir), versioned);
+    }),
+  );
+
   it.effect("writes daemon.pid inside the daemon directory", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

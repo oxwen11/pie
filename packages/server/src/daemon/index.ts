@@ -4,6 +4,14 @@ export {
   resolveDaemonLocation,
   resolvePieHome,
 } from "../config/paths";
+export {
+  type DaemonEndpoint,
+  DaemonClientError,
+  DaemonProtocolUnsupportedError,
+  inspectDaemonProtocol,
+  issueDaemonBrowserPairing,
+  issueDaemonWebSocketAccess,
+} from "./client";
 export { DaemonLaunchError, DaemonStoppedError } from "./errors";
 export {
   type DaemonHandle,
@@ -14,5 +22,6 @@ export {
   statusDaemon,
   stopDaemon,
 } from "./launcher";
-export { healthy, pidAlive } from "./liveness";
+export { healthy, pidAlive, probeHealth } from "./liveness";
+export type { DaemonHealth } from "./liveness";
 export { type DaemonRecord, readRecord } from "./record";

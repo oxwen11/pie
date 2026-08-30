@@ -76,11 +76,32 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(record?.pid, spawned.pid);
         assert.equal(record?.address, spawned.address);
         assert.equal(record?.token, spawned.token);
+        assert.equal(record?.protocolVersion, 2);
+        assert.equal(spawned.protocolVersion, 2);
 
         const attached = yield* resolve({ home, daemonDir, port: 0 });
         assert.equal(attached.reused, true);
         assert.equal(attached.pid, spawned.pid);
         assert.equal(attached.address, spawned.address);
+      }),
+    );
+
+    it.effect("reuses a healthy legacy daemon without stopping it", () =>
+      Effect.gen(function* () {
+        const { home, daemonDir } = yield* tempHome;
+        const legacy = yield* resolve({
+          home,
+          daemonDir,
+          port: 0,
+          environment: { ...process.env, PIE_TEST_LEGACY: "1" },
+          readyTimeoutMs: 15_000,
+        });
+        assert.equal(legacy.protocolVersion, undefined);
+
+        const attached = yield* resolve({ home, daemonDir, port: 0 });
+        assert.equal(attached.reused, true);
+        assert.equal(attached.pid, legacy.pid);
+        assert.ok(pidAlive(legacy.pid));
       }),
     );
 

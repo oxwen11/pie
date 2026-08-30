@@ -7,6 +7,9 @@ const port = Number(process.env.PIE_PORT ?? 0);
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {
+    if (process.env.PIE_TEST_LEGACY !== "1") {
+      res.setHeader("x-pie-protocol-version", "2");
+    }
     res.end("ok");
     return;
   }

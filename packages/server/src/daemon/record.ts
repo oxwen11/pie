@@ -16,6 +16,8 @@ export type DaemonRecord = {
   readonly address: string;
   /** The auth token the daemon was started with; front-doors read it from here. */
   readonly token: string;
+  /** HTTP protocol capability reported by health; absent means legacy. */
+  readonly protocolVersion?: number;
   /** Epoch millis the record was written. */
   readonly startedAt: number;
 };
@@ -43,6 +45,9 @@ export const readRecord = (
         pid: parsed.pid,
         address: parsed.address,
         token: parsed.token,
+        ...(typeof parsed.protocolVersion === "number"
+          ? { protocolVersion: parsed.protocolVersion }
+          : undefined),
         startedAt: typeof parsed.startedAt === "number" ? parsed.startedAt : 0,
       };
     }

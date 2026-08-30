@@ -1,8 +1,14 @@
 import { Effect } from "effect";
 
+import { parseProtocolVersion, PIE_PROTOCOL_HEADER } from "../http/protocol";
 import type { DaemonRecord } from "./record";
 
 const HEALTH_TIMEOUT_MS = 1_000;
+
+export type DaemonHealth = {
+  readonly healthy: boolean;
+  readonly protocolVersion?: number;
+};
 
 /** True if a process with this pid exists (signal 0 probes without killing). */
 export function pidAlive(pid: number): boolean {
@@ -11,32 +17,33 @@ export function pidAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    // EPERM means the process exists but we may not signal it — still alive.
     return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 }
 
-/**
- * True if `${address}/api/health` answers `ok`. Always bounded: a wedged
- * daemon that accepts connections but never responds must read as unhealthy,
- * not hang the probe (and with it every liveness poll built on top).
- */
-export const healthy = (address: string, signal?: AbortSignal): Effect.Effect<boolean> =>
+/** Probe health and read the optional protocol capability header. */
+export const probeHealth = (address: string, signal?: AbortSignal): Effect.Effect<DaemonHealth> =>
   Effect.promise(async () => {
     try {
-      const res = await fetch(new URL("/api/health", address), {
+      const response = await fetch(new URL("/api/health", address), {
         signal: signal ?? AbortSignal.timeout(HEALTH_TIMEOUT_MS),
       });
-      return res.ok && (await res.text()) === "ok";
+      const body = await response.text();
+      if (!response.ok || body !== "ok") return { healthy: false };
+      const protocolVersion = parseProtocolVersion(response.headers.get(PIE_PROTOCOL_HEADER));
+      return protocolVersion === undefined ? { healthy: true } : { healthy: true, protocolVersion };
     } catch {
-      return false;
+      return { healthy: false };
     }
   });
 
+/** True if `${address}/api/health` answers `ok`. */
+export const healthy = (address: string, signal?: AbortSignal): Effect.Effect<boolean> =>
+  probeHealth(address, signal).pipe(Effect.map((result) => result.healthy));
+
 /**
  * Two-signal liveness: the recorded pid is running AND the recorded address
- * answers health. Either alone is insufficient — a reused pid may be a foreign
- * process, and a stale address may be a different server.
+ * answers health. Either alone is insufficient.
  */
 export const daemonAlive = (record: DaemonRecord): Effect.Effect<boolean> =>
   pidAlive(record.pid) ? healthy(record.address) : Effect.succeed(false);
