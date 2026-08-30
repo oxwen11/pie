@@ -381,6 +381,20 @@ describe("createServer WebSocket ticket", () => {
   });
 });
 
+describe("createServer production UI", () => {
+  it("serves /pair through the SPA fallback and its hashed entry asset", async () => {
+    const base = await start({ authToken: TOKEN });
+    const page = await fetch(`${base}/pair`, { headers: { accept: "text/html" } });
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    const entry = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
+    expect(entry).toBeDefined();
+    const asset = await fetch(`${base}${entry}`);
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get("content-type")).toContain("javascript");
+  });
+});
+
 describe("createServer staged startup", () => {
   const ui: UIApp = Effect.succeed(HttpServerResponse.text("ok"));
 

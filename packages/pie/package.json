@@ -19,7 +19,7 @@
   },
   "scripts": {
     "dev": "PIE_PORT=4180 tsx src/node/cli.ts serve",
-    "build": "tsdown",
+    "build": "tsdown && node ../../tools/copy-browser-ui.mjs dist/client",
     "start": "node dist/cli.mjs",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p src/node",

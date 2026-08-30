@@ -1,7 +1,9 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppInterface } from "./app-interface";
+import { resolveBrowserAccess } from "./browser-access";
+import { BrowserAccess, BrowserAccessFallback } from "./browser-access-gate";
 import type { Platform } from "./platform";
 import { PlatformProvider } from "./platform-provider";
 
@@ -12,11 +14,16 @@ if (!rootElement) {
 }
 
 const platform = {} satisfies Platform;
+const access = resolveBrowserAccess();
 
 createRoot(rootElement).render(
   <StrictMode>
     <PlatformProvider value={platform}>
-      <AppInterface />
+      <Suspense fallback={<BrowserAccessFallback />}>
+        <BrowserAccess access={access}>
+          <AppInterface />
+        </BrowserAccess>
+      </Suspense>
     </PlatformProvider>
   </StrictMode>,
 );

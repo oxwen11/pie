@@ -3,6 +3,7 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { issueBrowserWebSocketTicket } from "@/browser-connection";
 import type { ServerConnection } from "@/server-connection";
 
 declare module "@tanstack/react-query" {
@@ -57,7 +58,7 @@ function createQueryClient(): QueryClient {
 }
 
 function createOrpcClient(server?: ServerConnection): PieClient {
-  if (!server) return createPieClient();
+  if (!server) return createPieClient({ getTicket: issueBrowserWebSocketTicket });
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
   return createPieClient({

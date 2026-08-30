@@ -1,6 +1,10 @@
 {
   "extends": ["//"],
   "tasks": {
+    "build": {
+      "dependsOn": ["@getpie/app#build"],
+      "outputs": ["dist/**"]
+    },
     "dev": {
       "passThroughEnv": [
         "AWS_*",

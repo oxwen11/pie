@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.com/schema.v2.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["@getpie/app#build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["@getpie/app#build"]
+    }
+  }
+}
