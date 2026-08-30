@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import url from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const source = path.join(repoRoot, "apps", "app", "dist");
