@@ -11,7 +11,7 @@ export const ServerStatusSnapshotSchema = z.object({
 export type ServerStatusSnapshot = z.infer<typeof ServerStatusSnapshotSchema>;
 
 export const WebSocketAccessSchema = z.object({
-  url: z.string().url(),
+  url: z.url(),
 });
 export type WebSocketAccess = z.infer<typeof WebSocketAccessSchema>;
 

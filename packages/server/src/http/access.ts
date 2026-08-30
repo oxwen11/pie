@@ -128,7 +128,9 @@ export function createAccessAuthority(options: AccessAuthorityOptions): AccessAu
 
     inspectBrowserSession(cookie) {
       removeExpired();
-      return { authenticated: browserPrincipal(cookie) !== null };
+      return {
+        authenticated: options.masterToken === undefined || browserPrincipal(cookie) !== null,
+      };
     },
 
     issueWebSocketTicket(principal) {

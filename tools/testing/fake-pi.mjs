@@ -7,6 +7,7 @@ const send = (frame) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 
 const logPath = process.env["PIE_E2E_PI_LOG"];
 const configuredResponse = process.env["PIE_E2E_PI_RESPONSE"] ?? "E2E fake Pi reply";
+const responseDelayMs = Number(process.env["PIE_E2E_PI_DELAY_MS"] ?? 0);
 
 const sidIndex = process.argv.indexOf("--session-id");
 const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
@@ -62,11 +63,15 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
 
   send({ id: msg.id, type: "response", command: "prompt", success: true });
-  send({ type: "agent_start" });
-  upd({ type: "start" });
-  upd({ type: "text_start", contentIndex: 0 });
-  upd({ type: "text_delta", contentIndex: 0, delta: configuredResponse });
-  upd({ type: "text_end", contentIndex: 0, content: configuredResponse });
-  send({ type: "message_end", message: assistant() });
-  settle();
+  const respond = () => {
+    send({ type: "agent_start" });
+    upd({ type: "start" });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: configuredResponse });
+    upd({ type: "text_end", contentIndex: 0, content: configuredResponse });
+    send({ type: "message_end", message: assistant() });
+    settle();
+  };
+  if (responseDelayMs > 0) setTimeout(respond, responseDelayMs);
+  else respond();
 });

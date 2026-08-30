@@ -24,7 +24,8 @@ function fragmentGrant(url: URL): string | null {
 
 async function hasBrowserSession(environment: BrowserAccessEnvironment): Promise<boolean> {
   try {
-    const response = await environment.fetch("/api/auth/session", {
+    const fetcher = environment.fetch;
+    const response = await fetcher("/api/auth/session", {
       credentials: "same-origin",
       cache: "no-store",
     });
@@ -46,7 +47,8 @@ async function exchangeGrant(
   grant: string,
 ): Promise<boolean> {
   try {
-    const response = await environment.fetch("/api/auth/browser-session", {
+    const fetcher = environment.fetch;
+    const response = await fetcher("/api/auth/browser-session", {
       method: "POST",
       credentials: "same-origin",
       cache: "no-store",

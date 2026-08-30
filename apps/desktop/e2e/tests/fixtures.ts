@@ -60,6 +60,7 @@ export async function stopDaemonFor(pieHome: string): Promise<void> {
  */
 export const test = base.extend<{
   e2ePaths: {
+    daemonDir: string;
     fakePiLog: string;
     userData: string;
     pieHome: string;
@@ -75,6 +76,7 @@ export const test = base.extend<{
     fs.mkdirSync(pieHome, { recursive: true });
     seedProject(pieHome, path.join(output, "workspace"));
     await use({
+      daemonDir: path.join(pieHome, "daemon"),
       fakePiLog: path.join(output, "fake-pi.jsonl"),
       userData: path.join(output, "user-data"),
       pieHome,
@@ -97,7 +99,9 @@ export const test = base.extend<{
         PIE_E2E_PI_EXECUTABLE: fakePiPath,
         PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
         PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
+        PIE_E2E_PI_DELAY_MS: "1000",
         PIE_HOME: e2ePaths.pieHome,
+        PIE_DAEMON_DIR: e2ePaths.daemonDir,
       },
     });
 

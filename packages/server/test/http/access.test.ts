@@ -61,6 +61,11 @@ describe("AccessAuthority pairing grants", () => {
 });
 
 describe("AccessAuthority browser sessions", () => {
+  it("keeps explicit tokenless foreground serve compatible with the browser UI", () => {
+    const authority = createAccessAuthority({ masterToken: undefined });
+    expect(authority.inspectBrowserSession(undefined)).toEqual({ authenticated: true });
+  });
+
   it("authenticates the HttpOnly cookie value without accepting unrelated cookies", () => {
     const authority = deterministicAuthority(Date.now);
     const { cookie } = issueBrowserSession(authority);
