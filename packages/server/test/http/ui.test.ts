@@ -26,7 +26,7 @@ const makeStaticHandler = (staticDir: string) =>
 describe("withStaticCacheControl", () => {
   it("caches versioned Vite assets immutably", () => {
     const response = withStaticCacheControl(
-      "/assets/index-pjSmfRhB.js",
+      "/assets/index-pjSmfRhB.js?v=1",
       HttpServerResponse.text("asset"),
     );
 
@@ -46,6 +46,15 @@ describe("withStaticCacheControl", () => {
 
   it("does not make an unfingerprinted asset immutable", () => {
     const response = withStaticCacheControl("/assets/runtime.js", HttpServerResponse.text("asset"));
+
+    expect(response.headers["cache-control"]).toBe("no-cache");
+  });
+
+  it("does not make an encoded asset-shaped alias immutable", () => {
+    const response = withStaticCacheControl(
+      "/assets/runtime-deadbeef.js%2f..%2f..%2findex.html",
+      HttpServerResponse.text("index"),
+    );
 
     expect(response.headers["cache-control"]).toBe("no-cache");
   });

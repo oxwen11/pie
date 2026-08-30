@@ -22,38 +22,11 @@ const REVALIDATE_CACHE_CONTROL = "no-cache";
 const ERROR_CACHE_CONTROL = "no-store";
 
 /**
- * Match Vite's default eight-character content hash. A successful file response
- * still has to pass this check: merely living under `/assets` is not enough to
- * earn a year-long immutable lifetime.
+ * Immutable caching is deliberately a narrow allowlist of Vite's literal
+ * emitted URLs. Encoded or normalized aliases revalidate instead of duplicating
+ * `HttpStaticServer`'s private path-resolution algorithm here.
  */
-const VERSIONED_ASSET_PATH = /^\/assets\/(?:[^/]+\/)*[^/]+-[A-Za-z0-9_-]{8}\.[^/]+$/;
-
-/**
- * Mirror `HttpStaticServer`'s decode + normalize order before classifying the
- * response. In particular, `/assets/%2e%2e%2findex.html` resolves to the app
- * shell, not an asset. Node's host path implementation matches the NodePath
- * layer used by the static server; separators are converted back to URL form
- * only after traversal checks.
- */
-const normalizedRequestPath = (requestUrl: string): string | undefined => {
-  const queryIndex = requestUrl.indexOf("?");
-  const urlPath = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
-  let decodedPath: string;
-  try {
-    decodedPath = decodeURIComponent(urlPath);
-  } catch {
-    return undefined;
-  }
-  if (decodedPath.includes("\u0000")) return undefined;
-
-  const normalizedPath = path.normalize(
-    decodedPath.startsWith("/") ? decodedPath.slice(1) : decodedPath,
-  );
-  if (normalizedPath === ".." || normalizedPath.startsWith(`..${path.sep}`)) {
-    return undefined;
-  }
-  return `/${normalizedPath.split(path.sep).join("/")}`;
-};
+const VERSIONED_ASSET_PATH = /^\/assets\/[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9_.-]+$/;
 
 /** Apply the built-UI cache contract after the static handler resolves a response. */
 export const withStaticCacheControl = (
@@ -64,13 +37,12 @@ export const withStaticCacheControl = (
     return HttpServerResponse.setHeader(response, "cache-control", ERROR_CACHE_CONTROL);
   }
 
-  const pathname = normalizedRequestPath(requestUrl);
+  const queryIndex = requestUrl.indexOf("?");
+  const pathname = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
   return HttpServerResponse.setHeader(
     response,
     "cache-control",
-    pathname !== undefined && VERSIONED_ASSET_PATH.test(pathname)
-      ? IMMUTABLE_ASSET_CACHE_CONTROL
-      : REVALIDATE_CACHE_CONTROL,
+    VERSIONED_ASSET_PATH.test(pathname) ? IMMUTABLE_ASSET_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
   );
 };
 
@@ -90,7 +62,7 @@ const resolveStaticDir = (
     const candidates = override
       ? [override]
       : [
-          "./client/", // packaged: dist/client next to dist/cli.js
+          "./client/", // packaged: dist/client next to dist/cli.mjs
           "../../../../apps/app/dist/", // monorepo, from src/node
           "../../../apps/app/dist/", // monorepo, from packages/pie/dist
         ];
