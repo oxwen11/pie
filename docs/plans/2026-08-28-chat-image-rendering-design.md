@@ -526,9 +526,17 @@ No Pi JSONL rewrite or migration is required.
 
 ## Verification
 
-Verification is based on user-observable image decoding, not only the presence of an `<img>` element.
+End-to-end runtime verification is the acceptance gate. Unit and component tests support diagnosis and security boundaries, but cannot substitute for opening a real transcript and decoding a real image.
 
-### Classifier tests
+The implementation must not add tests merely for coverage, framework behavior, snapshots, private helper structure, or assertions already proven by an end-to-end scenario. Prefer extending an existing test over creating a new test file. Add focused automated tests only when they protect a security invariant, a live/history adapter contract, or a failure mode that is impractical to reproduce reliably through the runtime UI.
+
+Required end-to-end evidence uses the normal server, RPC, history, Markdown, HTTP asset, browser, and Electron paths. It must not mock URL creation, replace `<img>` loading with a stub, inject a prebuilt signed URL, or stop after asserting that an `<img>` exists. Success requires browser-decoded dimensions:
+
+```js
+image.complete === true && image.naturalWidth > 0 && image.naturalHeight > 0;
+```
+
+### Focused classifier tests
 
 Cover:
 
@@ -595,34 +603,20 @@ Verify:
 - nearby `/api` paths still require bearer authentication;
 - refusal logs contain `/api/assets/<redacted>` and contain no token, filename, or local path.
 
-### App component tests
+### Focused app regression tests
 
-Given:
+Do not reproduce the complete runtime flow with mocks. Add only the smallest tests needed to pin behavior that the end-to-end run cannot diagnose precisely:
 
-```md
-![Result](/tmp/pie-chat-image.png)
-```
+- the raw local destination is never assigned directly to `<img src>`;
+- URL expiry or one load failure causes at most one remint, not a request loop;
+- a bare code-formatted path does not invoke image resolution;
+- existing Pi `ImageContent` → AI SDK `FileUIPart` live/history tests remain green.
 
-verify:
+Loading visuals, final image decoding, configured server-base resolution, CSP, and failure fallback are accepted through runtime integration rather than duplicate component fixtures.
 
-- the complete `SessionRef` reaches the image renderer;
-- the raw destination is never assigned to `<img src>`;
-- loading appears before URL resolution;
-- `relativeUrl` resolves against the configured server HTTP base;
-- signed URL success renders the image;
-- load failure produces the unavailable fallback;
-- the query remints before expiry despite global `staleTime: Infinity`;
-- a first image load error invalidates and remints once;
-- a second failure renders fallback without a retry loop;
-- repeated stable rendering deduplicates URL creation;
-- changing partial streaming destinations does not create an unbounded request loop;
-- a bare code-formatted path does not render an image;
-- Pi live/history adapter tests prove tool images become AI SDK file parts;
-- assistant message tests prove approved raster file parts render.
+### Required historical JSONL end-to-end run
 
-### Historical JSONL integration
-
-Use an isolated `PIE_HOME` and a Pi history fixture containing an assistant text block with local Markdown image syntax. Create a real raster file at the referenced path, load the session through the normal history path, and open the transcript.
+Use an isolated `PIE_HOME` and a real Pi JSONL session containing an assistant text block with local Markdown image syntax. Create a real raster file at the referenced path, launch the normal server and app, load the session through the normal history/RPC path, and open the transcript. Do not seed the client with constructed `UIMessage` objects.
 
 Browser assertions:
 
@@ -646,9 +640,9 @@ naturalHeight > 0
 
 Capture a screenshot of the rendered transcript.
 
-### Live-stream integration
+### Required live-stream end-to-end run
 
-Stream an assistant message that ends with a local Markdown image. Verify that:
+Run a real Pi session whose assistant message ends with a local Markdown image. Verify that:
 
 - partial Markdown does not crash the transcript;
 - incomplete destinations are not registered or minted;
@@ -656,9 +650,9 @@ Stream an assistant message that ends with a local Markdown image. Verify that:
 - the image decodes after final text arrives;
 - refreshing reproduces the same result through history.
 
-### Desktop runtime
+### Required Desktop end-to-end run
 
-Verify both Electron development and a packaged application.
+Verify both Electron development and a packaged application through their normal launch paths.
 
 For each mode, assert:
 
