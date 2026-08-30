@@ -12,7 +12,13 @@ import { describe, expect, it } from "vitest";
 
 import type { AgentResponse } from "./agent-requests";
 import { Chat } from "./chat";
+import { composeMessages, composeStatus } from "./chat-state";
 import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-port";
+
+const view = (chat: Chat) => {
+  const s = chat.store.getState();
+  return { messages: composeMessages(s), status: composeStatus(s) };
+};
 
 const ref = {
   projectId: "project-1",
@@ -145,7 +151,7 @@ describe("Chat hydration", () => {
     const { chat, transport, attach, live } = makeChat();
     transport.history = [userMessage("user-1", "hello")];
     await attach({ cursor: 8 });
-    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(view(chat).messages).toHaveLength(1);
 
     transport.history = [userMessage("user-1", "hello")];
     await attach({ cursor: 0 });
@@ -156,7 +162,7 @@ describe("Chat hydration", () => {
     }
     await settle();
 
-    const last = chat.store.getState().messages.at(-1)!;
+    const last = view(chat).messages.at(-1)!;
     expect(last.role).toBe("assistant");
     expect(assistantText(last)).toBe("after the restart");
   });
@@ -176,14 +182,14 @@ describe("Chat hydration", () => {
     });
     const sent = chat.prompt("still queued");
     await settle();
-    expect(chat.store.getState().messages).toHaveLength(2);
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).messages).toHaveLength(2);
+    expect(view(chat).status).toBe("submitted");
 
     // The rebuilt session restarts its seq counter and knows nothing yet.
     await attach({ cursor: 0 });
 
-    expect(chat.store.getState().messages.map((message) => message.role)).toEqual(["user", "user"]);
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).messages.map((message) => message.role)).toEqual(["user", "user"]);
+    expect(view(chat).status).toBe("submitted");
 
     releasePrompt();
     await sent;
@@ -205,13 +211,13 @@ describe("Chat hydration", () => {
     });
     const sent = chat.prompt("still queued");
     await settle();
-    expect(chat.store.getState().messages).toHaveLength(2);
+    expect(view(chat).messages).toHaveLength(2);
 
     // Not our turn, and not completed — so it both lands an idle phase and
     // triggers the reconcile.
     live(9, { type: "session.turn.ended", turnId: "other", outcome: "canceled", phase: "idle" });
     await settle();
-    expect(chat.store.getState().messages).toHaveLength(2);
+    expect(view(chat).messages).toHaveLength(2);
 
     releasePrompt();
     await sent;
@@ -227,11 +233,11 @@ describe("Chat hydration", () => {
     transport.history = [userMessage("user-1", "hello")];
     await attach({ cursor: 8 });
     await chat.prompt("second");
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).status).toBe("submitted");
 
     transport.history = [userMessage("user-1", "hello"), userMessage("assistant-1", "reply")];
     await attach({ cursor: 20 });
-    expect(chat.store.getState().status).toBe("ready");
+    expect(view(chat).status).toBe("ready");
   });
 
   it("lays the history floor before folding buffered or live chunks", async () => {
@@ -254,10 +260,10 @@ describe("Chat hydration", () => {
       chunk: { type: "text-end", id: "t" },
     });
     await settle();
-    const messages = chat.store.getState().messages;
+    const messages = view(chat).messages;
     expect(messages.map((message) => message.role)).toEqual(["user", "assistant"]);
     expect(assistantText(messages[1]!)).toBe("buffered");
-    expect(chat.store.getState().status).toBe("streaming");
+    expect(view(chat).status).toBe("streaming");
   });
 
   it("gates live events by seq so buffered replay never double-folds", async () => {
@@ -281,7 +287,7 @@ describe("Chat hydration", () => {
       chunk: { type: "text-end", id: "t" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = view(chat).messages.at(-1)!;
     expect(assistantText(assistant)).toBe("once");
   });
 
@@ -302,8 +308,8 @@ describe("Chat hydration", () => {
       }),
       cursor: 4,
     });
-    expect(chat.store.getState().messages).toHaveLength(2);
-    expect(chat.store.getState().status).toBe("ready");
+    expect(view(chat).messages).toHaveLength(2);
+    expect(view(chat).status).toBe("ready");
   });
 
   it("hydrates from the freshest snapshot when a re-attach races the history floor", async () => {
@@ -331,8 +337,12 @@ describe("Chat hydration", () => {
     // survives, with the settled floor laid underneath.
     const state = chat.store.getState();
     expect(state.pendingRequests.map((request) => request.id)).toEqual(["request-1"]);
-    expect(state.status).toBe("streaming");
-    expect(state.messages.map((message) => message.id)).toEqual(["user-1", "assistant-1", "m2"]);
+    expect(view(chat).status).toBe("streaming");
+    expect(view(chat).messages.map((message) => message.id)).toEqual([
+      "user-1",
+      "assistant-1",
+      "m2",
+    ]);
   });
 
   it("re-reads history when a whole turn completed inside a subscription drop", async () => {
@@ -361,7 +371,7 @@ describe("Chat hydration", () => {
     live(13, { type: "session.turn.ended", turnId: "turn-2", outcome: "completed", phase: "idle" });
     await settle();
     expect(transport.getMessagesCalls).toBe(2);
-    expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
+    expect(view(chat).messages.map((message) => message.id)).toEqual([
       "user-1",
       "assistant-1",
       "m2",
@@ -383,7 +393,7 @@ describe("Chat hydration", () => {
       }),
       cursor: 2,
     });
-    const messages = chat.store.getState().messages;
+    const messages = view(chat).messages;
     expect(messages[0]!.role).toBe("user");
     expect(messages[0]!.id).toBe("prompt-1");
   });
@@ -443,12 +453,12 @@ describe("Chat prompting", () => {
     });
 
     const sent = chat.prompt("from draft");
-    expect(chat.store.getState().messages).toHaveLength(1);
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).messages).toHaveLength(1);
+    expect(view(chat).status).toBe("submitted");
 
     await attach({});
-    expect(chat.store.getState().messages).toHaveLength(1);
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).messages).toHaveLength(1);
+    expect(view(chat).status).toBe("submitted");
 
     releasePrompt();
     await sent;
@@ -461,7 +471,7 @@ describe("Chat prompting", () => {
     await chat.prompt("hello there");
     expect(transport.promptCalls).toHaveLength(1);
     const { messageId } = transport.promptCalls[0]!;
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).status).toBe("submitted");
     // The echo carries the pre-turn idle phase — it must not clear the
     // sender's optimistic "submitted".
     live(1, {
@@ -470,10 +480,10 @@ describe("Chat prompting", () => {
       parts: [{ type: "text", text: "hello there" }],
       phase: "idle",
     });
-    expect(chat.store.getState().messages).toHaveLength(1);
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).messages).toHaveLength(1);
+    expect(view(chat).status).toBe("submitted");
     live(2, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
-    expect(chat.store.getState().status).toBe("streaming");
+    expect(view(chat).status).toBe("streaming");
   });
 
   it("appends another client's prompt from the broadcast", async () => {
@@ -485,7 +495,7 @@ describe("Chat prompting", () => {
       parts: [{ type: "text", text: "from B" }],
       phase: "idle",
     });
-    const messages = chat.store.getState().messages;
+    const messages = view(chat).messages;
     expect(messages).toHaveLength(1);
     expect(messages[0]!.id).toBe("other-1");
   });
@@ -501,11 +511,11 @@ describe("Chat prompting", () => {
       parts: [{ type: "text", text: "loser" }],
       phase: "idle",
     });
-    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(view(chat).messages).toHaveLength(1);
     // The server rejected the prompt (turn already running): the compensating
     // event removes the user bubble everywhere, optimistic copy included.
     live(2, { type: "session.prompt.rejected", messageId, reason: "turn running", phase: "idle" });
-    expect(chat.store.getState().messages).toEqual([]);
+    expect(view(chat).messages).toEqual([]);
   });
 
   it("folds this client's own turn through the same subscription path", async () => {
@@ -525,10 +535,10 @@ describe("Chat prompting", () => {
     }
     live(6, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
     await settle();
-    const messages = chat.store.getState().messages;
+    const messages = view(chat).messages;
     expect(messages).toHaveLength(2);
     expect(assistantText(messages[1]!)).toBe("reply");
-    expect(chat.store.getState().status).toBe("ready");
+    expect(view(chat).status).toBe("ready");
   });
 });
 
@@ -543,13 +553,13 @@ describe("Chat interruption", () => {
 
     await chat.interrupt();
     expect(transport.interruptCalls).toBe(1);
-    expect(chat.store.getState().status).toBe("streaming");
+    expect(view(chat).status).toBe("streaming");
     expect(chat.store.getState().pendingRequests).toHaveLength(1);
 
     live(2, { type: "session.turn.ended", turnId: "turn-1", outcome: "canceled", phase: "idle" });
     await settle();
 
-    expect(chat.store.getState().status).toBe("ready");
+    expect(view(chat).status).toBe("ready");
     expect(chat.store.getState().pendingRequests).toEqual([]);
   });
 });
@@ -572,11 +582,11 @@ describe("Chat stream errors", () => {
     await settle();
 
     expect(chat.store.getState().error?.message).toBe(providerError);
-    expect(chat.store.getState().status).toBe("ready");
+    expect(view(chat).status).toBe("ready");
 
     await chat.prompt("retry");
     expect(chat.store.getState().error).toBeUndefined();
-    expect(chat.store.getState().status).toBe("submitted");
+    expect(view(chat).status).toBe("submitted");
     expect(transport.promptCalls.at(-1)?.parts).toEqual([{ type: "text", text: "retry" }]);
   });
 
@@ -719,7 +729,7 @@ describe("Chat stream errors", () => {
     });
 
     expect(chat.store.getState().error).toBeUndefined();
-    expect(chat.store.getState().messages.at(-1)?.id).toBe("prompt-new");
+    expect(view(chat).messages.at(-1)?.id).toBe("prompt-new");
   });
 
   it("clears a stale error for unseen broadcast and retained prompts", async () => {
@@ -820,7 +830,7 @@ describe("Chat history reconcile", () => {
     live(2, { type: "session.turn.ended", turnId: "turn-1", outcome: "failed", phase: "idle" });
     await settle();
     expect(transport.getMessagesCalls).toBe(2);
-    expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
+    expect(view(chat).messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
   });
 
   it("reconciles when the stream carried an error chunk but the turn completed", async () => {
@@ -836,7 +846,7 @@ describe("Chat history reconcile", () => {
     live(3, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
     await settle();
     expect(transport.getMessagesCalls).toBe(2);
-    expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
+    expect(view(chat).messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
   });
 
   it("applies a settled reconcile without clobbering a newer live turn", async () => {
@@ -856,7 +866,7 @@ describe("Chat history reconcile", () => {
     // Settled can land immediately — live assistant is a separate slot.
     expect(chat.store.getState().settled.map((m) => m.id)).toEqual(["user-1"]);
     expect(chat.store.getState().liveAssistant).not.toBeNull();
-    expect(chat.store.getState().messages.map((m) => m.id)).not.toEqual(["user-1"]);
+    expect(view(chat).messages.map((m) => m.id)).not.toEqual(["user-1"]);
   });
 });
 
@@ -886,7 +896,7 @@ describe("Chat truncated buffers", () => {
       chunk: { type: "text-end", id: "kept" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = view(chat).messages.at(-1)!;
     expect(assistantText(assistant)).toBe("tail");
     // Turn end: the full turn (including the evicted head) comes back from
     // history.
@@ -894,7 +904,7 @@ describe("Chat truncated buffers", () => {
     live(54, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
     await settle();
     expect(transport.getMessagesCalls).toBe(2);
-    expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
+    expect(view(chat).messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
   });
 
   it("returning viewer with a mid-turn hole abandons the live view and recovers at end", async () => {
@@ -930,12 +940,12 @@ describe("Chat truncated buffers", () => {
       chunk: { type: "text-delta", id: "t", delta: "MORE" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = view(chat).messages.at(-1)!;
     expect(assistantText(assistant)).toBe("seen");
     transport.history = [userMessage("assistant-1", "whole turn")];
     live(12, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
     await settle();
-    expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["assistant-1"]);
+    expect(view(chat).messages.map((m) => m.id)).toEqual(["assistant-1"]);
   });
 
   it("reconciles on re-attach when a flagged turn ended while detached", async () => {
@@ -967,7 +977,7 @@ describe("Chat truncated buffers", () => {
     transport.history = [userMessage("assistant-1", "whole turn")];
     await attach({ status: { phase: "idle" }, activeTurn: null, cursor: 12 });
     await settle();
-    expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["assistant-1"]);
+    expect(view(chat).messages.map((m) => m.id)).toEqual(["assistant-1"]);
     void live;
   });
 });
@@ -977,7 +987,7 @@ describe("Chat lifecycle", () => {
     const { chat, attach, live } = makeChat();
     await attach({});
     live(1, { type: "session.crashed", reason: "boom", phase: "crashed" });
-    expect(chat.store.getState().status).toBe("error");
+    expect(view(chat).status).toBe("error");
   });
 
   it("clears pending requests when the session crashes", async () => {
@@ -997,21 +1007,21 @@ describe("Chat lifecycle", () => {
     live(1, { type: "session.request.asked", request: toolRequest, phase: "requires_action" });
 
     emit({ type: "closed", reason: "session_deleted" });
-    expect(chat.store.getState().status).toBe("error");
+    expect(view(chat).status).toBe("error");
     expect(chat.store.getState().error?.message).toBe("Session deleted");
     expect(chat.store.getState().pendingRequests).toEqual([]);
 
     // The terminal state is final: nothing may hydrate or fold over it.
     live(2, { type: "session.turn.started", turnId: "turn-late", phase: "running" });
     await attach({ status: { phase: "idle" } });
-    expect(chat.store.getState().status).toBe("error");
+    expect(view(chat).status).toBe("error");
   });
 
   it("names the close reason when the session was closed", async () => {
     const { chat, emit, attach } = makeChat();
     await attach({});
     emit({ type: "closed", reason: "session_closed" });
-    expect(chat.store.getState().status).toBe("error");
+    expect(view(chat).status).toBe("error");
     expect(chat.store.getState().error?.message).toBe("Session closed");
   });
 
@@ -1028,7 +1038,7 @@ describe("Chat lifecycle", () => {
         behavior: "allow",
       }),
     ).rejects.toThrow("Session is closed");
-    expect(chat.store.getState().messages).toEqual([]);
+    expect(view(chat).messages).toEqual([]);
   });
 
   it("hands the owner a one-shot termination signal", async () => {

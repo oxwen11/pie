@@ -13,31 +13,35 @@ import type { AgentRequest } from "./agent-requests";
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
 
-// Three sources, composed at write into `messages` (read-only view):
+// Sender-local overlay for one prompt. `rpcPending` is why a snapshot must
+// not clear it: the server has not seen the prompt yet. After the RPC
+// settles the id stays until a lifecycle phase or a later snapshot.
+export type InFlightPrompt = {
+  readonly id: string;
+  readonly rpcPending: boolean;
+};
+
+// Three sources, composed at read:
 //   settled      — getMessages() only
 //   pendingUsers — prompt() / prompt.submitted / snapshot.activePrompt
 //   liveAssistant — the current turn fold
-// `status` is likewise derived (phase + localSubmitted + terminated). Nothing
-// writes either field except #commit.
+// `messages` / AI-SDK `status` are not stored.
 export type ChatStoreState = {
   settled: UIMessage[];
   pendingUsers: UIMessage[];
   liveAssistant: UIMessage | null;
-  messages: UIMessage[];
   phase: SessionPhase;
-  // Sender-local overlay: set in prompt(), cleared by a lifecycle phase or a
-  // snapshot once the RPC is no longer in flight. Prompt events must not
-  // clear it — they carry a pre-turn idle phase.
-  localSubmitted: boolean;
+  inFlightPrompt: InFlightPrompt | null;
   terminated: boolean;
-  status: ChatStatus;
   error?: Error;
   retryNotice?: string;
   pendingRequests: AgentRequest[];
   historyStatus: HistoryStatus;
 };
 
-export const composeMessages = (s: ChatStoreState): UIMessage[] => {
+export const composeMessages = (
+  s: Pick<ChatStoreState, "settled" | "pendingUsers" | "liveAssistant">,
+): UIMessage[] => {
   const seen = new Set<string>();
   const out: UIMessage[] = [];
   for (const message of s.settled) {
@@ -54,51 +58,50 @@ export const composeMessages = (s: ChatStoreState): UIMessage[] => {
   return out;
 };
 
-export const composeStatus = (s: ChatStoreState): ChatStatus => {
+export const composeStatus = (
+  s: Pick<ChatStoreState, "phase" | "inFlightPrompt" | "terminated">,
+): ChatStatus => {
   if (s.terminated || s.phase === "crashed") return "error";
-  if (s.localSubmitted) return "submitted";
+  if (s.inFlightPrompt) return "submitted";
   // liveAssistant can linger one fold-tick after the turn ends idle; phase
   // is the server's word for whether the composer should stay locked.
   if (s.phase === "running" || s.phase === "requires_action") return "streaming";
   return "ready";
 };
 
-export const selectMessages = (s: ChatStoreState): UIMessage[] => s.messages;
+export const selectMessages = composeMessages;
 
-export const selectChatStatus = (s: ChatStoreState): ChatStatus => s.status;
+export const selectChatStatus = composeStatus;
 
-export const selectTurnInProgress = (s: ChatStoreState): boolean =>
-  s.localSubmitted || s.phase === "running" || s.phase === "requires_action";
+export const selectTurnInProgress = (
+  s: Pick<ChatStoreState, "phase" | "inFlightPrompt">,
+): boolean => s.inFlightPrompt !== null || s.phase === "running" || s.phase === "requires_action";
 
-export const selectCanInterrupt = (s: ChatStoreState): boolean =>
+export const selectCanInterrupt = (s: Pick<ChatStoreState, "phase" | "terminated">): boolean =>
   s.phase === "running" && !s.terminated;
 
-export const selectShowThinking = (s: ChatStoreState): boolean =>
-  s.localSubmitted && s.liveAssistant === null;
+export const selectShowThinking = (
+  s: Pick<ChatStoreState, "inFlightPrompt" | "liveAssistant">,
+): boolean => s.inFlightPrompt !== null && s.liveAssistant === null;
 
-const initial = (): ChatStoreState => {
-  const base: ChatStoreState = {
-    settled: [],
-    pendingUsers: [],
-    liveAssistant: null,
-    messages: [],
-    phase: "idle",
-    localSubmitted: false,
-    terminated: false,
-    status: "ready",
-    error: undefined,
-    retryNotice: undefined,
-    pendingRequests: [],
-    historyStatus: "loading",
-  };
-  return { ...base, messages: composeMessages(base), status: composeStatus(base) };
-};
+const initial = (): ChatStoreState => ({
+  settled: [],
+  pendingUsers: [],
+  liveAssistant: null,
+  phase: "idle",
+  inFlightPrompt: null,
+  terminated: false,
+  error: undefined,
+  retryNotice: undefined,
+  pendingRequests: [],
+  historyStatus: "loading",
+});
 
 const idsOf = (messages: readonly UIMessage[]): Set<string> =>
   new Set(messages.map((message) => message.id));
 
-// Chat's state container. Mutators write the three transcript slots and the
-// server phase; `messages` / `status` are always recomputed from those.
+// Chat's state container. Mutators write the three transcript slots, the
+// server phase, and the one in-flight overlay. Views compose at read.
 export class ChatState {
   readonly store: StoreApi<ChatStoreState>;
 
@@ -109,12 +112,7 @@ export class ChatState {
   #commit(
     update: Partial<ChatStoreState> | ((s: ChatStoreState) => Partial<ChatStoreState>),
   ): void {
-    this.store.setState((s) => {
-      const next = { ...s, ...(typeof update === "function" ? update(s) : update) };
-      next.messages = composeMessages(next);
-      next.status = composeStatus(next);
-      return next;
-    });
+    this.store.setState(update);
   }
 
   get snapshot(): ChatStoreState {
@@ -175,14 +173,14 @@ export class ChatState {
     this.#commit({ phase });
   }
 
-  setLocalSubmitted(localSubmitted: boolean): void {
-    this.#commit({ localSubmitted });
+  setInFlightPrompt(inFlightPrompt: InFlightPrompt | null): void {
+    this.#commit({ inFlightPrompt });
   }
 
   setTerminated(): void {
     this.#commit({
       terminated: true,
-      localSubmitted: false,
+      inFlightPrompt: null,
       liveAssistant: null,
       pendingRequests: [],
       retryNotice: undefined,

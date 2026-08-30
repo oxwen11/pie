@@ -1,6 +1,5 @@
 import type {
   PromptPart,
-  SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
@@ -93,9 +92,6 @@ export class Chat {
   // complete, with the retried tail persisted but never streamed — reconcile
   // from history at turn end regardless of outcome.
   readonly #erroredTurnIds = new Set<string>();
-  // Prompts whose RPC has not settled. A snapshot arriving mid-flight must
-  // not clear localSubmitted: the server has not seen the prompt yet.
-  #promptsInFlight = 0;
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -152,7 +148,9 @@ export class Chat {
         break;
       case "session.prompt.rejected":
         this.#state.removePendingUser(event.messageId);
-        if (this.#state.snapshot.localSubmitted) this.#state.setLocalSubmitted(false);
+        if (this.#state.snapshot.inFlightPrompt?.id === event.messageId) {
+          this.#state.setInFlightPrompt(null);
+        }
         break;
       case "session.turn.started":
         // Park the previous live assistant on settled before a new fold
@@ -194,16 +192,12 @@ export class Chat {
       }
     }
     // Phase is copied off the event (the runtime stamps its post-fold phase).
-    // Prompt events still must not clear localSubmitted: they carry a pre-turn
+    // Prompt events still must not clear inFlightPrompt: they carry a pre-turn
     // idle phase that would drop the sender's spinner before turn.started.
     if (event.phase !== undefined && event.type !== "session.message.chunk") {
-      this.#setPhase(event.phase, { keepSubmitted: isPromptEvent(event.type) });
+      this.#state.setPhase(event.phase);
+      if (!isPromptEvent(event.type)) this.#state.setInFlightPrompt(null);
     }
-  }
-
-  #setPhase(phase: SessionPhase, options?: { readonly keepSubmitted?: boolean }): void {
-    this.#state.setPhase(phase);
-    if (!options?.keepSubmitted) this.#state.setLocalSubmitted(false);
   }
 
   #terminate(reason: "session_closed" | "session_deleted"): void {
@@ -335,9 +329,12 @@ export class Chat {
 
     this.#cursor = Math.max(this.#cursor, snapshot.cursor);
     // A prompt still on the wire is invisible to the server, so this phase
-    // predates it. Leave localSubmitted standing; the RPC's own outcome, and
-    // the events it triggers, move the spinner from here.
-    this.#setPhase(snapshot.status.phase, { keepSubmitted: this.#promptsInFlight > 0 });
+    // predates it. Leave the overlay standing while rpcPending; the RPC's
+    // own outcome, and the events it triggers, move the spinner from here.
+    this.#state.setPhase(snapshot.status.phase);
+    if (!this.#state.snapshot.inFlightPrompt?.rpcPending) {
+      this.#state.setInFlightPrompt(null);
+    }
   }
 
   #replayActiveTurn(activeTurn: NonNullable<SessionRuntimeSnapshot["activeTurn"]>): void {
@@ -473,21 +470,23 @@ export class Chat {
     this.#state.setRetryNotice(undefined);
     this.#state.setError(undefined);
     this.#pushPendingUser(messageId, parts);
-    this.#state.setLocalSubmitted(true);
-    this.#promptsInFlight += 1;
+    this.#state.setInFlightPrompt({ id: messageId, rpcPending: true });
     try {
       await this.#transport.prompt({
         messageId,
         parts,
       });
+      if (this.#state.snapshot.inFlightPrompt?.id === messageId) {
+        this.#state.setInFlightPrompt({ id: messageId, rpcPending: false });
+      }
     } catch (promptError) {
       this.#state.setError(
         promptError instanceof Error ? promptError : new Error(String(promptError)),
       );
-      this.#state.setLocalSubmitted(false);
+      if (this.#state.snapshot.inFlightPrompt?.id === messageId) {
+        this.#state.setInFlightPrompt(null);
+      }
       throw promptError;
-    } finally {
-      this.#promptsInFlight -= 1;
     }
   };
 
