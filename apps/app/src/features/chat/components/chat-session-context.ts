@@ -1,3 +1,4 @@
+import type { SessionRef } from "@getpie/contract";
 import { createContext, useContext } from "react";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -5,6 +6,7 @@ import type { AgentRequest, AgentResponse } from "@/features/chat/runtime/agent-
 import type { ChatStoreState } from "@/features/chat/runtime/chat-state";
 
 export type ChatSessionValue = {
+  sessionRef: SessionRef;
   sessionId: string;
   store: StoreApi<ChatStoreState>;
   prompt: (text: string) => void;

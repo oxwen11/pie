@@ -13,6 +13,7 @@ declare module "@tanstack/react-query" {
 }
 
 export type AppClients = {
+  httpBaseUrl: string;
   orpcClient: PieClient;
   queryClient: QueryClient;
   orpcQueryUtils: ReturnType<typeof createTanstackQueryUtils<PieClient>>;
@@ -79,6 +80,7 @@ function createOrpcClient(server?: ServerConnection): PieClient {
 /** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
 export function createAppClients(server?: ServerConnection): AppClients {
   const queryClient = createQueryClient();
+  const httpBaseUrl = server?.httpBaseUrl ?? globalThis.location?.origin ?? "http://localhost";
   const orpcClient = createOrpcClient(server);
   const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
 
@@ -96,5 +98,5 @@ export function createAppClients(server?: ServerConnection): AppClients {
     queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
   }
 
-  return { orpcClient, queryClient, orpcQueryUtils };
+  return { httpBaseUrl, orpcClient, queryClient, orpcQueryUtils };
 }

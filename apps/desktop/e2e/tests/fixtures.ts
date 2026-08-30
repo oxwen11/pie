@@ -63,7 +63,9 @@ export const test = base.extend<{
     fakePiLog: string;
     userData: string;
     pieHome: string;
+    workspace: string;
   };
+  fakePiResponse: string;
   electronApp: ElectronApplication;
   window: Page;
 }>({
@@ -73,30 +75,35 @@ export const test = base.extend<{
     fs.mkdirSync(output, { recursive: true });
     const pieHome = path.join(output, "pie-home");
     fs.mkdirSync(pieHome, { recursive: true });
-    seedProject(pieHome, path.join(output, "workspace"));
+    const workspace = path.join(output, "workspace");
+    seedProject(pieHome, workspace);
     await use({
       fakePiLog: path.join(output, "fake-pi.jsonl"),
       userData: path.join(output, "user-data"),
       pieHome,
+      workspace,
     });
 
     await stopDaemonFor(pieHome);
   },
 
+  fakePiResponse: ["Desktop fake Pi reply", { option: true }],
+
   // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
-  electronApp: async ({ e2ePaths }, use) => {
+  electronApp: async ({ e2ePaths, fakePiResponse }, use) => {
     const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
     const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
 
+    const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...launchEnv } = process.env;
     const app = await electron.launch({
       args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
       env: {
-        ...process.env,
+        ...launchEnv,
         NODE_ENV: "test",
         PIE_E2E: "1",
         PIE_E2E_PI_EXECUTABLE: fakePiPath,
         PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
-        PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
+        PIE_E2E_PI_RESPONSE: fakePiResponse,
         PIE_HOME: e2ePaths.pieHome,
       },
     });

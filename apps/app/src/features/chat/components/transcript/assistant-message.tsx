@@ -5,6 +5,7 @@ import { isReasoningUIPart, isToolUIPart, type FileUIPart, type UIMessage } from
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
+import { CHAT_MARKDOWN_COMPONENTS, CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown-image";
 import { ReasoningPart } from "./reasoning-part";
 import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
@@ -71,7 +72,11 @@ export function AssistantMessage({
           return (
             <Message key={index} from="assistant">
               <MessageContent>
-                <Response isAnimating={isStreaming && index === lastTextIndex}>
+                <Response
+                  components={CHAT_MARKDOWN_COMPONENTS}
+                  isAnimating={isStreaming && index === lastTextIndex}
+                  remarkPlugins={CHAT_MARKDOWN_REMARK_PLUGINS}
+                >
                   {part.text}
                 </Response>
                 {canShowActions && <CopyMarkdownButton text={part.text} />}

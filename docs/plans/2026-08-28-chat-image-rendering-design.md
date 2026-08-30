@@ -147,11 +147,6 @@ Pi assistant text
   │
   │  ![result](/tmp/result.png)
   ▼
-server observes completed assistant text
-  ▼
-session-scoped image-reference registry
-  │  key: complete SessionRef + normalized Markdown destination
-  ▼
 AssistantMessage
   ▼
 Response / Streamdown
@@ -166,7 +161,7 @@ classify image source
                                       ▼
                               server asset service
                                       │
-                                      ├─ require registered reference
+                                      ├─ verify the ref in settled assistant history
                                       ├─ resolve stored session cwd
                                       ├─ validate allowed root
                                       ├─ open/read with no-follow protection
@@ -180,22 +175,15 @@ classify image source
                               browser / Electron <img>
 ```
 
-### Why a server-side reference registry exists
+### Server-side reference authorization
 
 The renderer must not gain a generic "read any image path" RPC. A compromised renderer holding a valid app connection must not be able to probe arbitrary Project or temporary files by inventing paths.
 
-The server therefore records local image destinations that actually appeared in completed assistant Markdown for a specific `SessionRef`. URL creation succeeds only when the requested destination is registered for that same complete ref.
+`assets.createUrl` therefore loads the authoritative settled messages for the complete `SessionRef`, parses assistant text as Markdown on the server, and requires an exact image-node destination match before opening a file. Code spans, ordinary prose, another session's messages, and client-invented destinations do not authorize access.
 
-Registry population:
+Local URL creation is disabled while a turn is streaming. It begins after settlement, when the normal history/snapshot path contains the completed assistant message. Replayed history uses the same authorization path; there is no separate mutable registry to hydrate or race after restart.
 
-- Live: register destinations before publishing any event or state that lets the client observe the completed Markdown destination. Registration and publication have a strict happens-before ordering; URL creation must not race registration.
-- History: scan normalized assistant text parts and complete registration before returning the messages to the client.
-- Restart: rebuild a ref's registrations from authoritative Pi history before serving its history response. If `assets.createUrl` arrives first, it performs the same one-time rehydration before checking authorization. The registry tracks a per-ref hydrated state so concurrent requests share one rebuild.
-- Cleanup: remove entries and hydration state when the session is deleted.
-
-The registry stores authorization evidence, not image bytes. It is keyed by complete `SessionRef`, never by bare `sessionId`. A URL-creation request is never rejected merely because post-restart rehydration has not run yet; it waits for that ref's rebuild and then applies the normal authorization check.
-
-A model can still intentionally emit a path that Pi itself can access. That is within the existing agent trust boundary. The registry prevents the renderer from expanding that authority independently or borrowing a path registered by another session.
+A model can still intentionally emit a path that Pi itself can access. That is within the existing agent trust boundary. Authoritative per-request message validation prevents the renderer from expanding that authority independently or borrowing a path from another session.
 
 ### Client source classification
 
@@ -328,7 +316,7 @@ The cache entry contains the bytes that the HTTP route will return. The GET rout
 
 ### Allowed roots
 
-A registered session image may resolve under:
+An authorized session image may resolve under:
 
 1. the session's stored cwd;
 2. explicitly supported canonical temporary roots needed for Pi-generated screenshots;
@@ -349,28 +337,22 @@ Registration is session-scoped, so a path appearing in one session cannot be min
 Before inserting bytes into the cache:
 
 1. Resolve the complete `SessionRef`.
-2. Confirm the destination is registered for that ref.
+2. Load settled messages for that ref and confirm the destination is an exact assistant Markdown image node.
 3. Resolve stored session cwd.
 4. Normalize the destination for the host platform.
 5. Resolve relative destinations against stored cwd.
-6. Open the canonical allowed root as a directory handle.
-7. Walk every relative path component from that handle without following links or reparse points.
-8. Open the final component from its verified parent handle with the same no-follow rule.
-9. Confirm from the open descriptor that it is a regular file.
-10. Read bytes from that descriptor.
-11. Enforce the size limit while reading.
+6. Canonicalize the candidate and confirm it is beneath an allowed canonical root.
+7. Record the canonical file's device/inode identity.
+8. Open the canonical final path with no-follow semantics.
+9. Confirm the open descriptor is a regular file and still has the recorded device/inode identity.
+10. Re-resolve the requested path after open and require the same canonical path beneath the same allowed root.
+11. Read bytes from that descriptor with a hard streaming byte limit.
 12. Detect MIME from bytes and reject unsupported formats.
 13. Hash the immutable bytes and insert them into the bounded cache.
 
-Validation and reading must use the same descriptor-relative containment operation. A final-component `O_NOFOLLOW` check after string-based parent validation is insufficient because an ancestor directory can be replaced concurrently.
+The identity and post-open canonical-path checks reject stable symlink escape and ordinary concurrent replacement before bytes are read. The asset service then reads from the verified open descriptor and never reopens the path by name.
 
-The implementation provides a small secure-open platform adapter:
-
-- Linux uses `openat2` with beneath/no-symlink resolution, or an equivalent descriptor-relative walk.
-- macOS uses descriptor-relative `openat` traversal with no-follow checks for every component.
-- Windows opens relative to verified directory handles and rejects reparse points for every component before reading.
-
-The adapter fails closed on a platform where it cannot establish this guarantee. It returns an open read handle; the asset service never reopens the path by name.
+The first implementation does not claim protection against an adversarial same-user process that can repeatedly swap an ancestor away and back between every individual filesystem operation. That actor already has the same host filesystem authority as Pi and is outside the renderer-confidentiality threat model. Defending against it would require a native descriptor-relative `openat2`/`openat`/Windows handle-walk helper; add that only if Pie introduces a lower-privilege agent or renderer boundary where same-user filesystem races become a privilege escalation.
 
 ### Capability
 
@@ -492,22 +474,22 @@ The bounded asset cache is process-local and temporary.
 
 Within a capability's lifetime, the returned bytes remain stable even if the original file is removed or replaced after URL creation. Browser responses use `no-store`, so an old URL is not satisfied from the browser cache after server restart.
 
-After server restart, capability expiry, or cache eviction, the first image GET returns `404`. The component invalidates the URL query and attempts one remint. Before authorizing that remint, the server completes any required registry rehydration for the ref. Reminting always securely reopens and reads current source state; it never returns a prior path-keyed cache entry. It fails if the source file no longer exists.
+After server restart, capability expiry, or cache eviction, the first image GET returns `404`. The component invalidates the URL query and attempts one remint. The server revalidates the destination against current settled assistant history before reopening the source. Reminting always reads current source state; it never returns a prior path-keyed cache entry. It fails if the source file no longer exists.
 
 Durable historical media under `PIE_HOME` is a later capability. The first implementation does not claim that deleted `/tmp` screenshots survive server restarts.
 
 ## Failure Behavior
 
-| Failure                                    | User-visible behavior      | Server behavior          |
-| ------------------------------------------ | -------------------------- | ------------------------ |
-| Source is still being resolved             | Static loading placeholder | No asset GET yet         |
-| Unsupported Markdown source                | Image unavailable fallback | No request               |
-| Destination was not registered for the ref | Image unavailable fallback | Typed create-URL failure |
-| Session no longer exists                   | Image unavailable fallback | Typed create-URL failure |
-| Path outside allowed roots                 | Image unavailable fallback | Typed create-URL failure |
-| Missing, invalid, or too-large file        | Image unavailable fallback | Typed create-URL failure |
-| Expired/tampered/evicted capability        | Image unavailable fallback | 404                      |
-| Unsupported MIME/SVG                       | Image unavailable fallback | Typed create-URL failure |
+| Failure                                                    | User-visible behavior      | Server behavior          |
+| ---------------------------------------------------------- | -------------------------- | ------------------------ |
+| Source is still being resolved                             | Static loading placeholder | No asset GET yet         |
+| Unsupported Markdown source                                | Image unavailable fallback | No request               |
+| Destination is not an assistant Markdown image for the ref | Image unavailable fallback | Typed create-URL failure |
+| Session no longer exists                                   | Image unavailable fallback | Typed create-URL failure |
+| Path outside allowed roots                                 | Image unavailable fallback | Typed create-URL failure |
+| Missing, invalid, or too-large file                        | Image unavailable fallback | Typed create-URL failure |
+| Expired/tampered/evicted capability                        | Image unavailable fallback | 404                      |
+| Unsupported MIME/SVG                                       | Image unavailable fallback | Typed create-URL failure |
 
 Assistant text remains visible when image resolution fails.
 
@@ -552,26 +534,23 @@ Cover:
 - local path without a complete ref;
 - bare path prose remaining ordinary text.
 
-### Reference-registry tests
+### Reference-authorization tests
 
 Cover:
 
-- live completed assistant text registers Markdown image destinations before publication;
-- historical assistant text rehydrates registrations before message return;
-- a post-restart `createUrl` request rehydrates the ref before authorization;
-- concurrent post-restart requests share one rehydration;
-- incomplete streaming Markdown does not register;
-- code spans and ordinary prose do not register;
-- registration is keyed by complete `SessionRef`;
-- session A cannot mint a destination registered only by session B.
+- settled live and historical assistant Markdown image destinations authorize URL creation;
+- incomplete streaming text does not mint a URL;
+- code spans and ordinary prose do not authorize a path;
+- authorization is keyed by complete `SessionRef`;
+- session A cannot mint a destination referenced only by session B.
 
 ### Server asset tests
 
 Create real raster files and verify:
 
 - stored-cwd image succeeds;
-- registered temporary-root image succeeds;
-- unregistered temporary image fails;
+- authorized temporary-root image succeeds;
+- unreferenced temporary image fails;
 - correct MIME and exact bytes are returned;
 - responses use `Cache-Control: private, no-store`;
 - token mutation returns 404;
@@ -580,8 +559,8 @@ Create real raster files and verify:
 - remint after source replacement returns newly read bytes, not a stale path-deduplicated entry;
 - identical reread bytes may deduplicate by content hash;
 - traversal and out-of-root paths fail;
-- concurrent ancestor-directory replacement cannot escape the root;
-- symlink/reparse-point escape at every component and the final component fails;
+- stable ancestor/final symlink escape fails;
+- replacement detected by descriptor identity or post-open canonical revalidation fails;
 - non-file targets fail;
 - extension/MIME mismatch fails;
 - SVG fails;
@@ -645,8 +624,8 @@ Capture a screenshot of the rendered transcript.
 Run a real Pi session whose assistant message ends with a local Markdown image. Verify that:
 
 - partial Markdown does not crash the transcript;
-- incomplete destinations are not registered or minted;
-- the completed destination is registered once;
+- incomplete destinations are not minted;
+- the completed destination is minted only after turn settlement;
 - the image decodes after final text arrives;
 - refreshing reproduces the same result through history.
 
@@ -692,7 +671,7 @@ The capability is complete only when all of the following are demonstrated:
 2. Assistant Markdown images under the stored session cwd render.
 3. Registered assistant Markdown images under supported temporary roots render.
 4. Bare path mentions do not render as images.
-5. The renderer cannot mint an unregistered or cross-session path.
+5. The renderer cannot mint an unreferenced or cross-session path.
 6. Invalid paths, symlink escapes, and unsupported formats cannot be read.
 7. Browser, Electron development, and packaged `pie://app` decode a real image.
 8. Live and historical messages behave consistently.

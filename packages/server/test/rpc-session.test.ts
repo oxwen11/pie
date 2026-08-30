@@ -7,6 +7,7 @@ import { createRouterClient } from "@orpc/server";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { describe, expect, it } from "vitest";
 
+import { SessionImageAssetsLayer } from "../src/assets";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
@@ -105,8 +106,11 @@ async function setup() {
     Layer.provide(NodeServices.layer),
   );
 
+  const sessionImageAssetsLayer = SessionImageAssetsLayer.pipe(Layer.provide(harnessSessionLayer));
+
   const appLayer = Layer.mergeAll(
     EventBusLayer,
+    sessionImageAssetsLayer,
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,

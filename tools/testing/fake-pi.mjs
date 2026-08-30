@@ -16,6 +16,9 @@ function log(value) {
 }
 
 const rl = readline.createInterface({ input: process.stdin });
+const entries = [];
+let leafId = null;
+let nextEntry = 1;
 
 process.stdout.write("pi startup banner (not json)\n");
 send({
@@ -59,7 +62,41 @@ rl.on("line", (line) => {
     return;
   }
 
+  if (msg.type === "get_entries") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "get_entries",
+      success: true,
+      data: { entries, leafId },
+    });
+    return;
+  }
+
   if (msg.type !== "prompt") return;
+
+  const now = Date.now();
+  const userId = `fake-user-${nextEntry++}`;
+  const assistantId = `fake-assistant-${nextEntry++}`;
+  entries.push({
+    type: "message",
+    id: userId,
+    parentId: leafId,
+    timestamp: new Date(now).toISOString(),
+    message: { role: "user", content: msg.message, timestamp: now },
+  });
+  const finalAssistant = assistant({
+    content: [{ type: "text", text: configuredResponse }],
+    timestamp: now + 1,
+  });
+  entries.push({
+    type: "message",
+    id: assistantId,
+    parentId: userId,
+    timestamp: new Date(now + 1).toISOString(),
+    message: finalAssistant,
+  });
+  leafId = assistantId;
 
   send({ id: msg.id, type: "response", command: "prompt", success: true });
   send({ type: "agent_start" });
@@ -67,6 +104,6 @@ rl.on("line", (line) => {
   upd({ type: "text_start", contentIndex: 0 });
   upd({ type: "text_delta", contentIndex: 0, delta: configuredResponse });
   upd({ type: "text_end", contentIndex: 0, content: configuredResponse });
-  send({ type: "message_end", message: assistant() });
-  settle();
+  send({ type: "message_end", message: finalAssistant });
+  settle(finalAssistant);
 });
