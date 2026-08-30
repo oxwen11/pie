@@ -1,3 +1,5 @@
+import { resolveDevelopmentScope } from "@getpie/core/development-scope";
+import { developmentDaemonEnvironment } from "@getpie/server/daemon";
 import { Effect, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
@@ -13,7 +15,9 @@ export const LocalServerLive = Layer.effect(
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const environment = config.isPackaged
       ? resolveLoginShellEnvironmentWith(spawner)
-      : Effect.sync(() => ({ ...process.env }));
+      : Effect.sync(() =>
+          developmentDaemonEnvironment({ ...process.env }, resolveDevelopmentScope()),
+        );
 
     // Attach the daemon selected by PIE_DAEMON_DIR (the same one the CLI
     // uses) instead of forking a private die-with-app child.

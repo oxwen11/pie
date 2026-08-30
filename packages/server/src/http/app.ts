@@ -16,6 +16,8 @@ export type RequestAppOptions = {
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
   readonly tickets: TicketStore;
+  /** Present only for authenticated daemon mode. Must return before shutdown starts. */
+  readonly shutdown: (() => void) | undefined;
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -129,6 +131,15 @@ const route = (
       !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
     ) {
       return withCors(unauthorized);
+    }
+
+    if (
+      request.method === "POST" &&
+      pathname === "/api/shutdown" &&
+      options.shutdown !== undefined
+    ) {
+      options.shutdown();
+      return withCors(HttpServerResponse.text("shutting down", { status: 202 }));
     }
 
     if (request.method === "POST" && pathname === "/api/ws-ticket") {
