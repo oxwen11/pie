@@ -1,9 +1,5 @@
-/** A resolved server endpoint used to configure the shared app's RPC client. */
+/** Host-owned authenticated WebSocket behavior used by the shared app runtime. */
 export type ServerConnection = {
-  /** e.g. "http://127.0.0.1:41234" */
-  httpBaseUrl: string;
-  /** e.g. "ws://127.0.0.1:41234" */
-  wsBaseUrl: string;
-  /** Per-launch bearer token. Never persisted. */
-  token: string;
+  /** Open one socket; called again whenever the oRPC link reconnects. */
+  readonly connectWebSocket: () => Promise<WebSocket>;
 };

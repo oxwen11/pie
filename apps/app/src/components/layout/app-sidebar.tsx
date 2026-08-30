@@ -2,6 +2,7 @@ import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -12,8 +13,9 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { SquarePen } from "lucide-react";
+import { ExternalLink, SquarePen } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
@@ -31,6 +33,7 @@ export function AppSidebar({
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
+  const openInBrowser = platform.openInBrowser;
   const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
   const expanded = !isMobile && state === "expanded";
@@ -68,6 +71,31 @@ export function AppSidebar({
 
         <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
       </SidebarContent>
+
+      {openInBrowser ? (
+        <SidebarFooter className="[-webkit-app-region:no-drag]">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => {
+                  void openInBrowser()
+                    .then((result) => {
+                      if (result.status === "restart-required") {
+                        toast.warning("Restart the running Pie daemon to enable browser access.");
+                      }
+                    })
+                    .catch(() => {
+                      toast.error("Unable to open Pie in the browser.");
+                    });
+                }}
+              >
+                <ExternalLink />
+                <span>Open in Browser</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      ) : null}
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}
     </Sidebar>

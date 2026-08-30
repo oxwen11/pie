@@ -1,10 +1,10 @@
 import { Effect, Layer } from "effect";
-import { app } from "electron";
+import { app, shell } from "electron";
 
 import { DesktopApplication, makeDesktopApplication } from "./application/desktop-application";
 import { RendererChannel, makeRendererChannel } from "./electron/renderer-channel";
 import { makeDesktopRpcServer } from "./rpc/desktop-rpc-server";
-import { LocalServer } from "./server/local-server";
+import { LocalServer, ServerAccessError } from "./server/local-server";
 
 // These two Live layers need Electron capabilities (app.quit, and the oRPC
 // MessagePort wiring that reaches into application/** and rpc/**) that the
@@ -18,6 +18,12 @@ export const DesktopApplicationLive = Layer.effect(
     const server = yield* LocalServer;
     return makeDesktopApplication({
       server,
+      openExternal: (url) =>
+        Effect.tryPromise(() => shell.openExternal(url)).pipe(
+          Effect.mapError(
+            () => new ServerAccessError({ message: "Unable to open the system browser" }),
+          ),
+        ),
       quit: Effect.sync(() => {
         setTimeout(() => app.quit(), 0);
       }),

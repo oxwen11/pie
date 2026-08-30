@@ -43,56 +43,15 @@ export function seedProject(pieHome: string, workspace: string): void {
  * or every test leaks one.
  */
 export async function stopDaemonFor(pieHome: string): Promise<void> {
-  let record: { pid?: number };
   try {
-    record = JSON.parse(
+    const record = JSON.parse(
       await fs.promises.readFile(path.join(pieHome, "daemon", "daemon.pid"), "utf8"),
     ) as { pid?: number };
+    if (typeof record.pid === "number" && record.pid > 0) {
+      process.kill(record.pid, "SIGTERM");
+    }
   } catch {
-    // No daemon record (never spawned).
-    return;
-  }
-  if (typeof record.pid === "number" && record.pid > 0) {
-    await stopProcess(record.pid);
-  }
-}
-
-export async function stopProcess(pid: number, graceMs = 5_000): Promise<void> {
-  if (!processAlive(pid)) return;
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {
-    return;
-  }
-
-  const deadline = Date.now() + graceMs;
-  while (Date.now() < deadline && processAlive(pid)) {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 50);
-    });
-  }
-  if (!processAlive(pid)) return;
-
-  try {
-    process.kill(pid, "SIGKILL");
-  } catch {
-    return;
-  }
-  const killDeadline = Date.now() + 2_000;
-  while (Date.now() < killDeadline && processAlive(pid)) {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 25);
-    });
-  }
-  if (processAlive(pid)) throw new Error(`Process ${pid} did not exit after SIGKILL`);
-}
-
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
+    // No daemon record (never spawned) or the process is already gone.
   }
 }
 
@@ -101,6 +60,7 @@ function processAlive(pid: number): boolean {
  */
 export const test = base.extend<{
   e2ePaths: {
+    daemonDir: string;
     fakePiLog: string;
     userData: string;
     pieHome: string;
@@ -116,6 +76,7 @@ export const test = base.extend<{
     fs.mkdirSync(pieHome, { recursive: true });
     seedProject(pieHome, path.join(output, "workspace"));
     await use({
+      daemonDir: path.join(pieHome, "daemon"),
       fakePiLog: path.join(output, "fake-pi.jsonl"),
       userData: path.join(output, "user-data"),
       pieHome,
@@ -138,8 +99,9 @@ export const test = base.extend<{
         PIE_E2E_PI_EXECUTABLE: fakePiPath,
         PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
         PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
+        PIE_E2E_PI_DELAY_MS: "1000",
         PIE_HOME: e2ePaths.pieHome,
-        PIE_DAEMON_DIR: path.join(e2ePaths.pieHome, "daemon"),
+        PIE_DAEMON_DIR: e2ePaths.daemonDir,
       },
     });
 

@@ -1,8 +1,8 @@
 import { Effect, Option, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
-import type { LocalServer } from "../server/local-server";
+import type { ServerStatusSnapshot } from "../../shared/desktop-rpc";
+import { type LocalServer, ServerProtocolUnsupportedError } from "../server/local-server";
 import { makeDesktopApplication } from "./desktop-application";
 
 // Whichever host the suite runs on — asserting a literal would pin these tests
@@ -10,10 +10,9 @@ import { makeDesktopApplication } from "./desktop-application";
 const anyOs = expect.stringMatching(/^(macos|windows|linux)$/);
 
 function makeHarness(
-  connection: Effect.Effect<ServerConnection> = Effect.succeed({
-    httpBaseUrl: "http://127.0.0.1:43123",
-    wsBaseUrl: "ws://127.0.0.1:43123",
-    token: "desktop-token",
+  ready: Effect.Effect<void> = Effect.void,
+  browserPairing: LocalServer["Service"]["browserPairing"] = Effect.succeed({
+    url: "http://127.0.0.1:43123/pair#grant=one-time",
   }),
 ) {
   const statusRef = Effect.runSync(
@@ -21,8 +20,13 @@ function makeHarness(
   );
   let retries = 0;
   let quits = 0;
+  const opened: string[] = [];
   const server: LocalServer["Service"] = {
-    connection,
+    ready,
+    webSocketAccess: Effect.succeed({
+      url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
+    }),
+    browserPairing,
     snapshot: SubscriptionRef.get(statusRef),
     changes: SubscriptionRef.changes(statusRef),
     retry: Effect.sync(() => {
@@ -31,6 +35,10 @@ function makeHarness(
   };
   const application = makeDesktopApplication({
     server,
+    openExternal: (url) =>
+      Effect.sync(() => {
+        opened.push(url);
+      }),
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -42,6 +50,7 @@ function makeHarness(
       Effect.runPromise(SubscriptionRef.set(statusRef, snapshot)),
     retries: () => retries,
     quits: () => quits,
+    opened: () => opened,
   };
 }
 
@@ -54,11 +63,15 @@ describe("DesktopApplication", () => {
       statusRevision: 0,
       os: anyOs,
     });
-    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual({
-      httpBaseUrl: "http://127.0.0.1:43123",
-      wsBaseUrl: "ws://127.0.0.1:43123",
-      token: "desktop-token",
+    await expect(Effect.runPromise(h.application.serverReady)).resolves.toBeUndefined();
+    await expect(Effect.runPromise(h.application.serverWebSocketAccess)).resolves.toEqual({
+      url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     });
+
+    await expect(Effect.runPromise(h.application.openInBrowser)).resolves.toEqual({
+      status: "opened",
+    });
+    expect(h.opened()).toHaveLength(1);
 
     await Effect.runPromise(h.application.retryServer);
     await Effect.runPromise(h.application.quit);
@@ -66,7 +79,23 @@ describe("DesktopApplication", () => {
     expect(h.quits()).toBe(1);
   });
 
-  it("bootstraps shell state without waiting for the server connection", async () => {
+  it("returns restart-required without opening a legacy daemon URL", async () => {
+    const h = makeHarness(
+      Effect.void,
+      Effect.fail(
+        new ServerProtocolUnsupportedError({
+          message: "restart required",
+        }),
+      ),
+    );
+
+    await expect(Effect.runPromise(h.application.openInBrowser)).resolves.toEqual({
+      status: "restart-required",
+    });
+    expect(h.opened()).toEqual([]);
+  });
+
+  it("bootstraps shell state without waiting for server readiness", async () => {
     const h = makeHarness(Effect.never);
 
     await expect(Effect.runPromise(h.application.bootstrap)).resolves.toEqual({

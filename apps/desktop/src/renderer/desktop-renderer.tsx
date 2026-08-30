@@ -16,12 +16,7 @@ export function DesktopRenderer({
     <PlatformProvider value={desktop.platform}>
       <ServerStatusOverlay feed={desktop.status} />
       <Suspense fallback={null}>
-        <ReadyApp
-          server={desktop.server}
-          refresh={desktop.refreshServer}
-          status={desktop.status}
-          onReady={onReady}
-        />
+        <ReadyApp ready={desktop.ready} connection={desktop.connection} onReady={onReady} />
       </Suspense>
     </PlatformProvider>
   );

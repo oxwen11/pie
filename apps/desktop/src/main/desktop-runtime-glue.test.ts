@@ -16,10 +16,12 @@ describe("DesktopApplicationLive", () => {
     // introduced by this module (LocalServer -> DesktopApplication), not
     // the already-covered supervision logic inside makeLocalServer itself.
     const fakeLocalServerLive = Layer.succeed(LocalServer, {
-      connection: Effect.succeed({
-        httpBaseUrl: "http://127.0.0.1:1",
-        wsBaseUrl: "ws://127.0.0.1:1",
-        token: "fake-token",
+      ready: Effect.void,
+      webSocketAccess: Effect.succeed({
+        url: "ws://127.0.0.1:1/ws/rpc?ticket=one-time",
+      }),
+      browserPairing: Effect.succeed({
+        url: "http://127.0.0.1:1/pair#grant=one-time",
       }),
       snapshot: SubscriptionRef.get(statusRef),
       changes: SubscriptionRef.changes(statusRef),
@@ -36,7 +38,7 @@ describe("DesktopApplicationLive", () => {
           const application = yield* DesktopApplication;
           return {
             bootstrap: yield* application.bootstrap,
-            server: yield* application.serverConnection,
+            server: yield* application.serverWebSocketAccess,
           };
         }),
       );
@@ -45,7 +47,9 @@ describe("DesktopApplicationLive", () => {
         status: "ready",
         statusRevision: 0,
       });
-      expect(result.server).toMatchObject({ token: "fake-token" });
+      expect(result.server).toEqual({
+        url: "ws://127.0.0.1:1/ws/rpc?ticket=one-time",
+      });
     } finally {
       await runtime.dispose();
     }

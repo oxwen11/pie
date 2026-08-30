@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bearerToken, createTicketStore, TICKET_TTL_MS, tokensMatch } from "../../src/http/auth";
+import { bearerToken, tokensMatch } from "../../src/http/auth";
 
 describe("bearerToken", () => {
   it("extracts the token from a Bearer header", () => {
@@ -39,43 +39,5 @@ describe("tokensMatch", () => {
 
   it("rejects null", () => {
     expect(tokensMatch("s3cret", null)).toBe(false);
-  });
-});
-
-describe("createTicketStore", () => {
-  it("accepts a ticket it issued", () => {
-    const store = createTicketStore();
-    const ticket = store.issue();
-    expect(store.consume(ticket)).toBe(true);
-  });
-
-  it("rejects the same ticket twice (single use)", () => {
-    const store = createTicketStore();
-    const ticket = store.issue();
-    store.consume(ticket);
-    expect(store.consume(ticket)).toBe(false);
-  });
-
-  it("rejects a ticket it never issued", () => {
-    const store = createTicketStore();
-    expect(store.consume("never-issued")).toBe(false);
-  });
-
-  it("rejects null", () => {
-    const store = createTicketStore();
-    expect(store.consume(null)).toBe(false);
-  });
-
-  it("rejects an expired ticket", () => {
-    let now = 1_000;
-    const store = createTicketStore(() => now);
-    const ticket = store.issue();
-    now += TICKET_TTL_MS + 1;
-    expect(store.consume(ticket)).toBe(false);
-  });
-
-  it("issues distinct tickets", () => {
-    const store = createTicketStore();
-    expect(store.issue()).not.toBe(store.issue());
   });
 });

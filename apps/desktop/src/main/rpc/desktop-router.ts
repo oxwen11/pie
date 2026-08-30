@@ -25,8 +25,14 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
       }),
     },
     server: {
-      connection: orpc.server.connection.effect(function* () {
-        return yield* application.serverConnection;
+      ready: orpc.server.ready.effect(function* () {
+        yield* application.serverReady;
+      }),
+      webSocketAccess: orpc.server.webSocketAccess.effect(function* () {
+        return yield* application.serverWebSocketAccess;
+      }),
+      openInBrowser: orpc.server.openInBrowser.effect(function* () {
+        return yield* application.openInBrowser;
       }),
       retry: orpc.server.retry.effect(function* () {
         yield* application.retryServer;
