@@ -32,7 +32,7 @@ export function ProjectSessionRow({
         }}
       >
         <SessionStatusIndicator phase={session.status?.phase} />
-        <span className="truncate">{session.title ?? "New chat"}</span>
+        <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
       </SidebarMenuButton>
       <SessionActionsMenu isActive={isActive} session={session} />
     </SidebarMenuItem>
