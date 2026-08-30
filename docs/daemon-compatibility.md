@@ -22,13 +22,9 @@ would skip config evaluation and could restore an artifact carrying an older
 Git identity. `@getpie/core` itself has an ordinary cached build output.
 
 Launch, attach, replacement, and stop decisions hold an OS-backed SQLite write
-transaction at `daemon.lock.v2`. During the transition from older builds, the
-same owner also holds a live PID-only `daemon.lock` sentinel, so old and new
-launchers exclude each other. A stale or malformed legacy sentinel is never
-automatically unlinked: portable filesystem APIs cannot condition an unlink on
-the file identity, so automatic reclamation could delete a concurrently created
-old-launcher successor. Startup instead fails with instructions to close older
-Pie launchers, remove that stale file, and retry.
+transaction at `daemon.lock`. Process exit releases the transaction through the
+SQLite connection lifecycle, so lock recovery never deletes a pathname that a
+successor may already own.
 
 Development Desktop runs isolate only lifecycle state. Unless
 `PIE_DAEMON_DIR` is explicitly set, Main derives a stable scope from the

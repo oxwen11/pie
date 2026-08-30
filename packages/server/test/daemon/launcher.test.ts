@@ -17,6 +17,7 @@ import {
   stopDaemon,
 } from "../../src/daemon/launcher";
 import { pidAlive } from "../../src/daemon/liveness";
+import { reservePort } from "../../src/daemon/port";
 import { readRecord, writeRecord } from "../../src/daemon/record";
 import * as Observability from "../../src/observability";
 
@@ -94,6 +95,47 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(attached.reused, true);
         assert.equal(attached.pid, spawned.pid);
         assert.equal(attached.address, spawned.address);
+      }),
+    );
+
+    it.effect("reuses a compatible daemon that is still starting", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const { home, daemonDir } = yield* tempHome;
+        yield* fs.makeDirectory(daemonDir, { recursive: true });
+        const port = yield* reservePort(0);
+        const token = "starting-daemon-token";
+        const child = childProcess.spawn(process.execPath, [FAKE_SERVER], {
+          env: {
+            ...process.env,
+            PIE_PORT: String(port),
+            PIE_AUTH_TOKEN: token,
+            PIE_TEST_STARTUP_DELAY_MS: "300",
+          },
+          stdio: "ignore",
+        });
+        assert.ok(child.pid);
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            if (child.exitCode === null) child.kill("SIGKILL");
+          }),
+        );
+        yield* writeRecord(daemonDir, {
+          pid: child.pid,
+          address: `http://127.0.0.1:${port}`,
+          token,
+          startedAt: Date.now(),
+          compatibilityKey: TEST_KEY,
+        });
+
+        const attached = yield* resolve({
+          home,
+          daemonDir,
+          port: 0,
+          readyTimeoutMs: 2_000,
+        });
+        assert.equal(attached.reused, true);
+        assert.equal(attached.pid, child.pid);
       }),
     );
 
@@ -353,22 +395,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(restarted.reused, false);
         const attached = yield* resolve({ home, daemonDir, port: 0, autoRespawn: true });
         assert.equal(attached.pid, restarted.pid);
-      }),
-    );
-
-    it.effect("fails safely instead of unlinking a stale legacy lock", () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const { home, daemonDir } = yield* tempHome;
-        const lockPath = path.join(daemonDir, "daemon.lock");
-        yield* fs.makeDirectory(daemonDir, { recursive: true });
-        yield* fs.writeFileString(lockPath, String(2_147_483_647));
-
-        const error = yield* Effect.flip(
-          resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 }),
-        );
-        assert.match(error.message, /Refusing to automatically remove stale legacy daemon lock/);
-        assert.equal(yield* fs.readFileString(lockPath), String(2_147_483_647));
       }),
     );
 

@@ -5,6 +5,7 @@ import http from "node:http";
 const port = Number(process.env.PIE_PORT ?? 0);
 const token = process.env.PIE_AUTH_TOKEN;
 const shutdownDelayMs = Number(process.env.PIE_TEST_SHUTDOWN_DELAY_MS ?? 0);
+const startupDelayMs = Number(process.env.PIE_TEST_STARTUP_DELAY_MS ?? 0);
 if (shutdownDelayMs > 0) process.on("SIGTERM", () => {});
 
 const server = http.createServer((req, res) => {
@@ -38,7 +39,9 @@ const server = http.createServer((req, res) => {
   res.end("nope");
 });
 
-server.listen(port, "127.0.0.1", () => {
-  const address = server.address();
-  console.log(`pie:ready {"port":${address.port}}`);
-});
+setTimeout(() => {
+  server.listen(port, "127.0.0.1", () => {
+    const address = server.address();
+    console.log(`pie:ready {"port":${address.port}}`);
+  });
+}, startupDelayMs);

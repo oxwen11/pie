@@ -14,12 +14,8 @@ import path from "node:path";
 /** Discovery record — pid, address, and the daemon's auth token. */
 export const daemonRecordPath = (daemonDir: string): string => path.join(daemonDir, "daemon.pid");
 
-/** Exclusive-create launch lock, held only while a launcher is spawning. */
+/** SQLite-backed lifecycle lock shared by launch, attach, replacement, and stop. */
 export const daemonLockPath = (daemonDir: string): string => path.join(daemonDir, "daemon.lock");
-
-/** SQLite-backed v2 lock; separate from the legacy pid-only lock pathname. */
-export const daemonLockDatabasePath = (daemonDir: string): string =>
-  path.join(daemonDir, "daemon.lock.v2");
 
 /** Written by an explicit stop so supervision does not resurrect the daemon. */
 export const daemonTombstonePath = (daemonDir: string): string =>

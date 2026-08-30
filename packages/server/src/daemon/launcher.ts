@@ -84,7 +84,7 @@ export type DaemonPlatform = FileSystem.FileSystem | Crypto.Crypto;
  * compatibility key, otherwise replace it with the foreground server detached,
  * record it, and wait for health. Both the CLI and Desktop go through here so
  * there is exactly one daemon per daemon directory — concurrent launches and
- * replacements are serialized by an OS-backed lease at `daemon.lock.v2`.
+ * replacements are serialized by an OS-backed SQLite transaction at `daemon.lock`.
  *
  * Effect-based orchestration around one deliberately-raw seam: the detached
  * spawn itself (see `spawnDetached`) — everything that sleeps, times out, or
@@ -239,11 +239,21 @@ const resolveLocked = (
     yield* clearTombstone(options.daemonDir);
 
     const existing = yield* readRecord(options.daemonDir);
-    if (existing !== undefined && (yield* daemonAlive(existing))) {
-      if (existing.compatibilityKey === options.requiredCompatibilityKey) {
+    const existingHealthy = existing !== undefined && (yield* daemonAlive(existing));
+    if (existing !== undefined && existing.compatibilityKey === options.requiredCompatibilityKey) {
+      if (existingHealthy) return attach(existing, true);
+
+      const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
+      const now = yield* Clock.currentTimeMillis;
+      const remainingMs = Math.max(0, existing.startedAt + timeoutMs - now);
+      if (
+        remainingMs > 0 &&
+        pidAlive(existing.pid) &&
+        (yield* waitHealthy(existing.address, existing.pid, remainingMs))
+      ) {
         return attach(existing, true);
       }
-
+    } else if (existing !== undefined && existingHealthy) {
       yield* Effect.logInfo("Replacing incompatible pie daemon").pipe(
         Effect.annotateLogs({
           event: "daemon.compatibility_mismatch",
@@ -331,9 +341,8 @@ const spawnDaemon = (
     // dies mid-wait (the app quitting seconds after first launch) must not
     // orphan an unrecorded daemon — unrecorded means undiscoverable, so
     // nothing can ever attach to it or stop it, and the next launch spawns a
-    // second daemon beside it. Readers tolerate a recorded-but-booting daemon:
-    // `resolveOrSpawnDaemon` defers to the live launch lock, and
-    // `waitForCompatibleRecord` polls until health answers.
+    // second daemon beside it. A successor that recovers the launch lock polls
+    // a live, same-key record for the remainder of this readiness window.
     const record: DaemonRecord = {
       pid,
       address,
