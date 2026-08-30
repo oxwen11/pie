@@ -31,8 +31,10 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-background relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border [-webkit-app-region:no-drag]",
-        "md:rounded-xl md:shadow-sm/5",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-[16px] dark:border-white/8",
+        presentation === "docked"
+          ? "md:rounded-s-none md:border-s-0"
+          : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
         className,
       )}
       {...props}
