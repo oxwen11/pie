@@ -343,6 +343,9 @@ importers:
       '@getpie/app':
         specifier: workspace:*
         version: link:../app
+      '@getpie/effect-json-store':
+        specifier: workspace:*
+        version: link:../../packages/effect-json-store
       '@getpie/server':
         specifier: workspace:*
         version: link:../../packages/server

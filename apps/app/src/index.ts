@@ -1,4 +1,5 @@
 export { AppInterface } from "./app-interface";
+export { applyBootAppearance } from "./appearance-boot";
 export type { ServerStatusFeed } from "./server-status";
 export { ServerStatusOverlay } from "./server-status-overlay";
 export type { Platform } from "./platform";

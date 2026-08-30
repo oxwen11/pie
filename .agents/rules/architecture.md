@@ -49,10 +49,19 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
   persistent roots: `resolvePieHome` for Projects and Sessions,
+  `configFile` for `$PIE_HOME/config.json` (three owner objects: `ui` SPA,
+  `desktop` Electron host, `agent` operator; the server writes `ui.theme`
+  via `settings.get`/`settings.update`; desktop Main reads and writes
+  `desktop.window` directly so the window can restore before the daemon is
+  up, accepting leftover `ui.window` until the next save relocates it; both
+  merge their slice and leave sibling objects in place; do not write an empty
+  `agent` until a key exists; Electron `userData` is Chromium/instance-lock
+  only),
   `resolveDaemonDirectory` for lifecycle state, and `logsDirectory` for
   `$PIE_HOME/logs`. The daemon directory holds only `daemon.pid`, `.lock`, and
-  `.stopped`. `Paths` includes `logsDir`; directory `0700` and files `0600` are
-  part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
+  `.stopped`. `Paths` includes `logsDir` and `configFile`; directory `0700` and
+  files `0600` are part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE`
+  / `CONFIG_FILE_MODE` in `paths.ts`).
   The process-owned observability Layer appends to `logsDir/pie.log` and
   requires FileSystem, Crypto, and Paths — bound at `runServe` / `NodeServices.layer`.
   Do not seal a platform layer inside the observability module, and do not name

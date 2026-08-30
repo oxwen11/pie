@@ -11,6 +11,7 @@
     "./git": "./src/git.ts",
     "./project": "./src/project.ts",
     "./session": "./src/session.ts",
+    "./settings": "./src/settings.ts",
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts"
   },

@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  configFilePath,
   daemonStdioLogPath,
   logsDirectory,
   resolveDaemonDirectory,
@@ -39,6 +40,12 @@ describe("logsDirectory", () => {
     expect(logsDir).toBe(path.join("/tmp/data", "logs"));
     expect(pieLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "pie.log"));
     expect(daemonStdioLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "daemon-stdio.log"));
+  });
+});
+
+describe("configFilePath", () => {
+  it("is $PIE_HOME/config.json, not under storage/", () => {
+    expect(configFilePath("/tmp/data")).toBe(path.join("/tmp/data", "config.json"));
   });
 });
 

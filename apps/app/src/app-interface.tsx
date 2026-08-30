@@ -8,6 +8,7 @@ import "./index.css";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { useResolvedAppearance } from "./features/settings/use-resolved-appearance";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
@@ -65,9 +66,20 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
          * The app's only error surface. Every `toast.*` call — the QueryClient's
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
+         * Theme follows operator settings (not Sonner's independent "system").
          */}
-        <Toaster theme="system" />
+        <AppearanceToaster orpcQueryUtils={orpcQueryUtils} />
       </ChatManagerProvider>
     </QueryClientProvider>
   );
+}
+
+/** Applies `html.dark` from operator settings and keeps Sonner on the same theme. */
+function AppearanceToaster({
+  orpcQueryUtils,
+}: {
+  orpcQueryUtils: AppClients["orpcQueryUtils"];
+}): ReactElement {
+  const appearance = useResolvedAppearance(orpcQueryUtils);
+  return <Toaster theme={appearance} />;
 }

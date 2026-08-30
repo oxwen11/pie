@@ -18,6 +18,7 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/ag
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
+import { SettingsRepositoryLayer, SettingsServiceLayer } from "../settings";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -62,6 +63,12 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
+const SettingsServiceProvided = SettingsServiceLayer.pipe(
+  Layer.provide(SettingsRepositoryLayer),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+);
+
 const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PiAgentSessionManagerProvided),
   Layer.provide(PiAgentProvided),
@@ -79,6 +86,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
   ProjectServiceProvided,
+  SettingsServiceProvided,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

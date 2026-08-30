@@ -2,8 +2,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppInterface } from "./app-interface";
+import { applyBootAppearance } from "./appearance-boot";
 import type { Platform } from "./platform";
 import { PlatformProvider } from "./platform-provider";
+
+applyBootAppearance();
 
 const rootElement = document.getElementById("root");
 

@@ -19,7 +19,7 @@ index.ts
 - `application/` contains renderer-facing desktop use cases, exposed as a `DesktopApplication` Tag.
 - `server/` contains local server supervision (`LocalServer` Tag) and the Node child-process adapter.
 - `rpc/` contains the transport-neutral router and oRPC MessagePort server.
-- `electron/` contains BrowserWindow (`MainWindow` Tag), MessageChannel (`RendererChannel` Tag), and custom asset protocol adapters.
+- `electron/` contains BrowserWindow (`MainWindow` Tag), MessageChannel (`RendererChannel` Tag), custom asset protocol adapters, and `$PIE_HOME/config.json` `desktop.window` (window bounds; not Electron `userData`).
 
 Most capability modules are `Context.Service` Tags with a plain-parameter factory function alongside them; `desktop-runtime.ts` wires their `Live` Layers into one graph instead of threading constructor parameters by hand. See "Tag and Layer ownership" in `apps/desktop/AGENTS.md` for which module owns a Tag's `Live` Layer and when a capability stays a plain factory instead.
 
