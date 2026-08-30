@@ -1,6 +1,12 @@
 {
   "extends": ["//"],
   "tasks": {
+    "build": {
+      "dependsOn": ["^build", "@getpie/app#build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
     "publint": {
       "dependsOn": ["build"]
     },

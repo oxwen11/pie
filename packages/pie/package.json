@@ -39,6 +39,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:effect",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"
