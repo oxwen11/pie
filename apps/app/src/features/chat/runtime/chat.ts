@@ -25,22 +25,6 @@ export interface ChatInit {
   onTerminated?: () => void;
 }
 
-// Runtime phase → AI-SDK chat status. "submitted" is a sender-local optimistic
-// state (set in prompt(), cleared by the next server-stamped phase) and never
-// comes from the server.
-function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
-  switch (phase) {
-    case "idle":
-      return "ready";
-    case "crashed":
-      return "error";
-    // requires_action keeps "streaming": the turn is still open, the composer
-    // stays blocked either way.
-    default:
-      return "streaming";
-  }
-}
-
 /** Wire prompt parts → the user UIMessage every client renders. */
 const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIMessage => ({
   id: messageId,
@@ -69,9 +53,15 @@ const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
   return reason ? `${reason}. ${suffix}` : suffix;
 };
 
+const isPromptEvent = (
+  type: SessionScopedEvent["type"],
+): type is "session.prompt.submitted" | "session.prompt.rejected" =>
+  type === "session.prompt.submitted" || type === "session.prompt.rejected";
+
 // One turn's chunk sink: chunks are pushed in as they arrive and the AI-SDK's
 // own reducer (readUIMessageStream — the same machinery the server-side
-// history folds use) turns them into evolving UIMessage snapshots.
+// history folds use) turns them into evolving UIMessage snapshots. Those
+// snapshots write the live-assistant slot only.
 type TurnFold = {
   readonly enqueue: (chunk: UIMessageChunk) => void;
   readonly close: () => void;
@@ -80,14 +70,14 @@ type TurnFold = {
 // Session controller, single-consumer: every message — this client's own
 // turns included — folds out of the one persistent subscription, so all
 // clients run the identical rendering path and none needs to claim turns.
-// Sending is fire-and-forget: prompt() pushes the optimistic user message and
-// submits the RPC; the turn's content comes back through the subscription
-// like everyone else's.
+// Sending is fire-and-forget: prompt() parks the optimistic user in
+// pendingUsers and submits the RPC; the turn's content comes back through
+// the subscription like everyone else's, into liveAssistant.
 //
-// State sync vs increments: the transport's "attached" snapshot replaces
-// wholesale what the server owns (pending requests, phase) and replays the
-// active turn's retained buffer; live events are increments on top, gated by
-// `seq > cursor` so the overlap around an attach never double-folds.
+// Transcript sources stay separate: settled is only getMessages(),
+// pendingUsers is unconfirmed prompts, liveAssistant is the open fold.
+// Hydrate / live events never write settled, so they cannot clobber an
+// in-flight bubble or a streaming tail.
 export class Chat {
   readonly store: StoreApi<ChatStoreState>;
   readonly #state: ChatState;
@@ -103,10 +93,8 @@ export class Chat {
   // complete, with the retried tail persisted but never streamed — reconcile
   // from history at turn end regardless of outcome.
   readonly #erroredTurnIds = new Set<string>();
-  // Prompts whose RPC has not settled. The link queues a call across a dropped
-  // socket, so a prompt can outlive the server it was aimed at: nothing the
-  // server says in the meantime — snapshot phase, settled transcript — has
-  // seen it, and neither may erase the optimistic bubble it put on screen.
+  // Prompts whose RPC has not settled. A snapshot arriving mid-flight must
+  // not clear localSubmitted: the server has not seen the prompt yet.
   #promptsInFlight = 0;
   #cursor = 0;
   #historyLoaded = false;
@@ -118,16 +106,9 @@ export class Chat {
   // is still loading replaces it, so hydration always folds the freshest
   // server state — never a stale first snapshot over a newer one.
   #floorSnapshot: SessionRuntimeSnapshot | null = null;
-  // The live view is known to miss settled content (a turn completed inside a
-  // subscription drop, a fold whose tail streamed while detached): re-read
-  // history at the next safe point. Cleared when a reconcile lands.
+  // The settled slot is known to miss content (a turn completed inside a
+  // subscription drop). Cleared when a reconcile lands.
   #needsReconcile = false;
-
-  // Set when the session was closed or deleted server-side: the subscription
-  // has stopped for good, and nothing may overwrite the terminal state — an
-  // in-flight history-floor read completing late would otherwise re-hydrate
-  // over it.
-  #terminated = false;
 
   constructor({ sessionRef: _sessionRef, transport, onTerminated }: ChatInit) {
     this.#state = new ChatState();
@@ -147,7 +128,7 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   #apply(event: SessionScopedEvent): void {
-    if (this.#terminated) return;
+    if (this.#state.snapshot.terminated) return;
     if (event.seq <= this.#cursor) return;
     this.#cursor = event.seq;
     switch (event.type) {
@@ -160,43 +141,33 @@ export class Chat {
           this.#turnFold(event.turnId).enqueue(event.chunk);
         }
         break;
-      // Another client's prompt — or this client's own echoed back, whose
-      // optimistic message already carries the same id, making the append a
-      // no-op.
       case "session.prompt.submitted":
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
-        if (this.#pushUserMessage(event.messageId, event.parts)) {
-          this.#state.retryNotice = undefined;
-          this.#state.error = undefined;
+        if (this.#pushPendingUser(event.messageId, event.parts)) {
+          this.#state.setRetryNotice(undefined);
+          this.#state.setError(undefined);
         }
         break;
-      // The server rejected a prompt whose submitted event already broadcast:
-      // drop the phantom user message (the sender's optimistic copy included).
       case "session.prompt.rejected":
-        this.#state.messages = this.#state.messages.filter(
-          (message) => message.id !== event.messageId,
-        );
+        this.#state.removePendingUser(event.messageId);
+        if (this.#state.snapshot.localSubmitted) this.#state.setLocalSubmitted(false);
         break;
       case "session.turn.started":
+        // Park the previous live assistant on settled before a new fold
+        // overwrites the slot, so pending users still render between them.
+        this.#state.promoteLive();
         break;
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
         this.#turnFolds.delete(event.turnId);
-        this.#state.retryNotice = undefined;
-        // Unanswered requests are stale once the turn ends — no ghost cards.
+        this.#state.setRetryNotice(undefined);
         this.#state.clearPendingRequests();
-        // The settled transcript may hold more than the live stream carried:
-        // a non-completed turn can have persisted partial (or internally
-        // retried full) output, and an abandoned turn was never rendered
-        // live at all.
         if (
           event.outcome !== "completed" ||
           this.#recoverTurnIds.has(event.turnId) ||
           this.#erroredTurnIds.has(event.turnId) ||
-          // A reconcile deferred earlier (skipped mid-stream) retries at the
-          // next turn boundary, when the replace is safe again.
           this.#needsReconcile
         ) {
           void this.#reconcileHistory();
@@ -214,48 +185,36 @@ export class Chat {
       case "session.crashed":
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
-        // The server projection drops its pending requests on crash; a card
-        // left behind here could never be answered.
+        this.#state.promoteLive();
         this.#state.clearPendingRequests();
         break;
+      default: {
+        const _exhaustive: never = event;
+        return _exhaustive;
+      }
     }
-    // Status is copied off the event (the runtime stamps its post-event
-    // phase), never derived from event types here. Lifecycle events only:
-    // chunk phases are redundant, and the prompt events carry a phase the
-    // sender's optimistic "submitted" / error state must outlive — copying
-    // it would wipe that local state before turn.started (or the prompt
-    // RPC's own rejection) lands.
-    if (
-      event.phase !== undefined &&
-      event.type !== "session.message.chunk" &&
-      event.type !== "session.prompt.submitted" &&
-      event.type !== "session.prompt.rejected"
-    ) {
-      this.#setStatus(statusFromPhase(event.phase));
+    // Phase is copied off the event (the runtime stamps its post-fold phase).
+    // Prompt events still must not clear localSubmitted: they carry a pre-turn
+    // idle phase that would drop the sender's spinner before turn.started.
+    if (event.phase !== undefined && event.type !== "session.message.chunk") {
+      this.#setPhase(event.phase, { keepSubmitted: isPromptEvent(event.type) });
     }
   }
 
-  // The stream ended for good: the session was closed or deleted server-side,
-  // so the runtime is gone and prompting or answering could only fail. Enter
-  // the same terminal shape a crash does, with the reason on the error.
+  #setPhase(phase: SessionPhase, options?: { readonly keepSubmitted?: boolean }): void {
+    this.#state.setPhase(phase);
+    if (!options?.keepSubmitted) this.#state.setLocalSubmitted(false);
+  }
+
   #terminate(reason: "session_closed" | "session_deleted"): void {
-    // A second `closed` would re-enter with the same terminal shape, but
-    // `onTerminated` is a one-shot handover — its owner may already have let
-    // this instance go.
-    if (this.#terminated) return;
-    this.#terminated = true;
+    if (this.#state.snapshot.terminated) return;
     for (const fold of this.#turnFolds.values()) fold.close();
     this.#turnFolds.clear();
     this.#queuedEvents = null;
-    // Terminal before the floor ever landed (or attached): no history is coming,
-    // so stop rendering a spinner that would never resolve.
-    this.#state.historyStatus = "settled";
-    this.#state.clearPendingRequests();
-    this.#state.retryNotice = undefined;
-    this.#state.error = new Error(
-      reason === "session_deleted" ? "Session deleted" : "Session closed",
+    this.#state.setError(
+      new Error(reason === "session_deleted" ? "Session deleted" : "Session closed"),
     );
-    this.#setStatus("error");
+    this.#state.setTerminated();
     this.#onTerminated?.();
   }
 
@@ -264,8 +223,6 @@ export class Chat {
   // ---------------------------------------------------------------------
 
   #hydrate(snapshot: SessionRuntimeSnapshot): void {
-    // The settled-history floor, once per Chat life, strictly before anything
-    // folds on top: live events queue while the read is in flight.
     if (!this.#historyLoaded) {
       this.#historyLoaded = true;
       this.#queuedEvents = [];
@@ -274,10 +231,6 @@ export class Chat {
       return;
     }
     if (this.#queuedEvents !== null) {
-      // Re-attach while the floor is still loading: the fresher snapshot
-      // supersedes the one the floor started with. Hydration happens once,
-      // from the latest — hydrating now and again on floor completion would
-      // let the stale first snapshot win.
       this.#floorSnapshot = snapshot;
       return;
     }
@@ -287,27 +240,16 @@ export class Chat {
   async #loadHistoryFloor(): Promise<void> {
     try {
       const history = await this.#transport.getMessages();
-      // Guarded on the transcript, not on status: a non-empty transcript is
-      // already ahead of the disk (optimistic prompt), while a server-side
-      // active turn just means another client is mid-turn — exactly when the
-      // floor is still wanted.
-      if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
-        this.#state.messages = Array.from(history);
-      }
-      // An empty read is still a floor: the session simply has nothing settled
-      // yet. Only the absent capability (null) leaves the transcript unfounded.
-      this.#state.historyStatus = history === null ? "unavailable" : "settled";
+      if (this.#state.snapshot.terminated) return;
+      if (history !== null) this.#state.setSettled(Array.from(history), { retainLive: true });
+      this.#state.setHistoryStatus(history === null ? "unavailable" : "settled");
     } catch (historyError) {
       console.error("Failed to load session history", historyError);
-      // A failed read is still a finished one — the spinner has to stop — but an
-      // unannotated blank would claim the session is empty. A later reconcile
-      // clears this when the read succeeds.
-      this.#state.historyStatus = "unavailable";
+      if (this.#state.snapshot.terminated) return;
+      this.#state.setHistoryStatus("unavailable");
     }
     const snapshot = this.#floorSnapshot;
     this.#floorSnapshot = null;
-    // The floor read itself just fetched settled history, so the gap check
-    // would only re-read what this hydration already has.
     if (snapshot) this.#hydrateFromSnapshot(snapshot, { skipGapCheck: true });
     const queued = this.#queuedEvents ?? [];
     this.#queuedEvents = null;
@@ -318,7 +260,7 @@ export class Chat {
     snapshot: SessionRuntimeSnapshot,
     options?: { readonly skipGapCheck?: boolean },
   ): void {
-    if (this.#terminated) return;
+    if (this.#state.snapshot.terminated) return;
     // A snapshot below our cursor means the server's seq counter restarted —
     // its in-memory session was rebuilt (a server restart, or a close and
     // reopen). Nothing else can produce it: within one incarnation the counter
@@ -330,20 +272,16 @@ export class Chat {
       this.#cursor = 0;
       this.#needsReconcile = true;
     }
-    // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
 
     const activeTurn = snapshot.activeTurn;
 
-    // A fold whose turn is no longer active ended while we were detached —
-    // its turn.ended will never arrive, so nothing else closes it (and an
-    // open fold blocks the reconcile guard below). Its tail streamed while
-    // we were gone, so only the settled transcript still has it.
     for (const [turnId, fold] of this.#turnFolds) {
       if (activeTurn?.turnId !== turnId) {
         fold.close();
         this.#turnFolds.delete(turnId);
+        this.#state.promoteLive();
         this.#needsReconcile = true;
       }
     }
@@ -352,11 +290,6 @@ export class Chat {
     // reply above the transcript.
     const stale = this.#cursor === 0 && activeTurn?.complete === true;
 
-    // The retained prompt is the only recovery for a `prompt.submitted`
-    // missed while detached (events are never re-sent). A complete turn is
-    // normally stale on first attach, except when the retained prompt itself
-    // is the snapshot's latest event: then it belongs to the next, not-yet-
-    // started turn and must render above the settled history floor.
     const activePrompt = snapshot.activePrompt;
     let appliedPromptSeq: number | undefined;
     if (
@@ -365,16 +298,12 @@ export class Chat {
       (!stale || activePrompt.seq === snapshot.cursor)
     ) {
       appliedPromptSeq = activePrompt.seq;
-      if (this.#pushUserMessage(activePrompt.messageId, activePrompt.parts)) {
-        this.#state.retryNotice = undefined;
-        this.#state.error = undefined;
+      if (this.#pushPendingUser(activePrompt.messageId, activePrompt.parts)) {
+        this.#state.setRetryNotice(undefined);
+        this.#state.setError(undefined);
       }
     }
 
-    // Error text and retry status are not part of the settled transcript
-    // floor. Replay them in order so a retry that later emits output (or a
-    // terminal error) wins. Ignore chunks older than a retained prompt: the
-    // runtime can hold a completed old turn beside a newer submitted prompt.
     for (const chunkEvent of activeTurn?.chunks ?? []) {
       if (
         chunkEvent.seq > this.#cursor &&
@@ -384,9 +313,6 @@ export class Chat {
       }
     }
 
-    // A turn flagged for recovery that is no longer active ended while we
-    // were detached — its turn.ended (and the reconcile it would have
-    // triggered) is gone.
     for (const turnId of this.#recoverTurnIds) {
       if (activeTurn?.turnId !== turnId) {
         this.#recoverTurnIds.delete(turnId);
@@ -395,10 +321,6 @@ export class Chat {
       }
     }
 
-    // The snapshot retains only the latest prompt and the current turn's
-    // buffer. If the seq gap since our cursor starts before anything the
-    // snapshot retains, whole events — typically an entire completed turn —
-    // fell inside the drop, and only the settled transcript still has them.
     if (!options?.skipGapCheck && snapshot.cursor > this.#cursor) {
       const retainedFloor = Math.min(
         activePrompt?.seq ?? Infinity,
@@ -413,22 +335,14 @@ export class Chat {
 
     this.#cursor = Math.max(this.#cursor, snapshot.cursor);
     // A prompt still on the wire is invisible to the server, so this phase
-    // predates it — the same reason `#apply` never copies a phase off the
-    // prompt events. Leave the sender's "submitted" standing; the RPC's own
-    // outcome, and the events it triggers, move the status from here.
-    if (this.#promptsInFlight === 0) this.#setStatus(statusFromPhase(snapshot.status.phase));
+    // predates it. Leave localSubmitted standing; the RPC's own outcome, and
+    // the events it triggers, move the spinner from here.
+    this.#setPhase(snapshot.status.phase, { keepSubmitted: this.#promptsInFlight > 0 });
   }
 
   #replayActiveTurn(activeTurn: NonNullable<SessionRuntimeSnapshot["activeTurn"]>): void {
     const unseen = activeTurn.chunks.filter((chunkEvent) => chunkEvent.seq > this.#cursor);
     const head = activeTurn.chunks[0];
-    // A truncated buffer lost its head. A fresh joiner (cursor 0) can still
-    // watch the tail live — orphan continuation chunks are filtered so the
-    // fold starts clean, and the reconcile at turn end backfills the missing
-    // beginning. A returning viewer whose last-seen seq doesn't reach the
-    // retained head has a hole in the *middle* — splicing the tail on would
-    // fabricate a seamless-looking transcript, so it abandons the live view
-    // and recovers the whole turn at its end instead.
     const contiguous = head !== undefined && head.seq <= this.#cursor + 1;
     let chunks: UIMessageChunk[];
     if (!activeTurn.truncated || contiguous) {
@@ -451,8 +365,6 @@ export class Chat {
     if (activeTurn.complete) {
       this.#turnFolds.get(activeTurn.turnId)?.close();
       this.#turnFolds.delete(activeTurn.turnId);
-      // Two statements, not `a || b`: both sets must drop the turn, and the
-      // short-circuit would leave the second entry behind.
       const recovered = this.#recoverTurnIds.delete(activeTurn.turnId);
       const errored = this.#erroredTurnIds.delete(activeTurn.turnId);
       if (recovered || errored) void this.#reconcileHistory();
@@ -466,26 +378,22 @@ export class Chat {
   #observeChunk(chunk: UIMessageChunk): void {
     const retryNotice = retryNoticeFrom(chunk);
     if (retryNotice !== undefined) {
-      this.#state.error = undefined;
-      this.#state.retryNotice = retryNotice;
+      this.#state.setError(undefined);
+      this.#state.setRetryNotice(retryNotice);
       return;
     }
     if (chunk.type === "error") {
-      this.#state.retryNotice = undefined;
-      this.#state.error = new Error(chunk.errorText);
+      this.#state.setRetryNotice(undefined);
+      this.#state.setError(new Error(chunk.errorText));
       return;
     }
-    if (this.#state.retryNotice !== undefined) this.#state.retryNotice = undefined;
+    if (this.#state.snapshot.retryNotice !== undefined) this.#state.setRetryNotice(undefined);
   }
 
-  #pushUserMessage(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
-    if (this.#state.messages.some((message) => message.id === messageId)) return false;
-    this.#state.pushMessage(toUserMessage(messageId, parts));
-    return true;
+  #pushPendingUser(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
+    return this.#state.addPendingUser(toUserMessage(messageId, parts));
   }
 
-  // Policy, not transport: an empty plan carries nothing to review, so it is
-  // approved on sight instead of surfacing a blank card.
   #handleRequest(request: AgentRequest): void {
     if (request.type === "plan" && !request.plan.trim()) {
       void this.#transport
@@ -499,31 +407,18 @@ export class Chat {
     this.#state.addPendingRequest(request);
   }
 
-  // The live view may have diverged from the settled transcript — re-read
-  // history and replace, when it is safe: a fresh turn's optimistic message
-  // or streaming chunks must not be clobbered. A skipped reconcile converges
-  // on the next reload instead.
+  // Settled is only ever replaced, never merged with live/pending, so this
+  // read is safe at any moment — including mid-stream and mid-prompt.
   async #reconcileHistory(): Promise<void> {
     try {
       const history = await this.#transport.getMessages();
-      // Same read as the floor's, so it answers the same question: a reconcile
-      // that lands clears a floor read that failed earlier.
-      this.#state.historyStatus = history === null ? "unavailable" : "settled";
+      if (this.#state.snapshot.terminated) return;
+      this.#state.setHistoryStatus(history === null ? "unavailable" : "settled");
       if (history === null) {
-        // Capability absent: no settled transcript will ever materialize, so
-        // a deferred reconcile must not retry forever.
         this.#needsReconcile = false;
         return;
       }
-      if (history.length === 0) return;
-      // An unacknowledged prompt cannot be in the settled transcript, so a
-      // replace would drop the bubble the sender is looking at. Checked on its
-      // own rather than through the status: a snapshot hydrated mid-flight can
-      // leave the status disagreeing with what is actually pending.
-      if (this.#promptsInFlight > 0) return;
-      if (this.#state.status === "streaming" || this.#state.status === "submitted") return;
-      if (this.#turnFolds.size > 0) return;
-      this.#state.messages = Array.from(history);
+      this.#state.setSettled(Array.from(history), { retainLive: this.#turnFolds.size > 0 });
       this.#needsReconcile = false;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
@@ -541,14 +436,10 @@ export class Chat {
     });
     void (async () => {
       try {
-        // Seed the fold with a turn-derived id: a start chunk that carries no
-        // messageId (claude-code) would otherwise leave the reader's constant
-        // default id on every folded message, and two turns would upsert into
-        // each other's slot. A start chunk that does carry one (pi) still
-        // overrides this seed.
         const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as UIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
-          this.#state.upsertMessage(message as UIMessage);
+          if (this.#state.snapshot.terminated) return;
+          this.#state.setLiveAssistant(message as UIMessage);
         }
       } catch (foldError) {
         console.error("Failed to fold turn", foldError);
@@ -569,23 +460,20 @@ export class Chat {
     return fold;
   }
 
-  #setStatus(status: "submitted" | "streaming" | "ready" | "error"): void {
-    if (this.#state.status !== status) this.#state.status = status;
-  }
-
   // ---------------------------------------------------------------------
   // Public surface
   // ---------------------------------------------------------------------
 
-  // Fire-and-forget: push the optimistic user message, submit the RPC, and
-  // let the subscription carry the reply back like any other client's turn.
   prompt = async (text: string): Promise<void> => {
+    if (this.#state.snapshot.terminated) {
+      throw new Error("Session is closed");
+    }
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
-    this.#state.retryNotice = undefined;
-    this.#state.error = undefined;
-    this.#state.pushMessage(toUserMessage(messageId, parts));
-    this.#setStatus("submitted");
+    this.#state.setRetryNotice(undefined);
+    this.#state.setError(undefined);
+    this.#pushPendingUser(messageId, parts);
+    this.#state.setLocalSubmitted(true);
     this.#promptsInFlight += 1;
     try {
       await this.#transport.prompt({
@@ -593,9 +481,10 @@ export class Chat {
         parts,
       });
     } catch (promptError) {
-      this.#state.error =
-        promptError instanceof Error ? promptError : new Error(String(promptError));
-      this.#setStatus("error");
+      this.#state.setError(
+        promptError instanceof Error ? promptError : new Error(String(promptError)),
+      );
+      this.#state.setLocalSubmitted(false);
       throw promptError;
     } finally {
       this.#promptsInFlight -= 1;
@@ -603,23 +492,28 @@ export class Chat {
   };
 
   interrupt = async (): Promise<void> => {
+    if (this.#state.snapshot.terminated) {
+      throw new Error("Session is closed");
+    }
     try {
       await this.#transport.interrupt();
     } catch (interruptError) {
       console.error("Failed to interrupt session", interruptError);
-      this.#state.error =
-        interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+      this.#state.setError(
+        interruptError instanceof Error ? interruptError : new Error(String(interruptError)),
+      );
     }
   };
 
   respondToAgentRequest = async (requestId: string, response: AgentResponse): Promise<void> => {
+    if (this.#state.snapshot.terminated) {
+      throw new Error("Session is closed");
+    }
     const request = this.store.getState().pendingRequests.find((r) => r.id === requestId);
-    this.#state.removePendingRequest(requestId); // optimistic: the card closes immediately
+    this.#state.removePendingRequest(requestId);
     try {
       await this.#transport.respondToAgentRequest(requestId, response);
     } catch (respondError) {
-      // Failure = the request is still pending server-side: restore the card so
-      // the user can answer again (addPendingRequest is idempotent by id).
       console.error("Failed to respond to agent request", respondError);
       if (request) this.#state.addPendingRequest(request);
     }

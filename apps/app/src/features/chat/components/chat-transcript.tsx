@@ -9,7 +9,12 @@ import {
   ConversationScrollButton,
 } from "@/components/conversation";
 import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
-import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat-state";
+import {
+  selectShowThinking,
+  selectTurnInProgress,
+  type ChatStoreState,
+  type HistoryStatus,
+} from "@/features/chat/runtime/chat-state";
 
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
@@ -50,7 +55,8 @@ function ChatTranscriptView({
   onRespond: (requestId: string, response: AgentResponse) => void;
 }) {
   const lastIndex = snapshot.messages.length - 1;
-  const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
+  const turnInProgress = selectTurnInProgress(snapshot);
+  const showThinking = selectShowThinking(snapshot);
   return (
     <Conversation>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
@@ -69,7 +75,7 @@ function ChatTranscriptView({
             isStreaming={turnInProgress && index === lastIndex}
           />
         ))}
-        {snapshot.status === "submitted" && (
+        {showThinking && (
           <div
             role="status"
             aria-live="polite"

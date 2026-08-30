@@ -12,6 +12,7 @@ import { GitBranchIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
+import { selectCanInterrupt, selectChatStatus } from "@/features/chat/runtime/chat-state";
 import { useLatestRef } from "@/hooks/use-latest-ref";
 
 import { useChatSession } from "./chat-session-context";
@@ -36,10 +37,12 @@ export function ChatInputComposer({
   const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
-  const status = useStore(store, (s) => s.status);
-  const canInterrupt = status === "streaming";
+  const status = useStore(store, selectChatStatus);
+  const canInterrupt = useStore(store, selectCanInterrupt);
+  const terminated = useStore(store, (s) => s.terminated);
   const turnInProgressRef = useLatestRef(turnInProgress);
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
+  const terminatedRef = useLatestRef(terminated);
 
   const controller = useChatInputController({
     // Order is a hard constraint: base extensions first, submit keymap last —
@@ -51,7 +54,9 @@ export function ChatInputComposer({
     ],
     onSubmit: (text) => {
       // Turn in progress or missing workspace: don't send, don't clear.
-      if (turnInProgressRef.current || workspaceUnavailableRef.current) return false;
+      if (turnInProgressRef.current || workspaceUnavailableRef.current || terminatedRef.current) {
+        return false;
+      }
       prompt(text);
       return undefined;
     },
@@ -77,7 +82,10 @@ export function ChatInputComposer({
             <PromptInputTools>{toolbar}</PromptInputTools>
             <PromptInputSubmit
               aria-label={canInterrupt ? "Stop generating" : "Send message"}
-              disabled={!canInterrupt && (!hasContent || turnInProgress || workspaceUnavailable)}
+              disabled={
+                !canInterrupt &&
+                (!hasContent || turnInProgress || workspaceUnavailable || terminated)
+              }
               onClick={canInterrupt ? () => void interrupt() : undefined}
               status={status}
               type={canInterrupt ? "button" : "submit"}

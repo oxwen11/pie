@@ -351,16 +351,21 @@ describe("Chat hydration", () => {
     });
     await settle();
     // The gap (seqs 1..9) starts before anything the snapshot retains — only
-    // the settled transcript still has turn-1, so it is re-read…
+    // the settled transcript still has turn-1. Settled is its own slot, so
+    // the re-read applies immediately and does not wait for turn-2 to end.
     expect(transport.getMessagesCalls).toBe(2);
-    // …but not applied over the streaming turn: the deferred reconcile lands
-    // at the turn boundary.
+    expect(chat.store.getState().settled.map((message) => message.id)).toEqual([
+      "user-1",
+      "assistant-1",
+    ]);
     live(13, { type: "session.turn.ended", turnId: "turn-2", outcome: "completed", phase: "idle" });
     await settle();
-    expect(transport.getMessagesCalls).toBe(3);
+    expect(transport.getMessagesCalls).toBe(2);
     expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
       "user-1",
       "assistant-1",
+      "m2",
+      "turn-turn-2",
     ]);
   });
 
@@ -834,7 +839,7 @@ describe("Chat history reconcile", () => {
     expect(chat.store.getState().messages.map((m) => m.id)).toEqual(["user-1", "assistant-1"]);
   });
 
-  it("skips the reconcile while a newer turn is already streaming", async () => {
+  it("applies a settled reconcile without clobbering a newer live turn", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
@@ -848,7 +853,9 @@ describe("Chat history reconcile", () => {
       chunk: { type: "text-start", id: "t" },
     });
     await settle();
-    // The read happened but its result was not applied over the live turn.
+    // Settled can land immediately — live assistant is a separate slot.
+    expect(chat.store.getState().settled.map((m) => m.id)).toEqual(["user-1"]);
+    expect(chat.store.getState().liveAssistant).not.toBeNull();
     expect(chat.store.getState().messages.map((m) => m.id)).not.toEqual(["user-1"]);
   });
 });
@@ -1006,6 +1013,22 @@ describe("Chat lifecycle", () => {
     emit({ type: "closed", reason: "session_closed" });
     expect(chat.store.getState().status).toBe("error");
     expect(chat.store.getState().error?.message).toBe("Session closed");
+  });
+
+  it("refuses prompt, interrupt, and respond after termination", async () => {
+    const { chat, emit, attach } = makeChat();
+    await attach({});
+    emit({ type: "closed", reason: "session_closed" });
+    await expect(chat.prompt("too late")).rejects.toThrow("Session is closed");
+    await expect(chat.interrupt()).rejects.toThrow("Session is closed");
+    await expect(
+      chat.respondToAgentRequest("request-1", {
+        type: "tool",
+        selectedActionId: "allow",
+        behavior: "allow",
+      }),
+    ).rejects.toThrow("Session is closed");
+    expect(chat.store.getState().messages).toEqual([]);
   });
 
   it("hands the owner a one-shot termination signal", async () => {
