@@ -3,6 +3,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
+import { resolveDevelopmentScope } from "@getpie/core/development-scope";
 import { resolvePieHome } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
@@ -13,7 +14,7 @@ import { makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
-import { devUserDataPath, devWorktreeSlug, pieTempPath } from "./lib/utils";
+import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
 
@@ -59,11 +60,10 @@ export function startDesktopRuntime(): void {
     app.setPath("userData", pieTempPath(`remote-debugging-${remoteDebugPort}`));
   } else if (is.dev && !isE2E) {
     // Give dev its own userData so its single-instance lock is independent of an
-    // installed build (which on macOS keeps holding the lock after its window
-    // closes). Key it on the git worktree so parallel dev instances from
-    // different worktrees don't collide. E2E is excluded — it passes its own
-    // --user-data-dir.
-    app.setPath("userData", devUserDataPath(Effect.runSync(devWorktreeSlug)));
+    // installed build. Key it on the canonical Git checkout identity so
+    // parallel worktrees do not share the single-instance lock. E2E is excluded
+    // because it passes its own --user-data-dir.
+    app.setPath("userData", devUserDataPath(resolveDevelopmentScope()));
   }
 
   let runtime: ReturnType<typeof makeRuntime> | undefined;

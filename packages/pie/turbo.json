@@ -2,6 +2,7 @@
   "extends": ["//"],
   "tasks": {
     "build": {
+      "cache": false,
       "dependsOn": ["^build", "@getpie/app#build"]
     },
     "test": {
