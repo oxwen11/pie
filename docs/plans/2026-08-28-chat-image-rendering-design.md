@@ -45,7 +45,7 @@ Pi persists image-producing `read` results as text plus base64 data:
 }
 ```
 
-`DynamicToolPart` owns this form. It renders approved raster image blocks as data URLs and preserves non-image result content through the generic JSON fallback.
+The Pi-to-AI-SDK adapter owns this form. It maps approved Pi `ImageContent` blocks to first-class AI SDK `FileUIPart` values with data URLs, while the tool output retains its typed text content and details. `AssistantMessage` renders approved raster file parts; `DynamicToolPart` remains a generic tool-output renderer and does not know Pi's result shape.
 
 ### Assistant Markdown image
 
@@ -126,10 +126,12 @@ Keep `pie://app` responsible for:
 
 Do not make `pie://app` a local-file protocol. Do not pass raw `file://` or absolute paths to `<img>`.
 
-Keep the existing data-URL rendering for structured tool-result images. The two forms coexist:
+Keep data URLs for structured tool-result images, but adapt them at the Pi-to-AI-SDK boundary rather than parsing Pi output in React. The two forms coexist:
 
 ```text
-structured tool image
+structured Pi tool image
+  → Pi ImageContent
+  → AI SDK FileUIPart
   → data:image/<type>;base64,...
 
 assistant Markdown local image
@@ -513,8 +515,8 @@ Assistant text remains visible when image resolution fails.
 
 The change must preserve:
 
-- structured tool-result raster images;
-- generic JSON rendering for non-image tool output;
+- structured tool-result raster images represented as AI SDK file parts;
+- generic JSON rendering for adapted non-image tool output;
 - remote Markdown links and images allowed by the existing sanitizer;
 - copy-as-Markdown behavior using original assistant text;
 - live/history message identity and segmentation;
@@ -615,7 +617,8 @@ verify:
 - repeated stable rendering deduplicates URL creation;
 - changing partial streaming destinations does not create an unbounded request loop;
 - a bare code-formatted path does not render an image;
-- existing tool-result image tests remain green.
+- Pi live/history adapter tests prove tool images become AI SDK file parts;
+- assistant message tests prove approved raster file parts render.
 
 ### Historical JSONL integration
 

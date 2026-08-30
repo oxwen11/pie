@@ -1,4 +1,5 @@
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
+import { adaptPiToolResult } from "./tool-result";
 import { isDynamicPiTool } from "./tools";
 import { toolResultText } from "./transform";
 import type { PiMetadata, PiUIMessage } from "./ui-message";
@@ -32,7 +33,7 @@ type PiDynamicToolPart = Extract<PiUIMessagePart, { type: "dynamic-tool" }>;
 /** Where a not-yet-answered toolCall part sits, so its result can replace it. */
 type PendingCall = {
   readonly parts: PiUIMessagePart[];
-  readonly index: number;
+  index: number;
   readonly toolName: string;
   readonly toolCallId: string;
   readonly input: unknown;
@@ -112,32 +113,33 @@ function callPart(call: PendingCall): PiUIMessagePart {
   } as PiToolPart;
 }
 
-function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessagePart {
+function resultParts(call: PendingCall, result: PiToolResultMessage): PiUIMessagePart[] {
   // isError lives in the part state, mirroring the live path where it is a
   // sibling of `tool_execution_end.result` — the output stays result-shaped.
-  const output = { content: result.content, details: result.details };
+  const piResult = { content: result.content, details: result.details };
+  const { output, files } = adaptPiToolResult(piResult);
   const settled = result.isError
     ? {
         state: "output-error" as const,
         input: call.input,
-        errorText: toolResultText(output) || "Tool execution failed",
+        errorText: toolResultText(piResult) || "Tool execution failed",
       }
     : { state: "output-available" as const, input: call.input, output };
-  if (isDynamicPiTool(call.toolName)) {
-    return {
-      type: "dynamic-tool",
-      toolName: call.toolName,
-      toolCallId: call.toolCallId,
-      providerExecuted: true,
-      ...settled,
-    } as PiDynamicToolPart;
-  }
-  return {
-    type: `tool-${call.toolName}`,
-    toolCallId: call.toolCallId,
-    providerExecuted: true,
-    ...settled,
-  } as PiToolPart;
+  const toolPart = isDynamicPiTool(call.toolName)
+    ? ({
+        type: "dynamic-tool",
+        toolName: call.toolName,
+        toolCallId: call.toolCallId,
+        providerExecuted: true,
+        ...settled,
+      } as PiDynamicToolPart)
+    : ({
+        type: `tool-${call.toolName}`,
+        toolCallId: call.toolCallId,
+        providerExecuted: true,
+        ...settled,
+      } as PiToolPart);
+  return result.isError ? [toolPart] : [toolPart, ...files];
 }
 
 /**
@@ -227,7 +229,14 @@ export function entriesToUIMessages(
     const call = pendingCalls.get(message.toolCallId);
     if (call === undefined) return;
     pendingCalls.delete(message.toolCallId);
-    call.parts[call.index] = resultPart(call, message);
+    const replacements = resultParts(call, message);
+    call.parts.splice(call.index, 1, ...replacements);
+    const inserted = replacements.length - 1;
+    if (inserted > 0) {
+      for (const pending of pendingCalls.values()) {
+        if (pending.parts === call.parts && pending.index > call.index) pending.index += inserted;
+      }
+    }
   };
 
   for (const entry of rebuildBranch(entries, leafId)) {

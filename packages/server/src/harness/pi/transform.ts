@@ -1,6 +1,7 @@
 import { v7 as uuid } from "uuid";
 
 import type { AgentSessionEvent } from "./protocol";
+import { adaptPiToolResult } from "./tool-result";
 import { isDynamicPiTool } from "./tools";
 import type { PiUIMessageChunk } from "./ui-message";
 
@@ -21,8 +22,8 @@ import type { PiUIMessageChunk } from "./ui-message";
 //     persisted history fold. The echo of the *prompting* input arrives
 //     before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
-//     The AI-SDK tool chunks are generic, so args/results forward whole; the
-//     PiTools types still discriminate `message.parts` downstream.
+//     Pi text/details stay in the tool output; Pi images become AI SDK file
+//     chunks so React consumes provider-neutral message parts.
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
@@ -166,13 +167,15 @@ export function createPiTransform(
             dynamic: isDynamicPiTool(event.toolName),
           };
         } else {
+          const { output, files } = adaptPiToolResult(event.result);
           yield {
             type: "tool-output-available",
             toolCallId: event.toolCallId,
-            output: event.result,
+            output,
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
+          yield* files;
         }
         break;
 

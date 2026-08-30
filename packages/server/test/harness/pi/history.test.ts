@@ -211,6 +211,68 @@ describe("entriesToUIMessages", () => {
     ]);
   });
 
+  it("adapts tool-result images to AI SDK file parts", () => {
+    const messages = entriesToUIMessages(
+      [
+        userEntry("u1", null, "read image"),
+        assistantEntry("a1", "u1", [toolCall("c1", "read", { path: "/tmp/image.png" })]),
+        toolResultEntry("tr1", "a1", {
+          toolName: "read",
+          content: [
+            { type: "text", text: "Read image file [image/png]" },
+            { type: "image", data: "AAA", mimeType: "image/png" },
+          ],
+        }),
+      ],
+      "tr1",
+      "s1",
+    );
+
+    expect(messages[1]?.parts).toEqual([
+      {
+        type: "tool-read",
+        toolCallId: "c1",
+        state: "output-available",
+        input: { path: "/tmp/image.png" },
+        output: {
+          content: [{ type: "text", text: "Read image file [image/png]" }],
+          details: {},
+        },
+        providerExecuted: true,
+      },
+      { type: "file", mediaType: "image/png", url: "data:image/png;base64,AAA" },
+    ]);
+  });
+
+  it("keeps later tool-call indexes valid when an image part is inserted", () => {
+    const messages = entriesToUIMessages(
+      [
+        userEntry("u1", null, "run tools"),
+        assistantEntry("a1", "u1", [
+          toolCall("c1", "read", { path: "/tmp/image.png" }),
+          toolCall("c2", "bash", { command: "pwd" }),
+        ]),
+        toolResultEntry("tr1", "a1", {
+          toolName: "read",
+          content: [{ type: "image", data: "AAA", mimeType: "image/png" }],
+        }),
+        toolResultEntry("tr2", "tr1", {
+          toolCallId: "c2",
+          content: [{ type: "text", text: "ok" }],
+        }),
+      ],
+      "tr2",
+      "s1",
+    );
+
+    expect(messages[1]?.parts.map((part) => part.type)).toEqual(["tool-read", "file", "tool-bash"]);
+    expect(messages[1]?.parts[2]).toMatchObject({
+      type: "tool-bash",
+      state: "output-available",
+      output: { content: [{ type: "text", text: "ok" }] },
+    });
+  });
+
   it("maps error results to output-error with the text-block errorText", () => {
     const messages = entriesToUIMessages(
       [

@@ -1,7 +1,7 @@
 import { Action, Actions } from "@getpie/ui/ai-elements/actions";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import { Response } from "@getpie/ui/ai-elements/response";
-import { isReasoningUIPart, isToolUIPart, type UIMessage } from "ai";
+import { isReasoningUIPart, isToolUIPart, type FileUIPart, type UIMessage } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -11,6 +11,14 @@ import { ToolPart } from "./tool-part";
 import { useToolBatches } from "./use-tool-batches";
 
 type Part = UIMessage["parts"][number];
+
+const RASTER_IMAGE_MEDIA_TYPES = new Set([
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 // Renders an assistant turn's parts: tool/reasoning runs as collapsible
 // batches, standalone tools (Task) as full cards, text as markdown. The copy
@@ -71,9 +79,28 @@ export function AssistantMessage({
             </Message>
           );
         }
+        if (part.type === "file" && RASTER_IMAGE_MEDIA_TYPES.has(part.mediaType)) {
+          return <AssistantImage key={index} part={part} />;
+        }
         return null;
       })}
     </>
+  );
+}
+
+function AssistantImage({ part }: { part: FileUIPart }) {
+  return (
+    <Message from="assistant">
+      <MessageContent>
+        <img
+          alt={part.filename ?? "Tool output image"}
+          className="max-h-[32rem] max-w-full rounded-md object-contain"
+          decoding="async"
+          loading="lazy"
+          src={part.url}
+        />
+      </MessageContent>
+    </Message>
   );
 }
 
