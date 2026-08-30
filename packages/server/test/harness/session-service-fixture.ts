@@ -25,6 +25,7 @@ import { NodePlatformLayer } from "../platform";
 export type Spy = {
   open: Array<{ cwd: string }>;
   resume: Array<{ sessionId: string; cwd: string | undefined }>;
+  prompt: Array<{ sessionId: string; turnId: string | undefined }>;
   close: Array<string>;
 };
 
@@ -54,6 +55,8 @@ export type SessionServiceRunOpts = {
   turn?: "open" | "finished";
   // The harness rejects every prompt (a turn is already running).
   promptFails?: boolean;
+  // Return an existing turn id to model a prompt delivered as a steer.
+  promptTurnId?: string;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;
   failWrite?: boolean;
@@ -72,7 +75,7 @@ export const run = <A, E>(
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const spy: Spy = { open: [], resume: [], close: [] };
+        const spy: Spy = { open: [], resume: [], prompt: [], close: [] };
         let opened = 0;
         const turnEvents = (sessionId: string) => {
           if (opts.turn === undefined) return Stream.empty;
@@ -105,7 +108,11 @@ export const run = <A, E>(
           events: turnEvents(sessionId),
           prompt: opts.promptFails
             ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
-            : () => Effect.succeed({ turnId: "turn-1" }),
+            : (input) =>
+                Effect.sync(() => {
+                  spy.prompt.push({ sessionId, turnId: input.turnId });
+                  return { turnId: opts.promptTurnId ?? input.turnId ?? "turn-1" };
+                }),
           interrupt: Effect.void,
           respondToAgentRequest: () => Effect.void,
           getCapabilities: Effect.succeed({

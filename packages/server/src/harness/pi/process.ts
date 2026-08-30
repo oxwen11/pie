@@ -101,6 +101,7 @@ export interface PiProcess {
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
+      readonly turnId?: string;
     }) => Effect.Effect<
       {
         readonly turnId: string;
@@ -479,7 +480,7 @@ export const makePiProcessWithDependencies = <R>(
             > =>
               Effect.uninterruptibleMask((restore) =>
                 Effect.gen(function* () {
-                  const turnId = uuid();
+                  const turnId = input.turnId ?? uuid();
                   const ended = yield* Deferred.make<void>();
                   const decision = yield* Ref.modify<PiTurnState, TurnDecision>(
                     session.turnState,

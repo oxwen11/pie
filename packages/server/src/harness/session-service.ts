@@ -293,8 +293,9 @@ export const makePiAgentSessionService = (deps: {
   const deliverPrompt = (
     ref: SessionRef,
     userInput: UserInput,
+    turnId: string,
   ): Effect.Effect<
-    void,
+    PromptReceipt,
     | ResumeSessionError
     | StoreReadError
     | StoreWriteError
@@ -307,7 +308,7 @@ export const makePiAgentSessionService = (deps: {
     Effect.gen(function* () {
       const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
       const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
-      yield* runtime.prompt(userInput).pipe(Effect.asVoid);
+      return yield* runtime.prompt({ ...userInput, turnId });
     });
 
   const readHistory = (
@@ -602,14 +603,15 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
-        yield* deliverPrompt(input.ref, userInput).pipe(
+        const receipt = yield* deliverPrompt(input.ref, userInput, turnId).pipe(
           Effect.catch((error: unknown) =>
-            reject(error instanceof Error ? error.message : String(error)),
+            reject(error instanceof Error ? error.message : String(error)).pipe(
+              Effect.as({ turnId }),
+            ),
           ),
-          Effect.forkDetach,
         );
 
-        return { turnId };
+        return { turnId: receipt.turnId };
       }).pipe(inSession(input.ref)),
 
     interrupt: (ref) =>

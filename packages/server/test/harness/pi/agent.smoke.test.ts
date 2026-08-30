@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
@@ -9,13 +6,10 @@ import { Effect, Stream } from "effect";
 
 import { makePiProcess } from "../../../src/harness/pi/process";
 
-const hasPiAuth =
-  Boolean(process.env.ANTHROPIC_API_KEY) ||
-  Boolean(process.env.OPENAI_API_KEY) ||
-  fs.existsSync(path.join(os.homedir(), ".pi/agent/auth.json"));
+const runLivePiTests = process.env.PIE_LIVE_TESTS === "1";
 
 layer(NodeServices.layer, { excludeTestServices: true })("pi live smoke", (it) => {
-  it.effect.skipIf(!hasPiAuth)(
+  it.effect.skipIf(!runLivePiTests)(
     "runs one real turn",
     () =>
       Effect.gen(function* () {

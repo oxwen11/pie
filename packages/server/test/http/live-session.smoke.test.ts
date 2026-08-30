@@ -12,10 +12,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type ManagedServer } from "../../src/http/server";
 import { discardContext } from "../platform";
 
-const hasPiAuth =
-  Boolean(process.env.ANTHROPIC_API_KEY) ||
-  Boolean(process.env.OPENAI_API_KEY) ||
-  fs.existsSync(path.join(os.homedir(), ".pi/agent/auth.json"));
+const runLivePiTests = process.env.PIE_LIVE_TESTS === "1";
+
+const withTimeout = async <A>(promise: Promise<A>, timeoutMs: number): Promise<A> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("timed out waiting for a session event")), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+};
 
 let server: ManagedServer | undefined;
 let previousHome: string | undefined;
@@ -29,7 +38,7 @@ afterEach(async () => {
 });
 
 describe("live HTTP/WebSocket session", () => {
-  it.skipIf(!hasPiAuth)(
+  it.skipIf(!runLivePiTests)(
     "creates a project and runs one real turn over the server API",
     async () => {
       const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-live-api-home-"));
@@ -59,15 +68,24 @@ describe("live HTTP/WebSocket session", () => {
       const events = await client.agent.session.subscribe({
         scope: { kind: "session", ref },
       });
+      const attached = await client.agent.session.getSnapshot({ ref });
+      expect(attached.cursor).toBe(0);
+      const iterator = events[Symbol.asyncIterator]();
+      let pendingEvent = iterator.next();
       const receipt = await client.agent.session.prompt({
         ref,
         parts: [{ type: "text", text: "Reply with exactly: PONG" }],
       });
 
       const chunks: Array<{ type: string; delta?: string }> = [];
-      const deadline = Date.now() + 170_000;
-      for await (const item of events) {
-        if (Date.now() > deadline) throw new Error("timed out waiting for the turn to end");
+      const deadline = Date.now() + 60_000;
+      while (true) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new Error("timed out waiting for the turn to end");
+        const next = await withTimeout(pendingEvent, remaining);
+        if (next.done) throw new Error("session event stream closed before the turn ended");
+        pendingEvent = iterator.next();
+        const item = next.value;
         if (item.type !== "event") continue;
         const event = item.event;
         if (event.type === "session.message.chunk") {
@@ -89,6 +107,6 @@ describe("live HTTP/WebSocket session", () => {
 
       await client.agent.session.close({ ref });
     },
-    180_000,
+    70_000,
   );
 });

@@ -1,12 +1,20 @@
 /* oxlint-disable pie/node-import-style, vitest/no-conditional-expect, typescript/no-extra-non-null-assertion */
 // UPSTREAM @earendil-works/pi-coding-agent@0.84.2 packages/coding-agent/test/rpc.test.ts
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
-import { RpcClient } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, RpcClient } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { resolvePiProcessEntry } from "../../../../src/harness/pi/resolve-executable";
@@ -14,12 +22,9 @@ import { resolvePiProcessEntry } from "../../../../src/harness/pi/resolve-execut
 /**
  * RPC mode tests.
  */
-const hasPiAuth =
-  Boolean(process.env.ANTHROPIC_API_KEY) ||
-  Boolean(process.env.ANTHROPIC_OAUTH_TOKEN) ||
-  existsSync(join(homedir(), ".pi/agent/auth.json"));
+const runLivePiTests = process.env.PIE_LIVE_TESTS === "1";
 
-describe.skipIf(!hasPiAuth)("RPC mode", () => {
+describe.skipIf(!runLivePiTests)("RPC mode", () => {
   let client: RpcClient;
   let sessionDir: string;
   let cwd: string;
@@ -28,12 +33,19 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     sessionDir = join(tmpdir(), `pi-rpc-test-${Date.now()}`);
     cwd = join(tmpdir(), `pi-rpc-cwd-${Date.now()}`);
     mkdirSync(cwd, { recursive: true });
+    mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+    const agentDir = getAgentDir();
+    for (const file of ["auth.json", "models.json", "settings.json"]) {
+      const source = join(agentDir, file);
+      if (!existsSync(source)) continue;
+      const target = join(sessionDir, file);
+      copyFileSync(source, target);
+      chmodSync(target, 0o600);
+    }
     client = new RpcClient({
       cliPath: resolvePiProcessEntry(),
       cwd,
       env: { PI_CODING_AGENT_DIR: sessionDir },
-      provider: "anthropic",
-      model: "claude-sonnet-4-5",
       args: ["--session-id", randomUUID()],
     });
   });
@@ -53,8 +65,8 @@ describe.skipIf(!hasPiAuth)("RPC mode", () => {
     const state = await client.getState();
 
     expect(state.model).toBeDefined();
-    expect(state.model?.provider).toBe("anthropic");
-    expect(state.model?.id).toBe("claude-sonnet-4-5");
+    expect(state.model?.provider).not.toBe("unknown");
+    expect(state.model?.id).not.toBe("unknown");
     expect(state.isStreaming).toBe(false);
     expect(state.messageCount).toBe(0);
   }, 30000);

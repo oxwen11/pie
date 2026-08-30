@@ -55,7 +55,7 @@ export type PiAgentRuntime = {
   readonly sessionId: string;
   readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
   readonly prompt: (
-    input: UserInput,
+    input: UserInput & { readonly turnId?: string },
   ) => Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>;
   readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
@@ -181,7 +181,11 @@ export const makePiAgentRuntime = (
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
           const prompt = yield* process.session
-            .prompt({ sessionId, text: toPromptText(input) })
+            .prompt({
+              sessionId,
+              text: toPromptText(input),
+              ...(input.turnId !== undefined ? { turnId: input.turnId } : undefined),
+            })
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning
