@@ -196,6 +196,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
       ELECTRON_RENDERER_URL: origin,
       PIE_E2E: "1",
       PIE_HOME: pieHome,
+      PIE_DAEMON_DIR: path.join(pieHome, "daemon"),
     },
   });
 

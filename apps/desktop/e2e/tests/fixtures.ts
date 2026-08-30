@@ -50,15 +50,56 @@ export function seedProject(pieHome: string, workspace: string): void {
  * or every test leaks one.
  */
 export async function stopDaemonFor(pieHome: string): Promise<void> {
+  let record: { pid?: number };
   try {
-    const record = JSON.parse(
+    record = JSON.parse(
       await fs.promises.readFile(path.join(pieHome, "daemon", "daemon.pid"), "utf8"),
     ) as { pid?: number };
-    if (typeof record.pid === "number" && record.pid > 0) {
-      process.kill(record.pid, "SIGTERM");
-    }
   } catch {
-    // No daemon record (never spawned) or the process is already gone.
+    // No daemon record (never spawned).
+    return;
+  }
+  if (typeof record.pid === "number" && record.pid > 0) {
+    await stopProcess(record.pid);
+  }
+}
+
+export async function stopProcess(pid: number, graceMs = 5_000): Promise<void> {
+  if (!processAlive(pid)) return;
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    return;
+  }
+
+  const deadline = Date.now() + graceMs;
+  while (Date.now() < deadline && processAlive(pid)) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 50);
+    });
+  }
+  if (!processAlive(pid)) return;
+
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    return;
+  }
+  const killDeadline = Date.now() + 2_000;
+  while (Date.now() < killDeadline && processAlive(pid)) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 25);
+    });
+  }
+  if (processAlive(pid)) throw new Error(`Process ${pid} did not exit after SIGKILL`);
+}
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -99,6 +140,7 @@ export const test = base.extend<{
         NODE_ENV: "test",
         PIE_E2E: "1",
         PIE_HOME: e2ePaths.pieHome,
+        PIE_DAEMON_DIR: path.join(e2ePaths.pieHome, "daemon"),
       },
     });
 

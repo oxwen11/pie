@@ -21,6 +21,8 @@
     "dev": "PIE_PORT=4180 bun src/node/cli.ts serve",
     "build": "tsdown",
     "start": "node dist/cli.mjs",
+    "publint": "publint",
+    "prepublishOnly": "pnpm turbo run publint --filter=@getpie/cli",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p src/node",
     "clean": "git clean -xdf node_modules dist .turbo"
@@ -37,6 +39,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:effect",
+    "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"

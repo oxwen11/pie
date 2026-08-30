@@ -2,6 +2,7 @@
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import {
   resolveDaemonDirectory,
   resolveDaemonLocation,
@@ -43,6 +44,7 @@ const startDaemon = (input: DaemonStartInput) =>
     const { port } = resolveServeConfig(input);
     const handle = yield* resolveOrSpawnDaemon({
       ...resolveDaemonLocation(),
+      requiredCompatibilityKey: embeddedDaemonCompatibilityKey(),
       serverArgv: serverArgv(),
       port,
     });

@@ -1,9 +1,11 @@
 # Package layout and boundaries
 
-`contract ← server ← cli|desktop` and `contract ← client ← app ← desktop`.
+`core ← server|cli|desktop`, `contract ← server ← cli|desktop`, and
+`contract ← client ← app ← desktop`.
 
 | dir                 | name                      | role                                                                                                           |
 | ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `packages/core`     | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
 | `packages/contract` | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
 | `packages/server`   | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
 | `packages/client`   | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |

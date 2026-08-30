@@ -1,6 +1,16 @@
 {
   "extends": ["//"],
   "tasks": {
+    "build": {
+      "cache": false,
+      "dependsOn": ["^build", "@getpie/app#build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "publint": {
+      "dependsOn": ["build"]
+    },
     "dev": {
       "dependsOn": ["@getpie/server#build"],
       "passThroughEnv": [
