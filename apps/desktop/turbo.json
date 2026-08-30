@@ -2,6 +2,9 @@
   "$schema": "https://turborepo.com/schema.v2.json",
   "extends": ["//"],
   "tasks": {
+    "build": {
+      "cache": false
+    },
     "dev": {
       "dependsOn": ["@getpie/server#build"],
       "passThroughEnv": ["*"]
@@ -17,6 +20,10 @@
     "e2e": {
       "cache": false,
       "dependsOn": ["build"]
+    },
+    "e2e:packaged": {
+      "cache": false,
+      "dependsOn": ["build:unpack"]
     },
     "e2e:headed": {
       "cache": false,

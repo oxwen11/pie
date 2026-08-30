@@ -1,6 +1,9 @@
 {
   "extends": ["//"],
   "tasks": {
+    "build": {
+      "cache": false
+    },
     "dev": {
       "passThroughEnv": [
         "AWS_*",

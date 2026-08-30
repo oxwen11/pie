@@ -37,6 +37,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"

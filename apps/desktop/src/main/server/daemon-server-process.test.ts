@@ -3,6 +3,10 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
+import {
+  type GitHashDaemonCompatibilityKey,
+  makeGitHashDaemonCompatibilityKey,
+} from "@getpie/core/compatibility";
 import { pidAlive, readRecord, stopDaemon } from "@getpie/server/daemon";
 import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
@@ -34,6 +38,15 @@ describe("resolveServerRuntimeExecutable", () => {
   });
 });
 
+const TEST_KEY = makeGitHashDaemonCompatibilityKey("aaaaaaaa");
+const NEXT_KEY = makeGitHashDaemonCompatibilityKey("bbbbbbbb");
+
+const makeTestDaemonServerProcess = (pollIntervalMs: number) =>
+  makeDaemonServerProcess({
+    pollIntervalMs,
+    requiredCompatibilityKey: TEST_KEY,
+  });
+
 // A minimal daemon body: binds PIE_PORT and answers /api/health, which is
 // all the launcher's readiness and the spawner's liveness poll observe.
 const FAKE_SERVER = `
@@ -43,6 +56,18 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {
     if (process.env.PIE_TEST_WEDGE_FILE && fs.existsSync(process.env.PIE_TEST_WEDGE_FILE)) return;
     return res.end("ok");
+  }
+  if (req.headers.authorization !== \`Bearer \${process.env.PIE_AUTH_TOKEN}\`) {
+    res.statusCode = 401;
+    return res.end();
+  }
+  if (req.method === "POST" && req.url === "/api/ws-ticket") {
+    res.setHeader("content-type", "application/json");
+    return res.end(JSON.stringify({ ticket: "test-ticket" }));
+  }
+  if (req.method === "POST" && req.url === "/api/shutdown") {
+    res.statusCode = 202;
+    return res.end("shutting down", () => server.close(() => process.exit(0)));
   }
   res.statusCode = 404;
   res.end();
@@ -88,7 +113,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const endpoint = yield* Effect.scoped(
           Effect.gen(function* () {
-            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 100 });
+            const spawn = yield* makeTestDaemonServerProcess(100);
             const running = yield* spawn(config, 0);
             return yield* running.ready;
           }),
@@ -96,6 +121,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const record = yield* readRecord(daemonDir);
         assert.ok(record);
+        assert.equal(record.compatibilityKey, TEST_KEY);
         // The endpoint carries the daemon's own minted token, read from the record.
         assert.deepEqual(endpoint, {
           port: Number(new URL(record.address).port),
@@ -104,13 +130,37 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const again = yield* Effect.scoped(
           Effect.gen(function* () {
-            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 100 });
+            const spawn = yield* makeTestDaemonServerProcess(100);
             const running = yield* spawn(config, endpoint.port);
             return yield* running.ready;
           }),
         );
         assert.deepEqual(again, endpoint);
         assert.equal((yield* readRecord(daemonDir))?.pid, record.pid);
+      }),
+    );
+
+    it.effect("replaces an older Desktop build daemon and reuses the replacement", () =>
+      Effect.gen(function* () {
+        const { daemonDir, config } = yield* workspace;
+        const start = (requiredCompatibilityKey: GitHashDaemonCompatibilityKey) =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              const spawn = yield* makeDaemonServerProcess({ requiredCompatibilityKey });
+              const running = yield* spawn(config, 0);
+              yield* running.ready;
+              return (yield* readRecord(daemonDir))!;
+            }),
+          );
+
+        const old = yield* start(TEST_KEY);
+        const replacement = yield* start(NEXT_KEY);
+        assert.notEqual(replacement.pid, old.pid);
+        assert.equal(pidAlive(old.pid), false);
+        assert.equal(replacement.compatibilityKey, NEXT_KEY);
+
+        const relaunched = yield* start(NEXT_KEY);
+        assert.equal(relaunched.pid, replacement.pid);
       }),
     );
 
@@ -121,7 +171,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const exit = yield* Effect.scoped(
           Effect.gen(function* () {
-            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 50 });
+            const spawn = yield* makeTestDaemonServerProcess(50);
             const running = yield* spawn(config, 0);
             yield* running.ready;
             yield* stopDaemon(daemonDir);
@@ -143,7 +193,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const exit = yield* Effect.scoped(
           Effect.gen(function* () {
-            const spawn = yield* makeDaemonServerProcess({ pollIntervalMs: 20 });
+            const spawn = yield* makeTestDaemonServerProcess(20);
             const running = yield* spawn(config, 0);
             yield* running.ready;
             const record = yield* readRecord(daemonDir);
