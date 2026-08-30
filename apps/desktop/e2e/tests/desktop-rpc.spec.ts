@@ -245,9 +245,12 @@ test("reports a server crash and recovers on the pinned connection", async ({
   const initialPid = await waitForServer(e2ePaths.pieHome);
   process.kill(initialPid, "SIGKILL");
 
-  const reconnecting = window.getByText("Reconnecting…");
-  await expect(reconnecting).toBeVisible({ timeout: 10_000 });
-  await expect(reconnecting).toBeHidden({ timeout: 15_000 });
+  // The reconnecting overlay can be shorter than a Playwright polling tick on
+  // fast machines, so the replacement discovery record is the stable barrier.
+  await expect
+    .poll(() => findServerPid(e2ePaths.pieHome) ?? initialPid, { timeout: 15_000 })
+    .not.toBe(initialPid);
+  await expect(window.getByText("Reconnecting…")).toBeHidden({ timeout: 15_000 });
 
   const restartedPid = serverPid(e2ePaths.pieHome);
   expect(restartedPid).not.toBe(initialPid);
