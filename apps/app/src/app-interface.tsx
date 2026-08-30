@@ -8,6 +8,7 @@ import "./index.css";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { SettingsThemeSync, useThemePreference } from "./features/settings/settings-theme";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
@@ -60,14 +61,20 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
   return (
     <QueryClientProvider client={queryClient}>
       <ChatManagerProvider manager={chatManager}>
+        <SettingsThemeSync orpcQueryUtils={orpcQueryUtils} />
         <RouterProvider router={router} />
         {/*
          * The app's only error surface. Every `toast.*` call — the QueryClient's
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
          */}
-        <Toaster theme="system" />
+        <AppToaster />
       </ChatManagerProvider>
     </QueryClientProvider>
   );
+}
+
+function AppToaster() {
+  const theme = useThemePreference();
+  return <Toaster theme={theme} />;
 }

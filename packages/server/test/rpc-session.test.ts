@@ -23,6 +23,7 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
+import { SettingsServiceLayer } from "../src/settings";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -89,6 +90,7 @@ async function setup() {
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsServiceLayer = SettingsServiceLayer.pipe(Layer.provide(pathsLayer));
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -110,6 +112,7 @@ async function setup() {
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    settingsServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),

@@ -2,6 +2,7 @@ import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -12,7 +13,7 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { SquarePen } from "lucide-react";
+import { Settings, SquarePen } from "lucide-react";
 import { useState } from "react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -24,10 +25,14 @@ import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
 export function AppSidebar({
   isSessionActive,
+  isSettingsActive,
   onNewChat,
+  onOpenSettings,
 }: {
   readonly isSessionActive: (ref: SessionRef) => boolean;
+  readonly isSettingsActive: boolean;
   readonly onNewChat: () => void;
+  readonly onOpenSettings: () => void;
 }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
@@ -68,6 +73,17 @@ export function AppSidebar({
 
         <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
       </SidebarContent>
+
+      <SidebarFooter className="[-webkit-app-region:no-drag]">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton isActive={isSettingsActive} onClick={onOpenSettings}>
+              <Settings />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}
     </Sidebar>
