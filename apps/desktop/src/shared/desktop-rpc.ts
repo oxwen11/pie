@@ -15,6 +15,11 @@ export const WebSocketAccessSchema = z.object({
 });
 export type WebSocketAccess = z.infer<typeof WebSocketAccessSchema>;
 
+export const OpenInBrowserResultSchema = z.object({
+  status: z.enum(["opened", "restart-required"]),
+});
+export type OpenInBrowserResult = z.infer<typeof OpenInBrowserResultSchema>;
+
 /** The three desktop targets, normalized off `process.platform`. */
 export const DesktopOsSchema = z.enum(["macos", "windows", "linux"]);
 export type DesktopOs = z.infer<typeof DesktopOsSchema>;
@@ -36,6 +41,7 @@ export const desktopContract = {
   server: {
     ready: oc.output(z.void()),
     webSocketAccess: oc.output(WebSocketAccessSchema),
+    openInBrowser: oc.output(OpenInBrowserResultSchema),
     retry: oc.output(z.void()),
   },
   app: {

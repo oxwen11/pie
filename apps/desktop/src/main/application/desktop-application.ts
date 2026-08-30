@@ -4,6 +4,7 @@ import type {
   ServerStatusSnapshot,
   DesktopBootstrap,
   DesktopOs,
+  OpenInBrowserResult,
   WebSocketAccess,
 } from "../../shared/desktop-rpc";
 import type { LocalServer, ServerAccessError } from "../server/local-server";
@@ -21,6 +22,7 @@ export class DesktopApplication extends Context.Service<
     readonly bootstrap: Effect.Effect<DesktopBootstrap>;
     readonly serverReady: Effect.Effect<void>;
     readonly serverWebSocketAccess: Effect.Effect<WebSocketAccess, ServerAccessError>;
+    readonly openInBrowser: Effect.Effect<OpenInBrowserResult, ServerAccessError>;
     readonly watchServerStatus: (after: number) => Stream.Stream<ServerStatusSnapshot>;
     readonly retryServer: Effect.Effect<void>;
     readonly quit: Effect.Effect<void>;
@@ -29,11 +31,13 @@ export class DesktopApplication extends Context.Service<
 
 export type DesktopApplicationDependencies = {
   readonly server: LocalServer["Service"];
+  readonly openExternal: (url: string) => Effect.Effect<void, ServerAccessError>;
   readonly quit: Effect.Effect<void>;
 };
 
 export function makeDesktopApplication({
   server,
+  openExternal,
   quit,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
   return {
@@ -47,6 +51,13 @@ export function makeDesktopApplication({
     }),
     serverReady: server.ready,
     serverWebSocketAccess: server.webSocketAccess,
+    openInBrowser: server.browserPairing.pipe(
+      Effect.flatMap(({ url }) => openExternal(url)),
+      Effect.as({ status: "opened" } as const),
+      Effect.catchTag("ServerProtocolUnsupportedError", () =>
+        Effect.succeed({ status: "restart-required" } as const),
+      ),
+    ),
     // v4 SubscriptionRef.changes replays the latest snapshot on subscribe
     // (PubSub replay: 1), so the stream always starts from the current status.
     watchServerStatus: (after) =>

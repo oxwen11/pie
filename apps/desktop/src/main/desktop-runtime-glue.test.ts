@@ -20,6 +20,9 @@ describe("DesktopApplicationLive", () => {
       webSocketAccess: Effect.succeed({
         url: "ws://127.0.0.1:1/ws/rpc?ticket=one-time",
       }),
+      browserPairing: Effect.succeed({
+        url: "http://127.0.0.1:1/pair#grant=one-time",
+      }),
       snapshot: SubscriptionRef.get(statusRef),
       changes: SubscriptionRef.changes(statusRef),
       retry: Effect.void,

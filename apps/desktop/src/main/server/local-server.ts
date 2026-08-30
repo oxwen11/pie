@@ -65,9 +65,17 @@ export class ServerAccessError extends Data.TaggedError("ServerAccessError")<{
   readonly message: string;
 }> {}
 
+export class ServerProtocolUnsupportedError extends Data.TaggedError(
+  "ServerProtocolUnsupportedError",
+)<{ readonly message: string }> {}
+
 export type RequestWebSocketAccess = (
   endpoint: ServerEndpoint,
 ) => Effect.Effect<WebSocketAccess, ServerAccessError>;
+
+export type RequestBrowserPairing = (
+  endpoint: ServerEndpoint,
+) => Effect.Effect<{ readonly url: string }, ServerAccessError | ServerProtocolUnsupportedError>;
 
 export type SpawnServer = (
   config: ServerProcessConfig,
@@ -88,6 +96,10 @@ export class LocalServer extends Context.Service<
   {
     readonly ready: Effect.Effect<void>;
     readonly webSocketAccess: Effect.Effect<WebSocketAccess, ServerAccessError>;
+    readonly browserPairing: Effect.Effect<
+      { readonly url: string },
+      ServerAccessError | ServerProtocolUnsupportedError
+    >;
     readonly snapshot: Effect.Effect<ServerStatusSnapshot>;
     readonly changes: Stream.Stream<ServerStatusSnapshot>;
     readonly retry: Effect.Effect<void>;
@@ -142,6 +154,7 @@ export function makeLocalServer(
   config: LocalServerConfig,
   spawnServer: SpawnServer,
   requestWebSocketAccess: RequestWebSocketAccess,
+  requestBrowserPairing: RequestBrowserPairing,
 ): Effect.Effect<LocalServer["Service"], never, Scope.Scope> {
   return Effect.gen(function* () {
     const statusRef = yield* SubscriptionRef.make<ServerStatusSnapshot>({
@@ -260,6 +273,7 @@ export function makeLocalServer(
     return {
       ready: Deferred.await(initial).pipe(Effect.asVoid),
       webSocketAccess: currentEndpoint.pipe(Effect.flatMap(requestWebSocketAccess)),
+      browserPairing: currentEndpoint.pipe(Effect.flatMap(requestBrowserPairing)),
       snapshot,
       changes: SubscriptionRef.changes(statusRef),
       retry: Effect.gen(function* () {

@@ -102,13 +102,18 @@ function makeHarness(
     brokeredEndpoints,
     logs,
     server: Effect.runPromise(
-      makeLocalServer(config, spawnServer, (endpoint) => {
-        brokeredEndpoints.push(endpoint);
-        accessCounter += 1;
-        return Effect.succeed({
-          url: `ws://127.0.0.1:${endpoint.port}/ws/rpc?ticket=fake-${accessCounter}`,
-        });
-      }).pipe(Scope.provide(scope), Effect.provide(logContext)),
+      makeLocalServer(
+        config,
+        spawnServer,
+        (endpoint) => {
+          brokeredEndpoints.push(endpoint);
+          accessCounter += 1;
+          return Effect.succeed({
+            url: `ws://127.0.0.1:${endpoint.port}/ws/rpc?ticket=fake-${accessCounter}`,
+          });
+        },
+        (endpoint) => Effect.succeed({ url: `http://127.0.0.1:${endpoint.port}/pair#grant=fake` }),
+      ).pipe(Scope.provide(scope), Effect.provide(logContext)),
     ),
     dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)),
   };

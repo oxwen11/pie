@@ -2,24 +2,31 @@ import { Effect, Option, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { ServerStatusSnapshot } from "../../shared/desktop-rpc";
-import type { LocalServer } from "../server/local-server";
+import { type LocalServer, ServerProtocolUnsupportedError } from "../server/local-server";
 import { makeDesktopApplication } from "./desktop-application";
 
 // Whichever host the suite runs on — asserting a literal would pin these tests
 // to the developer's OS and fail on a different CI runner.
 const anyOs = expect.stringMatching(/^(macos|windows|linux)$/);
 
-function makeHarness(ready: Effect.Effect<void> = Effect.void) {
+function makeHarness(
+  ready: Effect.Effect<void> = Effect.void,
+  browserPairing: LocalServer["Service"]["browserPairing"] = Effect.succeed({
+    url: "http://127.0.0.1:43123/pair#grant=one-time",
+  }),
+) {
   const statusRef = Effect.runSync(
     SubscriptionRef.make<ServerStatusSnapshot>({ revision: 0, status: "ready" }),
   );
   let retries = 0;
   let quits = 0;
+  const opened: string[] = [];
   const server: LocalServer["Service"] = {
     ready,
     webSocketAccess: Effect.succeed({
       url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     }),
+    browserPairing,
     snapshot: SubscriptionRef.get(statusRef),
     changes: SubscriptionRef.changes(statusRef),
     retry: Effect.sync(() => {
@@ -28,6 +35,10 @@ function makeHarness(ready: Effect.Effect<void> = Effect.void) {
   };
   const application = makeDesktopApplication({
     server,
+    openExternal: (url) =>
+      Effect.sync(() => {
+        opened.push(url);
+      }),
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -39,6 +50,7 @@ function makeHarness(ready: Effect.Effect<void> = Effect.void) {
       Effect.runPromise(SubscriptionRef.set(statusRef, snapshot)),
     retries: () => retries,
     quits: () => quits,
+    opened: () => opened,
   };
 }
 
@@ -56,10 +68,31 @@ describe("DesktopApplication", () => {
       url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     });
 
+    await expect(Effect.runPromise(h.application.openInBrowser)).resolves.toEqual({
+      status: "opened",
+    });
+    expect(h.opened()).toHaveLength(1);
+
     await Effect.runPromise(h.application.retryServer);
     await Effect.runPromise(h.application.quit);
     expect(h.retries()).toBe(1);
     expect(h.quits()).toBe(1);
+  });
+
+  it("returns restart-required without opening a legacy daemon URL", async () => {
+    const h = makeHarness(
+      Effect.void,
+      Effect.fail(
+        new ServerProtocolUnsupportedError({
+          message: "restart required",
+        }),
+      ),
+    );
+
+    await expect(Effect.runPromise(h.application.openInBrowser)).resolves.toEqual({
+      status: "restart-required",
+    });
+    expect(h.opened()).toEqual([]);
   });
 
   it("bootstraps shell state without waiting for server readiness", async () => {

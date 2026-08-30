@@ -10,10 +10,12 @@ import {
   stopDaemon,
 } from "@getpie/server/daemon";
 import { resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 import { Command } from "effect/unstable/cli";
 
 import pkg from "../../package.json" with { type: "json" };
+import { openSystemUrl } from "./open-url";
+import { pairResidentDaemon } from "./pairing";
 
 /**
  * argv that re-launches this very CLI in foreground `serve` mode. The daemon is
@@ -30,22 +32,22 @@ type DaemonStartInput = {
   readonly allowedHost: ReadonlyArray<string>;
 };
 
+const resolveDaemon = (input: DaemonStartInput) => {
+  const { port } = resolveServeConfig(input);
+  return resolveOrSpawnDaemon({
+    ...resolveDaemonLocation(),
+    serverArgv: serverArgv(),
+    port,
+  });
+};
+
+const browserPairing = (input: DaemonStartInput) => pairResidentDaemon(resolveDaemon(input));
+
 // Default startup is the daemon: a short-lived `pie` command must operate a
 // backend that outlives it, so it attaches to the running daemon or spawns one.
-// Both directories come from the ambient environment through the shared
-// resolver, which is also what `stop`/`status` and a desktop app inheriting the
-// same `PIE_DAEMON_DIR` use — that is what makes them address one daemon.
 const startDaemon = (input: DaemonStartInput) =>
   Effect.gen(function* () {
-    // Same flag > env > default port precedence as `pie serve`. CORS is not
-    // resolved here: the daemon's policy is static, and any extra origins are
-    // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
-    const { port } = resolveServeConfig(input);
-    const handle = yield* resolveOrSpawnDaemon({
-      ...resolveDaemonLocation(),
-      serverArgv: serverArgv(),
-      port,
-    });
+    const handle = yield* resolveDaemon(input);
     console.log(
       handle.reused
         ? `pie daemon already running at ${handle.address} (pid ${handle.pid})`
@@ -57,6 +59,25 @@ const startDaemon = (input: DaemonStartInput) =>
         `note: --port ${explicitPort} ignored — attached to the daemon already running on port ${handle.port}`,
       );
     }
+  });
+
+const pairHandler = (input: DaemonStartInput) =>
+  Effect.gen(function* () {
+    const { pairing } = yield* browserPairing(input);
+    console.log(pairing.url);
+    console.log(`This one-time pairing link expires in ${pairing.expiresInSeconds} seconds.`);
+  });
+
+const openHandler = (input: DaemonStartInput) =>
+  Effect.gen(function* () {
+    const { handle, pairing } = yield* browserPairing(input);
+    const opened = yield* openSystemUrl(pairing.url).pipe(Effect.result);
+    if (Result.isSuccess(opened)) {
+      console.log(`Opened Pie in the browser at ${handle.address}`);
+      return;
+    }
+    console.error("Unable to launch the system browser. Open this one-time pairing link manually:");
+    console.log(pairing.url);
   });
 
 const stopHandler = () =>
@@ -85,6 +106,13 @@ const daemonStatus = Command.make("status", {}, statusHandler).pipe(
   Command.withDescription("Report whether the pie daemon is running"),
 );
 
+const pair = Command.make("pair", serveFlags, pairHandler).pipe(
+  Command.withDescription("Print a one-time browser pairing link"),
+);
+const open = Command.make("open", serveFlags, openHandler).pipe(
+  Command.withDescription("Open Pie in the system browser"),
+);
+
 const daemon = Command.make("daemon", serveFlags, startDaemon).pipe(
   Command.withDescription("Manage the pie daemon (bare `daemon` starts it)"),
   Command.withSubcommands([daemonStart, daemonStop, daemonStatus]),
@@ -95,7 +123,7 @@ const daemon = Command.make("daemon", serveFlags, startDaemon).pipe(
 // Bare `pie` defaults to daemon startup.
 const pie = Command.make("pie", serveFlags, startDaemon).pipe(
   Command.withDescription("Pie local server"),
-  Command.withSubcommands([serve, daemon]),
+  Command.withSubcommands([serve, daemon, pair, open]),
 );
 
 Command.run(pie, { version: pkg.version }).pipe(

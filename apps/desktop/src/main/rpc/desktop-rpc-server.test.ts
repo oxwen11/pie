@@ -25,6 +25,7 @@ function makeHarness(
   );
   let retries = 0;
   let quits = 0;
+  let opens = 0;
   let streamFinalizers = 0;
 
   // A recording logger inside the injected context proves that handler
@@ -47,6 +48,9 @@ function makeHarness(
     webSocketAccess: Effect.succeed({
       url: "ws://127.0.0.1:43123/ws/rpc?ticket=one-time",
     }),
+    browserPairing: Effect.succeed({
+      url: "http://127.0.0.1:43123/pair#grant=one-time",
+    }),
     snapshot: SubscriptionRef.get(statusRef),
     changes: SubscriptionRef.changes(statusRef).pipe(
       Stream.ensuring(
@@ -61,6 +65,10 @@ function makeHarness(
   };
   const base = makeDesktopApplication({
     server,
+    openExternal: () =>
+      Effect.sync(() => {
+        opens += 1;
+      }),
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -79,6 +87,7 @@ function makeHarness(
       Effect.runPromise(SubscriptionRef.set(statusRef, snapshot)),
     retries: () => retries,
     quits: () => quits,
+    opens: () => opens,
     streamFinalizers: () => streamFinalizers,
     logged: () => logged,
     close: async () => {
@@ -122,10 +131,12 @@ describe("Desktop MessagePort RPC", () => {
       });
       expect(JSON.stringify(access)).not.toContain("master-token");
 
+      await expect(h.client.server.openInBrowser()).resolves.toEqual({ status: "opened" });
       await h.client.server.retry();
       await h.client.app.quit();
       expect(h.retries()).toBe(1);
       expect(h.quits()).toBe(1);
+      expect(h.opens()).toBe(1);
     } finally {
       await h.close();
     }

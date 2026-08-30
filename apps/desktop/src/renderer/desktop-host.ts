@@ -36,6 +36,7 @@ export function createDesktopHost(
 
   return {
     platform: {
+      openInBrowser: () => client.server.openInBrowser(),
       quit: () => {
         void client.app.quit().catch((error: unknown) => {
           if (!isAbortError(error)) console.error("Failed to request desktop quit", error);
