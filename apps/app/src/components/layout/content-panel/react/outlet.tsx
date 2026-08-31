@@ -67,7 +67,7 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-1">
+    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-10">
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
@@ -99,9 +99,9 @@ function TabStrip({
         )}
       </Button>
       {/*
-       * No hide button here: `ContentPanelToggle` already is one, and it has to
-       * live outside the panel anyway to bring it back. Two controls for one
-       * boolean is the duplication that button would be.
+       * No hide button here: the shell-fixed `ContentPanelToggle` already is
+       * one, and it has to live outside the panel anyway to bring it back. Two
+       * controls for one boolean is the duplication that button would be.
        */}
     </div>
   );
