@@ -5,6 +5,7 @@ import { createContext, type ReactNode, use, useCallback, useMemo } from "react"
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -137,6 +138,7 @@ export function AppShellBody({ children }: AppShellBodyProps) {
           </>
         )}
       </ShellGroup>
+      <ShellContentPanelToggle />
     </AppShellContext>
   );
 }

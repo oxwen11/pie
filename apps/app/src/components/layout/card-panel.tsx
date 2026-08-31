@@ -5,7 +5,7 @@ import { useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
+import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import {
   SHELL_TITLEBAR_HEADER_CLASS,
   SHELL_TITLEBAR_LABEL_CLASS,
@@ -20,6 +20,7 @@ export interface CardPanelProps {
 
 export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
+  const hasContentPanelToggle = useContentPanel() !== null;
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
@@ -69,7 +70,9 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
             )}
           </m.div>
         </div>
-        <ContentPanelToggle className="ms-auto [-webkit-app-region:no-drag]" />
+        {hasContentPanelToggle ? (
+          <div aria-hidden="true" className="ms-auto size-7 shrink-0" />
+        ) : null}
       </header>
       {/*
        * Always the Outlet, never a router-state-driven swap: `isLoading` flips
