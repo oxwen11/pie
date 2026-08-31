@@ -33,7 +33,8 @@ function createQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: queryDefaults },
     queryCache: new QueryCache({
-      onError: (error) => {
+      onError: (error, query) => {
+        if (query.meta?.suppressGlobalError === true) return;
         toast.error(`Error: ${error.message}`, {
           action: {
             label: "retry",
@@ -78,6 +79,13 @@ export function createAppClients(server?: ServerConnection): AppClients {
   queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
     staleTime: 30_000,
   });
+  const pullRequestDefaults = {
+    staleTime: 15_000,
+    retry: false,
+    meta: { suppressGlobalError: true },
+  };
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
 
   return { orpcClient, queryClient, orpcQueryUtils };
 }

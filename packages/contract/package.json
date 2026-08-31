@@ -9,6 +9,7 @@
     "./fs": "./src/fs.ts",
     "./git": "./src/git.ts",
     "./project": "./src/project.ts",
+    "./pull-request": "./src/pull-request.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts"
