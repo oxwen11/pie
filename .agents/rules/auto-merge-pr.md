@@ -2,6 +2,12 @@
 
 Squash-merge PRs that cannot change product behavior. Unsure → skip. Fail closed.
 
+## Merge conflict → silent exit
+
+Check mergeability first (`gh pr view --json mergeable,mergeStateStatus`). If not `MERGEABLE` (conflict / dirty) → **stop immediately**. Do not evaluate Allowed/Never, diff, or CI. **Do not comment on the PR** — no review, no inline comments, no thread resolution.
+
+## Eligibility
+
 Eligible only if all hold: repo `oxwen11/pie`; base `main`; author `oxwen11`; not draft; `MERGEABLE`; review is not `CHANGES_REQUESTED`. CI is a GitHub required-check gate — do not inspect, wait on, or decide from checks.
 
 Merge with `gh pr merge <n> --squash --delete-branch` only. No merge commit, rebase merge, `--admin`, or force-push.
