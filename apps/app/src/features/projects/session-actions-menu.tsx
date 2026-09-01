@@ -61,6 +61,7 @@ export function SessionActionsMenu({
           render={
             <SidebarMenuAction
               aria-label={`Actions for ${title}`}
+              className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent md:data-[state=open]:bg-sidebar-accent"
               disabled={setArchived.isPending}
               showOnHover
             />
