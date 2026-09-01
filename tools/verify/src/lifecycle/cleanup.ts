@@ -3,7 +3,7 @@ import path from "node:path";
 import { tryReadRunMeta, type RunMeta } from "../meta.ts";
 import { clearCurrentRun, currentRun, isUnder, realPath, removePath } from "../runtime/fs.ts";
 import { removeScaffold } from "../runtime/scaffold.ts";
-import type { SurfaceDefinition } from "../surface.ts";
+import type { Surface } from "../surface.ts";
 
 function sampleProjectOf(meta: RunMeta | undefined): string | undefined {
   switch (meta?.surface) {
@@ -21,7 +21,7 @@ function sampleProjectOf(meta: RunMeta | undefined): string | undefined {
   }
 }
 
-export async function cleanup(surface: SurfaceDefinition, args: string[]): Promise<void> {
+export async function cleanup(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
   const runDir =
     currentRun(identity.currentLink) ?? (args[0] === undefined ? undefined : realPath(args[0]));

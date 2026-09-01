@@ -2,21 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { CLI } from "../identity.ts";
-import { stopRecordedDaemon } from "../lifecycle/daemon-stop.ts";
-import { patchRunMeta, readRunMeta, type CliRunMeta, type RunMeta } from "../meta.ts";
+import { expectMeta, patchRunMeta, readRunMeta, type CliRunMeta, type RunMeta } from "../meta.ts";
 import {
   ensureCoreBuilt,
   invokePie,
   readDaemonRecord,
-  redactDaemonRecord,
   resolveCompatKey,
   spawnPie,
+  stopRecordedDaemon,
 } from "../runtime/daemon.ts";
 import { fail } from "../runtime/fail.ts";
-import { currentRun, isoNow, readText, writeText } from "../runtime/fs.ts";
+import { currentRun, readText, writeText } from "../runtime/fs.ts";
 import { fetchText, healthOk, ticketStatus, urlPort } from "../runtime/http.ts";
 import {
-  envPort,
   findRepoRoot,
   killTree,
   listenPids,
@@ -26,105 +24,32 @@ import {
   waitUntil,
   writePidFile,
 } from "../runtime/process.ts";
-import { parseLaunchArgs, type LaunchCtx, type SurfaceDefinition } from "../surface.ts";
+import { expectLaunch, type LaunchCtx, type ProbeOk, type Surface } from "../surface.ts";
 
-const usageText = `Usage:
-  pie-verify cli launch [--replace] [--serve]
-  pie-verify cli doctor
-  pie-verify cli run <pie argv…>
-  pie-verify cli evidence path|init|curl|note
-  pie-verify cli cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-
-function asCli(meta: RunMeta, where: string): CliRunMeta {
-  if (meta.surface !== "cli") {
-    fail(`pie-verify cli ${where}: FAIL — expected cli meta`);
-  }
-  return meta;
-}
-
-export const cliSurface: SurfaceDefinition = {
+export const cliSurface: Surface = {
   identity: CLI,
-  usage: usageText,
-  evidenceUsage: `Usage:
-  pie-verify cli evidence path
-  pie-verify cli evidence init
-  pie-verify cli evidence curl
-  pie-verify cli evidence note <text>`,
-  parseLaunch: (args) =>
-    parseLaunchArgs(args, { allowServe: true, usage: `${CLI.bin} launch [--replace] [--serve]` }),
-  ensureBuilt: (repo) => {
-    ensureCoreBuilt(repo);
-  },
-  portPlan: () => {
-    const piePort = envPort("PIE_PORT", CLI.defaultPiePort);
-    return { piePort, refuseTaken: [piePort], warnTaken: [] };
-  },
-  canReuse: (meta, request) => meta.surface === "cli" && meta.mode === (request.mode ?? "daemon"),
-  isHealthy: async (runDir, meta) => {
-    const cli = asCli(meta, "launch");
-    if (cli.mode === "serve") {
-      return (
-        pidAlive(readPidFile(path.join(runDir, "pids/serve.pid"))) && (await healthOk(cli.piePort))
-      );
-    }
-    const recordPath = path.join(runDir, "pie-home/daemon/daemon.pid");
-    if (!fs.existsSync(recordPath)) {
-      return false;
-    }
-    const record = readDaemonRecord(recordPath);
-    return pidAlive(record.pid) && (await healthOk(record.address));
-  },
-  livePids: (runDir, meta) => {
-    if (meta?.surface === "cli" && meta.mode === "serve") {
-      const pid = readPidFile(path.join(runDir, "pids/serve.pid"));
-      return pid === undefined ? [] : [pid];
-    }
-    const recordPath = path.join(runDir, "pie-home/daemon/daemon.pid");
-    if (!fs.existsSync(recordPath)) {
-      return [];
-    }
-    return [readDaemonRecord(recordPath).pid];
-  },
-  initialMeta: (ctx) => ({
-    surface: "cli",
-    runId: ctx.runId,
-    repo: ctx.repo,
-    pieHome: ctx.pieHome,
-    piePort: ctx.piePort,
-    mode: ctx.request.mode ?? "daemon",
-    daemonDir: ctx.daemonDir ?? path.join(ctx.pieHome, "daemon"),
-    startedAt: isoNow(),
-  }),
   spawn: startCli,
-  inspect: inspectCli,
+  probe: inspectCli,
   stop: stopCli,
-  afterEvidenceInit: (dest, runDir, meta) => {
-    const cli = asCli(meta, "evidence");
-    const record = path.join(cli.daemonDir, "daemon.pid");
-    if (fs.existsSync(record)) {
-      redactDaemonRecord(record, path.join(dest, "daemon.pid.redacted.json"));
-    }
-  },
-  evidenceExtra: evidenceCli,
-  run: runPie,
 };
 
 async function startCli(ctx: LaunchCtx): Promise<void> {
+  const cli = expectLaunch(ctx, "cli");
   const env = {
-    ...ctx.env,
-    PIE_DAEMON_COMPATIBILITY_KEY: await resolveCompatKey(ctx.repo),
+    ...cli.env,
+    PIE_DAEMON_COMPATIBILITY_KEY: await resolveCompatKey(cli.repo),
   };
-  if (ctx.request.mode === "serve") {
-    await startServe(ctx, env);
+  if (cli.request.mode === "serve") {
+    await startServe(cli, env);
     return;
   }
-  await startDaemon(ctx, env);
+  await startDaemon(cli, env);
 }
 
-async function startServe(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void> {
+async function startServe(
+  ctx: Extract<LaunchCtx, { surface: "cli" }>,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   const child = spawnPie(
     ctx.repo,
     ["serve", "--port", String(ctx.piePort)],
@@ -137,7 +62,7 @@ async function startServe(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void>
   writePidFile(path.join(ctx.runDir, "pids/serve.pid"), child.pid);
   await waitUntil(`pie serve on ${ctx.piePort}`, () => healthOk(ctx.piePort), 60);
   const address = `http://127.0.0.1:${ctx.piePort}`;
-  patchRunMeta(path.join(ctx.runDir, "meta.json"), { address });
+  patchRunMeta(path.join(ctx.runDir, "meta.json"), "cli", { address });
   console.log(`${CLI.logPrefix}: launched ${ctx.runId}`);
   console.log("  mode    serve (foreground, no token)");
   console.log(`  api     ${address}/api/health`);
@@ -146,7 +71,10 @@ async function startServe(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void>
   console.log(`  doctor  ${CLI.bin} doctor`);
 }
 
-async function startDaemon(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void> {
+async function startDaemon(
+  ctx: Extract<LaunchCtx, { surface: "cli" }>,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   const startLog = path.join(ctx.runDir, "logs/cli-start.log");
   const started = invokePie(ctx.repo, ["daemon", "start", "--port", env.PIE_PORT ?? ""], env, {
     logPath: startLog,
@@ -154,12 +82,11 @@ async function startDaemon(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void
   if (started.status !== 0) {
     throw new Error("daemon start failed");
   }
-  const daemonDir = ctx.daemonDir ?? path.join(ctx.pieHome, "daemon");
-  const recordPath = path.join(daemonDir, "daemon.pid");
+  const recordPath = path.join(ctx.daemonDir, "daemon.pid");
   await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 20);
   const record = readDaemonRecord(recordPath);
   await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
-  patchRunMeta(path.join(ctx.runDir, "meta.json"), {
+  patchRunMeta(path.join(ctx.runDir, "meta.json"), "cli", {
     address: record.address,
     daemonPid: record.pid,
   });
@@ -174,8 +101,8 @@ async function startDaemon(ctx: LaunchCtx, env: NodeJS.ProcessEnv): Promise<void
   console.log(`  doctor  ${CLI.bin} doctor`);
 }
 
-async function inspectCli(runDir: string, meta: RunMeta): Promise<string[]> {
-  const cli = asCli(meta, "doctor");
+async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
+  const cli = expectMeta(meta, "cli");
   if (cli.mode === "serve") {
     const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
     if (!pidAlive(servePid)) {
@@ -191,13 +118,16 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<string[]> {
         `${CLI.logPrefix} doctor: FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`,
       );
     }
-    return [
-      "  mode    serve",
-      `  api     ${address}/api/health`,
-      `  home    ${cli.pieHome}`,
-      `  serve   pid ${servePid}`,
-      "  ticket  /api/ws-ticket 200 (no token)",
-    ];
+    return {
+      pids: servePid === undefined ? [] : [servePid],
+      lines: [
+        "  mode    serve",
+        `  api     ${address}/api/health`,
+        `  home    ${cli.pieHome}`,
+        `  serve   pid ${servePid}`,
+        "  ticket  /api/ws-ticket 200 (no token)",
+      ],
+    };
   }
 
   const recordPath = path.join(cli.daemonDir, "daemon.pid");
@@ -227,13 +157,16 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<string[]> {
   if (listenPids(port).length === 0) {
     fail(`${CLI.logPrefix} doctor: FAIL — nothing listens on ${port} (from daemon.pid address)`);
   }
-  return [
-    "  mode    daemon",
-    `  api     ${record.address}/api/health`,
-    `  home    ${cli.pieHome}`,
-    `  daemon  pid ${record.pid}`,
-    "  ticket  anonymous 401 / bearer 200",
-  ];
+  return {
+    pids: [record.pid],
+    lines: [
+      "  mode    daemon",
+      `  api     ${record.address}/api/health`,
+      `  home    ${cli.pieHome}`,
+      `  daemon  pid ${record.pid}`,
+      "  ticket  anonymous 401 / bearer 200",
+    ],
+  };
 }
 
 async function stopCli(runDir: string, meta: RunMeta | undefined): Promise<void> {
@@ -256,25 +189,22 @@ async function stopCli(runDir: string, meta: RunMeta | undefined): Promise<void>
   }
 }
 
-async function evidenceCli(
+export async function extraEvidence(
   command: string,
   rest: string[],
   dest: string,
-  runDir: string,
-  meta: RunMeta,
+  typed: CliRunMeta,
 ): Promise<boolean> {
   void rest;
-  void runDir;
   if (command !== "curl") {
     return false;
   }
-  writeText(path.join(dest, "curl.txt"), await curlTranscript(meta));
+  writeText(path.join(dest, "curl.txt"), await curlTranscript(typed));
   console.log(path.join(dest, "curl.txt"));
   return true;
 }
 
-async function curlTranscript(meta: RunMeta): Promise<string> {
-  const cli = asCli(meta, "evidence");
+async function curlTranscript(cli: CliRunMeta): Promise<string> {
   if (cli.mode === "serve") {
     const address = `http://127.0.0.1:${cli.piePort}`;
     const health = await fetchText(`${address}/api/health`);
@@ -304,7 +234,7 @@ async function curlTranscript(meta: RunMeta): Promise<string> {
   ].join("\n");
 }
 
-async function runPie(args: string[]): Promise<void> {
+export async function runPie(args: string[]): Promise<void> {
   const repo = findRepoRoot();
   ensureCoreBuilt(repo);
   const runDir = currentRun(CLI.currentLink);
@@ -314,8 +244,7 @@ async function runPie(args: string[]): Promise<void> {
   }
   const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "development" };
   if (runDir !== undefined) {
-    const meta = readRunMeta(path.join(runDir, "meta.json"));
-    const cli = asCli(meta, "run");
+    const cli = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "cli");
     env.PIE_HOME = cli.pieHome;
     env.PIE_DAEMON_DIR = cli.daemonDir;
     env.PIE_PORT = String(cli.piePort);

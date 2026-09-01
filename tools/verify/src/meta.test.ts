@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { patchRunMeta, readRunMeta, writeRunMeta, type WebRunMeta } from "./meta.ts";
+import { expectMeta, patchRunMeta, readRunMeta, writeRunMeta, type WebRunMeta } from "./meta.ts";
 
 function webMeta(): WebRunMeta {
   return {
@@ -47,10 +47,19 @@ describe("readRunMeta", () => {
     expect(() => readRunMeta(file)).toThrow(/piePort/);
   });
 
-  it("refuses to change surface on patch", () => {
+  it("patches fields without changing surface", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-meta-"));
     const file = path.join(dir, "meta.json");
     writeRunMeta(file, webMeta());
-    expect(() => patchRunMeta(file, { surface: "cli" })).toThrow(/cannot change surface/);
+    const next = patchRunMeta(file, "web", { piePort: 4181 });
+    expect(next.surface).toBe("web");
+    expect(next.piePort).toBe(4181);
+    expect(readRunMeta(file).surface).toBe("web");
+  });
+
+  it("narrows with expectMeta and rejects a mismatch", () => {
+    const web = webMeta();
+    expect(expectMeta(web, "web").vitePort).toBe(4190);
+    expect(() => expectMeta(web, "cli")).toThrow(/expected cli meta/);
   });
 });

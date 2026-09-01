@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { tryReadRunMeta, writeRunMeta } from "../meta.ts";
+import { initialMeta, tryReadRunMeta, writeRunMeta } from "../meta.ts";
 import type { RunMeta } from "../meta.ts";
+import { ensureCoreBuilt, ensureServerBuilt } from "../runtime/daemon.ts";
 import {
   copyFailureLogs,
   currentRun,
@@ -12,30 +13,52 @@ import {
   setCurrentRun,
   tailFile,
 } from "../runtime/fs.ts";
-import { findRepoRoot, pidAlive } from "../runtime/process.ts";
+import { commandOnPath, findRepoRoot, pidAlive } from "../runtime/process.ts";
 import { ensureSampleProject } from "../runtime/scaffold.ts";
-import type { LaunchCtx, SurfaceDefinition } from "../surface.ts";
+import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
-import { applyPortPlan } from "./ports.ts";
+import { recordedPids } from "./pids.ts";
+import { applyPortPlan, portPlan } from "./ports.ts";
 import { classifyExisting } from "./reuse.ts";
 
-export async function launch(surface: SurfaceDefinition, args: string[]): Promise<void> {
-  const request = surface.parseLaunch(args);
+export async function launch(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
+  const request = parseLaunchArgs(args, {
+    allowServe: identity.allowServe,
+    usage: identity.allowServe
+      ? `${identity.bin} launch [--replace] [--serve]`
+      : `${identity.bin} launch [--replace]`,
+  });
   const repo = findRepoRoot();
-  surface.preflight?.();
-  await surface.ensureBuilt(repo);
+  if (
+    identity.needsDisplay &&
+    process.env.DISPLAY === undefined &&
+    commandOnPath("xvfb-run") === undefined
+  ) {
+    throw new Error(
+      "no DISPLAY and no xvfb-run. Refuse to start Electron headless without a display.",
+    );
+  }
+  switch (identity.build) {
+    case "core":
+      ensureCoreBuilt(repo);
+      break;
+    case "server":
+      ensureServerBuilt(repo);
+      break;
+    default: {
+      const exhaustive: never = identity.build;
+      void exhaustive;
+    }
+  }
 
-  const plan = surface.portPlan();
+  const plan = portPlan(identity);
   const existing = currentRun(identity.currentLink);
   if (existing !== undefined) {
     const meta = tryReadRunMeta(path.join(existing, "meta.json"));
-    const kind = await classifyRun(surface, existing, meta, request);
+    const kind = await classifyRun(surface, existing, meta, request.mode);
     switch (kind) {
       case "reuse":
-        if (meta !== undefined) {
-          printReuse(identity.bin, identity.logPrefix, existing, meta);
-        }
         return;
       case "live":
         if (request.replace) {
@@ -96,7 +119,8 @@ export async function launch(surface: SurfaceDefinition, args: string[]): Promis
     env.PIE_REMOTE_DEBUG_PORT = String(plan.cdpPort);
   }
 
-  const ctx: LaunchCtx = {
+  const ctx = buildCtx({
+    identityId: identity.id,
     repo,
     runId,
     runDir,
@@ -108,8 +132,8 @@ export async function launch(surface: SurfaceDefinition, args: string[]): Promis
     request,
     sample,
     env,
-  };
-  writeRunMeta(path.join(runDir, "meta.json"), surface.initialMeta(ctx));
+  });
+  writeRunMeta(path.join(runDir, "meta.json"), initialMeta(ctx));
   setCurrentRun(identity.currentLink, runDir);
 
   try {
@@ -123,44 +147,88 @@ export async function launch(surface: SurfaceDefinition, args: string[]): Promis
 }
 
 async function classifyRun(
-  surface: SurfaceDefinition,
+  surface: Surface,
   runDir: string,
   meta: RunMeta | undefined,
-  request: ReturnType<SurfaceDefinition["parseLaunch"]>,
+  mode: "daemon" | "serve" | undefined,
 ): Promise<"reuse" | "live" | "stale"> {
   const reusable =
     meta !== undefined &&
     meta.surface === surface.identity.id &&
-    (surface.canReuse === undefined || surface.canReuse(meta, request));
-  const healthy =
-    reusable && meta !== undefined && (await surface.isHealthy(runDir, meta, request));
-  const live = surface.livePids(runDir, meta).some((pid) => pidAlive(pid));
-  return classifyExisting({ healthy, live });
+    (meta.surface !== "cli" || mode === undefined || meta.mode === mode);
+  if (reusable && meta !== undefined) {
+    try {
+      const probe = await surface.probe(runDir, meta);
+      console.log(`${surface.identity.logPrefix}: already running at ${runDir}`);
+      for (const line of probe.lines) {
+        if (line !== "") {
+          console.log(line);
+        }
+      }
+      return "reuse";
+    } catch {
+      // fall through to live/stale
+    }
+  }
+  return classifyExisting({
+    healthy: false,
+    live: recordedPids(surface.identity, runDir).some((pid) => pidAlive(pid)),
+  });
 }
 
-function printReuse(bin: string, logPrefix: string, runDir: string, meta: RunMeta): void {
-  console.log(`${logPrefix}: already running at ${runDir}`);
-  switch (meta.surface) {
+function buildCtx(input: {
+  identityId: "web" | "cli" | "desktop";
+  repo: string;
+  runId: string;
+  runDir: string;
+  pieHome: string;
+  daemonDir?: string;
+  piePort: number;
+  vitePort?: number;
+  cdpPort?: number;
+  request: LaunchCtx["request"];
+  sample?: { path: string; created: boolean };
+  env: NodeJS.ProcessEnv;
+}): LaunchCtx {
+  const base = {
+    repo: input.repo,
+    runId: input.runId,
+    runDir: input.runDir,
+    pieHome: input.pieHome,
+    piePort: input.piePort,
+    request: input.request,
+    env: input.env,
+  };
+  switch (input.identityId) {
     case "web":
-      console.log(`  app     ${meta.appUrl}`);
-      console.log(`  api     http://127.0.0.1:${meta.piePort}/api/health`);
-      console.log(`  home    ${meta.pieHome}`);
-      return;
-    case "cli":
-      console.log(`  mode    ${meta.mode}`);
-      console.log(`  api     ${meta.address ?? `http://127.0.0.1:${meta.piePort}`}/api/health`);
-      if (meta.mode === "daemon") {
-        console.log(`  home    ${meta.pieHome}`);
+      if (input.vitePort === undefined || input.sample === undefined) {
+        throw new Error("web launch is missing vitePort or sample");
       }
-      return;
+      return { ...base, surface: "web", vitePort: input.vitePort, sample: input.sample };
+    case "cli":
+      if (input.daemonDir === undefined) {
+        throw new Error("cli launch is missing daemonDir");
+      }
+      return { ...base, surface: "cli", daemonDir: input.daemonDir };
     case "desktop":
-      console.log(`  api     ${meta.address ?? `http://127.0.0.1:${meta.piePort}`}/api/health`);
-      console.log(`  cdp     ${bin} browser connect`);
-      console.log(`  home    ${meta.pieHome}`);
-      return;
+      if (
+        input.cdpPort === undefined ||
+        input.daemonDir === undefined ||
+        input.sample === undefined
+      ) {
+        throw new Error("desktop launch is missing cdpPort, daemonDir, or sample");
+      }
+      return {
+        ...base,
+        surface: "desktop",
+        daemonDir: input.daemonDir,
+        cdpPort: input.cdpPort,
+        sample: input.sample,
+      };
     default: {
-      const exhaustive: never = meta;
+      const exhaustive: never = input.identityId;
       void exhaustive;
+      throw new Error("unknown surface");
     }
   }
 }

@@ -1,4 +1,4 @@
-import type { SurfaceIdentity } from "./identity.ts";
+import type { SurfaceId, SurfaceIdentity } from "./identity.ts";
 import type { RunMeta } from "./meta.ts";
 import type { SampleProject } from "./runtime/scaffold.ts";
 
@@ -15,46 +15,47 @@ export type PortPlan = {
   warnTaken: number[];
 };
 
-export type LaunchCtx = {
+type LaunchBase = {
   repo: string;
   runId: string;
   runDir: string;
   pieHome: string;
-  daemonDir?: string;
   piePort: number;
-  vitePort?: number;
-  cdpPort?: number;
   request: LaunchRequest;
-  sample?: SampleProject;
   env: NodeJS.ProcessEnv;
 };
 
-export type SurfaceDefinition = {
-  identity: SurfaceIdentity;
-  usage: string;
-  evidenceUsage: string;
-  parseLaunch: (args: string[]) => LaunchRequest;
-  ensureBuilt: (repo: string) => void | Promise<void>;
-  preflight?: () => void;
-  portPlan: () => PortPlan;
-  canReuse?: (meta: RunMeta, request: LaunchRequest) => boolean;
-  isHealthy: (runDir: string, meta: RunMeta, request: LaunchRequest) => Promise<boolean>;
-  livePids: (runDir: string, meta: RunMeta | undefined) => number[];
-  initialMeta: (ctx: LaunchCtx) => RunMeta;
-  spawn: (ctx: LaunchCtx) => Promise<void>;
-  inspect: (runDir: string, meta: RunMeta) => Promise<string[]>;
-  stop: (runDir: string, meta: RunMeta | undefined) => Promise<void>;
-  afterEvidenceInit?: (dest: string, runDir: string, meta: RunMeta) => void;
-  evidenceExtra?: (
-    command: string,
-    rest: string[],
-    dest: string,
-    runDir: string,
-    meta: RunMeta,
-  ) => Promise<boolean>;
-  browser?: (args: string[]) => Promise<void>;
-  run?: (args: string[]) => Promise<void>;
+export type LaunchCtx =
+  | (LaunchBase & { surface: "web"; vitePort: number; sample: SampleProject })
+  | (LaunchBase & { surface: "cli"; daemonDir: string })
+  | (LaunchBase & {
+      surface: "desktop";
+      daemonDir: string;
+      cdpPort: number;
+      sample: SampleProject;
+    });
+
+export type ProbeOk = {
+  pids: number[];
+  lines: string[];
 };
+
+export type Surface = {
+  identity: SurfaceIdentity;
+  spawn: (ctx: LaunchCtx) => Promise<void>;
+  probe: (runDir: string, meta: RunMeta) => Promise<ProbeOk>;
+  stop: (runDir: string, meta: RunMeta | undefined) => Promise<void>;
+};
+
+export function expectLaunch<S extends SurfaceId>(
+  ctx: LaunchCtx,
+  surface: S,
+): Extract<LaunchCtx, { surface: S }> {
+  if (ctx.surface !== surface) {
+    throw new TypeError(`expected ${surface} launch ctx, got ${ctx.surface}`);
+  }
+  return ctx as Extract<LaunchCtx, { surface: S }>;
+}
 
 export function parseLaunchArgs(
   args: string[],

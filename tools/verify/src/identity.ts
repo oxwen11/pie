@@ -14,6 +14,8 @@ export type SampleSpec = {
   markerBody: string;
 };
 
+export type TakenPolicy = "pie" | "pie-and-vite" | "cdp";
+
 export type SurfaceIdentity = {
   id: SurfaceId;
   skill: string;
@@ -26,7 +28,15 @@ export type SurfaceIdentity = {
   foreignPorts: number[];
   forbiddenPiePorts: Readonly<Record<number, string>>;
   takenHint: string;
+  takenPolicy: TakenPolicy;
+  warnTaken: number[];
+  pidFiles: string[];
+  build: "core" | "server";
+  allowServe: boolean;
+  needsDisplay: boolean;
   usesDaemonDir: boolean;
+  vitePort?: number;
+  cdpDefault?: number;
   sample?: SampleSpec;
   browserSession?: string;
 };
@@ -54,7 +64,14 @@ export const WEB: SurfaceIdentity = {
   forbiddenPiePorts: { 4000: WEB_4000 },
   takenHint:
     "Vite is pinned to 4190 (strict). Two web instances cannot share it.\n  Do not drive a foreign pie / Vite — refuse rather than hijack.",
+  takenPolicy: "pie-and-vite",
+  warnTaken: [],
+  pidFiles: ["pids/server.pid", "pids/vite.pid"],
+  build: "core",
+  allowServe: false,
+  needsDisplay: false,
   usesDaemonDir: false,
+  vitePort: VITE_PORT,
   sample: {
     name: "verify-pie-sample",
     marker: ".verify-pie-scaffold",
@@ -83,6 +100,12 @@ export const CLI: SurfaceIdentity = {
     4190: `refuse PIE_PORT=4190 — ${WEB_PORTS}`,
   },
   takenHint: "Do not attach to a foreign daemon — refuse rather than hijack.",
+  takenPolicy: "pie",
+  warnTaken: [],
+  pidFiles: ["pids/serve.pid"],
+  build: "core",
+  allowServe: true,
+  needsDisplay: false,
   usesDaemonDir: true,
 };
 
@@ -104,7 +127,14 @@ export const DESKTOP: SurfaceIdentity = {
     4182: `refuse using 4182 — ${CLI_PORT}`,
   },
   takenHint: "Do not attach to a foreign desktop / daemon — refuse rather than hijack.",
+  takenPolicy: "cdp",
+  warnTaken: [4000],
+  pidFiles: ["pids/electron-vite.pid"],
+  build: "server",
+  allowServe: false,
+  needsDisplay: true,
   usesDaemonDir: true,
+  cdpDefault: DEFAULT_CDP_PORT,
   sample: {
     name: "verify-pie-desktop-sample",
     marker: ".verify-pie-desktop-scaffold",

@@ -18,6 +18,21 @@ describe("identity roots", () => {
     expect(identityFor("cli")).toBe(CLI);
     expect(identityFor("desktop")).toBe(DESKTOP);
   });
+
+  it("pins build, taken policy, and pid files per surface", () => {
+    expect(WEB.build).toBe("core");
+    expect(WEB.takenPolicy).toBe("pie-and-vite");
+    expect(WEB.pidFiles).toEqual(["pids/server.pid", "pids/vite.pid"]);
+    expect(WEB.allowServe).toBe(false);
+    expect(CLI.build).toBe("core");
+    expect(CLI.takenPolicy).toBe("pie");
+    expect(CLI.pidFiles).toEqual(["pids/serve.pid"]);
+    expect(CLI.allowServe).toBe(true);
+    expect(DESKTOP.build).toBe("server");
+    expect(DESKTOP.takenPolicy).toBe("cdp");
+    expect(DESKTOP.pidFiles).toEqual(["pids/electron-vite.pid"]);
+    expect(DESKTOP.needsDisplay).toBe(true);
+  });
 });
 
 describe("assertPiePortAllowed", () => {

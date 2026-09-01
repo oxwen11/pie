@@ -2,16 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { isHelpFlag } from "../argv.ts";
-import { WEB, VITE_PORT } from "../identity.ts";
-import type { RunMeta, WebRunMeta } from "../meta.ts";
-import { agentBrowser, browserNeedsIsolation, forwardAgentBrowser } from "../runtime/browser.ts";
-import { ensureCoreBuilt } from "../runtime/daemon.ts";
+import { VITE_PORT, WEB } from "../identity.ts";
+import { expectMeta, type RunMeta, type WebRunMeta } from "../meta.ts";
+import {
+  agentBrowser,
+  browserNeedsIsolation,
+  forwardAgentBrowser,
+  saveScreenshot,
+  saveSnapshot,
+} from "../runtime/browser.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
 import { fail } from "../runtime/fail.ts";
-import { currentRun, isoNow, readText } from "../runtime/fs.ts";
+import { currentRun, readText } from "../runtime/fs.ts";
 import { healthOk, ticketStatusOnPort, warmupOrigin } from "../runtime/http.ts";
 import {
-  envPort,
   killTree,
   listenPids,
   pidAlive,
@@ -22,126 +26,63 @@ import {
   waitUntil,
   writePidFile,
 } from "../runtime/process.ts";
-import { parseLaunchArgs, type LaunchCtx, type SurfaceDefinition } from "../surface.ts";
+import { expectLaunch, type LaunchCtx, type ProbeOk, type Surface } from "../surface.ts";
 
-const usageText = `Usage:
-  pie-verify web launch [--replace]
-  pie-verify web doctor
-  pie-verify web browser open|snapshot|<agent-browser argv…>
-  pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
-  pie-verify web cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-
-function asWeb(meta: RunMeta, where: string): WebRunMeta {
-  if (meta.surface !== "web") {
-    fail(`pie-verify web ${where}: FAIL — expected web meta`);
-  }
-  return meta;
+function sessionName(): string {
+  return WEB.browserSession ?? "pie-verify-web";
 }
 
-export const webSurface: SurfaceDefinition = {
+export const webSurface: Surface = {
   identity: WEB,
-  usage: usageText,
-  evidenceUsage: `Usage:
-  pie-verify web evidence path
-  pie-verify web evidence init
-  pie-verify web evidence screenshot <name>
-  pie-verify web evidence snapshot <name>
-  pie-verify web evidence url
-  pie-verify web evidence side-effects
-  pie-verify web evidence note <text>`,
-  parseLaunch: (args) => parseLaunchArgs(args, { usage: `${WEB.bin} launch [--replace]` }),
-  ensureBuilt: (repo) => {
-    ensureCoreBuilt(repo);
-  },
-  portPlan: () => {
-    const piePort = envPort("PIE_PORT", WEB.defaultPiePort);
-    return { piePort, vitePort: VITE_PORT, refuseTaken: [piePort, VITE_PORT], warnTaken: [] };
-  },
-  isHealthy: async (runDir, meta) => {
-    const web = asWeb(meta, "launch");
-    const serverPid = readPidFile(path.join(runDir, "pids/server.pid"));
-    const vitePid = readPidFile(path.join(runDir, "pids/vite.pid"));
-    return (
-      pidAlive(serverPid) &&
-      pidAlive(vitePid) &&
-      (await healthOk(web.piePort)) &&
-      (await healthOk(web.vitePort))
-    );
-  },
-  livePids: (runDir) =>
-    [
-      readPidFile(path.join(runDir, "pids/server.pid")),
-      readPidFile(path.join(runDir, "pids/vite.pid")),
-    ].filter((pid): pid is number => pid !== undefined),
-  initialMeta: (ctx) => ({
-    surface: "web",
-    runId: ctx.runId,
-    repo: ctx.repo,
-    pieHome: ctx.pieHome,
-    piePort: ctx.piePort,
-    vitePort: ctx.vitePort ?? VITE_PORT,
-    appUrl: `http://localhost:${ctx.vitePort ?? VITE_PORT}/`,
-    sampleProject: ctx.sample?.path ?? "",
-    createdSample: ctx.sample?.created ?? false,
-    startedAt: isoNow(),
-  }),
   spawn: startWeb,
-  inspect: inspectWeb,
+  probe: inspectWeb,
   stop: stopWeb,
-  evidenceExtra: evidenceWeb,
-  browser: browserWeb,
 };
 
 async function startWeb(ctx: LaunchCtx): Promise<void> {
-  const vitePort = ctx.vitePort ?? VITE_PORT;
-  const server = spawnLogged("pnpm", ["dev"], path.join(ctx.runDir, "logs/server.log"), {
-    cwd: path.join(ctx.repo, "packages/pie"),
-    env: ctx.env,
+  const web = expectLaunch(ctx, "web");
+  const server = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/server.log"), {
+    cwd: path.join(web.repo, "packages/pie"),
+    env: web.env,
   });
   if (server.pid === undefined) {
     throw new Error("failed to spawn pie serve");
   }
-  writePidFile(path.join(ctx.runDir, "pids/server.pid"), server.pid);
+  writePidFile(path.join(web.runDir, "pids/server.pid"), server.pid);
+  await waitUntil(`pie serve on ${web.piePort}`, () => healthOk(web.piePort), 60);
 
-  await waitUntil(`pie serve on ${ctx.piePort}`, () => healthOk(ctx.piePort), 60);
-
-  const serverLog = path.join(ctx.runDir, "logs/server.log");
+  const serverLog = path.join(web.runDir, "logs/server.log");
   if (fs.existsSync(serverLog) && !readText(serverLog).includes("pie:ready ")) {
     console.error(
       `${WEB.logPrefix}: /api/health is ok but the ready line never appeared — continuing`,
     );
   }
 
-  const vite = spawnLogged("pnpm", ["dev"], path.join(ctx.runDir, "logs/vite.log"), {
-    cwd: path.join(ctx.repo, "apps/app"),
-    env: { ...process.env, PIE_PORT: String(ctx.piePort) },
+  const vite = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/vite.log"), {
+    cwd: path.join(web.repo, "apps/app"),
+    env: { ...process.env, PIE_PORT: String(web.piePort) },
   });
   if (vite.pid === undefined) {
     throw new Error("failed to spawn vite");
   }
-  writePidFile(path.join(ctx.runDir, "pids/vite.pid"), vite.pid);
-  await waitUntil(`vite proxy on ${vitePort}`, () => healthOk(vitePort), 90);
-  await warmupOrigin(vitePort);
+  writePidFile(path.join(web.runDir, "pids/vite.pid"), vite.pid);
+  await waitUntil(`vite proxy on ${web.vitePort}`, () => healthOk(web.vitePort), 90);
+  await warmupOrigin(web.vitePort);
 
-  console.log(`${WEB.logPrefix}: launched ${ctx.runId}`);
+  console.log(`${WEB.logPrefix}: launched ${web.runId}`);
   console.log(
-    `  app     http://localhost:${vitePort}/   (Vite binds [::1]; do not use 127.0.0.1:${vitePort})`,
+    `  app     http://localhost:${web.vitePort}/   (Vite binds [::1]; do not use 127.0.0.1:${web.vitePort})`,
   );
-  console.log(`  api     http://127.0.0.1:${ctx.piePort}/api/health`);
-  console.log(`  home    ${ctx.pieHome}`);
-  if (ctx.sample !== undefined) {
-    console.log(`  sample  ${ctx.sample.path}`);
-  }
-  console.log(`  logs    ${path.join(ctx.runDir, "logs")}`);
+  console.log(`  api     http://127.0.0.1:${web.piePort}/api/health`);
+  console.log(`  home    ${web.pieHome}`);
+  console.log(`  sample  ${web.sample.path}`);
+  console.log(`  logs    ${path.join(web.runDir, "logs")}`);
   console.log(`  doctor  ${WEB.bin} doctor`);
   console.log(`  browser ${WEB.bin} browser open`);
 }
 
-async function inspectWeb(runDir: string, meta: RunMeta): Promise<string[]> {
-  const web = asWeb(meta, "doctor");
+async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
+  const web = expectMeta(meta, "web");
   const serverPid = readPidFile(path.join(runDir, "pids/server.pid"));
   const vitePid = readPidFile(path.join(runDir, "pids/vite.pid"));
   if (!pidAlive(serverPid)) {
@@ -179,16 +120,19 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<string[]> {
     major < 24
       ? `\n${WEB.logPrefix} doctor: WARN — current shell Node is v${process.versions.node}; pie serve wants >= 24.`
       : "";
-  return [
-    `  app     ${web.appUrl}`,
-    `  api     http://127.0.0.1:${web.piePort}/api/health`,
-    `  home    ${web.pieHome}`,
-    `  server  pid ${serverPid}`,
-    `  vite    pid ${vitePid}`,
-    `  node    v${process.versions.node}`,
-    "  ticket  /api/ws-ticket 200",
-    warn,
-  ];
+  return {
+    pids: [serverPid, vitePid],
+    lines: [
+      `  app     ${web.appUrl}`,
+      `  api     http://127.0.0.1:${web.piePort}/api/health`,
+      `  home    ${web.pieHome}`,
+      `  server  pid ${serverPid}`,
+      `  vite    pid ${vitePid}`,
+      `  node    v${process.versions.node}`,
+      "  ticket  /api/ws-ticket 200",
+      warn,
+    ],
+  };
 }
 
 async function stopWeb(runDir: string): Promise<void> {
@@ -203,28 +147,20 @@ async function stopWeb(runDir: string): Promise<void> {
   await waitDead(serverPid);
 }
 
-async function evidenceWeb(
+export async function extraEvidence(
   command: string,
   rest: string[],
   dest: string,
-  runDir: string,
-  meta: RunMeta,
+  typed: WebRunMeta,
 ): Promise<boolean> {
-  void runDir;
-  const session = WEB.browserSession ?? "pie-verify-web";
+  const session = sessionName();
   switch (command) {
-    case "screenshot": {
-      const destPath = path.join(dest, `${rest[0] ?? "screen"}.png`);
-      agentBrowser(["screenshot", destPath], { session });
-      console.log(destPath);
+    case "screenshot":
+      console.log(saveScreenshot(dest, rest[0] ?? "screen", { session }));
       return true;
-    }
-    case "snapshot": {
-      const destPath = path.join(dest, `${rest[0] ?? "snapshot"}.txt`);
-      agentBrowser(["snapshot"], { session, outputPath: destPath });
-      console.log(destPath);
+    case "snapshot":
+      console.log(saveSnapshot(dest, rest[0] ?? "snapshot", { session }));
       return true;
-    }
     case "url": {
       const text = agentBrowser(["get", "url"], {
         session,
@@ -235,7 +171,7 @@ async function evidenceWeb(
     }
     case "side-effects": {
       const side = path.join(dest, "side-effects");
-      copySideEffects(asWeb(meta, "evidence").pieHome, side, true);
+      copySideEffects(typed.pieHome, side, true);
       console.log(side);
       return true;
     }
@@ -244,9 +180,9 @@ async function evidenceWeb(
   }
 }
 
-async function browserWeb(args: string[]): Promise<void> {
-  const session = WEB.browserSession ?? "pie-verify-web";
-  const usage = `Usage:
+export async function browserWeb(args: string[]): Promise<void> {
+  const session = sessionName();
+  const usageText = `Usage:
   ${WEB.bin} browser open [url]
   ${WEB.bin} browser snapshot
   ${WEB.bin} browser install|skills|--version
@@ -256,7 +192,7 @@ Uses the agent-browser dependency of @getpie/verify with --session ${session}.
 \`open\` with no URL uses http://localhost:${VITE_PORT}/.
 `;
   if (isHelpFlag(args[0])) {
-    process.stdout.write(usage);
+    process.stdout.write(usageText);
     return;
   }
   if (browserNeedsIsolation(args[0]) && currentRun(WEB.currentLink) === undefined) {

@@ -6,6 +6,7 @@ export {
   redactDaemonRecord,
   resolveCompatKey,
   spawnPie,
+  stopRecordedDaemon,
 } from "./daemon.ts";
 export type { DaemonRecord } from "./daemon.ts";
 export {
@@ -14,6 +15,8 @@ export {
   buildAgentBrowserArgv,
   forwardAgentBrowser,
   resolveAgentBrowserBin,
+  saveScreenshot,
+  saveSnapshot,
 } from "./browser.ts";
 export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
 export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";

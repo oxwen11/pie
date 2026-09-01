@@ -1,4 +1,6 @@
-import { readJson, writeJson } from "./runtime/fs.ts";
+import { userDataDir, type SurfaceId } from "./identity.ts";
+import { isoNow, readJson, writeJson } from "./runtime/fs.ts";
+import type { LaunchCtx } from "./surface.ts";
 
 type RunMetaBase = {
   runId: string;
@@ -64,14 +66,68 @@ export function tryReadRunMeta(filePath: string): RunMeta | undefined {
   }
 }
 
-export function patchRunMeta(filePath: string, patch: Partial<RunMeta>): RunMeta {
-  const current = readRunMeta(filePath);
-  if (patch.surface !== undefined && patch.surface !== current.surface) {
-    throw new TypeError(`cannot change surface in ${filePath}`);
+export function expectMeta<S extends SurfaceId>(
+  meta: RunMeta,
+  surface: S,
+): Extract<RunMeta, { surface: S }> {
+  if (meta.surface !== surface) {
+    throw new TypeError(`expected ${surface} meta, got ${meta.surface}`);
   }
-  const next = { ...current, ...patch } as RunMeta;
+  return meta as Extract<RunMeta, { surface: S }>;
+}
+
+export function patchRunMeta<S extends SurfaceId>(
+  filePath: string,
+  surface: S,
+  patch: Partial<Omit<Extract<RunMeta, { surface: S }>, "surface">>,
+): Extract<RunMeta, { surface: S }> {
+  const current = expectMeta(readRunMeta(filePath), surface);
+  const next = { ...current, ...patch };
   writeRunMeta(filePath, next);
   return next;
+}
+
+export function initialMeta(ctx: LaunchCtx): RunMeta {
+  const base = {
+    runId: ctx.runId,
+    repo: ctx.repo,
+    pieHome: ctx.pieHome,
+    piePort: ctx.piePort,
+    startedAt: isoNow(),
+  };
+  switch (ctx.surface) {
+    case "web":
+      return {
+        ...base,
+        surface: "web",
+        vitePort: ctx.vitePort,
+        appUrl: `http://localhost:${ctx.vitePort}/`,
+        sampleProject: ctx.sample.path,
+        createdSample: ctx.sample.created,
+      };
+    case "cli":
+      return {
+        ...base,
+        surface: "cli",
+        mode: ctx.request.mode ?? "daemon",
+        daemonDir: ctx.daemonDir,
+      };
+    case "desktop":
+      return {
+        ...base,
+        surface: "desktop",
+        daemonDir: ctx.daemonDir,
+        cdpPort: ctx.cdpPort,
+        userData: userDataDir(ctx.cdpPort),
+        sampleProject: ctx.sample.path,
+        createdSample: ctx.sample.created,
+      };
+    default: {
+      const exhaustive: never = ctx;
+      void exhaustive;
+      throw new Error("unhandled launch ctx");
+    }
+  }
 }
 
 function parseWeb(data: Record<string, unknown>, file: string): WebRunMeta {

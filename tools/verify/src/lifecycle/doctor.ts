@@ -5,13 +5,13 @@ import { readRunMeta } from "../meta.ts";
 import { fail } from "../runtime/fail.ts";
 import { currentRun } from "../runtime/fs.ts";
 import { isSharedPieHome, listenPids } from "../runtime/process.ts";
-import type { SurfaceDefinition } from "../surface.ts";
+import type { Surface } from "../surface.ts";
 
-export async function doctor(surface: SurfaceDefinition): Promise<void> {
+export async function doctor(surface: Surface): Promise<void> {
   process.stdout.write(await doctorReport(surface));
 }
 
-export async function doctorReport(surface: SurfaceDefinition): Promise<string> {
+export async function doctorReport(surface: Surface): Promise<string> {
   const { identity } = surface;
   const runDir = currentRun(identity.currentLink);
   if (runDir === undefined) {
@@ -52,6 +52,8 @@ export async function doctorReport(surface: SurfaceDefinition): Promise<string> 
     );
   }
 
-  const extra = await surface.inspect(runDir, meta);
-  return [`${identity.logPrefix} doctor: OK`, `  run     ${meta.runId}`, ...extra, ""].join("\n");
+  const probe = await surface.probe(runDir, meta);
+  return [`${identity.logPrefix} doctor: OK`, `  run     ${meta.runId}`, ...probe.lines, ""].join(
+    "\n",
+  );
 }

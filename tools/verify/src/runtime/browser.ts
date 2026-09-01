@@ -93,6 +93,18 @@ export function agentBrowser(args: string[], options: AgentBrowserOptions = {}):
   return result.stdout;
 }
 
+export function saveScreenshot(dest: string, name: string, target: AgentBrowserTarget): string {
+  const destPath = path.join(dest, `${name}.png`);
+  agentBrowser(["screenshot", destPath], target);
+  return destPath;
+}
+
+export function saveSnapshot(dest: string, name: string, target: AgentBrowserTarget): string {
+  const destPath = path.join(dest, `${name}.txt`);
+  agentBrowser(["snapshot"], { ...target, outputPath: destPath });
+  return destPath;
+}
+
 export function forwardAgentBrowser(args: string[], target: AgentBrowserTarget): void {
   const resolved = resolveAgentBrowserBin();
   const argv = buildAgentBrowserArgv(args, target);
