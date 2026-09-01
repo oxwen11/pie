@@ -7,13 +7,8 @@ import { Group } from "react-resizable-panels";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResizablePanel } from "./resizable-panel";
-import {
-  notifyUserLayoutListeners,
-  resolveSidebarUserLayout,
-  ShellContentPanel,
-  ShellGroup,
-  ShellSidebarPanel,
-} from "./shell-panels";
+import { ShellContentPanel, ShellGroup, ShellSidebarPanel } from "./shell-panels";
+import { notifyUserLayoutListeners, resolveSidebarUserLayout } from "./shell-user-layout";
 
 Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
