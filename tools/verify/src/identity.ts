@@ -32,15 +32,20 @@ type IdentityBase = {
   needsDisplay: boolean;
 };
 
-export type SurfaceIdentity =
-  | (IdentityBase & { id: "web"; vitePort: number; sample: SampleSpec; browserSession: string })
-  | (IdentityBase & { id: "cli" })
-  | (IdentityBase & {
-      id: "desktop";
-      cdpDefault: number;
-      sample: SampleSpec;
-      browserSession: string;
-    });
+export type WebIdentity = IdentityBase & {
+  id: "web";
+  vitePort: number;
+  sample: SampleSpec;
+  browserSession: string;
+};
+export type CliIdentity = IdentityBase & { id: "cli" };
+export type DesktopIdentity = IdentityBase & {
+  id: "desktop";
+  cdpDefault: number;
+  sample: SampleSpec;
+  browserSession: string;
+};
+export type SurfaceIdentity = WebIdentity | CliIdentity | DesktopIdentity;
 
 const WEB_4000 = "refuse PIE_PORT=4000 — that is the desktop daemon port (auth-token gated).";
 const CLI_4000 = "refuse PIE_PORT=4000 — that is the user/desktop daemon port.";
@@ -51,7 +56,7 @@ const webRoot = process.env.VERIFY_PIE_ROOT ?? "/tmp/pie-verify-web";
 const cliRoot = process.env.VERIFY_PIE_CLI_ROOT ?? "/tmp/pie-verify-cli";
 const desktopRoot = process.env.VERIFY_PIE_DESKTOP_ROOT ?? "/tmp/pie-verify-desktop";
 
-export const WEB: SurfaceIdentity = {
+export const WEB: WebIdentity = {
   id: "web",
   skill: "verify-pie",
   skillDir:
@@ -81,7 +86,7 @@ export const WEB: SurfaceIdentity = {
   browserSession: process.env.VERIFY_PIE_BROWSER_SESSION ?? "pie-verify-web",
 };
 
-export const CLI: SurfaceIdentity = {
+export const CLI: CliIdentity = {
   id: "cli",
   skill: "verify-pie-cli",
   skillDir:
@@ -106,7 +111,7 @@ export const CLI: SurfaceIdentity = {
   needsDisplay: false,
 };
 
-export const DESKTOP: SurfaceIdentity = {
+export const DESKTOP: DesktopIdentity = {
   id: "desktop",
   skill: "verify-pie-desktop",
   skillDir:

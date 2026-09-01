@@ -43,7 +43,7 @@ export async function dispatchCommands(surface: Surface, argv: string[]): Promis
           await browserDesktop(rest);
           return;
         default: {
-          const exhaustive: never = surface.identity.id;
+          const exhaustive: never = surface.identity;
           void exhaustive;
           throw new VerifyError("unknown surface", 2);
         }
