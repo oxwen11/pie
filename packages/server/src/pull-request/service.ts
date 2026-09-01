@@ -28,6 +28,7 @@ export class PullRequestService extends Context.Service<
   {
     readonly current: (
       cwd: string,
+      pullRequest?: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly runAction: (
       cwd: string,
@@ -47,7 +48,7 @@ export const PullRequestServiceLayer: Layer.Layer<
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const cli = makeGitHubCliAdapter(spawner);
 
-    const current = (cwd: string) => cli.current(cwd);
+    const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
 
     const runAction = (
       cwd: string,
