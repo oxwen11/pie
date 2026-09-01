@@ -2,6 +2,9 @@ import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { describe, expect, it } from "vitest";
 
 import {
+  actionConfirmationTitle,
+  checksSummaryLabel,
+  mergeMethodActionLabel,
   pullRequestActionInput,
   pullRequestHeaderStatus,
   pullRequestSessionState,
@@ -58,6 +61,15 @@ describe("pull request presentation", () => {
       expected: { pullRequest: snapshot.ref, headSha: "head-a" },
       action: { type: "merge", method: "squash" },
     });
+  });
+
+  it("labels checks, merge methods, and confirmation titles", () => {
+    expect(checksSummaryLabel("passing")).toBe("Checks passing");
+    expect(mergeMethodActionLabel("squash")).toBe("Squash and merge");
+    expect(actionConfirmationTitle({ type: "disable-auto-merge" })).toBe("Disable auto-merge");
+    expect(actionConfirmationTitle({ type: "enable-auto-merge", method: "rebase" })).toBe(
+      "Enable auto-merge · Rebase",
+    );
   });
 
   it("does not require a head commit to disable auto-merge", () => {

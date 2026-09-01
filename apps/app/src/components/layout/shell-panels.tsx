@@ -22,7 +22,6 @@ import {
 } from "react";
 import {
   Group,
-  type LayoutChangedMeta,
   type OnPanelResize,
   type PanelImperativeHandle,
   Separator,
@@ -32,6 +31,11 @@ import {
 } from "react-resizable-panels";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
+import {
+  notifyUserLayoutListeners,
+  resolveSidebarUserLayout,
+  type UserLayoutListener,
+} from "@/components/layout/shell-user-layout";
 
 /** Resizable sidebar | chat | content-panel columns. */
 
@@ -45,32 +49,7 @@ const PANEL_IDS = {
   sidebar: "sidebar",
 } as const;
 
-type UserLayoutListener = () => void;
 type SubscribeToUserLayout = (listener: UserLayoutListener) => () => void;
-
-export function notifyUserLayoutListeners(
-  meta: LayoutChangedMeta,
-  listeners: ReadonlySet<UserLayoutListener>,
-): void {
-  if (!meta.isUserInteraction) return;
-  for (const listener of listeners) listener();
-}
-
-export interface SidebarUserLayout {
-  expandedWidth?: number;
-  open?: boolean;
-}
-
-export function resolveSidebarUserLayout(
-  open: boolean,
-  collapsed: boolean,
-  width: number | undefined,
-): SidebarUserLayout {
-  const layout: SidebarUserLayout = {};
-  if (collapsed === open) layout.open = !collapsed;
-  if (!collapsed && width !== undefined && width > 0) layout.expandedWidth = width;
-  return layout;
-}
 
 const ShellLayoutContext = createContext<SubscribeToUserLayout | null>(null);
 
