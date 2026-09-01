@@ -5,7 +5,7 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 ## Sub-features
 
 - **Empty-state import** — no projects yet. `/draft` is a centered empty: heading **Import your first project**, button **Import project**.
-- **Sidebar import** — at least one project exists. **Import project** is the plus-folder action on the **Projects** group (`<span class="sr-only">Import project</span>`).
+- **Sidebar import** — the plus-folder action on the **Projects** group (`<span class="sr-only">Import project</span>`). It is present even when the home is empty, not only after the first project exists.
 - **Folder browser** — command dialog starts at `os.homedir()`. Click a row to drill in (`..` goes up). Hidden/dot folders stay hidden unless the query starts with `.`. `node_modules` is never listed.
 - **Import this folder** — creates (or returns the existing) Project for the path shown in the footer, then closes. Empty-state import also navigates to `/draft?projectId=<id>`.
 
@@ -43,7 +43,7 @@ Proof (all of these):
 - Sidebar **Projects** lists **verify-pie-sample**.
 - `$PIE_HOME/storage/projects.json` `data[]` has `name: "verify-pie-sample"` and `path` equal to that folder. Use `verify-pie evidence side-effects`.
 
-Sidebar path (after one project exists): same dialog, opened from the Projects group action named **Import project**. Importing the same folder again must not duplicate the row (server dedupes on path).
+Sidebar path: same dialog, opened from the Projects group action named **Import project** (available on the empty home too). Sidebar import **closes the dialog and refreshes the list**; it does not write `?projectId=` (only the empty-state `onImported` path navigates). Importing the same folder again must not duplicate the row (server dedupes on path).
 
 ## Gotchas
 

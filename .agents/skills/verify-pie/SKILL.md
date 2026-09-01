@@ -26,6 +26,8 @@ curl -fsS http://127.0.0.1:4180/api/health    # pie serve (IPv4)
 curl -fsS http://localhost:4190/api/health    # Vite proxy (listens on [::1]:4190)
 ```
 
+Helpers wait with `node:http` and try `127.0.0.1` / `localhost` / `[::1]`. Do not use global `fetch` for 4190 — some agent runtimes reject that port (`bad port`) even when Vite is healthy. IPv4 `127.0.0.1:4190` connection-refuses here.
+
 Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http://127.0.0.1:4180`. Launch writes that log to `/tmp/verify-pie/runs/<id>/logs/server.log`.
 
 **Open `http://localhost:4190/`, never 4180, and never `http://127.0.0.1:4190/`.** Vite binds `[::1]:4190` here — IPv4 4190 connection-refuses. 4180 serves `/api/*`, `/ws/rpc`, and a *built* bundle: it 503s when nothing is built or quietly shows a stale UI. `/` redirects to `/draft`.
@@ -76,7 +78,7 @@ agent-browser install
 agent-browser skills get core
 ```
 
-`agent-browser` 0.15.x needed a separate `playwright-core` chromium-headless-shell download. Current 0.35.x ships `agent-browser install`. Google Chrome at `/usr/local/bin/google-chrome` also works if the bundled browser is missing.
+Current `agent-browser` 0.35.x: `npm i -g --prefix "$HOME/.local" agent-browser` then `agent-browser install`. Google Chrome at `/usr/local/bin/google-chrome` also works if the bundled browser is missing.
 
 Recipe for every drive:
 

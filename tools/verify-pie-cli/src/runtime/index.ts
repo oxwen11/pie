@@ -38,7 +38,17 @@ export {
   writeJson,
   writeText,
 } from "./fs.ts";
-export { cdpOk, cdpVersion, fetchText, healthOk, ticketStatus, urlPort } from "./http.ts";
+export {
+  cdpOk,
+  cdpVersion,
+  fetchText,
+  healthOk,
+  healthUrls,
+  loopbackOrigins,
+  ticketStatus,
+  ticketStatusOnPort,
+  urlPort,
+} from "./http.ts";
 export type { FetchResult } from "./http.ts";
 export {
   assertNode24,

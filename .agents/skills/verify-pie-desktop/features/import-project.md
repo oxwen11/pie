@@ -1,6 +1,6 @@
 # Import project (desktop)
 
-Same SPA flow as `.cursor/skills/verify-pie/features/import-project.md`. Drive the **Electron renderer**, not `http://localhost:4190/`.
+Same SPA flow as `.cursor/skills/verify-pie/features/import-project.md`. Drive the **Electron renderer** via CDP. Do not `open http://localhost:4190/` and do not `open http://localhost:5173/` (electron-vite's renderer URL after connect) and call that desktop.
 
 ## How to get to it
 

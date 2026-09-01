@@ -5,7 +5,7 @@ After the first connect, the host owns reconnect / failed. The overlay is `apps/
 ## Copy
 
 - Reconnect: **Reconnecting…** / **The local server restarted. Reconnecting to it now.**
-- Failed: **The local server stopped** / **Retry** / **Quit** (`platform.quit` when present).
+- Failed: title **The local server stopped**; subtitle **Pie couldn't keep its server running. Retry, or quit and reopen the app.**; buttons **Quit** and **Retry** (`platform.quit` is always wired on desktop).
 
 ## How to get to it
 
@@ -16,8 +16,8 @@ Desktop supervision may respawn unless a `daemon.stopped` tombstone is present (
 ## Driving it
 
 1. Connect (splash gone).
-2. Stop the daemon with the run's env (`packages/pie` `tsx … daemon stop` and the run `PIE_HOME`).
-3. Overlay shows **The local server stopped** and **Retry**.
-4. **Retry** after a fresh start of the same isolated daemon (clear tombstone by starting again) should reconnect.
+2. Stop the daemon with the run's env (`packages/pie` `tsx … daemon stop` and the run `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_DAEMON_COMPATIBILITY_KEY`).
+3. Overlay first shows **Reconnecting…** for several seconds, then **The local server stopped**, the failed subtitle, **Quit**, and **Retry**.
+4. Start the same isolated daemon again (export `PIE_PORT` to the recorded port — bare `daemon start` in `NODE_ENV=development` may pick an ephemeral port). Click **Retry**; overlay hides.
 
 e2e already covers kill/respawn. Prefer that for "does overlay exist"; use a real window when you change the copy or Retry/Quit wiring.

@@ -10,6 +10,8 @@ The cold-start recipe and feature map live in
 `.agents/skills/verify-pie-cli` (`.cursor/skills/verify-pie-cli` is a
 symlink). Shared process/HTTP/JSON helpers are
 `@getpie/verify-pie-cli/runtime` (used by the web and desktop verify skills).
+Loopback health/ticket use `node:http` and try `[::1]` so Vite's IPv6-only
+4190 is reachable when global `fetch` is intercepted or `localhost` is IPv4.
 
 **Not Bun.** Pie, the daemon, `tsx`, and Electron's Node side are Node 24.
 

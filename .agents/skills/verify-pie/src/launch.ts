@@ -33,7 +33,7 @@ export async function launch(args: string[]): Promise<void> {
     const vitePid = readPidFile(join(existing, "pids/vite.pid"));
     if (pidAlive(serverPid) && pidAlive(vitePid) && (await healthOk(piePort)) && (await healthOk(VITE_PORT))) {
       console.log(`verify-pie: already running at ${existing}`);
-      console.log(`  app     http://127.0.0.1:${VITE_PORT}/`);
+      console.log(`  app     http://localhost:${VITE_PORT}/`);
       console.log(`  api     http://127.0.0.1:${piePort}/api/health`);
       console.log(`  home    ${readJsonField<string>(join(existing, "meta.json"), "pieHome")}`);
       return;

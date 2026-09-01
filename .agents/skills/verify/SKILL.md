@@ -67,16 +67,16 @@ Gotchas:
 
 ## Browser automation (agent-browser)
 
-`agent-browser` (bun-global, 0.15.x) drives Chromium via CDP with
-accessibility-tree snapshots: `agent-browser open <url>` / `snapshot` /
-`click @eN` / `keyboard type <text>` / `get url`.
+Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
+recipe is the two-process pair only.
 
-- It needs playwright's **chromium-headless-shell build 1208** (bundles
-  playwright-core ^1.57.0). `agent-browser install` fails
-  (`playwright: command not found`) — install with
-  `node ~/.bun/install/global/node_modules/playwright-core/cli.js install chromium-headless-shell`.
-  The download is slow (~200MB); as a stopgap a symlink
-  `chromium_headless_shell-1208 -> -1228` under `~/Library/Caches/ms-playwright/`
-  launches fine.
-- CDP-synthesized Enter/`\n` does NOT trigger the composer's submit path — click
-  the send button element instead. Shift+Enter probing works (content stays put).
+Current `agent-browser` (0.35.x, not bun-global 0.15.x):
+
+```bash
+npm i -g --prefix "$HOME/.local" agent-browser
+export PATH="$HOME/.local/bin:$PATH"
+agent-browser install
+agent-browser skills get core
+```
+
+CDP-synthesized Enter does **not** submit TipTap — click the send button.

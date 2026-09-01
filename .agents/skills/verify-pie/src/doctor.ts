@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fail } from "../../verify-runtime/src/fail.ts";
 import { currentRun, readJsonField } from "../../verify-runtime/src/fs.ts";
-import { healthOk, ticketStatus } from "../../verify-runtime/src/http.ts";
+import { healthOk, ticketStatusOnPort } from "../../verify-runtime/src/http.ts";
 import { isSharedPieHome, listenPids, pidAlive, portOwnedByAncestor, readPidFile } from "../../verify-runtime/src/process.ts";
 import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, VITE_PORT } from "./config.ts";
 
@@ -65,7 +65,7 @@ export async function doctorReport(): Promise<string> {
     fail(`verify-pie doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`);
   }
 
-  const ticket = (await ticketStatus(`http://localhost:${vitePort}`)) ?? (await ticketStatus(`http://127.0.0.1:${vitePort}`));
+  const ticket = await ticketStatusOnPort(vitePort);
   if (ticket !== 200) {
     fail(`verify-pie doctor: FAIL — /api/ws-ticket returned ${ticket} (401 means you hit the daemon on 4000, not this serve)`);
   }

@@ -6,7 +6,7 @@ The left **Projects** list is how a user finds chats. Each imported project is a
 
 - **New chat** — top of the sidebar; navigates to `/draft` (no project hint).
 - **Projects group** — label **Projects**, collapse chevron, **Import project** action.
-- **Per-project group** — folder name (`title` = full path), **New chat in \<name\>** pen, session rows.
+- **Per-project group** — visible label is `project.name` (folder basename); HTML `title` tooltip is the full path. **New chat in \<name\>** pen, session rows.
 - **Open session** — row label is `session.title ?? "New chat"`. Status dots: **A turn is running in this session**, **Waiting for your action**, **Session crashed**.
 - **Actions menu** — **Actions for \<title\>** (ellipsis, show-on-hover). **Rename** and **Archive** / **Restore**. Archive of the open session returns to `/draft?projectId=`.
 - **Rename dialog** — field placeholder **New chat**; saves a trimmed non-empty title (card heading and row update from `session.renamed`).

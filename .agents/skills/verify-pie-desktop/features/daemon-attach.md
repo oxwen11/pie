@@ -13,7 +13,9 @@ export PIE_DAEMON_DIR="$PIE_HOME/daemon"
 cd packages/pie && pnpm exec tsx src/node/cli.ts daemon status
 ```
 
-Or: launch desktop against a home that already has a daemon (start CLI first with `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_PORT` exported to the desktop launch). Default helpers do **not** share roots. To prove attach, export the desktop run's env into a CLI `daemon start` — expect `already running` and the same pid.
+`verify-pie-desktop launch` always allocates a **new** isolated home — it cannot attach to a CLI-prestarted daemon. The "CLI first, then desktop" path is a **manual** `electron-vite dev` with exported env, not the helper.
+
+Default helpers do **not** share roots. To prove attach, export the desktop run's env **and** `PIE_DAEMON_COMPATIBILITY_KEY` (from `daemon.pid` or `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`) into a CLI `daemon start` — tsx throws without that key. Expect `already running` and the same pid. `daemon status` does not need the key.
 
 ## Proof
 
