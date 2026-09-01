@@ -1,15 +1,10 @@
 import path from "node:path";
 
-import {
-  agentBrowser,
-  appendNote,
-  copySideEffects,
-  evidenceDir,
-  stampEvidence,
-} from "../../runtime/evidence.ts";
+import { agentBrowser } from "../../runtime/browser.ts";
+import { appendNote, copySideEffects, evidenceDir, stampEvidence } from "../../runtime/evidence.ts";
 import { usage } from "../../runtime/fail.ts";
 import { currentRun, readJsonField } from "../../runtime/fs.ts";
-import { CURRENT_LINK, SKILL_DIR } from "./config.ts";
+import { BROWSER_SESSION, CURRENT_LINK, SKILL_DIR } from "./config.ts";
 import { doctorReport } from "./doctor.ts";
 
 export async function evidence(args: string[]): Promise<void> {
@@ -32,18 +27,21 @@ export async function evidence(args: string[]): Promise<void> {
       return;
     case "screenshot": {
       const destPath = path.join(dest, `${rest[0] ?? "screen"}.png`);
-      agentBrowser(["screenshot", destPath]);
+      agentBrowser(["screenshot", destPath], { session: BROWSER_SESSION });
       console.log(destPath);
       return;
     }
     case "snapshot": {
       const destPath = path.join(dest, `${rest[0] ?? "snapshot"}.txt`);
-      agentBrowser(["snapshot"], { outputPath: destPath });
+      agentBrowser(["snapshot"], { session: BROWSER_SESSION, outputPath: destPath });
       console.log(destPath);
       return;
     }
     case "url": {
-      const text = agentBrowser(["get", "url"], { outputPath: path.join(dest, "url.txt") });
+      const text = agentBrowser(["get", "url"], {
+        session: BROWSER_SESSION,
+        outputPath: path.join(dest, "url.txt"),
+      });
       process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
       return;
     }

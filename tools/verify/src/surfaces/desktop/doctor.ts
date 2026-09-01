@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { agentBrowser } from "../../runtime/browser.ts";
 import { readDaemonRecord } from "../../runtime/daemon.ts";
-import { agentBrowser } from "../../runtime/evidence.ts";
 import { fail } from "../../runtime/fail.ts";
 import { currentRun, readJsonField } from "../../runtime/fs.ts";
 import { healthOk, ticketStatus } from "../../runtime/http.ts";
@@ -90,14 +90,14 @@ export async function doctorReport(): Promise<string> {
     "verify-pie-desktop doctor: OK",
     `  run     ${runId}`,
     `  api     ${record.address}/api/health`,
-    `  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`,
+    `  cdp     ${BIN} browser connect`,
     `  title   ${title || "(empty)"}`,
     `  url     ${url || "(empty)"}`,
     `  home    ${pieHome}`,
     `  evite   pid ${evPid}`,
     `  daemon  pid ${record.pid}`,
     "  ticket  anonymous 401 / bearer 200",
-    `  next    agent-browser --session ${BROWSER_SESSION} snapshot`,
+    `  next    ${BIN} browser snapshot`,
     "",
   ].join("\n");
 }

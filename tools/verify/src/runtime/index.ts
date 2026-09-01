@@ -10,12 +10,12 @@ export {
 export type { DaemonRecord } from "./daemon.ts";
 export {
   agentBrowser,
-  appendNote,
-  copySideEffects,
-  evidenceDir,
-  stampEvidence,
-} from "./evidence.ts";
-export type { AgentBrowserOptions } from "./evidence.ts";
+  buildAgentBrowserArgv,
+  forwardAgentBrowser,
+  requireAgentBrowser,
+} from "./browser.ts";
+export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
+export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";
 export { VerifyError, fail, usage } from "./fail.ts";
 export {
   clearCurrentRun,
@@ -63,6 +63,7 @@ export {
   portOwnedByAncestor,
   readPidFile,
   runCommand,
+  runCommandInherit,
   sleep,
   spawnLogged,
   waitDead,

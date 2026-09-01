@@ -20,10 +20,10 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 ## Driving it with agent-browser
 
 ```bash
-verify-pie doctor
-agent-browser open http://localhost:4190/
+pnpm exec pie-verify web doctor
+pnpm exec pie-verify web browser open
 # wait for empty heading or the draft composer — not the root-route flash
-agent-browser snapshot
+pnpm exec pie-verify web browser snapshot
 ```
 
 Empty home:

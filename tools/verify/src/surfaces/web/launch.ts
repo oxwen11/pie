@@ -181,6 +181,7 @@ export async function launch(args: string[]): Promise<void> {
   console.log(`  sample  ${sample.path}`);
   console.log(`  logs    ${path.join(runDir, "logs")}`);
   console.log(`  doctor  ${BIN} doctor`);
+  console.log(`  browser ${BIN} browser open`);
 }
 
 function refuseTakenPort(port: number): void {

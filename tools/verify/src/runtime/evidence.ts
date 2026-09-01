@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { copyDirContents, ensureDir, isoNow, readText, writeText } from "./fs.ts";
-import { commandOnPath, runCommand } from "./process.ts";
 
 export function evidenceDir(skillDir: string, runId: string): string {
   return path.join(skillDir, "evidence", runId);
@@ -24,36 +23,6 @@ export function appendNote(dest: string, text: string): void {
   const notePath = path.join(dest, "notes.txt");
   const previous = fs.existsSync(notePath) ? readText(notePath) : "";
   writeText(notePath, `${previous}${text}\n`);
-}
-
-export type AgentBrowserOptions = {
-  outputPath?: string;
-  session?: string;
-  cdpPort?: number;
-};
-
-export function agentBrowser(args: string[], options: AgentBrowserOptions = {}): string {
-  if (commandOnPath("agent-browser") === undefined) {
-    throw new Error(
-      "agent-browser is not on PATH — desktop drive uses `agent-browser connect`, not raw CDP curl",
-    );
-  }
-  const argv: string[] = [];
-  if (options.session !== undefined) {
-    argv.push("--session", options.session);
-  }
-  if (options.cdpPort !== undefined) {
-    argv.push("--cdp", String(options.cdpPort));
-  }
-  argv.push(...args);
-  const result = runCommand("agent-browser", argv);
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `agent-browser ${argv.join(" ")} failed`);
-  }
-  if (options.outputPath !== undefined) {
-    writeText(options.outputPath, result.stdout);
-  }
-  return result.stdout;
 }
 
 export function copySideEffects(pieHome: string, dest: string, copySessionBodies: boolean): void {

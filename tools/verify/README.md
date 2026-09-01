@@ -15,6 +15,8 @@ CLI.
 ```bash
 pnpm exec pie-verify web launch
 pnpm exec pie-verify web doctor
+pnpm exec pie-verify web browser open
+pnpm exec pie-verify web browser snapshot
 pnpm exec pie-verify web cleanup
 
 pnpm exec pie-verify cli launch
@@ -24,8 +26,11 @@ pnpm exec pie-verify cli cleanup
 
 pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor
+pnpm exec pie-verify desktop browser snapshot
 pnpm exec pie-verify desktop cleanup
 ```
+
+`web browser` / `desktop browser` forward to `agent-browser` with the isolated session (`pie-verify-web` / `pie-verify-desktop`) and, on desktop, the run's CDP port. `cli` has no page — do not add a browser there.
 
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers

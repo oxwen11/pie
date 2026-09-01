@@ -1,4 +1,5 @@
 import { VerifyError } from "../../runtime/fail.ts";
+import { browser } from "./browser.ts";
 import { cleanup } from "./cleanup.ts";
 import { doctor } from "./doctor.ts";
 import { evidence } from "./evidence.ts";
@@ -7,6 +8,7 @@ import { launch } from "./launch.ts";
 const usageText = `Usage:
   pie-verify web launch [--replace]
   pie-verify web doctor
+  pie-verify web browser open|snapshot|<agent-browser argv…>
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
   pie-verify web cleanup [run-dir]
 
@@ -28,6 +30,9 @@ export async function runWebSurface(argv: string[]): Promise<void> {
       return;
     case "doctor":
       await doctor();
+      return;
+    case "browser":
+      await browser(rest);
       return;
     case "evidence":
       await evidence(rest);

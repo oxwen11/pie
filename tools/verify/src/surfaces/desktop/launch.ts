@@ -31,7 +31,6 @@ import { ensureSampleProject } from "../../runtime/scaffold.ts";
 import { cleanup } from "./cleanup.ts";
 import {
   BIN,
-  BROWSER_SESSION,
   CURRENT_LINK,
   DEFAULT_CDP_PORT,
   DEFAULT_DAEMON_PORT,
@@ -173,12 +172,13 @@ export async function launch(args: string[]): Promise<void> {
     console.log(`verify-pie-desktop: launched ${runId}`);
     console.log(`  api     ${record.address}/api/health`);
     console.log(`  port    ${bound} (first spawn prefers 4000; this is the bound address)`);
-    console.log(`  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`);
+    console.log(`  cdp     ${BIN} browser connect`);
     console.log(`  pid     electron-vite ${child.pid} daemon ${record.pid}`);
     console.log(`  home    ${pieHome}`);
     console.log(`  sample  ${sample.path}`);
     console.log(`  logs    ${path.join(runDir, "logs")}`);
     console.log(`  doctor  ${BIN} doctor`);
+    console.log(`  browser ${BIN} browser snapshot`);
   } catch (error) {
     tailFile(logPath, 80);
     tailFile(path.join(pieHome, "logs/pie.log"));
@@ -199,7 +199,7 @@ async function reuseIfHealthy(runDir: string): Promise<boolean> {
   if (pidAlive(record.pid) && (await healthOk(record.address)) && (await cdpOk(cdpPort))) {
     console.log(`verify-pie-desktop: already running at ${runDir}`);
     console.log(`  api     ${record.address}/api/health`);
-    console.log(`  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`);
+    console.log(`  cdp     ${BIN} browser connect`);
     console.log(`  home    ${readJsonField<string>(path.join(runDir, "meta.json"), "pieHome")}`);
     return true;
   }

@@ -15,7 +15,7 @@ Empty isolated home: heading **Import your first project**, button **Import proj
 
 ## Driving it
 
-`agent-browser --session verify-pie-desktop connect 9223` (or whatever port doctor printed), then the same clicks as web verify-pie:
+`pnpm exec pie-verify desktop browser connect` (doctor already did this), then the same clicks as web verify-pie:
 
 1. **Import project**
 2. Type `verify-pie-desktop-sample`, enter that folder

@@ -21,8 +21,8 @@
 
 ```bash
 # after a draft send, or:
-agent-browser open 'http://localhost:4190/session/<sessionId>?projectId=<projectId>'
-agent-browser snapshot
+pnpm exec pie-verify web browser open 'http://localhost:4190/session/<sessionId>?projectId=<projectId>'
+pnpm exec pie-verify web browser snapshot
 ```
 
 Follow-up prompt:

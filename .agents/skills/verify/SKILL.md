@@ -69,9 +69,10 @@ Gotchas:
 ## Browser automation (agent-browser)
 
 Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
-recipe is the two-process pair only.
+recipe is the two-process pair only. After `pie-verify web launch`, drive
+with `pnpm exec pie-verify web browser open` then `… browser snapshot`.
 
-Current `agent-browser` (0.35.x, not bun-global 0.15.x):
+Current `agent-browser` (0.35.x, not bun-global 0.15.x) must be on PATH:
 
 ```bash
 npm i -g --prefix "$HOME/.local" agent-browser

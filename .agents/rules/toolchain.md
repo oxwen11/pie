@@ -40,7 +40,10 @@
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root
   `devDependency`) is the Node 24 TypeScript helper for isolated web / CLI /
   desktop proofs. Skills call one command:
-  `pnpm exec pie-verify web|cli|desktop …`. Isolation roots are
+  `pnpm exec pie-verify web|cli|desktop …`. Drive the SPA with
+  `pie-verify web browser` / `pie-verify desktop browser` (injects the
+  isolated `agent-browser` session; desktop also injects `--cdp`).
+  `pie-verify cli` has no browser. Isolation roots are
   `/tmp/pie-verify-web|cli|desktop` (override with `VERIFY_PIE_ROOT` /
   `VERIFY_PIE_CLI_ROOT` / `VERIFY_PIE_DESKTOP_ROOT`). The skill trees under
   `.agents/skills/verify-pie{,-cli,-desktop}` are cold-start recipes and

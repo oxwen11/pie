@@ -1,18 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { agentBrowser } from "../../runtime/browser.ts";
 import { readDaemonRecord, redactDaemonRecord } from "../../runtime/daemon.ts";
-import {
-  agentBrowser,
-  appendNote,
-  copySideEffects,
-  evidenceDir,
-  stampEvidence,
-} from "../../runtime/evidence.ts";
+import { appendNote, copySideEffects, evidenceDir, stampEvidence } from "../../runtime/evidence.ts";
 import { usage } from "../../runtime/fail.ts";
 import { currentRun, readJsonField, writeText } from "../../runtime/fs.ts";
 import { fetchText, ticketStatus } from "../../runtime/http.ts";
-import { BROWSER_SESSION, CURRENT_LINK, SKILL_DIR } from "./config.ts";
+import { BIN, BROWSER_SESSION, CURRENT_LINK, SKILL_DIR } from "./config.ts";
 import { doctorReport } from "./doctor.ts";
 
 export async function evidence(args: string[]): Promise<void> {
@@ -104,9 +99,9 @@ async function curlTranscript(runDir: string): Promise<string> {
     `status ${anon ?? "error"}`,
     `POST ${record.address}/api/ws-ticket (bearer)`,
     `status ${auth ?? "error"}`,
-    `agent-browser --session ${BROWSER_SESSION} --cdp ${cdpPort} get title`,
+    `${BIN} browser get title`,
     title,
-    `agent-browser --session ${BROWSER_SESSION} --cdp ${cdpPort} get url`,
+    `${BIN} browser get url`,
     url,
     "",
   ].join("\n");

@@ -67,29 +67,26 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 ## Drive
 
-Harness: **agent-browser** (Chromium via CDP, accessibility snapshot, `@eN` refs).
+Harness: **agent-browser** via `pie-verify web browser` (session `pie-verify-web`, Vite origin). Do not export `AGENT_BROWSER_SESSION` or call `agent-browser` directly — that can steal another session.
 
 ```bash
 # once per machine (user prefix if `npm i -g` hits EACCES on /usr/lib)
 npm i -g --prefix "$HOME/.local" agent-browser
 export PATH="$HOME/.local/bin:$PATH"
 agent-browser install
-# then
 agent-browser skills get core
 ```
 
-Current `agent-browser` 0.35.x: `npm i -g --prefix "$HOME/.local" agent-browser` then `agent-browser install`. Google Chrome at `/usr/local/bin/google-chrome` also works if the bundled browser is missing.
+Current `agent-browser` 0.35.x. Google Chrome at `/usr/local/bin/google-chrome` also works if the bundled browser is missing.
 
 Recipe for every drive:
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Named session (do not use the machine-wide default browser):
-   `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix verify-pie)"`
-3. Open the **Vite** origin: `agent-browser open http://localhost:4190/`
-4. `agent-browser snapshot` — click `@eN` refs, not coordinates. Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
-5. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
-6. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
-7. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
+2. Open the **Vite** origin: `pnpm exec pie-verify web browser open` (defaults to `http://localhost:4190/`).
+3. `pnpm exec pie-verify web browser snapshot` — click `@eN` refs, not coordinates. Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
+4. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+5. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
+6. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
 Stable handles (from source, not guesses):
 
@@ -159,6 +156,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | --- | --- |
 | `pnpm exec pie-verify web launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. |
 | `pnpm exec pie-verify web doctor` | Read-only worth-driving check. |
+| `pnpm exec pie-verify web browser` | Forwards to `agent-browser` with session `pie-verify-web`. `open` defaults to `http://localhost:4190/`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 

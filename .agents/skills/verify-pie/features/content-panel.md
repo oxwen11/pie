@@ -21,9 +21,9 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 
 ```bash
 # on a session route
-agent-browser snapshot
+pnpm exec pie-verify web browser snapshot
 # click Toggle content panel
-agent-browser snapshot
+pnpm exec pie-verify web browser snapshot
 ```
 
 1. Pressed toggle; complementary/`data-slot="content-panel"` is in the tree (or the empty copy is visible). Hidden unmounts the column — it is not merely CSS-hidden.

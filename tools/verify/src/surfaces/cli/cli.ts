@@ -40,6 +40,11 @@ export async function runCliSurface(argv: string[]): Promise<void> {
     case "cleanup":
       await cleanup(rest);
       return;
+    case "browser":
+      throw new VerifyError(
+        "pie-verify cli has no browser — this surface is pie / pie daemon / pie serve. Drive it with `pie-verify cli run`. Use `pie-verify web browser` or `pie-verify desktop browser`.",
+        2,
+      );
     default:
       throw new VerifyError(`${usageText}unknown command ${command}`, 2);
   }

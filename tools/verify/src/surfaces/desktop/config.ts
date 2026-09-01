@@ -15,7 +15,7 @@ export const SAMPLE_NAME = "verify-pie-desktop-sample";
 export const SAMPLE_MARKER = ".verify-pie-desktop-scaffold";
 export const BIN = process.env.VERIFY_PIE_DESKTOP_BIN ?? "pie-verify desktop";
 export const BROWSER_SESSION =
-  process.env.VERIFY_PIE_DESKTOP_BROWSER_SESSION ?? "verify-pie-desktop";
+  process.env.VERIFY_PIE_DESKTOP_BROWSER_SESSION ?? "pie-verify-desktop";
 
 export function userDataDir(cdpPort: number): string {
   return path.join(process.env.TMPDIR ?? "/tmp", `pie-desktop-remote-debugging-${cdpPort}`);

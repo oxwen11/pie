@@ -20,7 +20,7 @@ Always visible on `/draft` and `/session/*` (web inset sidebar). On a narrow vie
 Need at least one Project and one Session (import + draft send).
 
 ```bash
-agent-browser snapshot
+pnpm exec pie-verify web browser snapshot
 ```
 
 1. **New chat** → URL `/draft`, heading **New chat**.

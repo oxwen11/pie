@@ -8,6 +8,7 @@ export type ParsedArgv = { kind: "help" } | { kind: "surface"; surface: Surface;
 const usageText = `Usage:
   pie-verify web launch [--replace]
   pie-verify web doctor
+  pie-verify web browser open|snapshot|<agent-browser argv…>
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
   pie-verify web cleanup [run-dir]
 
@@ -19,6 +20,7 @@ const usageText = `Usage:
 
   pie-verify desktop launch [--replace]
   pie-verify desktop doctor
+  pie-verify desktop browser snapshot|connect|<agent-browser argv…>
   pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
   pie-verify desktop cleanup [run-dir]
 

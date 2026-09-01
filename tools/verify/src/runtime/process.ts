@@ -202,6 +202,11 @@ export async function waitUntil(
   throw new Error(`timed out waiting for ${name}`);
 }
 
+export function runCommandInherit(command: string, args: string[]): number {
+  const result = childProcess.spawnSync(command, args, { stdio: "inherit" });
+  return result.status ?? 1;
+}
+
 export function runCommand(
   command: string,
   args: string[],

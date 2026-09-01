@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_ROOT, refuseWebOrCliPort } from "./config.ts";
+import { BROWSER_SESSION, DEFAULT_ROOT, refuseWebOrCliPort } from "./config.ts";
 
 describe("DEFAULT_ROOT", () => {
   it("isolates under /tmp/pie-verify-desktop", () => {
     expect(DEFAULT_ROOT).toBe("/tmp/pie-verify-desktop");
+  });
+});
+
+describe("BROWSER_SESSION", () => {
+  it("uses a pie-verify session name", () => {
+    expect(BROWSER_SESSION).toBe(
+      process.env.VERIFY_PIE_DESKTOP_BROWSER_SESSION ?? "pie-verify-desktop",
+    );
   });
 });
 

@@ -13,3 +13,4 @@ export const VITE_PORT = 4190;
 export const SAMPLE_NAME = "verify-pie-sample";
 export const SAMPLE_MARKER = ".verify-pie-scaffold";
 export const BIN = process.env.VERIFY_PIE_BIN ?? "pie-verify web";
+export const BROWSER_SESSION = process.env.VERIFY_PIE_BROWSER_SESSION ?? "pie-verify-web";
