@@ -21,7 +21,11 @@ export const ref = {
 // Chunk folds run on microtasks (ReadableStream consumers): settle before
 // asserting on folded messages.
 export const settle = async () => {
-  for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+  for (let i = 0; i < 3; i += 1) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
 };
 
 export class FakeTransport implements ChatSessionTransport {
