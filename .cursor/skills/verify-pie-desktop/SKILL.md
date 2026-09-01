@@ -52,7 +52,7 @@ Checks, in order:
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
 5. Ticket: anonymous **401**, bearer **200**.
-6. `agent-browser --session verify-pie-desktop connect <cdpPort>` succeeds (own session so it does not steal a web verify-pie session). `get title` / `get url` work.
+6. `agent-browser --session verify-pie-desktop connect <cdpPort>` succeeds. That session name is **not** `AGENT_BROWSER_SESSION` (web verify). Override with `VERIFY_PIE_DESKTOP_BROWSER_SESSION` if needed. `get title` / `get url` work.
 
 Splash copy: `aria-label="Starting Pie"`. Failure dialog: **Pie could not start**. Overlay: **Reconnecting…**, **The local server stopped**, **Retry**, **Quit**. Window title **Pie**, `#root`. Doctor does not require the splash to have cleared — that is the window-connects feature.
 
