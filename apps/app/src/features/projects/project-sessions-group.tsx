@@ -15,7 +15,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
@@ -67,6 +67,7 @@ export function ProjectSessionsGroup({
   const pullRequestStatuses = useQuery({
     ...orpcQueryUtils.pullRequest.statuses.queryOptions({ input: { refs } }),
     enabled: refs.length > 0,
+    placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
   });
   const activeSession = rows.find(isSessionActive);
@@ -76,9 +77,7 @@ export function ProjectSessionsGroup({
     }),
     select: selectPullRequestLifecycle,
   });
-  const statusBySessionId = pullRequestStatuses.isError
-    ? EMPTY_PULL_REQUEST_STATUSES
-    : (pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES);
+  const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
 
   return (
     <Collapsible defaultOpen>
@@ -121,19 +120,14 @@ export function ProjectSessionsGroup({
               {rows.map((session) => {
                 const active = isSessionActive(session);
                 const listedLifecycle = statusBySessionId.get(session.sessionId);
-                const pullRequestLifecycle = active
-                  ? activePullRequest.isError
-                    ? undefined
-                    : activePullRequest.data === undefined
-                      ? listedLifecycle
-                      : (activePullRequest.data ?? undefined)
-                  : listedLifecycle;
                 return (
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
                     isActive={() => isSessionActive(session)}
-                    pullRequestLifecycle={pullRequestLifecycle ?? undefined}
+                    pullRequestLifecycle={
+                      active ? (activePullRequest.data ?? listedLifecycle) : listedLifecycle
+                    }
                     session={session}
                   />
                 );
