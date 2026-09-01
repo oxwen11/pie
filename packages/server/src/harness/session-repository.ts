@@ -1,3 +1,4 @@
+import { AgentThinkingLevelSchema } from "@getpie/contract";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Effect, Option, Schema } from "effect";
 
@@ -13,6 +14,7 @@ const SessionSchema = Schema.Struct({
   gitBranch: Schema.optionalKey(Schema.String),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
+  thinkingLevel: Schema.optionalKey(AgentThinkingLevelSchema),
   title: Schema.optionalKey(Schema.String),
   archived: Schema.optionalKey(Schema.Boolean),
   updatedAt: Schema.optionalKey(Schema.String),
@@ -43,6 +45,7 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
+  ...(metadata.thinkingLevel !== undefined ? { thinkingLevel: metadata.thinkingLevel } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
   ...(metadata.archived !== undefined ? { archived: metadata.archived } : undefined),
   ...(metadata.updatedAt !== undefined ? { updatedAt: metadata.updatedAt } : undefined),

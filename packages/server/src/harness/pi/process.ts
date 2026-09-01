@@ -1,4 +1,10 @@
-import type { AgentRequest, AgentResponse, AgentModelState } from "@getpie/contract";
+import type {
+  AgentModelState,
+  AgentRequest,
+  AgentResponse,
+  AgentThinkingLevel,
+  AgentThinkingState,
+} from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -12,7 +18,7 @@ import {
   TurnAlreadyRunning,
 } from "../errors";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
-import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
+import { toAgentModelState, toAgentThinkingState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
@@ -84,6 +90,7 @@ export interface PiProcessDependencies<R> {
   readonly makeTransport: (config: {
     readonly sessionId: string;
     readonly cwd?: string;
+    readonly args?: ReadonlyArray<string>;
   }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
 }
 
@@ -93,6 +100,7 @@ export interface PiProcess {
       readonly cwd: string;
       readonly provider?: string;
       readonly modelId?: string;
+      readonly thinkingLevel?: AgentThinkingLevel;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
     readonly resume: (config: {
       readonly sessionId: string;
@@ -137,6 +145,13 @@ export interface PiProcess {
       sessionId: string,
       model: { readonly provider: string; readonly modelId: string },
     ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
+    readonly getThinkingState: (
+      sessionId: string,
+    ) => Effect.Effect<AgentThinkingState, HarnessSessionNotFound | PiTransportFailure>;
+    readonly setThinkingLevel: (
+      sessionId: string,
+      level: AgentThinkingLevel,
+    ) => Effect.Effect<AgentThinkingState, HarnessSessionNotFound | PiTransportFailure>;
   };
 }
 
@@ -455,14 +470,31 @@ export const makePiProcessWithDependencies = <R>(
         ),
       );
 
+    const getThinkingState = (
+      sessionId: string,
+    ): Effect.Effect<AgentThinkingState, HarnessSessionNotFound | PiTransportFailure> =>
+      getSession(sessionId).pipe(
+        Effect.flatMap((session) =>
+          Effect.gen(function* () {
+            const state = yield* session.transport.command<RpcSessionState>({ type: "get_state" });
+            const { levels } = yield* session.transport.command<{
+              readonly levels: AgentThinkingLevel[];
+            }>({ type: "get_available_thinking_levels" });
+            return toAgentThinkingState(state, levels);
+          }),
+        ),
+      );
+
     return {
       session: {
         create: (config) => {
-          const spawnArgs =
-            config.provider && config.modelId
+          const spawnArgs = [
+            ...(config.provider && config.modelId
               ? ["--provider", config.provider, "--model", config.modelId]
-              : undefined;
-          return openSession(uuid(), config.cwd, spawnArgs);
+              : []),
+            ...(config.thinkingLevel ? ["--thinking", config.thinkingLevel] : []),
+          ];
+          return openSession(uuid(), config.cwd, spawnArgs.length > 0 ? spawnArgs : undefined);
         },
         resume: (config) => openSession(config.sessionId, config.cwd),
         prompt: (input) =>
@@ -656,7 +688,19 @@ export const makePiProcessWithDependencies = <R>(
                 modelId: model.modelId,
               }),
             ),
-            Effect.map(toAgentModel),
+            Effect.map((selected) => ({
+              provider: selected.provider,
+              modelId: selected.id,
+              name: selected.name,
+            })),
+          ),
+        getThinkingState,
+        setThinkingLevel: (sessionId, level) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.transport.command({ type: "set_thinking_level", level }),
+            ),
+            Effect.andThen(getThinkingState(sessionId)),
           ),
       },
     } satisfies PiProcess;
@@ -669,7 +713,9 @@ export const makePiProcess = (
     makeTransport: (config) =>
       makePiTransport({
         ...(options.executable ? { executable: options.executable } : undefined),
-        ...(options.args ? { args: options.args } : undefined),
+        ...((options.args?.length ?? 0) + (config.args?.length ?? 0) > 0
+          ? { args: [...(options.args ?? []), ...(config.args ?? [])] }
+          : undefined),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : undefined),
       }),

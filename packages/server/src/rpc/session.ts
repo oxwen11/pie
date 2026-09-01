@@ -71,6 +71,9 @@ export const sessionRouter = orpc.router({
           projectId: input.projectId,
           cwd: project.path,
           ...(model !== undefined ? { model } : undefined),
+          ...(input.thinkingLevel !== undefined
+            ? { thinkingLevel: input.thinkingLevel }
+            : undefined),
           ...(input.worktree !== undefined ? { worktree: input.worktree } : undefined),
         }),
       ),
@@ -283,6 +286,46 @@ export const sessionRouter = orpc.router({
           AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         }),
       );
+  }),
+  getThinkingState: orpc.getThinkingState.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.getThinkingState(input.ref).pipe(
+      Effect.catchTags({
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  setThinkingLevel: orpc.setThinkingLevel.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.setThinkingLevel(input.ref, input.level).pipe(
+      Effect.catchTags({
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
+        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
   }),
 
   subscribe: orpc.subscribe.effect(function* ({ input }) {

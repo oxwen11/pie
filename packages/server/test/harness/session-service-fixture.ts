@@ -7,7 +7,11 @@ import { ProjectNotFound, StoreWriteError } from "../../src/errors";
 import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type { GitFailure } from "../../src/git/service";
 import type { GitWorktreeCreateResult, GitWorktreeFailure } from "../../src/git/worktree-service";
-import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
+import {
+  AgentOperationError,
+  AgentUnavailable,
+  TurnAlreadyRunning,
+} from "../../src/harness/errors";
 import type { PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
@@ -54,6 +58,8 @@ export type SessionServiceRunOpts = {
   turn?: "open" | "finished";
   // The harness rejects every prompt (a turn is already running).
   promptFails?: boolean;
+  modelMutationFails?: boolean;
+  thinkingMutationFails?: boolean;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;
   failWrite?: boolean;
@@ -116,6 +122,34 @@ export const run = <A, E>(
           ...(opts.history !== undefined
             ? { getMessages: Effect.succeed(opts.history) }
             : undefined),
+          getModelState: Effect.succeed({ provider: "p", modelId: "m1", name: "Model 1" }),
+          setModel: (model) =>
+            opts.modelMutationFails
+              ? Effect.fail(
+                  new AgentOperationError({
+                    sessionId,
+                    operation: "set-model",
+                    cause: new Error("model mutation failed"),
+                  }),
+                )
+              : Effect.succeed(model),
+          getThinkingState: Effect.succeed({
+            level: "medium",
+            availableLevels: ["off", "minimal", "low", "medium", "high"],
+          }),
+          setThinkingLevel: (level) =>
+            opts.thinkingMutationFails
+              ? Effect.fail(
+                  new AgentOperationError({
+                    sessionId,
+                    operation: "set-thinking-level",
+                    cause: new Error("thinking mutation failed"),
+                  }),
+                )
+              : Effect.succeed({
+                  level,
+                  availableLevels: ["off", "minimal", "low", "medium", "high"],
+                }),
           close: Effect.sync(() => {
             spy.close.push(sessionId);
           }).pipe(

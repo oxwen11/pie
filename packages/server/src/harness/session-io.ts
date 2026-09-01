@@ -1,4 +1,4 @@
-import { InspectorTargetSchema } from "@getpie/contract";
+import { AgentThinkingLevelSchema, InspectorTargetSchema } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
@@ -11,6 +11,7 @@ export const CreateSessionInputSchema = Schema.Struct({
   sessionId: Schema.optionalKey(Schema.String),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
+  thinkingLevel: Schema.optionalKey(AgentThinkingLevelSchema),
 });
 export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 

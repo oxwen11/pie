@@ -1,4 +1,10 @@
-import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import {
+  AgentThinkingLevels,
+  type AgentThinkingLevel,
+  type CreateWorktreeInput,
+  type ListSessionsOutput,
+  type SessionSummary,
+} from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -23,6 +29,7 @@ import { toast } from "sonner";
 
 import Loader from "@/components/loader";
 import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
+import { DraftThinkingLevelSelect } from "@/features/chat/components/draft-thinking-level-select";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
@@ -41,10 +48,18 @@ type DraftSearch = {
   readonly projectId?: string;
   readonly provider?: string;
   readonly modelId?: string;
+  readonly thinkingLevel?: AgentThinkingLevel;
 };
+
+const THINKING_LEVELS = new Set<AgentThinkingLevel>(AgentThinkingLevels);
 
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
+
+const asThinkingLevel = (value: unknown): AgentThinkingLevel | undefined =>
+  typeof value === "string" && THINKING_LEVELS.has(value as AgentThinkingLevel)
+    ? (value as AgentThinkingLevel)
+    : undefined;
 
 const optional = <K extends keyof DraftSearch>(
   key: K,
@@ -57,6 +72,7 @@ export const Route = createFileRoute("/draft")({
     ...optional("projectId", asText(search.projectId)),
     ...optional("provider", asText(search.provider)),
     ...optional("modelId", asText(search.modelId)),
+    ...optional("thinkingLevel", asThinkingLevel(search.thinkingLevel)),
   }),
   component: DraftRoute,
 });
@@ -78,6 +94,14 @@ function DraftRoute() {
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
+  const selectedModel = modelsQuery.data?.models.find(
+    (model) => model.provider === search.provider && model.modelId === search.modelId,
+  );
+  const thinkingLevel =
+    search.thinkingLevel !== undefined &&
+    selectedModel?.availableThinkingLevels.includes(search.thinkingLevel)
+      ? search.thinkingLevel
+      : undefined;
 
   useEffect(() => {
     if (!defaultModel || search.provider || search.modelId) return;
@@ -102,6 +126,7 @@ function DraftRoute() {
         ...(search.provider && search.modelId
           ? { provider: search.provider, modelId: search.modelId }
           : undefined),
+        ...(thinkingLevel !== undefined ? { thinkingLevel } : undefined),
         ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
@@ -294,14 +319,42 @@ function DraftRoute() {
                   providerId={search.provider}
                   modelId={search.modelId}
                   onChange={(provider, modelId) => {
+                    const nextModel = modelsQuery.data?.models.find(
+                      (model) => model.provider === provider && model.modelId === modelId,
+                    );
                     navigate({
                       to: "/draft",
-                      search: (prev) => ({ ...prev, provider, modelId }),
+                      search: (prev) => ({
+                        ...prev,
+                        provider,
+                        modelId,
+                        thinkingLevel:
+                          prev.thinkingLevel !== undefined &&
+                          nextModel?.availableThinkingLevels.includes(prev.thinkingLevel)
+                            ? prev.thinkingLevel
+                            : undefined,
+                      }),
                       replace: true,
                     }).catch((error: unknown) => {
                       console.error("Failed to set the draft model", error);
                     });
                   }}
+                />
+                <DraftThinkingLevelSelect
+                  disabled={startSession.isPending || selected === null}
+                  level={thinkingLevel}
+                  modelId={search.modelId}
+                  onChange={(nextThinkingLevel) => {
+                    navigate({
+                      to: "/draft",
+                      search: (prev) => ({ ...prev, thinkingLevel: nextThinkingLevel }),
+                      replace: true,
+                    }).catch((error: unknown) => {
+                      console.error("Failed to set the draft thinking level", error);
+                    });
+                  }}
+                  projectId={selected?.id}
+                  providerId={search.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit

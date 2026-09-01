@@ -452,13 +452,26 @@ export const SessionCapabilitiesSchema = Schema.Struct({
 export type SessionCapabilities = typeof SessionCapabilitiesSchema.Type;
 
 // ---------------------------------------------------------------------------
-// Agent model (owned by Pi; queried via the live RPC child)
+// Agent model and thinking level (owned by Pi)
 // ---------------------------------------------------------------------------
+
+export const AgentThinkingLevels = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+export const AgentThinkingLevelSchema = Schema.Literals(AgentThinkingLevels);
+export type AgentThinkingLevel = typeof AgentThinkingLevelSchema.Type;
 
 export const AgentModelSchema = Schema.Struct({
   provider: Schema.String,
   modelId: Schema.String,
   name: Schema.optionalKey(Schema.String),
+  availableThinkingLevels: Schema.Array(AgentThinkingLevelSchema),
 });
 export type AgentModel = typeof AgentModelSchema.Type;
 
@@ -475,6 +488,18 @@ export const SetAgentModelInputSchema = Schema.Struct({
   modelId: Schema.NonEmptyString,
 });
 export type SetAgentModelInput = typeof SetAgentModelInputSchema.Type;
+
+export const AgentThinkingStateSchema = Schema.Struct({
+  level: Schema.optionalKey(AgentThinkingLevelSchema),
+  availableLevels: Schema.Array(AgentThinkingLevelSchema),
+});
+export type AgentThinkingState = typeof AgentThinkingStateSchema.Type;
+
+export const SetAgentThinkingLevelInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  level: AgentThinkingLevelSchema,
+});
+export type SetAgentThinkingLevelInput = typeof SetAgentThinkingLevelInputSchema.Type;
 
 export const ListAgentModelsInputSchema = Schema.Struct({
   projectId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
@@ -524,12 +549,14 @@ export const BrowseResultSchema = Schema.Struct({
 // Lifecycle method inputs / outputs
 // ---------------------------------------------------------------------------
 
-// Session-scoped config is owned by Pi — there are no session config RPCs.
+// Session-scoped model and thinking config is owned by Pi; the server persists
+// unopened-session choices so the first prompt can apply them at process start.
 
 export const CreateSessionInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
+  thinkingLevel: Schema.optionalKey(AgentThinkingLevelSchema),
   // Create a git worktree and persist its cwd before returning. Request payload,
   // not a stored pending flag — git failure fails create with no session record.
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),

@@ -63,6 +63,66 @@ describe("PiAgentSessionService", () => {
     expect(result.spy.open).toEqual([]);
   });
 
+  it("persists and updates thinking level before Pi opens", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          thinkingLevel: "low",
+        });
+        const initial = yield* fixture.service.getThinkingState(ref);
+        const updated = yield* fixture.service.setThinkingLevel(ref, "high");
+        const storedBeforeModelChange = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        yield* fixture.service.setModel(ref, { provider: "p", modelId: "m2" });
+        const storedAfterModelChange = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        return {
+          initial,
+          updated,
+          storedBeforeModelChange,
+          storedAfterModelChange,
+          spy: fixture.spy,
+        };
+      }),
+    );
+
+    expect(result.initial).toEqual({ level: "low", availableLevels: [] });
+    expect(result.updated).toEqual({ level: "high", availableLevels: [] });
+    expect(result.storedBeforeModelChange.thinkingLevel).toBe("high");
+    expect(result.storedAfterModelChange.thinkingLevel).toBeUndefined();
+    expect(result.spy.open).toEqual([]);
+  });
+
+  it("keeps persisted configuration when live mutations fail", async () => {
+    const result = await run({ modelMutationFails: true, thinkingMutationFails: true }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          model: { provider: "p", modelId: "m1" },
+          thinkingLevel: "low",
+        });
+        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
+        yield* Effect.sleep("50 millis");
+
+        const thinkingError = yield* fixture.service
+          .setThinkingLevel(ref, "high")
+          .pipe(Effect.flip);
+        const modelError = yield* fixture.service
+          .setModel(ref, { provider: "p", modelId: "m2" })
+          .pipe(Effect.flip);
+        const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        return { thinkingError, modelError, stored };
+      }),
+    );
+
+    expect(result.thinkingError._tag).toBe("AgentOperationError");
+    expect(result.modelError._tag).toBe("AgentOperationError");
+    expect(result.stored.provider).toBe("p");
+    expect(result.stored.modelId).toBe("m1");
+    expect(result.stored.thinkingLevel).toBe("low");
+  });
+
   it("prepare backfills the cwd and starts nothing", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {

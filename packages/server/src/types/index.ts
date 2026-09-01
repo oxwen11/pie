@@ -5,6 +5,8 @@
  * (Context.Service + Layer) live in each module; DTOs like these stay plain.
  */
 
+import type { AgentThinkingLevel } from "@getpie/contract";
+
 /** A project is a workspace path the runtime can open sessions against. */
 export type { Project } from "@getpie/contract";
 
@@ -29,9 +31,10 @@ export interface Session {
   readonly cwd?: string;
   /** Branch checked out in `cwd` when this session has a git worktree. */
   readonly gitBranch?: string;
-  /** Model selected at create; applied when Pi opens on the first prompt. */
+  /** Model and thinking level selected before Pi opens on the first prompt. */
   readonly provider?: string;
   readonly modelId?: string;
+  readonly thinkingLevel?: AgentThinkingLevel;
   /** Display title, set from the session's first prompt. */
   readonly title?: string;
   /** Whether the session is hidden from the project's primary session list. */

@@ -26,14 +26,26 @@ const upd = (ev) => send({ type: "message_update", usage: assistant().usage, ass
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
+const thinkingIndex = process.argv.indexOf("--thinking");
+let currentThinking = thinkingIndex === -1 ? "medium" : process.argv[thinkingIndex + 1];
 const availableModels = [
-  { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
-  { id: "m2", name: "Model 2", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
+  { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
+  { id: "m2", name: "Model 2", api: "a", provider: "p", baseUrl: "", reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
 ];
+const thinkingLevels = () => currentModel.modelId === "m2"
+  ? ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+  : ["off", "minimal", "low", "medium", "high"];
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
-  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
+  if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, thinkingLevel: currentThinking, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
   if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: availableModels } }); return; }
+  if (msg.type === "get_available_thinking_levels") { send({ id: msg.id, type: "response", command: "get_available_thinking_levels", success: true, data: { levels: thinkingLevels() } }); return; }
+  if (msg.type === "set_thinking_level") {
+    if (!thinkingLevels().includes(msg.level)) { send({ id: msg.id, type: "response", command: "set_thinking_level", success: false, error: "unsupported thinking level" }); return; }
+    currentThinking = msg.level;
+    send({ id: msg.id, type: "response", command: "set_thinking_level", success: true });
+    return;
+  }
   if (msg.type === "set_model") {
     const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);
     if (!next) { send({ id: msg.id, type: "response", command: "set_model", success: false, error: "unknown model" }); return; }
@@ -325,6 +337,42 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
       const after = yield* agent.session.getModelState(sessionId);
       assert.deepEqual(after, { provider: "p", modelId: "m2", name: "Model 2" });
+
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("reads, sets, and applies the thinking level at process start", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({
+        cwd: "/tmp",
+        thinkingLevel: "low",
+      });
+
+      const initial = yield* agent.session.getThinkingState(sessionId);
+      assert.deepEqual(initial, {
+        level: "low",
+        availableLevels: ["off", "minimal", "low", "medium", "high"],
+      });
+
+      const updated = yield* agent.session.setThinkingLevel(sessionId, "high");
+      assert.deepEqual(updated, {
+        level: "high",
+        availableLevels: ["off", "minimal", "low", "medium", "high"],
+      });
+
+      yield* agent.session.setModel(sessionId, { provider: "p", modelId: "m2" });
+      const extended = yield* agent.session.getThinkingState(sessionId);
+      assert.deepEqual(extended.availableLevels, [
+        "off",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+      ]);
 
       yield* agent.session.abort(sessionId);
     }),
