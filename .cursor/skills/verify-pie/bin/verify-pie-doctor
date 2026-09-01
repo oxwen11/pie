@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Read-only: is the current verify-pie instance worth driving?
+
+set -euo pipefail
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+fail() {
+  echo "verify-pie doctor: FAIL — $*" >&2
+  exit 1
+}
+
+warn() {
+  echo "verify-pie doctor: WARN — $*" >&2
+}
+
+if ! run_dir="$(verify_pie_current_run)"; then
+  pie_pids="$(verify_pie_listen_pids "${DEFAULT_PIE_PORT}")"
+  vite_pids="$(verify_pie_listen_pids "${VITE_PORT}")"
+  if [[ -n "${pie_pids}" || -n "${vite_pids}" ]]; then
+    fail "ports ${DEFAULT_PIE_PORT}/${VITE_PORT} are live but this is not a verify-pie run (no ${CURRENT_LINK}). Refuse to drive a shared ~/.pie or ~/.pie-dev instance."
+  fi
+  fail "no current run. Launch first: ${VERIFY_PIE_BIN}/verify-pie-launch"
+fi
+
+meta="${run_dir}/meta.json"
+[[ -f "${meta}" ]] || fail "missing ${meta}"
+
+pie_port="$(verify_pie_json_get "${meta}" piePort)"
+vite_port="$(verify_pie_json_get "${meta}" vitePort)"
+pie_home="$(verify_pie_json_get "${meta}" pieHome)"
+app_url="$(verify_pie_json_get "${meta}" appUrl)"
+run_id="$(verify_pie_json_get "${meta}" runId)"
+
+server_pid="$(verify_pie_read_pid "${run_dir}/pids/server.pid")"
+vite_pid="$(verify_pie_read_pid "${run_dir}/pids/vite.pid")"
+
+verify_pie_pid_alive "${server_pid}" || fail "server pid ${server_pid} is not running"
+verify_pie_pid_alive "${vite_pid}" || fail "vite pid ${vite_pid} is not running"
+
+listen_ok() {
+  local port="$1"
+  local expected="$2"
+  local pids
+  pids="$(verify_pie_listen_pids "${port}")"
+  [[ -n "${pids}" ]] || fail "nothing listens on ${port}"
+  local pid
+  for pid in ${pids}; do
+    local walk="${pid}"
+    local i
+    for ((i = 0; i < 8; i++)); do
+      if [[ "${walk}" == "${expected}" ]]; then
+        return 0
+      fi
+      walk="$(ps -o ppid= -p "${walk}" 2>/dev/null | tr -d '[:space:]' || true)"
+      [[ -n "${walk}" && "${walk}" != "1" ]] || break
+    done
+  done
+  fail "port ${port} is owned by pid(s) ${pids}, not our tree (expected ancestor ${expected})"
+}
+
+listen_ok "${pie_port}" "${server_pid}"
+listen_ok "${vite_port}" "${vite_pid}"
+
+verify_pie_http_ok "http://127.0.0.1:${pie_port}/api/health" ||
+  fail "http://127.0.0.1:${pie_port}/api/health is not ok"
+verify_pie_http_ok "http://127.0.0.1:${vite_port}/api/health" ||
+  fail "Vite proxy http://127.0.0.1:${vite_port}/api/health is not ok — open the Vite URL, not the API port"
+
+[[ -d "${pie_home}" ]] || fail "PIE_HOME ${pie_home} is missing"
+
+if [[ "${pie_home}" == "${HOME}/.pie" || "${pie_home}" == "${HOME}/.pie-dev" ]]; then
+  fail "PIE_HOME is the shared default (${pie_home}). This skill only drives isolated homes."
+fi
+
+# Ticket minting proves browser-mode (no PIE_AUTH_TOKEN), unlike the desktop daemon.
+ticket_status="$(curl -sS -o /tmp/verify-pie-ticket.json -w '%{http_code}' --max-time 2 \
+  -X POST "http://127.0.0.1:${vite_port}/api/ws-ticket" || true)"
+if [[ "${ticket_status}" != "200" ]]; then
+  fail "/api/ws-ticket returned ${ticket_status} (401 means you hit the daemon on 4000, not this serve)"
+fi
+
+node_ver="$(node -v 2>/dev/null || echo unknown)"
+major="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+if ((major < 24)); then
+  warn "current shell Node is ${node_ver}; the launched processes may differ. pie serve wants >= 24."
+fi
+
+echo "verify-pie doctor: OK"
+echo "  run     ${run_id}"
+echo "  app     ${app_url}"
+echo "  api     http://127.0.0.1:${pie_port}/api/health"
+echo "  home    ${pie_home}"
+echo "  server  pid ${server_pid}"
+echo "  vite    pid ${vite_pid}"
+echo "  node    ${node_ver}"
+echo "  ticket  /api/ws-ticket 200"

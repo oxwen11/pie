@@ -1,0 +1,17 @@
+# Feature map
+
+Source of truth for what a pie web proof must cover. Each file is one user-facing feature. A run that only exercises the easiest entry point is incomplete when the file lists others.
+
+Primary surface: Vite app at `http://127.0.0.1:4190/`. Harness: agent-browser.
+
+| Feature | File | User entry |
+| --- | --- | --- |
+| Import a local folder as a Project | [import-project.md](import-project.md) | Empty `/draft`, or sidebar **Import project** |
+| Start a new chat | [draft-new-chat.md](draft-new-chat.md) | `/` → `/draft`, **New chat**, or per-project compose |
+| Talk in a session | [session-chat.md](session-chat.md) | After send, or a sidebar session row |
+| Find and manage sessions | [sidebar-sessions.md](sidebar-sessions.md) | Left **Projects** list |
+| Content panel beside chat | [content-panel.md](content-panel.md) | **Toggle content panel** on a session |
+
+Desktop, the CLI daemon, and placeholder Terminal/Browser *behavior* (they are mock chrome) are noted in the files, not separate features.
+
+When routes, copy, or selectors change, edit the matching file. Use `/maintain-verification-skill` to keep this map honest.

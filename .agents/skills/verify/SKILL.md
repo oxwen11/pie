@@ -5,6 +5,9 @@ description: "Build/launch/drive recipe for verifying pie web changes at runtime
 
 # Verifying pie at runtime
 
+For an isolated launch/doctor/drive/cleanup loop (and the feature map), use
+`.cursor/skills/verify-pie`. This file is the short two-process recipe.
+
 ## Build + launch
 
 Dev is **two processes**: Vite serves the app, the pie server serves the API,
