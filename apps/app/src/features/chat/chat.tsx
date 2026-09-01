@@ -5,9 +5,13 @@ import { ChatInputComposer } from "@/features/chat/components/chat-input-compose
 import { ChatModelSelect } from "@/features/chat/components/chat-model-select";
 import { ChatSessionProvider } from "@/features/chat/components/chat-session-provider";
 import { ChatTranscript } from "@/features/chat/components/chat-transcript";
+import { SlashCommandMenu } from "@/features/chat/components/input/slash-command-menu";
+import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-state";
 import { sessionRefKey } from "@/lib/session-ref";
 
 export function Chat({ className, sessionRef }: { className?: string; sessionRef: SessionRef }) {
+  const commandState = useSlashCommandState(sessionRef.projectId);
+
   return (
     <ChatSessionProvider sessionRef={sessionRef}>
       <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
@@ -17,7 +21,9 @@ export function Chat({ className, sessionRef }: { className?: string; sessionRef
             key={sessionRefKey(sessionRef)}
             sessionRef={sessionRef}
             toolbar={<ChatModelSelect sessionRef={sessionRef} />}
-          />
+          >
+            <SlashCommandMenu state={commandState} />
+          </ChatInputComposer>
         </div>
       </div>
     </ChatSessionProvider>

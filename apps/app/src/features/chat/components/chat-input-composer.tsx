@@ -10,7 +10,7 @@ import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/co
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
@@ -33,12 +33,13 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 // as editable rows (steering first); the footer shows the session workspace's
 // git availability and current branch.
 export function ChatInputComposer({
+  children,
   sessionRef,
   toolbar,
-}: {
+}: PropsWithChildren<{
   sessionRef: SessionRef;
   toolbar?: ReactNode;
-}) {
+}>) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
   const currentBranch =
@@ -95,6 +96,7 @@ export function ChatInputComposer({
       >
         <ChatInputProvider controller={controller}>
           <ChatInput />
+          {children}
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
             <ChatComposerActions

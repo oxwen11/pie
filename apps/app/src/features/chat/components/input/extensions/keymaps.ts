@@ -1,16 +1,9 @@
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import type { EditorView } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 
 // Composable keymap: one behavior per extension. Future Tab/Shift+Tab/cmdEnter
 // behaviors are added as new extensions — this one doesn't change.
-export function createSubmitKeymap(opts: {
-  onSubmit: () => void;
-  // Lets Enter yield to certain states (e.g. an open suggestion menu consumes
-  // Enter to select). "When to yield" is injected by the consumer — the core
-  // keymap knows no menus and queries no global DOM.
-  shouldYield?: (view: EditorView) => boolean;
-}) {
+export function createSubmitKeymap(opts: { onSubmit: () => void }) {
   return Extension.create({
     name: "chatSubmitKeymap",
     addProseMirrorPlugins() {
@@ -18,7 +11,7 @@ export function createSubmitKeymap(opts: {
         new Plugin({
           key: new PluginKey("chatSubmitKeymap"),
           props: {
-            handleKeyDown(view, event) {
+            handleKeyDown(_view, event) {
               if (
                 event.key !== "Enter" ||
                 event.shiftKey ||
@@ -30,7 +23,9 @@ export function createSubmitKeymap(opts: {
               }
               // Enter during IME composition confirms the candidate — not a send.
               if (event.isComposing) return false;
-              if (opts.shouldYield?.(view)) return false;
+              // Suggestion navigation runs in the DOM capture phase and marks a
+              // selected Enter as handled before ProseMirror receives it.
+              if (event.defaultPrevented) return true;
               event.preventDefault();
               opts.onSubmit();
               return true;

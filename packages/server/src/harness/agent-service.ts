@@ -1,11 +1,17 @@
-import type { ListAgentModelsOutput } from "@getpie/contract";
+import type { ListAgentCommandsOutput, ListAgentModelsOutput } from "@getpie/contract";
 import { Context, Effect, Layer } from "effect";
 
 import { AgentOperationError } from "./errors";
+import { listAvailablePiCommands } from "./pi/list-available-commands";
 import { listAvailablePiModels } from "./pi/list-available-models";
 
 export type PiAgentServiceShape = {
-  readonly listModels: (cwd: string) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
+  readonly commands: (
+    cwd?: string,
+  ) => Effect.Effect<ListAgentCommandsOutput, AgentOperationError>;
+  readonly listModels: (
+    cwd?: string,
+  ) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
 };
 
 export class PiAgentService extends Context.Service<PiAgentService, PiAgentServiceShape>()(
@@ -13,7 +19,18 @@ export class PiAgentService extends Context.Service<PiAgentService, PiAgentServi
 ) {}
 
 export const makePiAgentService = (): PiAgentServiceShape => ({
-  listModels: Effect.fn("PiAgentService.listModels")(function* (cwd: string) {
+  commands: Effect.fn("PiAgentService.commands")(function* (cwd?: string) {
+    return yield* Effect.tryPromise({
+      try: () => listAvailablePiCommands(cwd),
+      catch: (cause) =>
+        new AgentOperationError({
+          sessionId: "",
+          operation: "list-commands",
+          cause,
+        }),
+    });
+  }),
+  listModels: Effect.fn("PiAgentService.listModels")(function* (cwd?: string) {
     return yield* listAvailablePiModels(cwd);
   }),
 });

@@ -23,8 +23,11 @@ import type { ChatInputController } from "@/features/chat/components/input/chat-
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
+import { SlashCommandMenu } from "@/features/chat/components/input/slash-command-menu";
+import type { SlashCommandState } from "@/features/chat/components/input/slash-command-suggestions";
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
+import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-state";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
@@ -69,6 +72,7 @@ function DraftRoute() {
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
   const draftWorktree = useDraftWorktree(selected);
+  const commandState = useSlashCommandState(selected?.id);
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
       input: selected?.id ? { projectId: selected.id } : {},
@@ -189,6 +193,7 @@ function DraftRoute() {
 
   return (
     <DraftComposer
+      commandState={commandState}
       controller={controller}
       draftModel={draftModel}
       draftWorktree={draftWorktree}
@@ -246,6 +251,7 @@ function DraftProjectsError({ message, onRetry }: { message: string; onRetry: ()
 }
 
 function DraftComposer({
+  commandState,
   controller,
   draftModel,
   draftWorktree,
@@ -258,6 +264,7 @@ function DraftComposer({
   selectedId,
   startPending,
 }: {
+  commandState: SlashCommandState;
   controller: ChatInputController | null;
   draftModel: { provider: string; modelId: string } | undefined;
   draftWorktree: ReturnType<typeof useDraftWorktree>;
@@ -312,6 +319,7 @@ function DraftComposer({
         >
           <ChatInputProvider controller={controller}>
             <ChatInput />
+            <SlashCommandMenu state={commandState} />
             <PromptInputToolbar>
               <PromptInputTools>
                 <ModelSelectorPicker
