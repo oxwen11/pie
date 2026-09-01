@@ -31,12 +31,12 @@ export async function evidence(args: string[]): Promise<void> {
     }
     case "snapshot": {
       const path = join(dest, `${rest[0] ?? "snapshot"}.txt`);
-      agentBrowser(["snapshot"], path);
+      agentBrowser(["snapshot"], { outputPath: path });
       console.log(path);
       return;
     }
     case "url": {
-      const text = agentBrowser(["get", "url"], join(dest, "url.txt"));
+      const text = agentBrowser(["get", "url"], { outputPath: join(dest, "url.txt") });
       process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
       return;
     }

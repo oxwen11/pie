@@ -24,7 +24,7 @@ Ready when all of these hold:
 
 - Electron (or electron-vite) pid from the run is alive.
 - `$PIE_DAEMON_DIR/daemon.pid` exists; `GET $address/api/health` is `ok`.
-- `http://127.0.0.1:9223/json/version` answers (CDP).
+- Chromium CDP is listening on **9223** (launch waits on that port). Doctor then attaches with `agent-browser connect`.
 
 What launch also does:
 
@@ -52,7 +52,7 @@ Checks, in order:
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
 5. Ticket: anonymous **401**, bearer **200**.
-6. CDP `/json/version` on the run's remote-debug port.
+6. `agent-browser --session verify-pie-desktop connect <cdpPort>` succeeds (own session so it does not steal a web verify-pie session). `get title` / `get url` work.
 
 Splash copy: `aria-label="Starting Pie"`. Failure dialog: **Pie could not start**. Overlay: **Reconnecting…**, **The local server stopped**, **Retry**, **Quit**. Window title **Pie**, `#root`. Doctor does not require the splash to have cleared — that is the window-connects feature.
 
@@ -65,14 +65,16 @@ Prefer **Playwright** (`apps/desktop/e2e/`) when the change is "does the window 
 cd apps/desktop && pnpm e2e -- desktop-rpc.spec.ts -g "renders in the background without taking focus and connects to the server"
 ```
 
-For a **real** isolated window (import, overlay, attach):
+For a **real** isolated window (import, overlay, attach), drive with **agent-browser**, not raw CDP curl:
 
 ```bash
-agent-browser skills get electron
-# attach to PIE_REMOTE_DEBUG_PORT from doctor (default 9223)
+# doctor already ran: agent-browser --session verify-pie-desktop connect 9223
+agent-browser --session verify-pie-desktop snapshot
+# if doctor did not run:
+# agent-browser --session verify-pie-desktop connect 9223
 ```
 
-Once the renderer is connected, selectors match `.cursor/skills/verify-pie` (same `@getpie/app`). CDP Enter still does not submit TipTap — click send. Draft send has no `aria-label`.
+`skills get electron` is the install-versioned attach recipe. After connect, selectors match `.cursor/skills/verify-pie` (same `@getpie/app`). CDP Enter still does not submit TipTap — click send. Draft send has no `aria-label`. Do not `open http://localhost:5173/` and call that desktop.
 
 Existing e2e worth knowing:
 
@@ -91,7 +93,7 @@ Existing e2e worth knowing:
 .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence path
 ```
 
-`daemon.pid` is stored **redacted**. Screenshots need agent-browser attached to the Electron CDP port.
+`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call `agent-browser --session verify-pie-desktop --cdp <port>` — they do not curl `/json/version`.
 
 ## Cleanup
 

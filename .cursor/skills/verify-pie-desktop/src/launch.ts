@@ -6,7 +6,7 @@ import { cdpOk, healthOk, urlPort } from "../../verify-runtime/src/http.ts";
 import { commandOnPath, envPort, findRepoRoot, listenPids, pidAlive, readPidFile, spawnLogged, waitUntil, writePidFile } from "../../verify-runtime/src/process.ts";
 import { ensureSampleProject } from "../../verify-runtime/src/scaffold.ts";
 import { cleanup } from "./cleanup.ts";
-import { BIN, CURRENT_LINK, DEFAULT_CDP_PORT, DEFAULT_DAEMON_PORT, ROOT, SAMPLE_MARKER, SAMPLE_NAME, refuseWebOrCliPort, userDataDir } from "./config.ts";
+import { BIN, BROWSER_SESSION, CURRENT_LINK, DEFAULT_CDP_PORT, DEFAULT_DAEMON_PORT, ROOT, SAMPLE_MARKER, SAMPLE_NAME, refuseWebOrCliPort, userDataDir } from "./config.ts";
 
 export async function launch(args: string[]): Promise<void> {
   let replace = false;
@@ -123,6 +123,8 @@ export async function launch(args: string[]): Promise<void> {
     await waitUntil("daemon.pid", () => existsSync(recordPath), 90);
     const record = readDaemonRecord(recordPath);
     await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
+    // Chromium's own ready signal — the same endpoint `agent-browser connect` uses.
+    // Do not loop `connect` here: that mutates a session. Doctor attaches via agent-browser.
     await waitUntil(`CDP on ${cdpPort}`, () => cdpOk(cdpPort), 40);
     const bound = urlPort(record.address);
     patchJson(join(runDir, "meta.json"), {
@@ -133,7 +135,7 @@ export async function launch(args: string[]): Promise<void> {
     console.log(`verify-pie-desktop: launched ${runId}`);
     console.log(`  api     ${record.address}/api/health`);
     console.log(`  port    ${bound} (first spawn prefers 4000; this is the bound address)`);
-    console.log(`  cdp     http://127.0.0.1:${cdpPort}/json/version`);
+    console.log(`  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`);
     console.log(`  pid     electron-vite ${child.pid} daemon ${record.pid}`);
     console.log(`  home    ${pieHome}`);
     console.log(`  sample  ${sample.path}`);

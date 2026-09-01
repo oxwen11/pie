@@ -10,6 +10,7 @@ export const DEFAULT_CDP_PORT = 9223;
 export const SAMPLE_NAME = "verify-pie-desktop-sample";
 export const SAMPLE_MARKER = ".verify-pie-desktop-scaffold";
 export const BIN = join(SKILL_DIR, "bin/verify-pie-desktop");
+export const BROWSER_SESSION = process.env.AGENT_BROWSER_SESSION ?? "verify-pie-desktop";
 
 export function userDataDir(cdpPort: number): string {
   return join(process.env.TMPDIR ?? "/tmp", `pie-desktop-remote-debugging-${cdpPort}`);

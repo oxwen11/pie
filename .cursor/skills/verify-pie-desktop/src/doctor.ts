@@ -3,9 +3,10 @@ import { join } from "node:path";
 import { readDaemonRecord } from "../../verify-runtime/src/daemon.ts";
 import { fail } from "../../verify-runtime/src/fail.ts";
 import { currentRun, readJsonField } from "../../verify-runtime/src/fs.ts";
-import { cdpOk, healthOk, ticketStatus } from "../../verify-runtime/src/http.ts";
+import { agentBrowser } from "../../verify-runtime/src/evidence.ts";
+import { healthOk, ticketStatus } from "../../verify-runtime/src/http.ts";
 import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "../../verify-runtime/src/process.ts";
-import { BIN, CURRENT_LINK, DEFAULT_DAEMON_PORT } from "./config.ts";
+import { BIN, BROWSER_SESSION, CURRENT_LINK, DEFAULT_DAEMON_PORT } from "./config.ts";
 
 export async function doctor(): Promise<void> {
   process.stdout.write(await doctorReport());
@@ -63,20 +64,29 @@ export async function doctorReport(): Promise<string> {
   if (auth !== 200) {
     fail(`verify-pie-desktop doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`);
   }
-  if (!(await cdpOk(cdpPort))) {
-    fail(`verify-pie-desktop doctor: FAIL — CDP http://127.0.0.1:${cdpPort}/json/version is not answering`);
+  let title = "";
+  let url = "";
+  try {
+    agentBrowser(["connect", String(cdpPort)], { session: BROWSER_SESSION });
+    title = agentBrowser(["get", "title"], { session: BROWSER_SESSION }).trim();
+    url = agentBrowser(["get", "url"], { session: BROWSER_SESSION }).trim();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`verify-pie-desktop doctor: FAIL — agent-browser could not attach to CDP ${cdpPort}: ${message}`);
   }
 
   return [
     "verify-pie-desktop doctor: OK",
     `  run     ${runId}`,
     `  api     ${record.address}/api/health`,
-    `  cdp     http://127.0.0.1:${cdpPort}/json/version`,
+    `  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`,
+    `  title   ${title || "(empty)"}`,
+    `  url     ${url || "(empty)"}`,
     `  home    ${pieHome}`,
     `  evite   pid ${evPid}`,
     `  daemon  pid ${record.pid}`,
     "  ticket  anonymous 401 / bearer 200",
-    `  attach  agent-browser skills get electron  (CDP ${cdpPort})`,
+    `  next    agent-browser --session ${BROWSER_SESSION} snapshot`,
     "",
   ].join("\n");
 }

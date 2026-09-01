@@ -15,7 +15,7 @@ Empty isolated home: heading **Import your first project**, button **Import proj
 
 ## Driving it
 
-`agent-browser skills get electron`, attach to the run CDP port. Then the same clicks as web verify-pie:
+`agent-browser --session verify-pie-desktop connect 9223` (or whatever port doctor printed), then the same clicks as web verify-pie:
 
 1. **Import project**
 2. Type `verify-pie-desktop-sample`, enter that folder

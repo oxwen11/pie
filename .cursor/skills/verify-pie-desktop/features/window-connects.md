@@ -6,7 +6,7 @@ The desktop window must leave the splash and talk to the isolated daemon. Title 
 
 - **Splash** — `aria-label="Starting Pie"` (`<main>`). Unmounts after the first successful server connection.
 - **Connected shell** — same draft / sidebar as web once the splash is gone.
-- **CDP** — `PIE_REMOTE_DEBUG_PORT` answers `/json/version`.
+- **CDP** — `agent-browser --session verify-pie-desktop connect <PIE_REMOTE_DEBUG_PORT>` attaches to the window.
 
 ## Scripted path (Playwright, test mode)
 
@@ -28,6 +28,12 @@ cd apps/desktop && pnpm e2e -- desktop-rpc.spec.ts -g "renders in the background
 .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence init
 ```
 
-Attach with `agent-browser skills get electron` to the CDP port from doctor. Snapshot must not show **Pie could not start**. After connect, splash `Starting Pie` is gone. Title is **Pie**.
+Doctor attaches with `agent-browser connect`. Then:
 
-Proof (real launch): doctor OK + CDP version + snapshot without the failure dialog. Playwright list output is enough for the scripted path; say it was E2E.
+```bash
+agent-browser --session verify-pie-desktop snapshot
+```
+
+Snapshot must not show **Pie could not start**. After connect, splash `Starting Pie` is gone. Title is **Pie**.
+
+Proof (real launch): doctor OK (agent-browser attached) + snapshot without the failure dialog. Playwright list output is enough for the scripted path; say it was E2E.

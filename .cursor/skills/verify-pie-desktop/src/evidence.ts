@@ -4,8 +4,8 @@ import { readDaemonRecord, redactDaemonRecord } from "../../verify-runtime/src/d
 import { agentBrowser, appendNote, copySideEffects, evidenceDir, stampEvidence } from "../../verify-runtime/src/evidence.ts";
 import { usage } from "../../verify-runtime/src/fail.ts";
 import { currentRun, readJsonField, writeText } from "../../verify-runtime/src/fs.ts";
-import { cdpVersion, fetchText, ticketStatus } from "../../verify-runtime/src/http.ts";
-import { CURRENT_LINK, SKILL_DIR } from "./config.ts";
+import { fetchText, ticketStatus } from "../../verify-runtime/src/http.ts";
+import { BROWSER_SESSION, CURRENT_LINK, SKILL_DIR } from "./config.ts";
 import { doctorReport } from "./doctor.ts";
 
 export async function evidence(args: string[]): Promise<void> {
@@ -33,13 +33,15 @@ export async function evidence(args: string[]): Promise<void> {
     }
     case "screenshot": {
       const path = join(dest, `${rest[0] ?? "screen"}.png`);
-      agentBrowser(["screenshot", path]);
+      const cdpPort = readJsonField<number>(join(runDir, "meta.json"), "cdpPort");
+      agentBrowser(["screenshot", path], { session: BROWSER_SESSION, cdpPort });
       console.log(path);
       return;
     }
     case "snapshot": {
       const path = join(dest, `${rest[0] ?? "snapshot"}.txt`);
-      agentBrowser(["snapshot"], path);
+      const cdpPort = readJsonField<number>(join(runDir, "meta.json"), "cdpPort");
+      agentBrowser(["snapshot"], { session: BROWSER_SESSION, cdpPort, outputPath: path });
       console.log(path);
       return;
     }
@@ -76,7 +78,8 @@ async function curlTranscript(runDir: string): Promise<string> {
   const health = await fetchText(`${record.address.replace(/\/$/, "")}/api/health`);
   const anon = await ticketStatus(record.address);
   const auth = await ticketStatus(record.address, record.token);
-  const version = await cdpVersion(cdpPort);
+  const title = agentBrowser(["get", "title"], { session: BROWSER_SESSION, cdpPort }).trim();
+  const url = agentBrowser(["get", "url"], { session: BROWSER_SESSION, cdpPort }).trim();
   return [
     `GET ${record.address}/api/health`,
     health?.body ?? "",
@@ -85,8 +88,10 @@ async function curlTranscript(runDir: string): Promise<string> {
     `status ${anon ?? "error"}`,
     `POST ${record.address}/api/ws-ticket (bearer)`,
     `status ${auth ?? "error"}`,
-    `GET http://127.0.0.1:${cdpPort}/json/version`,
-    version ?? "",
+    `agent-browser --session ${BROWSER_SESSION} --cdp ${cdpPort} get title`,
+    title,
+    `agent-browser --session ${BROWSER_SESSION} --cdp ${cdpPort} get url`,
+    url,
     "",
   ].join("\n");
 }

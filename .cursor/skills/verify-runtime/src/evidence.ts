@@ -22,16 +22,30 @@ export function appendNote(dest: string, text: string): void {
   writeText(path, `${previous}${text}\n`);
 }
 
-export function agentBrowser(args: string[], outputPath?: string): string {
+export type AgentBrowserOptions = {
+  outputPath?: string;
+  session?: string;
+  cdpPort?: number;
+};
+
+export function agentBrowser(args: string[], options: AgentBrowserOptions = {}): string {
   if (commandOnPath("agent-browser") === undefined) {
-    throw new Error("agent-browser is not on PATH");
+    throw new Error("agent-browser is not on PATH — desktop drive uses `agent-browser connect`, not raw CDP curl");
   }
-  const result = runCommand("agent-browser", args);
+  const argv: string[] = [];
+  if (options.session !== undefined) {
+    argv.push("--session", options.session);
+  }
+  if (options.cdpPort !== undefined) {
+    argv.push("--cdp", String(options.cdpPort));
+  }
+  argv.push(...args);
+  const result = runCommand("agent-browser", argv);
   if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `agent-browser ${args.join(" ")} failed`);
+    throw new Error(result.stderr.trim() || `agent-browser ${argv.join(" ")} failed`);
   }
-  if (outputPath !== undefined) {
-    writeText(outputPath, result.stdout);
+  if (options.outputPath !== undefined) {
+    writeText(options.outputPath, result.stdout);
   }
   return result.stdout;
 }
