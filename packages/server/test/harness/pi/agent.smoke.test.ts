@@ -6,8 +6,10 @@ import { Effect, Stream } from "effect";
 
 import { makePiProcess } from "../../../src/harness/pi/process";
 
-layer(NodeServices.layer)("pi live smoke", (it) => {
-  it.effect.skipIf(process.env.PI_SMOKE !== "1")(
+const runLivePiTests = process.env.PIE_LIVE_TESTS === "1";
+
+layer(NodeServices.layer, { excludeTestServices: true })("pi live smoke", (it) => {
+  it.effect.skipIf(!runLivePiTests)(
     "runs one real turn",
     () =>
       Effect.gen(function* () {
@@ -30,6 +32,6 @@ layer(NodeServices.layer)("pi live smoke", (it) => {
         assert.equal(chunks.at(-1)?.type, "finish");
         yield* agent.session.abort(sessionId);
       }),
-    120_000,
+    180_000,
   );
 });

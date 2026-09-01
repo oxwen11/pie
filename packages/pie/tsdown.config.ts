@@ -2,7 +2,10 @@ import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/node/cli.ts"],
+  entry: {
+    cli: "src/node/cli.ts",
+    "pi-process": "../server/src/harness/pi/process-host/main.ts",
+  },
   platform: "node",
   // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
   // artifact beside the final CLI so runtime lookup never depends on a repo.

@@ -19,7 +19,7 @@ import pkg from "../../package.json" with { type: "json" };
 /**
  * argv that re-launches this very CLI in foreground `serve` mode. The daemon is
  * just `pie serve` spawned detached — no second bundle, and `execArgv`
- * carries the dev loader (e.g. tsx) so it works from source too.
+ * carries the dev loader so it works from source too (`bun` in `pnpm dev`).
  */
 function serverArgv(): string[] {
   return [process.execPath, ...process.execArgv, process.argv[1] ?? "", "serve"];

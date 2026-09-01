@@ -1,5 +1,4 @@
 import path from "node:path";
-import url from "node:url";
 
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
@@ -7,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   checkPiAvailability,
   piAvailabilityTarget,
-  resolveBundledPiCli,
   resolvePiExecutable,
+  resolvePiProcessEntry,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
@@ -30,27 +29,24 @@ describe("resolvePiExecutable", () => {
     });
   });
 
-  it("falls back to bundled pi-coding-agent via Node", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
+  it("spawns the pie Pi process via Node against dist/pi-process.mjs", () => {
+    const entry = resolvePiProcessEntry();
+    expect(entry.endsWith(`${path.sep}dist${path.sep}pi-process.mjs`)).toBe(true);
     expect(resolvePiExecutable({})).toEqual({
       command: process.execPath,
-      prefixArgs: [bundled!],
+      prefixArgs: [entry],
     });
-  });
-
-  it("resolves the bundled cli from the workspace dependency graph", () => {
-    const bundled = resolveBundledPiCli();
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
   });
 });
 
 describe("piAvailabilityTarget", () => {
   it("checks the script path when Pi is run under Node", () => {
     expect(
-      piAvailabilityTarget({ command: process.execPath, prefixArgs: ["/opt/pi/dist/cli.js"] }),
-    ).toBe("/opt/pi/dist/cli.js");
+      piAvailabilityTarget({
+        command: process.execPath,
+        prefixArgs: ["/opt/pie/dist/pi-process.mjs"],
+      }),
+    ).toBe("/opt/pie/dist/pi-process.mjs");
   });
 
   it("checks the command name for PATH lookup", () => {
@@ -59,26 +55,25 @@ describe("piAvailabilityTarget", () => {
 });
 
 describe("checkPiAvailability", () => {
-  it("reports bundled Pi available when the script file exists", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
+  it("reports the pie Pi process available when the script file exists", () => {
+    const entry = resolvePiProcessEntry();
 
     const result = Effect.runSync(
-      checkPiAvailability({ command: process.execPath, prefixArgs: [bundled!] }).pipe(
-        Effect.provide(fakeStats({ [bundled!]: fileInfo("File", 0o644) })),
+      checkPiAvailability({ command: process.execPath, prefixArgs: [entry] }).pipe(
+        Effect.provide(fakeStats({ [entry]: fileInfo("File", 0o644) })),
       ),
     );
     expect(result).toEqual({ available: true });
   });
 
-  it("reports bundled Pi missing when the script file is absent", () => {
+  it("reports the pie Pi process missing when the script file is absent", () => {
     const result = Effect.runSync(
       checkPiAvailability({
         command: process.execPath,
-        prefixArgs: ["/does/not/exist/cli.js"],
+        prefixArgs: ["/does/not/exist/pi-process.mjs"],
       }).pipe(Effect.provide(fakeStats({}))),
     );
-    expect(result).toEqual({ available: false, reason: "Bundled Pi is missing." });
+    expect(result).toEqual({ available: false, reason: "Pie Pi process is missing." });
   });
 
   it("reports PATH Pi missing when the command is not installed", () => {

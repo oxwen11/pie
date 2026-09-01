@@ -106,7 +106,12 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
       assert.match(sessionId, /^[0-9a-f]{8}-[0-9a-f-]{27}$/);
 
-      const prompt = yield* agent.session.prompt({ sessionId, text: "ping" });
+      const prompt = yield* agent.session.prompt({
+        sessionId,
+        text: "ping",
+        turnId: "client-turn-id",
+      });
+      assert.equal(prompt.turnId, "client-turn-id");
       assert.equal(prompt.started, true);
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.deepEqual(

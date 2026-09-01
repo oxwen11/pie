@@ -15,13 +15,13 @@ import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
-import type { PiExecutable } from "./resolve-executable";
+import { resolvePiExecutable, type PiExecutable } from "./resolve-executable";
 import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
 
-// Pi facade: one `pi --mode rpc` child per session (pi's RPC mode hosts a
-// single session), unlike codex's shared app-server with thread demuxing.
+// Pi facade: one pie-owned Pi process per session (AgentSessionRuntime in a
+// child), unlike a shared app-server with thread demuxing.
 // Crash isolation therefore comes for free — a dead child only takes down its
 // own session — and there is no transport-generation bookkeeping.
 
@@ -101,6 +101,7 @@ export interface PiProcess {
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
+      readonly turnId?: string;
     }) => Effect.Effect<
       {
         readonly turnId: string;
@@ -479,7 +480,7 @@ export const makePiProcessWithDependencies = <R>(
             > =>
               Effect.uninterruptibleMask((restore) =>
                 Effect.gen(function* () {
-                  const turnId = uuid();
+                  const turnId = input.turnId ?? uuid();
                   const ended = yield* Deferred.make<void>();
                   const decision = yield* Ref.modify<PiTurnState, TurnDecision>(
                     session.turnState,
@@ -668,7 +669,7 @@ export const makePiProcess = (
   makePiProcessWithDependencies({
     makeTransport: (config) =>
       makePiTransport({
-        ...(options.executable ? { executable: options.executable } : undefined),
+        executable: options.executable ?? resolvePiExecutable(),
         ...(options.args ? { args: options.args } : undefined),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : undefined),

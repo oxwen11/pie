@@ -223,6 +223,35 @@ describe("PiAgentSessionService", () => {
     ).toEqual([true, false]);
   });
 
+  it("uses the prompt receipt turn id for runtime events", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const receipt = yield* fixture.service.prompt({
+          ref,
+          parts: [{ type: "text", text: "hello" }],
+        });
+        return { receipt, prompts: fixture.spy.prompt.slice() };
+      }),
+    );
+
+    expect(result.prompts).toEqual([{ sessionId: "native-1", turnId: result.receipt.turnId }]);
+  });
+
+  it("returns the active turn id when a prompt is delivered as a steer", async () => {
+    const receipt = await run({ promptTurnId: "active-turn" }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        return yield* fixture.service.prompt({
+          ref,
+          parts: [{ type: "text", text: "change direction" }],
+        });
+      }),
+    );
+
+    expect(receipt.turnId).toBe("active-turn");
+  });
+
   it("getMessages returns empty for a session Pi has never opened", async () => {
     const messages = await run({}, (fixture) =>
       Effect.gen(function* () {
@@ -670,8 +699,8 @@ describe("PiAgentSessionService", () => {
       Effect.gen(function* () {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
-        // prompt forkDetachs Pi open; keep this scope alive until the adapter
-        // log lands so the identity wrap is still on the fiber.
+        // Keep this scope alive until the adapter log lands so the identity
+        // wrap is still on the prompt fiber.
         yield* Effect.gen(function* () {
           for (let attempt = 0; attempt < 200; attempt += 1) {
             if (records.some((record) => record.message === "pi creating")) return;

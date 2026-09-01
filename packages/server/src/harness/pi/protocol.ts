@@ -8,10 +8,9 @@ import type {
   SessionMessageEntry,
 } from "@earendil-works/pi-coding-agent";
 
-// Pi's RPC wire protocol (`pi --mode rpc`, JSON lines over stdio). Unlike codex,
-// the types come straight from the published package — pi is TypeScript-native,
-// so there is no vendored ts-rs output. All imports are type-only; the pi
-// runtime itself never loads in-process.
+// JSONL stdio protocol between the server and the pie-owned Pi process.
+// Types come from the published package — all imports here are type-only.
+// The live runtime loads in the child (`process-host`), not in this process.
 //
 // stdout frames:
 //   • `{ type: "response", command, success, ... }`  — reply to a stdin command

@@ -2,6 +2,7 @@ import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from 
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
+import { serializeJsonLine } from "./process-host/jsonl";
 import {
   isBlockingUiRequest,
   type AgentSessionEvent,
@@ -15,7 +16,7 @@ const DEFAULT_FORCE_KILL_AFTER = "2 seconds";
 
 export type PiTransportFailure = PiTransportError | PiRpcError | AgentProcessExited;
 
-import type { PiExecutable } from "./resolve-executable";
+import { resolvePiExecutable, type PiExecutable } from "./resolve-executable";
 
 export interface PiTransportOptions {
   readonly executable?: PiExecutable;
@@ -74,15 +75,13 @@ export const makePiTransport = (
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
-    const executable = options.executable ?? { command: "pi", prefixArgs: [] };
+    const executable = options.executable ?? resolvePiExecutable();
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
           executable.command,
           [
             ...executable.prefixArgs,
-            "--mode",
-            "rpc",
             ...(options.sessionId ? ["--session-id", options.sessionId] : []),
             ...(options.args ?? []),
           ],
@@ -129,7 +128,7 @@ export const makePiTransport = (
     const offerOutgoing = (frame: Record<string, unknown>): Effect.Effect<void, PiTransportError> =>
       Effect.gen(function* () {
         const encoded = yield* Effect.try({
-          try: () => `${JSON.stringify(frame)}\n`,
+          try: () => serializeJsonLine(frame),
           catch: (cause) => transportError("encode-frame", cause),
         });
         const accepted = yield* Queue.offer(outgoing, encoded);

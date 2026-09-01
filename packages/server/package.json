@@ -40,8 +40,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@earendil-works/pi-agent-core": "0.84.2",
+    "@earendil-works/pi-ai": "0.84.2",
     "@effect/vitest": "catalog:effect",
     "@getpie/typescript": "workspace:*",
+    "@orpc/client": "catalog:orpc",
+    "@orpc/contract": "catalog:orpc",
     "@types/ws": "catalog:"
   }
 }

@@ -159,4 +159,31 @@ rl.on("line", (line) => {
       });
     }),
   );
+
+  it.effect("does not pass --mode rpc", () =>
+    Effect.gen(function* () {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-args-"));
+      const file = path.join(dir, "fake-pi.js");
+      fs.writeFileSync(
+        file,
+        `#!/usr/bin/env node
+const readline = require("node:readline");
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", (line) => {
+  const msg = JSON.parse(line);
+  process.stdout.write(JSON.stringify({ id: msg.id, type: "response", command: "get_state", success: true, data: { argv: process.argv } }) + "\\n");
+});
+`,
+      );
+      fs.chmodSync(file, 0o755);
+      const transport = yield* makePiTransport({
+        executable: { command: file, prefixArgs: [] },
+        sessionId: "sid-42",
+      });
+      const data = yield* transport.command<{ argv: string[] }>({ type: "get_state" });
+      assert.equal(data.argv.includes("rpc"), false);
+      assert.equal(data.argv.includes("--mode"), false);
+      assert.ok(data.argv.includes("--session-id"));
+    }),
+  );
 });

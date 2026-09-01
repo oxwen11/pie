@@ -18,7 +18,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "PIE_PORT=4180 tsx src/node/cli.ts serve",
+    "dev": "PIE_PORT=4180 bun src/node/cli.ts serve",
     "build": "tsdown",
     "start": "node dist/cli.mjs",
     "publint": "publint",
