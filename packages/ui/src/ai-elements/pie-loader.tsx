@@ -27,7 +27,7 @@ type PieLoaderStyle = CSSProperties & {
 };
 
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
-  /** Outer mark size in px. Omit to scale with the surrounding text (~0.7em). */
+  /** Outer mark size in px. Omit to follow the `--dot-grid-size` theme variable. */
   size?: number;
 };
 
@@ -49,7 +49,7 @@ export function PieLoader({ className, size, style, ...props }: PieLoaderProps) 
       aria-live={hidden ? undefined : "polite"}
       data-slot="pie-loader"
       className={cn(
-        "[container-type:size] inline-grid size-(--dot-grid-size) shrink-0 grid-cols-4 grid-rows-4 overflow-visible align-middle text-current [--dot-grid-animation-delay:-538ms] [--dot-grid-animation-duration:2s] [--dot-grid-off-opacity:0]",
+        "[container-type:size] inline-grid size-(--dot-grid-size,1em) shrink-0 grid-cols-4 grid-rows-4 overflow-visible align-middle text-current [--dot-grid-animation-delay:-538ms] [--dot-grid-animation-duration:2s] [--dot-grid-off-opacity:0]",
         className,
       )}
       style={markStyle}

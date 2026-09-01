@@ -1,6 +1,12 @@
 @import "@getpie/ui/globals.css";
 @import "tw-shimmer";
 
+/* PieLoader mark size. Relative to the surrounding text size; 0.7em ≈ 10px at
+ * text-sm, matching the session list. */
+@theme {
+  --dot-grid-size: 0.7em;
+}
+
 @source "../node_modules/@getpie/ui";
 
 /* Scan our own src explicitly: the desktop renderer's Vite root is

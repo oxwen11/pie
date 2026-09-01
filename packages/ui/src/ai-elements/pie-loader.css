@@ -1,7 +1,3 @@
-@theme {
-  --dot-grid-size: 0.7em;
-}
-
 @theme inline {
   --dot-grid-off-opacity: 0;
   --dot-grid-animation-duration: 2s;
