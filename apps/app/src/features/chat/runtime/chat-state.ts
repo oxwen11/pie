@@ -1,4 +1,5 @@
-import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
+import type { SessionPhase } from "@getpie/contract";
+import type { ChatStatus, UIMessage } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest } from "./agent-requests";
@@ -12,114 +13,212 @@ import type { AgentRequest } from "./agent-requests";
 // context does not.
 export type HistoryStatus = "loading" | "settled" | "unavailable";
 
-// Each Chat owns its own store: messages + status + error + retryNotice + pendingRequests.
+// Sender-local overlay for one prompt. `rpcPending` is why a snapshot must
+// not clear it: the server has not seen the prompt yet. After the RPC
+// settles the id stays until a lifecycle phase or a later snapshot.
+export type InFlightPrompt = {
+  readonly id: string;
+  readonly rpcPending: boolean;
+};
+
+// Three sources, composed at read:
+//   settled      — getMessages() only
+//   pendingUsers — prompt() / prompt.submitted / snapshot.activePrompt
+//   liveAssistant — the current turn fold
+// `messages` / AI-SDK `status` are not stored.
 export type ChatStoreState = {
-  messages: UIMessage[];
-  status: ChatStatus;
+  settled: UIMessage[];
+  pendingUsers: UIMessage[];
+  liveAssistant: UIMessage | null;
+  phase: SessionPhase;
+  inFlightPrompt: InFlightPrompt | null;
+  terminated: boolean;
   error?: Error;
-  // Transient provider retry (Pi willRetry / auto_retry). Not an Error: a
-  // successful retry must not leave a destructive banner behind.
   retryNotice?: string;
   pendingRequests: AgentRequest[];
   historyStatus: HistoryStatus;
 };
 
-// The slice of ai-sdk's ChatState this runtime still honors — the shared data
-// vocabulary (messages/status/error) plus the append and snapshot primitives.
-// The index-addressed mutators are omitted deliberately: under multi-client
-// reconcile the transcript is rewritten wholesale, so indexes are unstable and
-// replacement is id-based (upsertMessage). Implementing the remainder keeps
-// this state pinned to the ai-sdk shape — drift in `ai` fails typecheck here.
-type AiChatStateSlice = Omit<AiChatState<UIMessage>, "popMessage" | "replaceMessage">;
+export const composeMessages = (
+  s: Pick<ChatStoreState, "settled" | "pendingUsers" | "liveAssistant">,
+): UIMessage[] => {
+  const seen = new Set<string>();
+  const out: UIMessage[] = [];
+  for (const message of s.settled) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    out.push(message);
+  }
+  for (const message of s.pendingUsers) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    out.push(message);
+  }
+  if (s.liveAssistant && !seen.has(s.liveAssistant.id)) out.push(s.liveAssistant);
+  return out;
+};
 
-// Chat's state container, backed by the per-Chat store (no global store, no
-// adapter).
-export class ChatState implements AiChatStateSlice {
+export const composeStatus = (
+  s: Pick<ChatStoreState, "phase" | "inFlightPrompt" | "terminated">,
+): ChatStatus => {
+  if (s.terminated || s.phase === "crashed") return "error";
+  if (s.inFlightPrompt) return "submitted";
+  // liveAssistant can linger one fold-tick after the turn ends idle; phase
+  // is the server's word for whether the composer should stay locked.
+  if (s.phase === "running" || s.phase === "requires_action") return "streaming";
+  return "ready";
+};
+
+export const selectMessages = composeMessages;
+
+export const selectChatStatus = composeStatus;
+
+export const selectTurnInProgress = (
+  s: Pick<ChatStoreState, "phase" | "inFlightPrompt">,
+): boolean => s.inFlightPrompt !== null || s.phase === "running" || s.phase === "requires_action";
+
+export const selectCanInterrupt = (s: Pick<ChatStoreState, "phase" | "terminated">): boolean =>
+  s.phase === "running" && !s.terminated;
+
+export const selectShowThinking = (
+  s: Pick<ChatStoreState, "inFlightPrompt" | "liveAssistant">,
+): boolean => s.inFlightPrompt !== null && s.liveAssistant === null;
+
+const initial = (): ChatStoreState => ({
+  settled: [],
+  pendingUsers: [],
+  liveAssistant: null,
+  phase: "idle",
+  inFlightPrompt: null,
+  terminated: false,
+  error: undefined,
+  retryNotice: undefined,
+  pendingRequests: [],
+  historyStatus: "loading",
+});
+
+const idsOf = (messages: readonly UIMessage[]): Set<string> =>
+  new Set(messages.map((message) => message.id));
+
+// Chat's state container. Mutators write the three transcript slots, the
+// server phase, and the one in-flight overlay. Views compose at read.
+export class ChatState {
   readonly store: StoreApi<ChatStoreState>;
 
-  constructor(initialMessages: UIMessage[] = []) {
-    this.store = createStore<ChatStoreState>()(() => ({
-      messages: initialMessages,
-      status: "ready",
-      error: undefined,
-      retryNotice: undefined,
-      pendingRequests: [],
-      historyStatus: "loading",
+  constructor() {
+    this.store = createStore<ChatStoreState>()(() => initial());
+  }
+
+  #commit(
+    update: Partial<ChatStoreState> | ((s: ChatStoreState) => Partial<ChatStoreState>),
+  ): void {
+    this.store.setState(update);
+  }
+
+  get snapshot(): ChatStoreState {
+    return this.store.getState();
+  }
+
+  // `retainLive` keeps an open fold's assistant when settled is replaced
+  // mid-turn. After the fold is gone, omit it so a history replace drops the
+  // leftover live slot (history ids and fold ids are not the same).
+  setSettled(settled: UIMessage[], options?: { readonly retainLive?: boolean }): void {
+    this.#commit((s) => {
+      const ids = idsOf(settled);
+      const live = s.liveAssistant;
+      return {
+        settled,
+        pendingUsers: s.pendingUsers.filter((message) => !ids.has(message.id)),
+        liveAssistant: options?.retainLive && live && !ids.has(live.id) ? live : null,
+      };
+    });
+  }
+
+  // True when the id was not already in settled or pending.
+  addPendingUser(message: UIMessage): boolean {
+    const s = this.store.getState();
+    if (
+      s.settled.some((m) => m.id === message.id) ||
+      s.pendingUsers.some((m) => m.id === message.id)
+    ) {
+      return false;
+    }
+    this.#commit({ pendingUsers: [...s.pendingUsers, message] });
+    return true;
+  }
+
+  removePendingUser(messageId: string): void {
+    this.#commit((s) => ({
+      pendingUsers: s.pendingUsers.filter((message) => message.id !== messageId),
     }));
   }
 
-  get messages(): UIMessage[] {
-    return this.store.getState().messages;
-  }
-  set messages(messages: UIMessage[]) {
-    this.store.setState({ messages });
+  setLiveAssistant(message: UIMessage | null): void {
+    this.#commit({ liveAssistant: message === null ? null : structuredClone(message) });
   }
 
-  get status(): ChatStatus {
-    return this.store.getState().status;
-  }
-  set status(status: ChatStatus) {
-    this.store.setState({ status });
-  }
-
-  get historyStatus(): HistoryStatus {
-    return this.store.getState().historyStatus;
-  }
-  set historyStatus(historyStatus: HistoryStatus) {
-    this.store.setState({ historyStatus });
-  }
-
-  get error(): Error | undefined {
-    return this.store.getState().error;
-  }
-  set error(error: Error | undefined) {
-    this.store.setState({ error });
-  }
-
-  get retryNotice(): string | undefined {
-    return this.store.getState().retryNotice;
-  }
-  set retryNotice(retryNotice: string | undefined) {
-    this.store.setState({ retryNotice });
-  }
-
-  pushMessage = (message: UIMessage) => {
-    this.store.setState((s) => ({ messages: [...s.messages, message] }));
-  };
-  // Replace-by-id or append: the turn folds produce message snapshots that
-  // evolve under a stable id, and the reducer mutates one message object in
-  // place across chunks. Clone on write so each update carries fresh part
-  // identities — otherwise memos keyed on `message.parts` never recompute.
-  upsertMessage = (message: UIMessage) => {
-    this.store.setState((s) => {
-      const index = s.messages.findIndex((m) => m.id === message.id);
-      const next = s.messages.slice();
-      if (index === -1) next.push(this.snapshot(message));
-      else next[index] = this.snapshot(message);
-      return { messages: next };
+  // Fold the live assistant into settled so the bubble survives the fold
+  // closing, then drop the live slot. A later setSettled replaces this.
+  promoteLive(): void {
+    this.#commit((s) => {
+      if (!s.liveAssistant) return { liveAssistant: null };
+      if (s.settled.some((message) => message.id === s.liveAssistant!.id)) {
+        return { liveAssistant: null };
+      }
+      return { settled: [...s.settled, s.liveAssistant], liveAssistant: null };
     });
-  };
-  snapshot = <T>(value: T): T => structuredClone(value);
+  }
 
-  // Pending agent requests (cleared when the turn ends). The server owns this
-  // state: a snapshot hydration replaces the list wholesale, live events add
-  // and remove.
-  setPendingRequests = (pendingRequests: AgentRequest[]) => {
-    this.store.setState({ pendingRequests });
-  };
-  addPendingRequest = (request: AgentRequest) => {
-    this.store.setState((s) => ({
+  setPhase(phase: SessionPhase): void {
+    this.#commit({ phase });
+  }
+
+  setInFlightPrompt(inFlightPrompt: InFlightPrompt | null): void {
+    this.#commit({ inFlightPrompt });
+  }
+
+  setTerminated(): void {
+    this.#commit({
+      terminated: true,
+      inFlightPrompt: null,
+      liveAssistant: null,
+      pendingRequests: [],
+      retryNotice: undefined,
+      historyStatus: "settled",
+    });
+  }
+
+  setHistoryStatus(historyStatus: HistoryStatus): void {
+    this.#commit({ historyStatus });
+  }
+
+  setError(error: Error | undefined): void {
+    this.#commit({ error });
+  }
+
+  setRetryNotice(retryNotice: string | undefined): void {
+    this.#commit({ retryNotice });
+  }
+
+  setPendingRequests(pendingRequests: AgentRequest[]): void {
+    this.#commit({ pendingRequests });
+  }
+
+  addPendingRequest(request: AgentRequest): void {
+    this.#commit((s) => ({
       pendingRequests: s.pendingRequests.some((r) => r.id === request.id)
         ? s.pendingRequests.map((r) => (r.id === request.id ? request : r))
         : [...s.pendingRequests, request],
     }));
-  };
-  removePendingRequest = (requestId: string) => {
-    this.store.setState((s) => ({
+  }
+
+  removePendingRequest(requestId: string): void {
+    this.#commit((s) => ({
       pendingRequests: s.pendingRequests.filter((r) => r.id !== requestId),
     }));
-  };
-  clearPendingRequests = () => {
-    this.store.setState({ pendingRequests: [] });
-  };
+  }
+
+  clearPendingRequests(): void {
+    this.#commit({ pendingRequests: [] });
+  }
 }

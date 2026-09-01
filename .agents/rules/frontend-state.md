@@ -81,10 +81,14 @@ for per-agent tool rendering.
   referential stability; say so in a comment so nobody "simplifies" the
   `useCallback` away.
 - Zustand here is not a global store: each `Chat` instance creates its own vanilla
-  store as the AI SDK `ChatState`. `ChatManager` caches Chat instances by the
-  complete `SessionRef` so transcripts survive navigation without crossing
-  project/harness identity, and is constructed at App mount (module scope has no
-  host connection yet).
+  store. The transcript is three slots (`settled` from `getMessages`,
+  `pendingUsers` from unconfirmed prompts, `liveAssistant` from the open fold);
+  `messages` and AI-SDK `status` are composed at read, not stored.
+  `inFlightPrompt` is the one sender overlay (spinner until lifecycle / snapshot
+  after the RPC settles). `ChatManager` caches Chat instances by the complete
+  `SessionRef` so transcripts survive navigation without crossing project/harness
+  identity, and is constructed at App mount (module scope has no host connection
+  yet).
 - Content-panel tabs, live instances, provider bindings, and panel handles use
   the complete `SessionRef`; shell state is never keyed by a bare sessionId.
   The app-lifetime host registers unconditional panel definitions beside its
