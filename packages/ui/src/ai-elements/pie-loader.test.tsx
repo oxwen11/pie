@@ -50,7 +50,7 @@ describe("PieLoader", () => {
     expect(mark?.className).toContain("text-muted-foreground");
   });
 
-  it("leaves size to the 10px default when omitted", async () => {
+  it("leaves size to the proportional (~0.7em) default when omitted", async () => {
     const el = await render(<PieLoader />);
     const mark = el.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
 
