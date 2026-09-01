@@ -1,27 +1,36 @@
 import type { SessionSummary } from "@getpie/contract";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/menu";
-import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuPopup,
+  ContextMenuTrigger,
+} from "@getpie/ui/components/context-menu";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";
-import { useState } from "react";
+import { Archive, ArchiveRestore, Pencil } from "lucide-react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
 
-/** Session mutations live behind one actions-menu capability boundary. */
+/** Session mutations live behind one actions-menu capability boundary. The
+ *  menu is a right-click context menu: `render` is the row button element and
+ *  children render inside it. */
 export function SessionActionsMenu({
+  children,
   isActive,
+  render,
   session,
 }: {
+  readonly children: ReactNode;
   readonly isActive: () => boolean;
+  readonly render: ReactElement;
   readonly session: SessionSummary;
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
-  const title = session.title ?? "New chat";
 
   const setArchived = useMutation({
     mutationFn: (archived: boolean) =>
@@ -56,33 +65,25 @@ export function SessionActionsMenu({
 
   return (
     <>
-      <Menu>
-        <MenuTrigger
-          render={
-            <SidebarMenuAction
-              aria-label={`Actions for ${title}`}
-              className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent md:data-[state=open]:bg-sidebar-accent"
-              disabled={setArchived.isPending}
-              showOnHover
-            />
-          }
-        >
-          <Ellipsis />
-        </MenuTrigger>
-        <MenuPopup align="start" side="right">
-          <MenuItem onClick={() => setRenaming(true)}>
+      <ContextMenu>
+        <ContextMenuTrigger render={render}>{children}</ContextMenuTrigger>
+        {/* `!` — the vendored popup's not-[class*='w-']:min-w-32 guard
+            miscompiles to an always-matching, higher-specificity min-w-32, so a
+            plain override can't win. */}
+        <ContextMenuPopup align="start" className="min-w-48!">
+          <ContextMenuItem onClick={() => setRenaming(true)}>
             <Pencil />
             Rename
-          </MenuItem>
-          <MenuItem
+          </ContextMenuItem>
+          <ContextMenuItem
             disabled={setArchived.isPending}
             onClick={() => setArchived.mutate(!session.archived)}
           >
             {session.archived ? <ArchiveRestore /> : <Archive />}
             {session.archived ? "Restore" : "Archive"}
-          </MenuItem>
-        </MenuPopup>
-      </Menu>
+          </ContextMenuItem>
+        </ContextMenuPopup>
+      </ContextMenu>
       {/* Mounted only while open so the draft title starts from the current
           title every time, and unmounted before the menu's own exit animation
           has anywhere to put focus back. */}
