@@ -1,11 +1,19 @@
 // @vitest-environment jsdom
+import { SidebarProvider } from "@getpie/ui/components/sidebar";
+import { domAnimation, LazyMotion } from "motion/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Group } from "react-resizable-panels";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResizablePanel } from "./resizable-panel";
-import { ShellContentPanel } from "./shell-panels";
+import {
+  notifyUserLayoutListeners,
+  resolveSidebarUserLayout,
+  ShellContentPanel,
+  ShellGroup,
+  ShellSidebarPanel,
+} from "./shell-panels";
 
 Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
@@ -14,6 +22,17 @@ Object.assign(globalThis, {
     observe(): void {}
     unobserve(): void {}
   },
+});
+
+window.matchMedia = (query) => ({
+  addEventListener() {},
+  addListener() {},
+  dispatchEvent: () => false,
+  matches: false,
+  media: query,
+  onchange: null,
+  removeEventListener() {},
+  removeListener() {},
 });
 
 let root: Root | undefined;
@@ -27,6 +46,53 @@ afterEach(() => {
 });
 
 describe("shell panels", () => {
+  it("keeps the settled sidebar drawer bound to the live panel width", () => {
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <SidebarProvider defaultOpen>
+          <LazyMotion features={domAnimation}>
+            <ShellGroup hasContentPanel={false} hasSidebar>
+              <ShellSidebarPanel>
+                <div>Sidebar</div>
+              </ShellSidebarPanel>
+              <ResizablePanel id="main">Main</ResizablePanel>
+            </ShellGroup>
+          </LazyMotion>
+        </SidebarProvider>,
+      );
+    });
+
+    const drawer = container.querySelector<HTMLElement>("[data-slot=sidebar-drawer]");
+
+    expect(drawer?.dataset.state).toBe("open");
+    expect(drawer?.style.width).toBe("100%");
+    expect(drawer?.style.transform).toBe("none");
+  });
+
+  it("notifies width memory only for completed user layouts", () => {
+    const listener = vi.fn<() => void>();
+    const listeners = new Set([listener]);
+
+    notifyUserLayoutListeners({ isUserInteraction: false }, listeners);
+    expect(listener).not.toHaveBeenCalled();
+
+    notifyUserLayoutListeners({ isUserInteraction: true }, listeners);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("remembers expanded user widths and synchronizes user collapse state", () => {
+    expect(resolveSidebarUserLayout(true, false, 360)).toEqual({ expandedWidth: 360 });
+    expect(resolveSidebarUserLayout(true, true, 0)).toEqual({ open: false });
+    expect(resolveSidebarUserLayout(false, false, 360)).toEqual({
+      expandedWidth: 360,
+      open: true,
+    });
+  });
+
   it("clips the resizable panel content wrapper", () => {
     container = document.createElement("div");
     document.body.append(container);
