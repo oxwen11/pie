@@ -1,6 +1,7 @@
 import type {
   PullRequestAction,
   PullRequestMergeMethod,
+  PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 import { Data, Effect, Ref, Stream } from "effect";
@@ -41,12 +42,19 @@ export const CURRENT_PULL_REQUEST_FIELDS = [
   "updatedAt",
 ] as const;
 
-export const currentPullRequestArgs = (): ReadonlyArray<string> => [
-  "pr",
-  "view",
-  "--json",
-  CURRENT_PULL_REQUEST_FIELDS.join(","),
-];
+export const pullRequestViewUrl = (ref: PullRequestRef): string =>
+  `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
+
+export const currentPullRequestArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
+  pullRequest === undefined
+    ? ["pr", "view", "--json", CURRENT_PULL_REQUEST_FIELDS.join(",")]
+    : [
+        "pr",
+        "view",
+        pullRequestViewUrl(pullRequest),
+        "--json",
+        CURRENT_PULL_REQUEST_FIELDS.join(","),
+      ];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -195,7 +203,7 @@ const isUnsupportedContext = (stderr: string): boolean =>
   );
 
 const isNoPullRequest = (stderr: string): boolean =>
-  /no pull requests found for branch/i.test(stderr);
+  /no pull requests found(?: for branch)?|could not find pull request/i.test(stderr);
 
 const isUnsupportedHeadFlag = (stderr: string): boolean =>
   /unknown flag:\s*--match-head-commit|unknown shorthand flag.*match-head-commit/i.test(stderr);
@@ -231,6 +239,7 @@ export type PullRequestCliActionFailure =
 export interface GitHubCliAdapter {
   readonly current: (
     cwd: string,
+    pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly runAction: (input: {
     readonly cwd: string;
@@ -253,8 +262,8 @@ const mapExecutionActionError = (error: GitHubCliExecutionError): PullRequestCli
 export const makeGitHubCliAdapter = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
 ): GitHubCliAdapter => ({
-  current: (cwd) =>
-    executeGh(spawner, cwd, currentPullRequestArgs()).pipe(
+  current: (cwd, pullRequest) =>
+    executeGh(spawner, cwd, currentPullRequestArgs(pullRequest)).pipe(
       Effect.mapError(mapExecutionReadError),
       Effect.flatMap(
         (result): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {

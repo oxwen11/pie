@@ -19,6 +19,23 @@ describe("GitHub CLI command construction", () => {
     ]);
   });
 
+  it("views a stored pull request by URL", () => {
+    expect(
+      currentPullRequestArgs({
+        host: "github.com",
+        owner: "getpie",
+        repository: "pie",
+        number: 42,
+      }),
+    ).toEqual([
+      "pr",
+      "view",
+      "https://github.com/getpie/pie/pull/42",
+      "--json",
+      CURRENT_PULL_REQUEST_FIELDS.join(","),
+    ]);
+  });
+
   it("spawns gh directly in the resolved cwd with prompts disabled", async () => {
     const output = JSON.stringify({
       autoMergeRequest: null,

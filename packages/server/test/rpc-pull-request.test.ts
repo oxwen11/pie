@@ -123,6 +123,55 @@ describe("pull request router", () => {
     }
   });
 
+  it("persists the current pull request and rereads stored refs by number", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
+    const workspace = await makeRepository();
+    const received: Array<{ cwd: string; number: number | undefined }> = [];
+    const pullRequestLayer = Layer.succeed(PullRequestService, {
+      current: (cwd, pullRequest) => {
+        received.push({ cwd, number: pullRequest?.number });
+        return Effect.succeed(
+          pullRequest === undefined
+            ? { ...snapshot, lifecycle: { type: "merged" } as const }
+            : { ...snapshot, lifecycle: { type: "open", draft: false } as const },
+        );
+      },
+      runAction: () => Effect.die("unexpected pull request action"),
+    });
+    const harness = await makeRpcTestHarness(home, { pullRequestLayer });
+    try {
+      const project = await harness.client.project.create({ path: workspace });
+      const first = await harness.client.agent.session.create({ projectId: project.id });
+      const second = await harness.client.agent.session.create({ projectId: project.id });
+
+      await expect(harness.client.pullRequest.current({ ref: first.ref })).resolves.toMatchObject({
+        ref: snapshot.ref,
+        lifecycle: { type: "merged" },
+      });
+      const stored = JSON.parse(
+        fs.readFileSync(
+          path.join(home, "storage", "sessions", project.id, `${first.ref.sessionId}.json`),
+          "utf8",
+        ),
+      ) as { data: { pullRequestRefs?: unknown } };
+      expect(stored.data.pullRequestRefs).toEqual([snapshot.ref]);
+
+      received.length = 0;
+      await expect(
+        harness.client.pullRequest.statuses({ refs: [first.ref, second.ref] }),
+      ).resolves.toEqual([
+        { ref: first.ref, lifecycle: { type: "open", draft: false } },
+        { ref: second.ref, lifecycle: { type: "merged" } },
+      ]);
+      expect(received).toEqual([
+        { cwd: first.workspace.cwd, number: snapshot.ref.number },
+        { cwd: workspace, number: undefined },
+      ]);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("maps a missing SessionRef before calling the pull request service", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
     const harness = await makeRpcTestHarness(home, { pullRequestLayer: quietPullRequestLayer });
