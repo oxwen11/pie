@@ -70,7 +70,7 @@ export function SessionActionsMenu({
         {/* `!` — the vendored popup's not-[class*='w-']:min-w-32 guard
             miscompiles to an always-matching, higher-specificity min-w-32, so a
             plain override can't win. */}
-        <ContextMenuPopup className="min-w-48!">
+        <ContextMenuPopup align="end" className="min-w-48!">
           <ContextMenuItem onClick={() => setRenaming(true)}>
             <Pencil />
             Rename
