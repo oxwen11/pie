@@ -4,12 +4,12 @@ The CLI is Effect `Command`. `--help` / `-h` and `--version` must work without a
 
 ## How to get to it
 
-A current run is optional for `--help`. Prefer `verify-pie-cli-run` so Node 24 and the repo CLI are used.
+A current run is optional for `--help`. Prefer `verify-pie-cli run` so Node 24 and the repo CLI are used.
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli-run --help
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli-run daemon --help
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli-run --version
+.cursor/skills/verify-pie-cli/bin/verify-pie-cli run --help
+.cursor/skills/verify-pie-cli/bin/verify-pie-cli run daemon --help
+.cursor/skills/verify-pie-cli/bin/verify-pie-cli run --version
 ```
 
 ## Driving it

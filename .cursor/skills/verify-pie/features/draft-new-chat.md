@@ -35,7 +35,7 @@ Proof:
 
 - User bubble shows the exact prompt text.
 - Sidebar lists a session titled with that prompt under the project.
-- `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` exists; `cwd` is the project path; `title` is the prompt. `verify-pie-evidence side-effects`.
+- `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` exists; `cwd` is the project path; `title` is the prompt. `verify-pie evidence side-effects`.
 - Assistant streaming is **optional**. Without `pi` or provider keys, a **Model request failed** card is still a successful create.
 
 Worktree path (only if the imported folder is a git repo): switch the workspace select to **New worktree**, pick a base branch, send. Create must fail closed on git errors (no session file). Success writes `cwd` under `$PIE_HOME/worktrees/<repo>/<key>/`.

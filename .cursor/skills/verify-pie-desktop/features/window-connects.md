@@ -23,9 +23,9 @@ cd apps/desktop && pnpm e2e -- desktop-rpc.spec.ts -g "renders in the background
 ## Real isolated window
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-launch
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-doctor
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence init
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop doctor
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence init
 ```
 
 Attach with `agent-browser skills get electron` to the CDP port from doctor. Snapshot must not show **Pie could not start**. After connect, splash `Starting Pie` is gone. Title is **Pie**.

@@ -20,7 +20,7 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 ## Driving it with agent-browser
 
 ```bash
-verify-pie-doctor
+verify-pie doctor
 agent-browser open http://localhost:4190/
 # wait for empty heading or the draft composer — not the root-route flash
 agent-browser snapshot
@@ -41,7 +41,7 @@ Proof (all of these):
 - Draft composer is visible: placeholder **Ask Pi anything...**, project picker shows `verify-pie-sample` (not **Select a project**).
 - URL is `/draft?projectId=<uuid>` (model search params may appear once `listModels` returns).
 - Sidebar **Projects** lists **verify-pie-sample**.
-- `$PIE_HOME/storage/projects.json` `data[]` has `name: "verify-pie-sample"` and `path` equal to that folder. Use `verify-pie-evidence side-effects`.
+- `$PIE_HOME/storage/projects.json` `data[]` has `name: "verify-pie-sample"` and `path` equal to that folder. Use `verify-pie evidence side-effects`.
 
 Sidebar path (after one project exists): same dialog, opened from the Projects group action named **Import project**. Importing the same folder again must not duplicate the row (server dedupes on path).
 

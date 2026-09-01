@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for Pie Desktop (Electron + to
 
 Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web app via `@getpie/app`. It does **not** use Vite 4190. Main attach-or-spawns the **same token daemon** as the CLI (`makeDaemonServerProcess`). The daemon **outlives Electron** — closing the window is not teardown.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers live in `.cursor/skills/verify-pie-desktop/bin/` and are executable.
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers are **TypeScript** in `.cursor/skills/verify-pie-desktop/src/`, started by `.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop` (Node >= 24). Shared code: `.cursor/skills/verify-runtime/`. **Not Bash. Not Bun.**
 
 Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
@@ -16,8 +16,8 @@ Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-c
 Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. First spawn prefers **4000** (`reservePort(options.port ?? 4000)`). Main passes `port === 0` on the first attempt, so **`PIE_PORT` is ignored until a later pinned respawn**. Always read `address` from `daemon.pid`. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-launch
-# .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-launch --replace
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch
+# .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch --replace
 ```
 
 Ready when all of these hold:
@@ -42,7 +42,7 @@ If **4000** is already taken, the launcher falls back to an ephemeral port — s
 ## Doctor
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-doctor
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop doctor
 ```
 
 Checks, in order:
@@ -82,13 +82,13 @@ Existing e2e worth knowing:
 ## Evidence
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence init
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence screenshot <name>
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence snapshot <name>
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence curl
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence side-effects
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence note "…"
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-evidence path
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence init
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence screenshot <name>
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence snapshot <name>
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence curl
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence side-effects
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence note "…"
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence path
 ```
 
 `daemon.pid` is stored **redacted**. Screenshots need agent-browser attached to the Electron CDP port.
@@ -96,7 +96,7 @@ Existing e2e worth knowing:
 ## Cleanup
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-cleanup
+.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop cleanup
 ```
 
 1. Kill the recorded electron-vite process tree (TERM then KILL). **This does not stop the daemon.**
@@ -107,12 +107,14 @@ Never `pkill` electron / pie / vite.
 
 ## Helpers
 
-| Script | Purpose |
+One executable. Commands are TypeScript (`src/cli.ts`).
+
+| Command | Purpose |
 | --- | --- |
-| `verify-pie-desktop-launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. |
-| `verify-pie-desktop-doctor` | Read-only worth-driving check. |
-| `verify-pie-desktop-evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
-| `verify-pie-desktop-cleanup` | Stop Electron, then the daemon; keep evidence. |
+| `verify-pie-desktop launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. |
+| `verify-pie-desktop doctor` | Read-only worth-driving check. |
+| `verify-pie-desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
+| `verify-pie-desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate
 

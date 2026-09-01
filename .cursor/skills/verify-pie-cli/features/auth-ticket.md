@@ -7,7 +7,7 @@ The daemon always sets `PIE_AUTH_TOKEN`. `GET /api/health` stays open. `POST /ap
 Any healthy daemon launch. Doctor already checks this; a dedicated proof repeats it into evidence.
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli-evidence curl
+.cursor/skills/verify-pie-cli/bin/verify-pie-cli evidence curl
 ```
 
 ## Driving it

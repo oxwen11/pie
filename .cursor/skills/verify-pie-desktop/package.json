@@ -1,0 +1,5 @@
+{
+  "name": "@local/verify-pie-desktop",
+  "private": true,
+  "type": "module"
+}

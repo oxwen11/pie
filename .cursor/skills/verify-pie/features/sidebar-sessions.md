@@ -29,7 +29,7 @@ agent-browser snapshot
 4. Open **Actions for \<title\>** → **Rename**. Type a new title, confirm. Heading and row must match. `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` `title` matches.
 5. Actions → **Archive**. Active session: you land on `/draft?projectId=`. The row disappears from the default (non-archived) list. The JSON has `"archived": true`.
 
-Proof: URL + snapshot after each navigation, plus `verify-pie-evidence side-effects` after rename/archive. Do not prove rename by writing the JSON yourself.
+Proof: URL + snapshot after each navigation, plus `verify-pie evidence side-effects` after rename/archive. Do not prove rename by writing the JSON yourself.
 
 ## Gotchas
 

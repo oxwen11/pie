@@ -1,0 +1,5 @@
+{
+  "name": "@local/verify-pie-cli",
+  "private": true,
+  "type": "module"
+}

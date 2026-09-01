@@ -7,16 +7,16 @@ description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 
 
 Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers live in `.cursor/skills/verify-pie/bin/` and are executable.
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers are **TypeScript** in `.cursor/skills/verify-pie/src/`, started by `.cursor/skills/verify-pie/bin/verify-pie` (Node >= 24, `node --experimental-strip-types`). Shared process/HTTP/JSON code lives in `.cursor/skills/verify-runtime/`. **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
 
 ## Launch
 
 Two processes, **isolated `$PIE_HOME`**, default ports. Vite is hardcoded to **4190** with `strictPort: true` (`apps/app/vite.config.ts`); a second web instance cannot sit beside the first.
 
 ```bash
-.cursor/skills/verify-pie/bin/verify-pie-launch
+.cursor/skills/verify-pie/bin/verify-pie launch
 # idempotent if the current run is healthy
-# .cursor/skills/verify-pie/bin/verify-pie-launch --replace   # stop ours, then start
+# .cursor/skills/verify-pie/bin/verify-pie launch --replace   # stop ours, then start
 ```
 
 Ready when both answer `ok`:
@@ -49,7 +49,7 @@ If 4180 or 4190 is already taken by a process this skill did not start, launch *
 Read-only. Run before driving, and again whenever the page looks empty or disconnected.
 
 ```bash
-.cursor/skills/verify-pie/bin/verify-pie-doctor
+.cursor/skills/verify-pie/bin/verify-pie doctor
 ```
 
 It checks, in order:
@@ -80,7 +80,7 @@ agent-browser skills get core
 
 Recipe for every drive:
 
-1. `verify-pie-doctor` — abort if it fails.
+1. `verify-pie doctor` — abort if it fails.
 2. Named session (do not use the machine-wide default browser):
    `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix verify-pie)"`
 3. Open the **Vite** origin: `agent-browser open http://localhost:4190/`
@@ -118,15 +118,15 @@ Proof directory (survives cleanup):
 ```
 
 ```bash
-.cursor/skills/verify-pie/bin/verify-pie-evidence init
-.cursor/skills/verify-pie/bin/verify-pie-evidence snapshot before
-.cursor/skills/verify-pie/bin/verify-pie-evidence screenshot before
+.cursor/skills/verify-pie/bin/verify-pie evidence init
+.cursor/skills/verify-pie/bin/verify-pie evidence snapshot before
+.cursor/skills/verify-pie/bin/verify-pie evidence screenshot before
 # …drive…
-.cursor/skills/verify-pie/bin/verify-pie-evidence snapshot after
-.cursor/skills/verify-pie/bin/verify-pie-evidence screenshot after
-.cursor/skills/verify-pie/bin/verify-pie-evidence url
-.cursor/skills/verify-pie/bin/verify-pie-evidence side-effects
-.cursor/skills/verify-pie/bin/verify-pie-evidence note "what you proved"
+.cursor/skills/verify-pie/bin/verify-pie evidence snapshot after
+.cursor/skills/verify-pie/bin/verify-pie evidence screenshot after
+.cursor/skills/verify-pie/bin/verify-pie evidence url
+.cursor/skills/verify-pie/bin/verify-pie evidence side-effects
+.cursor/skills/verify-pie/bin/verify-pie evidence note "what you proved"
 ```
 
 Standards:
@@ -142,23 +142,23 @@ Standards:
 ## Cleanup
 
 ```bash
-.cursor/skills/verify-pie/bin/verify-pie-cleanup
+.cursor/skills/verify-pie/bin/verify-pie cleanup
 ```
 
 Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/verify-pie/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
 
-After cleanup, confirm evidence is still at the path `verify-pie-evidence path` printed before teardown (or `.cursor/skills/verify-pie/evidence/<run-id>/`).
+After cleanup, confirm evidence is still at the path `verify-pie evidence path` printed before teardown (or `.cursor/skills/verify-pie/evidence/<run-id>/`).
 
 ## Helpers
 
-All under `.cursor/skills/verify-pie/bin/`. Invocation is the path above; `common.sh` is sourced, not run.
+One executable. Commands are TypeScript (`src/cli.ts`).
 
-| Script | Purpose |
+| Command | Purpose |
 | --- | --- |
-| `verify-pie-launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. |
-| `verify-pie-doctor` | Read-only worth-driving check. |
-| `verify-pie-evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
-| `verify-pie-cleanup` | Kill what we started; keep evidence. |
+| `verify-pie launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. |
+| `verify-pie doctor` | Read-only worth-driving check. |
+| `verify-pie evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
+| `verify-pie cleanup` | Kill what we started; keep evidence. |
 
 ## Isolate
 

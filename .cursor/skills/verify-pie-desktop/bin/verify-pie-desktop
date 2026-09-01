@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { bootstrapSkill } from "../../verify-runtime/bootstrap.mjs";
+
+bootstrapSkill(import.meta.url);

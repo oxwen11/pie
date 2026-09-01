@@ -4,10 +4,10 @@ Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` + `$PIE_DAEMO
 
 ## How to get to it
 
-1. Start an isolated CLI daemon (`verify-pie-cli-launch` uses 4182 — **different root**). For a same-home proof, start the CLI **inside the desktop run's env** instead:
+1. Start an isolated CLI daemon (`verify-pie-cli launch` uses 4182 — **different root**). For a same-home proof, start the CLI **inside the desktop run's env** instead:
 
 ```bash
-# after verify-pie-desktop-launch
+# after verify-pie-desktop launch
 export PIE_HOME="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/verify-pie-desktop/current/meta.json","utf8")).pieHome)')"
 export PIE_DAEMON_DIR="$PIE_HOME/daemon"
 cd packages/pie && pnpm exec tsx src/node/cli.ts daemon status
