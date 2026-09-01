@@ -93,7 +93,7 @@ pnpm exec pie-verify desktop evidence note "…"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` and `desktop browser` use the packaged `agent-browser` with session `pie-verify-desktop` and `--cdp <port>` — they do not curl `/json/version`.
+`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` and `desktop browser` use the mise-managed `agent-browser` with session `pie-verify-desktop` and `--cdp <port>` — they do not curl `/json/version`.
 
 ## Cleanup
 
@@ -115,7 +115,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | --- | --- |
 | `pnpm exec pie-verify desktop launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. |
 | `pnpm exec pie-verify desktop doctor` | Read-only worth-driving check. |
-| `pnpm exec pie-verify desktop browser` | Packaged `agent-browser` with session `pie-verify-desktop` and the run's CDP port. |
+| `pnpm exec pie-verify desktop browser` | Mise-managed `agent-browser` with session `pie-verify-desktop` and the run's CDP port. |
 | `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 

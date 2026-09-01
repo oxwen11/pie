@@ -67,7 +67,7 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 ## Drive
 
-Harness: `@getpie/verify` owns **agent-browser** (`pie-verify web browser`, session `pie-verify-web`). Do not `npm i -g agent-browser`, do not export `AGENT_BROWSER_SESSION`, and do not call `agent-browser` on PATH — that splits the proof across two CLIs and can steal another session.
+Harness: `@getpie/verify` wraps the mise-managed **agent-browser** (`pie-verify web browser`, session `pie-verify-web`). Do not `npm i -g agent-browser`, do not export `AGENT_BROWSER_SESSION`, and do not call `agent-browser` on PATH — that splits the proof across two CLIs and can steal another session.
 
 Chrome at `/usr/local/bin/google-chrome` is used when present. First machine: `pnpm exec pie-verify web browser install` if the packaged CLI says no browser is available. Recipe docs: `pnpm exec pie-verify web browser skills get core`.
 
@@ -148,7 +148,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | --- | --- |
 | `pnpm exec pie-verify web launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. |
 | `pnpm exec pie-verify web doctor` | Read-only worth-driving check. |
-| `pnpm exec pie-verify web browser` | Packaged `agent-browser` with session `pie-verify-web`. `open` defaults to `http://localhost:4190/`. |
+| `pnpm exec pie-verify web browser` | Mise-managed `agent-browser` with session `pie-verify-web`. `open` defaults to `http://localhost:4190/`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 

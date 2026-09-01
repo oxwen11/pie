@@ -46,8 +46,22 @@ describe("buildAgentBrowserArgv", () => {
 });
 
 describe("resolveAgentBrowserBin", () => {
-  it("resolves the agent-browser dependency of @getpie/verify", () => {
+  it("prefers VERIFY_PIE_AGENT_BROWSER", () => {
+    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    try {
+      expect(resolveAgentBrowserBin()).toBe("/tmp/fake-agent-browser");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.VERIFY_PIE_AGENT_BROWSER;
+      } else {
+        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
+      }
+    }
+  });
+
+  it("resolves the mise-managed agent-browser", () => {
     const resolved = resolveAgentBrowserBin();
-    expect(resolved).toMatch(/agent-browser@0\.36\.0|[/\\]agent-browser[/\\]/);
+    expect(resolved).toMatch(/agent-browser/);
   });
 });

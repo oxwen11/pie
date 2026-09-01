@@ -188,7 +188,7 @@ export async function browserWeb(args: string[]): Promise<void> {
   ${WEB.bin} browser install|skills|--version
   ${WEB.bin} browser <agent-browser argv…>
 
-Uses the agent-browser dependency of @getpie/verify with --session ${session}.
+Uses the mise-managed agent-browser with --session ${session}.
 \`open\` with no URL uses http://localhost:${VITE_PORT}/.
 `;
   if (isHelpFlag(args[0])) {

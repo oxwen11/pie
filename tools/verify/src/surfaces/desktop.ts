@@ -229,7 +229,7 @@ export async function browserDesktop(args: string[]): Promise<void> {
   ${DESKTOP.bin} browser install|skills|--version
   ${DESKTOP.bin} browser <agent-browser argv…>
 
-Uses the agent-browser dependency of @getpie/verify with --session ${session}
+Uses the mise-managed agent-browser with --session ${session}
 and --cdp from the current run.
 Do not open http://localhost:4190/ or http://localhost:5173/ and call that desktop.
 `;
