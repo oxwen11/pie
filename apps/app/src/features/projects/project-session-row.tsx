@@ -24,6 +24,9 @@ export function ProjectSessionRow({
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
+        // The trailing action is hover-only on desktop (`showOnHover`); don't
+        // keep the default pe-8 gap or long titles truncate into empty space.
+        className="md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
         isActive={active}
         onClick={() => {
           navigate({
@@ -36,7 +39,7 @@ export function ProjectSessionRow({
         }}
       >
         <SessionStatusIndicator phase={session.status?.phase} />
-        <span className="truncate">{session.title ?? "New chat"}</span>
+        <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
         <SessionPullRequestIndicator lifecycle={pullRequestLifecycle} />
       </SidebarMenuButton>
       <SessionActionsMenu isActive={isActive} session={session} />

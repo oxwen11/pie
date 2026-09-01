@@ -3,6 +3,7 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
+import { makeGitHashDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Effect, FileSystem, PlatformError } from "effect";
 
 import { daemonRecordPath } from "../../src/daemon/paths";
@@ -13,6 +14,7 @@ const record: DaemonRecord = {
   address: "http://127.0.0.1:41234",
   token: "sekret",
   startedAt: 1_700_000_000_000,
+  compatibilityKey: makeGitHashDaemonCompatibilityKey("aaaaaaaa"),
 };
 
 layer(NodeServices.layer)("daemon record", (it) => {
@@ -55,6 +57,31 @@ layer(NodeServices.layer)("daemon record", (it) => {
     Effect.gen(function* () {
       const daemonDir = yield* tempDaemonDir;
       assert.equal(yield* readRecord(daemonDir), undefined);
+    }),
+  );
+
+  it.effect("reads a legacy record without a compatibility key", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const daemonDir = yield* tempDaemonDir;
+      const { compatibilityKey: _, ...legacyRecord } = record;
+
+      yield* fs.writeFileString(daemonRecordPath(daemonDir), JSON.stringify(legacyRecord));
+      assert.deepEqual(yield* readRecord(daemonDir), legacyRecord);
+    }),
+  );
+
+  it.effect("treats a malformed compatibility key as legacy", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const daemonDir = yield* tempDaemonDir;
+
+      yield* fs.writeFileString(
+        daemonRecordPath(daemonDir),
+        JSON.stringify({ ...record, compatibilityKey: "protocol:1" }),
+      );
+      const { compatibilityKey: _, ...legacyRecord } = record;
+      assert.deepEqual(yield* readRecord(daemonDir), legacyRecord);
     }),
   );
 

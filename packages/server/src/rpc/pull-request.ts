@@ -1,12 +1,11 @@
-import "@orpc/experimental-effect/extensions/effect";
 import type { SessionRef } from "@getpie/contract";
 import { pullRequestContract } from "@getpie/contract/pull-request";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import { ProjectNotFound, SessionNotFound, StoreReadError } from "../errors";
 import { PullRequestService } from "../pull-request";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { resolveWorkspaceCwd } from "./resolve-workspace";
 
 const orpc = implement(pullRequestContract).$context<RpcContext>();

@@ -237,8 +237,8 @@ function PullRequestChecks({ snapshot }: { snapshot: PullRequestSnapshot }) {
         <p className="text-muted-foreground text-sm">No checks reported.</p>
       ) : (
         <ul className="divide-y rounded-lg border">
-          {snapshot.checks.items.map((check, index) => (
-            <CheckRow check={check} key={`${check.name}:${index}`} />
+          {snapshot.checks.items.map((check) => (
+            <CheckRow check={check} key={`${check.name}:${check.url ?? ""}`} />
           ))}
         </ul>
       )}

@@ -336,7 +336,11 @@
     "import/no-unassigned-import": [
       "error",
       {
-        "allow": ["**/*.css", "@orpc/experimental-effect/extensions/effect"]
+        "allow": [
+          "**/*.css",
+          "@orpc/experimental-effect/extensions/effect",
+          "@orpc/experimental-effect/extensions/input-output"
+        ]
       }
     ],
     "promise/always-return": "off",
@@ -356,6 +360,7 @@
     "typescript/no-unnecessary-type-parameters": "off",
     "react/jsx-no-useless-fragment": "error",
     "pie/node-import-style": "error",
+    "pie/no-restricted-disable": "error",
     "pie-boundaries/feature-no-route-match": "error",
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",

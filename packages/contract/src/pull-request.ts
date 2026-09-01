@@ -1,7 +1,7 @@
-import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { SessionRefSchema, toStandardSchema } from "./domain";
+import { SessionRefSchema } from "./domain";
+import { oc, toStandardSchema } from "./orpc";
 
 export const PullRequestRefSchema = Schema.Struct({
   host: Schema.String,
@@ -163,15 +163,15 @@ const actionErrors = {
 
 export const pullRequestContract = {
   current: oc
-    .input(toStandardSchema(Schema.Struct({ ref: SessionRefSchema })))
+    .input(Schema.Struct({ ref: SessionRefSchema }))
     .errors(currentErrors)
-    .output(toStandardSchema(Schema.Union([PullRequestSnapshotSchema, Schema.Null]))),
+    .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   statuses: oc
-    .input(toStandardSchema(Schema.Struct({ refs: Schema.Array(SessionRefSchema) })))
+    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema) }))
     .errors(currentErrors)
-    .output(toStandardSchema(Schema.Array(PullRequestSessionStatusSchema))),
+    .output(Schema.Array(PullRequestSessionStatusSchema)),
   runAction: oc
-    .input(toStandardSchema(PullRequestActionInputSchema))
+    .input(PullRequestActionInputSchema)
     .errors(actionErrors)
-    .output(toStandardSchema(PullRequestActionAppliedSchema)),
+    .output(PullRequestActionAppliedSchema),
 };

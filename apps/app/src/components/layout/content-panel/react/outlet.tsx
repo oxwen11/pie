@@ -31,8 +31,10 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-background relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border [-webkit-app-region:no-drag]",
-        "md:rounded-xl md:shadow-sm/5",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-[16px] dark:border-white/8",
+        presentation === "docked"
+          ? "md:rounded-s-none md:border-s-0"
+          : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
         className,
       )}
       {...props}
@@ -65,7 +67,7 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-1">
+    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-10">
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
@@ -97,9 +99,9 @@ function TabStrip({
         )}
       </Button>
       {/*
-       * No hide button here: `ContentPanelToggle` already is one, and it has to
-       * live outside the panel anyway to bring it back. Two controls for one
-       * boolean is the duplication that button would be.
+       * No hide button here: the shell-fixed `ContentPanelToggle` already is
+       * one, and it has to live outside the panel anyway to bring it back. Two
+       * controls for one boolean is the duplication that button would be.
        */}
     </div>
   );

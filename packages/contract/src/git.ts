@@ -1,7 +1,7 @@
-import { oc } from "@orpc/contract";
 import { Schema } from "effect";
 
-import { toStandardSchema, withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
+import { withWorkspaceQuery, WorkspaceQuerySchema } from "./domain";
+import { oc, toStandardSchema } from "./orpc";
 
 const pathData = toStandardSchema(Schema.Struct({ path: Schema.String }));
 const pathEscapeData = toStandardSchema(Schema.Struct({ cwd: Schema.String, path: Schema.String }));
@@ -22,7 +22,8 @@ export const GitStatusSchema = Schema.Struct({
 });
 export type GitStatus = typeof GitStatusSchema.Type;
 
-export const GitBranchSchema = Schema.Struct({
+export const GitRepositoryBranchSchema = Schema.Struct({
+  kind: Schema.Literal("repository"),
   current: Schema.Union([Schema.String, Schema.Null]),
   /** Preferred compare target: `origin/main` when `origin/HEAD` exists, else local `main`. */
   defaultBranch: Schema.Union([Schema.String, Schema.Null]),
@@ -31,7 +32,21 @@ export const GitBranchSchema = Schema.Struct({
   /** Remote-tracking refs only (`origin/main`). Local names may contain `/`. */
   remotes: Schema.Array(Schema.String),
 });
+export type GitRepositoryBranch = typeof GitRepositoryBranchSchema.Type;
+
+/** Repository availability plus branch data when the workspace is a readable Git work tree. */
+export const GitBranchSchema = Schema.Union([
+  GitRepositoryBranchSchema,
+  Schema.Struct({ kind: Schema.Literal("not-repository") }),
+  Schema.Struct({ kind: Schema.Literal("workspace-unavailable") }),
+]);
 export type GitBranch = typeof GitBranchSchema.Type;
+
+export function isGitRepositoryBranch(
+  branch: GitBranch | undefined,
+): branch is GitRepositoryBranch {
+  return branch?.kind === "repository";
+}
 
 export const GitReviewModeSchema = Schema.Literals(["uncommitted", "committed", "branch"]);
 export type GitReviewMode = typeof GitReviewModeSchema.Type;
@@ -100,6 +115,12 @@ const cwdErrors = {
   },
 };
 
+const branchErrors = {
+  PATH_ESCAPE: cwdErrors.PATH_ESCAPE,
+  GIT_FAILED: cwdErrors.GIT_FAILED,
+  SESSION_NOT_FOUND: cwdErrors.SESSION_NOT_FOUND,
+};
+
 const reviewErrors = {
   ...cwdErrors,
   REF_NOT_FOUND: { data: refData },
@@ -123,20 +144,8 @@ const diffErrors = {
  * `session.create` when that request includes `worktree`.
  */
 export const gitContract = {
-  status: oc
-    .input(toStandardSchema(WorkspaceQuerySchema))
-    .errors(cwdErrors)
-    .output(toStandardSchema(GitStatusSchema)),
-  branch: oc
-    .input(toStandardSchema(WorkspaceQuerySchema))
-    .errors(cwdErrors)
-    .output(toStandardSchema(GitBranchSchema)),
-  review: oc
-    .input(toStandardSchema(GitReviewQuerySchema))
-    .errors(reviewErrors)
-    .output(toStandardSchema(GitReviewSchema)),
-  diff: oc
-    .input(toStandardSchema(GitDiffQuerySchema))
-    .errors(diffErrors)
-    .output(toStandardSchema(GitFileDiffSchema)),
+  status: oc.input(WorkspaceQuerySchema).errors(cwdErrors).output(GitStatusSchema),
+  branch: oc.input(WorkspaceQuerySchema).errors(branchErrors).output(GitBranchSchema),
+  review: oc.input(GitReviewQuerySchema).errors(reviewErrors).output(GitReviewSchema),
+  diff: oc.input(GitDiffQuerySchema).errors(diffErrors).output(GitFileDiffSchema),
 };

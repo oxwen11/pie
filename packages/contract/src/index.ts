@@ -6,6 +6,7 @@ import { pullRequestContract } from "./pull-request";
 import { sessionContract } from "./session";
 
 export * from "./domain";
+export { toStandardSchema } from "./orpc";
 export * from "./project";
 
 export const contract = {

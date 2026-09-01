@@ -33,7 +33,7 @@ describe("createAppClients", () => {
     const pullRequestDefaults = {
       staleTime: 15_000,
       retry: false,
-      meta: { suppressGlobalError: true },
+      meta: { errorMode: "inline" },
     };
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.current.key())).toMatchObject(
       pullRequestDefaults,
@@ -41,6 +41,22 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
       pullRequestDefaults,
     );
+
+    queryClient.clear();
+  });
+
+  it("marks queries with inline error UI so they never also toast", () => {
+    const { queryClient, orpcQueryUtils } = createAppClients();
+
+    for (const key of [
+      orpcQueryUtils.git.review.key(),
+      orpcQueryUtils.git.diff.key(),
+      orpcQueryUtils.fs.readTree.key(),
+    ]) {
+      expect(queryClient.getQueryDefaults(key).meta).toEqual({ errorMode: "inline" });
+    }
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.git.branch.key()).meta).toBeUndefined();
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.project.list.key()).meta).toBeUndefined();
 
     queryClient.clear();
   });
