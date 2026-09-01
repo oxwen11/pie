@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie CLI daemon and for
 
 The CLI (`packages/pie`, package `@getpie/cli`, bin `pie`) is a **different front door** from the Vite web UI. Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a **detached daemon** that outlives the CLI process. `pie serve` is the **foreground** server (what `.cursor/skills/verify-pie` uses).
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Implementation is the workspace package `tools/verify-pie-cli` (`@getpie/verify-pie-cli`). Invoke with `pnpm exec verify-pie-cli` or `.cursor/skills/verify-pie-cli/bin/verify-pie-cli` (Node >= 24). **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). Implementation is the workspace package `tools/verify-pie-cli` (`@getpie/verify-pie-cli`). Invoke with `pnpm exec verify-pie-cli` or `.cursor/skills/verify-pie-cli/bin/verify-pie-cli` (Node >= 24). **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
 
 Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 

@@ -6,8 +6,9 @@ This is **not** `@getpie/cli` (`packages/pie`, bin `pie`). That is the product
 CLI. This package is the Node >= 24 helper that launches an isolated home on
 port **4182**, doctors it, drives `tsx src/node/cli.ts`, and cleans up.
 
-The cold-start recipe and feature map stay in
-`.cursor/skills/verify-pie-cli`. Shared process/HTTP/JSON helpers are
+The cold-start recipe and feature map live in
+`.agents/skills/verify-pie-cli` (`.cursor/skills/verify-pie-cli` is a
+symlink). Shared process/HTTP/JSON helpers are
 `@getpie/verify-pie-cli/runtime` (used by the web and desktop verify skills).
 
 **Not Bun.** Pie, the daemon, `tsx`, and Electron's Node side are Node 24.

@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for Pie Desktop (Electron + to
 
 Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web app via `@getpie/app`. It does **not** use Vite 4190. Main attach-or-spawns the **same token daemon** as the CLI (`makeDaemonServerProcess`). The daemon **outlives Electron** — closing the window is not teardown.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers are **TypeScript** in `.cursor/skills/verify-pie-desktop/src/`, started by `.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop` (Node >= 24). Shared process/HTTP/JSON code is `@getpie/verify-pie-cli/runtime` (`tools/verify-pie-cli`). **Not Bash. Not Bun.**
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. Helpers are **TypeScript** in `.agents/skills/verify-pie-desktop/src/`, started by `.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop` (Node >= 24). Shared process/HTTP/JSON code is `@getpie/verify-pie-cli/runtime` (`tools/verify-pie-cli`). **Not Bash. Not Bun.**
 
 Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 

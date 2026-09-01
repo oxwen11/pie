@@ -6,8 +6,9 @@ description: "Build/launch/drive recipe for verifying pie web changes at runtime
 # Verifying pie at runtime
 
 For an isolated launch/doctor/drive/cleanup loop (and the feature map), use
-`.cursor/skills/verify-pie` (web), `.cursor/skills/verify-pie-cli` (CLI daemon /
-serve), or `.cursor/skills/verify-pie-desktop` (Electron). This file is the
+`.agents/skills/verify-pie` (web), `.agents/skills/verify-pie-cli` (CLI daemon /
+serve), or `.agents/skills/verify-pie-desktop` (Electron) — each is also linked
+from `.cursor/skills`. This file is the
 short two-process **web** recipe.
 
 ## Build + launch

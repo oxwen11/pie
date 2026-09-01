@@ -39,8 +39,9 @@
   is referenced by relative path from both server tests and desktop e2e.
 - **Verify CLI:** `tools/verify-pie-cli` (`@getpie/verify-pie-cli`, bin
   `verify-pie-cli`) is the Node 24 TypeScript helper for isolated `pie` /
-  `pie daemon` / `pie serve` proofs. The skill `.cursor/skills/verify-pie-cli`
-  is the cold-start recipe and feature map. Shared process/HTTP/JSON helpers
+  `pie daemon` / `pie serve` proofs. The skill `.agents/skills/verify-pie-cli`
+  is the cold-start recipe and feature map (`.cursor/skills/verify-pie-cli` is
+  a symlink). Shared process/HTTP/JSON helpers
   are `@getpie/verify-pie-cli/runtime`. This is not `@getpie/cli`
   (`packages/pie`, bin `pie`) and is not Bun.
 - **Assertions:** the runner is always vitest; only the assertion library splits.

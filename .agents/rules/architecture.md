@@ -17,6 +17,10 @@
 
 `tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
 
+Repo skills live in `.agents/skills/<name>`. `.cursor/skills`, `.claude/skills`,
+and `.codex/skills` hold relative symlinks to that tree so each client discovers
+the same files. Do not copy a skill into `.cursor/skills` as a second original.
+
 ## Boundaries
 
 - **Pi is the only agent.** The server talks to one Pi child process per live
