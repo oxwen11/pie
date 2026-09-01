@@ -84,6 +84,7 @@ export interface PiProcessDependencies<R> {
   readonly makeTransport: (config: {
     readonly sessionId: string;
     readonly cwd?: string;
+    readonly args?: ReadonlyArray<string>;
   }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
 }
 
@@ -666,11 +667,13 @@ export const makePiProcess = (
   options: PiProcessOptions = {},
 ): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
   makePiProcessWithDependencies({
-    makeTransport: (config) =>
-      makePiTransport({
+    makeTransport: (config) => {
+      const args = [...(options.args ?? []), ...(config.args ?? [])];
+      return makePiTransport({
         ...(options.executable ? { executable: options.executable } : undefined),
-        ...(options.args ? { args: options.args } : undefined),
         sessionId: config.sessionId,
         ...(config.cwd ? { cwd: config.cwd } : undefined),
-      }),
+        ...(args.length > 0 ? { args } : undefined),
+      });
+    },
   });
