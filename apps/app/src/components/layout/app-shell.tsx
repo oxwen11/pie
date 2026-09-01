@@ -46,10 +46,7 @@ export function AppShellSidebar({ children }: AppShellSidebarProps) {
   const { contentPanel } = useAppShell();
   if (isMobile) return children;
   return (
-    <>
-      <ShellSidebarPanel>{children}</ShellSidebarPanel>
-      <ShellSeparator disabled={contentPanel.maximized} />
-    </>
+    <ShellSidebarPanel separatorDisabled={contentPanel.maximized}>{children}</ShellSidebarPanel>
   );
 }
 

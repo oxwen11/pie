@@ -30,7 +30,7 @@ catalog:
   vite: ^8.2.1
   vitest: 4.1.10
   ws: ^8.21.3
-  zod: ^4.4.3
+  zod: ^4.5.2
   zustand: ^5.0.15
 catalogs:
   # Effect v4 ecosystem is versioned in lockstep. Every `effect` / `@effect/*`

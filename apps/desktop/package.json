@@ -55,7 +55,6 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "tailwindcss": "catalog:tailwind",
-    "zod": "catalog:",
     "zustand": "catalog:"
   }
 }

@@ -86,6 +86,13 @@ export function createAppClients(server?: ServerConnection): AppClients {
   queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
     staleTime: 30_000,
   });
+  const pullRequestDefaults = {
+    staleTime: 15_000,
+    retry: false,
+    meta: { errorMode: "inline" as const },
+  };
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
 
   // These queries render their own error state in the workspace panels.
   for (const key of [

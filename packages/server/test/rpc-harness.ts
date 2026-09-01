@@ -15,11 +15,16 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 
-export async function makeRpcTestHarness(home: string) {
+export interface RpcTestHarnessOptions {
+  readonly pullRequestLayer?: Layer.Layer<PullRequestService>;
+}
+
+export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOptions = {}) {
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
   const piProcessLayer = Layer.effect(PiProcessTag, makePiProcess()).pipe(
     Layer.provide(NodeServices.layer),
@@ -59,6 +64,8 @@ export async function makeRpcTestHarness(home: string) {
     Layer.provide(worktreeProvided),
     Layer.provide(NodeServices.layer),
   );
+  const pullRequestLayer =
+    options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -68,6 +75,7 @@ export async function makeRpcTestHarness(home: string) {
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
+    pullRequestLayer,
     NodeServices.layer,
     Observability.discard,
   );
