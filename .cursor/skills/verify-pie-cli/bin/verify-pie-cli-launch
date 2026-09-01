@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# Start an isolated pie CLI daemon (or foreground serve) for verification.
+
+set -euo pipefail
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+REPLACE=0
+MODE="daemon"
+for arg in "$@"; do
+  case "${arg}" in
+    --replace) REPLACE=1 ;;
+    --serve) MODE="serve" ;;
+    *)
+      echo "verify-pie-cli-launch: unknown arg ${arg}" >&2
+      echo "  usage: verify-pie-cli-launch [--replace] [--serve]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+verify_pie_cli_use_node24
+REPO="$(verify_pie_cli_repo_root)"
+PIE_PORT="${PIE_PORT:-${DEFAULT_PIE_PORT}}"
+verify_pie_cli_reserved_port "${PIE_PORT}"
+
+if [[ ! -f "${REPO}/packages/core/dist/compatibility.mjs" ]]; then
+  echo "verify-pie-cli: building @getpie/core (packages/core/dist missing)"
+  (cd "${REPO}" && pnpm turbo run build --filter=@getpie/core)
+fi
+
+if run_dir="$(verify_pie_cli_current_run)"; then
+  existing_mode="$(verify_pie_cli_json_get "${run_dir}/meta.json" mode 2>/dev/null || true)"
+  if [[ "${existing_mode}" == "${MODE}" ]]; then
+    if [[ "${MODE}" == "daemon" ]]; then
+      record="${run_dir}/pie-home/daemon/daemon.pid"
+      if [[ -f "${record}" ]]; then
+        address="$(verify_pie_cli_daemon_field "${record}" address)"
+        daemon_pid="$(verify_pie_cli_daemon_field "${record}" pid)"
+        if verify_pie_cli_pid_alive "${daemon_pid}" && verify_pie_cli_health_ok "${address}"; then
+          echo "verify-pie-cli: already running at ${run_dir}"
+          echo "  mode    daemon"
+          echo "  api     ${address}/api/health"
+          echo "  home    $(verify_pie_cli_json_get "${run_dir}/meta.json" pieHome)"
+          exit 0
+        fi
+      fi
+    else
+      serve_pid="$(verify_pie_cli_read_pid "${run_dir}/pids/serve.pid")"
+      if verify_pie_cli_pid_alive "${serve_pid}" &&
+        verify_pie_cli_http_ok "http://127.0.0.1:${PIE_PORT}/api/health"; then
+        echo "verify-pie-cli: already running at ${run_dir}"
+        echo "  mode    serve"
+        echo "  api     http://127.0.0.1:${PIE_PORT}/api/health"
+        exit 0
+      fi
+    fi
+  fi
+  if ((REPLACE == 1)); then
+    "${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup"
+  else
+    echo "verify-pie-cli: a previous run still exists (${run_dir})." >&2
+    echo "  run ${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup or re-launch with --replace" >&2
+    exit 1
+  fi
+fi
+
+foreign="$(verify_pie_cli_listen_pids "${PIE_PORT}")"
+if [[ -n "${foreign}" ]]; then
+  echo "verify-pie-cli: port ${PIE_PORT} is already taken by pid(s): ${foreign}" >&2
+  echo "  Do not attach to a foreign daemon — refuse rather than hijack." >&2
+  exit 1
+fi
+
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+RUN_DIR="${VERIFY_ROOT}/runs/${RUN_ID}"
+PIE_HOME="${RUN_DIR}/pie-home"
+PIE_DAEMON_DIR="${PIE_HOME}/daemon"
+mkdir -p "${RUN_DIR}/pids" "${RUN_DIR}/logs" "${PIE_HOME}" "${PIE_DAEMON_DIR}"
+
+export PIE_HOME PIE_DAEMON_DIR PIE_PORT
+export NODE_ENV=development
+
+cat >"${RUN_DIR}/meta.json" <<EOF
+{
+  "runId": "${RUN_ID}",
+  "repo": "${REPO}",
+  "mode": "${MODE}",
+  "pieHome": "${PIE_HOME}",
+  "daemonDir": "${PIE_DAEMON_DIR}",
+  "piePort": ${PIE_PORT},
+  "startedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+
+mkdir -p "${VERIFY_ROOT}/runs"
+ln -sfn "${RUN_DIR}" "${CURRENT_LINK}"
+
+wait_for() {
+  local name="$1"
+  local check="$2"
+  local seconds="${3:-60}"
+  local i
+  for ((i = 0; i < seconds; i++)); do
+    if eval "${check}"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "verify-pie-cli: timed out waiting for ${name}" >&2
+  return 1
+}
+
+if [[ "${MODE}" == "serve" ]]; then
+  (
+    cd "${REPO}/packages/pie"
+    exec pnpm exec tsx src/node/cli.ts serve --port "${PIE_PORT}"
+  ) >"${RUN_DIR}/logs/serve.log" 2>&1 &
+  echo $! >"${RUN_DIR}/pids/serve.pid"
+
+  if ! wait_for "pie serve on ${PIE_PORT}" \
+    "verify_pie_cli_http_ok 'http://127.0.0.1:${PIE_PORT}/api/health'" 60; then
+    tail -n 40 "${RUN_DIR}/logs/serve.log" >&2 || true
+    verify_pie_cli_copy_failure_logs "${RUN_DIR}"
+    "${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup" || true
+    exit 1
+  fi
+
+  ADDRESS="http://127.0.0.1:${PIE_PORT}"
+  node -e '
+    const fs = require("node:fs");
+    const file = process.argv[1];
+    const address = process.argv[2];
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    data.address = address;
+    fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  ' "${RUN_DIR}/meta.json" "${ADDRESS}"
+
+  echo "verify-pie-cli: launched ${RUN_ID}"
+  echo "  mode    serve (foreground, no token)"
+  echo "  api     ${ADDRESS}/api/health"
+  echo "  home    ${PIE_HOME}"
+  echo "  logs    ${RUN_DIR}/logs"
+  echo "  doctor  ${VERIFY_PIE_CLI_BIN}/verify-pie-cli-doctor"
+  exit 0
+fi
+
+if ! verify_pie_cli_tsx "${REPO}" daemon start --port "${PIE_PORT}" \
+  >"${RUN_DIR}/logs/cli-start.log" 2>&1; then
+  echo "verify-pie-cli: daemon start failed" >&2
+  tail -n 40 "${RUN_DIR}/logs/cli-start.log" >&2 || true
+  verify_pie_cli_copy_failure_logs "${RUN_DIR}"
+  "${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup" || true
+  exit 1
+fi
+
+RECORD="${PIE_DAEMON_DIR}/daemon.pid"
+if ! wait_for "daemon.pid" "[[ -f '${RECORD}' ]]" 20; then
+  tail -n 40 "${RUN_DIR}/logs/cli-start.log" >&2 || true
+  verify_pie_cli_copy_failure_logs "${RUN_DIR}"
+  "${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup" || true
+  exit 1
+fi
+
+ADDRESS="$(verify_pie_cli_daemon_field "${RECORD}" address)"
+DAEMON_PID="$(verify_pie_cli_daemon_field "${RECORD}" pid)"
+
+if ! wait_for "daemon health at ${ADDRESS}" "verify_pie_cli_health_ok '${ADDRESS}'" 40; then
+  tail -n 40 "${RUN_DIR}/logs/cli-start.log" >&2 || true
+  tail -n 40 "${PIE_HOME}/logs/pie.log" >&2 || true
+  verify_pie_cli_copy_failure_logs "${RUN_DIR}"
+  "${VERIFY_PIE_CLI_BIN}/verify-pie-cli-cleanup" || true
+  exit 1
+fi
+
+node -e '
+  const fs = require("node:fs");
+  const [file, address, pid] = process.argv.slice(1);
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  data.address = address;
+  data.daemonPid = Number(pid);
+  fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+' "${RUN_DIR}/meta.json" "${ADDRESS}" "${DAEMON_PID}"
+
+echo "verify-pie-cli: launched ${RUN_ID}"
+echo "  mode    daemon"
+echo "  api     ${ADDRESS}/api/health"
+echo "  pid     ${DAEMON_PID}"
+echo "  home    ${PIE_HOME}"
+echo "  start   $(tr -d '\n' <"${RUN_DIR}/logs/cli-start.log")"
+echo "  doctor  ${VERIFY_PIE_CLI_BIN}/verify-pie-cli-doctor"

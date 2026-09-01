@@ -5,7 +5,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 
 
 # Verify pie (web)
 
-Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill.
+Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
 This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers live in `.cursor/skills/verify-pie/bin/` and are executable.
 
@@ -176,8 +176,8 @@ If the user already has `pnpm dev` on 4180/4190 against `~/.pie-dev`, **stop and
 
 `.cursor/skills/verify-pie/features/` — start with `README.md`. Prove at least the feature you changed; the map lists every entry point that must still work.
 
-## Secondary surfaces (out of scope here)
+## Sibling surfaces
 
-- **Desktop Electron** — `pnpm dev --filter=@getpie/desktop`; daemon on 4000; Playwright in `apps/desktop/e2e/`.
-- **CLI daemon** — `pie` / `pie daemon start|status|stop`. Same server, different front door.
+- **Desktop Electron** — `.cursor/skills/verify-pie-desktop` (token daemon, isolated from 4180/4190).
+- **CLI daemon / serve** — `.cursor/skills/verify-pie-cli` (`pie` / `pie daemon` / `pie serve`).
 - **Library** — `@getpie/app` mounted by Desktop. No separate UI.

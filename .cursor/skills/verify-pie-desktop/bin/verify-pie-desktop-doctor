@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Read-only: is the current verify-pie-desktop instance worth driving?
+
+set -euo pipefail
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+fail() {
+  echo "verify-pie-desktop doctor: FAIL — $*" >&2
+  exit 1
+}
+
+if ! run_dir="$(verify_pie_desktop_current_run)"; then
+  foreign="$(verify_pie_desktop_listen_pids "${DEFAULT_PIE_PORT}")"
+  if [[ -n "${foreign}" ]]; then
+    fail "port ${DEFAULT_PIE_PORT} is live but this is not a verify-pie-desktop run (no ${CURRENT_LINK}). Refuse."
+  fi
+  fail "no current run. Launch first: ${VERIFY_PIE_DESKTOP_BIN}/verify-pie-desktop-launch"
+fi
+
+meta="${run_dir}/meta.json"
+[[ -f "${meta}" ]] || fail "missing ${meta}"
+
+pie_home="$(verify_pie_desktop_json_get "${meta}" pieHome)"
+daemon_dir="$(verify_pie_desktop_json_get "${meta}" daemonDir)"
+cdp_port="$(verify_pie_desktop_json_get "${meta}" cdpPort)"
+run_id="$(verify_pie_desktop_json_get "${meta}" runId)"
+
+[[ -d "${pie_home}" ]] || fail "PIE_HOME ${pie_home} is missing"
+if [[ "${pie_home}" == "${HOME}/.pie" || "${pie_home}" == "${HOME}/.pie-dev" ]]; then
+  fail "PIE_HOME is the shared default (${pie_home}). This skill only drives isolated homes."
+fi
+
+ev_pid="$(verify_pie_desktop_read_pid "${run_dir}/pids/electron-vite.pid")"
+verify_pie_desktop_pid_alive "${ev_pid}" || fail "electron-vite pid ${ev_pid} is not running"
+
+record="${daemon_dir}/daemon.pid"
+[[ -f "${record}" ]] || fail "missing ${record} — Electron did not attach/spawn a daemon"
+
+address="$(verify_pie_desktop_daemon_field "${record}" address)"
+daemon_pid="$(verify_pie_desktop_daemon_field "${record}" pid)"
+token="$(verify_pie_desktop_daemon_field "${record}" token)"
+
+verify_pie_desktop_pid_alive "${daemon_pid}" || fail "daemon pid ${daemon_pid} is not running"
+verify_pie_desktop_health_ok "${address}" || fail "${address}/api/health is not ok"
+
+anon_status="$(curl -sS -o /tmp/verify-pie-desktop-ticket-anon.json -w '%{http_code}' --max-time 2 \
+  -X POST "${address}/api/ws-ticket" || true)"
+if [[ "${anon_status}" != "401" ]]; then
+  fail "/api/ws-ticket without token returned ${anon_status} (expected 401)"
+fi
+
+auth_status="$(curl -sS -o /tmp/verify-pie-desktop-ticket-auth.json -w '%{http_code}' --max-time 2 \
+  -X POST "${address}/api/ws-ticket" \
+  -H "Authorization: Bearer ${token}" || true)"
+if [[ "${auth_status}" != "200" ]]; then
+  fail "/api/ws-ticket with record token returned ${auth_status} (expected 200)"
+fi
+
+verify_pie_desktop_cdp_ok "${cdp_port}" ||
+  fail "CDP http://127.0.0.1:${cdp_port}/json/version is not answering"
+
+echo "verify-pie-desktop doctor: OK"
+echo "  run     ${run_id}"
+echo "  api     ${address}/api/health"
+echo "  cdp     http://127.0.0.1:${cdp_port}/json/version"
+echo "  home    ${pie_home}"
+echo "  evite   pid ${ev_pid}"
+echo "  daemon  pid ${daemon_pid}"
+echo "  ticket  anonymous 401 / bearer 200"
+echo "  attach  agent-browser skills get electron  (CDP ${cdp_port})"

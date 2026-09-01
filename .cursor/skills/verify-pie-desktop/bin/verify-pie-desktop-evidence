@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Create / write proof artifacts for the current desktop run. Cleanup never deletes these.
+
+set -euo pipefail
+# shellcheck disable=SC1091
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  verify-pie-desktop-evidence path
+  verify-pie-desktop-evidence init
+  verify-pie-desktop-evidence screenshot <name>
+  verify-pie-desktop-evidence snapshot <name>
+  verify-pie-desktop-evidence curl
+  verify-pie-desktop-evidence side-effects
+  verify-pie-desktop-evidence note <text>
+EOF
+}
+
+run_dir="$(verify_pie_desktop_current_run)" || {
+  echo "verify-pie-desktop-evidence: no current run" >&2
+  exit 1
+}
+run_id="$(verify_pie_desktop_json_get "${run_dir}/meta.json" runId)"
+dest="$(verify_pie_desktop_evidence_dir_for "${run_id}")"
+
+cmd="${1:-path}"
+shift || true
+
+case "${cmd}" in
+  path)
+    printf '%s\n' "${dest}"
+    ;;
+  init)
+    mkdir -p "${dest}/logs"
+    cp "${run_dir}/meta.json" "${dest}/meta.json"
+    "${VERIFY_PIE_DESKTOP_BIN}/verify-pie-desktop-doctor" >"${dest}/doctor.txt"
+    date -u +%Y-%m-%dT%H:%M:%SZ >"${dest}/created-at"
+    if [[ -d "${run_dir}/logs" ]]; then
+      cp -a "${run_dir}/logs/." "${dest}/logs/" || true
+    fi
+    daemon_dir="$(verify_pie_desktop_json_get "${run_dir}/meta.json" daemonDir)"
+    if [[ -f "${daemon_dir}/daemon.pid" ]]; then
+      verify_pie_desktop_redact_record "${daemon_dir}/daemon.pid" "${dest}/daemon.pid.redacted.json"
+    fi
+    printf '%s\n' "${dest}"
+    ;;
+  screenshot)
+    name="${1:-screen}"
+    mkdir -p "${dest}"
+    if ! command -v agent-browser >/dev/null 2>&1; then
+      echo "verify-pie-desktop-evidence: agent-browser is not on PATH" >&2
+      exit 1
+    fi
+    agent-browser screenshot "${dest}/${name}.png"
+    printf '%s\n' "${dest}/${name}.png"
+    ;;
+  snapshot)
+    name="${1:-snapshot}"
+    mkdir -p "${dest}"
+    if ! command -v agent-browser >/dev/null 2>&1; then
+      echo "verify-pie-desktop-evidence: agent-browser is not on PATH" >&2
+      exit 1
+    fi
+    agent-browser snapshot >"${dest}/${name}.txt"
+    printf '%s\n' "${dest}/${name}.txt"
+    ;;
+  curl)
+    mkdir -p "${dest}"
+    record="$(verify_pie_desktop_json_get "${run_dir}/meta.json" daemonDir)/daemon.pid"
+    address="$(verify_pie_desktop_daemon_field "${record}" address)"
+    token="$(verify_pie_desktop_daemon_field "${record}" token)"
+    cdp_port="$(verify_pie_desktop_json_get "${run_dir}/meta.json" cdpPort)"
+    {
+      echo "GET ${address}/api/health"
+      curl -sS --max-time 2 "${address}/api/health" || true
+      echo
+      echo "POST ${address}/api/ws-ticket (no token)"
+      curl -sS -o /dev/null -w "status %{http_code}\n" --max-time 2 -X POST "${address}/api/ws-ticket" || true
+      echo "POST ${address}/api/ws-ticket (bearer)"
+      curl -sS -o /dev/null -w "status %{http_code}\n" --max-time 2 \
+        -X POST "${address}/api/ws-ticket" \
+        -H "Authorization: Bearer ${token}" || true
+      echo "GET http://127.0.0.1:${cdp_port}/json/version"
+      curl -sS --max-time 2 "http://127.0.0.1:${cdp_port}/json/version" || true
+      echo
+    } >"${dest}/curl.txt"
+    printf '%s\n' "${dest}/curl.txt"
+    ;;
+  side-effects)
+    mkdir -p "${dest}/side-effects"
+    pie_home="$(verify_pie_desktop_json_get "${run_dir}/meta.json" pieHome)"
+    if [[ -f "${pie_home}/storage/projects.json" ]]; then
+      cp "${pie_home}/storage/projects.json" "${dest}/side-effects/projects.json"
+    else
+      echo "missing" >"${dest}/side-effects/projects.json.missing"
+    fi
+    if [[ -d "${pie_home}/storage/sessions" ]]; then
+      find "${pie_home}/storage/sessions" -type f -name '*.json' | sort >"${dest}/side-effects/session-files.txt"
+    else
+      echo "no sessions dir" >"${dest}/side-effects/session-files.txt"
+    fi
+    printf '%s\n' "${dest}/side-effects"
+    ;;
+  note)
+    mkdir -p "${dest}"
+    printf '%s\n' "$*" >>"${dest}/notes.txt"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
