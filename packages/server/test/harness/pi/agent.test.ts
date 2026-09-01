@@ -9,6 +9,7 @@ import { Deferred, Effect, Fiber, Stream } from "effect";
 
 import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
+import { resolvePiExecutable } from "../../../src/harness/pi/resolve-executable";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -353,6 +354,66 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       if (ended?.type === "session.turn.ended") assert.equal(ended.outcome, "canceled");
       yield* session.close;
     }),
+  );
+
+  it.effect("approves registered Project resources in the Pi child", () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-trust-"))),
+      (dir) =>
+        Effect.gen(function* () {
+          const file = path.join(dir, "fake-pi.js");
+          fs.writeFileSync(
+            file,
+            `#!/usr/bin/env node
+const sidIndex = process.argv.indexOf("--session-id");
+const isResume = process.argv[sidIndex + 1] === "existing";
+const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
+if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+const readline = require("node:readline");
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", (line) => {
+  const msg = JSON.parse(line);
+  if (msg.type === "get_state") {
+    process.stdout.write(JSON.stringify({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId: "trusted" } }) + "\\n");
+  }
+});
+`,
+          );
+          fs.chmodSync(file, 0o755);
+
+          const process = yield* makePiProcess({ executable: { command: file, prefixArgs: [] } });
+          const opened = yield* process.session.create({ cwd: dir, provider: "p", modelId: "m" });
+          assert.equal(typeof opened.sessionId, "string");
+          yield* process.session.abort(opened.sessionId);
+
+          const resumed = yield* process.session.resume({ sessionId: "existing", cwd: dir });
+          assert.equal(resumed.sessionId, "existing");
+          yield* process.session.abort(resumed.sessionId);
+        }),
+      (dir) => Effect.sync(() => fs.rmSync(dir, { recursive: true, force: true })),
+    ),
+  );
+
+  it.effect("does not execute Project extensions when opening a live Pi child", () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), "pi-project-policy-"))),
+      (cwd) =>
+        Effect.gen(function* () {
+          const extensionDirectory = path.join(cwd, ".pi", "extensions");
+          const marker = path.join(cwd, "extension-loaded");
+          fs.mkdirSync(extensionDirectory, { recursive: true });
+          fs.writeFileSync(
+            path.join(extensionDirectory, "marker.ts"),
+            `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(marker)}, "loaded");\nexport default function markerExtension() {}\n`,
+          );
+
+          const process = yield* makePiProcess({ executable: resolvePiExecutable({}) });
+          const opened = yield* process.session.create({ cwd });
+          assert.equal(fs.existsSync(marker), false);
+          yield* process.session.abort(opened.sessionId);
+        }),
+      (cwd) => Effect.sync(() => fs.rmSync(cwd, { recursive: true, force: true })),
+    ),
   );
 
   it.effect("PiAgent create exposes prompt output on the PiAgentRuntime event stream", () =>

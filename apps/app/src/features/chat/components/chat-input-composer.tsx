@@ -4,7 +4,7 @@ import {
   PromptInputToolbar,
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
-import type { ReactNode } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
@@ -21,8 +21,12 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 // handled by the submit keymap) / Shift+Enter breaks the line; an in-flight
 // turn blocks sending but not typing (onSubmit returns false → content stays).
 // prompt/turnInProgress come from ChatSessionProvider — not props.
-// toolbar = surface-composed toolbar content (e.g. <ChatModelSelect/>).
-export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
+// Surface-specific input affordances are composed through slots.
+export type ChatInputComposerProps = PropsWithChildren<{
+  toolbar?: ReactNode;
+}>;
+
+export function ChatInputComposer({ children, toolbar }: ChatInputComposerProps) {
   const { prompt, interrupt, turnInProgress, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const canInterrupt = status === "streaming";
@@ -55,6 +59,7 @@ export function ChatInputComposer({ toolbar }: { toolbar?: ReactNode }) {
     >
       <ChatInputProvider controller={controller}>
         <ChatInput />
+        {children}
         <PromptInputToolbar>
           <PromptInputTools>{toolbar}</PromptInputTools>
           <PromptInputSubmit

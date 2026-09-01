@@ -11,11 +11,7 @@ import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
 import { GitServiceLayer } from "../src/git";
-import {
-  PiAgentServiceLayer,
-  PiAgentSessionManagerLayer,
-  PiAgentSessionServiceLayer,
-} from "../src/harness";
+import { PiAgentSessionManagerLayer, PiAgentSessionServiceLayer } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
@@ -97,7 +93,6 @@ async function setup() {
 
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
     piAgentLayer,

@@ -5,7 +5,7 @@ Glossary of project-specific terms. pie integrates the Pi coding agent into the 
 ## Session Domain
 
 **Project**:
-A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path.
+A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Registration is the trust boundary for declarative Project-local Pi resources: session children approve prompts, skills, and context from that Project. Automatic Pi extension discovery is disabled for every Pie-owned child because Pie does not yet model inputs that an extension handles without starting a model turn; this intentionally makes discovered global and Project extension commands, tools, hooks, and UI unavailable. The extension request plumbing remains at the Pi protocol seam for compatibility and future explicit extension support. Sessions always resolve their working directory through a Project, never from a caller-supplied path.
 _Avoid_: workspace, repo, cwd (for the Project field)
 
 **SessionRef**:

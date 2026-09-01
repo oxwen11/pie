@@ -20,7 +20,10 @@ export class ChatInputController {
   #submitting = false;
 
   constructor(private readonly opts: ChatInputControllerOptions) {
-    this.editor = new Editor({ extensions: opts.extensions(this) });
+    this.editor = new Editor({
+      extensions: opts.extensions(this),
+      editorProps: { attributes: { "aria-label": "Message" } },
+    });
   }
 
   focus() {

@@ -16,6 +16,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "@getpie/client": "workspace:*",
     "@getpie/contract": "workspace:*",
     "@getpie/ui": "workspace:*",
@@ -33,6 +34,7 @@
     "@tiptap/extensions": "catalog:tiptap",
     "@tiptap/pm": "catalog:tiptap",
     "@tiptap/react": "catalog:tiptap",
+    "@tiptap/suggestion": "catalog:tiptap",
     "ai": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:react",

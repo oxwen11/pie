@@ -2,11 +2,14 @@ import { Exit, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
+  AgentCommandSchema,
   ArchiveSessionInputSchema,
   CollectionEventTypes,
+  ListAgentCommandsInputSchema,
   ListSessionsInputSchema,
   MAX_SESSION_TITLE_CHARS,
   RenameSessionInputSchema,
+  SessionCapabilitiesSchema,
   type ServerEvent,
   serverErrors,
   ServerErrorCodes,
@@ -75,6 +78,33 @@ describe("ListSessionsInput", () => {
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: false })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: true })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID })).toBe(true);
+  });
+});
+
+describe("Agent commands", () => {
+  it("accepts prompt templates and skill invocations without host source paths", () => {
+    expect(
+      accepts(AgentCommandSchema, {
+        name: "explain",
+        description: "Explain the current code",
+        source: "prompt",
+      }),
+    ).toBe(true);
+    expect(accepts(AgentCommandSchema, { name: "skill:review", source: "skill" })).toBe(true);
+    expect(accepts(ListAgentCommandsInputSchema, { projectId: UUID })).toBe(true);
+  });
+
+  it("keeps session capability commands independent from submittable input commands", () => {
+    expect(
+      accepts(SessionCapabilitiesSchema, {
+        commands: [{ name: "reload", description: "Reload extensions" }],
+        supportsResume: true,
+        supportsSteering: true,
+        supportsPermissions: false,
+      }),
+    ).toBe(true);
+    expect(accepts(AgentCommandSchema, { name: "reload", source: "extension" })).toBe(false);
+    expect(accepts(ListAgentCommandsInputSchema, {})).toBe(true);
   });
 });
 

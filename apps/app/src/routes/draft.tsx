@@ -27,9 +27,11 @@ import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
+import { SlashCommandMenu } from "@/features/chat/components/input/slash-command-menu";
 import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useAgentModels } from "@/features/chat/hooks/use-agent-models";
+import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-state";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
@@ -66,6 +68,7 @@ function DraftRoute() {
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
+  const commandState = useSlashCommandState(selected?.id);
   const modelsQuery = useAgentModels(selected?.id);
   const defaultModel = modelsQuery.data?.defaultModel;
 
@@ -218,6 +221,7 @@ function DraftRoute() {
         >
           <ChatInputProvider controller={controller}>
             <ChatInput />
+            <SlashCommandMenu state={commandState} />
             <PromptInputToolbar>
               <PromptInputTools>
                 <DraftModelSelect

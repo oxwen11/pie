@@ -116,6 +116,18 @@ export class AgentOperationError extends Schema.TaggedError<AgentOperationError>
   }
 }
 
+export class AgentDiscoveryError extends Schema.TaggedError<AgentDiscoveryError>()(
+  "AgentDiscoveryError",
+  {
+    operation: Schema.String,
+    cause: Schema.Defect(),
+  },
+) {
+  override get message() {
+    return `Agent discovery operation '${this.operation}' failed: ${causeSummary(this.cause)}`;
+  }
+}
+
 export class PiTransportError extends Schema.TaggedError<PiTransportError>()("PiTransportError", {
   operation: Schema.String,
   cause: Schema.Defect(),

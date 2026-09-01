@@ -1,11 +1,9 @@
 import "@orpc/experimental-effect/extensions/effect";
-import os from "node:os";
-
 import { agentContract } from "@getpie/contract/agent";
 import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
-import { PiAgentService } from "../harness";
+import { PiAgent } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { sessionRouter } from "./session";
@@ -13,12 +11,13 @@ import { sessionRouter } from "./session";
 const orpc = implement(agentContract).$context<RpcContext>();
 
 export const agentRouter = orpc.router({
-  listModels: orpc.listModels.effect(function* ({ input, errors }) {
-    const agent = yield* PiAgentService;
-    const cwd = input.projectId
+  commands: orpc.commands.effect(function* ({ input, errors }) {
+    const agent = yield* PiAgent;
+    const projectId = input.projectId;
+    const cwd = projectId
       ? yield* ProjectService.pipe(
           Effect.flatMap((projects) =>
-            projects.findById(input.projectId!).pipe(
+            projects.findById(projectId).pipe(
               Effect.map((project) => project.path),
               Effect.catchTags({
                 ProjectNotFound: (e) =>
@@ -27,11 +26,34 @@ export const agentRouter = orpc.router({
             ),
           ),
         )
-      : os.homedir();
+      : undefined;
+
+    return yield* agent.commands(cwd).pipe(
+      Effect.catchTags({
+        AgentDiscoveryError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  listModels: orpc.listModels.effect(function* ({ input, errors }) {
+    const agent = yield* PiAgent;
+    const projectId = input.projectId;
+    const cwd = projectId
+      ? yield* ProjectService.pipe(
+          Effect.flatMap((projects) =>
+            projects.findById(projectId).pipe(
+              Effect.map((project) => project.path),
+              Effect.catchTags({
+                ProjectNotFound: (e) =>
+                  Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+              }),
+            ),
+          ),
+        )
+      : undefined;
 
     return yield* agent.listModels(cwd).pipe(
       Effect.catchTags({
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentDiscoveryError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
     );
   }),

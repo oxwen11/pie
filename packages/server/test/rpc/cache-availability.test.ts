@@ -10,6 +10,8 @@ import { cacheAvailability } from "../../src/rpc/runtime";
 const unusedPi = {
   create: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
+  commands: () => Effect.die("unused"),
+  listModels: () => Effect.die("unused"),
   getSessionInfo: () => Effect.die("unused"),
 } satisfies Omit<PiAgentShape, "availability">;
 

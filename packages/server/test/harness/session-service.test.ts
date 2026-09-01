@@ -174,6 +174,8 @@ describe("PiAgentSessionService", () => {
                   return makeSession(sessionId);
                 }),
               ),
+            commands: () => Effect.die("unused"),
+            listModels: () => Effect.die("unused"),
             ...(opts.coldHistory !== undefined
               ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
               : {}),

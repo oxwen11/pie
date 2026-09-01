@@ -104,6 +104,8 @@ const makeFixture = Effect.gen(function* () {
         Effect.andThen(Deferred.await(resumeGate)),
         Effect.andThen(makeRuntime(sessionId)),
       ),
+    commands: () => Effect.die("unused"),
+    listModels: () => Effect.die("unused"),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   } satisfies PiAgentShape;
 

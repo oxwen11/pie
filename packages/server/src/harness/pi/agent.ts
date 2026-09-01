@@ -1,7 +1,9 @@
+import type { ListAgentCommandsOutput, ListAgentModelsOutput } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Context, Effect, Layer, type FileSystem, type Scope } from "effect";
 
 import {
+  AgentDiscoveryError,
   AgentOpenError,
   AgentUnavailable,
   type AgentOperationError,
@@ -9,6 +11,8 @@ import {
   type SessionNotResumable,
 } from "../errors";
 import type { CreateSessionInput, ResumeSessionInput } from "../session-io";
+import { listAvailablePiCommands } from "./list-available-commands";
+import { listAvailablePiModels } from "./list-available-models";
 import type { PiProcess } from "./process";
 import { checkPiAvailability } from "./resolve-executable";
 import type { PiExecutable } from "./resolve-executable";
@@ -32,6 +36,8 @@ export type PiAgentShape = {
     SessionNotResumable | AgentUnavailable | ExecutableNotFound | AgentOpenError,
     Scope.Scope | FileSystem.FileSystem
   >;
+  readonly commands: (cwd?: string) => Effect.Effect<ListAgentCommandsOutput, AgentDiscoveryError>;
+  readonly listModels: (cwd?: string) => Effect.Effect<ListAgentModelsOutput, AgentDiscoveryError>;
   readonly getMessages?: (
     agentSessionId: string,
     cwd?: string,
@@ -66,6 +72,16 @@ export const makePiAgent = (
     availability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
     create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(process, input)),
     resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(process, input)),
+    commands: (cwd) =>
+      Effect.tryPromise({
+        try: () => listAvailablePiCommands(cwd),
+        catch: (cause) => new AgentDiscoveryError({ operation: "commands", cause }),
+      }),
+    listModels: (cwd) =>
+      Effect.tryPromise({
+        try: () => listAvailablePiModels(cwd),
+        catch: (cause) => new AgentDiscoveryError({ operation: "models", cause }),
+      }),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   };
   return pi;

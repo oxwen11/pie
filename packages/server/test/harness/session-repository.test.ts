@@ -72,6 +72,38 @@ describe("SessionRepository", () => {
     expect(raw.data).not.toHaveProperty("version");
   });
 
+  it("reads legacy sessions without an agent session id without breaking the list", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "legacy.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "legacy",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+        },
+      }),
+      "utf8",
+    );
+
+    const listed = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        return yield* repo.list("proj-a");
+      }),
+    );
+
+    expect(listed).toEqual([
+      expect.objectContaining({
+        sessionId: "legacy",
+        agentSessionId: "legacy",
+        historyAvailable: false,
+      }),
+    ]);
+  });
+
   it("lists all sessions of a project", async () => {
     const listed = await run(
       Effect.gen(function* () {

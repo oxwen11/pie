@@ -7,7 +7,7 @@ import type { Session } from "../types";
 const SessionSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  agentSessionId: Schema.String,
+  agentSessionId: Schema.optionalKey(Schema.String),
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -15,6 +15,19 @@ const SessionSchema = Schema.Struct({
   updatedAt: Schema.optionalKey(Schema.String),
   historyAvailable: Schema.optionalKey(Schema.Boolean),
 });
+
+const fromStorage = (metadata: typeof SessionSchema.Type): Session => {
+  const { agentSessionId, historyAvailable, ...rest } = metadata;
+  return {
+    ...rest,
+    agentSessionId: agentSessionId ?? metadata.sessionId,
+    ...(agentSessionId === undefined
+      ? { historyAvailable: false }
+      : historyAvailable !== undefined
+        ? { historyAvailable }
+        : {}),
+  };
+};
 
 const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   sessionId: metadata.sessionId,
@@ -81,7 +94,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
       list: (projectId) =>
         isSafeId(projectId)
           ? sessions.list({ under: projectId }).pipe(
-              Effect.map((entries) => entries.map((entry) => entry.data)),
+              Effect.map((entries) => entries.map((entry) => fromStorage(entry.data))),
               Effect.mapError(asReadError),
             )
           : Effect.succeed([]),
@@ -93,7 +106,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
               Effect.mapError(asReadError),
               Effect.flatMap((found) =>
                 Option.isSome(found)
-                  ? Effect.succeed(found.value)
+                  ? Effect.succeed(fromStorage(found.value))
                   : Effect.fail(new SessionNotFound({ projectId, sessionId })),
               ),
             ),
@@ -111,7 +124,7 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
               if (Option.isNone(found)) {
                 return yield* Effect.fail(new SessionRefNotFound({ sessionId }));
               }
-              return found.value;
+              return fromStorage(found.value);
             }),
 
       write: (metadata) =>

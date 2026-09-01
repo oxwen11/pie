@@ -9,11 +9,7 @@ import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import { GitServiceLayer } from "../git";
-import {
-  PiAgentSessionManagerLayer,
-  PiAgentServiceLayer,
-  PiAgentSessionServiceLayer,
-} from "../harness";
+import { PiAgentSessionManagerLayer, PiAgentSessionServiceLayer } from "../harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
@@ -61,11 +57,8 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
-const PiAgentServiceProvided = PiAgentServiceLayer;
-
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
-  PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
   ProjectServiceProvided,
   PiAgentProvided,
