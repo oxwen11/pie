@@ -118,9 +118,13 @@ export async function cdpOk(port: number): Promise<boolean> {
   return result?.status === 200;
 }
 
-export async function cdpVersion(port: number): Promise<string | undefined> {
-  const result = await fetchText(`http://127.0.0.1:${port}/json/version`);
-  return result?.body;
+export async function warmupOrigin(port: number, timeoutMs = 10_000): Promise<void> {
+  for (const origin of loopbackOrigins(port)) {
+    const result = await fetchText(`${origin}/`, {}, timeoutMs);
+    if (result !== undefined) {
+      return;
+    }
+  }
 }
 
 export function urlPort(address: string): number {

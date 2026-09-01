@@ -86,20 +86,10 @@ export function bootstrapPackage() {
 }
 
 export function bootstrapSurface(surface, binImportMetaUrl) {
-  const extraEnv = {
-    VERIFY_PIE_DEFAULT_SURFACE: surface,
-  };
+  const extraEnv = {};
   if (binImportMetaUrl !== undefined) {
     const envName = skillDirEnv(surface);
     extraEnv[envName] = process.env[envName] ?? skillDirFromBin(binImportMetaUrl);
   }
   execCli([surface, ...process.argv.slice(2)], extraEnv);
-}
-
-export function bootstrapVerifyPieCli(binImportMetaUrl) {
-  bootstrapSurface("cli", binImportMetaUrl);
-}
-
-export function bootstrapSkill(binImportMetaUrl) {
-  bootstrapSurface("web", binImportMetaUrl);
 }

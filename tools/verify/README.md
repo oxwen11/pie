@@ -36,8 +36,10 @@ package (not a global install) with the isolated session (`pie-verify-web` /
 
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers
-are `@getpie/verify/runtime`. Loopback health/ticket use `node:http` and try
-`[::1]` so Vite's IPv6-only 4190 is reachable when global `fetch` is intercepted
-or `localhost` is IPv4.
+are `@getpie/verify/runtime`. Launch/doctor/cleanup/evidence orchestration is
+one lifecycle; each surface only supplies spawn, health, inspect, and stop.
+Loopback health/ticket/warmup use `node:http` and try `[::1]` so Vite's
+IPv6-only 4190 is reachable when global `fetch` is intercepted or `localhost`
+is IPv4.
 
 **Not Bun.** Pie, the daemon, `tsx`, and Electron's Node side are Node 24.

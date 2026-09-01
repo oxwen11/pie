@@ -61,10 +61,6 @@ export function resolveAgentBrowserBin(): string {
   }
 }
 
-export function requireAgentBrowser(): string {
-  return resolveAgentBrowserBin();
-}
-
 export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget = {}): string[] {
   if (!browserNeedsIsolation(args[0])) {
     return [...args];

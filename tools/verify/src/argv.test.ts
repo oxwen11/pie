@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultSurfaceFromEnv, isSurface, parsePieVerifyArgv } from "./argv.ts";
+import { isSurface, parsePieVerifyArgv } from "./argv.ts";
 import { VerifyError } from "./runtime/fail.ts";
 
 describe("isSurface", () => {
@@ -36,36 +36,7 @@ describe("parsePieVerifyArgv", () => {
     });
   });
 
-  it("lets a default surface treat the first token as a command", () => {
-    expect(parsePieVerifyArgv(["launch", "--serve"], { defaultSurface: "cli" })).toEqual({
-      kind: "surface",
-      surface: "cli",
-      rest: ["launch", "--serve"],
-    });
-    expect(parsePieVerifyArgv(["--help"], { defaultSurface: "cli" })).toEqual({
-      kind: "surface",
-      surface: "cli",
-      rest: ["--help"],
-    });
-  });
-
-  it("still honors an explicit surface when a default is set", () => {
-    expect(parsePieVerifyArgv(["desktop", "doctor"], { defaultSurface: "cli" })).toEqual({
-      kind: "surface",
-      surface: "desktop",
-      rest: ["doctor"],
-    });
-  });
-
-  it("rejects an unknown first token when no default surface is set", () => {
+  it("rejects an unknown first token", () => {
     expect(() => parsePieVerifyArgv(["launch"])).toThrow(VerifyError);
-  });
-});
-
-describe("defaultSurfaceFromEnv", () => {
-  it("reads VERIFY_PIE_DEFAULT_SURFACE only when it is a known surface", () => {
-    expect(defaultSurfaceFromEnv({ VERIFY_PIE_DEFAULT_SURFACE: "cli" })).toBe("cli");
-    expect(defaultSurfaceFromEnv({ VERIFY_PIE_DEFAULT_SURFACE: "pie" })).toBeUndefined();
-    expect(defaultSurfaceFromEnv({})).toBeUndefined();
   });
 });

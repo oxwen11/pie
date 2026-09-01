@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isHelpOrVersion } from "./run.ts";
+import { isHelpOrVersion } from "./cli.ts";
 
 describe("isHelpOrVersion", () => {
   it("treats help and version flags as not needing a launched daemon", () => {

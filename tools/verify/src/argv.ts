@@ -54,20 +54,10 @@ export function isHelpFlag(value: string | undefined): boolean {
   }
 }
 
-export function defaultSurfaceFromEnv(env: NodeJS.ProcessEnv = process.env): Surface | undefined {
-  return isSurface(env.VERIFY_PIE_DEFAULT_SURFACE) ? env.VERIFY_PIE_DEFAULT_SURFACE : undefined;
-}
-
-export function parsePieVerifyArgv(
-  argv: string[],
-  options: { defaultSurface?: Surface } = {},
-): ParsedArgv {
+export function parsePieVerifyArgv(argv: string[]): ParsedArgv {
   const first = argv[0];
   if (isSurface(first)) {
     return { kind: "surface", surface: first, rest: argv.slice(1) };
-  }
-  if (options.defaultSurface !== undefined) {
-    return { kind: "surface", surface: options.defaultSurface, rest: argv };
   }
   if (isHelpFlag(first)) {
     return { kind: "help" };

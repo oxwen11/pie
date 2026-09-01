@@ -1,13 +1,14 @@
-import { defaultSurfaceFromEnv, parsePieVerifyArgv, pieVerifyUsage } from "./argv.ts";
+import { parsePieVerifyArgv, pieVerifyUsage } from "./argv.ts";
+import { dispatchCommands } from "./commands.ts";
 import { VerifyError } from "./runtime/fail.ts";
 import { assertNode24 } from "./runtime/process.ts";
-import { runCliSurface } from "./surfaces/cli/cli.ts";
-import { runDesktopSurface } from "./surfaces/desktop/cli.ts";
-import { runWebSurface } from "./surfaces/web/cli.ts";
+import { cliSurface } from "./surfaces/cli.ts";
+import { desktopSurface } from "./surfaces/desktop.ts";
+import { webSurface } from "./surfaces/web.ts";
 
 async function main(argv: string[]): Promise<void> {
   assertNode24();
-  const parsed = parsePieVerifyArgv(argv, { defaultSurface: defaultSurfaceFromEnv() });
+  const parsed = parsePieVerifyArgv(argv);
   switch (parsed.kind) {
     case "help":
       process.stdout.write(pieVerifyUsage());
@@ -15,13 +16,13 @@ async function main(argv: string[]): Promise<void> {
     case "surface":
       switch (parsed.surface) {
         case "web":
-          await runWebSurface(parsed.rest);
+          await dispatchCommands(webSurface, parsed.rest);
           return;
         case "cli":
-          await runCliSurface(parsed.rest);
+          await dispatchCommands(cliSurface, parsed.rest);
           return;
         case "desktop":
-          await runDesktopSurface(parsed.rest);
+          await dispatchCommands(desktopSurface, parsed.rest);
           return;
         default: {
           const exhaustive: never = parsed.surface;

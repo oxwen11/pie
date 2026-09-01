@@ -13,7 +13,6 @@ export {
   browserNeedsIsolation,
   buildAgentBrowserArgv,
   forwardAgentBrowser,
-  requireAgentBrowser,
   resolveAgentBrowserBin,
 } from "./browser.ts";
 export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
@@ -42,7 +41,6 @@ export {
 } from "./fs.ts";
 export {
   cdpOk,
-  cdpVersion,
   fetchText,
   healthOk,
   healthUrls,
@@ -50,6 +48,7 @@ export {
   ticketStatus,
   ticketStatusOnPort,
   urlPort,
+  warmupOrigin,
 } from "./http.ts";
 export type { FetchResult } from "./http.ts";
 export {
