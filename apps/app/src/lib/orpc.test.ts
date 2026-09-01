@@ -30,6 +30,17 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.agent.session.list.key()).staleTime).toBe(
       30_000,
     );
+    const pullRequestDefaults = {
+      staleTime: 15_000,
+      retry: false,
+      meta: { errorMode: "inline" },
+    };
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.current.key())).toMatchObject(
+      pullRequestDefaults,
+    );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
+      pullRequestDefaults,
+    );
 
     queryClient.clear();
   });

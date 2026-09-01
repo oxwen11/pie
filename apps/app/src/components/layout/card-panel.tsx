@@ -13,12 +13,26 @@ import {
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost } from "@/platform-host";
 
+export interface CardPanelStatus {
+  readonly label: string;
+  readonly tone: "positive" | "warning" | "negative" | "muted" | "accent";
+}
+
 export interface CardPanelProps {
   readonly heading: string;
   readonly supportingText?: string;
+  readonly status?: CardPanelStatus;
 }
 
-export function CardPanel({ heading, supportingText }: CardPanelProps) {
+const statusClassName = {
+  positive: "bg-success/8 text-success-foreground",
+  warning: "bg-warning/8 text-warning-foreground",
+  negative: "bg-destructive/8 text-destructive-foreground",
+  muted: "bg-muted text-muted-foreground",
+  accent: "bg-primary/8 text-primary",
+} satisfies Record<CardPanelStatus["tone"], string>;
+
+export function CardPanel({ heading, status, supportingText }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
   const hasContentPanelToggle = useContentPanel() !== null;
   const desktop = isDesktopHost(usePlatform());
@@ -66,6 +80,17 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
                 title={supportingText}
               >
                 {supportingText}
+              </span>
+            )}
+            {status !== undefined && (
+              <span
+                className={cn(
+                  "inline-flex h-5 shrink-0 items-center rounded-md px-1.5 text-xs font-medium",
+                  statusClassName[status.tone],
+                )}
+                data-tone={status.tone}
+              >
+                {status.label}
               </span>
             )}
           </m.div>
