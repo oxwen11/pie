@@ -1,15 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { cleanup } from "./cleanup.ts";
-import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, ROOT, refuseReservedPort } from "./config.ts";
 import {
   ensureCoreBuilt,
   readDaemonRecord,
   resolveCompatKey,
   invokePie,
   spawnPie,
-} from "./runtime/daemon.ts";
+} from "../../runtime/daemon.ts";
 import {
   copyFailureLogs,
   currentRun,
@@ -22,8 +20,8 @@ import {
   setCurrentRun,
   tailFile,
   writeJson,
-} from "./runtime/fs.ts";
-import { healthOk } from "./runtime/http.ts";
+} from "../../runtime/fs.ts";
+import { healthOk } from "../../runtime/http.ts";
 import {
   envPort,
   findRepoRoot,
@@ -32,7 +30,9 @@ import {
   readPidFile,
   waitUntil,
   writePidFile,
-} from "./runtime/process.ts";
+} from "../../runtime/process.ts";
+import { cleanup } from "./cleanup.ts";
+import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, ROOT, refuseReservedPort } from "./config.ts";
 
 export async function launch(args: string[]): Promise<void> {
   let replace = false;

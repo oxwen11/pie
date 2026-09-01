@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { readDaemonRecord, redactDaemonRecord } from "../../runtime/daemon.ts";
+import { appendNote, evidenceDir, stampEvidence } from "../../runtime/evidence.ts";
+import { usage } from "../../runtime/fail.ts";
+import { currentRun, ensureDir, readJsonField, writeText } from "../../runtime/fs.ts";
+import { fetchText, ticketStatus } from "../../runtime/http.ts";
 import { CURRENT_LINK, SKILL_DIR } from "./config.ts";
 import { doctorReport } from "./doctor.ts";
-import { readDaemonRecord, redactDaemonRecord } from "./runtime/daemon.ts";
-import { appendNote, evidenceDir, stampEvidence } from "./runtime/evidence.ts";
-import { usage } from "./runtime/fail.ts";
-import { currentRun, ensureDir, readJsonField, writeText } from "./runtime/fs.ts";
-import { fetchText, ticketStatus } from "./runtime/http.ts";
 
 export async function evidence(args: string[]): Promise<void> {
   const runDir = currentRun(CURRENT_LINK);
@@ -43,10 +43,10 @@ export async function evidence(args: string[]): Promise<void> {
       return;
     default:
       usage(`Usage:
-  verify-pie-cli evidence path
-  verify-pie-cli evidence init
-  verify-pie-cli evidence curl
-  verify-pie-cli evidence note <text>`);
+  pie-verify cli evidence path
+  pie-verify cli evidence init
+  pie-verify cli evidence curl
+  pie-verify cli evidence note <text>`);
   }
 }
 

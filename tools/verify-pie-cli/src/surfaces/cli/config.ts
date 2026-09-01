@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { findRepoRoot } from "./runtime/process.ts";
+import { findRepoRoot } from "../../runtime/process.ts";
 
 export const SKILL = "verify-pie-cli";
 export const SKILL_DIR =
@@ -9,7 +9,7 @@ export const SKILL_DIR =
 export const ROOT = process.env.VERIFY_PIE_CLI_ROOT ?? "/tmp/verify-pie-cli";
 export const CURRENT_LINK = path.join(ROOT, "current");
 export const DEFAULT_PIE_PORT = 4182;
-export const BIN = process.env.VERIFY_PIE_CLI_BIN ?? "verify-pie-cli";
+export const BIN = process.env.VERIFY_PIE_CLI_BIN ?? "pie-verify cli";
 
 export function refuseReservedPort(port: number): void {
   switch (port) {

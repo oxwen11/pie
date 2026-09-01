@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie CLI daemon and for
 
 The CLI (`packages/pie`, package `@getpie/cli`, bin `pie`) is a **different front door** from the Vite web UI. Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a **detached daemon** that outlives the CLI process. `pie serve` is the **foreground** server (what `.cursor/skills/verify-pie` uses).
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). Implementation is the workspace package `tools/verify-pie-cli` (`@getpie/verify-pie-cli`). Invoke with `pnpm exec verify-pie-cli` or `.cursor/skills/verify-pie-cli/bin/verify-pie-cli` (Node >= 24). **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). The helper is **`pnpm exec pie-verify cli`** from the root-installed workspace package `@getpie/verify-pie-cli` (`tools/verify-pie-cli`, Node >= 24). `pnpm exec verify-pie-cli` is a compatibility alias for the same `cli` surface. **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
 
 Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
@@ -16,11 +16,10 @@ Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/ve
 Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. Default daemon port **4182** (not 4000, not web 4180).
 
 ```bash
-pnpm exec verify-pie-cli launch
-# .cursor/skills/verify-pie-cli/bin/verify-pie-cli launch   # same, finds Node 24
+pnpm exec pie-verify cli launch
 # idempotent if the current run is healthy
-# pnpm exec verify-pie-cli launch --replace
-# pnpm exec verify-pie-cli launch --serve   # foreground pie serve
+# pnpm exec pie-verify cli launch --replace
+# pnpm exec pie-verify cli launch --serve   # foreground pie serve
 ```
 
 Ready when `GET $address/api/health` returns `ok`. **Read `address` from `$PIE_DAEMON_DIR/daemon.pid`** — do not guess the port. Preferred port is 4182; if it is taken the launcher refuses rather than silently moving.
@@ -51,7 +50,7 @@ Stdout you should see:
 Read-only. Run before driving, and again after any stop/start.
 
 ```bash
-pnpm exec verify-pie-cli doctor
+pnpm exec pie-verify cli doctor
 ```
 
 It checks, in order:
@@ -69,11 +68,11 @@ It checks, in order:
 Harness: the CLI itself plus `curl`. No browser.
 
 ```bash
-pnpm exec verify-pie-cli run daemon status
-pnpm exec verify-pie-cli run --help
+pnpm exec pie-verify cli run daemon status
+pnpm exec pie-verify cli run --help
 ```
 
-`verify-pie-cli run` injects the current run's `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_PORT` and runs `tsx src/node/cli.ts` with the remaining args. Do not call a global `pie` — it may point at another home.
+`pie-verify cli run` injects the current run's `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_PORT` and runs `tsx src/node/cli.ts` with the remaining args. Do not call a global `pie` — it may point at another home.
 
 Commands:
 
@@ -92,10 +91,10 @@ Do not `pie daemon stop` against `~/.pie` / a live user daemon. Only the run hel
 ## Evidence
 
 ```bash
-pnpm exec verify-pie-cli evidence init
-pnpm exec verify-pie-cli evidence curl
-pnpm exec verify-pie-cli evidence note "…"
-pnpm exec verify-pie-cli evidence path
+pnpm exec pie-verify cli evidence init
+pnpm exec pie-verify cli evidence curl
+pnpm exec pie-verify cli evidence note "…"
+pnpm exec pie-verify cli evidence path
 ```
 
 Evidence lands in `.cursor/skills/verify-pie-cli/evidence/<run-id>/` (gitignored except `.gitignore`). `daemon.pid` is copied **with `token` stripped**. Never paste a raw record into chat.
@@ -103,22 +102,22 @@ Evidence lands in `.cursor/skills/verify-pie-cli/evidence/<run-id>/` (gitignored
 ## Cleanup
 
 ```bash
-pnpm exec verify-pie-cli cleanup
+pnpm exec pie-verify cli cleanup
 ```
 
 Daemon mode: `pie daemon stop` with this run's env, then TERM/KILL only the **recorded daemon pid** if it is still alive. Serve mode: kill the recorded serve process tree. Removes `/tmp/verify-pie-cli/runs/<id>`. Does **not** delete evidence. Does **not** `pkill` pie / node / tsx.
 
 ## Helpers
 
-One executable. Commands are TypeScript in `tools/verify-pie-cli/src`.
+One executable for every verify skill: `pie-verify` (`@getpie/verify-pie-cli`, root `devDependency`). This skill uses the `cli` surface. `pnpm exec verify-pie-cli …` still means `pie-verify cli …`.
 
 | Command | Purpose |
 | --- | --- |
-| `verify-pie-cli launch` | Isolated daemon (or `--serve`). `--replace` cleans ours first. |
-| `verify-pie-cli doctor` | Read-only worth-driving check. |
-| `verify-pie-cli run` | CLI with the current run's env. |
-| `verify-pie-cli evidence` | `init` / `curl` / `note` / `path`. |
-| `verify-pie-cli cleanup` | Stop what we started; keep evidence. |
+| `pnpm exec pie-verify cli launch` | Isolated daemon (or `--serve`). `--replace` cleans ours first. |
+| `pnpm exec pie-verify cli doctor` | Read-only worth-driving check. |
+| `pnpm exec pie-verify cli run` | CLI with the current run's env. |
+| `pnpm exec pie-verify cli evidence` | `init` / `curl` / `note` / `path`. |
+| `pnpm exec pie-verify cli cleanup` | Stop what we started; keep evidence. |
 
 ## Isolate
 

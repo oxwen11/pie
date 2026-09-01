@@ -23,9 +23,9 @@ pnpm turbo run e2e --filter=@getpie/desktop -- desktop-rpc.spec.ts -g "renders i
 ## Real isolated window
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop doctor
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence init
+pnpm exec pie-verify desktop launch
+pnpm exec pie-verify desktop doctor
+pnpm exec pie-verify desktop evidence init
 ```
 
 Doctor attaches with `agent-browser connect`. Then:

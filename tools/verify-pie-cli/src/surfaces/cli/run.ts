@@ -1,9 +1,9 @@
 import path from "node:path";
 
+import { ensureCoreBuilt, invokePie, resolveCompatKey } from "../../runtime/daemon.ts";
+import { currentRun, readJsonField } from "../../runtime/fs.ts";
+import { findRepoRoot } from "../../runtime/process.ts";
 import { CURRENT_LINK } from "./config.ts";
-import { ensureCoreBuilt, invokePie, resolveCompatKey } from "./runtime/daemon.ts";
-import { currentRun, readJsonField } from "./runtime/fs.ts";
-import { findRepoRoot } from "./runtime/process.ts";
 
 export async function run(args: string[]): Promise<void> {
   const repo = findRepoRoot();

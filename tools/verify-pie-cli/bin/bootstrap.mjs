@@ -43,15 +43,11 @@ export function resolveNode24() {
   }
 
   throw new Error(
-    `Need Node >= 24 (PATH has ${process.versions.node}). Install with nvm and use the skill bin wrapper.`,
+    `Need Node >= 24 (PATH has ${process.versions.node}). Install with nvm and use pnpm exec pie-verify.`,
   );
 }
 
 function cliArgv() {
-  const dist = path.join(packageRoot, "dist/cli.mjs");
-  if (fs.existsSync(dist)) {
-    return [dist];
-  }
   return [
     "--experimental-strip-types",
     "--no-warnings=ExperimentalWarning",
@@ -59,44 +55,51 @@ function cliArgv() {
   ];
 }
 
-function execCli(extraEnv = {}) {
+function execCli(argv, extraEnv = {}) {
   const { node, pathEnv } = resolveNode24();
-  const result = childProcess.spawnSync(node, [...cliArgv(), ...process.argv.slice(2)], {
+  const result = childProcess.spawnSync(node, [...cliArgv(), ...argv], {
     stdio: "inherit",
     env: { ...process.env, PATH: pathEnv, ...extraEnv },
   });
   process.exitCode = result.status ?? 1;
 }
 
-export function bootstrapVerifyPieCli(binImportMetaUrl) {
-  const skillBin = url.fileURLToPath(binImportMetaUrl);
-  const skillDir = path.dirname(path.dirname(skillBin));
-  execCli({
-    VERIFY_PIE_CLI_SKILL_DIR: process.env.VERIFY_PIE_CLI_SKILL_DIR ?? skillDir,
-    VERIFY_PIE_CLI_BIN: process.env.VERIFY_PIE_CLI_BIN ?? skillBin,
-  });
+function skillDirFromBin(binImportMetaUrl) {
+  return path.dirname(path.dirname(url.fileURLToPath(binImportMetaUrl)));
+}
+
+function skillDirEnv(surface) {
+  switch (surface) {
+    case "web":
+      return "VERIFY_PIE_SKILL_DIR";
+    case "cli":
+      return "VERIFY_PIE_CLI_SKILL_DIR";
+    case "desktop":
+      return "VERIFY_PIE_DESKTOP_SKILL_DIR";
+    default:
+      throw new Error(`unknown verify surface ${surface}`);
+  }
 }
 
 export function bootstrapPackage() {
-  execCli();
+  execCli(process.argv.slice(2));
+}
+
+export function bootstrapSurface(surface, binImportMetaUrl) {
+  const extraEnv = {
+    VERIFY_PIE_DEFAULT_SURFACE: surface,
+  };
+  if (binImportMetaUrl !== undefined) {
+    const envName = skillDirEnv(surface);
+    extraEnv[envName] = process.env[envName] ?? skillDirFromBin(binImportMetaUrl);
+  }
+  execCli([surface, ...process.argv.slice(2)], extraEnv);
+}
+
+export function bootstrapVerifyPieCli(binImportMetaUrl) {
+  bootstrapSurface("cli", binImportMetaUrl);
 }
 
 export function bootstrapSkill(binImportMetaUrl) {
-  const { node, pathEnv } = resolveNode24();
-  const skillDir = path.dirname(path.dirname(url.fileURLToPath(binImportMetaUrl)));
-  const cli = path.join(skillDir, "src/cli.ts");
-  const result = childProcess.spawnSync(
-    node,
-    [
-      "--experimental-strip-types",
-      "--no-warnings=ExperimentalWarning",
-      cli,
-      ...process.argv.slice(2),
-    ],
-    {
-      stdio: "inherit",
-      env: { ...process.env, PATH: pathEnv },
-    },
-  );
-  process.exitCode = result.status ?? 1;
+  bootstrapSurface("web", binImportMetaUrl);
 }

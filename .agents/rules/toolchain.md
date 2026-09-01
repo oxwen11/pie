@@ -38,11 +38,12 @@
   `apps/desktop/e2e/` is Playwright and not in CI. `tools/testing/fake-claude.mjs`
   is referenced by relative path from both server tests and desktop e2e.
 - **Verify CLI:** `tools/verify-pie-cli` (`@getpie/verify-pie-cli`, bin
-  `verify-pie-cli`) is the Node 24 TypeScript helper for isolated `pie` /
-  `pie daemon` / `pie serve` proofs. The skill `.agents/skills/verify-pie-cli`
-  is the cold-start recipe and feature map (`.cursor/skills/verify-pie-cli` is
-  a symlink). Shared process/HTTP/JSON helpers
-  are `@getpie/verify-pie-cli/runtime`. This is not `@getpie/cli`
+  `pie-verify`, root `devDependency`) is the Node 24 TypeScript helper for
+  isolated web / CLI / desktop proofs. Skills call one command:
+  `pnpm exec pie-verify web|cli|desktop …`. The skill trees under
+  `.agents/skills/verify-pie{,-cli,-desktop}` are cold-start recipes and
+  feature maps (`.cursor/skills/…` are symlinks). Shared process/HTTP/JSON
+  helpers are `@getpie/verify-pie-cli/runtime`. This is not `@getpie/cli`
   (`packages/pie`, bin `pie`) and is not Bun.
 - **Assertions:** the runner is always vitest; only the assertion library splits.
   Effect tests (`it.effect`, `layer`) use `node:assert/strict`, plain synchronous

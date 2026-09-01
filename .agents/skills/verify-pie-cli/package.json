@@ -1,6 +1,0 @@
-{
-  "name": "@local/verify-pie-cli",
-  "private": true,
-  "type": "module",
-  "description": "Cold-start recipe for @getpie/verify-pie-cli. Implementation is tools/verify-pie-cli."
-}

@@ -5,8 +5,8 @@
 ## How to get to it
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli launch --serve
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli doctor
+pnpm exec pie-verify cli launch --serve
+pnpm exec pie-verify cli doctor
 ```
 
 Do not mix `--serve` with an existing daemon run on the same current pointer. `--replace` first.

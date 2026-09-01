@@ -13,23 +13,23 @@ Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a detached daem
 ## How to get to it
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli launch
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli doctor
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli evidence init
+pnpm exec pie-verify cli launch
+pnpm exec pie-verify cli doctor
+pnpm exec pie-verify cli evidence init
 ```
 
 ## Driving it
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli run daemon status
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli evidence curl
+pnpm exec pie-verify cli run daemon status
+pnpm exec pie-verify cli evidence curl
 ```
 
 Then stop as the last drive step (or leave it for cleanup — cleanup also stops):
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli run daemon stop
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli run daemon status
+pnpm exec pie-verify cli run daemon stop
+pnpm exec pie-verify cli run daemon status
 ```
 
 Proof (all of these):

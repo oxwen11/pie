@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { readDaemonRecord } from "../../runtime/daemon.ts";
+import { fail } from "../../runtime/fail.ts";
+import { currentRun, readJsonField } from "../../runtime/fs.ts";
+import { healthOk, ticketStatus, urlPort } from "../../runtime/http.ts";
+import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "../../runtime/process.ts";
 import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT } from "./config.ts";
-import { readDaemonRecord } from "./runtime/daemon.ts";
-import { fail } from "./runtime/fail.ts";
-import { currentRun, readJsonField } from "./runtime/fs.ts";
-import { healthOk, ticketStatus, urlPort } from "./runtime/http.ts";
-import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "./runtime/process.ts";
 
 export async function doctor(): Promise<void> {
   process.stdout.write(await doctorReport());

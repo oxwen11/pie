@@ -1,12 +1,42 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { ensureCoreBuilt } from "../../verify-runtime/src/daemon.ts";
-import { copyFailureLogs, currentRun, ensureDir, isoNow, newRunId, readJsonField, readText, removePath, setCurrentRun, tailFile, writeJson } from "../../verify-runtime/src/fs.ts";
-import { healthOk } from "../../verify-runtime/src/http.ts";
-import { envPort, findRepoRoot, listenPids, pidAlive, readPidFile, spawnLogged, waitUntil, writePidFile } from "../../verify-runtime/src/process.ts";
-import { ensureSampleProject } from "../../verify-runtime/src/scaffold.ts";
+import fs from "node:fs";
+import path from "node:path";
+
+import { ensureCoreBuilt } from "../../runtime/daemon.ts";
+import {
+  copyFailureLogs,
+  currentRun,
+  ensureDir,
+  isoNow,
+  newRunId,
+  readJsonField,
+  readText,
+  removePath,
+  setCurrentRun,
+  tailFile,
+  writeJson,
+} from "../../runtime/fs.ts";
+import { healthOk } from "../../runtime/http.ts";
+import {
+  envPort,
+  findRepoRoot,
+  listenPids,
+  pidAlive,
+  readPidFile,
+  spawnLogged,
+  waitUntil,
+  writePidFile,
+} from "../../runtime/process.ts";
+import { ensureSampleProject } from "../../runtime/scaffold.ts";
 import { cleanup } from "./cleanup.ts";
-import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, ROOT, SAMPLE_MARKER, SAMPLE_NAME, VITE_PORT } from "./config.ts";
+import {
+  BIN,
+  CURRENT_LINK,
+  DEFAULT_PIE_PORT,
+  ROOT,
+  SAMPLE_MARKER,
+  SAMPLE_NAME,
+  VITE_PORT,
+} from "./config.ts";
 
 export async function launch(args: string[]): Promise<void> {
   let replace = false;
@@ -29,20 +59,29 @@ export async function launch(args: string[]): Promise<void> {
 
   const existing = currentRun(CURRENT_LINK);
   if (existing !== undefined) {
-    const serverPid = readPidFile(join(existing, "pids/server.pid"));
-    const vitePid = readPidFile(join(existing, "pids/vite.pid"));
-    if (pidAlive(serverPid) && pidAlive(vitePid) && (await healthOk(piePort)) && (await healthOk(VITE_PORT))) {
+    const serverPid = readPidFile(path.join(existing, "pids/server.pid"));
+    const vitePid = readPidFile(path.join(existing, "pids/vite.pid"));
+    if (
+      pidAlive(serverPid) &&
+      pidAlive(vitePid) &&
+      (await healthOk(piePort)) &&
+      (await healthOk(VITE_PORT))
+    ) {
       console.log(`verify-pie: already running at ${existing}`);
       console.log(`  app     http://localhost:${VITE_PORT}/`);
       console.log(`  api     http://127.0.0.1:${piePort}/api/health`);
-      console.log(`  home    ${readJsonField<string>(join(existing, "meta.json"), "pieHome")}`);
+      console.log(
+        `  home    ${readJsonField<string>(path.join(existing, "meta.json"), "pieHome")}`,
+      );
       return;
     }
     if (pidAlive(serverPid) || pidAlive(vitePid)) {
       if (replace) {
         await cleanup([]);
       } else {
-        throw new Error(`a previous run still has live processes (${existing}).\n  run ${BIN} cleanup or re-launch with --replace`);
+        throw new Error(
+          `a previous run still has live processes (${existing}).\n  run ${BIN} cleanup or re-launch with --replace`,
+        );
       }
     } else {
       console.log(`verify-pie: dropping stale run pointer ${existing}`);
@@ -54,8 +93,8 @@ export async function launch(args: string[]): Promise<void> {
   refuseTakenPort(VITE_PORT);
 
   const runId = newRunId();
-  const runDir = join(ROOT, "runs", runId);
-  const pieHome = join(runDir, "pie-home");
+  const runDir = path.join(ROOT, "runs", runId);
+  const pieHome = path.join(runDir, "pie-home");
   const sample = ensureSampleProject({
     home: process.env.HOME ?? "",
     name: SAMPLE_NAME,
@@ -65,11 +104,11 @@ export async function launch(args: string[]): Promise<void> {
       "verify-pie scaffolding — safe to delete. Created so the import-project dialog\nlists a distinctive folder at $HOME without walking a long path.\n",
     logPrefix: "verify-pie",
   });
-  ensureDir(join(runDir, "pids"));
-  ensureDir(join(runDir, "logs"));
+  ensureDir(path.join(runDir, "pids"));
+  ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
 
-  writeJson(join(runDir, "meta.json"), {
+  writeJson(path.join(runDir, "meta.json"), {
     runId,
     repo,
     pieHome,
@@ -82,56 +121,65 @@ export async function launch(args: string[]): Promise<void> {
   });
   setCurrentRun(CURRENT_LINK, runDir);
 
-  const env = { ...process.env, PIE_PORT: String(piePort), PIE_HOME: pieHome, NODE_ENV: "development" };
-  const server = spawnLogged("pnpm", ["dev"], join(runDir, "logs/server.log"), {
-    cwd: join(repo, "packages/pie"),
+  const env = {
+    ...process.env,
+    PIE_PORT: String(piePort),
+    PIE_HOME: pieHome,
+    NODE_ENV: "development",
+  };
+  const server = spawnLogged("pnpm", ["dev"], path.join(runDir, "logs/server.log"), {
+    cwd: path.join(repo, "packages/pie"),
     env,
   });
   if (server.pid === undefined) {
     throw new Error("failed to spawn pie serve");
   }
-  writePidFile(join(runDir, "pids/server.pid"), server.pid);
+  writePidFile(path.join(runDir, "pids/server.pid"), server.pid);
 
   try {
     await waitUntil(`pie serve on ${piePort}`, () => healthOk(piePort), 60);
   } catch (error) {
-    tailFile(join(runDir, "logs/server.log"));
-    copyFailureLogs(runDir, join(ROOT, "last-failure"));
+    tailFile(path.join(runDir, "logs/server.log"));
+    copyFailureLogs(runDir, path.join(ROOT, "last-failure"));
     await cleanup([]).catch(() => undefined);
     throw error;
   }
 
-  const serverLog = join(runDir, "logs/server.log");
-  if (existsSync(serverLog) && !readText(serverLog).includes("pie:ready ")) {
+  const serverLog = path.join(runDir, "logs/server.log");
+  if (fs.existsSync(serverLog) && !readText(serverLog).includes("pie:ready ")) {
     console.error("verify-pie: /api/health is ok but the ready line never appeared — continuing");
   }
 
-  const vite = spawnLogged("pnpm", ["dev"], join(runDir, "logs/vite.log"), {
-    cwd: join(repo, "apps/app"),
+  const vite = spawnLogged("pnpm", ["dev"], path.join(runDir, "logs/vite.log"), {
+    cwd: path.join(repo, "apps/app"),
     env: { ...process.env, PIE_PORT: String(piePort) },
   });
   if (vite.pid === undefined) {
     throw new Error("failed to spawn vite");
   }
-  writePidFile(join(runDir, "pids/vite.pid"), vite.pid);
+  writePidFile(path.join(runDir, "pids/vite.pid"), vite.pid);
 
   try {
     await waitUntil(`vite proxy on ${VITE_PORT}`, () => healthOk(VITE_PORT), 90);
   } catch (error) {
-    tailFile(join(runDir, "logs/vite.log"));
-    copyFailureLogs(runDir, join(ROOT, "last-failure"));
+    tailFile(path.join(runDir, "logs/vite.log"));
+    copyFailureLogs(runDir, path.join(ROOT, "last-failure"));
     await cleanup([]).catch(() => undefined);
     throw error;
   }
 
-  await fetch(`http://localhost:${VITE_PORT}/`, { signal: AbortSignal.timeout(10_000) }).catch(() => undefined);
+  await fetch(`http://localhost:${VITE_PORT}/`, { signal: AbortSignal.timeout(10_000) }).catch(
+    () => undefined,
+  );
 
   console.log(`verify-pie: launched ${runId}`);
-  console.log(`  app     http://localhost:${VITE_PORT}/   (Vite binds [::1]; do not use 127.0.0.1:${VITE_PORT})`);
+  console.log(
+    `  app     http://localhost:${VITE_PORT}/   (Vite binds [::1]; do not use 127.0.0.1:${VITE_PORT})`,
+  );
   console.log(`  api     http://127.0.0.1:${piePort}/api/health`);
   console.log(`  home    ${pieHome}`);
   console.log(`  sample  ${sample.path}`);
-  console.log(`  logs    ${join(runDir, "logs")}`);
+  console.log(`  logs    ${path.join(runDir, "logs")}`);
   console.log(`  doctor  ${BIN} doctor`);
 }
 

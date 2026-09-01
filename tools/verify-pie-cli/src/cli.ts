@@ -1,49 +1,39 @@
-import { cleanup } from "./cleanup.ts";
-import { doctor } from "./doctor.ts";
-import { evidence } from "./evidence.ts";
-import { launch } from "./launch.ts";
-import { run } from "./run.ts";
+import { defaultSurfaceFromEnv, parsePieVerifyArgv, pieVerifyUsage } from "./argv.ts";
 import { VerifyError } from "./runtime/fail.ts";
 import { assertNode24 } from "./runtime/process.ts";
-
-const usageText = `Usage:
-  verify-pie-cli launch [--replace] [--serve]
-  verify-pie-cli doctor
-  verify-pie-cli run <pie argv…>
-  verify-pie-cli evidence path|init|curl|note
-  verify-pie-cli cleanup [run-dir]
-
-TypeScript helpers from tools/verify-pie-cli, executed with Node >= 24 (not Bash, not Bun).
-`;
+import { runCliSurface } from "./surfaces/cli/cli.ts";
+import { runDesktopSurface } from "./surfaces/desktop/cli.ts";
+import { runWebSurface } from "./surfaces/web/cli.ts";
 
 async function main(argv: string[]): Promise<void> {
   assertNode24();
-  const command = argv[0];
-  const rest = argv.slice(1);
-  switch (command) {
-    case undefined:
-    case "-h":
-    case "--help":
+  const parsed = parsePieVerifyArgv(argv, { defaultSurface: defaultSurfaceFromEnv() });
+  switch (parsed.kind) {
     case "help":
-      process.stdout.write(usageText);
+      process.stdout.write(pieVerifyUsage());
       return;
-    case "launch":
-      await launch(rest);
-      return;
-    case "doctor":
-      await doctor();
-      return;
-    case "run":
-      await run(rest);
-      return;
-    case "evidence":
-      await evidence(rest);
-      return;
-    case "cleanup":
-      await cleanup(rest);
-      return;
-    default:
-      throw new VerifyError(`${usageText}unknown command ${command}`, 2);
+    case "surface":
+      switch (parsed.surface) {
+        case "web":
+          await runWebSurface(parsed.rest);
+          return;
+        case "cli":
+          await runCliSurface(parsed.rest);
+          return;
+        case "desktop":
+          await runDesktopSurface(parsed.rest);
+          return;
+        default: {
+          const exhaustive: never = parsed.surface;
+          void exhaustive;
+          throw new VerifyError("unknown surface", 2);
+        }
+      }
+    default: {
+      const exhaustive: never = parsed;
+      void exhaustive;
+      throw new VerifyError("unhandled argv", 2);
+    }
   }
 }
 
@@ -51,6 +41,6 @@ try {
   await main(process.argv.slice(2));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(message.startsWith("verify-pie-cli") ? message : `verify-pie-cli: ${message}`);
+  console.error(message.startsWith("pie-verify") ? message : `pie-verify: ${message}`);
   process.exitCode = error instanceof VerifyError ? error.exitCode : 1;
 }

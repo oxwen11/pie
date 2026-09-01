@@ -4,7 +4,7 @@ Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` + `$PIE_DAEMO
 
 ## How to get to it
 
-1. Start an isolated CLI daemon (`verify-pie-cli launch` uses 4182 — **different root**). For a same-home proof, start the CLI **inside the desktop run's env** instead:
+1. Start an isolated CLI daemon (`pnpm exec pie-verify cli launch` uses 4182 — **different root**). For a same-home proof, start the CLI **inside the desktop run's env** instead:
 
 ```bash
 # after verify-pie-desktop launch

@@ -2,8 +2,9 @@
   "name": "@getpie/verify-pie-cli",
   "version": "0.0.0",
   "private": true,
-  "description": "Isolated launch/doctor/drive/cleanup for pie / pie daemon / pie serve proofs",
+  "description": "Isolated launch/doctor/drive/cleanup for pie web, CLI, and desktop proofs (bin pie-verify)",
   "bin": {
+    "pie-verify": "./bin/pie-verify.mjs",
     "verify-pie-cli": "./bin/verify-pie-cli.mjs"
   },
   "type": "module",

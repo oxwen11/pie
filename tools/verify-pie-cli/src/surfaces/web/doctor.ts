@@ -1,9 +1,16 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { fail } from "../../verify-runtime/src/fail.ts";
-import { currentRun, readJsonField } from "../../verify-runtime/src/fs.ts";
-import { healthOk, ticketStatusOnPort } from "../../verify-runtime/src/http.ts";
-import { isSharedPieHome, listenPids, pidAlive, portOwnedByAncestor, readPidFile } from "../../verify-runtime/src/process.ts";
+import fs from "node:fs";
+import path from "node:path";
+
+import { fail } from "../../runtime/fail.ts";
+import { currentRun, readJsonField } from "../../runtime/fs.ts";
+import { healthOk, ticketStatusOnPort } from "../../runtime/http.ts";
+import {
+  isSharedPieHome,
+  listenPids,
+  pidAlive,
+  portOwnedByAncestor,
+  readPidFile,
+} from "../../runtime/process.ts";
 import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, VITE_PORT } from "./config.ts";
 
 export async function doctor(): Promise<void> {
@@ -23,8 +30,8 @@ export async function doctorReport(): Promise<string> {
     fail(`verify-pie doctor: FAIL — no current run. Launch first: ${BIN} launch`);
   }
 
-  const meta = join(runDir, "meta.json");
-  if (!existsSync(meta)) {
+  const meta = path.join(runDir, "meta.json");
+  if (!fs.existsSync(meta)) {
     fail(`verify-pie doctor: FAIL — missing ${meta}`);
   }
 
@@ -33,8 +40,8 @@ export async function doctorReport(): Promise<string> {
   const pieHome = readJsonField<string>(meta, "pieHome");
   const appUrl = readJsonField<string>(meta, "appUrl");
   const runId = readJsonField<string>(meta, "runId");
-  const serverPid = readPidFile(join(runDir, "pids/server.pid"));
-  const vitePid = readPidFile(join(runDir, "pids/vite.pid"));
+  const serverPid = readPidFile(path.join(runDir, "pids/server.pid"));
+  const vitePid = readPidFile(path.join(runDir, "pids/vite.pid"));
 
   if (!pidAlive(serverPid)) {
     fail(`verify-pie doctor: FAIL — server pid ${serverPid} is not running`);
@@ -56,22 +63,31 @@ export async function doctorReport(): Promise<string> {
     fail(`verify-pie doctor: FAIL — http://127.0.0.1:${piePort}/api/health is not ok`);
   }
   if (!(await healthOk(vitePort))) {
-    fail(`verify-pie doctor: FAIL — Vite proxy :${vitePort}/api/health is not ok — open the Vite URL, not the API port`);
+    fail(
+      `verify-pie doctor: FAIL — Vite proxy :${vitePort}/api/health is not ok — open the Vite URL, not the API port`,
+    );
   }
-  if (!existsSync(pieHome)) {
+  if (!fs.existsSync(pieHome)) {
     fail(`verify-pie doctor: FAIL — PIE_HOME ${pieHome} is missing`);
   }
   if (isSharedPieHome(pieHome)) {
-    fail(`verify-pie doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`);
+    fail(
+      `verify-pie doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`,
+    );
   }
 
   const ticket = await ticketStatusOnPort(vitePort);
   if (ticket !== 200) {
-    fail(`verify-pie doctor: FAIL — /api/ws-ticket returned ${ticket} (401 means you hit the daemon on 4000, not this serve)`);
+    fail(
+      `verify-pie doctor: FAIL — /api/ws-ticket returned ${ticket} (401 means you hit the daemon on 4000, not this serve)`,
+    );
   }
 
   const major = Number(process.versions.node.split(".")[0]);
-  const warn = major < 24 ? `\nverify-pie doctor: WARN — current shell Node is v${process.versions.node}; pie serve wants >= 24.\n` : "";
+  const warn =
+    major < 24
+      ? `\nverify-pie doctor: WARN — current shell Node is v${process.versions.node}; pie serve wants >= 24.\n`
+      : "";
 
   return [
     "verify-pie doctor: OK",

@@ -1,11 +1,12 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { readDaemonRecord } from "../../verify-runtime/src/daemon.ts";
-import { fail } from "../../verify-runtime/src/fail.ts";
-import { currentRun, readJsonField } from "../../verify-runtime/src/fs.ts";
-import { agentBrowser } from "../../verify-runtime/src/evidence.ts";
-import { healthOk, ticketStatus } from "../../verify-runtime/src/http.ts";
-import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "../../verify-runtime/src/process.ts";
+import fs from "node:fs";
+import path from "node:path";
+
+import { readDaemonRecord } from "../../runtime/daemon.ts";
+import { agentBrowser } from "../../runtime/evidence.ts";
+import { fail } from "../../runtime/fail.ts";
+import { currentRun, readJsonField } from "../../runtime/fs.ts";
+import { healthOk, ticketStatus } from "../../runtime/http.ts";
+import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "../../runtime/process.ts";
 import { BIN, BROWSER_SESSION, CURRENT_LINK, DEFAULT_DAEMON_PORT } from "./config.ts";
 
 export async function doctor(): Promise<void> {
@@ -23,8 +24,8 @@ export async function doctorReport(): Promise<string> {
     fail(`verify-pie-desktop doctor: FAIL — no current run. Launch first: ${BIN} launch`);
   }
 
-  const meta = join(runDir, "meta.json");
-  if (!existsSync(meta)) {
+  const meta = path.join(runDir, "meta.json");
+  if (!fs.existsSync(meta)) {
     fail(`verify-pie-desktop doctor: FAIL — missing ${meta}`);
   }
 
@@ -33,21 +34,25 @@ export async function doctorReport(): Promise<string> {
   const cdpPort = readJsonField<number>(meta, "cdpPort");
   const runId = readJsonField<string>(meta, "runId");
 
-  if (!existsSync(pieHome)) {
+  if (!fs.existsSync(pieHome)) {
     fail(`verify-pie-desktop doctor: FAIL — PIE_HOME ${pieHome} is missing`);
   }
   if (isSharedPieHome(pieHome)) {
-    fail(`verify-pie-desktop doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`);
+    fail(
+      `verify-pie-desktop doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`,
+    );
   }
 
-  const evPid = readPidFile(join(runDir, "pids/electron-vite.pid"));
+  const evPid = readPidFile(path.join(runDir, "pids/electron-vite.pid"));
   if (!pidAlive(evPid)) {
     fail(`verify-pie-desktop doctor: FAIL — electron-vite pid ${evPid} is not running`);
   }
 
-  const recordPath = join(daemonDir, "daemon.pid");
-  if (!existsSync(recordPath)) {
-    fail(`verify-pie-desktop doctor: FAIL — missing ${recordPath} — Electron did not attach/spawn a daemon`);
+  const recordPath = path.join(daemonDir, "daemon.pid");
+  if (!fs.existsSync(recordPath)) {
+    fail(
+      `verify-pie-desktop doctor: FAIL — missing ${recordPath} — Electron did not attach/spawn a daemon`,
+    );
   }
   const record = readDaemonRecord(recordPath);
   if (!pidAlive(record.pid)) {
@@ -58,11 +63,15 @@ export async function doctorReport(): Promise<string> {
   }
   const anon = await ticketStatus(record.address);
   if (anon !== 401) {
-    fail(`verify-pie-desktop doctor: FAIL — /api/ws-ticket without token returned ${anon} (expected 401)`);
+    fail(
+      `verify-pie-desktop doctor: FAIL — /api/ws-ticket without token returned ${anon} (expected 401)`,
+    );
   }
   const auth = await ticketStatus(record.address, record.token);
   if (auth !== 200) {
-    fail(`verify-pie-desktop doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`);
+    fail(
+      `verify-pie-desktop doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
+    );
   }
   let title = "";
   let url = "";
@@ -72,7 +81,9 @@ export async function doctorReport(): Promise<string> {
     url = agentBrowser(["get", "url"], { session: BROWSER_SESSION }).trim();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    fail(`verify-pie-desktop doctor: FAIL — agent-browser could not attach to CDP ${cdpPort}: ${message}`);
+    fail(
+      `verify-pie-desktop doctor: FAIL — agent-browser could not attach to CDP ${cdpPort}: ${message}`,
+    );
   }
 
   return [

@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { CURRENT_LINK, ROOT, SKILL_DIR } from "./config.ts";
-import { invokePie, readDaemonRecord } from "./runtime/daemon.ts";
+import { invokePie, readDaemonRecord } from "../../runtime/daemon.ts";
 import {
   clearCurrentRun,
   currentRun,
@@ -12,8 +11,9 @@ import {
   realPath,
   removePath,
   tryReadJsonField,
-} from "./runtime/fs.ts";
-import { killTree, pidAlive, readPidFile, waitDead } from "./runtime/process.ts";
+} from "../../runtime/fs.ts";
+import { killTree, pidAlive, readPidFile, waitDead } from "../../runtime/process.ts";
+import { CURRENT_LINK, ROOT, SKILL_DIR } from "./config.ts";
 
 export async function cleanup(args: string[]): Promise<void> {
   const runDir = resolveCleanupTarget(args[0]);

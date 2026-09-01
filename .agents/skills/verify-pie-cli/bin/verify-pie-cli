@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { bootstrapVerifyPieCli } from "@getpie/verify-pie-cli/bootstrap";
+import { bootstrapSurface } from "@getpie/verify-pie-cli/bootstrap";
 
-bootstrapVerifyPieCli(import.meta.url);
+bootstrapSurface("cli", import.meta.url);

@@ -7,8 +7,8 @@ A second CLI against the same `$PIE_HOME` / `$PIE_DAEMON_DIR` must attach, not s
 Launch once, then run start again without cleanup.
 
 ```bash
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli launch
-.cursor/skills/verify-pie-cli/bin/verify-pie-cli run daemon start
+pnpm exec pie-verify cli launch
+pnpm exec pie-verify cli run daemon start
 ```
 
 ## Driving it

@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for Pie Desktop (Electron + to
 
 Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web app via `@getpie/app`. It does **not** use Vite 4190. Main attach-or-spawns the **same token daemon** as the CLI (`makeDaemonServerProcess`). The daemon **outlives Electron** — closing the window is not teardown.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. Helpers are **TypeScript** in `.agents/skills/verify-pie-desktop/src/`, started by `.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop` (Node >= 24). Shared process/HTTP/JSON code is `@getpie/verify-pie-cli/runtime` (`tools/verify-pie-cli`). **Not Bash. Not Bun.**
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify-pie-cli` (`tools/verify-pie-cli`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
 
 Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
@@ -16,8 +16,8 @@ Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-c
 Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. First spawn prefers **4000** (`reservePort(options.port ?? 4000)`). Main passes `port === 0` on the first attempt, so **`PIE_PORT` is ignored until a later pinned respawn**. Always read `address` from `daemon.pid`. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch
-# .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop launch --replace
+pnpm exec pie-verify desktop launch
+# pnpm exec pie-verify desktop launch --replace
 ```
 
 Ready when all of these hold:
@@ -42,7 +42,7 @@ If **4000** is already taken, the launcher falls back to an ephemeral port — s
 ## Doctor
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop doctor
+pnpm exec pie-verify desktop doctor
 ```
 
 Checks, in order:
@@ -84,13 +84,13 @@ Existing e2e worth knowing:
 ## Evidence
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence init
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence screenshot <name>
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence snapshot <name>
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence curl
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence side-effects
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence note "…"
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop evidence path
+pnpm exec pie-verify desktop evidence init
+pnpm exec pie-verify desktop evidence screenshot <name>
+pnpm exec pie-verify desktop evidence snapshot <name>
+pnpm exec pie-verify desktop evidence curl
+pnpm exec pie-verify desktop evidence side-effects
+pnpm exec pie-verify desktop evidence note "…"
+pnpm exec pie-verify desktop evidence path
 ```
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call `agent-browser --session verify-pie-desktop --cdp <port>` — they do not curl `/json/version`.
@@ -98,7 +98,7 @@ Existing e2e worth knowing:
 ## Cleanup
 
 ```bash
-.cursor/skills/verify-pie-desktop/bin/verify-pie-desktop cleanup
+pnpm exec pie-verify desktop cleanup
 ```
 
 1. Kill the recorded electron-vite process tree (TERM then KILL). **This does not stop the daemon.**
@@ -109,14 +109,14 @@ Never `pkill` electron / pie / vite.
 
 ## Helpers
 
-One executable. Commands are TypeScript (`src/cli.ts`).
+One executable for every verify skill: `pie-verify` (`@getpie/verify-pie-cli`, root `devDependency`). This skill uses the `desktop` surface.
 
 | Command | Purpose |
 | --- | --- |
-| `verify-pie-desktop launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. |
-| `verify-pie-desktop doctor` | Read-only worth-driving check. |
-| `verify-pie-desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
-| `verify-pie-desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
+| `pnpm exec pie-verify desktop launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. |
+| `pnpm exec pie-verify desktop doctor` | Read-only worth-driving check. |
+| `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
+| `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate
 
