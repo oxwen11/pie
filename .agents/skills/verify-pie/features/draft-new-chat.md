@@ -16,7 +16,7 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 - Sidebar **New chat** (clears to a fresh draft).
 - Per-project compose: **New chat in \<name\>** (sr-only on the folder's pen). Lands on `/draft?projectId=<that project>`.
 
-## Driving it with agent-browser
+## Driving it with pie-verify
 
 Prerequisite: a Project (see [import-project.md](import-project.md)). Isolated launch + import of `verify-pie-sample` is enough. That sample is **not** a git repo, so you should see **Not a Git repository** and no worktree picker.
 

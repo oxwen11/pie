@@ -71,14 +71,7 @@ Gotchas:
 Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
 recipe is the two-process pair only. After `pie-verify web launch`, drive
 with `pnpm exec pie-verify web browser open` then `… browser snapshot`.
-
-Current `agent-browser` (0.35.x, not bun-global 0.15.x) must be on PATH:
-
-```bash
-npm i -g --prefix "$HOME/.local" agent-browser
-export PATH="$HOME/.local/bin:$PATH"
-agent-browser install
-agent-browser skills get core
-```
+`agent-browser` is a dependency of `@getpie/verify` — do not install it
+globally and do not call it on PATH.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.

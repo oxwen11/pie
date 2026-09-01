@@ -17,7 +17,7 @@
 - Click a session row in the sidebar.
 - Revisit a bookmarked `/session/<uuid>` (optionally `?projectId=`).
 
-## Driving it with agent-browser
+## Driving it with pie-verify
 
 ```bash
 # after a draft send, or:

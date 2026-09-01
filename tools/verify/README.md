@@ -30,7 +30,9 @@ pnpm exec pie-verify desktop browser snapshot
 pnpm exec pie-verify desktop cleanup
 ```
 
-`web browser` / `desktop browser` forward to `agent-browser` with the isolated session (`pie-verify-web` / `pie-verify-desktop`) and, on desktop, the run's CDP port. `cli` has no page — do not add a browser there.
+`web browser` / `desktop browser` run the `agent-browser` dependency of this
+package (not a global install) with the isolated session (`pie-verify-web` /
+`pie-verify-desktop`) and, on desktop, the run's CDP port. `cli` has no page.
 
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers

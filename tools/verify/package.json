@@ -19,6 +19,9 @@
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
+  "dependencies": {
+    "agent-browser": "0.36.0"
+  },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
     "@types/node": "catalog:",

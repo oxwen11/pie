@@ -1,22 +1,28 @@
 import path from "node:path";
 
 import { isHelpFlag } from "../../argv.ts";
-import { forwardAgentBrowser } from "../../runtime/browser.ts";
+import { browserNeedsIsolation, forwardAgentBrowser } from "../../runtime/browser.ts";
 import { currentRun, readJsonField } from "../../runtime/fs.ts";
 import { BIN, BROWSER_SESSION, CURRENT_LINK } from "./config.ts";
 
 const usageText = `Usage:
   ${BIN} browser snapshot
   ${BIN} browser connect [port]
+  ${BIN} browser install|skills|--version
   ${BIN} browser <agent-browser argv…>
 
-Forwards to agent-browser with --session ${BROWSER_SESSION} and --cdp from the current run.
+Uses the agent-browser dependency of @getpie/verify with --session ${BROWSER_SESSION}
+and --cdp from the current run.
 Do not open http://localhost:4190/ or http://localhost:5173/ and call that desktop.
 `;
 
 export async function browser(args: string[]): Promise<void> {
   if (isHelpFlag(args[0])) {
     process.stdout.write(usageText);
+    return;
+  }
+  if (!browserNeedsIsolation(args[0])) {
+    forwardAgentBrowser(args, {});
     return;
   }
   const runDir = currentRun(CURRENT_LINK);

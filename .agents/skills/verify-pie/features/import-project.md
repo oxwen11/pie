@@ -17,7 +17,7 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 4. In the dialog, move to the folder you want. Launch creates `$HOME/verify-pie-sample` for this (scaffolding).
 5. Click **Import this folder**.
 
-## Driving it with agent-browser
+## Driving it with pie-verify
 
 ```bash
 pnpm exec pie-verify web doctor

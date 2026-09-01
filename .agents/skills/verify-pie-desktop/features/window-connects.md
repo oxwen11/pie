@@ -28,7 +28,7 @@ pnpm exec pie-verify desktop doctor
 pnpm exec pie-verify desktop evidence init
 ```
 
-Doctor attaches with `agent-browser connect`. Then:
+Doctor attaches with `pie-verify desktop browser connect`. Then:
 
 ```bash
 pnpm exec pie-verify desktop browser snapshot

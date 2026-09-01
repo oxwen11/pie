@@ -17,7 +17,7 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 2. Click **Toggle content panel**.
 3. Pick **Files** / **Review** / **Terminal** / **Browser**, or use **Open a panel** after the first tab exists.
 
-## Driving it with agent-browser
+## Driving it with pie-verify
 
 ```bash
 # on a session route

@@ -15,7 +15,7 @@ The left **Projects** list is how a user finds chats. Each imported project is a
 
 Always visible on `/draft` and `/session/*` (web inset sidebar). On a narrow viewport the sidebar is an overlay; open it with the shell's sidebar trigger before driving rows.
 
-## Driving it with agent-browser
+## Driving it with pie-verify
 
 Need at least one Project and one Session (import + draft send).
 

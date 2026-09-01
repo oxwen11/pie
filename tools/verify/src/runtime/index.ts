@@ -10,9 +10,11 @@ export {
 export type { DaemonRecord } from "./daemon.ts";
 export {
   agentBrowser,
+  browserNeedsIsolation,
   buildAgentBrowserArgv,
   forwardAgentBrowser,
   requireAgentBrowser,
+  resolveAgentBrowserBin,
 } from "./browser.ts";
 export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
 export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";
