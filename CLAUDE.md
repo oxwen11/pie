@@ -53,7 +53,7 @@ of `main`'s history, so deleting the local feature branch needs `git branch -D`
   are closed for debate
 - `.agents/skills/verify` — short build/launch notes for the two-process web dev pair
 - `.cursor/skills/verify-pie` — isolated launch/doctor/drive/cleanup for the web UI
-- `.cursor/skills/verify-pie-cli` — isolated `pie` / `pie daemon` / `pie serve`
+- `.cursor/skills/verify-pie-cli` — isolated `pie` / `pie daemon` / `pie serve` recipe; implementation is `tools/verify-pie-cli` (`@getpie/verify-pie-cli`)
 - `.cursor/skills/verify-pie-desktop` — isolated Electron + token daemon
 - `.agents/skills/react-doctor` — React health check; CI fails on error-level only
 - `todos/` — numbered security/perf remediation tickets

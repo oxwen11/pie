@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { bootstrapSkill } from "../../verify-runtime/bootstrap.mjs";
+import { bootstrapVerifyPieCli } from "@getpie/verify-pie-cli/bootstrap";
 
-bootstrapSkill(import.meta.url);
+bootstrapVerifyPieCli(import.meta.url);

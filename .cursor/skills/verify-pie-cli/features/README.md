@@ -2,7 +2,7 @@
 
 Source of truth for what a pie CLI proof must cover. Each file is one user-facing command path.
 
-Primary surface: `packages/pie` via `verify-pie-cli run`. Harness: CLI + curl. No browser.
+Primary surface: `packages/pie` via `pnpm exec verify-pie-cli run` (implementation: `tools/verify-pie-cli`). Harness: CLI + curl. No browser.
 
 | Feature | File | User entry |
 | --- | --- | --- |

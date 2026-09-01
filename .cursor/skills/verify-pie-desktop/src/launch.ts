@@ -161,7 +161,7 @@ async function reuseIfHealthy(runDir: string): Promise<boolean> {
   if (pidAlive(record.pid) && (await healthOk(record.address)) && (await cdpOk(cdpPort))) {
     console.log(`verify-pie-desktop: already running at ${runDir}`);
     console.log(`  api     ${record.address}/api/health`);
-    console.log(`  cdp     http://127.0.0.1:${cdpPort}/json/version`);
+    console.log(`  cdp     agent-browser --session ${BROWSER_SESSION} connect ${cdpPort}`);
     console.log(`  home    ${readJsonField<string>(join(runDir, "meta.json"), "pieHome")}`);
     return true;
   }

@@ -1,11 +1,12 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { fail } from "../../verify-runtime/src/fail.ts";
-import { readDaemonRecord } from "../../verify-runtime/src/daemon.ts";
-import { currentRun, readJsonField } from "../../verify-runtime/src/fs.ts";
-import { healthOk, ticketStatus, urlPort } from "../../verify-runtime/src/http.ts";
-import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "../../verify-runtime/src/process.ts";
+import fs from "node:fs";
+import path from "node:path";
+
 import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT } from "./config.ts";
+import { readDaemonRecord } from "./runtime/daemon.ts";
+import { fail } from "./runtime/fail.ts";
+import { currentRun, readJsonField } from "./runtime/fs.ts";
+import { healthOk, ticketStatus, urlPort } from "./runtime/http.ts";
+import { isSharedPieHome, listenPids, pidAlive, readPidFile } from "./runtime/process.ts";
 
 export async function doctor(): Promise<void> {
   process.stdout.write(await doctorReport());
@@ -23,8 +24,8 @@ export async function doctorReport(): Promise<string> {
     fail(`verify-pie-cli doctor: FAIL — no current run. Launch first: ${BIN} launch`);
   }
 
-  const meta = join(runDir, "meta.json");
-  if (!existsSync(meta)) {
+  const meta = path.join(runDir, "meta.json");
+  if (!fs.existsSync(meta)) {
     fail(`verify-pie-cli doctor: FAIL — missing ${meta}`);
   }
 
@@ -34,15 +35,17 @@ export async function doctorReport(): Promise<string> {
   const piePort = readJsonField<number>(meta, "piePort");
   const runId = readJsonField<string>(meta, "runId");
 
-  if (!existsSync(pieHome)) {
+  if (!fs.existsSync(pieHome)) {
     fail(`verify-pie-cli doctor: FAIL — PIE_HOME ${pieHome} is missing`);
   }
   if (isSharedPieHome(pieHome)) {
-    fail(`verify-pie-cli doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`);
+    fail(
+      `verify-pie-cli doctor: FAIL — PIE_HOME is the shared default (${pieHome}). This skill only drives isolated homes.`,
+    );
   }
 
   if (mode === "serve") {
-    const servePid = readPidFile(join(runDir, "pids/serve.pid"));
+    const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
     if (!pidAlive(servePid)) {
       fail(`verify-pie-cli doctor: FAIL — serve pid ${servePid} is not running`);
     }
@@ -52,7 +55,9 @@ export async function doctorReport(): Promise<string> {
     }
     const status = await ticketStatus(address);
     if (status !== 200) {
-      fail(`verify-pie-cli doctor: FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`);
+      fail(
+        `verify-pie-cli doctor: FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`,
+      );
     }
     return [
       "verify-pie-cli doctor: OK",
@@ -66,8 +71,8 @@ export async function doctorReport(): Promise<string> {
     ].join("\n");
   }
 
-  const recordPath = join(daemonDir, "daemon.pid");
-  if (!existsSync(recordPath)) {
+  const recordPath = path.join(daemonDir, "daemon.pid");
+  if (!fs.existsSync(recordPath)) {
     fail(`verify-pie-cli doctor: FAIL — missing ${recordPath}`);
   }
   const record = readDaemonRecord(recordPath);
@@ -85,7 +90,9 @@ export async function doctorReport(): Promise<string> {
   }
   const auth = await ticketStatus(record.address, record.token);
   if (auth !== 200) {
-    fail(`verify-pie-cli doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`);
+    fail(
+      `verify-pie-cli doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
+    );
   }
   const port = urlPort(record.address);
   if (listenPids(port).length === 0) {

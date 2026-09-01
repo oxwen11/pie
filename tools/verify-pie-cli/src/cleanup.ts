@@ -1,9 +1,19 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { invokePie, readDaemonRecord } from "../../verify-runtime/src/daemon.ts";
-import { clearCurrentRun, currentRun, isUnder, readJsonField, readText, realPath, removePath, tryReadJsonField } from "../../verify-runtime/src/fs.ts";
-import { killTree, pidAlive, readPidFile, waitDead } from "../../verify-runtime/src/process.ts";
+import fs from "node:fs";
+import path from "node:path";
+
 import { CURRENT_LINK, ROOT, SKILL_DIR } from "./config.ts";
+import { invokePie, readDaemonRecord } from "./runtime/daemon.ts";
+import {
+  clearCurrentRun,
+  currentRun,
+  isUnder,
+  readJsonField,
+  readText,
+  realPath,
+  removePath,
+  tryReadJsonField,
+} from "./runtime/fs.ts";
+import { killTree, pidAlive, readPidFile, waitDead } from "./runtime/process.ts";
 
 export async function cleanup(args: string[]): Promise<void> {
   const runDir = resolveCleanupTarget(args[0]);
@@ -12,15 +22,15 @@ export async function cleanup(args: string[]): Promise<void> {
     return;
   }
 
-  const meta = join(runDir, "meta.json");
-  const mode = existsSync(meta) ? tryReadJsonField<string>(meta, "mode") : undefined;
+  const meta = path.join(runDir, "meta.json");
+  const mode = fs.existsSync(meta) ? tryReadJsonField<string>(meta, "mode") : undefined;
 
   if (mode === "serve") {
-    const servePid = readPidFile(join(runDir, "pids/serve.pid"));
+    const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
     console.log(`verify-pie-cli: stopping serve pid=${servePid ?? "none"}`);
     killTree(servePid);
     await waitDead(servePid);
-  } else if (existsSync(meta)) {
+  } else if (fs.existsSync(meta)) {
     const repo = readJsonField<string>(meta, "repo");
     const env = {
       ...process.env,
@@ -29,22 +39,24 @@ export async function cleanup(args: string[]): Promise<void> {
       PIE_PORT: String(readJsonField<number>(meta, "piePort")),
       NODE_ENV: "development",
     };
-    const recordPath = join(env.PIE_DAEMON_DIR, "daemon.pid");
-    const daemonPid = existsSync(recordPath) ? readDaemonRecord(recordPath).pid : undefined;
+    const recordPath = path.join(env.PIE_DAEMON_DIR, "daemon.pid");
+    const daemonPid = fs.existsSync(recordPath) ? readDaemonRecord(recordPath).pid : undefined;
     console.log(`verify-pie-cli: pie daemon stop (recorded pid=${daemonPid ?? "none"})`);
-    invokePie(repo, ["daemon", "stop"], env, { logPath: join(runDir, "logs/cli-stop.log") });
-    const stopLog = join(runDir, "logs/cli-stop.log");
-    if (existsSync(stopLog)) {
+    invokePie(repo, ["daemon", "stop"], env, { logPath: path.join(runDir, "logs/cli-stop.log") });
+    const stopLog = path.join(runDir, "logs/cli-stop.log");
+    if (fs.existsSync(stopLog)) {
       process.stdout.write(readText(stopLog));
     }
     if (daemonPid !== undefined && pidAlive(daemonPid)) {
-      console.log(`verify-pie-cli: daemon still alive after stop; killing recorded pid ${daemonPid}`);
+      console.log(
+        `verify-pie-cli: daemon still alive after stop; killing recorded pid ${daemonPid}`,
+      );
       killTree(daemonPid);
       await waitDead(daemonPid);
     }
   }
 
-  if (isUnder(join(ROOT, "runs"), runDir)) {
+  if (isUnder(path.join(ROOT, "runs"), runDir)) {
     removePath(runDir);
     console.log(`verify-pie-cli: removed ${runDir}`);
   }

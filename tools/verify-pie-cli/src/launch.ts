@@ -1,6 +1,15 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { ensureCoreBuilt, readDaemonRecord, resolveCompatKey, invokePie, spawnPie } from "../../verify-runtime/src/daemon.ts";
+import fs from "node:fs";
+import path from "node:path";
+
+import { cleanup } from "./cleanup.ts";
+import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, ROOT, refuseReservedPort } from "./config.ts";
+import {
+  ensureCoreBuilt,
+  readDaemonRecord,
+  resolveCompatKey,
+  invokePie,
+  spawnPie,
+} from "./runtime/daemon.ts";
 import {
   copyFailureLogs,
   currentRun,
@@ -13,11 +22,17 @@ import {
   setCurrentRun,
   tailFile,
   writeJson,
-} from "../../verify-runtime/src/fs.ts";
-import { healthOk } from "../../verify-runtime/src/http.ts";
-import { envPort, findRepoRoot, listenPids, pidAlive, readPidFile, waitUntil, writePidFile } from "../../verify-runtime/src/process.ts";
-import { cleanup } from "./cleanup.ts";
-import { BIN, CURRENT_LINK, DEFAULT_PIE_PORT, ROOT, refuseReservedPort } from "./config.ts";
+} from "./runtime/fs.ts";
+import { healthOk } from "./runtime/http.ts";
+import {
+  envPort,
+  findRepoRoot,
+  listenPids,
+  pidAlive,
+  readPidFile,
+  waitUntil,
+  writePidFile,
+} from "./runtime/process.ts";
 
 export async function launch(args: string[]): Promise<void> {
   let replace = false;
@@ -48,7 +63,9 @@ export async function launch(args: string[]): Promise<void> {
     if (replace) {
       await cleanup([]);
     } else {
-      throw new Error(`a previous run still exists (${existing}).\n  run ${BIN} cleanup or re-launch with --replace`);
+      throw new Error(
+        `a previous run still exists (${existing}).\n  run ${BIN} cleanup or re-launch with --replace`,
+      );
     }
   }
 
@@ -60,11 +77,11 @@ export async function launch(args: string[]): Promise<void> {
   }
 
   const runId = newRunId();
-  const runDir = join(ROOT, "runs", runId);
-  const pieHome = join(runDir, "pie-home");
-  const daemonDir = join(pieHome, "daemon");
-  ensureDir(join(runDir, "pids"));
-  ensureDir(join(runDir, "logs"));
+  const runDir = path.join(ROOT, "runs", runId);
+  const pieHome = path.join(runDir, "pie-home");
+  const daemonDir = path.join(pieHome, "daemon");
+  ensureDir(path.join(runDir, "pids"));
+  ensureDir(path.join(runDir, "logs"));
   ensureDir(daemonDir);
 
   const env = {
@@ -76,7 +93,7 @@ export async function launch(args: string[]): Promise<void> {
     PIE_DAEMON_COMPATIBILITY_KEY: await resolveCompatKey(repo),
   };
 
-  writeJson(join(runDir, "meta.json"), {
+  writeJson(path.join(runDir, "meta.json"), {
     runId,
     repo,
     mode,
@@ -94,22 +111,26 @@ export async function launch(args: string[]): Promise<void> {
     }
     await startDaemon(repo, runDir, pieHome, daemonDir, env, runId);
   } catch (error) {
-    copyFailureLogs(runDir, join(ROOT, "last-failure"));
+    copyFailureLogs(runDir, path.join(ROOT, "last-failure"));
     await cleanup([]).catch(() => undefined);
     throw error;
   }
 }
 
-async function reuseIfHealthy(runDir: string, mode: "daemon" | "serve", piePort: number): Promise<boolean> {
-  const meta = join(runDir, "meta.json");
-  if (!existsSync(meta)) {
+async function reuseIfHealthy(
+  runDir: string,
+  mode: "daemon" | "serve",
+  piePort: number,
+): Promise<boolean> {
+  const meta = path.join(runDir, "meta.json");
+  if (!fs.existsSync(meta)) {
     return false;
   }
   if (readJsonField<string>(meta, "mode") !== mode) {
     return false;
   }
   if (mode === "serve") {
-    const servePid = readPidFile(join(runDir, "pids/serve.pid"));
+    const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
     if (pidAlive(servePid) && (await healthOk(piePort))) {
       console.log(`verify-pie-cli: already running at ${runDir}`);
       console.log("  mode    serve");
@@ -118,8 +139,8 @@ async function reuseIfHealthy(runDir: string, mode: "daemon" | "serve", piePort:
     }
     return false;
   }
-  const recordPath = join(runDir, "pie-home/daemon/daemon.pid");
-  if (!existsSync(recordPath)) {
+  const recordPath = path.join(runDir, "pie-home/daemon/daemon.pid");
+  if (!fs.existsSync(recordPath)) {
     return false;
   }
   const record = readDaemonRecord(recordPath);
@@ -141,24 +162,29 @@ async function startServe(
   runId: string,
   pieHome: string,
 ): Promise<void> {
-  const child = spawnPie(repo, ["serve", "--port", String(piePort)], join(runDir, "logs/serve.log"), env);
+  const child = spawnPie(
+    repo,
+    ["serve", "--port", String(piePort)],
+    path.join(runDir, "logs/serve.log"),
+    env,
+  );
   if (child.pid === undefined) {
     throw new Error("failed to spawn pie serve");
   }
-  writePidFile(join(runDir, "pids/serve.pid"), child.pid);
+  writePidFile(path.join(runDir, "pids/serve.pid"), child.pid);
   try {
     await waitUntil(`pie serve on ${piePort}`, () => healthOk(piePort), 60);
   } catch (error) {
-    tailFile(join(runDir, "logs/serve.log"));
+    tailFile(path.join(runDir, "logs/serve.log"));
     throw error;
   }
   const address = `http://127.0.0.1:${piePort}`;
-  patchJson(join(runDir, "meta.json"), { address });
+  patchJson(path.join(runDir, "meta.json"), { address });
   console.log(`verify-pie-cli: launched ${runId}`);
   console.log("  mode    serve (foreground, no token)");
   console.log(`  api     ${address}/api/health`);
   console.log(`  home    ${pieHome}`);
-  console.log(`  logs    ${join(runDir, "logs")}`);
+  console.log(`  logs    ${path.join(runDir, "logs")}`);
   console.log(`  doctor  ${BIN} doctor`);
 }
 
@@ -170,15 +196,17 @@ async function startDaemon(
   env: NodeJS.ProcessEnv,
   runId: string,
 ): Promise<void> {
-  const startLog = join(runDir, "logs/cli-start.log");
-  const started = invokePie(repo, ["daemon", "start", "--port", env.PIE_PORT ?? ""], env, { logPath: startLog });
+  const startLog = path.join(runDir, "logs/cli-start.log");
+  const started = invokePie(repo, ["daemon", "start", "--port", env.PIE_PORT ?? ""], env, {
+    logPath: startLog,
+  });
   if (started.status !== 0) {
     tailFile(startLog);
     throw new Error("daemon start failed");
   }
-  const recordPath = join(daemonDir, "daemon.pid");
+  const recordPath = path.join(daemonDir, "daemon.pid");
   try {
-    await waitUntil("daemon.pid", () => existsSync(recordPath), 20);
+    await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 20);
   } catch (error) {
     tailFile(startLog);
     throw error;
@@ -188,16 +216,16 @@ async function startDaemon(
     await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
   } catch (error) {
     tailFile(startLog);
-    tailFile(join(pieHome, "logs/pie.log"));
+    tailFile(path.join(pieHome, "logs/pie.log"));
     throw error;
   }
-  patchJson(join(runDir, "meta.json"), { address: record.address, daemonPid: record.pid });
+  patchJson(path.join(runDir, "meta.json"), { address: record.address, daemonPid: record.pid });
   console.log(`verify-pie-cli: launched ${runId}`);
   console.log("  mode    daemon");
   console.log(`  api     ${record.address}/api/health`);
   console.log(`  pid     ${record.pid}`);
   console.log(`  home    ${pieHome}`);
-  if (existsSync(startLog)) {
+  if (fs.existsSync(startLog)) {
     console.log(`  start   ${readText(startLog).replaceAll("\n", "")}`);
   }
   console.log(`  doctor  ${BIN} doctor`);

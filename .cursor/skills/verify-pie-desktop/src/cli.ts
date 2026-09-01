@@ -12,7 +12,7 @@ const usageText = `Usage:
   verify-pie-desktop cleanup [run-dir]
 
 TypeScript helpers, executed with Node >= 24 (not Bash, not Bun).
-See .cursor/skills/verify-runtime/README.md
+See tools/verify-pie-cli/README.md
 `;
 
 async function main(argv: string[]): Promise<void> {

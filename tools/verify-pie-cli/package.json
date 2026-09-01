@@ -1,0 +1,32 @@
+{
+  "name": "@getpie/verify-pie-cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Isolated launch/doctor/drive/cleanup for pie / pie daemon / pie serve proofs",
+  "bin": {
+    "verify-pie-cli": "./bin/verify-pie-cli.mjs"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/cli.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./bootstrap": "./bin/bootstrap.mjs"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "devDependencies": {
+    "@getpie/typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

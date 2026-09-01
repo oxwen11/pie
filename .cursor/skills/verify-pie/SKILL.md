@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 
 
 Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers are **TypeScript** in `.cursor/skills/verify-pie/src/`, started by `.cursor/skills/verify-pie/bin/verify-pie` (Node >= 24, `node --experimental-strip-types`). Shared process/HTTP/JSON code lives in `.cursor/skills/verify-runtime/`. **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Helpers are **TypeScript** in `.cursor/skills/verify-pie/src/`, started by `.cursor/skills/verify-pie/bin/verify-pie` (Node >= 24, `node --experimental-strip-types`). Shared process/HTTP/JSON code is `@getpie/verify-pie-cli/runtime` (`tools/verify-pie-cli`). **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
 
 ## Launch
 
