@@ -129,7 +129,7 @@ verify_pie_cli_compat_key() {
   local repo="$1"
   (
     cd "${repo}"
-    node --input-type=module -e 'import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility"; process.stdout.write(resolveDaemonCompatibilityKey());'
+    node --input-type=module -e 'import { resolveDaemonCompatibilityKey } from "./packages/core/dist/compatibility.mjs"; process.stdout.write(resolveDaemonCompatibilityKey({ cwd: process.cwd() }));'
   )
 }
 
