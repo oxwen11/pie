@@ -15,12 +15,17 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
+import { useState } from "react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
+import {
+  rememberPullRequestLifecycle,
+  rememberPullRequestLifecycles,
+} from "@/features/projects/remember-pull-request-lifecycles";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, PullRequestLifecycle>();
@@ -67,6 +72,7 @@ export function ProjectSessionsGroup({
   const pullRequestStatuses = useQuery({
     ...orpcQueryUtils.pullRequest.statuses.queryOptions({ input: { refs } }),
     enabled: refs.length > 0,
+    placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
   });
   const activeSession = rows.find(isSessionActive);
@@ -76,9 +82,13 @@ export function ProjectSessionsGroup({
     }),
     select: selectPullRequestLifecycle,
   });
-  const statusBySessionId = pullRequestStatuses.isError
-    ? EMPTY_PULL_REQUEST_STATUSES
-    : (pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES);
+  const [remembered, setRemembered] = useState(EMPTY_PULL_REQUEST_STATUSES);
+  const statusBySessionId = rememberPullRequestLifecycle(
+    rememberPullRequestLifecycles(remembered, pullRequestStatuses.data),
+    activeSession?.sessionId,
+    activePullRequest.data,
+  );
+  if (statusBySessionId !== remembered) setRemembered(statusBySessionId);
 
   return (
     <Collapsible defaultOpen>
@@ -120,20 +130,12 @@ export function ProjectSessionsGroup({
             <SidebarMenu>
               {rows.map((session) => {
                 const active = isSessionActive(session);
-                const listedLifecycle = statusBySessionId.get(session.sessionId);
-                const pullRequestLifecycle = active
-                  ? activePullRequest.isError
-                    ? undefined
-                    : activePullRequest.data === undefined
-                      ? listedLifecycle
-                      : (activePullRequest.data ?? undefined)
-                  : listedLifecycle;
                 return (
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
                     isActive={() => isSessionActive(session)}
-                    pullRequestLifecycle={pullRequestLifecycle ?? undefined}
+                    pullRequestLifecycle={statusBySessionId.get(session.sessionId)}
                     session={session}
                   />
                 );

@@ -29,7 +29,7 @@ const presentations = {
   },
 } as const;
 
-/** PR lifecycle for one session workspace. No icon means no current PR or an unavailable read. */
+/** PR lifecycle for one session workspace. No icon means this session has not yet shown a PR. */
 export function SessionPullRequestIndicator({
   lifecycle,
 }: {
