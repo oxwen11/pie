@@ -188,10 +188,6 @@ verify_pie_cli_reserved_port() {
       echo "verify-pie-cli: refuse PIE_PORT=${port} — reserved for web verify-pie (serve 4180 / Vite 4190)." >&2
       return 1
       ;;
-    4183)
-      echo "verify-pie-cli: refuse PIE_PORT=4183 — reserved for verify-pie-desktop." >&2
-      return 1
-      ;;
   esac
   return 0
 }

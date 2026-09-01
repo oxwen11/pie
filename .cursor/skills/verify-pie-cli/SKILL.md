@@ -126,7 +126,7 @@ Daemon mode: `pie daemon stop` with this run's env, then TERM/KILL only the **re
 | `$PIE_DAEMON_DIR` | `$PIE_HOME/daemon`. |
 | Port 4182 | Default. Launch refuses a taken port. Never 4000 / 4180 / 4190. |
 | Web verify 4180/4190 | **Do not touch.** |
-| Desktop verify 4183 | **Do not touch.** |
+| Desktop verify (prefers 4000) | **Do not touch.** Different `$PIE_HOME`. |
 | User daemon 4000 | **Do not touch.** |
 
 ## Feature map

@@ -11,9 +11,9 @@ fail() {
 }
 
 if ! run_dir="$(verify_pie_desktop_current_run)"; then
-  foreign="$(verify_pie_desktop_listen_pids "${DEFAULT_PIE_PORT}")"
+  foreign="$(verify_pie_desktop_listen_pids "${DEFAULT_DAEMON_PORT}")"
   if [[ -n "${foreign}" ]]; then
-    fail "port ${DEFAULT_PIE_PORT} is live but this is not a verify-pie-desktop run (no ${CURRENT_LINK}). Refuse."
+    fail "port ${DEFAULT_DAEMON_PORT} is live but this is not a verify-pie-desktop run (no ${CURRENT_LINK}). Refuse to drive a shared daemon."
   fi
   fail "no current run. Launch first: ${VERIFY_PIE_DESKTOP_BIN}/verify-pie-desktop-launch"
 fi

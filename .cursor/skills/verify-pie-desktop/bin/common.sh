@@ -7,7 +7,8 @@ VERIFY_PIE_DESKTOP_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERIFY_PIE_DESKTOP_SKILL="$(cd "${VERIFY_PIE_DESKTOP_BIN}/.." && pwd)"
 VERIFY_ROOT="${VERIFY_PIE_DESKTOP_ROOT:-/tmp/verify-pie-desktop}"
 CURRENT_LINK="${VERIFY_ROOT}/current"
-DEFAULT_PIE_PORT=4183
+# First desktop spawn prefers 4000 (Main passes port 0 → launcher DEFAULT_PORT).
+DEFAULT_DAEMON_PORT=4000
 DEFAULT_CDP_PORT=9223
 SAMPLE_PROJECT_NAME="verify-pie-desktop-sample"
 SAMPLE_MARKER=".verify-pie-desktop-scaffold"
@@ -172,19 +173,15 @@ verify_pie_desktop_copy_failure_logs() {
   echo "verify-pie-desktop: copied logs to ${dest}" >&2
 }
 
-verify_pie_desktop_reserved_port() {
+verify_pie_desktop_web_or_cli_port() {
   local port="$1"
   case "${port}" in
-    4000)
-      echo "verify-pie-desktop: refuse PIE_PORT=4000 — that is the default user daemon port." >&2
-      return 1
-      ;;
     4180 | 4190)
-      echo "verify-pie-desktop: refuse PIE_PORT=${port} — reserved for web verify-pie." >&2
+      echo "verify-pie-desktop: refuse using ${port} — reserved for web verify-pie." >&2
       return 1
       ;;
     4182)
-      echo "verify-pie-desktop: refuse PIE_PORT=4182 — reserved for verify-pie-cli." >&2
+      echo "verify-pie-desktop: refuse using ${port} — reserved for verify-pie-cli." >&2
       return 1
       ;;
   esac

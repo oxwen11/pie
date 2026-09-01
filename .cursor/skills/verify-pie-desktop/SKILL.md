@@ -13,7 +13,7 @@ Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-c
 
 ## Launch
 
-Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. Default daemon port **4183**. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
+Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. First spawn prefers **4000** (`reservePort(options.port ?? 4000)`). Main passes `port === 0` on the first attempt, so **`PIE_PORT` is ignored until a later pinned respawn**. Always read `address` from `daemon.pid`. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
 
 ```bash
 .cursor/skills/verify-pie-desktop/bin/verify-pie-desktop-launch
@@ -35,7 +35,7 @@ What launch also does:
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
 
-Never `PIE_PORT=4000` / `4180` / `4182` / `4190`. If 4183 or 9223 is taken by a foreign process, launch **refuses**.
+If **4000** is already taken, the launcher falls back to an ephemeral port — still isolated because `$PIE_DAEMON_DIR` is ours. Launch **refuses** a taken **9223** (CDP). Never point this run at `~/.pie` or a live user `PIE_DAEMON_DIR`. Never use web 4180/4190 or CLI-verify 4182 as *this* home's ports.
 
 `daemon.pid` contains a token. **Do not copy the token into evidence.**
 
@@ -47,7 +47,7 @@ Never `PIE_PORT=4000` / `4180` / `4182` / `4190`. If 4183 or 9223 is taken by a 
 
 Checks, in order:
 
-1. Current run at `/tmp/verify-pie-desktop/current` (else refuse a live 4183).
+1. Current run at `/tmp/verify-pie-desktop/current` (else refuse a live listener that is not ours).
 2. Isolated `$PIE_HOME` (not `~/.pie` / `~/.pie-dev`).
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
@@ -119,7 +119,7 @@ Never `pkill` electron / pie / vite.
 | Resource | Shared? |
 | --- | --- |
 | `$PIE_HOME` | Isolated under `/tmp/verify-pie-desktop/runs/<id>/pie-home`. |
-| Daemon port 4183 | Default. Never 4000 / 4180 / 4182 / 4190. |
+| Daemon port | Prefers **4000** on first spawn. Read `daemon.pid`. Isolated home, not a shared `~/.pie` daemon. |
 | CDP 9223 | Default `PIE_REMOTE_DEBUG_PORT`. |
 | Renderer 5173 | electron-vite default. Do not point a browser at it and call that desktop. |
 | Web 4180/4190 | **Do not touch.** |

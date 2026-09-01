@@ -16,9 +16,12 @@ fi
 
 verify_pie_desktop_use_node24
 REPO="$(verify_pie_desktop_repo_root)"
-PIE_PORT="${PIE_PORT:-${DEFAULT_PIE_PORT}}"
+# First spawn prefers 4000. PIE_PORT is only used on a later pinned respawn.
 CDP_PORT="${PIE_REMOTE_DEBUG_PORT:-${DEFAULT_CDP_PORT}}"
-verify_pie_desktop_reserved_port "${PIE_PORT}"
+if [[ -n "${PIE_PORT:-}" ]]; then
+  verify_pie_desktop_web_or_cli_port "${PIE_PORT}"
+fi
+PIE_PORT="${PIE_PORT:-${DEFAULT_DAEMON_PORT}}"
 
 if [[ ! -f "${REPO}/packages/server/dist/server.mjs" ]]; then
   echo "verify-pie-desktop: building @getpie/server (packages/server/dist/server.mjs missing)"
@@ -72,7 +75,11 @@ foreign_port() {
   fi
 }
 
-foreign_port "${PIE_PORT}" "daemon"
+# CDP must be ours. 4000 may be a user daemon — we still isolate via PIE_HOME;
+# the launcher then lands on an ephemeral port. Read the bound address after start.
+if [[ -n "$(verify_pie_desktop_listen_pids "${DEFAULT_DAEMON_PORT}")" ]]; then
+  echo "verify-pie-desktop: port ${DEFAULT_DAEMON_PORT} is taken; daemon will pick an ephemeral port (isolated PIE_HOME)." >&2
+fi
 foreign_port "${CDP_PORT}" "CDP"
 
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -173,17 +180,20 @@ if ! wait_for "CDP on ${CDP_PORT}" "verify_pie_desktop_cdp_ok '${CDP_PORT}'" 40;
   exit 1
 fi
 
+BOUND_PORT="$(node -e 'process.stdout.write(new URL(process.argv[1]).port)' "${ADDRESS}")"
 node -e '
   const fs = require("node:fs");
-  const [file, address, pid] = process.argv.slice(1);
+  const [file, address, pid, port] = process.argv.slice(1);
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
   data.address = address;
   data.daemonPid = Number(pid);
+  data.piePort = Number(port);
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
-' "${RUN_DIR}/meta.json" "${ADDRESS}" "${DAEMON_PID}"
+' "${RUN_DIR}/meta.json" "${ADDRESS}" "${DAEMON_PID}" "${BOUND_PORT}"
 
 echo "verify-pie-desktop: launched ${RUN_ID}"
 echo "  api     ${ADDRESS}/api/health"
+echo "  port    ${BOUND_PORT} (first spawn prefers 4000; this is the bound address)"
 echo "  cdp     http://127.0.0.1:${CDP_PORT}/json/version"
 echo "  pid     electron-vite $(verify_pie_desktop_read_pid "${RUN_DIR}/pids/electron-vite.pid") daemon ${DAEMON_PID}"
 echo "  home    ${PIE_HOME}"
