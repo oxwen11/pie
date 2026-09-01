@@ -22,22 +22,23 @@ Two processes, **isolated `$PIE_HOME`**, default ports. Vite is hardcoded to **4
 Ready when both answer `ok`:
 
 ```bash
-curl -fsS http://127.0.0.1:4180/api/health    # pie serve
-curl -fsS http://127.0.0.1:4190/api/health    # Vite proxy — this is the one to open
+curl -fsS http://127.0.0.1:4180/api/health    # pie serve (IPv4)
+curl -fsS http://localhost:4190/api/health    # Vite proxy (listens on [::1]:4190)
 ```
 
 Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http://127.0.0.1:4180`. Launch writes that log to `/tmp/verify-pie/runs/<id>/logs/server.log`.
 
-**Open `http://127.0.0.1:4190/`, never 4180.** 4180 serves `/api/*`, `/ws/rpc`, and a *built* bundle: it 503s when nothing is built or quietly shows a stale UI. `/` redirects to `/draft`.
+**Open `http://localhost:4190/`, never 4180, and never `http://127.0.0.1:4190/`.** Vite binds `[::1]:4190` here — IPv4 4190 connection-refuses. 4180 serves `/api/*`, `/ws/rpc`, and a *built* bundle: it 503s when nothing is built or quietly shows a stale UI. `/` redirects to `/draft`.
 
 What launch also does:
 
-- Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present.
+- Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
+- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
 - Sets `PIE_HOME=/tmp/verify-pie/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie-dev`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
 - Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
-- Hits `http://127.0.0.1:4190/` once so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file).
+- Hits `http://localhost:4190/` once so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file).
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
 
@@ -67,22 +68,26 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 Harness: **agent-browser** (Chromium via CDP, accessibility snapshot, `@eN` refs).
 
 ```bash
-# once per machine
-npm i -g agent-browser
-# `agent-browser install` needs a `playwright` bin. This repo's older note still holds:
-node "$(npm root -g)/playwright-core/cli.js" install chromium-headless-shell
+# once per machine (user prefix if `npm i -g` hits EACCES on /usr/lib)
+npm i -g --prefix "$HOME/.local" agent-browser
+export PATH="$HOME/.local/bin:$PATH"
+agent-browser install
 # then
 agent-browser skills get core
 ```
 
+`agent-browser` 0.15.x needed a separate `playwright-core` chromium-headless-shell download. Current 0.35.x ships `agent-browser install`. Google Chrome at `/usr/local/bin/google-chrome` also works if the bundled browser is missing.
+
 Recipe for every drive:
 
 1. `verify-pie-doctor` — abort if it fails.
-2. Open the **Vite** origin: `agent-browser open http://127.0.0.1:4190/`
-3. `agent-browser snapshot` — click `@eN` refs, not coordinates.
-4. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
-5. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
-6. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
+2. Named session (do not use the machine-wide default browser):
+   `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix verify-pie)"`
+3. Open the **Vite** origin: `agent-browser open http://localhost:4190/`
+4. `agent-browser snapshot` — click `@eN` refs, not coordinates. Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
+5. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+6. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
+7. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
 Stable handles (from source, not guesses):
 
@@ -140,7 +145,7 @@ Standards:
 .cursor/skills/verify-pie/bin/verify-pie-cleanup
 ```
 
-Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/verify-pie/runs/<id>` and the `$HOME/verify-pie-sample` folder **if this run created it** (marker `.verify-pie-scaffold`). Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/verify-pie/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
 
 After cleanup, confirm evidence is still at the path `verify-pie-evidence path` printed before teardown (or `.cursor/skills/verify-pie/evidence/<run-id>/`).
 
@@ -159,7 +164,7 @@ All under `.cursor/skills/verify-pie/bin/`. Invocation is the path above; `commo
 
 | Resource | Shared? |
 | --- | --- |
-| Vite 4190 | **No.** `strictPort`. One web instance on the machine. |
+| Vite 4190 | **No.** `strictPort`, IPv6 `[::1]` only. One web instance. Open `http://localhost:4190/`. |
 | Server 4180 | Movable via `PIE_PORT` (both processes). Launch still refuses a taken 4180. |
 | `$PIE_HOME` | Isolated per run under `/tmp/verify-pie/runs/<id>/pie-home`. |
 | `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |

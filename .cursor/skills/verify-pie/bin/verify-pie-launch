@@ -14,6 +14,12 @@ verify_pie_use_node24
 REPO="$(verify_pie_repo_root)"
 PIE_PORT="${PIE_PORT:-${DEFAULT_PIE_PORT}}"
 
+# @getpie/core exports dist/*.mjs only. Server/UI still resolve src/*.ts via tsx/Vite.
+if [[ ! -f "${REPO}/packages/core/dist/compatibility.mjs" ]]; then
+  echo "verify-pie: building @getpie/core (packages/core/dist missing)"
+  (cd "${REPO}" && pnpm turbo run build --filter=@getpie/core)
+fi
+
 if ((PIE_PORT == 4000)); then
   echo "verify-pie: refuse PIE_PORT=4000 — that is the desktop daemon port (auth-token gated)." >&2
   exit 1
@@ -86,7 +92,7 @@ cat >"${RUN_DIR}/meta.json" <<EOF
   "pieHome": "${PIE_HOME}",
   "piePort": ${PIE_PORT},
   "vitePort": ${VITE_PORT},
-  "appUrl": "http://127.0.0.1:${VITE_PORT}/",
+  "appUrl": "http://localhost:${VITE_PORT}/",
   "sampleProject": "${SAMPLE_DIR}",
   "createdSample": ${created_sample},
   "startedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -122,8 +128,9 @@ wait_for() {
 }
 
 if ! wait_for "pie serve on ${PIE_PORT}" \
-  "verify_pie_http_ok 'http://127.0.0.1:${PIE_PORT}/api/health'" 60; then
+  "verify_pie_health_ok '${PIE_PORT}'" 60; then
   tail -n 40 "${RUN_DIR}/logs/server.log" >&2 || true
+  verify_pie_copy_failure_logs "${RUN_DIR}"
   "${VERIFY_PIE_BIN}/verify-pie-cleanup" || true
   exit 1
 fi
@@ -140,17 +147,18 @@ fi
 echo $! >"${RUN_DIR}/pids/vite.pid"
 
 if ! wait_for "vite proxy on ${VITE_PORT}" \
-  "verify_pie_http_ok 'http://127.0.0.1:${VITE_PORT}/api/health'" 90; then
+  "verify_pie_health_ok '${VITE_PORT}'" 90; then
   tail -n 40 "${RUN_DIR}/logs/vite.log" >&2 || true
+  verify_pie_copy_failure_logs "${RUN_DIR}"
   "${VERIFY_PIE_BIN}/verify-pie-cleanup" || true
   exit 1
 fi
 
 # Warm the TanStack router plugin so routeTree.gen.ts is current.
-curl -fsS -o /dev/null --max-time 10 "http://127.0.0.1:${VITE_PORT}/" || true
+curl -fsS -o /dev/null --max-time 10 "http://localhost:${VITE_PORT}/" || true
 
 echo "verify-pie: launched ${RUN_ID}"
-echo "  app     http://127.0.0.1:${VITE_PORT}/   (open this, not :${PIE_PORT})"
+echo "  app     http://localhost:${VITE_PORT}/   (Vite binds [::1]; do not use 127.0.0.1:${VITE_PORT})"
 echo "  api     http://127.0.0.1:${PIE_PORT}/api/health"
 echo "  home    ${PIE_HOME}"
 echo "  sample  ${SAMPLE_DIR}"

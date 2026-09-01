@@ -38,6 +38,11 @@ verify_pie_use_node24() {
     . "${nvm_dir}/nvm.sh"
     nvm use 24 >/dev/null
     set -u
+    # Cloud / agent PATHs often put another `node` ahead of nvm. Force the
+    # selected bin directory to the front so `pnpm dev` is not Node 22.
+    if [[ -n "${NVM_BIN:-}" ]]; then
+      export PATH="${NVM_BIN}:${PATH}"
+    fi
   fi
   local major
   major="$(node -p "process.versions.node.split('.')[0]")"
@@ -62,6 +67,28 @@ verify_pie_http_ok() {
   local body
   body="$(curl -fsS --max-time 2 "${url}" 2>/dev/null || true)"
   [[ "${body}" == "ok" ]]
+}
+
+# Vite prints `Local: http://localhost:4190/` and may bind only that name.
+# The server listens on 127.0.0.1. Probe both.
+verify_pie_health_ok() {
+  local port="$1"
+  verify_pie_http_ok "http://127.0.0.1:${port}/api/health" ||
+    verify_pie_http_ok "http://localhost:${port}/api/health"
+}
+
+verify_pie_copy_failure_logs() {
+  local run_dir="$1"
+  local dest="${VERIFY_ROOT}/last-failure"
+  rm -rf "${dest}"
+  mkdir -p "${dest}"
+  if [[ -d "${run_dir}/logs" ]]; then
+    cp -a "${run_dir}/logs/." "${dest}/"
+  fi
+  if [[ -f "${run_dir}/meta.json" ]]; then
+    cp "${run_dir}/meta.json" "${dest}/meta.json"
+  fi
+  echo "verify-pie: copied logs to ${dest}" >&2
 }
 
 verify_pie_current_run() {

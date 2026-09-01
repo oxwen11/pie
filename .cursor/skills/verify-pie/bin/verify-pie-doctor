@@ -62,10 +62,10 @@ listen_ok() {
 listen_ok "${pie_port}" "${server_pid}"
 listen_ok "${vite_port}" "${vite_pid}"
 
-verify_pie_http_ok "http://127.0.0.1:${pie_port}/api/health" ||
+verify_pie_health_ok "${pie_port}" ||
   fail "http://127.0.0.1:${pie_port}/api/health is not ok"
-verify_pie_http_ok "http://127.0.0.1:${vite_port}/api/health" ||
-  fail "Vite proxy http://127.0.0.1:${vite_port}/api/health is not ok — open the Vite URL, not the API port"
+verify_pie_health_ok "${vite_port}" ||
+  fail "Vite proxy :${vite_port}/api/health is not ok — open the Vite URL, not the API port"
 
 [[ -d "${pie_home}" ]] || fail "PIE_HOME ${pie_home} is missing"
 
@@ -75,7 +75,9 @@ fi
 
 # Ticket minting proves browser-mode (no PIE_AUTH_TOKEN), unlike the desktop daemon.
 ticket_status="$(curl -sS -o /tmp/verify-pie-ticket.json -w '%{http_code}' --max-time 2 \
-  -X POST "http://127.0.0.1:${vite_port}/api/ws-ticket" || true)"
+  -X POST "http://localhost:${vite_port}/api/ws-ticket" ||
+  curl -sS -o /tmp/verify-pie-ticket.json -w '%{http_code}' --max-time 2 \
+    -X POST "http://127.0.0.1:${vite_port}/api/ws-ticket" || true)"
 if [[ "${ticket_status}" != "200" ]]; then
   fail "/api/ws-ticket returned ${ticket_status} (401 means you hit the daemon on 4000, not this serve)"
 fi

@@ -55,14 +55,19 @@ kill_tree "${server_pid}"
 wait_dead "${vite_pid}"
 wait_dead "${server_pid}"
 
-if [[ -f "${run_dir}/meta.json" ]]; then
-  created_sample="$(verify_pie_json_get "${run_dir}/meta.json" createdSample || true)"
-  sample="$(verify_pie_json_get "${run_dir}/meta.json" sampleProject || true)"
-  if [[ "${created_sample}" == "true" && -n "${sample}" && -f "${sample}/${SAMPLE_MARKER}" ]]; then
+remove_scaffold() {
+  local sample="$1"
+  if [[ -n "${sample}" && -f "${sample}/${SAMPLE_MARKER}" ]]; then
     rm -rf "${sample}"
     echo "verify-pie: removed scaffolding ${sample}"
   fi
+}
+
+if [[ -f "${run_dir}/meta.json" ]]; then
+  remove_scaffold "$(verify_pie_json_get "${run_dir}/meta.json" sampleProject || true)"
 fi
+# Failed earlier runs may have left the marker folder with createdSample=false.
+remove_scaffold "${HOME}/${SAMPLE_PROJECT_NAME}"
 
 # Scratch instance only. Evidence lives next to the skill and is not here.
 if [[ "${run_dir}" == "${VERIFY_ROOT}/runs/"* ]]; then

@@ -21,7 +21,7 @@
 
 ```bash
 # after a draft send, or:
-agent-browser open 'http://127.0.0.1:4190/session/<sessionId>?projectId=<projectId>'
+agent-browser open 'http://localhost:4190/session/<sessionId>?projectId=<projectId>'
 agent-browser snapshot
 ```
 

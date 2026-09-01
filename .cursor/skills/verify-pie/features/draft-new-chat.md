@@ -21,7 +21,7 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 Prerequisite: a Project (see [import-project.md](import-project.md)). Isolated launch + import of `verify-pie-sample` is enough. That sample is **not** a git repo, so you should see **Not a Git repository** and no worktree picker.
 
 ```bash
-agent-browser open 'http://127.0.0.1:4190/draft'
+agent-browser open 'http://localhost:4190/draft'
 agent-browser snapshot
 ```
 

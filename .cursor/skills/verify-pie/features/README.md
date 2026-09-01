@@ -2,7 +2,7 @@
 
 Source of truth for what a pie web proof must cover. Each file is one user-facing feature. A run that only exercises the easiest entry point is incomplete when the file lists others.
 
-Primary surface: Vite app at `http://127.0.0.1:4190/`. Harness: agent-browser.
+Primary surface: Vite app at `http://localhost:4190/`. Harness: agent-browser.
 
 | Feature | File | User entry |
 | --- | --- | --- |
