@@ -21,8 +21,10 @@ through turbo so they wait on `@getpie/oxlint#build` (the oxlint tsdown
 plugins). `test` and `typecheck` are cached, so re-run with `--force` after
 changing something outside their hash inputs. `pnpm clean` runs `turbo run clean` then
 `git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.
-Runtime UI checks use `.agents/skills/verify` (launch the vite app plus server,
-then drive the page).
+Runtime UI checks use `pnpm exec pie-verify web|cli|desktop` (`@getpie/verify`).
+Skill recipes live in `.agents/skills/verify-pie{,-cli,-desktop}`
+(`.cursor/skills/…` are symlinks). `.agents/skills/verify` is the short
+two-process note.
 
 ## Rules
 
@@ -51,6 +53,10 @@ of `main`'s history, so deleting the local feature branch needs `git branch -D`
 - `docs/design/`, `docs/2026-*.md` — designs in flight
 - `docs/wayfinder/session-streaming-refactor/map.md` — streaming decisions that
   are closed for debate
-- `.agents/skills/verify` — build, launch, and drive the app at runtime
+- `.agents/skills/verify` — short build/launch notes for the two-process web dev pair
+- `.agents/skills/verify-pie` — web recipe; invoke `pnpm exec pie-verify web`
+- `.agents/skills/verify-pie-cli` — `pie` / `pie daemon` / `pie serve` recipe; invoke `pnpm exec pie-verify cli`
+- `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
+- `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
 - `.agents/skills/react-doctor` — React health check; CI fails on error-level only
 - `todos/` — numbered security/perf remediation tickets

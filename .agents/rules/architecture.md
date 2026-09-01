@@ -13,6 +13,13 @@
 | `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
 | `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
 | `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
+| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. Depends on `agent-browser`; drive UI via `web browser` / `desktop browser`. Not the product CLI. |
+
+`tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
+
+Repo skills live in `.agents/skills/<name>`. `.cursor/skills`, `.claude/skills`,
+and `.codex/skills` hold relative symlinks to that tree so each client discovers
+the same files. Do not copy a skill into `.cursor/skills` as a second original.
 
 ## Boundaries
 

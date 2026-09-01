@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { bootstrapSurface } from "@getpie/verify/bootstrap";
+
+bootstrapSurface("desktop", import.meta.url);
