@@ -20,6 +20,9 @@ export function ProjectSessionRow({
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
+        // The trailing action is hover-only on desktop (`showOnHover`); don't
+        // keep the default pe-8 gap or long titles truncate into empty space.
+        className="md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
         isActive={active}
         onClick={() => {
           navigate({
