@@ -8,40 +8,40 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resolveDefaultPiModel } from "../../../src/harness/pi/resolve-default-model";
 
-const catalog: ReadonlyArray<AgentModel> = [
+const models: ReadonlyArray<AgentModel> = [
   { provider: "openai", modelId: "gpt-5.4" },
   { provider: "anthropic", modelId: "claude-sonnet-4-5", name: "Sonnet" },
 ];
 
 describe("resolveDefaultPiModel", () => {
-  it("returns the catalog row that matches Pi settings", () => {
+  it("returns the available model that matches Pi settings", () => {
     expect(
-      resolveDefaultPiModel(catalog, {
+      resolveDefaultPiModel(models, {
         getDefaultProvider: () => "anthropic",
         getDefaultModel: () => "claude-sonnet-4-5",
       }),
-    ).toEqual(catalog[1]);
+    ).toEqual(models[1]);
   });
 
-  it("falls through to the first catalog model when settings are empty", () => {
+  it("falls through to the first available model when settings are empty", () => {
     expect(
-      resolveDefaultPiModel(catalog, {
+      resolveDefaultPiModel(models, {
         getDefaultProvider: () => undefined,
         getDefaultModel: () => undefined,
       }),
-    ).toEqual(catalog[0]);
+    ).toEqual(models[0]);
   });
 
-  it("falls through when the saved default is not in the catalog", () => {
+  it("falls through when the saved default is not among available models", () => {
     expect(
-      resolveDefaultPiModel(catalog, {
+      resolveDefaultPiModel(models, {
         getDefaultProvider: () => "anthropic",
         getDefaultModel: () => "claude-opus-4-8",
       }),
-    ).toEqual(catalog[0]);
+    ).toEqual(models[0]);
   });
 
-  it("returns undefined for an empty catalog", () => {
+  it("returns undefined when no models are available", () => {
     expect(
       resolveDefaultPiModel([], {
         getDefaultProvider: () => "anthropic",
@@ -72,7 +72,7 @@ describe("resolveDefaultPiModel", () => {
       await settings.flush();
 
       const reread = SettingsManager.create(agentDir);
-      expect(resolveDefaultPiModel(catalog, reread)).toEqual(catalog[1]);
+      expect(resolveDefaultPiModel(models, reread)).toEqual(models[1]);
     });
   });
 });

@@ -1,8 +1,8 @@
 import type { AgentModel } from "@getpie/contract";
 
 /**
- * Pick `listModels.defaultModel`: the SettingsManager pair if it is in the
- * catalogue, otherwise the first available row.
+ * Pick `listModels.defaultModel`: the SettingsManager pair if it is in
+ * the available models, otherwise the first row.
  */
 export type PiDefaultSettings = {
   readonly getDefaultProvider: () => string | undefined;
