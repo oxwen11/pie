@@ -80,6 +80,9 @@ mkdir -p "${RUN_DIR}/pids" "${RUN_DIR}/logs" "${PIE_HOME}" "${PIE_DAEMON_DIR}"
 
 export PIE_HOME PIE_DAEMON_DIR PIE_PORT
 export NODE_ENV=development
+# Source `tsx` has no tsdown define; daemon start reads this at process.env.
+export PIE_DAEMON_COMPATIBILITY_KEY
+PIE_DAEMON_COMPATIBILITY_KEY="$(verify_pie_cli_compat_key "${REPO}")"
 
 cat >"${RUN_DIR}/meta.json" <<EOF
 {

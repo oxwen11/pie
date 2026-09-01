@@ -124,9 +124,19 @@ verify_pie_cli_redact_record() {
   ' "${src}" "${dest}"
 }
 
+# tsx source does not get the tsdown define. Built `dist/cli.mjs` already has it.
+verify_pie_cli_compat_key() {
+  local repo="$1"
+  (
+    cd "${repo}"
+    node --input-type=module -e 'import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility"; process.stdout.write(resolveDaemonCompatibilityKey());'
+  )
+}
+
 verify_pie_cli_tsx() {
   local repo="$1"
   shift
+  export PIE_DAEMON_COMPATIBILITY_KEY="${PIE_DAEMON_COMPATIBILITY_KEY:-$(verify_pie_cli_compat_key "${repo}")}"
   (
     cd "${repo}/packages/pie"
     exec pnpm exec tsx src/node/cli.ts "$@"
@@ -136,6 +146,7 @@ verify_pie_cli_tsx() {
 verify_pie_cli_apply_run_env() {
   local run_dir="$1"
   local meta="${run_dir}/meta.json"
+  local repo
   export PIE_HOME
   export PIE_DAEMON_DIR
   export PIE_PORT
@@ -143,6 +154,8 @@ verify_pie_cli_apply_run_env() {
   PIE_DAEMON_DIR="$(verify_pie_cli_json_get "${meta}" daemonDir)"
   PIE_PORT="$(verify_pie_cli_json_get "${meta}" piePort)"
   export NODE_ENV=development
+  repo="$(verify_pie_cli_json_get "${meta}" repo)"
+  export PIE_DAEMON_COMPATIBILITY_KEY="${PIE_DAEMON_COMPATIBILITY_KEY:-$(verify_pie_cli_compat_key "${repo}")}"
 }
 
 verify_pie_cli_evidence_dir_for() {

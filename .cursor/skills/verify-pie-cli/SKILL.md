@@ -30,6 +30,7 @@ What launch also does:
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing.
 - Sets `PIE_HOME=/tmp/verify-pie-cli/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
 - Invokes source: `cd packages/pie && pnpm exec tsx src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
+- Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.mjs`; **tsx does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
 - Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME` / `PIE_DAEMON_DIR`, not killing the short-lived CLI pid.
 - `--serve` starts foreground `pie serve` instead (no token). Use that only for the serve-foreground feature.
 
