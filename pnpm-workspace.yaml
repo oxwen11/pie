@@ -101,9 +101,6 @@ allowBuilds:
   # weight, so deny them.
   "@google/genai": false
   "@swc/core": true
-  # @getpie/verify depends on this; postinstall downloads the platform native
-  # CLI. Without it, `pie-verify web|desktop browser` has no binary.
-  agent-browser: true
   electron: true
   electron-winstaller: true
   esbuild: true
