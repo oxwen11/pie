@@ -10,7 +10,7 @@ const usageText = `Usage:
   pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
   pie-verify desktop cleanup [run-dir]
 
-TypeScript helpers from tools/verify-pie-cli, executed with Node >= 24 (not Bash, not Bun).
+TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
 `;
 
 export async function runDesktopSurface(argv: string[]): Promise<void> {

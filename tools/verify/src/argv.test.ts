@@ -36,7 +36,7 @@ describe("parsePieVerifyArgv", () => {
     });
   });
 
-  it("lets verify-pie-cli keep treating the first token as a cli command", () => {
+  it("lets a default surface treat the first token as a command", () => {
     expect(parsePieVerifyArgv(["launch", "--serve"], { defaultSurface: "cli" })).toEqual({
       kind: "surface",
       surface: "cli",

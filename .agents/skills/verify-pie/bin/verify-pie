@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { bootstrapSurface } from "@getpie/verify-pie-cli/bootstrap";
+import { bootstrapSurface } from "@getpie/verify/bootstrap";
 
 bootstrapSurface("web", import.meta.url);

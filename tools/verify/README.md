@@ -1,4 +1,4 @@
-# @getpie/verify-pie-cli
+# @getpie/verify
 
 Workspace toolchain for isolated Pie proofs. Installed at the repo root as a
 `devDependency`. The command every verify skill calls is **`pie-verify`**.
@@ -27,12 +27,10 @@ pnpm exec pie-verify desktop doctor
 pnpm exec pie-verify desktop cleanup
 ```
 
-`pnpm exec verify-pie-cli …` is a compatibility alias for `pie-verify cli …`.
-
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers
-are `@getpie/verify-pie-cli/runtime`. Loopback health/ticket use `node:http`
-and try `[::1]` so Vite's IPv6-only 4190 is reachable when global `fetch` is
-intercepted or `localhost` is IPv4.
+are `@getpie/verify/runtime`. Loopback health/ticket use `node:http` and try
+`[::1]` so Vite's IPv6-only 4190 is reachable when global `fetch` is intercepted
+or `localhost` is IPv4.
 
 **Not Bun.** Pie, the daemon, `tsx`, and Electron's Node side are Node 24.

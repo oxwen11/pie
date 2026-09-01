@@ -1,1 +1,1 @@
-export { VerifyError, fail, usage } from "@getpie/verify-pie-cli/runtime";
+export { VerifyError, fail, usage } from "@getpie/verify/runtime";

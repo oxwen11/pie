@@ -150,9 +150,9 @@ importers:
       '@getpie/oxlint':
         specifier: workspace:*
         version: link:tools/oxlint
-      '@getpie/verify-pie-cli':
+      '@getpie/verify':
         specifier: workspace:*
-        version: link:tools/verify-pie-cli
+        version: link:tools/verify
       '@oxlint/plugins':
         specifier: 1.80.0
         version: 1.80.0
@@ -758,7 +758,7 @@ importers:
 
   tools/typescript: {}
 
-  tools/verify-pie-cli:
+  tools/verify:
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*

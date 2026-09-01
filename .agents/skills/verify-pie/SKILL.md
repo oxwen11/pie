@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 
 
 Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify-pie-cli` (`tools/verify-pie-cli`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
 
 ## Launch
 
@@ -153,7 +153,7 @@ After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web e
 
 ## Helpers
 
-One executable for every verify skill: `pie-verify` (`@getpie/verify-pie-cli`, root `devDependency`). This skill uses the `web` surface.
+One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `devDependency`). This skill uses the `web` surface.
 
 | Command | Purpose |
 | --- | --- |

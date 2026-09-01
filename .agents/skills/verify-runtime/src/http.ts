@@ -8,5 +8,5 @@ export {
   ticketStatus,
   ticketStatusOnPort,
   urlPort,
-} from "@getpie/verify-pie-cli/runtime";
-export type { FetchResult } from "@getpie/verify-pie-cli/runtime";
+} from "@getpie/verify/runtime";
+export type { FetchResult } from "@getpie/verify/runtime";

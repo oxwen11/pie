@@ -18,4 +18,4 @@ export {
   tryReadJsonField,
   writeJson,
   writeText,
-} from "@getpie/verify-pie-cli/runtime";
+} from "@getpie/verify/runtime";

@@ -3,4 +3,4 @@ export {
   bootstrapSkill,
   bootstrapSurface,
   resolveNode24,
-} from "@getpie/verify-pie-cli/bootstrap";
+} from "@getpie/verify/bootstrap";

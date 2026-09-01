@@ -1,5 +1,0 @@
-#!/usr/bin/env node
-import { bootstrapPackage } from "./bootstrap.mjs";
-
-process.env.VERIFY_PIE_DEFAULT_SURFACE ??= "cli";
-bootstrapPackage();

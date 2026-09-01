@@ -16,4 +16,4 @@ export {
   waitDead,
   waitUntil,
   writePidFile,
-} from "@getpie/verify-pie-cli/runtime";
+} from "@getpie/verify/runtime";

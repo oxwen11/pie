@@ -6,5 +6,5 @@ export {
   redactDaemonRecord,
   resolveCompatKey,
   spawnPie,
-} from "@getpie/verify-pie-cli/runtime";
-export type { DaemonRecord } from "@getpie/verify-pie-cli/runtime";
+} from "@getpie/verify/runtime";
+export type { DaemonRecord } from "@getpie/verify/runtime";

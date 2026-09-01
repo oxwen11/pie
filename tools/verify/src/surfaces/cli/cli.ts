@@ -3,17 +3,19 @@ import { cleanup } from "./cleanup.ts";
 import { doctor } from "./doctor.ts";
 import { evidence } from "./evidence.ts";
 import { launch } from "./launch.ts";
+import { run } from "./run.ts";
 
 const usageText = `Usage:
-  pie-verify web launch [--replace]
-  pie-verify web doctor
-  pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
-  pie-verify web cleanup [run-dir]
+  pie-verify cli launch [--replace] [--serve]
+  pie-verify cli doctor
+  pie-verify cli run <pie argv…>
+  pie-verify cli evidence path|init|curl|note
+  pie-verify cli cleanup [run-dir]
 
-TypeScript helpers from tools/verify-pie-cli, executed with Node >= 24 (not Bash, not Bun).
+TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
 `;
 
-export async function runWebSurface(argv: string[]): Promise<void> {
+export async function runCliSurface(argv: string[]): Promise<void> {
   const command = argv[0];
   const rest = argv.slice(1);
   switch (command) {
@@ -28,6 +30,9 @@ export async function runWebSurface(argv: string[]): Promise<void> {
       return;
     case "doctor":
       await doctor();
+      return;
+    case "run":
+      await run(rest);
       return;
     case "evidence":
       await evidence(rest);

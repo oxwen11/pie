@@ -1,1 +1,1 @@
-export { ensureSampleProject, removeScaffold } from "@getpie/verify-pie-cli/runtime";
+export { ensureSampleProject, removeScaffold } from "@getpie/verify/runtime";

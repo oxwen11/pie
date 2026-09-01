@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for Pie Desktop (Electron + to
 
 Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web app via `@getpie/app`. It does **not** use Vite 4190. Main attach-or-spawns the **same token daemon** as the CLI (`makeDaemonServerProcess`). The daemon **outlives Electron** — closing the window is not teardown.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify-pie-cli` (`tools/verify-pie-cli`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
 
 Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
@@ -109,7 +109,7 @@ Never `pkill` electron / pie / vite.
 
 ## Helpers
 
-One executable for every verify skill: `pie-verify` (`@getpie/verify-pie-cli`, root `devDependency`). This skill uses the `desktop` surface.
+One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `devDependency`). This skill uses the `desktop` surface.
 
 | Command | Purpose |
 | --- | --- |
