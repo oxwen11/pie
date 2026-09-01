@@ -1,3 +1,4 @@
 [tools]
 node = "24"
 pnpm = "11.24.0"
+"aqua:vercel-labs/agent-browser" = "0.36.0"

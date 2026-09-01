@@ -1,12 +1,8 @@
-import fs from "node:fs";
-import module from "node:module";
 import path from "node:path";
 
 import { VerifyError } from "./fail.ts";
 import { writeText } from "./fs.ts";
-import { commandOnPath, runCommand, runCommandInherit } from "./process.ts";
-
-const require = module.createRequire(import.meta.url);
+import { commandOnPath, findRepoRoot, runCommand, runCommandInherit } from "./process.ts";
 
 export type AgentBrowserTarget = {
   session?: string;
@@ -38,27 +34,15 @@ export function resolveAgentBrowserBin(): string {
   if (override !== undefined && override !== "") {
     return override;
   }
-  try {
-    const pkgPath = require.resolve("agent-browser/package.json");
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
-      bin?: string | Record<string, string>;
-    };
-    const rel = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.["agent-browser"];
-    if (rel === undefined) {
-      throw new Error("agent-browser package.json has no bin");
+  const mise = commandOnPath("mise");
+  if (mise !== undefined) {
+    const result = runCommand(mise, ["which", "agent-browser"], { cwd: findRepoRoot() });
+    const resolved = result.stdout.trim();
+    if (result.status === 0 && resolved !== "") {
+      return resolved;
     }
-    return path.resolve(path.dirname(pkgPath), rel);
-  } catch (error) {
-    const onPath = commandOnPath("agent-browser");
-    if (onPath !== undefined) {
-      return onPath;
-    }
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `agent-browser is a dependency of @getpie/verify — run pnpm install (${detail})`,
-      { cause: error },
-    );
   }
+  throw new Error("agent-browser is a mise tool — run mise install");
 }
 
 export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget = {}): string[] {
