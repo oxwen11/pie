@@ -7,11 +7,15 @@ describe("buildAgentBrowserArgv", () => {
     expect(buildAgentBrowserArgv(["snapshot"], { session: "pie-verify-web" })).toEqual([
       "--session",
       "pie-verify-web",
+      "--headed",
+      "false",
+      "--profile",
+      "/tmp/pie-verify-web/chrome-profile",
       "snapshot",
     ]);
   });
 
-  it("injects desktop CDP and session together", () => {
+  it("injects desktop CDP and session together without launching Chrome", () => {
     expect(
       buildAgentBrowserArgv(["snapshot"], { session: "pie-verify-desktop", cdpPort: 9223 }),
     ).toEqual(["--session", "pie-verify-desktop", "--cdp", "9223", "snapshot"]);
@@ -23,7 +27,16 @@ describe("buildAgentBrowserArgv", () => {
         session: "pie-verify-web",
         defaultOpenUrl: "http://localhost:4190/",
       }),
-    ).toEqual(["--session", "pie-verify-web", "open", "http://localhost:4190/"]);
+    ).toEqual([
+      "--session",
+      "pie-verify-web",
+      "--headed",
+      "false",
+      "--profile",
+      "/tmp/pie-verify-web/chrome-profile",
+      "open",
+      "http://localhost:4190/",
+    ]);
   });
 
   it("keeps an explicit open URL", () => {
@@ -32,7 +45,16 @@ describe("buildAgentBrowserArgv", () => {
         session: "pie-verify-web",
         defaultOpenUrl: "http://localhost:4190/",
       }),
-    ).toEqual(["--session", "pie-verify-web", "open", "http://localhost:4190/draft"]);
+    ).toEqual([
+      "--session",
+      "pie-verify-web",
+      "--headed",
+      "false",
+      "--profile",
+      "/tmp/pie-verify-web/chrome-profile",
+      "open",
+      "http://localhost:4190/draft",
+    ]);
   });
 
   it("does not inject isolation for install and skills", () => {

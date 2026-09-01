@@ -8,6 +8,7 @@ export type AgentBrowserTarget = {
   session?: string;
   cdpPort?: number;
   defaultOpenUrl?: string;
+  profile?: string;
 };
 
 export type AgentBrowserOptions = AgentBrowserTarget & {
@@ -45,6 +46,10 @@ export function resolveAgentBrowserBin(): string {
   throw new Error("agent-browser is a mise tool — run mise install");
 }
 
+export function isolatedChromeProfile(session: string): string {
+  return path.join("/tmp", session, "chrome-profile");
+}
+
 export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget = {}): string[] {
   if (!browserNeedsIsolation(args[0])) {
     return [...args];
@@ -59,6 +64,16 @@ export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget
   }
   if (target.cdpPort !== undefined) {
     argv.push("--cdp", String(target.cdpPort));
+  } else {
+    // ~/.agent-browser/config.json is headed + work-browser profile. --session
+    // alone does not override those, and a headed launch restores every window.
+    argv.push("--headed", "false");
+    const profile =
+      target.profile ??
+      (target.session !== undefined ? isolatedChromeProfile(target.session) : undefined);
+    if (profile !== undefined) {
+      argv.push("--profile", profile);
+    }
   }
   argv.push(...forwarded);
   return argv;
@@ -95,5 +110,13 @@ export function forwardAgentBrowser(args: string[], target: AgentBrowserTarget):
   const status = runCommandInherit(resolved, argv);
   if (status !== 0) {
     throw new VerifyError(`agent-browser exited ${status}`, status);
+  }
+}
+
+export function closeAgentBrowser(session: string): void {
+  try {
+    agentBrowser(["close"], { session });
+  } catch {
+    // no session, or already closed
   }
 }
