@@ -5,7 +5,8 @@ import { findRepoRoot } from "../../runtime/process.ts";
 export const SKILL = "verify-pie";
 export const SKILL_DIR =
   process.env.VERIFY_PIE_SKILL_DIR ?? path.join(findRepoRoot(), ".agents/skills/verify-pie");
-export const ROOT = process.env.VERIFY_PIE_ROOT ?? "/tmp/verify-pie";
+export const DEFAULT_ROOT = "/tmp/pie-verify-web";
+export const ROOT = process.env.VERIFY_PIE_ROOT ?? DEFAULT_ROOT;
 export const CURRENT_LINK = path.join(ROOT, "current");
 export const DEFAULT_PIE_PORT = 4180;
 export const VITE_PORT = 4190;

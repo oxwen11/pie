@@ -9,7 +9,7 @@ The CLI (`packages/pie`, package `@getpie/cli`, bin `pie`) is a **different fron
 
 This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). The helper is **`pnpm exec pie-verify cli`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
 
-Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
+Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
 ## Launch
 
@@ -28,7 +28,7 @@ What launch also does:
 
 - Requires **Node >= 24**. Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing.
-- Sets `PIE_HOME=/tmp/verify-pie-cli/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
+- Sets `PIE_HOME=/tmp/pie-verify-cli/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
 - Invokes source: `cd packages/pie && pnpm exec tsx src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
 - Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.mjs`; **tsx does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
 - Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME` / `PIE_DAEMON_DIR`, not killing the short-lived CLI pid.
@@ -55,7 +55,7 @@ pnpm exec pie-verify cli doctor
 
 It checks, in order:
 
-1. A current run pointer exists at `/tmp/verify-pie-cli/current` (else: a live 4182 without that pointer is a **foreign** daemon — refuse).
+1. A current run pointer exists at `/tmp/pie-verify-cli/current` (else: a live 4182 without that pointer is a **foreign** daemon — refuse).
 2. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie-dev`.
 3. Daemon mode: `daemon.pid` exists, recorded pid is alive, `GET $address/api/health` is `ok`.
 4. `POST $address/api/ws-ticket` is **401** without `Authorization`, **200** with `Authorization: Bearer <token>` from the live record (token is not printed).
@@ -105,7 +105,7 @@ Evidence lands in `.cursor/skills/verify-pie-cli/evidence/<run-id>/` (gitignored
 pnpm exec pie-verify cli cleanup
 ```
 
-Daemon mode: `pie daemon stop` with this run's env, then TERM/KILL only the **recorded daemon pid** if it is still alive. Serve mode: kill the recorded serve process tree. Removes `/tmp/verify-pie-cli/runs/<id>`. Does **not** delete evidence. Does **not** `pkill` pie / node / tsx.
+Daemon mode: `pie daemon stop` with this run's env, then TERM/KILL only the **recorded daemon pid** if it is still alive. Serve mode: kill the recorded serve process tree. Removes `/tmp/pie-verify-cli/runs/<id>`. Does **not** delete evidence. Does **not** `pkill` pie / node / tsx.
 
 ## Helpers
 
@@ -123,7 +123,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Resource | Shared? |
 | --- | --- |
-| `$PIE_HOME` | Isolated under `/tmp/verify-pie-cli/runs/<id>/pie-home`. |
+| `$PIE_HOME` | Isolated under `/tmp/pie-verify-cli/runs/<id>/pie-home`. |
 | `$PIE_DAEMON_DIR` | `$PIE_HOME/daemon`. |
 | Port 4182 | Default. Launch refuses a taken port. Never 4000 / 4180 / 4190. |
 | Web verify 4180/4190 | **Do not touch.** |

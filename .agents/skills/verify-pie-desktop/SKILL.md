@@ -9,7 +9,7 @@ Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web ap
 
 This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
 
-Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/verify-pie/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
+Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
 
 ## Launch
 
@@ -30,7 +30,7 @@ What launch also does:
 
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
 - Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
-- Sets `PIE_HOME=/tmp/verify-pie-desktop/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
+- Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
 - Starts `cd apps/desktop && pnpm exec electron-vite dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. electron-vite injects `ELECTRON_RENDERER_URL` (renderer is often **5173**).
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
@@ -47,7 +47,7 @@ pnpm exec pie-verify desktop doctor
 
 Checks, in order:
 
-1. Current run at `/tmp/verify-pie-desktop/current` (else refuse a live listener that is not ours).
+1. Current run at `/tmp/pie-verify-desktop/current` (else refuse a live listener that is not ours).
 2. Isolated `$PIE_HOME` (not `~/.pie` / `~/.pie-dev`).
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
@@ -122,7 +122,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Resource | Shared? |
 | --- | --- |
-| `$PIE_HOME` | Isolated under `/tmp/verify-pie-desktop/runs/<id>/pie-home`. |
+| `$PIE_HOME` | Isolated under `/tmp/pie-verify-desktop/runs/<id>/pie-home`. |
 | Daemon port | Prefers **4000** on first spawn. Read `daemon.pid`. Isolated home, not a shared `~/.pie` daemon. |
 | CDP 9223 | Default `PIE_REMOTE_DEBUG_PORT`. |
 | Renderer 5173 | electron-vite default. Do not point a browser at it and call that desktop. |

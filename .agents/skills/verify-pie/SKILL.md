@@ -28,7 +28,7 @@ curl -fsS http://localhost:4190/api/health    # Vite proxy (listens on [::1]:419
 
 Helpers wait with `node:http` and try `127.0.0.1` / `localhost` / `[::1]`. Do not use global `fetch` for 4190 — some agent runtimes reject that port (`bad port`) even when Vite is healthy. IPv4 `127.0.0.1:4190` connection-refuses here.
 
-Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http://127.0.0.1:4180`. Launch writes that log to `/tmp/verify-pie/runs/<id>/logs/server.log`.
+Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http://127.0.0.1:4180`. Launch writes that log to `/tmp/pie-verify-web/runs/<id>/logs/server.log`.
 
 **Open `http://localhost:4190/`, never 4180, and never `http://127.0.0.1:4190/`.** Vite binds `[::1]:4190` here — IPv4 4190 connection-refuses. 4180 serves `/api/*`, `/ws/rpc`, and a *built* bundle: it 503s when nothing is built or quietly shows a stale UI. `/` redirects to `/draft`.
 
@@ -36,7 +36,7 @@ What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
-- Sets `PIE_HOME=/tmp/verify-pie/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie-dev`.
+- Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie-dev`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
 - Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
@@ -56,7 +56,7 @@ pnpm exec pie-verify web doctor
 
 It checks, in order:
 
-1. A current run pointer exists at `/tmp/verify-pie/current` (else: live 4180/4190 without that pointer is a **foreign** instance — refuse).
+1. A current run pointer exists at `/tmp/pie-verify-web/current` (else: live 4180/4190 without that pointer is a **foreign** instance — refuse).
 2. Server and Vite pids from that run are alive.
 3. Those pids (or their children) own 4180 and 4190.
 4. Both `/api/health` endpoints return `ok`.
@@ -138,7 +138,7 @@ Standards:
 - Confirm side effects on disk:
   - Projects: `$PIE_HOME/storage/projects.json` — envelope `{ "version": 1, "data": [ { "id", "name", "path", "createdAt" } ] }`. `name` is the folder basename.
   - Sessions: `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` after a successful draft send. Title is the prompt text.
-- Logs for a failed connect: `/tmp/verify-pie/runs/<id>/logs/{server,vite}.log` and `$PIE_HOME/logs/pie.log`. Copy into evidence if you cite them; cleanup deletes the run dir.
+- Logs for a failed connect: `/tmp/pie-verify-web/runs/<id>/logs/{server,vite}.log` and `$PIE_HOME/logs/pie.log`. Copy into evidence if you cite them; cleanup deletes the run dir.
 - No mocks. There is no test-mode server in this recipe. A dry-run name does not exist — if you skip `pi`, observe that skip (no `agentSessionId` in the session file, error card in the transcript).
 
 ## Cleanup
@@ -147,7 +147,7 @@ Standards:
 pnpm exec pie-verify web cleanup
 ```
 
-Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/verify-pie/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
 
 After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web evidence path` printed before teardown (or `.agents/skills/verify-pie/evidence/<run-id>/`).
 
@@ -168,7 +168,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | --- | --- |
 | Vite 4190 | **No.** `strictPort`, IPv6 `[::1]` only. One web instance. Open `http://localhost:4190/`. |
 | Server 4180 | Movable via `PIE_PORT` (both processes). Launch still refuses a taken 4180. |
-| `$PIE_HOME` | Isolated per run under `/tmp/verify-pie/runs/<id>/pie-home`. |
+| `$PIE_HOME` | Isolated per run under `/tmp/pie-verify-web/runs/<id>/pie-home`. |
 | `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 

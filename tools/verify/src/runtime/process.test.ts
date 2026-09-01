@@ -41,6 +41,8 @@ describe("isSharedPieHome", () => {
     const home = process.env.HOME ?? "";
     expect(isSharedPieHome(path.join(home, ".pie"))).toBe(true);
     expect(isSharedPieHome(path.join(home, ".pie-dev"))).toBe(true);
-    expect(isSharedPieHome("/tmp/verify-pie-cli/runs/x/pie-home")).toBe(false);
+    expect(isSharedPieHome("/tmp/pie-verify-cli/runs/x/pie-home")).toBe(false);
+    expect(isSharedPieHome("/tmp/pie-verify-web/runs/x/pie-home")).toBe(false);
+    expect(isSharedPieHome("/tmp/pie-verify-desktop/runs/x/pie-home")).toBe(false);
   });
 });

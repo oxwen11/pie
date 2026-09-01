@@ -6,7 +6,8 @@ export const SKILL = "verify-pie-desktop";
 export const SKILL_DIR =
   process.env.VERIFY_PIE_DESKTOP_SKILL_DIR ??
   path.join(findRepoRoot(), ".agents/skills/verify-pie-desktop");
-export const ROOT = process.env.VERIFY_PIE_DESKTOP_ROOT ?? "/tmp/verify-pie-desktop";
+export const DEFAULT_ROOT = "/tmp/pie-verify-desktop";
+export const ROOT = process.env.VERIFY_PIE_DESKTOP_ROOT ?? DEFAULT_ROOT;
 export const CURRENT_LINK = path.join(ROOT, "current");
 export const DEFAULT_DAEMON_PORT = 4000;
 export const DEFAULT_CDP_PORT = 9223;

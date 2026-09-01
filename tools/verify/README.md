@@ -6,11 +6,11 @@ Workspace toolchain for isolated Pie proofs. Installed at the repo root as a
 This is **not** `@getpie/cli` (`packages/pie`, bin `pie`). That is the product
 CLI.
 
-| Surface   | Skill recipe                        | Isolation                                                              |
-| --------- | ----------------------------------- | ---------------------------------------------------------------------- |
-| `web`     | `.agents/skills/verify-pie`         | Vite **4190** + foreground `pie serve` **4180**, `/tmp/verify-pie/`    |
-| `cli`     | `.agents/skills/verify-pie-cli`     | `pie` / `pie daemon` / `pie serve` on **4182**, `/tmp/verify-pie-cli/` |
-| `desktop` | `.agents/skills/verify-pie-desktop` | Electron + token daemon, CDP **9223**, `/tmp/verify-pie-desktop/`      |
+| Surface   | Skill recipe                        | Isolation                                                               |
+| --------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| `web`     | `.agents/skills/verify-pie`         | Vite **4190** + foreground `pie serve` **4180**, `/tmp/pie-verify-web/` |
+| `cli`     | `.agents/skills/verify-pie-cli`     | `pie` / `pie daemon` / `pie serve` on **4182**, `/tmp/pie-verify-cli/`  |
+| `desktop` | `.agents/skills/verify-pie-desktop` | Electron + token daemon, CDP **9223**, `/tmp/pie-verify-desktop/`       |
 
 ```bash
 pnpm exec pie-verify web launch

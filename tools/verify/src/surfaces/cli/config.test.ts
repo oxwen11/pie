@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { refuseReservedPort } from "./config.ts";
+import { DEFAULT_ROOT, refuseReservedPort } from "./config.ts";
+
+describe("DEFAULT_ROOT", () => {
+  it("isolates under /tmp/pie-verify-cli", () => {
+    expect(DEFAULT_ROOT).toBe("/tmp/pie-verify-cli");
+  });
+});
 
 describe("refuseReservedPort", () => {
   it("rejects the user/desktop daemon port", () => {

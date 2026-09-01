@@ -6,7 +6,8 @@ export const SKILL = "verify-pie-cli";
 export const SKILL_DIR =
   process.env.VERIFY_PIE_CLI_SKILL_DIR ??
   path.join(findRepoRoot(), ".agents/skills/verify-pie-cli");
-export const ROOT = process.env.VERIFY_PIE_CLI_ROOT ?? "/tmp/verify-pie-cli";
+export const DEFAULT_ROOT = "/tmp/pie-verify-cli";
+export const ROOT = process.env.VERIFY_PIE_CLI_ROOT ?? DEFAULT_ROOT;
 export const CURRENT_LINK = path.join(ROOT, "current");
 export const DEFAULT_PIE_PORT = 4182;
 export const BIN = process.env.VERIFY_PIE_CLI_BIN ?? "pie-verify cli";

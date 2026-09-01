@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { refuseWebOrCliPort } from "./config.ts";
+import { DEFAULT_ROOT, refuseWebOrCliPort } from "./config.ts";
+
+describe("DEFAULT_ROOT", () => {
+  it("isolates under /tmp/pie-verify-desktop", () => {
+    expect(DEFAULT_ROOT).toBe("/tmp/pie-verify-desktop");
+  });
+});
 
 describe("refuseWebOrCliPort", () => {
   it("rejects the web verify ports", () => {
