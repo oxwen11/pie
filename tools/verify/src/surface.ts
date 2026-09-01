@@ -9,8 +9,6 @@ export type LaunchRequest = {
 
 export type PortPlan = {
   piePort: number;
-  vitePort?: number;
-  cdpPort?: number;
   refuseTaken: number[];
   warnTaken: number[];
 };

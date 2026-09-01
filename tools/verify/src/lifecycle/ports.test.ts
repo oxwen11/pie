@@ -24,8 +24,6 @@ describe("portPlan", () => {
     delete process.env.PIE_PORT;
     expect(portPlan(WEB)).toEqual({
       piePort: 4180,
-      vitePort: 4190,
-      cdpPort: undefined,
       refuseTaken: [4180, 4190],
       warnTaken: [],
     });
@@ -35,8 +33,6 @@ describe("portPlan", () => {
     delete process.env.PIE_PORT;
     expect(portPlan(CLI)).toEqual({
       piePort: 4182,
-      vitePort: undefined,
-      cdpPort: undefined,
       refuseTaken: [4182],
       warnTaken: [],
     });
@@ -47,8 +43,6 @@ describe("portPlan", () => {
     delete process.env.PIE_REMOTE_DEBUG_PORT;
     expect(portPlan(DESKTOP)).toEqual({
       piePort: 4000,
-      vitePort: undefined,
-      cdpPort: 9223,
       refuseTaken: [9223],
       warnTaken: [4000],
     });

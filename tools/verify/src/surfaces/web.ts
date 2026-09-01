@@ -86,33 +86,33 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   const serverPid = readPidFile(path.join(runDir, "pids/server.pid"));
   const vitePid = readPidFile(path.join(runDir, "pids/vite.pid"));
   if (!pidAlive(serverPid)) {
-    fail(`${WEB.logPrefix} doctor: FAIL — server pid ${serverPid} is not running`);
+    fail(`${WEB.logPrefix} FAIL — server pid ${serverPid} is not running`);
   }
   if (!pidAlive(vitePid)) {
-    fail(`${WEB.logPrefix} doctor: FAIL — vite pid ${vitePid} is not running`);
+    fail(`${WEB.logPrefix} FAIL — vite pid ${vitePid} is not running`);
   }
   if (serverPid === undefined || !portOwnedByAncestor(web.piePort, serverPid)) {
     fail(
-      `${WEB.logPrefix} doctor: FAIL — port ${web.piePort} is owned by pid(s) ${listenPids(web.piePort).join(" ")}, not our tree (expected ancestor ${serverPid})`,
+      `${WEB.logPrefix} FAIL — port ${web.piePort} is owned by pid(s) ${listenPids(web.piePort).join(" ")}, not our tree (expected ancestor ${serverPid})`,
     );
   }
   if (vitePid === undefined || !portOwnedByAncestor(web.vitePort, vitePid)) {
     fail(
-      `${WEB.logPrefix} doctor: FAIL — port ${web.vitePort} is owned by pid(s) ${listenPids(web.vitePort).join(" ")}, not our tree (expected ancestor ${vitePid})`,
+      `${WEB.logPrefix} FAIL — port ${web.vitePort} is owned by pid(s) ${listenPids(web.vitePort).join(" ")}, not our tree (expected ancestor ${vitePid})`,
     );
   }
   if (!(await healthOk(web.piePort))) {
-    fail(`${WEB.logPrefix} doctor: FAIL — http://127.0.0.1:${web.piePort}/api/health is not ok`);
+    fail(`${WEB.logPrefix} FAIL — http://127.0.0.1:${web.piePort}/api/health is not ok`);
   }
   if (!(await healthOk(web.vitePort))) {
     fail(
-      `${WEB.logPrefix} doctor: FAIL — Vite proxy :${web.vitePort}/api/health is not ok — open the Vite URL, not the API port`,
+      `${WEB.logPrefix} FAIL — Vite proxy :${web.vitePort}/api/health is not ok — open the Vite URL, not the API port`,
     );
   }
   const ticket = await ticketStatusOnPort(web.vitePort);
   if (ticket !== 200) {
     fail(
-      `${WEB.logPrefix} doctor: FAIL — /api/ws-ticket returned ${ticket} (401 means you hit the daemon on 4000, not this serve)`,
+      `${WEB.logPrefix} FAIL — /api/ws-ticket returned ${ticket} (401 means you hit the daemon on 4000, not this serve)`,
     );
   }
   const major = Number(process.versions.node.split(".")[0]);

@@ -90,31 +90,31 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   const desktop = expectMeta(meta, "desktop");
   const evPid = readPidFile(path.join(runDir, "pids/electron-vite.pid"));
   if (!pidAlive(evPid)) {
-    fail(`${DESKTOP.logPrefix} doctor: FAIL — electron-vite pid ${evPid} is not running`);
+    fail(`${DESKTOP.logPrefix} FAIL — electron-vite pid ${evPid} is not running`);
   }
   const recordPath = path.join(desktop.daemonDir, "daemon.pid");
   if (!fs.existsSync(recordPath)) {
     fail(
-      `${DESKTOP.logPrefix} doctor: FAIL — missing ${recordPath} — Electron did not attach/spawn a daemon`,
+      `${DESKTOP.logPrefix} FAIL — missing ${recordPath} — Electron did not attach/spawn a daemon`,
     );
   }
   const record = readDaemonRecord(recordPath);
   if (!pidAlive(record.pid)) {
-    fail(`${DESKTOP.logPrefix} doctor: FAIL — daemon pid ${record.pid} is not running`);
+    fail(`${DESKTOP.logPrefix} FAIL — daemon pid ${record.pid} is not running`);
   }
   if (!(await healthOk(record.address))) {
-    fail(`${DESKTOP.logPrefix} doctor: FAIL — ${record.address}/api/health is not ok`);
+    fail(`${DESKTOP.logPrefix} FAIL — ${record.address}/api/health is not ok`);
   }
   const anon = await ticketStatus(record.address);
   if (anon !== 401) {
     fail(
-      `${DESKTOP.logPrefix} doctor: FAIL — /api/ws-ticket without token returned ${anon} (expected 401)`,
+      `${DESKTOP.logPrefix} FAIL — /api/ws-ticket without token returned ${anon} (expected 401)`,
     );
   }
   const auth = await ticketStatus(record.address, record.token);
   if (auth !== 200) {
     fail(
-      `${DESKTOP.logPrefix} doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
+      `${DESKTOP.logPrefix} FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
     );
   }
   let title = "";
@@ -127,7 +127,7 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     fail(
-      `${DESKTOP.logPrefix} doctor: FAIL — agent-browser could not attach to CDP ${desktop.cdpPort}: ${message}`,
+      `${DESKTOP.logPrefix} FAIL — agent-browser could not attach to CDP ${desktop.cdpPort}: ${message}`,
     );
   }
   return {

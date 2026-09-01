@@ -1,37 +1,50 @@
+import type { SurfaceId } from "./identity.ts";
 import { VerifyError } from "./runtime/fail.ts";
 
-export const SURFACES = ["web", "cli", "desktop"] as const;
-export type Surface = (typeof SURFACES)[number];
+export const SURFACES = ["web", "cli", "desktop"] as const satisfies readonly SurfaceId[];
 
-export type ParsedArgv = { kind: "help" } | { kind: "surface"; surface: Surface; rest: string[] };
+export type ParsedArgv = { kind: "help" } | { kind: "surface"; surface: SurfaceId; rest: string[] };
 
-const usageText = `Usage:
-  pie-verify web launch [--replace]
+const TOOL_FOOTER =
+  "TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).\n";
+
+function surfaceLines(id: SurfaceId): string {
+  switch (id) {
+    case "web":
+      return `  pie-verify web launch [--replace]
   pie-verify web doctor
   pie-verify web browser open|snapshot|<agent-browser argv…>
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
-  pie-verify web cleanup [run-dir]
-
-  pie-verify cli launch [--replace] [--serve]
+  pie-verify web cleanup [run-dir]`;
+    case "cli":
+      return `  pie-verify cli launch [--replace] [--serve]
   pie-verify cli doctor
   pie-verify cli run <pie argv…>
   pie-verify cli evidence path|init|curl|note
-  pie-verify cli cleanup [run-dir]
-
-  pie-verify desktop launch [--replace]
+  pie-verify cli cleanup [run-dir]`;
+    case "desktop":
+      return `  pie-verify desktop launch [--replace]
   pie-verify desktop doctor
   pie-verify desktop browser snapshot|connect|<agent-browser argv…>
   pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
-  pie-verify desktop cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-
-export function pieVerifyUsage(): string {
-  return usageText;
+  pie-verify desktop cleanup [run-dir]`;
+    default: {
+      const exhaustive: never = id;
+      void exhaustive;
+      return "";
+    }
+  }
 }
 
-export function isSurface(value: string | undefined): value is Surface {
+export function surfaceUsage(id: SurfaceId): string {
+  return `Usage:\n${surfaceLines(id)}\n\n${TOOL_FOOTER}`;
+}
+
+export function pieVerifyUsage(): string {
+  return `Usage:\n${surfaceLines("web")}\n\n${surfaceLines("cli")}\n\n${surfaceLines("desktop")}\n\n${TOOL_FOOTER}`;
+}
+
+export function isSurface(value: string | undefined): value is SurfaceId {
   switch (value) {
     case "web":
     case "cli":
@@ -62,5 +75,5 @@ export function parsePieVerifyArgv(argv: string[]): ParsedArgv {
   if (isHelpFlag(first)) {
     return { kind: "help" };
   }
-  throw new VerifyError(`${usageText}unknown surface ${first}`, 2);
+  throw new VerifyError(`${pieVerifyUsage()}unknown surface ${first}`, 2);
 }

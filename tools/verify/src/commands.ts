@@ -1,4 +1,4 @@
-import { isHelpFlag } from "./argv.ts";
+import { isHelpFlag, surfaceUsage } from "./argv.ts";
 import { cleanup } from "./lifecycle/cleanup.ts";
 import { doctor } from "./lifecycle/doctor.ts";
 import { evidence } from "./lifecycle/evidence.ts";
@@ -56,45 +56,5 @@ export async function dispatchCommands(surface: Surface, argv: string[]): Promis
       return;
     default:
       throw new VerifyError(`${surfaceUsage(surface.identity.id)}unknown command ${command}`, 2);
-  }
-}
-
-function surfaceUsage(id: Surface["identity"]["id"]): string {
-  switch (id) {
-    case "web":
-      return `Usage:
-  pie-verify web launch [--replace]
-  pie-verify web doctor
-  pie-verify web browser open|snapshot|<agent-browser argv…>
-  pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
-  pie-verify web cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-    case "cli":
-      return `Usage:
-  pie-verify cli launch [--replace] [--serve]
-  pie-verify cli doctor
-  pie-verify cli run <pie argv…>
-  pie-verify cli evidence path|init|curl|note
-  pie-verify cli cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-    case "desktop":
-      return `Usage:
-  pie-verify desktop launch [--replace]
-  pie-verify desktop doctor
-  pie-verify desktop browser snapshot|connect|<agent-browser argv…>
-  pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
-  pie-verify desktop cleanup [run-dir]
-
-TypeScript helpers from @getpie/verify, executed with Node >= 24 (not Bash, not Bun).
-`;
-    default: {
-      const exhaustive: never = id;
-      void exhaustive;
-      return "";
-    }
   }
 }

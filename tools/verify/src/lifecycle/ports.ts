@@ -8,7 +8,6 @@ export function portPlan(identity: SurfaceIdentity): PortPlan {
     case "web":
       return {
         piePort,
-        vitePort: identity.vitePort,
         refuseTaken: [piePort, identity.vitePort],
         warnTaken: identity.warnTaken,
       };
@@ -22,7 +21,6 @@ export function portPlan(identity: SurfaceIdentity): PortPlan {
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
       return {
         piePort,
-        cdpPort,
         refuseTaken: [cdpPort],
         warnTaken: identity.warnTaken,
       };

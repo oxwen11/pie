@@ -106,16 +106,16 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   if (cli.mode === "serve") {
     const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
     if (!pidAlive(servePid)) {
-      fail(`${CLI.logPrefix} doctor: FAIL — serve pid ${servePid} is not running`);
+      fail(`${CLI.logPrefix} FAIL — serve pid ${servePid} is not running`);
     }
     const address = `http://127.0.0.1:${cli.piePort}`;
     if (!(await healthOk(address))) {
-      fail(`${CLI.logPrefix} doctor: FAIL — ${address}/api/health is not ok`);
+      fail(`${CLI.logPrefix} FAIL — ${address}/api/health is not ok`);
     }
     const status = await ticketStatus(address);
     if (status !== 200) {
       fail(
-        `${CLI.logPrefix} doctor: FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`,
+        `${CLI.logPrefix} FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`,
       );
     }
     return {
@@ -132,30 +132,30 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
 
   const recordPath = path.join(cli.daemonDir, "daemon.pid");
   if (!fs.existsSync(recordPath)) {
-    fail(`${CLI.logPrefix} doctor: FAIL — missing ${recordPath}`);
+    fail(`${CLI.logPrefix} FAIL — missing ${recordPath}`);
   }
   const record = readDaemonRecord(recordPath);
   if (!pidAlive(record.pid)) {
-    fail(`${CLI.logPrefix} doctor: FAIL — daemon pid ${record.pid} is not running`);
+    fail(`${CLI.logPrefix} FAIL — daemon pid ${record.pid} is not running`);
   }
   if (!(await healthOk(record.address))) {
-    fail(`${CLI.logPrefix} doctor: FAIL — ${record.address}/api/health is not ok`);
+    fail(`${CLI.logPrefix} FAIL — ${record.address}/api/health is not ok`);
   }
   const anon = await ticketStatus(record.address);
   if (anon !== 401) {
     fail(
-      `${CLI.logPrefix} doctor: FAIL — /api/ws-ticket without token returned ${anon} (expected 401 — 200 means you hit pie serve)`,
+      `${CLI.logPrefix} FAIL — /api/ws-ticket without token returned ${anon} (expected 401 — 200 means you hit pie serve)`,
     );
   }
   const auth = await ticketStatus(record.address, record.token);
   if (auth !== 200) {
     fail(
-      `${CLI.logPrefix} doctor: FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
+      `${CLI.logPrefix} FAIL — /api/ws-ticket with record token returned ${auth} (expected 200)`,
     );
   }
   const port = urlPort(record.address);
   if (listenPids(port).length === 0) {
-    fail(`${CLI.logPrefix} doctor: FAIL — nothing listens on ${port} (from daemon.pid address)`);
+    fail(`${CLI.logPrefix} FAIL — nothing listens on ${port} (from daemon.pid address)`);
   }
   return {
     pids: [record.pid],
