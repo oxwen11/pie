@@ -34,9 +34,9 @@ export const healthy = (address: string, signal?: AbortSignal): Effect.Effect<bo
   });
 
 /**
- * Two-signal liveness: the recorded pid is running AND the recorded address
- * answers health. Either alone is insufficient — a reused pid may be a foreign
- * process, and a stale address may be a different server.
+ * Coarse liveness: the recorded pid exists and the recorded address answers
+ * health. This does not establish process ownership; destructive operations
+ * separately authenticate the record token against the address first.
  */
 export const daemonAlive = (record: DaemonRecord): Effect.Effect<boolean> =>
   pidAlive(record.pid) ? healthy(record.address) : Effect.succeed(false);

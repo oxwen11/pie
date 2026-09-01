@@ -28,6 +28,7 @@
     "@earendil-works/pi-coding-agent": "0.84.2",
     "@effect/platform-node": "catalog:effect",
     "@getpie/contract": "workspace:*",
+    "@getpie/core": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
