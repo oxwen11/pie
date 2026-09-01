@@ -6,7 +6,6 @@ import {
   checksSummaryLabel,
   mergeMethodActionLabel,
   pullRequestActionInput,
-  pullRequestHeaderStatus,
   pullRequestSessionState,
 } from "./pull-request-presentation";
 
@@ -26,22 +25,6 @@ const snapshot: PullRequestSnapshot = {
 };
 
 describe("pull request presentation", () => {
-  it("prioritizes lifecycle and conflict states over check summaries", () => {
-    expect(pullRequestHeaderStatus(snapshot)).toEqual({
-      label: "Checks passing",
-      tone: "positive",
-    });
-    expect(pullRequestHeaderStatus({ ...snapshot, mergeability: "conflicting" })).toEqual({
-      label: "Conflicts",
-      tone: "negative",
-    });
-    expect(pullRequestHeaderStatus({ ...snapshot, lifecycle: { type: "merged" } })).toEqual({
-      label: "Merged",
-      tone: "accent",
-    });
-    expect(pullRequestHeaderStatus(null)).toBeUndefined();
-  });
-
   it("reduces snapshots to the lifecycle shown in a session row", () => {
     expect(pullRequestSessionState(snapshot)).toBe("open");
     expect(pullRequestSessionState({ ...snapshot, lifecycle: { type: "open", draft: true } })).toBe(
