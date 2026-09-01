@@ -36,16 +36,21 @@ describe("Effect Schema oRPC integration", () => {
     expect(aiTool.inputSchema).toBe(converted);
   });
 
-  it("coexists with Zod and supports event iterator yield schemas", () => {
+  it("coexists with Zod and supports event iterator yield schemas", async () => {
+    const IdInput = z.compile(z.object({ id: z.string() }));
     const router = {
       effect: oc.input(GreetingInput),
-      zod: oc.input(z.object({ id: z.string() })),
+      zod: oc.input(IdInput),
       events: oc.output(eventIterator(toStandardSchema(GreetingInput))),
     };
 
     expect(router.effect["~orpc"].inputSchemas).toHaveLength(1);
     expect(router.zod["~orpc"].inputSchemas).toHaveLength(1);
     expect(router.events["~orpc"].outputSchemas).toHaveLength(1);
+
+    const [zodInput] = router.zod["~orpc"].inputSchemas;
+    const validation = await zodInput!["~standard"].validate({ id: "ada" });
+    expect("issues" in validation).toBe(false);
   });
 
   it("returns Standard Schema issues for invalid input", async () => {
