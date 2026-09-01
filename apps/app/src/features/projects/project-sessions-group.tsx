@@ -1,4 +1,9 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import type {
+  PullRequestLifecycle,
+  PullRequestSessionStatus,
+  PullRequestSnapshot,
+} from "@getpie/contract/pull-request";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -10,7 +15,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
@@ -18,6 +23,16 @@ import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
+const EMPTY_PULL_REQUEST_STATUSES = new Map<string, PullRequestLifecycle>();
+
+const selectPullRequestStatuses = (
+  statuses: ReadonlyArray<PullRequestSessionStatus>,
+): ReadonlyMap<string, PullRequestLifecycle> =>
+  new Map(statuses.map((status) => [status.ref.sessionId, status.lifecycle]));
+
+const selectPullRequestLifecycle = (
+  snapshot: PullRequestSnapshot | null,
+): PullRequestLifecycle | null => snapshot?.lifecycle ?? null;
 
 // Newest-first: a session is opened right after it is created. Module scope
 // keeps `select` referentially stable across renders.
@@ -48,6 +63,22 @@ export function ProjectSessionsGroup({
     select: selectNewestFirst,
   });
   const rows = sessions.data ?? EMPTY_SESSIONS;
+  const refs = rows.map(({ projectId, sessionId }) => ({ projectId, sessionId }));
+  const pullRequestStatuses = useQuery({
+    ...orpcQueryUtils.pullRequest.statuses.queryOptions({ input: { refs } }),
+    enabled: refs.length > 0,
+    select: selectPullRequestStatuses,
+  });
+  const activeSession = rows.find(isSessionActive);
+  const activePullRequest = useQuery({
+    ...orpcQueryUtils.pullRequest.current.queryOptions({
+      input: activeSession === undefined ? skipToken : { ref: activeSession },
+    }),
+    select: selectPullRequestLifecycle,
+  });
+  const statusBySessionId = pullRequestStatuses.isError
+    ? EMPTY_PULL_REQUEST_STATUSES
+    : (pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES);
 
   return (
     <Collapsible defaultOpen>
@@ -87,14 +118,26 @@ export function ProjectSessionsGroup({
         <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
           <SidebarGroupContent>
             <SidebarMenu>
-              {rows.map((session) => (
-                <ProjectSessionRow
-                  key={session.sessionId}
-                  active={isSessionActive(session)}
-                  isActive={() => isSessionActive(session)}
-                  session={session}
-                />
-              ))}
+              {rows.map((session) => {
+                const active = isSessionActive(session);
+                const listedLifecycle = statusBySessionId.get(session.sessionId);
+                const pullRequestLifecycle = active
+                  ? activePullRequest.isError
+                    ? undefined
+                    : activePullRequest.data === undefined
+                      ? listedLifecycle
+                      : (activePullRequest.data ?? undefined)
+                  : listedLifecycle;
+                return (
+                  <ProjectSessionRow
+                    key={session.sessionId}
+                    active={active}
+                    isActive={() => isSessionActive(session)}
+                    pullRequestLifecycle={pullRequestLifecycle ?? undefined}
+                    session={session}
+                  />
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </CollapsiblePanel>

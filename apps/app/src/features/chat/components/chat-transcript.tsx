@@ -1,4 +1,5 @@
-import { Loader } from "@getpie/ui/ai-elements/loader";
+import { LoadingBox } from "@getpie/ui/ai-elements/loading-box";
+import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
 import { useStore } from "zustand";
 
@@ -20,7 +21,12 @@ import { ModelErrorCard } from "./transcript/model-error-card";
 // messages simply has none yet.
 function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
   if (historyStatus === "loading") {
-    return <Shimmer className="text-sm">Loading earlier messages…</Shimmer>;
+    return (
+      <LoadingBox className="flex items-center gap-2.5">
+        <PieLoader aria-hidden />
+        <Shimmer className="text-sm">Loading earlier messages…</Shimmer>
+      </LoadingBox>
+    );
   }
   if (historyStatus === "unavailable") {
     return (
@@ -63,7 +69,17 @@ function ChatTranscriptView({
             isStreaming={turnInProgress && index === lastIndex}
           />
         ))}
-        {snapshot.status === "submitted" && <Loader />}
+        {snapshot.status === "submitted" && (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            className="text-muted-foreground my-2 flex items-center gap-2.5 text-sm"
+          >
+            <PieLoader aria-hidden />
+            <Shimmer className="text-sm">Thinking…</Shimmer>
+          </div>
+        )}
         {snapshot.retryNotice && (
           <div className="text-muted-foreground text-xs">{snapshot.retryNotice}</div>
         )}

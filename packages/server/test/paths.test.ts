@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   daemonStdioLogPath,
+  developmentDaemonEnvironment,
   logsDirectory,
   resolveDaemonDirectory,
   resolvePieHome,
@@ -30,6 +31,23 @@ describe("resolvePieHome", () => {
   it("treats an empty PIE_HOME as unset", () => {
     expect(resolvePieHome({ PIE_HOME: "" })).toBe(path.join(os.homedir(), ".pie"));
     expect(resolvePieHome({ PIE_HOME: "   " })).toBe(path.join(os.homedir(), ".pie"));
+  });
+});
+
+describe("developmentDaemonEnvironment", () => {
+  it("isolates only daemon lifecycle state under the canonical development home", () => {
+    const environment = developmentDaemonEnvironment(
+      { PIE_HOME: "/tmp/pie-home", NODE_ENV: "development" },
+      "pie-a1b2c3d4",
+    );
+
+    expect(environment.PIE_HOME).toBe("/tmp/pie-home");
+    expect(environment.PIE_DAEMON_DIR).toBe(path.join("/tmp/pie-home", "daemons", "pie-a1b2c3d4"));
+  });
+
+  it("preserves an explicitly selected daemon directory", () => {
+    const environment = { PIE_DAEMON_DIR: "/tmp/explicit-daemon" };
+    expect(developmentDaemonEnvironment(environment, "scope")).toBe(environment);
   });
 });
 

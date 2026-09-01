@@ -83,6 +83,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
       PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
       PIE_E2E_PI_RESPONSE: "![E2E local image](e2e-image.png)",
       PIE_HOME: e2ePaths.pieHome,
+      PIE_DAEMON_DIR: path.join(e2ePaths.pieHome, "daemon"),
     },
   });
 

@@ -21,6 +21,7 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
@@ -118,6 +119,7 @@ async function setup() {
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
+    PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,
   );

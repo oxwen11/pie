@@ -35,6 +35,7 @@
     "@tiptap/react": "catalog:tiptap",
     "ai": "catalog:",
     "lucide-react": "catalog:",
+    "motion": "^13.1.1",
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "react-error-boundary": "catalog:",

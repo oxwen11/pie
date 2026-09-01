@@ -1,0 +1,33 @@
+{
+  "name": "@getpie/core",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared core types and process identity for Pie",
+  "type": "module",
+  "exports": {
+    "./compatibility": {
+      "types": "./dist/compatibility.d.mts",
+      "default": "./dist/compatibility.mjs"
+    },
+    "./development-scope": {
+      "types": "./dist/development-scope.d.mts",
+      "default": "./dist/development-scope.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "devDependencies": {
+    "@getpie/typescript": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}
