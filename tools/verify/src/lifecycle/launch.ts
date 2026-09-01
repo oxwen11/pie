@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import type { SurfaceIdentity } from "../identity.ts";
 import { initialMeta, tryReadRunMeta, writeRunMeta } from "../meta.ts";
 import type { RunMeta } from "../meta.ts";
 import { ensureCoreBuilt, ensureServerBuilt } from "../runtime/daemon.ts";
@@ -13,13 +14,12 @@ import {
   setCurrentRun,
   tailFile,
 } from "../runtime/fs.ts";
-import { commandOnPath, findRepoRoot, pidAlive } from "../runtime/process.ts";
-import { ensureSampleProject } from "../runtime/scaffold.ts";
+import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
+import { ensureSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
 import { recordedPids } from "./pids.ts";
 import { applyPortPlan, portPlan } from "./ports.ts";
-import { classifyExisting } from "./reuse.ts";
 
 export async function launch(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
@@ -86,52 +86,36 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const runId = newRunId();
   const runDir = path.join(identity.root, "runs", runId);
   const pieHome = path.join(runDir, "pie-home");
-  const daemonDir = identity.usesDaemonDir ? path.join(pieHome, "daemon") : undefined;
-  const sample =
-    identity.sample === undefined
-      ? undefined
-      : ensureSampleProject({
-          home: process.env.HOME ?? "",
-          name: identity.sample.name,
-          marker: identity.sample.marker,
-          readme: identity.sample.readme,
-          markerBody: identity.sample.markerBody,
-          logPrefix: identity.logPrefix,
-        });
 
   ensureDir(path.join(runDir, "pids"));
   ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
-  if (daemonDir !== undefined) {
-    ensureDir(daemonDir);
+  switch (identity.id) {
+    case "cli":
+    case "desktop":
+      ensureDir(path.join(pieHome, "daemon"));
+      break;
+    case "web":
+      break;
+    default: {
+      const exhaustive: never = identity;
+      void exhaustive;
+    }
   }
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PIE_HOME: pieHome,
-    PIE_PORT: String(plan.piePort),
-    NODE_ENV: "development",
-  };
-  if (daemonDir !== undefined) {
-    env.PIE_DAEMON_DIR = daemonDir;
-  }
-  if (plan.cdpPort !== undefined) {
-    env.PIE_REMOTE_DEBUG_PORT = String(plan.cdpPort);
-  }
-
-  const ctx = buildCtx({
-    identityId: identity.id,
+  const ctx = toLaunchCtx(identity, {
     repo,
     runId,
     runDir,
     pieHome,
-    daemonDir,
     piePort: plan.piePort,
-    vitePort: plan.vitePort,
-    cdpPort: plan.cdpPort,
     request,
-    sample,
-    env,
+    env: {
+      ...process.env,
+      PIE_HOME: pieHome,
+      PIE_PORT: String(plan.piePort),
+      NODE_ENV: "development",
+    },
   });
   writeRunMeta(path.join(runDir, "meta.json"), initialMeta(ctx));
   setCurrentRun(identity.currentLink, runDir);
@@ -170,67 +154,71 @@ async function classifyRun(
       // fall through to live/stale
     }
   }
-  return classifyExisting({
-    healthy: false,
-    live: recordedPids(surface.identity, runDir).some((pid) => pidAlive(pid)),
-  });
+  return recordedPids(surface.identity, runDir).some((pid) => pidAlive(pid)) ? "live" : "stale";
 }
 
-function buildCtx(input: {
-  identityId: "web" | "cli" | "desktop";
-  repo: string;
-  runId: string;
-  runDir: string;
-  pieHome: string;
-  daemonDir?: string;
-  piePort: number;
-  vitePort?: number;
-  cdpPort?: number;
-  request: LaunchCtx["request"];
-  sample?: { path: string; created: boolean };
-  env: NodeJS.ProcessEnv;
-}): LaunchCtx {
-  const base = {
-    repo: input.repo,
-    runId: input.runId,
-    runDir: input.runDir,
-    pieHome: input.pieHome,
-    piePort: input.piePort,
-    request: input.request,
-    env: input.env,
-  };
-  switch (input.identityId) {
+function toLaunchCtx(
+  identity: SurfaceIdentity,
+  base: {
+    repo: string;
+    runId: string;
+    runDir: string;
+    pieHome: string;
+    piePort: number;
+    request: LaunchCtx["request"];
+    env: NodeJS.ProcessEnv;
+  },
+): LaunchCtx {
+  switch (identity.id) {
     case "web":
-      if (input.vitePort === undefined || input.sample === undefined) {
-        throw new Error("web launch is missing vitePort or sample");
-      }
-      return { ...base, surface: "web", vitePort: input.vitePort, sample: input.sample };
-    case "cli":
-      if (input.daemonDir === undefined) {
-        throw new Error("cli launch is missing daemonDir");
-      }
-      return { ...base, surface: "cli", daemonDir: input.daemonDir };
-    case "desktop":
-      if (
-        input.cdpPort === undefined ||
-        input.daemonDir === undefined ||
-        input.sample === undefined
-      ) {
-        throw new Error("desktop launch is missing cdpPort, daemonDir, or sample");
-      }
+      return {
+        ...base,
+        surface: "web",
+        vitePort: identity.vitePort,
+        sample: scaffold(identity),
+      };
+    case "cli": {
+      const daemonDir = path.join(base.pieHome, "daemon");
+      return {
+        ...base,
+        surface: "cli",
+        daemonDir,
+        env: { ...base.env, PIE_DAEMON_DIR: daemonDir },
+      };
+    }
+    case "desktop": {
+      const daemonDir = path.join(base.pieHome, "daemon");
+      const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
       return {
         ...base,
         surface: "desktop",
-        daemonDir: input.daemonDir,
-        cdpPort: input.cdpPort,
-        sample: input.sample,
+        daemonDir,
+        cdpPort,
+        sample: scaffold(identity),
+        env: {
+          ...base.env,
+          PIE_DAEMON_DIR: daemonDir,
+          PIE_REMOTE_DEBUG_PORT: String(cdpPort),
+        },
       };
+    }
     default: {
-      const exhaustive: never = input.identityId;
+      const exhaustive: never = identity;
       void exhaustive;
       throw new Error("unknown surface");
     }
   }
+}
+
+function scaffold(identity: Extract<SurfaceIdentity, { sample: unknown }>): SampleProject {
+  return ensureSampleProject({
+    home: process.env.HOME ?? "",
+    name: identity.sample.name,
+    marker: identity.sample.marker,
+    readme: identity.sample.readme,
+    markerBody: identity.sample.markerBody,
+    logPrefix: identity.logPrefix,
+  });
 }
 
 function tailFailure(runDir: string, pieHome: string): void {

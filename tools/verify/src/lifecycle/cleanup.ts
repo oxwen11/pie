@@ -33,14 +33,22 @@ export async function cleanup(surface: Surface, args: string[]): Promise<void> {
   const meta = tryReadRunMeta(path.join(runDir, "meta.json"));
   await surface.stop(runDir, meta);
 
-  const sample = identity.sample;
-  if (sample !== undefined) {
-    removeScaffold(sampleProjectOf(meta), sample.marker, identity.logPrefix);
-    removeScaffold(
-      path.join(process.env.HOME ?? "", sample.name),
-      sample.marker,
-      identity.logPrefix,
-    );
+  switch (identity.id) {
+    case "web":
+    case "desktop":
+      removeScaffold(sampleProjectOf(meta), identity.sample.marker, identity.logPrefix);
+      removeScaffold(
+        path.join(process.env.HOME ?? "", identity.sample.name),
+        identity.sample.marker,
+        identity.logPrefix,
+      );
+      break;
+    case "cli":
+      break;
+    default: {
+      const exhaustive: never = identity;
+      void exhaustive;
+    }
   }
 
   if (isUnder(path.join(identity.root, "runs"), runDir)) {

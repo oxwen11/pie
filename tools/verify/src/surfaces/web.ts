@@ -29,7 +29,7 @@ import {
 import { expectLaunch, type LaunchCtx, type ProbeOk, type Surface } from "../surface.ts";
 
 function sessionName(): string {
-  return WEB.browserSession ?? "pie-verify-web";
+  return WEB.browserSession;
 }
 
 export const webSurface: Surface = {

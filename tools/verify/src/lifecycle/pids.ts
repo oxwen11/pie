@@ -13,10 +13,20 @@ export function recordedPids(identity: SurfaceIdentity, runDir: string): number[
       pids.push(pid);
     }
   }
-  if (identity.usesDaemonDir) {
-    const recordPath = path.join(runDir, "pie-home/daemon/daemon.pid");
-    if (fs.existsSync(recordPath)) {
-      pids.push(readDaemonRecord(recordPath).pid);
+  switch (identity.id) {
+    case "cli":
+    case "desktop": {
+      const recordPath = path.join(runDir, "pie-home/daemon/daemon.pid");
+      if (fs.existsSync(recordPath)) {
+        pids.push(readDaemonRecord(recordPath).pid);
+      }
+      break;
+    }
+    case "web":
+      break;
+    default: {
+      const exhaustive: never = identity;
+      void exhaustive;
     }
   }
   return pids;

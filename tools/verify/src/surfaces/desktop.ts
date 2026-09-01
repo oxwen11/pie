@@ -34,7 +34,7 @@ import {
 import { expectLaunch, type LaunchCtx, type ProbeOk, type Surface } from "../surface.ts";
 
 function sessionName(): string {
-  return DESKTOP.browserSession ?? "pie-verify-desktop";
+  return DESKTOP.browserSession;
 }
 
 export const desktopSurface: Surface = {

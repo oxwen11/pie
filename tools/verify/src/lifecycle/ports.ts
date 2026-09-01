@@ -1,37 +1,38 @@
-import { DEFAULT_CDP_PORT, assertPiePortAllowed, type SurfaceIdentity } from "../identity.ts";
+import { assertPiePortAllowed, type SurfaceIdentity } from "../identity.ts";
 import { envPort, listenPids } from "../runtime/process.ts";
 import type { PortPlan } from "../surface.ts";
 
 export function portPlan(identity: SurfaceIdentity): PortPlan {
   const piePort = envPort("PIE_PORT", identity.defaultPiePort);
-  const vitePort = identity.vitePort;
-  const cdpPort =
-    identity.cdpDefault === undefined
-      ? undefined
-      : envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault ?? DEFAULT_CDP_PORT);
-  const refuseTaken: number[] = [];
-  switch (identity.takenPolicy) {
-    case "pie":
-      refuseTaken.push(piePort);
-      break;
-    case "pie-and-vite":
-      if (vitePort === undefined) {
-        throw new Error("pie-and-vite policy requires vitePort");
-      }
-      refuseTaken.push(piePort, vitePort);
-      break;
-    case "cdp":
-      if (cdpPort === undefined) {
-        throw new Error("cdp policy requires cdpDefault");
-      }
-      refuseTaken.push(cdpPort);
-      break;
+  switch (identity.id) {
+    case "web":
+      return {
+        piePort,
+        vitePort: identity.vitePort,
+        refuseTaken: [piePort, identity.vitePort],
+        warnTaken: identity.warnTaken,
+      };
+    case "cli":
+      return {
+        piePort,
+        refuseTaken: [piePort],
+        warnTaken: identity.warnTaken,
+      };
+    case "desktop": {
+      const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
+      return {
+        piePort,
+        cdpPort,
+        refuseTaken: [cdpPort],
+        warnTaken: identity.warnTaken,
+      };
+    }
     default: {
-      const exhaustive: never = identity.takenPolicy;
+      const exhaustive: never = identity;
       void exhaustive;
+      throw new Error("unknown surface");
     }
   }
-  return { piePort, vitePort, cdpPort, refuseTaken, warnTaken: identity.warnTaken };
 }
 
 export function applyPortPlan(identity: SurfaceIdentity, plan: PortPlan): void {
