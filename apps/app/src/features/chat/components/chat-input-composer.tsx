@@ -10,7 +10,7 @@ import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/co
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { GitBranchIcon, NavigationIcon, SquareIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
@@ -25,10 +25,11 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
 // handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
-// turn queues the send as a Pi follow-up unless Steer is armed, then it
-// injects before the next LLM call. prompt comes from ChatSessionProvider —
-// not props. The CardFrame header lists queued prompts (steering first);
-// the footer shows the session workspace's git availability and current branch.
+// turn queues Send as a Pi follow-up. Steer submits the same draft as a
+// steer (inject before the next LLM call) — one shot, not a mode. prompt
+// comes from ChatSessionProvider — not props. The CardFrame header lists
+// queued prompts (steering first); the footer shows the session workspace's
+// git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -44,13 +45,11 @@ export function ChatInputComposer({
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const canInterrupt = status === "streaming";
-  const [steerArmed, setSteerArmed] = useState(false);
-  // Steer only applies while a turn is running; leaving streaming drops the
-  // mode so the next turn starts as follow-up again.
-  if (!canInterrupt && steerArmed) setSteerArmed(false);
-  const steering = canInterrupt && steerArmed;
   const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
+  // One-shot: Steer sets this, then submit() consumes it. Send / Enter leave
+  // it unset so a busy submit stays follow-up.
+  const nextDeliveryRef = useRef<"steer" | undefined>(undefined);
 
   const controller = useChatInputController({
     // Order is a hard constraint: base extensions first, submit keymap last —
@@ -62,9 +61,11 @@ export function ChatInputComposer({
     ],
     onSubmit: (text) => {
       // Missing workspace: don't send, don't clear. A running turn still
-      // accepts the send — it becomes a Pi follow-up or steer.
+      // accepts the send — follow-up unless Steer just requested otherwise.
       if (workspaceUnavailableRef.current) return false;
-      prompt(text, canInterrupt ? (steerArmed ? "steer" : "followUp") : undefined);
+      const steer = nextDeliveryRef.current === "steer";
+      nextDeliveryRef.current = undefined;
+      prompt(text, canInterrupt ? (steer ? "steer" : "followUp") : undefined);
       return undefined;
     },
   });
@@ -97,10 +98,16 @@ export function ChatInputComposer({
               {canInterrupt ? (
                 <>
                   <PromptInputButton
-                    aria-label="Steer"
-                    aria-pressed={steering}
-                    onClick={() => setSteerArmed((armed) => !armed)}
-                    variant={steering ? "secondary" : "ghost"}
+                    aria-label="Steer message"
+                    disabled={!hasContent || workspaceUnavailable}
+                    onClick={() => {
+                      if (!controller) return;
+                      nextDeliveryRef.current = "steer";
+                      void controller.submit().then(() => {
+                        // Empty / already-submitting submit never reaches onSubmit.
+                        nextDeliveryRef.current = undefined;
+                      });
+                    }}
                   >
                     <NavigationIcon className="size-4" />
                     Steer
@@ -115,7 +122,7 @@ export function ChatInputComposer({
                 </>
               ) : null}
               <PromptInputSubmit
-                aria-label={steering ? "Steer message" : "Send message"}
+                aria-label="Send message"
                 disabled={!hasContent || workspaceUnavailable}
               />
             </div>
