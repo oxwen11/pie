@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import type { UIMessage } from "ai";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -13,12 +12,6 @@ vi.mock("./reasoning-part", () => ({ ReasoningPart: () => null }));
 vi.mock("./tool-part", () => ({ ToolPart: () => createElement("div", null, "tool") }));
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-
-const message: UIMessage = {
-  id: "message-1",
-  role: "assistant",
-  parts: [],
-};
 
 const runningParts = (count: number): IndexedBatchPart[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -55,7 +48,7 @@ function render(parts: IndexedBatchPart[], shouldShimmer: boolean): HTMLButtonEl
   }
 
   act(() => {
-    root?.render(createElement(ToolBatch, { message, parts, shouldShimmer }));
+    root?.render(createElement(ToolBatch, { parts, shouldShimmer }));
   });
 
   const trigger = host.querySelector<HTMLButtonElement>("[data-slot='collapsible-trigger']");

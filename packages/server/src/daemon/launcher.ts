@@ -1,6 +1,7 @@
 import childProcess from "node:child_process";
 import fs from "node:fs";
 
+import type { DaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Clock, Crypto, Effect, Encoding, FileSystem, type PlatformError } from "effect";
 
 import {
@@ -11,7 +12,7 @@ import {
 } from "../config/paths";
 import { DaemonLaunchError, DaemonStoppedError } from "./errors";
 import { daemonAlive, healthy, pidAlive } from "./liveness";
-import { lockExists, readLockPid, releaseLock, tryAcquireLock } from "./lock";
+import { acquireLock } from "./lock";
 import { reservePort } from "./port";
 import { type DaemonRecord, readRecord, removeRecord, writeRecord } from "./record";
 import { clearTombstone, hasTombstone, writeTombstone } from "./tombstone";
@@ -20,7 +21,6 @@ const DEFAULT_PORT = 4000;
 const READY_TIMEOUT_MS = 30_000;
 const HEALTH_POLL_INTERVAL_MS = 150;
 const STOP_GRACE_MS = 5_000;
-const LOCK_ATTEMPTS = 10;
 
 export type DaemonHandle = {
   readonly address: string;
@@ -44,6 +44,8 @@ export type ResolveDaemonOptions = {
    * default here.
    */
   readonly daemonDir: string;
+  /** Exact compatibility class the running daemon must match to be reused. */
+  readonly requiredCompatibilityKey: DaemonCompatibilityKey;
   /**
    * argv that launches the plain foreground server, e.g.
    * `[process.execPath, ...process.execArgv, cliEntry, "serve"]`. The daemon is
@@ -78,54 +80,28 @@ export type DaemonPlatform = FileSystem.FileSystem | Crypto.Crypto;
 
 /**
  * The shared launcher (the local twin of the SSH launch script): read
- * `daemon/daemon.pid`; if a healthy daemon is there, attach; otherwise spawn the
- * foreground server detached, record it, and wait for it to answer health. Both
- * the CLI and the desktop go through here so there is exactly one daemon per
- * daemon directory — concurrent launchers are serialized by an exclusive-create
- * launch lock, and the loser attaches to the winner's daemon.
+ * `daemon/daemon.pid`; attach only when a healthy daemon has the required exact
+ * compatibility key, otherwise replace it with the foreground server detached,
+ * record it, and wait for health. Both the CLI and Desktop go through here so
+ * there is exactly one daemon per daemon directory — concurrent launches and
+ * replacements are serialized by an OS-backed SQLite transaction at `daemon.lock`.
  *
  * Effect-based orchestration around one deliberately-raw seam: the detached
  * spawn itself (see `spawnDetached`) — everything that sleeps, times out, or
  * can fail lives in Effect so callers get interruption and typed errors.
  *
  * There is no origin negotiation here: the daemon's CORS policy is static (the
- * desktop scheme + loopback are always trusted), so any client attaches to the
- * one daemon regardless of who started it — no restart-to-widen-CORS.
+ * desktop scheme + loopback are always trusted), so compatibility is the only
+ * reuse partition and CORS never triggers a restart-to-widen policy.
  */
 export const resolveOrSpawnDaemon = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    const existing = yield* readRecord(options.daemonDir);
-    if (existing !== undefined && (yield* daemonAlive(existing))) {
-      // A live daemon makes any tombstone stale (someone started it again).
-      yield* clearTombstone(options.daemonDir);
-      return attach(existing, true);
-    }
-
     if (options.autoRespawn === true && (yield* hasTombstone(options.daemonDir))) {
-      return yield* Effect.fail(
-        new DaemonStoppedError({
-          message:
-            "pie daemon was stopped explicitly; not auto-respawning (run `pie daemon start` to start it again)",
-        }),
-      );
+      return yield* daemonStopped();
     }
-    yield* clearTombstone(options.daemonDir);
 
-    if (existing !== undefined) {
-      // The record lands before the health wait, so an unhealthy record with a
-      // live lock holder is a daemon still booting under another launcher —
-      // defer to `spawnLocked`'s wait instead of killing it mid-boot. Without
-      // a live holder it is wedged (pid alive but unhealthy) or dead, and must
-      // die before we replace it, or it leaks as an orphan still holding its
-      // port. A dead pid makes the kill a no-op.
-      const holder = yield* readLockPid(options.daemonDir);
-      if (holder === undefined || !pidAlive(holder)) {
-        yield* killPid(existing.pid);
-        yield* removeRecord(options.daemonDir);
-      }
-    }
     return yield* spawnLocked(options);
   });
 
@@ -152,18 +128,32 @@ export const statusDaemon = (
  */
 export const stopDaemon = (
   daemonDir: string,
-): Effect.Effect<"stopped" | "not-running", PlatformError.PlatformError, FileSystem.FileSystem> =>
+): Effect.Effect<
+  "stopped" | "not-running",
+  DaemonLaunchError | PlatformError.PlatformError,
+  FileSystem.FileSystem
+> =>
   Effect.gen(function* () {
-    const record = yield* readRecord(daemonDir);
-    if (record === undefined || !pidAlive(record.pid)) {
-      yield* removeRecord(daemonDir);
-      return "not-running";
-    }
+    yield* ensureDaemonDirectory(daemonDir);
+    const lock = yield* acquireDaemonLock(daemonDir, READY_TIMEOUT_MS);
+    return yield* Effect.gen(function* () {
+      const record = yield* readRecord(daemonDir);
+      if (record === undefined || !pidAlive(record.pid)) {
+        yield* removeRecord(daemonDir);
+        return "not-running" as const;
+      }
 
-    yield* writeTombstone(daemonDir);
-    yield* killPid(record.pid);
-    yield* removeRecord(daemonDir);
-    return "stopped";
+      yield* writeTombstone(daemonDir);
+      if (!(yield* terminateRecordedDaemon(record))) {
+        return yield* Effect.fail(
+          new DaemonLaunchError({
+            message: `Refusing to forget daemon pid ${record.pid}: ownership or shutdown could not be confirmed`,
+          }),
+        );
+      }
+      yield* removeRecord(daemonDir);
+      return "stopped" as const;
+    }).pipe(Effect.ensuring(lock.release));
   });
 
 /** SIGTERM, wait up to the grace period, escalate to SIGKILL. */
@@ -179,82 +169,150 @@ const killPid = (pid: number): Effect.Effect<void> =>
   });
 
 /**
- * Serialize spawns with the launch lock (see `lock.ts`) so two launchers racing
- * an empty daemon directory (or a respawn window) cannot both spawn a daemon —
- * the loser waits for the winner's record and attaches. A lock whose holder pid
- * died is reclaimed. `ensuring` releases the lock even when the spawn is
- * interrupted.
+ * Prove the record token belongs to the server at its address before signaling
+ * the recorded pid. New daemons accept authenticated shutdown directly; an
+ * older daemon is identified through its authenticated ws-ticket endpoint.
  */
+const terminateRecordedDaemon = (record: DaemonRecord): Effect.Effect<boolean> =>
+  Effect.gen(function* () {
+    if (!pidAlive(record.pid)) return true;
+    if (yield* authenticatedPost(record, "/api/shutdown")) {
+      return yield* waitForRecordedDaemonExit(record);
+    }
+    if (!(yield* authenticatedPost(record, "/api/ws-ticket"))) return false;
+
+    // The legacy endpoint authenticated this record immediately before the one
+    // safe signal. Never escalate later using only a reusable numeric pid.
+    signal(record.pid, "SIGTERM");
+    return yield* waitForRecordedDaemonExit(record);
+  });
+
+const waitForRecordedDaemonExit = (record: DaemonRecord): Effect.Effect<boolean> =>
+  Effect.gen(function* () {
+    const deadline = (yield* Clock.currentTimeMillis) + STOP_GRACE_MS;
+    while ((yield* Clock.currentTimeMillis) < deadline) {
+      if (!pidAlive(record.pid)) return true;
+      yield* Effect.sleep(100);
+    }
+    return !pidAlive(record.pid);
+  });
+
+const authenticatedPost = (record: DaemonRecord, pathname: string): Effect.Effect<boolean> =>
+  Effect.promise(async () => {
+    try {
+      const response = await fetch(new URL(pathname, record.address), {
+        method: "POST",
+        headers: { authorization: `Bearer ${record.token}` },
+        signal: AbortSignal.timeout(1_000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  });
+
+/** Serialize every attach, replacement, spawn, and stop decision. */
 const spawnLocked = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    const { daemonDir } = options;
-    const fileSystem = yield* FileSystem.FileSystem;
-    yield* fileSystem.makeDirectory(daemonDir, { recursive: true }).pipe(
-      Effect.mapError(
-        (cause) =>
-          new DaemonLaunchError({
-            message: `Unable to create ${daemonDir}: ${cause.message}`,
-            cause,
-          }),
-      ),
+    yield* ensureDaemonDirectory(options.daemonDir);
+    const lock = yield* acquireDaemonLock(
+      options.daemonDir,
+      options.readyTimeoutMs ?? READY_TIMEOUT_MS,
     );
-    const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
-
-    for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
-      // The exclusive create is still one atomic syscall, so making the
-      // surrounding steps async moves no decision: only the winner proceeds to
-      // spawn, and every other branch below already assumes the file state can
-      // change under it (a reclaim can lose its race, and the retry loop is
-      // what covers that).
-      const acquired = yield* tryAcquireLock(daemonDir).pipe(
-        Effect.mapError(
-          (cause) =>
-            new DaemonLaunchError({
-              message: `Unable to acquire the pie daemon launch lock: ${cause.message}`,
-              cause,
-            }),
-        ),
-      );
-
-      if (!acquired) {
-        const holder = yield* readLockPid(daemonDir);
-        if (holder !== undefined && !pidAlive(holder)) {
-          // The locking launcher died mid-spawn; reclaim and try again.
-          yield* releaseLock(daemonDir);
-          continue;
-        }
-        // Another launcher is spawning right now: wait for its daemon, then
-        // re-enter the full resolve so this caller attaches to the winner's
-        // daemon (which by then is recorded and healthy).
-        const winner = yield* waitForRecord(daemonDir, timeoutMs);
-        if (winner) return yield* resolveOrSpawnDaemon(options);
-        continue;
-      }
-
-      return yield* spawnDaemon(options).pipe(Effect.ensuring(releaseLock(daemonDir)));
-    }
-    return yield* Effect.fail(
-      new DaemonLaunchError({ message: "Could not acquire the pie daemon launch lock" }),
-    );
+    return yield* resolveLocked(options).pipe(Effect.ensuring(lock.release));
   });
 
-/** Poll for a healthy record to appear (a concurrent launcher is spawning). */
-const waitForRecord = (
-  daemonDir: string,
-  timeoutMs: number,
-): Effect.Effect<DaemonRecord | undefined, never, FileSystem.FileSystem> =>
+/**
+ * Re-read and decide while holding the launch lock. Compatibility replacement
+ * must be one lock-owned transaction so concurrent new clients cannot kill the
+ * replacement daemon selected by the first winner.
+ */
+const resolveLocked = (
+  options: ResolveDaemonOptions,
+): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    const deadline = (yield* Clock.currentTimeMillis) + timeoutMs;
-    while ((yield* Clock.currentTimeMillis) < deadline) {
-      const record = yield* readRecord(daemonDir);
-      if (record !== undefined && (yield* daemonAlive(record))) return record;
-      if (!(yield* lockExists(daemonDir))) return undefined;
-      yield* Effect.sleep(HEALTH_POLL_INTERVAL_MS);
+    if (options.autoRespawn === true && (yield* hasTombstone(options.daemonDir))) {
+      return yield* daemonStopped();
     }
-    return undefined;
+    yield* clearTombstone(options.daemonDir);
+
+    const existing = yield* readRecord(options.daemonDir);
+    const existingHealthy = existing !== undefined && (yield* daemonAlive(existing));
+    if (existing !== undefined && existing.compatibilityKey === options.requiredCompatibilityKey) {
+      if (existingHealthy) return attach(existing, true);
+
+      const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
+      const now = yield* Clock.currentTimeMillis;
+      const remainingMs = Math.max(0, existing.startedAt + timeoutMs - now);
+      if (
+        remainingMs > 0 &&
+        pidAlive(existing.pid) &&
+        (yield* waitHealthy(existing.address, existing.pid, remainingMs))
+      ) {
+        return attach(existing, true);
+      }
+    } else if (existing !== undefined && existingHealthy) {
+      yield* Effect.logInfo("Replacing incompatible pie daemon").pipe(
+        Effect.annotateLogs({
+          event: "daemon.compatibility_mismatch",
+          actualCompatibilityKey: existing.compatibilityKey ?? "legacy",
+          requiredCompatibilityKey: options.requiredCompatibilityKey,
+          action: "replace",
+        }),
+      );
+    }
+
+    if (existing !== undefined) {
+      // Once this launcher owns the lock, no other attach, stop, or replacement
+      // decision can race this record generation.
+      if (!(yield* terminateRecordedDaemon(existing))) {
+        return yield* Effect.fail(
+          new DaemonLaunchError({
+            message: `Refusing to replace daemon pid ${existing.pid}: ownership or shutdown could not be confirmed`,
+          }),
+        );
+      }
+      yield* removeRecord(options.daemonDir);
+    }
+
+    return yield* spawnDaemon(options);
   });
+
+const daemonStopped = (): Effect.Effect<never, DaemonStoppedError> =>
+  Effect.fail(
+    new DaemonStoppedError({
+      message:
+        "pie daemon was stopped explicitly; not auto-respawning (run `pie daemon start` to start it again)",
+    }),
+  );
+
+const ensureDaemonDirectory = (
+  daemonDir: string,
+): Effect.Effect<void, DaemonLaunchError, FileSystem.FileSystem> =>
+  FileSystem.FileSystem.use((fileSystem) =>
+    fileSystem.makeDirectory(daemonDir, { recursive: true }),
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new DaemonLaunchError({
+          message: `Unable to create ${daemonDir}: ${cause.message}`,
+          cause,
+        }),
+    ),
+  );
+
+const acquireDaemonLock = (daemonDir: string, timeoutMs: number) =>
+  acquireLock(daemonDir, timeoutMs).pipe(
+    Effect.mapError(
+      (cause) =>
+        new DaemonLaunchError({
+          message: `Unable to acquire the pie daemon launch lock: ${String(cause)}`,
+          cause,
+        }),
+    ),
+  );
 
 const spawnDaemon = (
   options: ResolveDaemonOptions,
@@ -283,14 +341,14 @@ const spawnDaemon = (
     // dies mid-wait (the app quitting seconds after first launch) must not
     // orphan an unrecorded daemon — unrecorded means undiscoverable, so
     // nothing can ever attach to it or stop it, and the next launch spawns a
-    // second daemon beside it. Readers tolerate a recorded-but-booting daemon:
-    // `resolveOrSpawnDaemon` defers to the live launch lock, and
-    // `waitForRecord` polls until health answers.
+    // second daemon beside it. A successor that recovers the launch lock polls
+    // a live, same-key record for the remainder of this readiness window.
     const record: DaemonRecord = {
       pid,
       address,
       token,
       startedAt: yield* Clock.currentTimeMillis,
+      compatibilityKey: options.requiredCompatibilityKey,
     };
     yield* writeRecord(options.daemonDir, record).pipe(
       Effect.mapError(

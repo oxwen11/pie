@@ -115,7 +115,7 @@ export function ModelSelect({
             startAddon={<SearchIcon />}
           />
         </div>
-        <ComboboxEmpty className="text-muted-foreground px-3 py-6 text-center text-sm">
+        <ComboboxEmpty className="text-muted-foreground text-center text-sm">
           No matching models.
         </ComboboxEmpty>
         <div className="min-h-0 flex-1">

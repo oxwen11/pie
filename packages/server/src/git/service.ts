@@ -25,7 +25,9 @@ import {
   WorkspaceReadError,
 } from "../errors";
 import { FileSystemService } from "../fs";
+import { contains, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
 import { parseNameStatus, parseNulPaths } from "./name-status";
+import { isUnsafeRef, makeGitHelpers } from "./shared";
 
 /** GitService always runs against a resolved absolute cwd — not a session ref. */
 export type GitReviewCwdQuery = {
@@ -43,39 +45,7 @@ export type GitDiffCwdQuery = {
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const NUL_BYTE = 0;
-const BINARY_MAGIC_PREFIXES: ReadonlyArray<ReadonlyArray<number>> = [
-  [0x25, 0x50, 0x44, 0x46, 0x2d],
-  [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-  [0xff, 0xd8, 0xff],
-  [0x47, 0x49, 0x46, 0x38, 0x37, 0x61],
-  [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
-  [0x50, 0x4b, 0x03, 0x04],
-  [0x50, 0x4b, 0x05, 0x06],
-  [0x1f, 0x8b],
-  [0x7f, 0x45, 0x4c, 0x46],
-];
 const DEFAULT_BRANCH_NAMES = ["main", "master", "trunk"] as const;
-
-const contains = (parent: string, child: string): boolean => {
-  const relative = path.relative(parent, child);
-  return (
-    relative === "" ||
-    (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
-  );
-};
-
-const toPosixPath = (value: string): string => value.split(path.sep).join("/");
-
-const hasBinaryMagicPrefix = (bytes: Uint8Array): boolean =>
-  BINARY_MAGIC_PREFIXES.some(
-    (prefix) =>
-      bytes.byteLength >= prefix.length && prefix.every((byte, index) => bytes[index] === byte),
-  );
-
-const isNotRepositoryMessage = (cause: unknown): boolean => {
-  const message = cause instanceof Error ? cause.message : String(cause);
-  return /not a git repository/i.test(message);
-};
 
 const decodeText = (
   bytes: Uint8Array,
@@ -91,23 +61,14 @@ const decodeText = (
   }
 };
 
-/** Reject anything that is not a listed ref name — no `../`, flags, or rev magic. */
-const isUnsafeRef = (ref: string): boolean =>
-  ref === "" ||
-  ref.startsWith("-") ||
-  ref.includes("..") ||
-  ref.includes("\\") ||
-  ref.includes("\0") ||
-  ref.includes(":") ||
-  ref.includes("@{") ||
-  /\s/.test(ref);
-
 export type GitFailure =
   | WorkspacePathEscape
   | WorkspaceNotDirectory
   | WorkspaceReadError
   | GitNotRepository
   | GitError;
+
+type GitBranchFailure = WorkspacePathEscape | GitError;
 
 type GitReviewFailure = GitFailure | GitRefNotFound;
 
@@ -136,7 +97,7 @@ export class GitService extends Context.Service<
   GitService,
   {
     readonly status: (cwd: string) => Effect.Effect<GitStatus, GitFailure>;
-    readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitFailure>;
+    readonly branch: (cwd: string) => Effect.Effect<GitBranch, GitBranchFailure>;
     readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
     readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
@@ -151,41 +112,7 @@ export const GitServiceLayer: Layer.Layer<
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
-
-    const readError = (relativePath: string) => (cause: unknown) =>
-      new WorkspaceReadError({ path: relativePath, cause });
-
-    const resolveRoot = (cwd: string) =>
-      Effect.gen(function* () {
-        if (!path.isAbsolute(cwd)) {
-          return yield* new WorkspacePathEscape({ cwd, path: "." });
-        }
-        const realRoot = yield* fs.realPath(cwd).pipe(Effect.mapError(readError(".")));
-        const info = yield* fs.stat(realRoot).pipe(Effect.mapError(readError(".")));
-        if (info.type !== "Directory") {
-          return yield* new WorkspaceNotDirectory({ path: "." });
-        }
-        return realRoot;
-      });
-
-    const gitError = (cwd: string) => (cause: unknown) =>
-      isNotRepositoryMessage(cause) ? new GitNotRepository({ cwd }) : new GitError({ cwd, cause });
-
-    const raw = (cwd: string, args: readonly string[]) =>
-      Effect.tryPromise({
-        try: () => simpleGit(cwd).raw([...args]),
-        catch: gitError(cwd),
-      });
-
-    const resolveRepoRoot = (cwd: string) =>
-      raw(cwd, ["rev-parse", "--show-toplevel"]).pipe(
-        Effect.map((value) => value.trim()),
-        Effect.flatMap((toplevel) =>
-          toplevel === ""
-            ? Effect.fail(new GitNotRepository({ cwd }))
-            : Effect.succeed(path.resolve(toplevel)),
-        ),
-      );
+    const { gitError, raw, resolveRoot, resolveRepoRoot } = makeGitHelpers(fs);
 
     const toWorkspacePath = (cwd: string, repoRoot: string, gitPath: string): string | null => {
       if (path.isAbsolute(gitPath) || gitPath.split(/[\\/]/).includes("..")) return null;
@@ -426,12 +353,19 @@ export const GitServiceLayer: Layer.Layer<
           const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
           const listed = yield* listRefs(realRoot);
           return {
+            kind: "repository" as const,
             current,
             defaultBranch,
             branches: listed.all,
             remotes: listed.remotes,
           };
-        }),
+        }).pipe(
+          Effect.catchTags({
+            GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
+            WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+            WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+          }),
+        ),
 
       review: (query) =>
         Effect.gen(function* () {

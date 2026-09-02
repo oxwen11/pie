@@ -1,4 +1,3 @@
-import type { WorkspaceQuery } from "@getpie/contract";
 import type { GitDiffQuery, GitReviewQuery } from "@getpie/contract/git";
 import { gitContract } from "@getpie/contract/git";
 import { Effect } from "effect";
@@ -18,7 +17,7 @@ import {
 import { GitService } from "../git";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
 
 const orpc = implement(gitContract).$context<RpcContext>();
 
@@ -45,10 +44,19 @@ const mapGitCwdErrors = <
     GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
   });
 
-const resolveCwd = (
-  input: WorkspaceQuery,
-  errors: Parameters<typeof catchWorkspaceResolveErrors>[0],
-) => resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));
+const mapGitBranchErrors = <
+  E extends {
+    PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
+    GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
+  },
+>(
+  errors: E,
+) =>
+  Effect.catchTags({
+    WorkspacePathEscape: (error: WorkspacePathEscape) =>
+      Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
+    GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
+  });
 
 const toReviewInput = (input: GitReviewQuery, cwd: string) => ({
   cwd,
@@ -66,17 +74,17 @@ const toDiffInput = (input: GitDiffQuery, cwd: string) => ({
 export const gitRouter = orpc.router({
   status: orpc.status.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    const cwd = yield* resolveCwd(input, errors);
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
     return yield* git.status(cwd).pipe(mapGitCwdErrors(cwd, errors));
   }),
   branch: orpc.branch.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    const cwd = yield* resolveCwd(input, errors);
-    return yield* git.branch(cwd).pipe(mapGitCwdErrors(cwd, errors));
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
+    return yield* git.branch(cwd).pipe(mapGitBranchErrors(errors));
   }),
   review: orpc.review.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    const cwd = yield* resolveCwd(input, errors);
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
     return yield* git.review(toReviewInput(input, cwd)).pipe(
       mapGitCwdErrors(cwd, errors),
       Effect.catchTags({
@@ -87,7 +95,7 @@ export const gitRouter = orpc.router({
   }),
   diff: orpc.diff.effect(function* ({ input, errors }) {
     const git = yield* GitService;
-    const cwd = yield* resolveCwd(input, errors);
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
     return yield* git.diff(toDiffInput(input, cwd)).pipe(
       mapGitCwdErrors(cwd, errors),
       Effect.catchTags({

@@ -16,12 +16,10 @@ type Part = UIMessage["parts"][number];
 // batches, standalone tools (Task) as full cards, text as markdown. The copy
 // action only appears on the last text once streaming has settled.
 export function AssistantMessage({
-  message,
   parts,
   isStreaming,
   showActions = true,
 }: {
-  message: UIMessage;
   parts: readonly Part[];
   isStreaming: boolean;
   showActions?: boolean;
@@ -38,7 +36,6 @@ export function AssistantMessage({
           return (
             <ToolBatch
               key={`batch-${item.parts[0]?.index ?? 0}`}
-              message={message}
               parts={item.parts}
               shouldShimmer={isStreaming && item.isTrailing}
             />
@@ -46,7 +43,7 @@ export function AssistantMessage({
         }
         const { part, index } = item;
         if (isToolUIPart(part)) {
-          return <ToolPart key={part.toolCallId} message={message} part={part} />;
+          return <ToolPart key={part.toolCallId} part={part} />;
         }
         if (isReasoningUIPart(part)) {
           return (

@@ -20,6 +20,9 @@ export function useSessionModels(ref: SessionRef) {
       void queryClient.invalidateQueries({
         queryKey: orpcQueryUtils.agent.session.getModelState.key({ input: { ref } }),
       });
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
     },
   });
 

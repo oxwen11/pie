@@ -21,6 +21,7 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
@@ -122,6 +123,7 @@ async function setup() {
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
+    PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,
   );
@@ -295,6 +297,8 @@ describe("agent.session router", () => {
       expect(afterPrompt.workspace).toEqual(created.workspace);
 
       const branch = await client.git.branch({ ref: created.ref });
+      expect(branch.kind).toBe("repository");
+      if (branch.kind !== "repository") throw new Error("expected repository branch data");
       expect(branch.current).toBe(created.workspace.gitBranch);
       const tree = await client.fs.readTree({ ref: created.ref });
       expect(tree.cwd).toBe(created.workspace.cwd);

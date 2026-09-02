@@ -5,6 +5,8 @@
  * (Context.Service + Layer) live in each module; DTOs like these stay plain.
  */
 
+import type { PullRequestRef } from "@getpie/contract/pull-request";
+
 /** A project is a workspace path the runtime can open sessions against. */
 export type { Project } from "@getpie/contract";
 
@@ -29,6 +31,8 @@ export interface Session {
   readonly cwd?: string;
   /** Branch checked out in `cwd` when this session has a git worktree. */
   readonly gitBranch?: string;
+  /** GitHub pull requests associated with this session, newest last. Identity only. */
+  readonly pullRequestRefs?: ReadonlyArray<PullRequestRef>;
   /** Model selected at create; applied when Pi opens on the first prompt. */
   readonly provider?: string;
   readonly modelId?: string;

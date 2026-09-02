@@ -23,6 +23,7 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/ag
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
+import { PullRequestServiceLayer } from "../pull-request";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -78,6 +79,7 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
 );
 
 const PiAgentServiceProvided = PiAgentServiceLayer;
+const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
 const AutomationServiceProvided = AutomationServiceLayer.pipe(
   Layer.provide(AutomationRepositoryLayer),
@@ -103,6 +105,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   GitProvided,
   WorktreeProvided,
+  PullRequestServiceProvided,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

@@ -21,6 +21,7 @@ import { makePiProcess } from "../src/harness/pi/process";
 import type { PiExecutable } from "../src/harness/pi/resolve-executable";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
@@ -60,10 +61,12 @@ export function writeFakePiExecutable(): PiExecutable {
   return { command: file, prefixArgs: [] };
 }
 
-export async function makeRpcTestHarness(
-  home: string,
-  options: { readonly executable?: PiExecutable } = {},
-) {
+export interface RpcTestHarnessOptions {
+  readonly executable?: PiExecutable;
+  readonly pullRequestLayer?: Layer.Layer<PullRequestService>;
+}
+
+export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOptions = {}) {
   const processOptions = options.executable !== undefined ? { executable: options.executable } : {};
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
   const piProcessLayer = Layer.effect(PiProcessTag, makePiProcess(processOptions)).pipe(
@@ -110,6 +113,8 @@ export async function makeRpcTestHarness(
     Layer.provide(harnessSessionLayer),
     Layer.provide(pathsLayer),
   );
+  const pullRequestLayer =
+    options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -120,6 +125,7 @@ export async function makeRpcTestHarness(
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
+    pullRequestLayer,
     NodeServices.layer,
     Observability.discard,
   );

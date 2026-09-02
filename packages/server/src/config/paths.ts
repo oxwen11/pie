@@ -98,6 +98,21 @@ export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): Dae
   return { home, daemonDir: explicitPath(env.PIE_DAEMON_DIR) ?? path.join(home, "daemon") };
 }
 
+/**
+ * Preserve an explicit daemon directory; otherwise scope only development
+ * lifecycle state under the canonical development home. Desktop computes the
+ * checkout identity, while this module remains the sole owner of home/daemon
+ * path policy.
+ */
+export function developmentDaemonEnvironment(
+  env: NodeJS.ProcessEnv,
+  scope: string | undefined,
+): NodeJS.ProcessEnv {
+  if (explicitPath(env.PIE_DAEMON_DIR) !== undefined || scope === undefined) return env;
+  const home = resolvePieHome({ ...env, NODE_ENV: "development" });
+  return { ...env, PIE_DAEMON_DIR: path.join(home, "daemons", scope) };
+}
+
 /** `resolveDaemonLocation().daemonDir`, for callers that need only the directory. */
 export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): string {
   return resolveDaemonLocation(env).daemonDir;

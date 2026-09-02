@@ -18,15 +18,15 @@ describe("shell-chrome", () => {
     expect(shellProviderStyle(desktopMacos)).toEqual({
       "--shell-controls-left": "96px",
       "--shell-titlebar-content-left": "132px",
-      "--shell-sidebar-brand-inset": "126px",
+      "--shell-sidebar-brand-inset": "128px",
     });
   });
 
   it("offsets sidebar brand past the fixed toggle on desktop win/linux", () => {
-    expect(shellTitlebarContentLeftPx(desktopLinux)).toBe(42);
+    expect(shellTitlebarContentLeftPx(desktopLinux)).toBe(40);
     expect(shellProviderStyle(desktopLinux)).toEqual({
-      "--shell-controls-left": "6px",
-      "--shell-titlebar-content-left": "42px",
+      "--shell-controls-left": "4px",
+      "--shell-titlebar-content-left": "40px",
       "--shell-sidebar-brand-inset": "36px",
     });
   });

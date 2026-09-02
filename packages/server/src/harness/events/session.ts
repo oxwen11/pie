@@ -5,7 +5,6 @@ export {
   SessionDeleted,
   SessionRenamed,
   SessionRequestAsked,
-  SessionRequestRejected,
   SessionRequestReplied,
   SessionTurnEnded,
   SessionTurnStarted,

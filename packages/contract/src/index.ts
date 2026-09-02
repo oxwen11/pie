@@ -3,6 +3,7 @@ import { automationContract } from "./automation";
 import { fsContract } from "./fs";
 import { gitContract } from "./git";
 import { projectContract } from "./project";
+import { pullRequestContract } from "./pull-request";
 import { sessionContract } from "./session";
 
 export * from "./domain";
@@ -16,14 +17,16 @@ export const contract = {
   fs: fsContract,
   git: gitContract,
   automation: automationContract,
+  pullRequest: pullRequestContract,
 };
 export type Contract = typeof contract;
 
 export {
   agentContract,
+  automationContract,
   fsContract,
   gitContract,
   projectContract,
-  automationContract,
+  pullRequestContract,
   sessionContract,
 };
