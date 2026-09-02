@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { VerifyError } from "./fail.ts";
 import { ensureDir, writeText } from "./fs.ts";
-import { commandOnPath, findRepoRoot, runCommand, runCommandInherit } from "./process.ts";
+import { commandOnPath, findRepoRoot, runCommand } from "./process.ts";
 
 export type AgentBrowserTarget = {
   session?: string;
@@ -302,13 +301,4 @@ export function saveSnapshot(dest: string, name: string, target: AgentBrowserTar
   const destPath = path.join(dest, `${name}.txt`);
   agentBrowser(["snapshot"], { ...target, outputPath: destPath });
   return destPath;
-}
-
-export function forwardAgentBrowser(args: string[], target: AgentBrowserTarget): void {
-  const resolved = resolveAgentBrowserBin();
-  const argv = buildAgentBrowserArgv(args, target);
-  const status = runCommandInherit(resolved, argv);
-  if (status !== 0) {
-    throw new VerifyError(`agent-browser exited ${status}`, status);
-  }
 }

@@ -1,20 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { isHelpFlag } from "../argv.ts";
 import { WEB } from "../identity.ts";
 import { driveHintLines } from "../lifecycle/env.ts";
 import { expectMeta, type RunMeta, type WebRunMeta } from "../meta.ts";
-import {
-  agentBrowser,
-  browserNeedsIsolation,
-  forwardAgentBrowser,
-  saveScreenshot,
-  saveSnapshot,
-} from "../runtime/browser.ts";
+import { agentBrowser, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
 import { fail } from "../runtime/fail.ts";
-import { currentRun, readText } from "../runtime/fs.ts";
+import { readText } from "../runtime/fs.ts";
 import { healthOk, ticketStatusOnPort, warmupOrigin } from "../runtime/http.ts";
 import {
   killTree,
@@ -182,24 +175,4 @@ export async function extraEvidence(
     default:
       return false;
   }
-}
-
-export async function browserWeb(args: string[]): Promise<void> {
-  const session = sessionName();
-  const usageText = `Usage:
-  ${WEB.bin} env [--export]
-  ${WEB.bin} browser <agent-browser argv…>
-
-Prefer the mise-managed binary from \`${WEB.bin} env --export\`.
-This command only prepends --session ${session}; it does not invent an open URL.
-Pass the Vite origin yourself: open http://localhost:4190/
-`;
-  if (isHelpFlag(args[0])) {
-    process.stdout.write(usageText);
-    return;
-  }
-  if (browserNeedsIsolation(args[0]) && currentRun(WEB.currentLink) === undefined) {
-    throw new Error(`no current run. Launch first: ${WEB.bin} launch`);
-  }
-  forwardAgentBrowser(args, { session });
 }

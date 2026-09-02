@@ -65,7 +65,7 @@ It checks, in order:
 
 ## Drive
 
-Harness: the CLI itself plus `curl`. **No browser** — 4182 is the daemon/API, not the Vite SPA. Do not `pie-verify cli browser` / `pie-verify cli env`. UI proofs: `pie-verify web launch` or `pie-verify desktop launch`, then `agent-browser`.
+Harness: the CLI itself plus `curl`. **No browser** — 4182 is the daemon/API, not the Vite SPA. Do not `pie-verify cli env`. UI proofs: `pie-verify web launch` or `pie-verify desktop launch`, then `agent-browser`.
 
 ```bash
 pnpm exec pie-verify cli run daemon status

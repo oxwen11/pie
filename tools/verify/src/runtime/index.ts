@@ -18,7 +18,6 @@ export {
   buildAgentBrowserArgv,
   ensureBrowserEnvDirs,
   formatBrowserEnv,
-  forwardAgentBrowser,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   resolveIsolatedChromeExecutable,

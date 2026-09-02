@@ -1,27 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { isHelpFlag } from "../argv.ts";
 import { DESKTOP } from "../identity.ts";
 import { driveHintLines } from "../lifecycle/env.ts";
-import {
-  expectMeta,
-  patchRunMeta,
-  readRunMeta,
-  type DesktopRunMeta,
-  type RunMeta,
-} from "../meta.ts";
-import {
-  agentBrowser,
-  browserNeedsIsolation,
-  forwardAgentBrowser,
-  saveScreenshot,
-  saveSnapshot,
-} from "../runtime/browser.ts";
+import { expectMeta, patchRunMeta, type DesktopRunMeta, type RunMeta } from "../meta.ts";
+import { agentBrowser, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
 import { readDaemonRecord, stopRecordedDaemon } from "../runtime/daemon.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
 import { fail } from "../runtime/fail.ts";
-import { currentRun, removePath, writeText } from "../runtime/fs.ts";
+import { removePath, writeText } from "../runtime/fs.ts";
 import { cdpOk, fetchText, healthOk, ticketStatus, urlPort } from "../runtime/http.ts";
 import {
   killTree,
@@ -221,31 +208,4 @@ async function curlTranscript(meta: DesktopRunMeta): Promise<string> {
     url,
     "",
   ].join("\n");
-}
-
-export async function browserDesktop(args: string[]): Promise<void> {
-  const session = sessionName();
-  const usageText = `Usage:
-  ${DESKTOP.bin} env [--export]
-  ${DESKTOP.bin} browser <agent-browser argv…>
-
-Prefer the mise-managed binary from \`${DESKTOP.bin} env --export\`.
-This command only prepends --session ${session} and --cdp from the current run.
-Pass connect PORT yourself. Do not open http://localhost:4190/ or
-http://localhost:5173/ and call that desktop.
-`;
-  if (isHelpFlag(args[0])) {
-    process.stdout.write(usageText);
-    return;
-  }
-  if (!browserNeedsIsolation(args[0])) {
-    forwardAgentBrowser(args, {});
-    return;
-  }
-  const runDir = currentRun(DESKTOP.currentLink);
-  if (runDir === undefined) {
-    throw new Error(`no current run. Launch first: ${DESKTOP.bin} launch`);
-  }
-  const meta = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "desktop");
-  forwardAgentBrowser(args, { session, cdpPort: meta.cdpPort });
 }

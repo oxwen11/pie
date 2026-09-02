@@ -71,7 +71,7 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, sockets / screenshots / downloads under `$runDir/agent-browser/`, idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
-First machine only: `pnpm exec agent-browser install` (or `pie-verify web browser install`) if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
+First machine only: `pnpm exec agent-browser install` if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
 
 ```bash
 pnpm exec pie-verify web launch

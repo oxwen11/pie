@@ -42,9 +42,11 @@ describe("parsePieVerifyArgv", () => {
 });
 
 describe("surfaceUsage", () => {
-  it("lists env before the thin browser forward", () => {
+  it("lists env and does not advertise a browser forward", () => {
     expect(surfaceUsage("web")).toMatch(/pie-verify web env \[--export\]/);
     expect(surfaceUsage("desktop")).toMatch(/pie-verify desktop env \[--export\]/);
+    expect(surfaceUsage("web")).not.toMatch(/\bbrowser\b/);
+    expect(surfaceUsage("desktop")).not.toMatch(/\bbrowser\b/);
     expect(surfaceUsage("cli")).not.toMatch(/\benv\b/);
   });
 });
