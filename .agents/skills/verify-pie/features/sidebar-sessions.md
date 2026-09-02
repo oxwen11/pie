@@ -16,12 +16,15 @@ The left **Projects** list is how a user finds chats. Each imported project is a
 
 Always visible on `/draft` and `/session/*` (web inset sidebar). On a narrow viewport the sidebar is an overlay; open it with the shell's sidebar trigger before driving rows.
 
-## Driving it with pie-verify
+## Driving it with agent-browser
 
 Need at least one Project and one Session (import + draft send).
 
 ```bash
-pnpm exec pie-verify web browser snapshot
+eval "$(pnpm exec pie-verify web env --export)"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find --name "New chat" click
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --url "**/draft*"
 ```
 
 1. **New chat** → URL `/draft`, heading **New chat**.

@@ -69,9 +69,16 @@ Gotchas:
 ## Browser automation (agent-browser)
 
 Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
-recipe is the two-process pair only. After `pie-verify web launch`, drive
-with `pnpm exec pie-verify web browser open` then `… browser snapshot`.
+recipe is the two-process pair only. After `pie-verify web launch`:
+
+```bash
+eval "$(pnpm exec pie-verify web env --export)"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+```
+
 `agent-browser` is a mise tool (`aqua:vercel-labs/agent-browser`) — do not
-install it via npm and do not call it on PATH.
+install it via npm and do not call it on PATH. Always pass an explicit `open`
+URL. Prefer `find` / `wait` over `snapshot` + `@eN`.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.

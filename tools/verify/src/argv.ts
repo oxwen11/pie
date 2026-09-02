@@ -13,7 +13,8 @@ function surfaceLines(id: SurfaceId): string {
     case "web":
       return `  pie-verify web launch [--replace]
   pie-verify web doctor
-  pie-verify web browser open|snapshot|<agent-browser argv…>
+  pie-verify web env [--export]
+  pie-verify web browser <agent-browser argv…>
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
   pie-verify web cleanup [run-dir]`;
     case "cli":
@@ -25,7 +26,8 @@ function surfaceLines(id: SurfaceId): string {
     case "desktop":
       return `  pie-verify desktop launch [--replace]
   pie-verify desktop doctor
-  pie-verify desktop browser snapshot|connect|<agent-browser argv…>
+  pie-verify desktop env [--export]
+  pie-verify desktop browser <agent-browser argv…>
   pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
   pie-verify desktop cleanup [run-dir]`;
     default: {

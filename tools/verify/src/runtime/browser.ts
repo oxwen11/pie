@@ -7,11 +7,17 @@ import { commandOnPath, findRepoRoot, runCommand, runCommandInherit } from "./pr
 export type AgentBrowserTarget = {
   session?: string;
   cdpPort?: number;
-  defaultOpenUrl?: string;
 };
 
 export type AgentBrowserOptions = AgentBrowserTarget & {
   outputPath?: string;
+};
+
+export type BrowserEnvVars = {
+  AGENT_BROWSER: string;
+  AGENT_BROWSER_SESSION: string;
+  AGENT_BROWSER_CDP?: string;
+  PIE_VERIFY_APP_URL?: string;
 };
 
 export function browserNeedsIsolation(command: string | undefined): boolean {
@@ -49,10 +55,6 @@ export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget
   if (!browserNeedsIsolation(args[0])) {
     return [...args];
   }
-  const forwarded = [...args];
-  if (forwarded[0] === "open" && forwarded.length === 1 && target.defaultOpenUrl !== undefined) {
-    forwarded.push(target.defaultOpenUrl);
-  }
   const argv: string[] = [];
   if (target.session !== undefined) {
     argv.push("--session", target.session);
@@ -60,8 +62,47 @@ export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget
   if (target.cdpPort !== undefined) {
     argv.push("--cdp", String(target.cdpPort));
   }
-  argv.push(...forwarded);
+  argv.push(...args);
   return argv;
+}
+
+export function resolveBrowserEnv(
+  target: AgentBrowserTarget & { appUrl?: string },
+): BrowserEnvVars {
+  const env: BrowserEnvVars = {
+    AGENT_BROWSER: resolveAgentBrowserBin(),
+    AGENT_BROWSER_SESSION: target.session ?? "",
+  };
+  if (target.cdpPort !== undefined) {
+    env.AGENT_BROWSER_CDP = String(target.cdpPort);
+  }
+  if (target.appUrl !== undefined && target.appUrl !== "") {
+    env.PIE_VERIFY_APP_URL = target.appUrl;
+  }
+  return env;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+const BROWSER_ENV_KEYS = [
+  "AGENT_BROWSER",
+  "AGENT_BROWSER_SESSION",
+  "AGENT_BROWSER_CDP",
+  "PIE_VERIFY_APP_URL",
+] as const;
+
+export function formatBrowserEnv(vars: BrowserEnvVars, mode: "plain" | "export"): string {
+  const lines: string[] = [];
+  for (const key of BROWSER_ENV_KEYS) {
+    const value = vars[key];
+    if (value === undefined || value === "") {
+      continue;
+    }
+    lines.push(mode === "export" ? `export ${key}=${shellQuote(value)}` : `${key}=${value}`);
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 export function agentBrowser(args: string[], options: AgentBrowserOptions = {}): string {

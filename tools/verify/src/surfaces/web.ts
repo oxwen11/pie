@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { isHelpFlag } from "../argv.ts";
-import { VITE_PORT, WEB } from "../identity.ts";
+import { WEB } from "../identity.ts";
+import { driveHintLines } from "../lifecycle/env.ts";
 import { expectMeta, type RunMeta, type WebRunMeta } from "../meta.ts";
 import {
   agentBrowser,
@@ -78,7 +79,9 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
   console.log(`  sample  ${web.sample.path}`);
   console.log(`  logs    ${path.join(web.runDir, "logs")}`);
   console.log(`  doctor  ${WEB.bin} doctor`);
-  console.log(`  browser ${WEB.bin} browser open`);
+  for (const line of driveHintLines(WEB)) {
+    console.log(line);
+  }
 }
 
 async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
@@ -130,6 +133,7 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
       `  vite    pid ${vitePid}`,
       `  node    v${process.versions.node}`,
       "  ticket  /api/ws-ticket 200",
+      ...driveHintLines(WEB),
       warn,
     ],
   };
@@ -183,13 +187,12 @@ export async function extraEvidence(
 export async function browserWeb(args: string[]): Promise<void> {
   const session = sessionName();
   const usageText = `Usage:
-  ${WEB.bin} browser open [url]
-  ${WEB.bin} browser snapshot
-  ${WEB.bin} browser install|skills|--version
+  ${WEB.bin} env [--export]
   ${WEB.bin} browser <agent-browser argv…>
 
-Uses the mise-managed agent-browser with --session ${session}.
-\`open\` with no URL uses http://localhost:${VITE_PORT}/.
+Prefer the mise-managed binary from \`${WEB.bin} env --export\`.
+This command only prepends --session ${session}; it does not invent an open URL.
+Pass the Vite origin yourself: open http://localhost:4190/
 `;
   if (isHelpFlag(args[0])) {
     process.stdout.write(usageText);
@@ -198,8 +201,5 @@ Uses the mise-managed agent-browser with --session ${session}.
   if (browserNeedsIsolation(args[0]) && currentRun(WEB.currentLink) === undefined) {
     throw new Error(`no current run. Launch first: ${WEB.bin} launch`);
   }
-  forwardAgentBrowser(args, {
-    session,
-    defaultOpenUrl: `http://localhost:${VITE_PORT}/`,
-  });
+  forwardAgentBrowser(args, { session });
 }

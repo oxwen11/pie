@@ -1,6 +1,7 @@
 import { isHelpFlag, surfaceUsage } from "./argv.ts";
 import { cleanup } from "./lifecycle/cleanup.ts";
 import { doctor } from "./lifecycle/doctor.ts";
+import { printEnv } from "./lifecycle/env.ts";
 import { evidence } from "./lifecycle/evidence.ts";
 import { launch } from "./lifecycle/launch.ts";
 import { VerifyError } from "./runtime/fail.ts";
@@ -29,11 +30,14 @@ export async function dispatchCommands(surface: Surface, argv: string[]): Promis
     case "evidence":
       await evidence(surface, rest);
       return;
+    case "env":
+      printEnv(surface, rest);
+      return;
     case "browser":
       switch (surface.identity.id) {
         case "cli":
           throw new VerifyError(
-            `${surface.identity.bin} has no browser — this surface is pie / pie daemon / pie serve. Drive it with \`${surface.identity.bin} run\`. Use \`pie-verify web browser\` or \`pie-verify desktop browser\`.`,
+            `${surface.identity.bin} has no browser — this surface is pie / pie daemon / pie serve. Drive it with \`${surface.identity.bin} run\`. Load isolation with \`pie-verify web env\` or \`pie-verify desktop env\`, then call \`$AGENT_BROWSER\`.`,
             2,
           );
         case "web":

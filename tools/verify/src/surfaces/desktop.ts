@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { isHelpFlag } from "../argv.ts";
 import { DESKTOP } from "../identity.ts";
+import { driveHintLines } from "../lifecycle/env.ts";
 import {
   expectMeta,
   patchRunMeta,
@@ -77,13 +78,14 @@ async function startDesktop(ctx: LaunchCtx): Promise<void> {
   console.log(`${DESKTOP.logPrefix}: launched ${desktop.runId}`);
   console.log(`  api     ${record.address}/api/health`);
   console.log(`  port    ${bound} (first spawn prefers 4000; this is the bound address)`);
-  console.log(`  cdp     ${DESKTOP.bin} browser connect`);
   console.log(`  pid     electron-vite ${child.pid} daemon ${record.pid}`);
   console.log(`  home    ${desktop.pieHome}`);
   console.log(`  sample  ${desktop.sample.path}`);
   console.log(`  logs    ${path.join(desktop.runDir, "logs")}`);
   console.log(`  doctor  ${DESKTOP.bin} doctor`);
-  console.log(`  browser ${DESKTOP.bin} browser snapshot`);
+  for (const line of driveHintLines(DESKTOP)) {
+    console.log(line);
+  }
 }
 
 async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
@@ -134,14 +136,14 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
     pids: evPid === undefined ? [record.pid] : [evPid, record.pid],
     lines: [
       `  api     ${record.address}/api/health`,
-      `  cdp     ${DESKTOP.bin} browser connect`,
+      `  cdp     ${desktop.cdpPort} (doctor already attached session ${session})`,
       `  title   ${title || "(empty)"}`,
       `  url     ${url || "(empty)"}`,
       `  home    ${desktop.pieHome}`,
       `  evite   pid ${evPid}`,
       `  daemon  pid ${record.pid}`,
       "  ticket  anonymous 401 / bearer 200",
-      `  next    ${DESKTOP.bin} browser snapshot`,
+      ...driveHintLines(DESKTOP),
     ],
   };
 }
@@ -213,9 +215,9 @@ async function curlTranscript(meta: DesktopRunMeta): Promise<string> {
     `status ${anon ?? "error"}`,
     `POST ${record.address}/api/ws-ticket (bearer)`,
     `status ${auth ?? "error"}`,
-    `${DESKTOP.bin} browser get title`,
+    `agent-browser --session ${session} get title`,
     title,
-    `${DESKTOP.bin} browser get url`,
+    `agent-browser --session ${session} get url`,
     url,
     "",
   ].join("\n");
@@ -224,14 +226,13 @@ async function curlTranscript(meta: DesktopRunMeta): Promise<string> {
 export async function browserDesktop(args: string[]): Promise<void> {
   const session = sessionName();
   const usageText = `Usage:
-  ${DESKTOP.bin} browser snapshot
-  ${DESKTOP.bin} browser connect [port]
-  ${DESKTOP.bin} browser install|skills|--version
+  ${DESKTOP.bin} env [--export]
   ${DESKTOP.bin} browser <agent-browser argv…>
 
-Uses the mise-managed agent-browser with --session ${session}
-and --cdp from the current run.
-Do not open http://localhost:4190/ or http://localhost:5173/ and call that desktop.
+Prefer the mise-managed binary from \`${DESKTOP.bin} env --export\`.
+This command only prepends --session ${session} and --cdp from the current run.
+Pass connect PORT yourself. Do not open http://localhost:4190/ or
+http://localhost:5173/ and call that desktop.
 `;
   if (isHelpFlag(args[0])) {
     process.stdout.write(usageText);
@@ -246,7 +247,5 @@ Do not open http://localhost:4190/ or http://localhost:5173/ and call that deskt
     throw new Error(`no current run. Launch first: ${DESKTOP.bin} launch`);
   }
   const meta = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "desktop");
-  const forwarded =
-    args[0] === "connect" && args.length === 1 ? ["connect", String(meta.cdpPort)] : args;
-  forwardAgentBrowser(forwarded, { session, cdpPort: meta.cdpPort });
+  forwardAgentBrowser(args, { session, cdpPort: meta.cdpPort });
 }

@@ -13,12 +13,14 @@ export {
   agentBrowser,
   browserNeedsIsolation,
   buildAgentBrowserArgv,
+  formatBrowserEnv,
   forwardAgentBrowser,
   resolveAgentBrowserBin,
+  resolveBrowserEnv,
   saveScreenshot,
   saveSnapshot,
 } from "./browser.ts";
-export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
+export type { AgentBrowserOptions, AgentBrowserTarget, BrowserEnvVars } from "./browser.ts";
 export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";
 export { VerifyError, fail, usage } from "./fail.ts";
 export {

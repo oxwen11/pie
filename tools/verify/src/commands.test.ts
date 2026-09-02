@@ -9,4 +9,8 @@ describe("dispatchCommands", () => {
       /no browser/,
     );
   });
+
+  it("refuses env on the CLI surface", async () => {
+    await expect(dispatchCommands(cliSurface, ["env"])).rejects.toThrow(/no browser/);
+  });
 });

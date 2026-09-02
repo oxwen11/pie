@@ -17,13 +17,16 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 4. In the dialog, move to the folder you want. Launch creates `$HOME/verify-pie-sample` for this (scaffolding).
 5. Click **Import this folder**.
 
-## Driving it with pie-verify
+## Driving it with agent-browser
 
 ```bash
 pnpm exec pie-verify web doctor
-pnpm exec pie-verify web browser open
+eval "$(pnpm exec pie-verify web env --export)"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
 # wait for empty heading or the draft composer — not the root-route flash
-pnpm exec pie-verify web browser snapshot
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import your first project"
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import this folder"
 ```
 
 Empty home:
