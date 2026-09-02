@@ -13,6 +13,7 @@ import {
   persistAutomationSession,
   reachedMaxRuns,
   reuseSessionIdOf,
+  bindAutomationSession,
   UpdateAutomationInputSchema,
 } from "../src/automation";
 
@@ -41,7 +42,7 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "manual" },
-        session: { type: "reuse" },
+        session: { type: "create" },
       }),
     ).toBe(true);
     expect(
@@ -50,9 +51,18 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "manual" },
-        session: { type: "new" },
+        session: { type: "each-run" },
       }),
     ).toBe(true);
+    expect(
+      accepts(CreateAutomationInputSchema, {
+        name: "Bare reuse",
+        projectId: UUID,
+        prompt: "review",
+        spec: { kind: "manual" },
+        session: { type: "reuse" },
+      }),
+    ).toBe(false);
     expect(
       accepts(CreateAutomationInputSchema, {
         name: "TZ",
@@ -100,12 +110,18 @@ describe("CreateAutomationInput", () => {
 });
 
 describe("AutomationSession helpers", () => {
-  it("defaults omitted session to new and persists only reuse", () => {
-    expect(automationSessionOf({})).toEqual({ type: "new" });
+  it("defaults omitted session to each-run and persists create/reuse", () => {
+    expect(automationSessionOf({})).toEqual({ type: "each-run" });
     expect(reuseSessionIdOf({ type: "reuse", sessionId: UUID })).toBe(UUID);
-    expect(reuseSessionIdOf({ type: "new" })).toBeUndefined();
-    expect(persistAutomationSession({ type: "new" })).toEqual({});
-    expect(persistAutomationSession({ type: "reuse" })).toEqual({ session: { type: "reuse" } });
+    expect(reuseSessionIdOf({ type: "create", sessionId: UUID })).toBe(UUID);
+    expect(reuseSessionIdOf({ type: "each-run" })).toBeUndefined();
+    expect(persistAutomationSession({ type: "each-run" })).toEqual({});
+    expect(persistAutomationSession({ type: "create" })).toEqual({ session: { type: "create" } });
+    expect(bindAutomationSession({ type: "create" }, UUID)).toEqual({
+      type: "create",
+      sessionId: UUID,
+    });
+    expect(bindAutomationSession({ type: "each-run" }, UUID)).toBeUndefined();
   });
 });
 

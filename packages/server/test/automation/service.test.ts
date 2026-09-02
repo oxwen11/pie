@@ -390,16 +390,16 @@ describe("AutomationService", () => {
       },
     });
     const created = await run(
-      h.service.create(cronInput({ session: { type: "reuse" }, spec: { kind: "manual" } })),
+      h.service.create(cronInput({ session: { type: "create" }, spec: { kind: "manual" } })),
     );
     await run(h.service.runNow(created.id));
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(1);
-    expect(h.store.get(created.id)?.session).toEqual({ type: "reuse", sessionId: "sess-1" });
+    expect(h.store.get(created.id)?.session).toEqual({ type: "create", sessionId: "sess-1" });
     archived = true;
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(2);
-    expect(h.store.get(created.id)?.session).toEqual({ type: "reuse", sessionId: "sess-2" });
+    expect(h.store.get(created.id)?.session).toEqual({ type: "create", sessionId: "sess-2" });
   });
 
   it("reuses a preselected session without creating first", async () => {

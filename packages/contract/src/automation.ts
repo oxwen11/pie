@@ -51,15 +51,20 @@ export const AutomationSpecSchema = Schema.Union([
 ]);
 export type AutomationSpec = typeof AutomationSpecSchema.Type;
 
-export const AutomationSessionNewSchema = Schema.Struct({
-  type: Schema.Literal("new"),
+export const AutomationSessionEachRunSchema = Schema.Struct({
+  type: Schema.Literal("each-run"),
+});
+export const AutomationSessionCreateSchema = Schema.Struct({
+  type: Schema.Literal("create"),
+  sessionId: Schema.optionalKey(Schema.String),
 });
 export const AutomationSessionReuseSchema = Schema.Struct({
   type: Schema.Literal("reuse"),
-  sessionId: Schema.optionalKey(Schema.String),
+  sessionId: Schema.String,
 });
 export const AutomationSessionSchema = Schema.Union([
-  AutomationSessionNewSchema,
+  AutomationSessionEachRunSchema,
+  AutomationSessionCreateSchema,
   AutomationSessionReuseSchema,
 ]);
 export type AutomationSession = typeof AutomationSessionSchema.Type;
@@ -67,17 +72,26 @@ export type AutomationSession = typeof AutomationSessionSchema.Type;
 export function automationSessionOf(automation: {
   readonly session?: AutomationSession;
 }): AutomationSession {
-  return automation.session ?? { type: "new" };
+  return automation.session ?? { type: "each-run" };
 }
 
 export function reuseSessionIdOf(session: AutomationSession): string | undefined {
-  return session.type === "reuse" ? session.sessionId : undefined;
+  return session.type === "each-run" ? undefined : session.sessionId;
 }
 
 export function persistAutomationSession(session: AutomationSession | undefined): {
   readonly session?: AutomationSession;
 } {
-  return session?.type === "reuse" ? { session } : {};
+  return session !== undefined && session.type !== "each-run" ? { session } : {};
+}
+
+export function bindAutomationSession(
+  session: AutomationSession,
+  sessionId: string,
+): AutomationSession | undefined {
+  if (session.type === "each-run") return undefined;
+  if (session.type === "create") return { type: "create", sessionId };
+  return { type: "reuse", sessionId };
 }
 
 export const AutomationPauseReasonSchema = Schema.Literals([

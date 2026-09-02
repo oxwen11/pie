@@ -54,9 +54,11 @@ export type AutomationFormProps = {
 };
 
 function sessionFromForm(reuseSession: boolean, initial?: Automation): AutomationSession {
-  if (!reuseSession) return { type: "new" };
-  const sessionId = initial?.session?.type === "reuse" ? initial.session.sessionId : undefined;
-  return sessionId !== undefined ? { type: "reuse", sessionId } : { type: "reuse" };
+  if (!reuseSession) return { type: "each-run" };
+  if (initial?.session?.type === "reuse" || initial?.session?.type === "create") {
+    return initial.session;
+  }
+  return { type: "create" };
 }
 
 function formFromAutomation(
@@ -71,7 +73,7 @@ function formFromAutomation(
     name: initial.name,
     prompt: initial.prompt,
     worktree: initial.worktree !== undefined,
-    reuseSession: initial.session?.type === "reuse",
+    reuseSession: initial.session !== undefined && initial.session.type !== "each-run",
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,

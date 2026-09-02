@@ -21,6 +21,7 @@ import {
   persistAutomationSession,
   reachedMaxRuns,
   reuseSessionIdOf,
+  bindAutomationSession,
 } from "@getpie/contract";
 import { Context, Crypto, Effect, Layer, Result, Semaphore } from "effect";
 
@@ -416,7 +417,7 @@ export const makeAutomationService = (deps: {
     Effect.gen(function* () {
       const project = yield* projects.findById(snapshot.projectId);
       const reuseSessionId = reuseSessionIdOf(snapshot.session);
-      if (snapshot.session.type === "reuse" && reuseSessionId !== undefined) {
+      if (reuseSessionId !== undefined) {
         const ref = { projectId: snapshot.projectId, sessionId: reuseSessionId };
         const found = yield* sessions.find(ref);
         if (found !== null && !found.archived) {
@@ -637,9 +638,9 @@ export const makeAutomationService = (deps: {
       const started = yield* record(
         {
           ...automation,
-          ...(snapshot.session.type === "reuse"
-            ? { session: { type: "reuse" as const, sessionId: outcome.ref.sessionId } }
-            : undefined),
+          ...persistAutomationSession(
+            bindAutomationSession(snapshot.session, outcome.ref.sessionId),
+          ),
         },
         {
           id: runId,
@@ -711,7 +712,7 @@ export const makeAutomationService = (deps: {
     session: AutomationSession | undefined,
   ): Effect.Effect<void, StoreReadError | InvalidAutomation> => {
     const sessionId = session === undefined ? undefined : reuseSessionIdOf(session);
-    if (session === undefined || session.type === "new" || sessionId === undefined) {
+    if (sessionId === undefined) {
       return Effect.void;
     }
     return sessions.find({ projectId, sessionId }).pipe(
