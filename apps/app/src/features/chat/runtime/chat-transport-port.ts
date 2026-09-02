@@ -61,7 +61,8 @@ export interface ChatSessionTransport {
   prompt(input: {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
-  }): Promise<{ readonly turnId: string }>;
+    readonly delivery?: "steer" | "followUp";
+  }): Promise<{ readonly turnId: string; readonly started: boolean }>;
   /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
   interrupt(): Promise<void>;
   /**

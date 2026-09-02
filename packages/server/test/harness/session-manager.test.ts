@@ -83,7 +83,7 @@ const makeFixture = Effect.gen(function* () {
               turnId: "turn-1",
               outcome: "completed",
             });
-            return { turnId: "turn-1" };
+            return { turnId: "turn-1", started: true };
           }),
         interrupt: Effect.void,
         respondToAgentRequest: () => Effect.void,
@@ -149,7 +149,7 @@ it.effect("drains the native stream into the session and tears down on close", (
 
     yield* fixture.manager.close(ref);
 
-    assert.deepEqual(receipt, { turnId: "turn-1" });
+    assert.deepEqual(receipt, { turnId: "turn-1", started: true });
     assert.equal(snapshot.status.phase, "idle");
     assert.equal(yield* Ref.get(fixture.closeCalls), 1);
     assert.equal(yield* isActive(fixture, ref), false);

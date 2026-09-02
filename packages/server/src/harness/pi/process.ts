@@ -1,4 +1,9 @@
-import type { AgentRequest, AgentResponse, AgentModelState } from "@getpie/contract";
+import type {
+  AgentRequest,
+  AgentResponse,
+  AgentModelState,
+  SessionPendingPrompt,
+} from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -69,6 +74,7 @@ type SessionState = {
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
   readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
+  readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
   readonly requestGate: Semaphore.Semaphore;
   readonly turnState: Ref.Ref<PiTurnState>;
@@ -99,9 +105,12 @@ export interface PiProcess {
       readonly sessionId: string;
       readonly cwd?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
+    // When the session is already running: `followUp` queues after the current
+    // run's tools; omitted/`steer` injects before the next LLM call.
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
+      readonly delivery?: "steer" | "followUp";
     }) => Effect.Effect<
       {
         readonly turnId: string;
@@ -121,6 +130,10 @@ export interface PiProcess {
     readonly requestPermission: (
       sessionId: string,
     ) => Stream.Stream<AgentRequest, HarnessSessionNotFound>;
+    /** Pi `queue_update` events — not a transcript chunk. One consumer (the runtime). */
+    readonly queueUpdates: (
+      sessionId: string,
+    ) => Stream.Stream<SessionPendingPrompt, HarnessSessionNotFound>;
     readonly awaitTermination: (
       sessionId: string,
     ) => Effect.Effect<never, HarnessSessionNotFound | PiSessionFailure>;
@@ -206,6 +219,7 @@ export const makePiProcessWithDependencies = <R>(
         Effect.andThen(settlePending(session)),
         Effect.andThen(completeTurn(session)),
         Effect.andThen(Queue.end(session.requests)),
+        Effect.andThen(Queue.end(session.queueUpdates)),
         Effect.andThen(Queue.fail(session.chunks, error)),
         Effect.andThen(closeScope(session)),
         Effect.asVoid,
@@ -220,6 +234,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(settlePending(session)),
             Effect.andThen(completeTurn(session)),
             Effect.andThen(Queue.end(session.requests)),
+            Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(
               Queue.offer(session.chunks, { type: "error", errorText: failure.message }),
             ),
@@ -242,6 +257,15 @@ export const makePiProcessWithDependencies = <R>(
       event: Parameters<SessionState["transform"]>[0],
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
+        if (event.type === "queue_update") {
+          const accepted = yield* Queue.offer(session.queueUpdates, {
+            steering: Array.from(event.steering),
+            followUp: Array.from(event.followUp),
+          });
+          if (!accepted) yield* evictOverflowedSession(session);
+          return;
+        }
+
         for (const chunk of session.transform(event)) {
           if (chunk.type === "finish") {
             const transition = yield* Ref.modify<PiTurnState, FinishTransition>(
@@ -392,6 +416,9 @@ export const makePiProcessWithDependencies = <R>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
+            queueUpdates: yield* Queue.dropping<SessionPendingPrompt, Cause.Done>(
+              SESSION_QUEUE_CAPACITY,
+            ),
             pending: yield* Ref.make<ReadonlyMap<string, PendingRequest>>(new Map()),
             requestGate: yield* Semaphore.make(1),
             turnState: yield* Ref.make<PiTurnState>({ _tag: "Idle" }),
@@ -449,6 +476,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(settlePending(session)),
             Effect.andThen(completeTurn(session)),
             Effect.andThen(Queue.end(session.requests)),
+            Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(Queue.end(session.chunks)),
             Effect.andThen(closeScope(session)),
             Effect.asVoid,
@@ -516,13 +544,15 @@ export const makePiProcessWithDependencies = <R>(
                     return yield* Effect.suspend(prepareTurn);
                   }
                   if (decision._tag === "Steer") {
-                    const steered = yield* restore(
-                      session.transport.command({ type: "steer", message: input.text }),
-                    ).pipe(
+                    const command =
+                      input.delivery === "followUp"
+                        ? ({ type: "follow_up", message: input.text } as const)
+                        : ({ type: "steer", message: input.text } as const);
+                    const queued = yield* restore(session.transport.command(command)).pipe(
                       Effect.as(true),
                       Effect.catch(() => Effect.succeed(false)),
                     );
-                    if (steered) {
+                    if (queued) {
                       return {
                         turnId: decision.turn.turnId,
                         started: false,
@@ -617,6 +647,12 @@ export const makePiProcessWithDependencies = <R>(
           Stream.unwrap(
             getSession(sessionId).pipe(
               Effect.map((session) => streamFromQueueOne(session.requests)),
+            ),
+          ),
+        queueUpdates: (sessionId) =>
+          Stream.unwrap(
+            getSession(sessionId).pipe(
+              Effect.map((session) => streamFromQueueOne(session.queueUpdates)),
             ),
           ),
         awaitTermination: (sessionId) =>

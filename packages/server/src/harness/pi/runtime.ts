@@ -19,6 +19,7 @@ import type {
   CreateSessionInput,
   PromptReceipt,
   ResumeSessionInput,
+  RuntimePromptReceipt,
   UserInput,
 } from "../session-io";
 import { entriesToUIMessages } from "./history";
@@ -56,7 +57,10 @@ export type PiAgentRuntime = {
   readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
   readonly prompt: (
     input: UserInput,
-  ) => Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>;
+  ) => Effect.Effect<
+    RuntimePromptReceipt,
+    SessionClosed | TurnAlreadyRunning | AgentOperationError
+  >;
   readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     requestId: string,
@@ -173,6 +177,14 @@ export const makePiAgentRuntime = (
     yield* Stream.runForEach(process.session.requestPermission(sessionId), (request) =>
       emit({ type: "session.request.asked", sessionId, request }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
+    yield* Stream.runForEach(process.session.queueUpdates(sessionId), (queue) =>
+      emit({
+        type: "session.queue.updated",
+        sessionId,
+        steering: queue.steering,
+        followUp: queue.followUp,
+      }),
+    ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
     return {
       sessionId,
@@ -180,8 +192,11 @@ export const makePiAgentRuntime = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          const command = { sessionId, text: toPromptText(input) };
           const prompt = yield* process.session
-            .prompt({ sessionId, text: toPromptText(input) })
+            .prompt(
+              input.delivery !== undefined ? { ...command, delivery: input.delivery } : command,
+            )
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning

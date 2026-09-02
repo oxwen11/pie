@@ -1,23 +1,17 @@
 import { createAgentSessionServices } from "@earendil-works/pi-coding-agent";
-import type { AgentModel } from "@getpie/contract";
+import type { ListAgentModelsOutput } from "@getpie/contract";
 
 import { toAgentModel } from "./model-mapping";
 import { resolveDefaultPiModel } from "./resolve-default-model";
 
-export type PiModelCatalog = {
-  readonly models: ReadonlyArray<AgentModel>;
-  readonly defaultModel: AgentModel | undefined;
-};
-
 /**
- * Cold model catalogue: same source as `pi --list-models` and RPC
- * `get_available_models` (`ModelRuntime.getAvailable()`), without spawning
- * `pi --mode rpc` or opening a live AgentSession.
+ * Available models plus Pi's startup default, from one
+ * `createAgentSessionServices` load. No RPC child.
  */
-export async function listAvailablePiModels(cwd: string): Promise<PiModelCatalog> {
+export async function listAvailablePiModels(cwd: string): Promise<ListAgentModelsOutput> {
   const services = await createAgentSessionServices({ cwd });
   const available = await services.modelRuntime.getAvailable();
   const models = available.map(toAgentModel);
-  const defaultModel = await resolveDefaultPiModel(services);
-  return { models, defaultModel };
+  const defaultModel = resolveDefaultPiModel(models, services.settingsManager);
+  return defaultModel === undefined ? { models } : { models, defaultModel };
 }

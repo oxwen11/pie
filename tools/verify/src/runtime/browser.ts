@@ -1,8 +1,12 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 import { ensureDir, writeText } from "./fs.ts";
 import { commandOnPath, findRepoRoot, runCommand } from "./process.ts";
+
+/** agent-browser rejects Unix socket paths over this many bytes (sun_path minus NUL). */
+export const AGENT_BROWSER_UNIX_SOCKET_MAX = 103;
 
 export type AgentBrowserTarget = {
   session?: string;
@@ -118,15 +122,60 @@ export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget
   return argv;
 }
 
+/**
+ * agent-browser 0.36 binds `{socketDir}/namespaces/{namespace}/run/{session}.sock`.
+ * A run-scoped dir such as
+ * `/tmp/pie-verify-web/runs/<stamp>-<pid>/agent-browser/sockets` plus that
+ * suffix is already ~120 bytes — over the Unix `sun_path` limit — so the
+ * socket dir is a short `/tmp/pvs-<hash>` derived from the run, not nested
+ * under `runDir`. Screenshots and downloads stay on the run.
+ */
 export function agentBrowserIsolation(runDir: string) {
   const root = path.join(runDir, "agent-browser");
   return {
     root,
-    socketDir: path.join(root, "sockets"),
+    socketDir: shortAgentBrowserSocketDir(runDir),
     screenshotDir: path.join(root, "screenshots"),
     downloadPath: path.join(root, "downloads"),
     configPath: path.join(runDir, "agent-browser.json"),
   };
+}
+
+export function agentBrowserDaemonSocketPath(socketDir: string, session: string): string {
+  return path.join(socketDir, "namespaces", session, "run", `${session}.sock`);
+}
+
+export function shortAgentBrowserSocketDir(runDir: string): string {
+  const override = process.env.VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR;
+  if (override !== undefined && override !== "") {
+    return override;
+  }
+  const digest = crypto.createHash("sha256").update(stableRunKey(runDir)).digest("hex");
+  return path.join("/tmp", `pvs-${digest.slice(0, 8)}`);
+}
+
+export function isManagedAgentBrowserSocketDir(dir: string): boolean {
+  return /^\/tmp\/pvs-[0-9a-f]{8}$/.test(dir);
+}
+
+function stableRunKey(runDir: string): string {
+  try {
+    return fs.realpathSync(runDir);
+  } catch {
+    return path.resolve(runDir);
+  }
+}
+
+function assertAgentBrowserSocketFits(socketDir: string, session: string): void {
+  if (session === "") {
+    return;
+  }
+  const socketPath = agentBrowserDaemonSocketPath(socketDir, session);
+  if (socketPath.length > AGENT_BROWSER_UNIX_SOCKET_MAX) {
+    throw new Error(
+      `agent-browser socket path is ${String(socketPath.length)} bytes (max ${String(AGENT_BROWSER_UNIX_SOCKET_MAX)}): ${socketPath}`,
+    );
+  }
 }
 
 export function resolveIsolatedChromeExecutable(): string | undefined {
@@ -187,6 +236,7 @@ export function resolveBrowserEnv(input: BrowserEnvInput): BrowserEnvVars {
   if (input.appUrl !== undefined && input.appUrl !== "") {
     env.PIE_VERIFY_APP_URL = input.appUrl;
   }
+  assertAgentBrowserSocketFits(env.AGENT_BROWSER_SOCKET_DIR, session);
   return env;
 }
 
