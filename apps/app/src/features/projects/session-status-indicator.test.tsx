@@ -28,14 +28,17 @@ afterEach(() => {
   container = undefined;
 });
 
+const PR_URL = "https://github.com/getpie/pie/pull/42";
+
 const renderPullRequestIndicator = (
   lifecycle: Parameters<typeof SessionPullRequestIndicator>[0]["lifecycle"],
+  url: string | undefined = PR_URL,
 ) => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(createElement(SessionPullRequestIndicator, { lifecycle }));
+    root?.render(createElement(SessionPullRequestIndicator, { lifecycle, url }));
   });
   return container;
 };
@@ -113,8 +116,12 @@ describe("SessionPullRequestIndicator", () => {
 
     for (const [lifecycle, label, iconClass, colorClass] of cases) {
       const node = renderPullRequestIndicator(lifecycle);
-      const indicator = node.querySelector('[role="img"]');
+      const indicator = node.querySelector("a");
       expect(indicator?.getAttribute("aria-label")).toBe(label);
+      expect(indicator?.getAttribute("title")).toBe(label);
+      expect(indicator?.getAttribute("href")).toBe(PR_URL);
+      expect(indicator?.getAttribute("target")).toBe("_blank");
+      expect(indicator?.getAttribute("rel")).toBe("noreferrer");
       expect(indicator?.classList.contains(colorClass)).toBe(true);
       expect(indicator?.querySelector("svg")?.classList.contains(iconClass)).toBe(true);
       act(() => root?.unmount());
@@ -125,6 +132,6 @@ describe("SessionPullRequestIndicator", () => {
   });
 
   it("renders nothing without a current pull request status", () => {
-    expect(renderPullRequestIndicator(undefined).childElementCount).toBe(0);
+    expect(renderPullRequestIndicator(undefined, undefined).childElementCount).toBe(0);
   });
 });
