@@ -5,7 +5,7 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Stream } from "effect";
+import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 
 import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
@@ -62,7 +62,13 @@ rl.on("line", (line) => {
   }
   if (msg.type === "steer") {
     send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering: [msg.message], followUp: [] });
     if (holding) { holding = false; settle(); }
+    return;
+  }
+  if (msg.type === "follow_up") {
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering: [], followUp: [msg.message] });
     return;
   }
   if (msg.type === "abort") {
@@ -249,6 +255,60 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(first.output);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("queues a follow-up on an active turn instead of starting a new one", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold" });
+      assert.equal(first.started, true);
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
+      const queued = yield* Effect.forkChild(Stream.runHead(agent.session.queueUpdates(sessionId)));
+
+      const second = yield* agent.session.prompt({
+        sessionId,
+        text: "later",
+        delivery: "followUp",
+      });
+      assert.equal(second.started, false);
+      assert.equal(second.turnId, first.turnId);
+      assert.deepEqual(Option.getOrThrow(yield* Fiber.join(queued)), {
+        steering: [],
+        followUp: ["later"],
+      });
+
+      yield* agent.session.interrupt(sessionId);
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.equal(chunks.at(-1)?.type, "finish");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("PiAgent projects queue_update as session.queue.updated", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
+      const queued = yield* Effect.forkChild(
+        Stream.runHead(
+          session.events.pipe(
+            Stream.filter((event) => event.body.type === "session.queue.updated"),
+          ),
+        ),
+      );
+      yield* session.prompt({ parts: [{ type: "text", text: "hold" }] });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "later" }],
+        delivery: "followUp",
+      });
+      const event = Option.getOrUndefined(yield* Fiber.join(queued));
+      assert.ok(event);
+      assert.equal(event.body.type, "session.queue.updated");
+      if (event.body.type === "session.queue.updated") {
+        assert.deepEqual(event.body.followUp, ["later"]);
+      }
+      yield* session.close;
     }),
   );
 

@@ -43,6 +43,7 @@ describe("event manifest naming invariant", () => {
     expect(types).toContain("session.turn.started");
     expect(types).toContain("session.turn.ended");
     expect(types).toContain("session.request.asked");
+    expect(types).toContain("session.queue.updated");
     expect(types).toContain("session.crashed");
   });
 });

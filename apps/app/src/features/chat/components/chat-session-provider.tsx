@@ -17,8 +17,8 @@ export function ChatSessionProvider({
   const turnInProgress = useStore(chat.store, selectTurnInProgress);
 
   const prompt = useCallback(
-    (text: string) => {
-      chat.prompt(text).catch((error: unknown) => {
+    (text: string, delivery?: "steer" | "followUp") => {
+      chat.prompt(text, delivery).catch((error: unknown) => {
         console.error("Failed to prompt", error);
       });
     },

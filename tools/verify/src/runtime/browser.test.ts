@@ -5,15 +5,19 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_BROWSER_UNIX_SOCKET_MAX,
+  agentBrowserDaemonSocketPath,
   agentBrowserIsolation,
   applyBrowserEnv,
   browserConfigForEnv,
   browserNeedsIsolation,
   buildAgentBrowserArgv,
   formatBrowserEnv,
+  isManagedAgentBrowserSocketDir,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   resolveIsolatedChromeExecutable,
+  shortAgentBrowserSocketDir,
 } from "./browser.ts";
 
 describe("buildAgentBrowserArgv", () => {
@@ -78,8 +82,49 @@ describe("resolveAgentBrowserBin", () => {
   });
 });
 
+describe("shortAgentBrowserSocketDir", () => {
+  it("keeps the daemon socket under the Unix sun_path limit for a real run dir", () => {
+    const runDir = "/tmp/pie-verify-web/runs/20260902T112638Z-63968";
+    const socketDir = shortAgentBrowserSocketDir(runDir);
+    expect(socketDir).toMatch(/^\/tmp\/pvs-[0-9a-f]{8}$/);
+    expect(isManagedAgentBrowserSocketDir(socketDir)).toBe(true);
+    expect(
+      agentBrowserDaemonSocketPath(socketDir, "pie-verify-desktop").length,
+    ).toBeLessThanOrEqual(AGENT_BROWSER_UNIX_SOCKET_MAX);
+    expect(
+      agentBrowserDaemonSocketPath(path.join(runDir, "agent-browser/sockets"), "pie-verify-web")
+        .length,
+    ).toBeGreaterThan(AGENT_BROWSER_UNIX_SOCKET_MAX);
+  });
+
+  it("stays short when the isolation root is long", () => {
+    const runDir = `/tmp/${"pie-verify-isolation-".repeat(8)}/runs/20260902T112638Z-1`;
+    const socketDir = shortAgentBrowserSocketDir(runDir);
+    expect(socketDir.startsWith("/tmp/pvs-")).toBe(true);
+    expect(
+      agentBrowserDaemonSocketPath(socketDir, "pie-verify-desktop").length,
+    ).toBeLessThanOrEqual(AGENT_BROWSER_UNIX_SOCKET_MAX);
+  });
+
+  it("is stable for the same run dir and honors VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR", () => {
+    const runDir = "/tmp/pie-verify-web/runs/run-1";
+    expect(shortAgentBrowserSocketDir(runDir)).toBe(shortAgentBrowserSocketDir(runDir));
+    expect(shortAgentBrowserSocketDir(runDir)).not.toBe(
+      shortAgentBrowserSocketDir("/tmp/pie-verify-desktop/runs/run-1"),
+    );
+    const previous = process.env.VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR;
+    process.env.VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR = "/tmp/pvw-s";
+    try {
+      expect(shortAgentBrowserSocketDir(runDir)).toBe("/tmp/pvw-s");
+      expect(isManagedAgentBrowserSocketDir("/tmp/pvw-s")).toBe(false);
+    } finally {
+      restoreEnv("VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR", previous);
+    }
+  });
+});
+
 describe("resolveBrowserEnv", () => {
-  it("pins web isolation under the run dir and skips CDP", () => {
+  it("pins web screenshots under the run dir, sockets under /tmp/pvs-*, and skips CDP", () => {
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-browser-"));
     const isolation = agentBrowserIsolation(runDir);
     const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
@@ -106,6 +151,8 @@ describe("resolveBrowserEnv", () => {
         AGENT_BROWSER_DEFAULT_TIMEOUT: "40000",
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
       });
+      expect(resolved.AGENT_BROWSER_SOCKET_DIR.startsWith(runDir)).toBe(false);
+      expect(resolved.AGENT_BROWSER_SCREENSHOT_DIR.startsWith(runDir)).toBe(true);
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previousBin);
       restoreEnv("VERIFY_PIE_CHROME", previousChrome);
@@ -133,6 +180,23 @@ describe("resolveBrowserEnv", () => {
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previousBin);
       restoreEnv("VERIFY_PIE_CHROME", previousChrome);
+    }
+  });
+
+  it("refuses a socket dir that would overflow Unix sun_path", () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-browser-"));
+    const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
+    const previousSocket = process.env.VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    process.env.VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR =
+      "/tmp/pie-verify-web/runs/20260902T112638Z-63968/agent-browser/sockets";
+    try {
+      expect(() => resolveBrowserEnv({ session: "pie-verify-web", runDir })).toThrow(
+        /socket path is \d+ bytes/,
+      );
+    } finally {
+      restoreEnv("VERIFY_PIE_AGENT_BROWSER", previousBin);
+      restoreEnv("VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR", previousSocket);
     }
   });
 });

@@ -69,7 +69,7 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 `pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with `agent-browser`.** After launch you do **not** `eval` env or pass `--session` on every command.
 
-Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, sockets / screenshots / downloads under `$runDir/agent-browser/`, idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
+Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, screenshots / downloads under `$runDir/agent-browser/`, daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` is ~103 bytes and agent-browser appends `namespaces/<session>/run/<session>.sock`), idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
 First machine only: `pnpm exec agent-browser install` if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
 
@@ -109,7 +109,8 @@ Stable handles (from source, not guesses):
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
-| Session send | button **Send message**; while streaming, **Stop generating** |
+| Session send | button **Send message**; while streaming: **Steer message**, **Stop generating**, **Send message** |
+| Session queue | header lists **Steering** (lines labeled **Steer**) then **Queued follow-ups**; not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
