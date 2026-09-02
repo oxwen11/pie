@@ -1,7 +1,7 @@
 import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { describe, expect, it } from "vitest";
 
-import { pickSessionPullRequestLifecycle } from "../src/pull-request/pick-lifecycle";
+import { pickSessionPullRequest } from "../src/pull-request/pick-lifecycle";
 
 const snapshot = (
   lifecycle: PullRequestSnapshot["lifecycle"],
@@ -21,29 +21,29 @@ const snapshot = (
   updatedAt: "2026-08-30T00:00:00Z",
 });
 
-describe("pickSessionPullRequestLifecycle", () => {
+describe("pickSessionPullRequest", () => {
   it("returns undefined when nothing resolved", () => {
-    expect(pickSessionPullRequestLifecycle([])).toBeUndefined();
-    expect(pickSessionPullRequestLifecycle([null, null])).toBeUndefined();
+    expect(pickSessionPullRequest([])).toBeUndefined();
+    expect(pickSessionPullRequest([null, null])).toBeUndefined();
   });
 
   it("prefers the last still-open snapshot", () => {
     expect(
-      pickSessionPullRequestLifecycle([
+      pickSessionPullRequest([
         snapshot({ type: "open", draft: false }, 1),
         snapshot({ type: "merged" }, 2),
         snapshot({ type: "open", draft: true }, 3),
       ]),
-    ).toEqual({ type: "open", draft: true });
+    ).toEqual(snapshot({ type: "open", draft: true }, 3));
   });
 
   it("falls back to the last resolved snapshot when none are open", () => {
     expect(
-      pickSessionPullRequestLifecycle([
+      pickSessionPullRequest([
         snapshot({ type: "closed" }, 1),
         null,
         snapshot({ type: "merged" }, 2),
       ]),
-    ).toEqual({ type: "merged" });
+    ).toEqual(snapshot({ type: "merged" }, 2));
   });
 });

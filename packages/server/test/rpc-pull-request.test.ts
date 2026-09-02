@@ -114,8 +114,8 @@ describe("pull request router", () => {
       await expect(
         harness.client.pullRequest.statuses({ refs: [first.ref, second.ref] }),
       ).resolves.toEqual([
-        { ref: first.ref, lifecycle: { type: "merged" } },
-        { ref: second.ref, lifecycle: { type: "merged" } },
+        { ref: first.ref, lifecycle: { type: "merged" }, url: snapshot.url },
+        { ref: second.ref, lifecycle: { type: "merged" }, url: snapshot.url },
       ]);
       expect(receivedCwds).toEqual([workspace]);
     } finally {
@@ -160,8 +160,8 @@ describe("pull request router", () => {
       await expect(
         harness.client.pullRequest.statuses({ refs: [first.ref, second.ref] }),
       ).resolves.toEqual([
-        { ref: first.ref, lifecycle: { type: "open", draft: false } },
-        { ref: second.ref, lifecycle: { type: "merged" } },
+        { ref: first.ref, lifecycle: { type: "open", draft: false }, url: snapshot.url },
+        { ref: second.ref, lifecycle: { type: "merged" }, url: snapshot.url },
       ]);
       expect(received).toEqual([
         { cwd: first.workspace.cwd, number: snapshot.ref.number },
