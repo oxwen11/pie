@@ -26,6 +26,7 @@ export {
   saveSnapshot,
 } from "./browser.ts";
 export type {
+  AgentBrowserConfig,
   AgentBrowserOptions,
   AgentBrowserTarget,
   BrowserEnvInput,
