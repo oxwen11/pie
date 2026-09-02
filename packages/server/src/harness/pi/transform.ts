@@ -26,6 +26,8 @@ import type { PiUIMessageChunk } from "./ui-message";
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
+//   • queue_update → skipped here; the process offers it on `queueUpdates`
+//     and the runtime emits `session.queue.updated`
 //   • agent_start/agent_settled → `start`/`finish`; a retry re-emits
 //     agent_start, so `start` is guarded to fire once per turn.
 
@@ -225,7 +227,6 @@ export function createPiTransform(
           | "tool_execution_update"
           | "turn_start"
           | "turn_end"
-          | "queue_update"
           | "entry_appended"
           | "session_info_changed"
           | "thinking_level_changed"
@@ -235,7 +236,8 @@ export function createPiTransform(
           | "summarization_retry_scheduled"
           | "summarization_retry_attempt_start"
           | "summarization_retry_finished"
-          | "bash_execution_update");
+          | "bash_execution_update"
+          | "queue_update");
     }
   };
 }

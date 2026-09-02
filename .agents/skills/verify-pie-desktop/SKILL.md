@@ -65,7 +65,7 @@ Prefer **Playwright** (`apps/desktop/e2e/`) when the change is "does the window 
 cd apps/desktop && pnpm e2e -- desktop-rpc.spec.ts -g "renders in the background without taking focus and connects to the server"
 ```
 
-For a **real** isolated window (import, overlay, attach), drive **`agent-browser`** against the Electron CDP port. Do not curl `/json/version`. After launch you do **not** `eval` env or pass `--session` / `--cdp` on every command — launch writes session + namespace `pie-verify-desktop`, `AGENT_BROWSER_CDP`, `AGENT_BROWSER_PIN_TAB=true`, and isolated sockets / screenshots / downloads. Do not set Chrome launch args (they conflict with CDP). The repo shim loads that env.
+For a **real** isolated window (import, overlay, attach), drive **`agent-browser`** against the Electron CDP port. Do not curl `/json/version`. After launch you do **not** `eval` env or pass `--session` / `--cdp` on every command — launch writes session + namespace `pie-verify-desktop`, `AGENT_BROWSER_CDP`, `AGENT_BROWSER_PIN_TAB=true`, screenshots / downloads under the run, and daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` limit). Do not set Chrome launch args (they conflict with CDP). The repo shim loads that env.
 
 ```bash
 pnpm exec pie-verify desktop launch
