@@ -26,6 +26,7 @@ import {
   CADENCE_OPTIONS,
   CREATE_ON_FIRST_RUN_VALUE,
   EVERY_UNIT_OPTIONS,
+  type AutomationFormValues,
   WEEKDAY_OPTIONS,
   defaultOnceLocal,
   defaultAutomationForm,
