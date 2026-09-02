@@ -90,3 +90,31 @@ it.effect("withLock after release still works", () =>
     }),
   ),
 );
+
+it.effect("concurrent first withLock on a ref share one semaphore", () =>
+  withLocks(
+    Effect.gen(function* () {
+      const locks = yield* SessionMetadataLocks;
+      const entered = yield* Ref.make(0);
+      const firstEntered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const hold = locks.withLock(
+        refA,
+        Ref.update(entered, (count) => count + 1).pipe(
+          Effect.andThen(Deferred.succeed(firstEntered, undefined)),
+          Effect.andThen(Deferred.await(release)),
+        ),
+      );
+
+      const first = yield* Effect.forkChild(hold);
+      const second = yield* Effect.forkChild(hold);
+      yield* Deferred.await(firstEntered);
+      yield* Effect.yieldNow;
+      assert.equal(yield* Ref.get(entered), 1);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(first);
+      yield* Fiber.join(second);
+      assert.equal(yield* Ref.get(entered), 2);
+    }),
+  ),
+);
