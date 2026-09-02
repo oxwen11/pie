@@ -1,17 +1,30 @@
 import type { GitRepositoryBranch } from "@getpie/contract/git";
+import { Button } from "@getpie/ui/components/button";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectGroupLabel,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@getpie/ui/components/select";
+  Combobox,
+  ComboboxCollection,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxTrigger,
+  ComboboxValue,
+  useComboboxFilter,
+} from "@getpie/ui/components/combobox";
+import { ChevronsUpDownIcon, SearchIcon } from "lucide-react";
+import { useCallback } from "react";
 
 type SplitRefs = {
   local: string[];
   remote: string[];
+};
+
+type BranchGroup = {
+  label: string;
+  items: string[];
 };
 
 function splitBranchRefs(
@@ -39,48 +52,71 @@ export function DraftWorktreeBaseSelect({
   onValueChange: (base: string) => void;
   disabled?: boolean;
 }) {
+  const filter = useComboboxFilter();
   const refs = splitBranchRefs(branch?.branches ?? [], branch?.remotes ?? []);
-  const items = (branch?.branches ?? []).map((name) => ({ label: name, value: name }));
+  const groups: BranchGroup[] = [];
+  if (refs.local.length > 0) groups.push({ label: "Local", items: refs.local });
+  if (refs.remote.length > 0) groups.push({ label: "Remote", items: refs.remote });
+
+  const matchesQuery = useCallback(
+    (name: string, query: string) => filter.contains(name, query),
+    [filter],
+  );
 
   return (
-    <Select
-      disabled={disabled || branch === undefined || items.length === 0}
-      items={items}
+    <Combobox
+      autoHighlight
+      disabled={disabled || branch === undefined || groups.length === 0}
+      filter={matchesQuery}
+      items={groups}
       onValueChange={(next) => {
-        if (typeof next === "string") onValueChange(next);
+        if (next) onValueChange(next);
       }}
       value={value}
     >
-      <SelectTrigger
+      <ComboboxTrigger
         aria-label="Base branch for worktree"
-        className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
-        size="sm"
+        className="data-placeholder:text-muted-foreground w-auto max-w-56 min-w-0 justify-self-start font-normal"
+        render={<Button size="sm" variant="ghost" />}
         title={value ?? undefined}
       >
-        <SelectValue placeholder="Base branch" />
-      </SelectTrigger>
-      <SelectContent>
-        {refs.local.length > 0 ? (
-          <SelectGroup>
-            <SelectGroupLabel>Local</SelectGroupLabel>
-            {refs.local.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ) : null}
-        {refs.remote.length > 0 ? (
-          <SelectGroup>
-            <SelectGroupLabel>Remote</SelectGroupLabel>
-            {refs.remote.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ) : null}
-      </SelectContent>
-    </Select>
+        <ComboboxValue placeholder="Base branch">
+          {(name: string | null) => <span className="truncate">{name ?? "Base branch"}</span>}
+        </ComboboxValue>
+        <ChevronsUpDownIcon />
+      </ComboboxTrigger>
+      <ComboboxPopup aria-label="Base branch options" className="min-w-64">
+        <div className="border-b px-2 py-1.5">
+          <ComboboxInput
+            aria-label="Search branches"
+            autoFocus
+            className="border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0"
+            placeholder="Search branches…"
+            showTrigger={false}
+            size="sm"
+            startAddon={<SearchIcon />}
+          />
+        </div>
+        <ComboboxEmpty className="text-muted-foreground text-center text-sm">
+          No matching branches.
+        </ComboboxEmpty>
+        <div className="min-h-0 flex-1">
+          <ComboboxList>
+            {(group: BranchGroup) => (
+              <ComboboxGroup items={group.items} key={group.label}>
+                <ComboboxGroupLabel>{group.label}</ComboboxGroupLabel>
+                <ComboboxCollection>
+                  {(name: string) => (
+                    <ComboboxItem key={name} value={name}>
+                      {name}
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
+            )}
+          </ComboboxList>
+        </div>
+      </ComboboxPopup>
+    </Combobox>
   );
 }

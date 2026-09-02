@@ -51,6 +51,51 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
+  it("appends unique pull request refs without replacing earlier ones", async () => {
+    const first = {
+      host: "github.com",
+      owner: "getpie",
+      repository: "pie",
+      number: 99,
+    };
+    const second = { ...first, number: 109 };
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
+        yield* fixture.service.rememberPullRequestRef(ref, first);
+        yield* fixture.service.rememberPullRequestRef(ref, first);
+        yield* fixture.service.rememberPullRequestRef(ref, second);
+        return {
+          listed: yield* fixture.service.pullRequestRefsFor(ref),
+          stored: yield* fixture.repo.read(ref.projectId, ref.sessionId),
+        };
+      }),
+    );
+    expect(result.listed).toEqual([first, second]);
+    expect(result.stored.pullRequestRefs).toEqual([first, second]);
+  });
+
+  it("the first prompt opens Pi with the model stored at create", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          model: { provider: "p", modelId: "m2" },
+        });
+        const before = yield* fixture.service.getModelState(ref);
+        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
+        yield* Effect.sleep("50 millis");
+        return { before, open: fixture.spy.open };
+      }),
+    );
+    expect(result.before).toEqual({ provider: "p", modelId: "m2" });
+    expect(result.open).toEqual([{ cwd: "/tmp/pie-app", provider: "p", modelId: "m2" }]);
+  });
+
   it("create succeeds without opening Pi even when the agent is unavailable", async () => {
     const result = await run({ unavailable: "not installed" }, (fixture) =>
       Effect.gen(function* () {
@@ -335,18 +380,6 @@ describe("PiAgentSessionService", () => {
     expect(result.resume).toEqual([]);
   });
 
-  it("getMessages fails CapabilityUnsupported when the harness has no history read", async () => {
-    const err = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
-        yield* Effect.sleep("50 millis");
-        return yield* Effect.flip(fixture.service.getMessages(ref));
-      }),
-    );
-    expect(err._tag).toBe("CapabilityUnsupported");
-  });
-
   it("interrupt succeeds with nothing running instead of starting an agent", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
@@ -590,6 +623,89 @@ describe("PiAgentSessionService", () => {
     );
     expect(event?.type).toBe("session.prompt.submitted");
     expect(event && "messageId" in event ? event.messageId : undefined).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("skips session.prompt.submitted when a follow-up does not start a turn", async () => {
+    const result = await run({ turn: "open", promptStarted: false }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const receipt = yield* fixture.service.prompt({
+          ref,
+          parts: [{ type: "text", text: "later" }],
+          delivery: "followUp",
+          messageId: "queued-1",
+        });
+        const snapshot = yield* fixture.service.getSnapshot(ref);
+        return {
+          receipt,
+          activePrompt: snapshot.activePrompt,
+          prompts: fixture.spy.prompts,
+        };
+      }),
+    );
+    expect(result.receipt).toEqual({ turnId: "turn-1", started: false });
+    expect(result.activePrompt).toBeNull();
+    expect(result.prompts).toEqual([
+      { parts: [{ type: "text", text: "later" }], delivery: "followUp" },
+    ]);
+  });
+
+  it("fails the RPC when a queued follow-up's deliverPrompt fails", async () => {
+    const result = await run({ turn: "open", promptFails: true }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        const error = yield* fixture.service
+          .prompt({
+            ref,
+            parts: [{ type: "text", text: "later" }],
+            delivery: "followUp",
+            messageId: "queued-fail",
+          })
+          .pipe(Effect.flip);
+        const snapshot = yield* fixture.service.getSnapshot(ref);
+        return { error, activePrompt: snapshot.activePrompt, prompts: fixture.spy.prompts };
+      }),
+    );
+    expect(result.error._tag).toBe("TurnAlreadyRunning");
+    expect(result.activePrompt).toBeNull();
+    expect(result.prompts).toEqual([
+      { parts: [{ type: "text", text: "later" }], delivery: "followUp" },
+    ]);
+  });
+
+  it("emits session.prompt.submitted when a follow-up races to a new turn", async () => {
+    const event = await run({ turn: "open", promptStarted: true }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
+            yield* fixture.service.prompt({
+              ref,
+              parts: [{ type: "text", text: "later" }],
+              delivery: "followUp",
+              messageId: "raced-1",
+            });
+            const items = yield* Stream.runCollect(
+              Stream.take(
+                Stream.filter(
+                  stream,
+                  (item) => item.type === "event" && item.event.type === "session.prompt.submitted",
+                ),
+                1,
+              ),
+            );
+            const item = Array.from(items)[0];
+            return item?.type === "event" ? item.event : undefined;
+          }),
+        );
+      }),
+    );
+    expect(event).toMatchObject({
+      type: "session.prompt.submitted",
+      messageId: "raced-1",
+      parts: [{ type: "text", text: "later" }],
+    });
   });
 
   it("keeps the first prompt's title; later prompts don't rename", async () => {

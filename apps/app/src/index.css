@@ -1,6 +1,12 @@
 @import "@getpie/ui/globals.css";
 @import "tw-shimmer";
 
+/* PieLoader mark size. Relative to the surrounding text size; 0.7em ≈ 10px at
+ * text-sm, matching the session list. */
+@theme {
+  --dot-grid-size: 0.7em;
+}
+
 @source "../node_modules/@getpie/ui";
 
 /* Scan our own src explicitly: the desktop renderer's Vite root is
@@ -23,6 +29,14 @@
   --sidebar-border: hsl(220 13% 91%);
 
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
+
+  --pull-request-open: #1a7f37;
+
+  --pull-request-draft: #6e7781;
+
+  --pull-request-closed: #cf222e;
+
+  --pull-request-merged: #8250df;
 }
 
 .dark {
@@ -41,6 +55,14 @@
   --sidebar-border: hsl(240 3.7% 15.9%);
 
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
+
+  --pull-request-open: #3fb950;
+
+  --pull-request-draft: #8b949e;
+
+  --pull-request-closed: #f85149;
+
+  --pull-request-merged: #a371f7;
 }
 
 @theme inline {
@@ -59,6 +81,14 @@
   --color-sidebar-border: var(--sidebar-border);
 
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-pull-request-open: var(--pull-request-open);
+
+  --color-pull-request-draft: var(--pull-request-draft);
+
+  --color-pull-request-closed: var(--pull-request-closed);
+
+  --color-pull-request-merged: var(--pull-request-merged);
 }
 
 @layer base {

@@ -1,9 +1,11 @@
 # Package layout and boundaries
 
-`contract ← server ← cli|desktop` and `contract ← client ← app ← desktop`.
+`core ← server|cli|desktop`, `contract ← server ← cli|desktop`, and
+`contract ← client ← app ← desktop`.
 
 | dir                 | name                      | role                                                                                                           |
 | ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `packages/core`     | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
 | `packages/contract` | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
 | `packages/server`   | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
 | `packages/client`   | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
@@ -11,6 +13,13 @@
 | `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
 | `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
 | `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
+| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run's native env). Not the product CLI. |
+
+`tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
+
+Repo skills live in `.agents/skills/<name>`. `.cursor/skills`, `.claude/skills`,
+and `.codex/skills` hold relative symlinks to that tree so each client discovers
+the same files. Do not copy a skill into `.cursor/skills` as a second original.
 
 ## Boundaries
 

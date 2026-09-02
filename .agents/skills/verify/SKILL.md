@@ -5,6 +5,13 @@ description: "Build/launch/drive recipe for verifying pie web changes at runtime
 
 # Verifying pie at runtime
 
+For an isolated launch/doctor/drive/cleanup loop (and the feature map), use
+`.agents/skills/verify-pie` (`pnpm exec pie-verify web`),
+`.agents/skills/verify-pie-cli` (`pnpm exec pie-verify cli`), or
+`.agents/skills/verify-pie-desktop` (`pnpm exec pie-verify desktop`) — each is
+also linked from `.cursor/skills`. This file is the short two-process **web**
+recipe.
+
 ## Build + launch
 
 Dev is **two processes**: Vite serves the app, the pie server serves the API,
@@ -61,16 +68,17 @@ Gotchas:
 
 ## Browser automation (agent-browser)
 
-`agent-browser` (bun-global, 0.15.x) drives Chromium via CDP with
-accessibility-tree snapshots: `agent-browser open <url>` / `snapshot` /
-`click @eN` / `keyboard type <text>` / `get url`.
+Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
+recipe is the two-process pair only. After `pie-verify web launch`:
 
-- It needs playwright's **chromium-headless-shell build 1208** (bundles
-  playwright-core ^1.57.0). `agent-browser install` fails
-  (`playwright: command not found`) — install with
-  `node ~/.bun/install/global/node_modules/playwright-core/cli.js install chromium-headless-shell`.
-  The download is slow (~200MB); as a stopgap a symlink
-  `chromium_headless_shell-1208 -> -1228` under `~/Library/Caches/ms-playwright/`
-  launches fine.
-- CDP-synthesized Enter/`\n` does NOT trigger the composer's submit path — click
-  the send button element instead. Shift+Enter probing works (content stays put).
+```bash
+agent-browser open http://localhost:4190/
+agent-browser find role button --name "Import project" click
+```
+
+The repo shim (`tools/verify/bin/agent-browser`) loads the current run's native
+agent-browser env (session, namespace, sockets, Chrome) and execs the mise
+binary. Always pass an explicit `open` URL. Prefer `find` / `wait` over
+`snapshot` + `@eN`.
+
+CDP-synthesized Enter does **not** submit TipTap — click the send button.

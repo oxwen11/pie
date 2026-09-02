@@ -1,0 +1,11 @@
+{
+  "extends": "@getpie/typescript/node.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023"]
+  },
+  "include": ["src"]
+}

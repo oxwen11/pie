@@ -69,6 +69,27 @@ describe("createServer auth", () => {
     expect(body.ticket).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("invokes shutdown only through the authenticated daemon route", async () => {
+    let shutdown = false;
+    const base = await start({ authToken: TOKEN, shutdown: () => (shutdown = true) });
+    const unauthorized = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(unauthorized.status).toBe(401);
+    expect(shutdown).toBe(false);
+
+    const accepted = await fetch(`${base}/api/shutdown`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(accepted.status).toBe(202);
+    expect(shutdown).toBe(true);
+  });
+
+  it("does not expose shutdown in browser mode", async () => {
+    const base = await start({});
+    const response = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(response.status).toBe(404);
+  });
+
   it("requires no token at all when none is configured (browser mode)", async () => {
     const base = await start({});
     const response = await fetch(`${base}/api/ws-ticket`, { method: "POST" });

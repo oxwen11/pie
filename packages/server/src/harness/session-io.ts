@@ -1,4 +1,4 @@
-import { InspectorTargetSchema } from "@getpie/contract";
+import { InspectorTargetSchema, PromptDeliverySchema } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
@@ -42,8 +42,15 @@ export type UserInputPart = typeof UserInputPartSchema.Type;
 
 export const UserInputSchema = Schema.Struct({
   parts: Schema.Array(UserInputPartSchema),
+  delivery: Schema.optionalKey(PromptDeliverySchema),
 });
 export type UserInput = typeof UserInputSchema.Type;
 
-export const PromptReceiptSchema = Schema.Struct({ turnId: Schema.String });
+export const PromptReceiptSchema = Schema.Struct({
+  turnId: Schema.String,
+  started: Schema.Boolean,
+});
 export type PromptReceipt = typeof PromptReceiptSchema.Type;
+
+/** Runtime receipt is the wire receipt — `started` is on both. */
+export type RuntimePromptReceipt = PromptReceipt;
