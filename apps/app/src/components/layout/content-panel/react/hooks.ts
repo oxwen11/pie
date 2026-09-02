@@ -53,6 +53,15 @@ export function useContentPanel(): ContentPanelSession | null {
   }, [contentPanel, sessionRef]);
 }
 
+/** Bound session operations for outlet internals already gated off a session. */
+export function useRequiredContentPanel(): ContentPanelSession {
+  const session = useContentPanel();
+  if (session === null) {
+    throw new Error("Content panel outlet requires a session");
+  }
+  return session;
+}
+
 /**
  * The one subscription entry point; granularity is the caller's to choose.
  * The selector must return something `Object.is`-stable — every field on the

@@ -6,7 +6,7 @@ import { Maximize2Icon, Minimize2Icon, PlusIcon, XIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, type ReactNode } from "react";
 
 import type { OpenPanel } from "../model/content-panel";
-import { type ContentPanelSession, useContentPanel, usePanelSnapshot } from "./hooks";
+import { useContentPanel, usePanelSnapshot, useRequiredContentPanel } from "./hooks";
 import type { AnyPanelView } from "./view";
 
 /**
@@ -39,19 +39,14 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       )}
       {...props}
     >
-      <TabStrip presentation={presentation} session={session} />
-      <PanelBody session={session} />
+      <TabStrip presentation={presentation} />
+      <PanelBody />
     </aside>
   );
 }
 
-function TabStrip({
-  presentation,
-  session,
-}: {
-  presentation: "docked" | "maximized";
-  session: ContentPanelSession;
-}): ReactNode {
+function TabStrip({ presentation }: { presentation: "docked" | "maximized" }): ReactNode {
+  const session = useRequiredContentPanel();
   const panels = usePanelSnapshot((snapshot) => snapshot.panels);
   const activeId = usePanelSnapshot((snapshot) => snapshot.active?.id ?? null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -79,10 +74,10 @@ function TabStrip({
         className="scrollbar-hide flex min-w-0 items-center gap-0.5 overflow-x-auto"
       >
         {panels.map((panel) => (
-          <Tab key={panel.id} panel={panel} active={panel.id === activeId} session={session} />
+          <Tab key={panel.id} panel={panel} active={panel.id === activeId} />
         ))}
       </div>
-      {panels.length > 0 ? <AddPanelMenu session={session} /> : null}
+      {panels.length > 0 ? <AddPanelMenu /> : null}
       <Button
         className="ms-auto"
         variant="ghost"
@@ -107,15 +102,8 @@ function TabStrip({
   );
 }
 
-function Tab({
-  panel,
-  active,
-  session,
-}: {
-  panel: OpenPanel<AnyPanelView>;
-  active: boolean;
-  session: ContentPanelSession;
-}): ReactNode {
+function Tab({ panel, active }: { panel: OpenPanel<AnyPanelView>; active: boolean }): ReactNode {
+  const session = useRequiredContentPanel();
   const Icon = panel.view.icon;
   return (
     <div
@@ -159,7 +147,8 @@ function Tab({
   );
 }
 
-function AddPanelMenu({ session }: { session: ContentPanelSession }): ReactNode {
+function AddPanelMenu(): ReactNode {
+  const session = useRequiredContentPanel();
   const openable = usePanelSnapshot((snapshot) => snapshot.openable);
   if (openable.length === 0) return null;
 
@@ -186,9 +175,9 @@ function AddPanelMenu({ session }: { session: ContentPanelSession }): ReactNode 
   );
 }
 
-function PanelBody({ session }: { session: ContentPanelSession }): ReactNode {
+function PanelBody(): ReactNode {
   const active = usePanelSnapshot((snapshot) => snapshot.active);
-  if (active === null) return <EmptyState session={session} />;
+  if (active === null) return <EmptyState />;
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Reading `instance` is what materializes the panel — only this one. */}
@@ -197,7 +186,8 @@ function PanelBody({ session }: { session: ContentPanelSession }): ReactNode {
   );
 }
 
-function EmptyState({ session }: { session: ContentPanelSession }): ReactNode {
+function EmptyState(): ReactNode {
+  const session = useRequiredContentPanel();
   const openable = usePanelSnapshot((snapshot) => snapshot.openable);
   return (
     <Empty className="py-6 md:py-6">
