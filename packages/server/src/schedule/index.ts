@@ -1,5 +1,5 @@
 export { CronError, parseCron, nextOccurrence, parseRunAt, assertTimeZone } from "./cron";
-export { runScheduleLoop, SCHEDULE_TICK_INTERVAL } from "./daemon";
+export { runScheduleLoop } from "./daemon";
 export {
   CATCH_UP_MS,
   LATE_MS,

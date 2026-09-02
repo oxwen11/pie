@@ -6,6 +6,7 @@ import type {
   SessionRef,
   SessionSummary,
 } from "@getpie/contract";
+import { CAPABILITY_UNAVAILABLE_TAG } from "@getpie/contract";
 import { Context, Effect, Fiber, Layer, Logger } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -692,7 +693,7 @@ describe("ScheduleService", () => {
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
       const h = yield* harness({
-        prompt: () => Effect.fail(new Error("capability-unavailable: no model")),
+        prompt: () => Effect.fail(new Error(`${CAPABILITY_UNAVAILABLE_TAG}: no model`)),
       });
       const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
       yield* h.service.runNow(created.id);

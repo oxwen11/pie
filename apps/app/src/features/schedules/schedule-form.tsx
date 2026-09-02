@@ -23,22 +23,19 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  CADENCE_OPTIONS,
   CREATE_ON_FIRST_RUN_VALUE,
-  EVERY_UNIT_OPTIONS,
   type ScheduleFormValues,
-  WEEKDAY_OPTIONS,
-  defaultOnceLocal,
   defaultScheduleForm,
   formFromSpec,
   isoToLocalDateTime,
-  isScheduleCadence,
-  isScheduleEveryUnit,
   localDateTimeToIso,
   sessionFromForm,
   sessionSelectValue,
   specFromForm,
 } from "./cadence";
+import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
+import { ScheduleFormLimitsFields } from "./schedule-form-limits";
+import { ScheduleFormSessionFields } from "./schedule-form-session";
 
 export type ScheduleFormSubmit = {
   readonly name: string;
@@ -233,233 +230,14 @@ export function ScheduleForm({
           value={form.prompt}
         />
       </Field>
-      <Field>
-        <FieldLabel>Cadence</FieldLabel>
-        <Select
-          items={CADENCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
-          onValueChange={(next) => {
-            if (typeof next !== "string" || !isScheduleCadence(next)) return;
-            setForm((current) => ({
-              ...current,
-              cadence: next,
-              runAt: next === "once" && current.runAt === "" ? defaultOnceLocal() : current.runAt,
-            }));
-          }}
-          value={form.cadence}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CADENCE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      {form.cadence === "every" ? (
-        <div className="grid grid-cols-2 gap-3">
-          <Field>
-            <FieldLabel htmlFor="schedule-every-amount">Every</FieldLabel>
-            <Input
-              id="schedule-every-amount"
-              min={1}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, everyAmount: event.target.value }))
-              }
-              required
-              type="number"
-              value={form.everyAmount}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="schedule-every-unit">Unit</FieldLabel>
-            <Select
-              items={EVERY_UNIT_OPTIONS.map((option) => ({
-                label: option.label,
-                value: option.value,
-              }))}
-              onValueChange={(next) => {
-                if (typeof next === "string" && isScheduleEveryUnit(next)) {
-                  setForm((current) => ({ ...current, everyUnit: next }));
-                }
-              }}
-              value={form.everyUnit}
-            >
-              <SelectTrigger id="schedule-every-unit">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EVERY_UNIT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-      ) : null}
-      {form.cadence === "daily" || form.cadence === "weekdays" || form.cadence === "weekly" ? (
-        <Field>
-          <FieldLabel htmlFor="schedule-time">Time</FieldLabel>
-          <Input
-            id="schedule-time"
-            onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}
-            type="time"
-            value={form.time}
-          />
-        </Field>
-      ) : null}
-      {form.cadence === "weekly" ? (
-        <Field>
-          <FieldLabel htmlFor="schedule-weekday">Weekday</FieldLabel>
-          <Select
-            items={WEEKDAY_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
-            onValueChange={(next) => {
-              if (typeof next === "string") {
-                setForm((current) => ({ ...current, weekday: next }));
-              }
-            }}
-            value={form.weekday}
-          >
-            <SelectTrigger id="schedule-weekday">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WEEKDAY_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      ) : null}
-      {form.cadence === "once" ? (
-        <Field>
-          <FieldLabel htmlFor="schedule-once">Run at</FieldLabel>
-          <Input
-            id="schedule-once"
-            onChange={(event) => setForm((current) => ({ ...current, runAt: event.target.value }))}
-            required
-            type="datetime-local"
-            value={form.runAt}
-          />
-        </Field>
-      ) : null}
-      {form.cadence === "cron" ? (
-        <>
-          <Field>
-            <FieldLabel htmlFor="schedule-cron">Cron</FieldLabel>
-            <Input
-              id="schedule-cron"
-              onChange={(event) => setForm((current) => ({ ...current, cron: event.target.value }))}
-              placeholder="0 9 * * 1-5"
-              required
-              value={form.cron}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="schedule-timezone">Timezone</FieldLabel>
-            <Input
-              id="schedule-timezone"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, timeZone: event.target.value }))
-              }
-              placeholder="Leave empty for the server's local timezone"
-              value={form.timeZone}
-            />
-            <FieldDescription>IANA name, for example UTC or America/New_York.</FieldDescription>
-          </Field>
-        </>
-      ) : null}
-      <Field>
-        <FieldLabel htmlFor="schedule-expires">Expires</FieldLabel>
-        <Input
-          id="schedule-expires"
-          onChange={(event) =>
-            setForm((current) => ({ ...current, expiresAt: event.target.value }))
-          }
-          type="datetime-local"
-          value={form.expiresAt}
-        />
-        <FieldDescription>Optional. After this time the schedule pauses itself.</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="schedule-max-runs">Stop after N runs</FieldLabel>
-        <Input
-          id="schedule-max-runs"
-          max={MAX_SCHEDULE_MAX_RUNS}
-          min={1}
-          onChange={(event) => setForm((current) => ({ ...current, maxRuns: event.target.value }))}
-          placeholder="Unlimited"
-          type="number"
-          value={form.maxRuns}
-        />
-        <FieldDescription>
-          Optional. After this many fires the schedule pauses itself.
-        </FieldDescription>
-      </Field>
-      <Field>
-        <div className="flex w-full items-center justify-between gap-3">
-          <div className="min-w-0">
-            <FieldLabel htmlFor="schedule-reuse">Reuse one session</FieldLabel>
-            <FieldDescription>
-              Keep sending prompts to the same chat instead of creating a new one.
-            </FieldDescription>
-          </div>
-          <Switch
-            checked={form.reuseSession}
-            id="schedule-reuse"
-            onCheckedChange={(checked) =>
-              setForm((current) => ({ ...current, reuseSession: checked }))
-            }
-          />
-        </div>
-      </Field>
-      {form.reuseSession ? (
-        <Field>
-          <FieldLabel htmlFor="schedule-session">Session</FieldLabel>
-          <Select
-            disabled={form.projectId.length === 0}
-            items={sessionItems}
-            onValueChange={(next) => {
-              if (typeof next !== "string") return;
-              if (next === CREATE_ON_FIRST_RUN_VALUE) {
-                setForm((current) => ({
-                  ...current,
-                  sessionPick: "create",
-                  sessionId: "",
-                }));
-                return;
-              }
-              setForm((current) => ({
-                ...current,
-                sessionPick: "existing",
-                sessionId: next,
-              }));
-            }}
-            value={selectedSessionValue}
-          >
-            <SelectTrigger id="schedule-session">
-              <SelectValue placeholder="Create on first run" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessionItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldDescription>
-            Create a chat on the first run, or keep prompting an existing one.
-          </FieldDescription>
-        </Field>
-      ) : null}
+      <ScheduleFormCadenceFields form={form} setForm={setForm} />
+      <ScheduleFormLimitsFields form={form} setForm={setForm} />
+      <ScheduleFormSessionFields
+        form={form}
+        selectedSessionValue={selectedSessionValue}
+        sessionItems={sessionItems}
+        setForm={setForm}
+      />
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
           <FieldLabel htmlFor="schedule-worktree">Isolated worktree</FieldLabel>

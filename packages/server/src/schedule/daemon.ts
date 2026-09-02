@@ -2,9 +2,6 @@ import { Effect } from "effect";
 
 import { ScheduleService } from "./service";
 
-/** Upper bound for the daemon sleep. Actual delay is `nextWakeDelay` (1s–60s). */
-export const SCHEDULE_TICK_INTERVAL = "60 seconds" as const;
-
 /**
  * Process-lifetime loop. The daemon — not any Session — is the clock:
  * each tick creates a fresh session when a Schedule is due.

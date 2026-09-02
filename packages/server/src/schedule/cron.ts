@@ -1,6 +1,6 @@
 /**
- * 5-field cron in the process local timezone. Same dialect as `@getpie/pi-loop`
- * so in-session loops and application Schedules share one calendar language.
+ * 5-field cron in the process local timezone. Forked from `@getpie/pi-loop`
+ * so the two calendars stay the same dialect; they are not a shared module.
  */
 
 export class CronError extends Error {

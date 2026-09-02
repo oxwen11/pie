@@ -66,7 +66,7 @@ describe("specFromForm", () => {
     });
   });
 
-  it("round-trips preset cron expressions", () => {
+  it("loads stored cron as cron and intervals as every", () => {
     const base = defaultScheduleForm("proj");
     const specs = [
       specFromForm({ ...base, cadence: "hourly" }),
@@ -76,12 +76,15 @@ describe("specFromForm", () => {
       specFromForm({ ...base, cadence: "every", everyAmount: "1", everyUnit: "hours" }),
     ];
     expect(specs.map((spec) => formFromSpec(spec, base).cadence)).toEqual([
-      "hourly",
-      "daily",
-      "weekdays",
-      "weekly",
+      "cron",
+      "cron",
+      "cron",
+      "cron",
       "every",
     ]);
+    expect(
+      formFromSpec(specFromForm({ ...base, cadence: "daily", time: "09:00" }), base).cron,
+    ).toBe("0 9 * * *");
   });
 
   it("keeps a timezone cron on the custom cadence", () => {
@@ -123,7 +126,8 @@ describe("formatRunStatus", () => {
     expect(formatRunStatus("running")).toBe("Running");
     expect(formatRunStatus("succeeded")).toBe("Succeeded");
     expect(formatRunStatus("missed")).toBe("Missed");
-    expect(formatSkipReason("queue_overflow")).toBe("already running");
+    expect(formatSkipReason("in_progress")).toBe("already running");
+    expect(formatSkipReason("queue_overflow")).toBe("queue overflow");
     expect(formatSkipReason("max_runs")).toBe("run limit reached");
   });
 });

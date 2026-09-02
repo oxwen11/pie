@@ -12,6 +12,12 @@ export const MIN_SCHEDULE_EVERY_MS = 60_000;
 export const MAX_SCHEDULE_EVERY_MS = 365 * 24 * 60 * 60 * 1000;
 export const MAX_SCHEDULE_MAX_RUNS = 10_000;
 export const SCHEDULE_CIRCUIT_FAILURES = 3;
+/** Prefix of a stored run error that must not trip the failure circuit. */
+export const CAPABILITY_UNAVAILABLE_TAG = "capability-unavailable";
+
+export function isCapabilityUnavailableError(error: string): boolean {
+  return error.includes(CAPABILITY_UNAVAILABLE_TAG);
+}
 
 export const ScheduleCronSpecSchema = Schema.Struct({
   kind: Schema.Literal("cron"),
@@ -77,6 +83,26 @@ export function scheduleSessionOf(schedule: {
 
 export function reuseSessionIdOf(session: ScheduleSession): string | undefined {
   return session.policy === "isolated" ? undefined : session.sessionId;
+}
+
+/** Session ids a Schedule has created or reused. Origin lives here, not on the session. */
+export function collectFiredSessionIds(
+  schedules: ReadonlyArray<{
+    readonly lastSessionId?: string;
+    readonly session?: ScheduleSession;
+    readonly runs: ReadonlyArray<{ readonly sessionId?: string }>;
+  }>,
+): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const schedule of schedules) {
+    if (schedule.lastSessionId !== undefined) ids.add(schedule.lastSessionId);
+    const reuseSessionId = reuseSessionIdOf(scheduleSessionOf(schedule));
+    if (reuseSessionId !== undefined) ids.add(reuseSessionId);
+    for (const run of schedule.runs) {
+      if (run.sessionId !== undefined) ids.add(run.sessionId);
+    }
+  }
+  return ids;
 }
 
 export function persistScheduleSession(session: ScheduleSession | undefined): {

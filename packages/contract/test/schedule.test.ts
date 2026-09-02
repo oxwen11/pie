@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 import {
   ScheduleSchema,
   scheduleSessionOf,
+  collectFiredSessionIds,
   countFiredRuns,
   CreateScheduleInputSchema,
+  CAPABILITY_UNAVAILABLE_TAG,
   firedRunCount,
+  isCapabilityUnavailableError,
   MAX_SCHEDULE_EVERY_MS,
   MAX_SCHEDULE_MAX_RUNS,
   MIN_SCHEDULE_EVERY_MS,
@@ -124,6 +127,32 @@ describe("ScheduleSession helpers", () => {
       sessionId: UUID,
     });
     expect(bindScheduleSession({ policy: "isolated" }, UUID)).toBeUndefined();
+  });
+});
+
+describe("collectFiredSessionIds", () => {
+  it("collects last, reused, and run session ids", () => {
+    expect(
+      collectFiredSessionIds([
+        {
+          lastSessionId: "sess-last",
+          session: { policy: "existing", sessionId: "sess-reuse" },
+          runs: [{ sessionId: "sess-run" }],
+        },
+        { runs: [] },
+      ]),
+    ).toEqual(new Set(["sess-last", "sess-reuse", "sess-run"]));
+  });
+
+  it("returns an empty set when no session ids are recorded", () => {
+    expect(collectFiredSessionIds([{ runs: [] }]).size).toBe(0);
+  });
+});
+
+describe("isCapabilityUnavailableError", () => {
+  it("matches the stable tag inside a stored error string", () => {
+    expect(isCapabilityUnavailableError(`${CAPABILITY_UNAVAILABLE_TAG}: no model`)).toBe(true);
+    expect(isCapabilityUnavailableError("session crashed")).toBe(false);
   });
 });
 
