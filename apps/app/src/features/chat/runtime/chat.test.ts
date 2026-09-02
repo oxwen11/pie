@@ -1,140 +1,17 @@
-import type {
-  AgentRequest,
-  PromptPart,
-  SessionMessageChunkEvent,
-  SessionPhase,
-  SessionRuntimeSnapshot,
-  SessionScopedEvent,
-  SessionScopedEventBody,
-} from "@getpie/contract";
-import type { UIMessage, UIMessageChunk } from "ai";
+import type { AgentRequest } from "@getpie/contract";
+import type { UIMessageChunk } from "ai";
 import { describe, expect, it } from "vitest";
 
-import type { AgentResponse } from "./agent-requests";
-import { Chat } from "./chat";
-import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-port";
-
-const ref = {
-  projectId: "project-1",
-  sessionId: "session-1",
-} as const;
-
-// Chunk folds run on microtasks (ReadableStream consumers): settle before
-// asserting on folded messages.
-const settle = async () => {
-  for (let i = 0; i < 3; i += 1) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-  }
-};
-
-class FakeTransport implements ChatSessionTransport {
-  onEvent: ((event: ChatTransportEvent) => void) | null = null;
-  disposed = 0;
-  history: readonly UIMessage[] | null = null;
-  // When set, getMessages blocks on it — for tests that race the history
-  // floor against live traffic.
-  historyGate: Promise<void> | null = null;
-  getMessagesCalls = 0;
-  promptCalls: Array<{
-    messageId: string;
-    parts: ReadonlyArray<PromptPart>;
-  }> = [];
-  promptError: Error | null = null;
-  // When set, prompt blocks on it — for tests where the RPC is still in flight
-  // (a dropped socket queues it until the link reconnects).
-  promptGate: Promise<void> | null = null;
-  responded: Array<{ requestId: string; response: AgentResponse }> = [];
-  interruptCalls = 0;
-
-  subscribe(onEvent: (event: ChatTransportEvent) => void): () => void {
-    this.onEvent = onEvent;
-    return () => {
-      this.disposed += 1;
-    };
-  }
-  prompt = async (input: { messageId: string; parts: ReadonlyArray<PromptPart> }) => {
-    this.promptCalls.push(input);
-    if (this.promptGate) await this.promptGate;
-    if (this.promptError) throw this.promptError;
-    return { turnId: "turn-receipt" };
-  };
-  getMessages = async () => {
-    this.getMessagesCalls += 1;
-    if (this.historyGate) await this.historyGate;
-    return this.history;
-  };
-  respondToAgentRequest = async (requestId: string, response: AgentResponse) => {
-    this.responded.push({ requestId, response });
-  };
-  interrupt = async () => {
-    this.interruptCalls += 1;
-  };
-}
-
-const makeChat = (options?: { onTerminated?: () => void }) => {
-  const transport = new FakeTransport();
-  const chat = new Chat({ sessionRef: ref, transport, onTerminated: options?.onTerminated });
-  const emit = (event: ChatTransportEvent) => transport.onEvent?.(event);
-  const attach = async (snapshot: Partial<SessionRuntimeSnapshot>) => {
-    emit({
-      type: "attached",
-      snapshot: {
-        ref,
-        status: { phase: "idle" },
-        activeTurn: null,
-        activePrompt: null,
-        pendingRequests: [],
-        cursor: 0,
-        ...snapshot,
-      },
-    });
-    await settle();
-  };
-  const live = (seq: number, body: SessionScopedEventBody & { phase?: SessionPhase }) =>
-    emit({ seq, ref, ...body } as SessionScopedEvent);
-  return { chat, transport, attach, live, emit };
-};
-
-const chunkEvent = (seq: number, turnId: string, chunk: UIMessageChunk): SessionMessageChunkEvent =>
-  ({ seq, ref, type: "session.message.chunk", turnId, chunk }) as SessionMessageChunkEvent;
-
-type ActiveTurnInit = Partial<NonNullable<SessionRuntimeSnapshot["activeTurn"]>> & {
-  turnId: string;
-  chunks: SessionMessageChunkEvent[];
-};
-
-const activeTurn = (init: ActiveTurnInit): NonNullable<SessionRuntimeSnapshot["activeTurn"]> => ({
-  messageId: null,
-  complete: false,
-  truncated: false,
-  ...init,
-});
-
-const textChunks = (id: string, text: string): UIMessageChunk[] => [
-  { type: "text-start", id },
-  { type: "text-delta", id, delta: text },
-  { type: "text-end", id },
-];
-
-const userMessage = (id: string, text: string): UIMessage => ({
-  id,
-  role: "user",
-  parts: [{ type: "text", text }],
-});
-
-const assistantText = (message: UIMessage): string =>
-  message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
-
-const toolRequest: AgentRequest = {
-  type: "tool",
-  id: "request-1",
-  toolName: "Bash",
-  input: { command: "pwd" },
-  actions: [{ id: "allow", label: "Allow", behavior: "allow" }],
-  native: null,
-};
+import {
+  activeTurn,
+  assistantText,
+  chunkEvent,
+  makeChat,
+  settle,
+  textChunks,
+  toolRequest,
+  userMessage,
+} from "./chat-test-helpers";
 
 describe("Chat hydration", () => {
   // Reattaching across a server restart: the session's seq counter is rebuilt

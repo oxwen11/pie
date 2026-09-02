@@ -47,7 +47,7 @@ import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
-import type { PromptReceipt, UserInput } from "./session-io";
+import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
 import type { PiAgentSessionManagerShape } from "./session-manager";
 import { PiAgentSessionManager } from "./session-manager";
 import {
@@ -65,12 +65,19 @@ const deriveTitle = (parts: PromptInput["parts"]): string | undefined => {
 
 const toUserInput = (
   parts: PromptInput["parts"],
+  delivery: PromptInput["delivery"],
 ): Effect.Effect<UserInput, UnsupportedPromptPart> =>
   Effect.forEach(parts, (part) =>
     part.type === "file"
       ? Effect.fail(new UnsupportedPromptPart({ kind: "file" }))
       : Effect.succeed(part),
-  ).pipe(Effect.map((userParts) => ({ parts: userParts })));
+  ).pipe(
+    Effect.map((userParts) => {
+      const userInput: UserInput = { parts: userParts };
+      if (delivery === undefined) return userInput;
+      return { ...userInput, delivery };
+    }),
+  );
 
 type SessionWithCwd = Session & { readonly cwd: string };
 
@@ -151,6 +158,8 @@ export type PiAgentSessionServiceShape = {
     PromptReceipt,
     | SessionNotFound
     | StoreReadError
+    | StoreWriteError
+    | ProjectNotFound
     | UnsupportedPromptPart
     | ResumeSessionError
     | SessionClosed
@@ -304,7 +313,7 @@ export const makePiAgentSessionService = (deps: {
     ref: SessionRef,
     userInput: UserInput,
   ): Effect.Effect<
-    void,
+    RuntimePromptReceipt,
     | ResumeSessionError
     | StoreReadError
     | StoreWriteError
@@ -317,7 +326,7 @@ export const makePiAgentSessionService = (deps: {
     Effect.gen(function* () {
       const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
       const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
-      yield* runtime.prompt(userInput).pipe(Effect.asVoid);
+      return yield* runtime.prompt(userInput);
     });
 
   const readHistory = (
@@ -602,16 +611,17 @@ export const makePiAgentSessionService = (deps: {
 
     prompt: (input) =>
       Effect.gen(function* () {
-        const userInput = yield* toUserInput(input.parts);
+        const queued = input.delivery !== undefined;
+        const userInput = yield* toUserInput(input.parts, input.delivery);
         yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
         const messageId = input.messageId ?? (yield* newSessionId);
-        const turnId = yield* newSessionId;
 
-        yield* manager.emit(input.ref, {
-          type: "session.prompt.submitted",
-          messageId,
-          parts: input.parts,
-        });
+        const submitted = () =>
+          manager.emit(input.ref, {
+            type: "session.prompt.submitted",
+            messageId,
+            parts: input.parts,
+          });
 
         const reject = (reason: string) =>
           manager.emit(input.ref, {
@@ -620,14 +630,24 @@ export const makePiAgentSessionService = (deps: {
             reason,
           });
 
-        yield* deliverPrompt(input.ref, userInput).pipe(
-          Effect.catch((error: unknown) =>
-            reject(error instanceof Error ? error.message : String(error)),
-          ),
-          Effect.forkDetach,
-        );
+        // Idle: fire-and-forget so `submitted` still precedes `turn.started`.
+        // Queued: await the harness — a failed follow-up must fail the RPC
+        // (nothing was submitted, so there is no `rejected` to compensate).
+        if (!queued) {
+          const turnId = yield* newSessionId;
+          yield* submitted();
+          yield* deliverPrompt(input.ref, userInput).pipe(
+            Effect.catch((error: unknown) =>
+              reject(error instanceof Error ? error.message : String(error)),
+            ),
+            Effect.forkDetach,
+          );
+          return { turnId, started: true };
+        }
 
-        return { turnId };
+        const receipt = yield* deliverPrompt(input.ref, userInput);
+        if (receipt.started) yield* submitted();
+        return { turnId: receipt.turnId, started: receipt.started };
       }).pipe(inSession(input.ref)),
 
     interrupt: (ref) =>
