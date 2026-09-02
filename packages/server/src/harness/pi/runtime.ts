@@ -66,12 +66,12 @@ export type PiAgentRuntime = {
     SessionCapabilities,
     CapabilityUnsupported | AgentOperationError
   >;
-  readonly getMessages?: Effect.Effect<
+  readonly getMessages: Effect.Effect<
     ReadonlyArray<UIMessage>,
     SessionClosed | AgentOperationError
   >;
-  readonly getModelState?: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
-  readonly setModel?: (model: {
+  readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly setModel: (model: {
     readonly provider: string;
     readonly modelId: string;
   }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;

@@ -7,8 +7,6 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts",
     "./project": "./src/project/index.ts",
-    "./provider": "./src/provider/index.ts",
-    "./mcp": "./src/mcp/index.ts",
     "./events": "./src/events/index.ts",
     "./fs": "./src/fs/index.ts",
     "./git": "./src/git/index.ts",

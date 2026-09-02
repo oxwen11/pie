@@ -92,6 +92,9 @@ const makeFixture = Effect.gen(function* () {
           supportsSteering: false,
           supportsPermissions: false,
         }),
+        getMessages: Effect.succeed([]),
+        getModelState: Effect.succeed({}),
+        setModel: (model) => Effect.succeed(model),
         close,
       } satisfies PiAgentRuntime;
     });
