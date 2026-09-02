@@ -51,9 +51,9 @@ export function SessionPullRequestIndicator({
     <SidebarMenuAction
       className={color}
       render={
-        <a aria-label={label} href={url} rel="noreferrer" target="_blank" title={label}>
+        <span aria-label={label} role="img" title={label}>
           <Icon aria-hidden className="size-3.5" />
-        </a>
+        </span>
       }
     />
   );
