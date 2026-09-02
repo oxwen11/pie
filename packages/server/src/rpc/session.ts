@@ -184,6 +184,12 @@ export const sessionRouter = orpc.router({
         // Metadata gone → NOT_FOUND; native session not open → SESSION_NOT_ACTIVE.
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        StoreReadError: (e) =>
+          Effect.fail(errors.INTERNAL({ message: `session store read failed: ${e.file}` })),
+        StoreWriteError: (e) =>
+          Effect.fail(errors.INTERNAL({ message: `session store write failed: ${e.file}` })),
         HarnessSessionNotFound: (e) =>
           Effect.fail(
             errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
