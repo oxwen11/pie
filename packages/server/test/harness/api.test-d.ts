@@ -8,7 +8,7 @@ import type {
   ExecutableNotFound,
   PiAgentShape,
   PiAgentRuntime,
-  PromptReceipt,
+  RuntimePromptReceipt,
   SessionClosed,
   TurnAlreadyRunning,
 } from "../../src/harness";
@@ -26,7 +26,7 @@ test("PiAgent create is scoped and effect native", () => {
 test("session operations expose Effect and Stream only", () => {
   expectTypeOf<PiAgentRuntime["events"]>().toMatchTypeOf<Stream.Stream<unknown, unknown>>();
   expectTypeOf<ReturnType<PiAgentRuntime["prompt"]>>().toEqualTypeOf<
-    Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>
+    Effect.Effect<RuntimePromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>
   >();
   expectTypeOf<PiAgentRuntime["close"]>().toEqualTypeOf<Effect.Effect<void>>();
 });

@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { tryReadRunMeta, type RunMeta } from "../meta.ts";
+import { agentBrowserIsolation, isManagedAgentBrowserSocketDir } from "../runtime/browser.ts";
 import { clearCurrentRun, currentRun, isUnder, realPath, removePath } from "../runtime/fs.ts";
 import { removeScaffold } from "../runtime/scaffold.ts";
 import type { Surface } from "../surface.ts";
@@ -35,14 +36,19 @@ export async function cleanup(surface: Surface, args: string[]): Promise<void> {
 
   switch (identity.id) {
     case "web":
-    case "desktop":
+    case "desktop": {
       removeScaffold(sampleProjectOf(meta), identity.sample.marker, identity.logPrefix);
       removeScaffold(
         path.join(process.env.HOME ?? "", identity.sample.name),
         identity.sample.marker,
         identity.logPrefix,
       );
+      const socketDir = agentBrowserIsolation(runDir).socketDir;
+      if (isManagedAgentBrowserSocketDir(socketDir)) {
+        removePath(socketDir);
+      }
       break;
+    }
     case "cli":
       break;
     default: {

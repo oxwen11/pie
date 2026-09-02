@@ -11,6 +11,7 @@ import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
 import type { PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
+import type { UserInput } from "../../src/harness/session-io";
 import { makePiAgentSessionManager } from "../../src/harness/session-manager";
 import {
   type PiAgentSessionRepositoryShape,
@@ -26,6 +27,7 @@ export type Spy = {
   open: Array<{ cwd: string; provider?: string; modelId?: string }>;
   resume: Array<{ sessionId: string; cwd: string | undefined }>;
   close: Array<string>;
+  prompts: UserInput[];
 };
 
 export type Fixture = {
@@ -54,6 +56,9 @@ export type SessionServiceRunOpts = {
   turn?: "open" | "finished";
   // The harness rejects every prompt (a turn is already running).
   promptFails?: boolean;
+  // Whether a successful prompt opens a new turn. Queued follow-ups set this
+  // false so the service can skip `session.prompt.submitted`.
+  promptStarted?: boolean;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;
   failWrite?: boolean;
@@ -72,7 +77,7 @@ export const run = <A, E>(
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
-        const spy: Spy = { open: [], resume: [], close: [] };
+        const spy: Spy = { open: [], resume: [], close: [], prompts: [] };
         let opened = 0;
         const turnEvents = (sessionId: string) => {
           if (opts.turn === undefined) return Stream.empty;
@@ -104,8 +109,17 @@ export const run = <A, E>(
           sessionId,
           events: turnEvents(sessionId),
           prompt: opts.promptFails
-            ? () => Effect.fail(new TurnAlreadyRunning({ sessionId }))
-            : () => Effect.succeed({ turnId: "turn-1" }),
+            ? (input) => {
+                spy.prompts.push(input);
+                return Effect.fail(new TurnAlreadyRunning({ sessionId }));
+              }
+            : (input) => {
+                spy.prompts.push(input);
+                return Effect.succeed({
+                  turnId: "turn-1",
+                  started: opts.promptStarted ?? true,
+                });
+              },
           interrupt: Effect.void,
           respondToAgentRequest: () => Effect.void,
           getCapabilities: Effect.succeed({
@@ -113,9 +127,9 @@ export const run = <A, E>(
             supportsSteering: false,
             supportsPermissions: false,
           }),
-          ...(opts.history !== undefined
-            ? { getMessages: Effect.succeed(opts.history) }
-            : undefined),
+          getMessages: Effect.succeed(opts.history ?? []),
+          getModelState: Effect.succeed({}),
+          setModel: (model) => Effect.succeed(model),
           close: Effect.sync(() => {
             spy.close.push(sessionId);
           }).pipe(
