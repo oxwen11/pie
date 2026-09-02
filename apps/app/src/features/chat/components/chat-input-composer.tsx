@@ -15,6 +15,7 @@ import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
 
+import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
 import { ChatInput } from "./input/chat-input";
 import { ChatInputProvider } from "./input/chat-input-provider";
@@ -28,8 +29,8 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 // turn queues Send as a Pi follow-up. Steer submits the same draft as a
 // steer (inject before the next LLM call) — one shot, not a mode. prompt
 // comes from ChatSessionProvider — not props. The CardFrame header lists
-// queued prompts (steering first); the footer shows the session workspace's
-// git availability and current branch.
+// queued prompts as editable rows (steering first); the footer shows the
+// session workspace's git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -41,7 +42,7 @@ export function ChatInputComposer({
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
   const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
-  const { prompt, interrupt, store } = useChatSession();
+  const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const canInterrupt = status === "streaming";
@@ -75,9 +76,8 @@ export function ChatInputComposer({
   return (
     <CardFrame>
       {hasQueued ? (
-        <CardFrameHeader className="min-w-0 grid-rows-none gap-1 py-2">
-          <QueueLines items={pendingPrompt.steering} kind="steer" label="Steering" />
-          <QueueLines items={pendingPrompt.followUp} kind="followUp" label="Queued follow-ups" />
+        <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
+          <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
         </CardFrameHeader>
       ) : null}
       <Card
@@ -149,33 +149,5 @@ export function ChatInputComposer({
         </span>
       </CardFrameFooter>
     </CardFrame>
-  );
-}
-
-function QueueLines({
-  items,
-  kind,
-  label,
-}: {
-  items: readonly string[];
-  kind: "steer" | "followUp";
-  label: string;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <ul aria-label={label} className="flex w-full min-w-0 flex-col gap-1">
-      {items.map((text, index) => (
-        <li
-          className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-sm"
-          key={`${kind}:${index}:${text}`}
-          title={text}
-        >
-          {kind === "steer" ? (
-            <span className="text-foreground shrink-0 text-xs font-medium">Steer</span>
-          ) : null}
-          <span className="truncate">{text}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

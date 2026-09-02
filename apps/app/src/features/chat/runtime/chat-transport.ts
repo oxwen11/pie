@@ -1,5 +1,10 @@
 import type { PieClient } from "@getpie/client";
-import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@getpie/contract";
+import type {
+  PromptPart,
+  SessionPendingPrompt,
+  SessionRef,
+  SubscribeStreamEvent,
+} from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import type { UIMessage } from "ai";
 
@@ -17,7 +22,7 @@ type PieSessionClient = PieClient["agent"]["session"];
 
 type SessionClient = Pick<
   PieSessionClient,
-  "prompt" | "interrupt" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
+  "prompt" | "interrupt" | "replaceQueue" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
 > & {
   subscribe: (
     ...args: Parameters<PieSessionClient["subscribe"]>
@@ -77,6 +82,10 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
 
   interrupt = async (): Promise<void> => {
     await this.client.session.interrupt({ ref: this.#ref });
+  };
+
+  replaceQueue = async (pending: SessionPendingPrompt): Promise<void> => {
+    await this.client.session.replaceQueue({ ref: this.#ref, ...pending });
   };
 
   getMessages = async (): Promise<readonly UIMessage[] | null> => {
