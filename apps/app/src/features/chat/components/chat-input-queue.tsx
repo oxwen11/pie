@@ -29,6 +29,19 @@ export function removeQueuedItem(
   return { ...pending, [kind]: items.filter((_, itemIndex) => itemIndex !== index) };
 }
 
+export function promoteQueuedFollowUp(
+  pending: SessionPendingPrompt,
+  index: number,
+): SessionPendingPrompt {
+  const items = pending.followUp;
+  if (index < 0 || index >= items.length) return pending;
+  const text = items[index]!;
+  return {
+    steering: [...pending.steering, text],
+    followUp: items.filter((_, itemIndex) => itemIndex !== index),
+  };
+}
+
 export function ChatInputQueue({
   pending,
   onReplace,
@@ -59,6 +72,7 @@ export function ChatInputQueue({
             key={`followUp:${index}:${text}`}
             kind="followUp"
             text={text}
+            onPromote={() => onReplace(promoteQueuedFollowUp(pending, index))}
             onRemove={() => onReplace(removeQueuedItem(pending, "followUp", index))}
             onSave={(next) => onReplace(replaceQueuedItem(pending, "followUp", index, next))}
           />
@@ -71,11 +85,13 @@ export function ChatInputQueue({
 function ChatInputQueueItem({
   kind,
   text,
+  onPromote,
   onRemove,
   onSave,
 }: {
   kind: QueuedPromptKind;
   text: string;
+  onPromote?: () => void;
   onRemove: () => void;
   onSave: (text: string) => void;
 }) {
@@ -122,6 +138,17 @@ function ChatInputQueueItem({
       {kind === "steering" ? <SteerBadge /> : null}
       <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">{text}</span>
       <span className="flex shrink-0 items-center gap-0.5">
+        {onPromote ? (
+          <Button
+            aria-label="Steer queued message"
+            onClick={onPromote}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            Send
+          </Button>
+        ) : null}
         <Button
           aria-label="Edit queued message"
           onClick={() => setDraft(text)}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { removeQueuedItem, replaceQueuedItem } from "./chat-input-queue";
+import { promoteQueuedFollowUp, removeQueuedItem, replaceQueuedItem } from "./chat-input-queue";
 
 const pending = {
   steering: ["steer-a", "steer-b"],
@@ -30,6 +30,25 @@ describe("queued prompt edits", () => {
   it("removes a line without touching the other kind", () => {
     expect(removeQueuedItem(pending, "followUp", 0)).toEqual({
       steering: ["steer-a", "steer-b"],
+      followUp: ["later-b"],
+    });
+  });
+
+  it("promotes a follow-up onto the end of steering", () => {
+    expect(promoteQueuedFollowUp(pending, 1)).toEqual({
+      steering: ["steer-a", "steer-b", "later-b"],
+      followUp: ["later-a"],
+    });
+  });
+
+  it("returns the same pending prompt when the follow-up index is out of range", () => {
+    expect(promoteQueuedFollowUp(pending, -1)).toBe(pending);
+    expect(promoteQueuedFollowUp(pending, 2)).toBe(pending);
+  });
+
+  it("keeps other follow-ups when promoting the first line", () => {
+    expect(promoteQueuedFollowUp(pending, 0)).toEqual({
+      steering: ["steer-a", "steer-b", "later-a"],
       followUp: ["later-b"],
     });
   });
