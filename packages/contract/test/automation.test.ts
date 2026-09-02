@@ -19,14 +19,14 @@ const accepts = <A>(schema: Schema.ConstraintDecoder<A>, value: unknown): boolea
   Exit.isSuccess(Schema.decodeUnknownExit(schema)(value));
 
 describe("CreateAutomationInput", () => {
-  it("accepts every, timezone cron, and merged output", () => {
+  it("accepts every, timezone cron, and reused session", () => {
     expect(
       accepts(CreateAutomationInputSchema, {
         name: "Nightly",
         projectId: UUID,
         prompt: "review",
         spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS },
-        outputMode: "merged",
+        sessionMode: "reuse",
         expiresAt: "2026-12-01T00:00:00.000Z",
         maxRuns: 3,
         runNow: true,

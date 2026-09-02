@@ -16,13 +16,13 @@ const base = {
 };
 
 describe("collectFiredSessionIds", () => {
-  it("collects last, merged, and run session ids", () => {
+  it("collects last, reused, and run session ids", () => {
     const automations: ReadonlyArray<Automation> = [
       {
         ...base,
         id: "00000000-0000-0000-0000-0000000000aa",
         lastSessionId: "sess-last",
-        mergedSessionId: "sess-merged",
+        reuseSessionId: "sess-reuse",
         runs: [
           {
             id: "run-1",
@@ -35,7 +35,7 @@ describe("collectFiredSessionIds", () => {
       },
     ];
     expect(collectFiredSessionIds(automations)).toEqual(
-      new Set(["sess-last", "sess-merged", "sess-run"]),
+      new Set(["sess-last", "sess-reuse", "sess-run"]),
     );
   });
 

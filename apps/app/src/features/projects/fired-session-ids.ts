@@ -7,7 +7,7 @@ export function collectFiredSessionIds(
   const ids = new Set<string>();
   for (const automation of automations) {
     if (automation.lastSessionId !== undefined) ids.add(automation.lastSessionId);
-    if (automation.mergedSessionId !== undefined) ids.add(automation.mergedSessionId);
+    if (automation.reuseSessionId !== undefined) ids.add(automation.reuseSessionId);
     for (const run of automation.runs) {
       if (run.sessionId !== undefined) ids.add(run.sessionId);
     }

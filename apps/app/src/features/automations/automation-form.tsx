@@ -1,4 +1,4 @@
-import type { Project, Automation, AutomationSpec } from "@getpie/contract";
+import type { Project, Automation, AutomationSessionMode, AutomationSpec } from "@getpie/contract";
 import {
   MAX_AUTOMATION_MAX_RUNS,
   MAX_AUTOMATION_NAME_CHARS,
@@ -39,7 +39,7 @@ export type AutomationFormSubmit = {
   readonly prompt: string;
   readonly spec: AutomationSpec;
   readonly worktree: boolean;
-  readonly outputMode: "independent" | "merged";
+  readonly sessionMode: AutomationSessionMode;
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
@@ -65,7 +65,7 @@ function formFromAutomation(
     name: initial.name,
     prompt: initial.prompt,
     worktree: initial.worktree !== undefined,
-    reuseSession: initial.outputMode === "merged",
+    reuseSession: initial.sessionMode === "reuse",
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
@@ -122,7 +122,7 @@ export function AutomationForm({
             prompt: form.prompt.trim(),
             spec,
             worktree: form.worktree,
-            outputMode: form.reuseSession ? "merged" : "independent",
+            sessionMode: form.reuseSession ? "reuse" : "new",
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,

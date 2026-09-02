@@ -382,7 +382,7 @@ describe("AutomationService", () => {
     expect(after?.runs[0]?.skipReason).toBe("expired");
   });
 
-  it("reuses one session in merged mode and creates again after archive", async () => {
+  it("reuses one session in reuse mode and creates again after archive", async () => {
     let archived = false;
     const h = setup({
       sessions: {
@@ -390,16 +390,16 @@ describe("AutomationService", () => {
       },
     });
     const created = await run(
-      h.service.create(cronInput({ outputMode: "merged", spec: { kind: "manual" } })),
+      h.service.create(cronInput({ sessionMode: "reuse", spec: { kind: "manual" } })),
     );
     await run(h.service.runNow(created.id));
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(1);
-    expect(h.store.get(created.id)?.mergedSessionId).toBe("sess-1");
+    expect(h.store.get(created.id)?.reuseSessionId).toBe("sess-1");
     archived = true;
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(2);
-    expect(h.store.get(created.id)?.mergedSessionId).toBe("sess-2");
+    expect(h.store.get(created.id)?.reuseSessionId).toBe("sess-2");
   });
 
   it("opens the failure circuit after three settled failures", async () => {
