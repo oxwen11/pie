@@ -14,7 +14,7 @@ import { ProjectService } from "../project";
 import type { FireResult } from "./fire";
 import * as mutations from "./mutations";
 import { ScheduleRepository } from "./repository";
-import { ScheduleRuntimeLayer, type ScheduleServiceEnv } from "./runtime";
+import { ScheduleRuntime, ScheduleRuntimeLayer } from "./runtime";
 import { tick } from "./tick";
 
 export type { FireResult };
@@ -56,9 +56,22 @@ export const ScheduleServiceLayer: Layer.Layer<
 > = Layer.effect(
   ScheduleService,
   Effect.gen(function* () {
-    const env = yield* Effect.context<ScheduleServiceEnv>();
+    const repo = yield* ScheduleRepository;
+    const projects = yield* ProjectService;
+    const sessions = yield* PiAgentSessionService;
+    const crypto = yield* Crypto.Crypto;
+    const runtime = yield* ScheduleRuntime;
+    // Only these five — do not capture Logger/Clock from layer build, or
+    // TestClock / captureLogs lose to the frozen context.
+    const env = Context.make(ScheduleRepository, repo).pipe(
+      Context.add(ProjectService, projects),
+      Context.add(PiAgentSessionService, sessions),
+      Context.add(Crypto.Crypto, crypto),
+      Context.add(ScheduleRuntime, runtime),
+    );
+    // Shape stays R-free. Modules yield* services; this seam provides them.
     const provide = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
-      effect.pipe(Effect.provide(env as never));
+      effect.pipe(Effect.provide(env)) as Effect.Effect<A, E>;
     return {
       list: () => provide(mutations.list()),
       get: (id) => provide(mutations.get(id)),
