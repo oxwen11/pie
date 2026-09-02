@@ -3,8 +3,9 @@ name: Code check
 on:
   push:
     branches: ["main"]
+  # No base-branch filter: stacked PRs target the layer below them, not main,
+  # and still need the same gate before they can be merged bottom-up.
   pull_request:
-    branches: ["main"]
 
 permissions:
   contents: read
