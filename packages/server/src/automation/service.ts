@@ -439,7 +439,6 @@ export const makeAutomationService = (deps: {
   const fire = (
     automation: Automation,
     reason: AutomationRunReason,
-    options: { readonly skipIfBusy: boolean },
   ): Effect.Effect<FireResult, StoreReadError | StoreWriteError> =>
     Effect.gen(function* () {
       const startedAt = now();
@@ -514,10 +513,13 @@ export const makeAutomationService = (deps: {
         return { automation: skipped };
       }
 
-      if (options.skipIfBusy && automation.lastSessionId !== undefined) {
+      // Bound target only — isolated lastSessionId being live must not block a
+      // new session. Run now uses the same check; there is no queue.
+      const targetId = reuseSessionIdOf(automationSessionOf(automation));
+      if (targetId !== undefined) {
         const live = yield* sessions.getStatus({
           projectId: automation.projectId,
-          sessionId: automation.lastSessionId,
+          sessionId: targetId,
         });
         if (isBusy(live.phase)) {
           const skipped = yield* record(
@@ -780,7 +782,7 @@ export const makeAutomationService = (deps: {
           },
         });
         if (input.runNow === true) {
-          const fired = yield* fire(automation, "manual", { skipIfBusy: false });
+          const fired = yield* fire(automation, "manual");
           return fired.automation;
         }
         return automation;
@@ -895,10 +897,7 @@ export const makeAutomationService = (deps: {
         ),
       ),
 
-    runNow: (id) =>
-      repo
-        .read(id)
-        .pipe(Effect.flatMap((automation) => fire(automation, "manual", { skipIfBusy: false }))),
+    runNow: (id) => repo.read(id).pipe(Effect.flatMap((automation) => fire(automation, "manual"))),
 
     recover: () =>
       Effect.gen(function* () {
@@ -1034,10 +1033,10 @@ export const makeAutomationService = (deps: {
                       missedCount,
                     },
                   });
-                  yield* fire(withMissed, "missed_recovery", { skipIfBusy: true });
+                  yield* fire(withMissed, "missed_recovery");
                   return;
                 }
-                yield* fire(automation, "scheduled", { skipIfBusy: true });
+                yield* fire(automation, "scheduled");
               }),
             { concurrency: 1, discard: true },
           );

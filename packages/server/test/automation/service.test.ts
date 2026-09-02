@@ -1,4 +1,4 @@
-import type { CreateAutomationInput, Automation } from "@getpie/contract";
+import type { CreateAutomationInput, Automation, SessionPhase, SessionRef } from "@getpie/contract";
 import { Effect, Logger } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -79,6 +79,7 @@ function idleSessions(overrides: Partial<AutomationSessions> = {}): AutomationSe
 function setup(
   opts: {
     readonly live?: boolean;
+    readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
     readonly missingProject?: boolean;
     readonly sessions?: Partial<AutomationSessions>;
     readonly forkSettle?: (effect: Effect.Effect<void>) => Effect.Effect<void>;
@@ -124,7 +125,10 @@ function setup(
         prompted.push(text);
         return { turnId: `turn-${prompted.length}` };
       }),
-    getStatus: () => Effect.succeed({ phase: opts.live === true ? "running" : "idle" }),
+    getStatus: (ref) =>
+      Effect.succeed({
+        phase: opts.sessionPhase?.(ref) ?? (opts.live === true ? "running" : "idle"),
+      }),
     ...opts.sessions,
   });
   const service = makeAutomationService({
@@ -288,7 +292,58 @@ describe("AutomationService", () => {
     expect(Date.parse(after!.nextRunAt!)).toBeGreaterThan(Date.parse(firstNext));
   });
 
-  it("tick skips a live previous session", async () => {
+  it("skips a scheduled fire when the bound session is busy", async () => {
+    const h = setup({ live: true });
+    const created = await run(
+      h.service.create(
+        cronInput({
+          spec: { kind: "cron", expr: "* * * * *" },
+          session: { policy: "existing", sessionId: "picked" },
+        }),
+      ),
+    );
+    h.setNow(created.nextRunAt!);
+    await run(h.service.tick());
+    const after = h.store.get(created.id);
+    expect(h.created).toHaveLength(0);
+    expect(after?.lastRunStatus).toBe("skipped");
+    expect(after?.runs[0]?.skipReason).toBe("in_progress");
+  });
+
+  it("skips runNow when the bound session is busy", async () => {
+    const h = setup({ live: true });
+    const created = await run(
+      h.service.create(
+        cronInput({
+          spec: { kind: "manual" },
+          session: { policy: "owned", sessionId: "owned-1" },
+        }),
+      ),
+    );
+    const fired = await run(h.service.runNow(created.id));
+    expect(fired.ref).toBeUndefined();
+    expect(h.created).toHaveLength(0);
+    expect(fired.automation.lastRunStatus).toBe("skipped");
+    expect(fired.automation.runs[0]?.skipReason).toBe("in_progress");
+  });
+
+  it("skips create runNow when the bound session is busy", async () => {
+    const h = setup({ live: true });
+    const created = await run(
+      h.service.create(
+        cronInput({
+          spec: { kind: "manual" },
+          session: { policy: "existing", sessionId: "picked" },
+          runNow: true,
+        }),
+      ),
+    );
+    expect(h.created).toHaveLength(0);
+    expect(created.lastRunStatus).toBe("skipped");
+    expect(created.runs[0]?.skipReason).toBe("in_progress");
+  });
+
+  it("fires an isolated scheduled run even when the last session is still live", async () => {
     const h = setup({ live: true });
     const created = await run(
       h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" } })),
@@ -298,9 +353,57 @@ describe("AutomationService", () => {
     h.setNow(first.automation.nextRunAt!);
     await run(h.service.tick());
     const after = h.store.get(created.id);
+    expect(h.created).toHaveLength(2);
+    expect(after?.lastRunStatus).toBe("succeeded");
+    expect(after?.lastSessionId).toBe("sess-2");
+  });
+
+  it("creates a session for owned-without-id even when lastSessionId is live", async () => {
+    const h = setup({ live: true });
+    const created = await run(
+      h.service.create(cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } })),
+    );
+    h.store.set(created.id, {
+      ...created,
+      lastSessionId: "old-live",
+      lastRunStatus: "succeeded",
+    });
+    const fired = await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(1);
-    expect(after?.lastRunStatus).toBe("skipped");
-    expect(after?.runs[0]?.skipReason).toBe("in_progress");
+    expect(fired.ref?.sessionId).toBe("sess-1");
+    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-1" });
+  });
+
+  it("skips a second automation when they share a busy session", async () => {
+    const phases = new Map<string, SessionPhase>([["shared", "idle"]]);
+    const h = setup({
+      sessionPhase: (ref) => phases.get(ref.sessionId) ?? "idle",
+    });
+    const first = await run(
+      h.service.create(
+        cronInput({
+          name: "First",
+          session: { policy: "existing", sessionId: "shared" },
+          spec: { kind: "manual" },
+        }),
+      ),
+    );
+    const second = await run(
+      h.service.create(
+        cronInput({
+          name: "Second",
+          session: { policy: "existing", sessionId: "shared" },
+          spec: { kind: "manual" },
+        }),
+      ),
+    );
+    const fired = await run(h.service.runNow(first.id));
+    expect(fired.ref?.sessionId).toBe("shared");
+    phases.set("shared", "running");
+    const skipped = await run(h.service.runNow(second.id));
+    expect(skipped.ref).toBeUndefined();
+    expect(skipped.automation.lastRunStatus).toBe("skipped");
+    expect(skipped.automation.runs[0]?.skipReason).toBe("in_progress");
   });
 
   it("records one missed run then fires a single recovery when late", async () => {
