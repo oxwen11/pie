@@ -965,4 +965,27 @@ describe("PiAgentSessionService", () => {
 
     expect(stored.title).toBe("Still responsive");
   });
+
+  it("setModel on an unopened session writes metadata without opening Pi", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          model: { provider: "anthropic", modelId: "claude-opus-4-6" },
+        });
+        const state = yield* fixture.service.setModel(ref, {
+          provider: "anthropic",
+          modelId: "claude-sonnet-4-5",
+        });
+        const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+        return { state, stored, open: fixture.spy.open };
+      }),
+    );
+
+    expect(result.open).toEqual([]);
+    expect(result.state).toEqual({ provider: "anthropic", modelId: "claude-sonnet-4-5" });
+    expect(result.stored.provider).toBe("anthropic");
+    expect(result.stored.modelId).toBe("claude-sonnet-4-5");
+  });
 });
