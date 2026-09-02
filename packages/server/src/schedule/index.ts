@@ -11,7 +11,6 @@ export {
 } from "./next-run";
 export { ScheduleRepository, ScheduleRepositoryLayer } from "./repository";
 export {
-  makeScheduleService,
   ScheduleService,
   ScheduleServiceLayer,
   type FireResult,

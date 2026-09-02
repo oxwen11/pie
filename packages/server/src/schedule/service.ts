@@ -23,7 +23,7 @@ import {
   reuseSessionIdOf,
   bindScheduleSession,
 } from "@getpie/contract";
-import { Context, Crypto, Effect, Layer, Result, Semaphore } from "effect";
+import { Clock, Context, Crypto, Effect, Layer, Result, Semaphore } from "effect";
 
 import {
   InvalidSchedule,
@@ -34,11 +34,7 @@ import {
   type StoreWriteError,
 } from "../errors";
 import type { GitWorktreeFailure } from "../git/worktree-service";
-import {
-  type CreatePiSessionInput,
-  type PiAgentSessionServiceShape,
-  PiAgentSessionService,
-} from "../harness";
+import { type PiAgentSessionServiceShape, PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import { CronError } from "./cron";
 import {
@@ -53,37 +49,8 @@ import {
 } from "./next-run";
 import { ScheduleRepository } from "./repository";
 
-export type ScheduleStore = {
-  readonly list: () => Effect.Effect<ReadonlyArray<Schedule>, StoreReadError>;
-  readonly read: (id: string) => Effect.Effect<Schedule, StoreReadError | ScheduleNotFound>;
-  readonly write: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
-  readonly remove: (id: string) => Effect.Effect<void, StoreWriteError>;
-};
-
-export type ScheduleProjects = {
-  readonly findById: (
-    id: string,
-  ) => Effect.Effect<{ readonly path: string }, StoreReadError | ProjectNotFound>;
-};
-
 export type FoundSession = {
   readonly archived: boolean;
-};
-
-export type ScheduleSessions = {
-  readonly create: (
-    input: CreatePiSessionInput,
-  ) => Effect.Effect<
-    { readonly ref: SessionRef; readonly workspace: { readonly cwd: string } },
-    StoreWriteError | GitWorktreeFailure
-  >;
-  readonly prompt: (input: {
-    readonly ref: SessionRef;
-    readonly parts: ReadonlyArray<{ readonly type: "text"; readonly text: string }>;
-  }) => Effect.Effect<unknown, unknown>;
-  readonly getStatus: (ref: SessionRef) => Effect.Effect<{ readonly phase: SessionPhase }>;
-  readonly find: (ref: SessionRef) => Effect.Effect<FoundSession | null, StoreReadError>;
-  readonly waitUntilSettled: (ref: SessionRef) => Effect.Effect<{ readonly phase: SessionPhase }>;
 };
 
 const MAX_RUNS = 20;
@@ -245,16 +212,44 @@ const logSchedule = (entry: {
   return log.pipe(Effect.annotateLogs({ event: entry.event, ...entry.annotations }));
 };
 
-export const makeScheduleService = (deps: {
-  readonly repo: ScheduleStore;
-  readonly projects: ScheduleProjects;
-  readonly sessions: ScheduleSessions;
+const SETTLE_ATTEMPTS = 300;
+
+const waitUntilSettled = (
+  sessions: PiAgentSessionServiceShape,
+  ref: SessionRef,
+): Effect.Effect<{ readonly phase: SessionPhase }> =>
+  Effect.gen(function* () {
+    for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+      const status = yield* sessions.getStatus(ref);
+      if (status.phase === "idle" || status.phase === "crashed") return status;
+      yield* Effect.sleep("200 millis");
+    }
+    return yield* sessions.getStatus(ref);
+  });
+
+const findSession = (
+  sessions: PiAgentSessionServiceShape,
+  ref: SessionRef,
+): Effect.Effect<FoundSession | null, StoreReadError> =>
+  Effect.gen(function* () {
+    const open = yield* sessions.list(ref.projectId, false);
+    if (open.some((session) => session.sessionId === ref.sessionId)) {
+      return { archived: false };
+    }
+    const archived = yield* sessions.list(ref.projectId, true);
+    if (archived.some((session) => session.sessionId === ref.sessionId)) {
+      return { archived: true };
+    }
+    return null;
+  });
+
+const liveScheduleService = (deps: {
+  readonly repo: ScheduleRepository["Service"];
+  readonly projects: ProjectService["Service"];
+  readonly sessions: PiAgentSessionServiceShape;
   readonly newId: Effect.Effect<string>;
-  readonly now: () => number;
-  readonly forkSettle?: (effect: Effect.Effect<void>) => Effect.Effect<void>;
 }): ScheduleServiceShape => {
-  const { repo, projects, sessions, newId, now } = deps;
-  const forkSettle = deps.forkSettle ?? ((effect) => effect.pipe(Effect.forkDetach, Effect.asVoid));
+  const { repo, projects, sessions, newId } = deps;
   const tickGate = Semaphore.makeUnsafe(1);
   const inFlight = new Set<string>();
 
@@ -311,7 +306,7 @@ export const makeScheduleService = (deps: {
       if (current === null) return;
       const existing = current.runs.find((run) => run.id === runId);
       if (existing?.status !== "running") return;
-      const finishedAt = new Date(now()).toISOString();
+      const finishedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
       const capabilityBlocked =
         outcome.status === "failed" && outcome.error.includes("capability-unavailable");
       const failures =
@@ -393,7 +388,7 @@ export const makeScheduleService = (deps: {
         });
         return;
       }
-      const status = yield* sessions.waitUntilSettled(ref);
+      const status = yield* waitUntilSettled(sessions, ref);
       if (status.phase === "idle") {
         yield* finishRun(scheduleId, runId, { status: "succeeded" });
         return;
@@ -419,7 +414,7 @@ export const makeScheduleService = (deps: {
       const reuseSessionId = reuseSessionIdOf(scheduleSessionOf(snapshot));
       if (reuseSessionId !== undefined) {
         const ref = { projectId: snapshot.projectId, sessionId: reuseSessionId };
-        const found = yield* sessions.find(ref);
+        const found = yield* findSession(sessions, ref);
         if (found !== null && !found.archived) {
           return ref;
         }
@@ -441,7 +436,7 @@ export const makeScheduleService = (deps: {
     reason: ScheduleRunReason,
   ): Effect.Effect<FireResult, StoreReadError | StoreWriteError> =>
     Effect.gen(function* () {
-      const startedAt = now();
+      const startedAt = yield* Clock.currentTimeMillis;
       const runId = yield* newId;
       const startedIso = new Date(startedAt).toISOString();
       const snapshot = snapshotOf(schedule);
@@ -681,7 +676,10 @@ export const makeScheduleService = (deps: {
         ref: outcome.ref,
         parts: [{ type: "text", text: snapshot.prompt }],
       });
-      yield* forkSettle(settleAfterPrompt(schedule.id, runId, outcome.ref, prompt));
+      yield* settleAfterPrompt(schedule.id, runId, outcome.ref, prompt).pipe(
+        Effect.forkDetach,
+        Effect.asVoid,
+      );
       return { schedule: started, ref: outcome.ref };
     });
 
@@ -717,7 +715,7 @@ export const makeScheduleService = (deps: {
     if (sessionId === undefined) {
       return Effect.void;
     }
-    return sessions.find({ projectId, sessionId }).pipe(
+    return findSession(sessions, { projectId, sessionId }).pipe(
       Effect.flatMap((found) => {
         if (found === null) {
           return Effect.fail(new InvalidSchedule({ reason: "session not found" }));
@@ -740,7 +738,7 @@ export const makeScheduleService = (deps: {
       Effect.gen(function* () {
         yield* projects.findById(input.projectId);
         yield* trySession(input.projectId, input.session);
-        const createdAt = now();
+        const createdAt = yield* Clock.currentTimeMillis;
         yield* tryValidate(input.spec, createdAt, input.expiresAt);
         const existing = yield* repo.list();
         if (existing.length >= MAX_SCHEDULES) {
@@ -796,7 +794,7 @@ export const makeScheduleService = (deps: {
           session: currentSession,
           ...currentRest
         } = current;
-        const updatedAt = now();
+        const updatedAt = yield* Clock.currentTimeMillis;
         const spec = input.spec ?? current.spec;
         const expiresAt =
           input.expiresAt === undefined
@@ -899,7 +897,7 @@ export const makeScheduleService = (deps: {
 
     recover: () =>
       Effect.gen(function* () {
-        const tickedAt = now();
+        const tickedAt = yield* Clock.currentTimeMillis;
         const finishedAt = new Date(tickedAt).toISOString();
         const schedules = yield* repo.list();
         let recovered = 0;
@@ -935,23 +933,22 @@ export const makeScheduleService = (deps: {
       }),
 
     nextWakeDelay: () =>
-      repo.list().pipe(
-        Effect.map((schedules) => {
-          const tickedAt = now();
-          const times: Array<number | null> = [];
-          for (const schedule of schedules) {
-            if (!schedule.enabled) continue;
-            times.push(schedule.nextRunAt === null ? null : Date.parse(schedule.nextRunAt));
-            if (schedule.expiresAt !== undefined) times.push(Date.parse(schedule.expiresAt));
-          }
-          return nextWakeDelayMs(times, tickedAt);
-        }),
-      ),
+      Effect.gen(function* () {
+        const tickedAt = yield* Clock.currentTimeMillis;
+        const schedules = yield* repo.list();
+        const times: Array<number | null> = [];
+        for (const schedule of schedules) {
+          if (!schedule.enabled) continue;
+          times.push(schedule.nextRunAt === null ? null : Date.parse(schedule.nextRunAt));
+          if (schedule.expiresAt !== undefined) times.push(Date.parse(schedule.expiresAt));
+        }
+        return nextWakeDelayMs(times, tickedAt);
+      }),
 
     tick: () =>
       tickGate.withPermit(
         Effect.gen(function* () {
-          const tickedAt = now();
+          const tickedAt = yield* Clock.currentTimeMillis;
           const schedules = yield* repo.list();
           const due = schedules
             .filter((schedule) => {
@@ -1040,37 +1037,6 @@ export const makeScheduleService = (deps: {
   };
 };
 
-const SETTLE_ATTEMPTS = 300;
-
-const waitUntilSettled = (
-  sessions: PiAgentSessionServiceShape,
-  ref: SessionRef,
-): Effect.Effect<{ readonly phase: SessionPhase }> =>
-  Effect.gen(function* () {
-    for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
-      const status = yield* sessions.getStatus(ref);
-      if (status.phase === "idle" || status.phase === "crashed") return status;
-      yield* Effect.sleep("200 millis");
-    }
-    return yield* sessions.getStatus(ref);
-  });
-
-const findSession = (
-  sessions: PiAgentSessionServiceShape,
-  ref: SessionRef,
-): Effect.Effect<FoundSession | null, StoreReadError> =>
-  Effect.gen(function* () {
-    const open = yield* sessions.list(ref.projectId, false);
-    if (open.some((session) => session.sessionId === ref.sessionId)) {
-      return { archived: false };
-    }
-    const archived = yield* sessions.list(ref.projectId, true);
-    if (archived.some((session) => session.sessionId === ref.sessionId)) {
-      return { archived: true };
-    }
-    return null;
-  });
-
 export const ScheduleServiceLayer: Layer.Layer<
   ScheduleService,
   never,
@@ -1082,22 +1048,15 @@ export const ScheduleServiceLayer: Layer.Layer<
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
     const crypto = yield* Crypto.Crypto;
-    return makeScheduleService({
+    return liveScheduleService({
       repo,
       projects,
-      sessions: {
-        create: (input) => sessions.create(input),
-        prompt: (input) => sessions.prompt(input),
-        getStatus: (ref) => sessions.getStatus(ref),
-        find: (ref) => findSession(sessions, ref),
-        waitUntilSettled: (ref) => waitUntilSettled(sessions, ref),
-      },
+      sessions,
       newId: crypto.randomUUIDv4.pipe(
         Effect.catchTag("PlatformError", (cause) =>
-          Effect.die(new Error("invariant: platform RNG failed minting an schedule id", { cause })),
+          Effect.die(new Error("invariant: platform RNG failed minting a schedule id", { cause })),
         ),
       ),
-      now: () => Date.now(),
     });
   }),
 );

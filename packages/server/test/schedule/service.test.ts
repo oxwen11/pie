@@ -1,17 +1,26 @@
-import type { CreateScheduleInput, Schedule, SessionPhase, SessionRef } from "@getpie/contract";
-import { Effect, Logger } from "effect";
-import { describe, expect, it } from "vitest";
+import { assert, describe, it } from "@effect/vitest";
+import type {
+  CreateScheduleInput,
+  Schedule,
+  SessionPhase,
+  SessionRef,
+  SessionSummary,
+} from "@getpie/contract";
+import { Context, Effect, Fiber, Layer, Logger } from "effect";
+import { TestClock } from "effect/testing";
 
 import { ProjectNotFound, ScheduleNotFound, StoreWriteError } from "../../src/errors";
-import * as Observability from "../../src/observability";
-import {
-  makeScheduleService,
-  type ScheduleSessions,
-  type ScheduleStore,
-} from "../../src/schedule/service";
+import { PiAgentSessionService, type PiAgentSessionServiceShape } from "../../src/harness";
+import { ProjectService } from "../../src/project";
+import { runScheduleLoop } from "../../src/schedule/daemon";
+import { ScheduleRepository } from "../../src/schedule/repository";
+import { ScheduleService, ScheduleServiceLayer } from "../../src/schedule/service";
 import { structured, type LogRecord } from "../log-record";
+import { NodePlatformLayer } from "../platform";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
+const ORIGIN = Date.parse("2026-08-27T08:00:00.000Z");
+const ORIGIN_ISO = "2026-08-27T08:00:00.000Z";
 
 const cronInput = (overrides: Partial<CreateScheduleInput> = {}): CreateScheduleInput => ({
   name: "Morning review",
@@ -21,13 +30,12 @@ const cronInput = (overrides: Partial<CreateScheduleInput> = {}): CreateSchedule
   ...overrides,
 });
 
-const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> =>
-  Effect.runPromise(effect.pipe(Effect.provide(Observability.discard)));
+const unused = (): Effect.Effect<never> => Effect.die("unused");
 
-const captureLogs = <A, E>(
-  effect: Effect.Effect<A, E>,
+const captureLogs = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
   into: Array<LogRecord>,
-): Effect.Effect<A, E> =>
+): Effect.Effect<A, E, R> =>
   effect.pipe(
     Effect.provide(
       Logger.layer([
@@ -38,716 +46,855 @@ const captureLogs = <A, E>(
     ),
   );
 
-function memoryStore(initial: ReadonlyArray<Schedule> = []): ScheduleStore {
-  const store = new Map<string, Schedule>(initial.map((schedule) => [schedule.id, schedule]));
-  return {
-    list: () => Effect.succeed(Array.from(store.values())),
-    read: (id) => {
-      const found = store.get(id);
-      return found === undefined
-        ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
-        : Effect.succeed(found);
-    },
-    write: (schedule) =>
-      Effect.sync(() => {
-        store.set(schedule.id, schedule);
-      }),
-    remove: (id) =>
-      Effect.sync(() => {
-        store.delete(id);
-      }),
-  };
-}
+const memoryRepo = (
+  store: Map<string, Schedule>,
+  write: ScheduleRepository["Service"]["write"] = (schedule) =>
+    Effect.sync(() => {
+      store.set(schedule.id, schedule);
+    }),
+): ScheduleRepository["Service"] => ({
+  list: () => Effect.succeed(Array.from(store.values())),
+  read: (id) => {
+    const found = store.get(id);
+    return found === undefined
+      ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
+      : Effect.succeed(found);
+  },
+  write,
+  remove: (id) =>
+    Effect.sync(() => {
+      store.delete(id);
+    }),
+});
 
-function idleSessions(overrides: Partial<ScheduleSessions> = {}): ScheduleSessions {
+const stubProjects = (missingProject: boolean): ProjectService["Service"] => ({
+  list: unused,
+  findById: (id) =>
+    missingProject || id !== PROJECT_ID
+      ? Effect.fail(new ProjectNotFound({ projectId: id }))
+      : Effect.succeed({
+          id,
+          name: "app",
+          path: "/tmp/app",
+          createdAt: ORIGIN_ISO,
+        }),
+  findByPath: unused,
+  create: unused,
+  remove: unused,
+});
+
+type SessionRecord = {
+  readonly projectId: string;
+  readonly sessionId: string;
+  archived: boolean;
+};
+
+const stubSessions = (opts: {
+  readonly created: Array<{ title?: string; projectId: string }>;
+  readonly prompted: Array<string>;
+  readonly catalog: Array<SessionRecord>;
+  readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
+  readonly live?: boolean;
+  readonly prompt?: (
+    input: Parameters<PiAgentSessionServiceShape["prompt"]>[0],
+  ) => Effect.Effect<{ readonly turnId: string; readonly started: boolean }, unknown>;
+}): PiAgentSessionServiceShape => {
+  const summary = (session: SessionRecord): SessionSummary => ({
+    projectId: session.projectId,
+    sessionId: session.sessionId,
+    archived: session.archived,
+    createdAt: ORIGIN_ISO,
+    historyAvailable: false,
+  });
   return {
     create: (input) =>
-      Effect.succeed({
-        ref: { projectId: input.projectId, sessionId: "sess-1" },
-        workspace: { cwd: input.cwd },
-      }),
-    prompt: () => Effect.succeed({ turnId: "turn-1" }),
-    getStatus: () => Effect.succeed({ phase: "idle" }),
-    find: () => Effect.succeed({ archived: false }),
-    waitUntilSettled: () => Effect.succeed({ phase: "idle" }),
-    ...overrides,
-  };
-}
-
-function setup(
-  opts: {
-    readonly live?: boolean;
-    readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
-    readonly missingProject?: boolean;
-    readonly sessions?: Partial<ScheduleSessions>;
-    readonly forkSettle?: (effect: Effect.Effect<void>) => Effect.Effect<void>;
-  } = {},
-) {
-  const store = new Map<string, Schedule>();
-  let next = 1;
-  let clock = Date.parse("2026-08-27T08:00:00.000Z");
-  const created: Array<{ title?: string; projectId: string }> = [];
-  const prompted: Array<string> = [];
-  const repo: ScheduleStore = {
-    list: () => Effect.succeed(Array.from(store.values())),
-    read: (id) => {
-      const found = store.get(id);
-      return found === undefined
-        ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
-        : Effect.succeed(found);
-    },
-    write: (schedule) =>
       Effect.sync(() => {
-        store.set(schedule.id, schedule);
-      }),
-    remove: (id) =>
-      Effect.sync(() => {
-        store.delete(id);
-      }),
-  };
-  const sessions = idleSessions({
-    create: (input) =>
-      Effect.sync(() => {
-        created.push({
+        opts.created.push({
           projectId: input.projectId,
           ...(input.title !== undefined ? { title: input.title } : undefined),
         });
+        const sessionId = `sess-${opts.created.length}`;
+        opts.catalog.push({ projectId: input.projectId, sessionId, archived: false });
         return {
-          ref: { projectId: input.projectId, sessionId: `sess-${created.length}` },
+          ref: { projectId: input.projectId, sessionId },
           workspace: { cwd: input.cwd },
         };
       }),
-    prompt: (input) =>
-      Effect.sync(() => {
-        const text = input.parts[0]?.type === "text" ? input.parts[0].text : "";
-        prompted.push(text);
-        return { turnId: `turn-${prompted.length}` };
-      }),
+    prompt: (opts.prompt ??
+      ((input) =>
+        Effect.sync(() => {
+          const text = input.parts[0]?.type === "text" ? input.parts[0].text : "";
+          opts.prompted.push(text);
+          return { turnId: `turn-${opts.prompted.length}`, started: true };
+        }))) as PiAgentSessionServiceShape["prompt"],
     getStatus: (ref) =>
       Effect.succeed({
         phase: opts.sessionPhase?.(ref) ?? (opts.live === true ? "running" : "idle"),
       }),
-    ...opts.sessions,
-  });
-  const service = makeScheduleService({
-    repo,
-    projects: {
-      findById: (id) =>
-        opts.missingProject === true || id !== PROJECT_ID
-          ? Effect.fail(new ProjectNotFound({ projectId: id }))
-          : Effect.succeed({ path: "/tmp/app" }),
-    },
-    sessions,
-    newId: Effect.sync(() => {
-      const id = `00000000-0000-0000-0000-${String(next).padStart(12, "0")}`;
-      next += 1;
-      return id;
-    }),
-    now: () => clock,
-    forkSettle: opts.forkSettle ?? ((effect) => effect),
-  });
-  return {
-    service,
-    store,
-    created,
-    prompted,
-    setNow: (iso: string) => {
-      clock = Date.parse(iso);
-    },
+    list: (projectId, archived) =>
+      Effect.succeed(
+        opts.catalog
+          .filter((session) => session.projectId === projectId && session.archived === archived)
+          .map(summary),
+      ),
+    prepare: unused,
+    workspaceFor: unused,
+    close: unused,
+    delete: unused,
+    rename: unused,
+    archive: unused,
+    pullRequestRefsFor: unused,
+    rememberPullRequestRef: unused,
+    getMessages: unused,
+    interrupt: unused,
+    respondToAgentRequest: unused,
+    getCapabilities: unused,
+    getModelState: unused,
+    setModel: unused,
+    getSessionInfo: unused,
+    getSnapshot: unused,
+    resolveRef: unused,
   };
-}
+};
+
+const seedSession = (catalog: Array<SessionRecord>, sessionId: string, archived = false): void => {
+  catalog.push({ projectId: PROJECT_ID, sessionId, archived });
+};
+
+const harness = (
+  opts: {
+    readonly live?: boolean;
+    readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
+    readonly missingProject?: boolean;
+    readonly writeFails?: boolean;
+    readonly prompt?: (
+      input: Parameters<PiAgentSessionServiceShape["prompt"]>[0],
+    ) => Effect.Effect<{ readonly turnId: string; readonly started: boolean }, unknown>;
+    readonly seed?: ReadonlyArray<{ readonly sessionId: string; readonly archived?: boolean }>;
+  } = {},
+) =>
+  Effect.gen(function* () {
+    const store = new Map<string, Schedule>();
+    const created: Array<{ title?: string; projectId: string }> = [];
+    const prompted: Array<string> = [];
+    const catalog: Array<SessionRecord> = [];
+    for (const session of opts.seed ?? []) {
+      seedSession(catalog, session.sessionId, session.archived ?? false);
+    }
+    const context = yield* Layer.build(
+      ScheduleServiceLayer.pipe(
+        Layer.provide(
+          Layer.succeed(
+            ScheduleRepository,
+            memoryRepo(
+              store,
+              opts.writeFails === true
+                ? () =>
+                    Effect.fail(
+                      new StoreWriteError({ file: "schedules", cause: new Error("full") }),
+                    )
+                : undefined,
+            ),
+          ),
+        ),
+        Layer.provide(Layer.succeed(ProjectService, stubProjects(opts.missingProject === true))),
+        Layer.provide(
+          Layer.succeed(
+            PiAgentSessionService,
+            stubSessions({
+              created,
+              prompted,
+              catalog,
+              ...(opts.sessionPhase !== undefined
+                ? { sessionPhase: opts.sessionPhase }
+                : undefined),
+              ...(opts.live === true ? { live: true } : undefined),
+              ...(opts.prompt !== undefined ? { prompt: opts.prompt } : undefined),
+            }),
+          ),
+        ),
+        Layer.provide(NodePlatformLayer),
+      ),
+    );
+    return {
+      service: Context.get(context, ScheduleService),
+      store,
+      created,
+      prompted,
+      catalog,
+    };
+  });
 
 describe("ScheduleService", () => {
-  it("creates a cron schedule with a future nextRunAt", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput()));
-    expect(created.name).toBe("Morning review");
-    expect(created.enabled).toBe(true);
-    expect(created.nextRunAt).toBeTruthy();
-    expect(Date.parse(created.nextRunAt!)).toBeGreaterThan(Date.parse("2026-08-27T08:00:00.000Z"));
-  });
+  it.effect("creates a cron schedule with a future nextRunAt", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput());
+      assert.strictEqual(created.name, "Morning review");
+      assert.strictEqual(created.enabled, true);
+      assert.isTrue(created.nextRunAt !== null);
+      assert.isTrue(Date.parse(created.nextRunAt!) > ORIGIN);
+    }),
+  );
 
-  it("creates an interval schedule at now + everyMs", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "every", everyMs: 60_000 } })),
-    );
-    expect(created.nextRunAt).toBe("2026-08-27T08:01:00.000Z");
-  });
+  it.effect("creates an interval schedule at now + everyMs", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "every", everyMs: 60_000 } }),
+      );
+      assert.strictEqual(created.nextRunAt, "2026-08-27T08:01:00.000Z");
+    }),
+  );
 
-  it("rejects an invalid cron expression", async () => {
-    const h = setup();
-    await expect(
-      run(h.service.create(cronInput({ spec: { kind: "cron", expr: "not-a-cron" } }))),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
-  });
+  it.effect("rejects an invalid cron expression", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const error = yield* Effect.flip(
+        h.service.create(cronInput({ spec: { kind: "cron", expr: "not-a-cron" } })),
+      );
+      assert.strictEqual(error._tag, "InvalidSchedule");
+    }),
+  );
 
-  it("runNow creates a session, snapshots the prompt, then settles succeeded", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput()));
-    const fired = await run(h.service.runNow(created.id));
-    expect(h.created).toEqual([{ projectId: PROJECT_ID, title: "Morning review" }]);
-    expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-1" });
-    expect(fired.schedule.lastRunStatus).toBe("running");
-    expect(fired.schedule.lastSessionId).toBe("sess-1");
-    expect(fired.schedule.runs[0]?.reason).toBe("manual");
-    expect(fired.schedule.runs[0]?.sessionId).toBe("sess-1");
-    expect(fired.schedule.runs[0]?.snapshot?.prompt).toBe("Review yesterday's commits.");
-    const stored = h.store.get(created.id);
-    expect(stored?.lastRunStatus).toBe("succeeded");
-    expect(stored?.runs[0]?.status).toBe("succeeded");
-    expect(stored?.lastSessionId).toBe("sess-1");
-    expect(h.prompted).toEqual(["Review yesterday's commits."]);
-  });
+  it.effect("runNow creates a session, snapshots the prompt, then settles succeeded", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput());
+      const fired = yield* h.service.runNow(created.id);
+      assert.deepStrictEqual(h.created, [{ projectId: PROJECT_ID, title: "Morning review" }]);
+      assert.deepStrictEqual(fired.ref, { projectId: PROJECT_ID, sessionId: "sess-1" });
+      assert.strictEqual(fired.schedule.lastRunStatus, "running");
+      assert.strictEqual(fired.schedule.lastSessionId, "sess-1");
+      assert.strictEqual(fired.schedule.runs[0]?.reason, "manual");
+      assert.strictEqual(fired.schedule.runs[0]?.sessionId, "sess-1");
+      assert.strictEqual(fired.schedule.runs[0]?.snapshot?.prompt, "Review yesterday's commits.");
+      yield* Effect.yieldNow;
+      const stored = h.store.get(created.id);
+      assert.strictEqual(stored?.lastRunStatus, "succeeded");
+      assert.strictEqual(stored?.runs[0]?.status, "succeeded");
+      assert.strictEqual(stored?.lastSessionId, "sess-1");
+      assert.deepStrictEqual(h.prompted, ["Review yesterday's commits."]);
+    }),
+  );
 
-  it("keeps the fired snapshot after the live prompt changes", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ prompt: "first prompt" })));
-    await run(h.service.runNow(created.id));
-    await run(h.service.update({ id: created.id, prompt: "second prompt" }));
-    const stored = h.store.get(created.id);
-    expect(stored?.prompt).toBe("second prompt");
-    expect(stored?.runs[0]?.snapshot?.prompt).toBe("first prompt");
-  });
+  it.effect("keeps the fired snapshot after the live prompt changes", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ prompt: "first prompt" }));
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      yield* h.service.update({ id: created.id, prompt: "second prompt" });
+      const stored = h.store.get(created.id);
+      assert.strictEqual(stored?.prompt, "second prompt");
+      assert.strictEqual(stored?.runs[0]?.snapshot?.prompt, "first prompt");
+    }),
+  );
 
-  it("runNow returns after create even if prompt never settles", async () => {
-    const hanging = makeScheduleService({
-      repo: memoryStore(),
-      projects: {
-        findById: () => Effect.succeed({ path: "/tmp/app" }),
-      },
-      sessions: idleSessions({
-        create: (input) =>
-          Effect.succeed({
-            ref: { projectId: input.projectId, sessionId: "sess-hang" },
-            workspace: { cwd: input.cwd },
-          }),
-        prompt: () => Effect.never,
-      }),
-      newId: Effect.succeed("00000000-0000-0000-0000-000000000088"),
-      now: () => Date.parse("2026-08-27T08:00:00.000Z"),
-    });
-    const created = await run(hanging.create(cronInput()));
-    const fired = await run(hanging.runNow(created.id));
-    expect(fired.ref).toEqual({ projectId: PROJECT_ID, sessionId: "sess-hang" });
-    expect(fired.schedule.lastRunStatus).toBe("running");
-  });
+  it.effect("settles a still-running session after TestClock advances the poll", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      let phase: SessionPhase = "running";
+      const h = yield* harness({ sessionPhase: () => phase });
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      yield* h.service.runNow(created.id);
+      assert.strictEqual(h.store.get(created.id)?.lastRunStatus, "running");
+      phase = "idle";
+      yield* TestClock.adjust("200 millis");
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.store.get(created.id)?.lastRunStatus, "succeeded");
+    }),
+  );
 
-  it("records queue overflow when a run is already in flight", async () => {
-    let next = 1;
-    const store = new Map<string, Schedule>();
-    const hanging = makeScheduleService({
-      repo: {
-        list: () => Effect.succeed(Array.from(store.values())),
-        read: (id) => {
-          const found = store.get(id);
-          return found === undefined
-            ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
-            : Effect.succeed(found);
-        },
-        write: (schedule) =>
-          Effect.sync(() => {
-            store.set(schedule.id, schedule);
-          }),
-        remove: (id) =>
-          Effect.sync(() => {
-            store.delete(id);
-          }),
-      },
-      projects: {
-        findById: () => Effect.succeed({ path: "/tmp/app" }),
-      },
-      sessions: idleSessions({
-        prompt: () => Effect.never,
-      }),
-      newId: Effect.sync(() => {
-        const id = `00000000-0000-0000-0000-${String(next).padStart(12, "0")}`;
-        next += 1;
-        return id;
-      }),
-      now: () => Date.parse("2026-08-27T08:00:00.000Z"),
-    });
-    const created = await run(hanging.create(cronInput()));
-    await run(hanging.runNow(created.id));
-    const overflow = await run(hanging.runNow(created.id));
-    expect(overflow.schedule.lastRunStatus).toBe("missed");
-    expect(overflow.schedule.runs[0]?.skipReason).toBe("queue_overflow");
-  });
+  it.effect("runNow returns after create even if prompt never settles", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({ prompt: () => Effect.never });
+      const created = yield* h.service.create(cronInput());
+      const fired = yield* h.service.runNow(created.id);
+      assert.deepStrictEqual(fired.ref, { projectId: PROJECT_ID, sessionId: "sess-1" });
+      assert.strictEqual(fired.schedule.lastRunStatus, "running");
+    }),
+  );
 
-  it("tick fires a due schedule and advances nextRunAt", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" } })),
-    );
-    const firstNext = created.nextRunAt!;
-    h.setNow(firstNext);
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(1);
-    expect(after?.lastRunStatus).toBe("succeeded");
-    expect(after?.runs[0]?.reason).toBe("scheduled");
-    expect(after?.nextRunAt).not.toBe(firstNext);
-    expect(Date.parse(after!.nextRunAt!)).toBeGreaterThan(Date.parse(firstNext));
-  });
+  it.effect("records queue overflow when a run is already in flight", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({ prompt: () => Effect.never });
+      const created = yield* h.service.create(cronInput());
+      yield* h.service.runNow(created.id);
+      const overflow = yield* h.service.runNow(created.id);
+      assert.strictEqual(overflow.schedule.lastRunStatus, "missed");
+      assert.strictEqual(overflow.schedule.runs[0]?.skipReason, "queue_overflow");
+    }),
+  );
 
-  it("skips a scheduled fire when the bound session is busy", async () => {
-    const h = setup({ live: true });
-    const created = await run(
-      h.service.create(
+  it.effect("tick fires a due schedule and advances nextRunAt", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "cron", expr: "* * * * *" } }),
+      );
+      const firstNext = created.nextRunAt!;
+      yield* TestClock.setTime(Date.parse(firstNext));
+      yield* h.service.tick();
+      yield* Effect.yieldNow;
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 1);
+      assert.strictEqual(after?.lastRunStatus, "succeeded");
+      assert.strictEqual(after?.runs[0]?.reason, "scheduled");
+      assert.notStrictEqual(after?.nextRunAt, firstNext);
+      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse(firstNext));
+    }),
+  );
+
+  it.effect("skips a scheduled fire when the bound session is busy", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({
+        live: true,
+        seed: [{ sessionId: "picked" }],
+      });
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "cron", expr: "* * * * *" },
           session: { policy: "existing", sessionId: "picked" },
         }),
-      ),
-    );
-    h.setNow(created.nextRunAt!);
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(0);
-    expect(after?.lastRunStatus).toBe("skipped");
-    expect(after?.runs[0]?.skipReason).toBe("in_progress");
-  });
+      );
+      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      yield* h.service.tick();
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 0);
+      assert.strictEqual(after?.lastRunStatus, "skipped");
+      assert.strictEqual(after?.runs[0]?.skipReason, "in_progress");
+    }),
+  );
 
-  it("skips runNow when the bound session is busy", async () => {
-    const h = setup({ live: true });
-    const created = await run(
-      h.service.create(
+  it.effect("skips runNow when the bound session is busy", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({
+        live: true,
+        seed: [{ sessionId: "owned-1" }],
+      });
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "manual" },
           session: { policy: "owned", sessionId: "owned-1" },
         }),
-      ),
-    );
-    const fired = await run(h.service.runNow(created.id));
-    expect(fired.ref).toBeUndefined();
-    expect(h.created).toHaveLength(0);
-    expect(fired.schedule.lastRunStatus).toBe("skipped");
-    expect(fired.schedule.runs[0]?.skipReason).toBe("in_progress");
-  });
+      );
+      const fired = yield* h.service.runNow(created.id);
+      assert.isUndefined(fired.ref);
+      assert.strictEqual(h.created.length, 0);
+      assert.strictEqual(fired.schedule.lastRunStatus, "skipped");
+      assert.strictEqual(fired.schedule.runs[0]?.skipReason, "in_progress");
+    }),
+  );
 
-  it("skips create runNow when the bound session is busy", async () => {
-    const h = setup({ live: true });
-    const created = await run(
-      h.service.create(
+  it.effect("skips create runNow when the bound session is busy", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({
+        live: true,
+        seed: [{ sessionId: "picked" }],
+      });
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "manual" },
           session: { policy: "existing", sessionId: "picked" },
           runNow: true,
         }),
-      ),
-    );
-    expect(h.created).toHaveLength(0);
-    expect(created.lastRunStatus).toBe("skipped");
-    expect(created.runs[0]?.skipReason).toBe("in_progress");
-  });
+      );
+      assert.strictEqual(h.created.length, 0);
+      assert.strictEqual(created.lastRunStatus, "skipped");
+      assert.strictEqual(created.runs[0]?.skipReason, "in_progress");
+    }),
+  );
 
-  it("fires an isolated scheduled run even when the last session is still live", async () => {
-    const h = setup({ live: true });
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" } })),
-    );
-    const first = await run(h.service.runNow(created.id));
-    expect(first.schedule.lastSessionId).toBe("sess-1");
-    h.setNow(first.schedule.nextRunAt!);
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(2);
-    expect(after?.lastRunStatus).toBe("succeeded");
-    expect(after?.lastSessionId).toBe("sess-2");
-  });
+  it.effect("fires an isolated scheduled run even when the last session is still live", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const live = new Set<string>();
+      const h = yield* harness({
+        sessionPhase: (ref) => (live.has(ref.sessionId) ? "running" : "idle"),
+      });
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "cron", expr: "* * * * *" } }),
+      );
+      const first = yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      assert.strictEqual(first.schedule.lastSessionId, "sess-1");
+      live.add("sess-1");
+      yield* TestClock.setTime(Date.parse(first.schedule.nextRunAt!));
+      yield* h.service.tick();
+      yield* Effect.yieldNow;
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 2);
+      assert.strictEqual(after?.lastRunStatus, "succeeded");
+      assert.strictEqual(after?.lastSessionId, "sess-2");
+    }),
+  );
 
-  it("creates a session for owned-without-id even when lastSessionId is live", async () => {
-    const h = setup({ live: true });
-    const created = await run(
-      h.service.create(cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } })),
-    );
-    h.store.set(created.id, {
-      ...created,
-      lastSessionId: "old-live",
-      lastRunStatus: "succeeded",
-    });
-    const fired = await run(h.service.runNow(created.id));
-    expect(h.created).toHaveLength(1);
-    expect(fired.ref?.sessionId).toBe("sess-1");
-    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-1" });
-  });
+  it.effect("creates a session for owned-without-id even when lastSessionId is live", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({ live: true });
+      const created = yield* h.service.create(
+        cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } }),
+      );
+      h.store.set(created.id, {
+        ...created,
+        lastSessionId: "old-live",
+        lastRunStatus: "succeeded",
+      });
+      const fired = yield* h.service.runNow(created.id);
+      assert.strictEqual(h.created.length, 1);
+      assert.strictEqual(fired.ref?.sessionId, "sess-1");
+      assert.deepStrictEqual(h.store.get(created.id)?.session, {
+        policy: "owned",
+        sessionId: "sess-1",
+      });
+    }),
+  );
 
-  it("skips a second schedule when they share a busy session", async () => {
-    const phases = new Map<string, SessionPhase>([["shared", "idle"]]);
-    const h = setup({
-      sessionPhase: (ref) => phases.get(ref.sessionId) ?? "idle",
-    });
-    const first = await run(
-      h.service.create(
+  it.effect("skips a second schedule when they share a busy session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const phases = new Map<string, SessionPhase>([["shared", "idle"]]);
+      const h = yield* harness({
+        sessionPhase: (ref) => phases.get(ref.sessionId) ?? "idle",
+        seed: [{ sessionId: "shared" }],
+      });
+      const first = yield* h.service.create(
         cronInput({
           name: "First",
           session: { policy: "existing", sessionId: "shared" },
           spec: { kind: "manual" },
         }),
-      ),
-    );
-    const second = await run(
-      h.service.create(
+      );
+      const second = yield* h.service.create(
         cronInput({
           name: "Second",
           session: { policy: "existing", sessionId: "shared" },
           spec: { kind: "manual" },
         }),
-      ),
-    );
-    const fired = await run(h.service.runNow(first.id));
-    expect(fired.ref?.sessionId).toBe("shared");
-    phases.set("shared", "running");
-    const skipped = await run(h.service.runNow(second.id));
-    expect(skipped.ref).toBeUndefined();
-    expect(skipped.schedule.lastRunStatus).toBe("skipped");
-    expect(skipped.schedule.runs[0]?.skipReason).toBe("in_progress");
-  });
+      );
+      const fired = yield* h.service.runNow(first.id);
+      assert.strictEqual(fired.ref?.sessionId, "shared");
+      phases.set("shared", "running");
+      const skipped = yield* h.service.runNow(second.id);
+      assert.isUndefined(skipped.ref);
+      assert.strictEqual(skipped.schedule.lastRunStatus, "skipped");
+      assert.strictEqual(skipped.schedule.runs[0]?.skipReason, "in_progress");
+    }),
+  );
 
-  it("records one missed run then fires a single recovery when late", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "every", everyMs: 60_000 } })),
-    );
-    h.setNow("2026-08-27T08:03:30.000Z");
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(1);
-    expect(after?.runs[0]?.reason).toBe("missed_recovery");
-    expect(after?.runs[0]?.status).toBe("succeeded");
-    expect(after?.runs[1]?.status).toBe("missed");
-    expect(after?.runs[1]?.missedCount).toBe(2);
-  });
+  it.effect("records one missed run then fires a single recovery when late", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "every", everyMs: 60_000 } }),
+      );
+      yield* TestClock.setTime(Date.parse("2026-08-27T08:03:30.000Z"));
+      yield* h.service.tick();
+      yield* Effect.yieldNow;
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 1);
+      assert.strictEqual(after?.runs[0]?.reason, "missed_recovery");
+      assert.strictEqual(after?.runs[0]?.status, "succeeded");
+      assert.strictEqual(after?.runs[1]?.status, "missed");
+      assert.strictEqual(after?.runs[1]?.missedCount, 2);
+    }),
+  );
 
-  it("disables a one-shot after it fires", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(
+  it.effect("disables a one-shot after it fires", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "once", runAt: "2026-08-27T09:00:00.000Z" },
         }),
-      ),
-    );
-    expect(created.enabled).toBe(true);
-    h.setNow("2026-08-27T09:00:00.000Z");
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(after?.enabled).toBe(false);
-    expect(after?.nextRunAt).toBeNull();
-    expect(h.created).toHaveLength(1);
-  });
+      );
+      assert.strictEqual(created.enabled, true);
+      yield* TestClock.setTime(Date.parse("2026-08-27T09:00:00.000Z"));
+      yield* h.service.tick();
+      yield* Effect.yieldNow;
+      const after = h.store.get(created.id);
+      assert.strictEqual(after?.enabled, false);
+      assert.strictEqual(after?.nextRunAt, null);
+      assert.strictEqual(h.created.length, 1);
+    }),
+  );
 
-  it("does not fire a paused schedule", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "cron", expr: "* * * * *" }, enabled: false })),
-    );
-    h.setNow(created.nextRunAt ?? "2026-08-27T09:00:00.000Z");
-    await run(h.service.tick());
-    expect(h.created).toHaveLength(0);
-  });
+  it.effect("does not fire a paused schedule", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "cron", expr: "* * * * *" }, enabled: false }),
+      );
+      yield* TestClock.setTime(Date.parse(created.nextRunAt ?? "2026-08-27T09:00:00.000Z"));
+      yield* h.service.tick();
+      assert.strictEqual(h.created.length, 0);
+    }),
+  );
 
-  it("records a stale miss without creating a session", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "cron", expr: "0 9 * * *" } })),
-    );
-    h.setNow("2026-09-10T09:00:00.000Z");
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(0);
-    expect(after?.lastRunStatus).toBe("missed");
-    expect(after?.runs[0]?.skipReason).toBe("stale");
-    expect(after?.runs[0]?.missedCount).toBeGreaterThan(0);
-    expect(after?.nextRunAt).toBeTruthy();
-    expect(Date.parse(after!.nextRunAt!)).toBeGreaterThan(Date.parse("2026-09-10T09:00:00.000Z"));
-  });
+  it.effect("records a stale miss without creating a session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "cron", expr: "0 9 * * *" } }),
+      );
+      yield* TestClock.setTime(Date.parse("2026-09-10T09:00:00.000Z"));
+      yield* h.service.tick();
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 0);
+      assert.strictEqual(after?.lastRunStatus, "missed");
+      assert.strictEqual(after?.runs[0]?.skipReason, "stale");
+      assert.isTrue((after?.runs[0]?.missedCount ?? 0) > 0);
+      assert.isTrue(after?.nextRunAt !== null && after?.nextRunAt !== undefined);
+      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse("2026-09-10T09:00:00.000Z"));
+    }),
+  );
 
-  it("expires an schedule that is past expiresAt", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(
+  it.effect("expires a schedule that is past expiresAt", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "cron", expr: "* * * * *" },
           expiresAt: "2026-08-27T08:30:00.000Z",
         }),
-      ),
-    );
-    h.setNow("2026-08-27T08:30:00.000Z");
-    await run(h.service.tick());
-    const after = h.store.get(created.id);
-    expect(h.created).toHaveLength(0);
-    expect(after?.enabled).toBe(false);
-    expect(after?.pauseReason).toBe("expired");
-    expect(after?.lastRunStatus).toBe("skipped");
-    expect(after?.runs[0]?.skipReason).toBe("expired");
-  });
+      );
+      yield* TestClock.setTime(Date.parse("2026-08-27T08:30:00.000Z"));
+      yield* h.service.tick();
+      const after = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 0);
+      assert.strictEqual(after?.enabled, false);
+      assert.strictEqual(after?.pauseReason, "expired");
+      assert.strictEqual(after?.lastRunStatus, "skipped");
+      assert.strictEqual(after?.runs[0]?.skipReason, "expired");
+    }),
+  );
 
-  it("reuses one session and creates again after archive", async () => {
-    let archived = false;
-    const h = setup({
-      sessions: {
-        find: () => Effect.succeed({ archived }),
-      },
-    });
-    const created = await run(
-      h.service.create(cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } })),
-    );
-    await run(h.service.runNow(created.id));
-    await run(h.service.runNow(created.id));
-    expect(h.created).toHaveLength(1);
-    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-1" });
-    archived = true;
-    await run(h.service.runNow(created.id));
-    expect(h.created).toHaveLength(2);
-    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-2" });
-  });
+  it.effect("reuses one session and creates again after archive", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } }),
+      );
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.created.length, 1);
+      assert.deepStrictEqual(h.store.get(created.id)?.session, {
+        policy: "owned",
+        sessionId: "sess-1",
+      });
+      const bound = h.catalog.find((session) => session.sessionId === "sess-1");
+      assert.isDefined(bound);
+      bound!.archived = true;
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.created.length, 2);
+      assert.deepStrictEqual(h.store.get(created.id)?.session, {
+        policy: "owned",
+        sessionId: "sess-2",
+      });
+    }),
+  );
 
-  it("reuses a preselected session without creating first", async () => {
-    const h = setup({
-      sessions: {
-        find: () => Effect.succeed({ archived: false }),
-      },
-    });
-    const created = await run(
-      h.service.create(
+  it.effect("reuses a preselected session without creating first", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({ seed: [{ sessionId: "picked-session" }] });
+      const created = yield* h.service.create(
         cronInput({
           session: { policy: "existing", sessionId: "picked-session" },
           spec: { kind: "manual" },
         }),
-      ),
-    );
-    await run(h.service.runNow(created.id));
-    expect(h.created).toHaveLength(0);
-    expect(h.store.get(created.id)?.session).toEqual({
-      policy: "existing",
-      sessionId: "picked-session",
-    });
-  });
+      );
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.created.length, 0);
+      assert.deepStrictEqual(h.store.get(created.id)?.session, {
+        policy: "existing",
+        sessionId: "picked-session",
+      });
+    }),
+  );
 
-  it("rejects a missing or archived reuse session on create", async () => {
-    const missing = setup({
-      sessions: { find: () => Effect.succeed(null) },
-    });
-    await expect(
-      run(
+  it.effect("rejects a missing or archived reuse session on create", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const missing = yield* harness();
+      const missingError = yield* Effect.flip(
         missing.service.create(
           cronInput({
             session: { policy: "existing", sessionId: "missing" },
             spec: { kind: "manual" },
           }),
         ),
-      ),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
-    const archived = setup({
-      sessions: { find: () => Effect.succeed({ archived: true }) },
-    });
-    await expect(
-      run(
+      );
+      assert.strictEqual(missingError._tag, "InvalidSchedule");
+      const archived = yield* harness({ seed: [{ sessionId: "old", archived: true }] });
+      const archivedError = yield* Effect.flip(
         archived.service.create(
           cronInput({
             session: { policy: "existing", sessionId: "old" },
             spec: { kind: "manual" },
           }),
         ),
-      ),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
-  });
+      );
+      assert.strictEqual(archivedError._tag, "InvalidSchedule");
+    }),
+  );
 
-  it("opens the failure circuit after three settled failures", async () => {
-    const h = setup({
-      sessions: {
+  it.effect("opens the failure circuit after three settled failures", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({
         prompt: () => Effect.fail(new Error("boom")),
-      },
-    });
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    await run(h.service.runNow(created.id));
-    await run(h.service.runNow(created.id));
-    expect(h.store.get(created.id)?.enabled).toBe(true);
-    await run(h.service.runNow(created.id));
-    const tripped = h.store.get(created.id);
-    expect(tripped?.enabled).toBe(false);
-    expect(tripped?.pauseReason).toBe("failureCircuit");
-    expect(tripped?.consecutiveFailures).toBe(3);
-    expect(tripped?.nextRunAt).toBeNull();
-    const resumed = await run(h.service.update({ id: created.id, enabled: true }));
-    expect(resumed.enabled).toBe(true);
-    expect(resumed.pauseReason).toBeUndefined();
-    expect(resumed.consecutiveFailures).toBe(0);
-  });
+      });
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.store.get(created.id)?.enabled, true);
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      const tripped = h.store.get(created.id);
+      assert.strictEqual(tripped?.enabled, false);
+      assert.strictEqual(tripped?.pauseReason, "failureCircuit");
+      assert.strictEqual(tripped?.consecutiveFailures, 3);
+      assert.strictEqual(tripped?.nextRunAt, null);
+      const resumed = yield* h.service.update({ id: created.id, enabled: true });
+      assert.strictEqual(resumed.enabled, true);
+      assert.isUndefined(resumed.pauseReason);
+      assert.strictEqual(resumed.consecutiveFailures, 0);
+    }),
+  );
 
-  it("does not increment the circuit on capability-unavailable", async () => {
-    const h = setup({
-      sessions: {
+  it.effect("does not increment the circuit on capability-unavailable", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({
         prompt: () => Effect.fail(new Error("capability-unavailable: no model")),
-      },
-    });
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    await run(h.service.runNow(created.id));
-    const after = h.store.get(created.id);
-    expect(after?.enabled).toBe(true);
-    expect(after?.consecutiveFailures).toBe(0);
-    expect(after?.lastRunStatus).toBe("failed");
-  });
+      });
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      const after = h.store.get(created.id);
+      assert.strictEqual(after?.enabled, true);
+      assert.strictEqual(after?.consecutiveFailures, 0);
+      assert.strictEqual(after?.lastRunStatus, "failed");
+    }),
+  );
 
-  it("caps the next wake delay at one minute", async () => {
-    const h = setup();
-    await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    await expect(run(h.service.nextWakeDelay())).resolves.toBe(60_000);
-  });
+  it.effect("caps the next wake delay at one minute", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      const delay = yield* h.service.nextWakeDelay();
+      assert.strictEqual(delay, 60_000);
+    }),
+  );
 
-  it("recovers leftover running runs as interrupted", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    h.store.set(created.id, {
-      ...created,
-      lastRunStatus: "running",
-      runs: [
-        {
-          id: "run-live",
-          startedAt: created.createdAt,
-          reason: "scheduled",
-          status: "running",
-          sessionId: "sess-old",
-        },
-      ],
-    });
-    await run(h.service.recover());
-    const after = h.store.get(created.id);
-    expect(after?.lastRunStatus).toBe("interrupted");
-    expect(after?.lastError).toBe("app-exit");
-    expect(after?.runs[0]?.status).toBe("interrupted");
-    expect(after?.runs[0]?.error).toBe("app-exit");
-  });
+  it.effect("recovers leftover running runs as interrupted", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      h.store.set(created.id, {
+        ...created,
+        lastRunStatus: "running",
+        runs: [
+          {
+            id: "run-live",
+            startedAt: created.createdAt,
+            reason: "scheduled",
+            status: "running",
+            sessionId: "sess-old",
+          },
+        ],
+      });
+      yield* h.service.recover();
+      const after = h.store.get(created.id);
+      assert.strictEqual(after?.lastRunStatus, "interrupted");
+      assert.strictEqual(after?.lastError, "app-exit");
+      assert.strictEqual(after?.runs[0]?.status, "interrupted");
+      assert.strictEqual(after?.runs[0]?.error, "app-exit");
+    }),
+  );
 
-  it("logs enable and pause", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    const records: Array<LogRecord> = [];
-    await Effect.runPromise(
-      captureLogs(h.service.update({ id: created.id, enabled: false }), records),
-    );
-    await Effect.runPromise(
-      captureLogs(h.service.update({ id: created.id, enabled: true }), records),
-    );
-    expect(records.map((record) => record.annotations.event)).toEqual([
-      "schedule.paused",
-      "schedule.enabled",
-    ]);
-  });
+  it.effect("logs enable and pause", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      const records: Array<LogRecord> = [];
+      yield* captureLogs(h.service.update({ id: created.id, enabled: false }), records);
+      yield* captureLogs(h.service.update({ id: created.id, enabled: true }), records);
+      assert.deepStrictEqual(
+        records.map((record) => record.annotations.event),
+        ["schedule.paused", "schedule.enabled"],
+      );
+    }),
+  );
 
-  it("logs fire and settle bookends", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    const records: Array<LogRecord> = [];
-    await Effect.runPromise(captureLogs(h.service.runNow(created.id), records));
-    const events = records.map((record) => record.annotations.event);
-    expect(events).toContain("schedule.fired");
-    expect(events).toContain("schedule.settled");
-  });
+  it.effect("logs fire and settle bookends", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      const records: Array<LogRecord> = [];
+      yield* captureLogs(h.service.runNow(created.id), records);
+      yield* Effect.yieldNow;
+      const events = new Set(records.map((record) => record.annotations.event));
+      assert.isTrue(events.has("schedule.fired"));
+      assert.isTrue(events.has("schedule.settled"));
+    }),
+  );
 
-  it("skips runNow when the project is gone", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput()));
-    const later = setup({ missingProject: true });
-    later.store.set(created.id, created);
-    const fired = await run(later.service.runNow(created.id));
-    expect(fired.schedule.lastRunStatus).toBe("skipped");
-    expect(fired.schedule.runs[0]?.skipReason).toBe("project_missing");
-    expect(fired.schedule.pauseReason).toBe("project_missing");
-  });
+  it.effect("skips runNow when the project is gone", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput());
+      const later = yield* harness({ missingProject: true });
+      later.store.set(created.id, created);
+      const fired = yield* later.service.runNow(created.id);
+      assert.strictEqual(fired.schedule.lastRunStatus, "skipped");
+      assert.strictEqual(fired.schedule.runs[0]?.skipReason, "project_missing");
+      assert.strictEqual(fired.schedule.pauseReason, "project_missing");
+    }),
+  );
 
-  it("rejects a one-shot in the past", async () => {
-    const h = setup();
-    await expect(
-      run(
+  it.effect("rejects a one-shot in the past", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const error = yield* Effect.flip(
         h.service.create(cronInput({ spec: { kind: "once", runAt: "2026-08-01T09:00:00.000Z" } })),
-      ),
-    ).rejects.toMatchObject({ _tag: "InvalidSchedule" });
-  });
+      );
+      assert.strictEqual(error._tag, "InvalidSchedule");
+    }),
+  );
 
-  it("surfaces a write failure", async () => {
-    const failing = makeScheduleService({
-      repo: {
-        ...memoryStore(),
-        write: () =>
-          Effect.fail(new StoreWriteError({ file: "schedules", cause: new Error("full") })),
-      },
-      projects: {
-        findById: () => Effect.succeed({ path: "/tmp/app" }),
-      },
-      sessions: idleSessions({
-        create: () => Effect.die("unused"),
-        prompt: () => Effect.die("unused"),
-      }),
-      newId: Effect.succeed("00000000-0000-0000-0000-000000000099"),
-      now: () => Date.parse("2026-08-27T08:00:00.000Z"),
-      forkSettle: (effect) => effect,
-    });
-    await expect(Effect.runPromise(failing.create(cronInput()))).rejects.toMatchObject({
-      _tag: "StoreWriteError",
-    });
-  });
+  it.effect("surfaces a write failure", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness({ writeFails: true });
+      const error = yield* Effect.flip(h.service.create(cronInput()));
+      assert.strictEqual(error._tag, "StoreWriteError");
+    }),
+  );
 
-  it("create with runNow fires immediately and returns the session", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(cronInput({ spec: { kind: "manual" }, runNow: true })),
-    );
-    expect(h.created).toEqual([{ projectId: PROJECT_ID, title: "Morning review" }]);
-    expect(created.lastRunStatus).toBe("running");
-    expect(created.lastSessionId).toBe("sess-1");
-    expect(created.runs[0]?.reason).toBe("manual");
-    expect(h.store.get(created.id)?.lastRunStatus).toBe("succeeded");
-  });
+  it.effect("create with runNow fires immediately and returns the session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ spec: { kind: "manual" }, runNow: true }),
+      );
+      assert.deepStrictEqual(h.created, [{ projectId: PROJECT_ID, title: "Morning review" }]);
+      assert.strictEqual(created.lastRunStatus, "running");
+      assert.strictEqual(created.lastSessionId, "sess-1");
+      assert.strictEqual(created.runs[0]?.reason, "manual");
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.store.get(created.id)?.lastRunStatus, "succeeded");
+    }),
+  );
 
-  it("create without runNow does not start a session", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    expect(h.created).toHaveLength(0);
-    expect(created.runs).toEqual([]);
-    expect(created.lastSessionId).toBeUndefined();
-  });
+  it.effect("create without runNow does not start a session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      assert.strictEqual(h.created.length, 0);
+      assert.deepStrictEqual(created.runs, []);
+      assert.isUndefined(created.lastSessionId);
+    }),
+  );
 
-  it("pauses after reaching maxRuns and does not fire again", async () => {
-    const h = setup();
-    const created = await run(
-      h.service.create(
+  it.effect("pauses after reaching maxRuns and does not fire again", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
         cronInput({
           spec: { kind: "cron", expr: "* * * * *" },
           maxRuns: 1,
         }),
-      ),
-    );
-    h.setNow(created.nextRunAt!);
-    await run(h.service.tick());
-    const afterFire = h.store.get(created.id);
-    expect(h.created).toHaveLength(1);
-    expect(afterFire?.firedCount).toBe(1);
-    expect(afterFire?.enabled).toBe(false);
-    expect(afterFire?.pauseReason).toBe("max_runs");
-    expect(afterFire?.nextRunAt).toBeNull();
-    h.setNow("2026-08-27T09:00:00.000Z");
-    await run(h.service.tick());
-    expect(h.created).toHaveLength(1);
-    const skipped = await run(h.service.runNow(created.id));
-    expect(h.created).toHaveLength(1);
-    expect(skipped.ref).toBeUndefined();
-    expect(skipped.schedule.lastRunStatus).toBe("skipped");
-    expect(skipped.schedule.runs[0]?.skipReason).toBe("max_runs");
-  });
+      );
+      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      yield* h.service.tick();
+      yield* Effect.yieldNow;
+      const afterFire = h.store.get(created.id);
+      assert.strictEqual(h.created.length, 1);
+      assert.strictEqual(afterFire?.firedCount, 1);
+      assert.strictEqual(afterFire?.enabled, false);
+      assert.strictEqual(afterFire?.pauseReason, "max_runs");
+      assert.strictEqual(afterFire?.nextRunAt, null);
+      yield* TestClock.setTime(Date.parse("2026-08-27T09:00:00.000Z"));
+      yield* h.service.tick();
+      assert.strictEqual(h.created.length, 1);
+      const skipped = yield* h.service.runNow(created.id);
+      assert.strictEqual(h.created.length, 1);
+      assert.isUndefined(skipped.ref);
+      assert.strictEqual(skipped.schedule.lastRunStatus, "skipped");
+      assert.strictEqual(skipped.schedule.runs[0]?.skipReason, "max_runs");
+    }),
+  );
 
-  it("pauses immediately when update sets maxRuns already reached", async () => {
-    const h = setup();
-    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
-    await run(h.service.runNow(created.id));
-    const capped = await run(h.service.update({ id: created.id, maxRuns: 1 }));
-    expect(capped.enabled).toBe(false);
-    expect(capped.pauseReason).toBe("max_runs");
-    expect(capped.maxRuns).toBe(1);
-    const raised = await run(h.service.update({ id: created.id, maxRuns: 2, enabled: true }));
-    expect(raised.enabled).toBe(true);
-    expect(raised.pauseReason).toBeUndefined();
-    expect(raised.maxRuns).toBe(2);
-  });
+  it.effect("pauses immediately when update sets maxRuns already reached", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+      yield* h.service.runNow(created.id);
+      yield* Effect.yieldNow;
+      const capped = yield* h.service.update({ id: created.id, maxRuns: 1 });
+      assert.strictEqual(capped.enabled, false);
+      assert.strictEqual(capped.pauseReason, "max_runs");
+      assert.strictEqual(capped.maxRuns, 1);
+      const raised = yield* h.service.update({ id: created.id, maxRuns: 2, enabled: true });
+      assert.strictEqual(raised.enabled, true);
+      assert.isUndefined(raised.pauseReason);
+      assert.strictEqual(raised.maxRuns, 2);
+    }),
+  );
+
+  it.effect("daemon fires after TestClock advances past nextRunAt", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      yield* h.service.create(cronInput({ spec: { kind: "every", everyMs: 60_000 } }));
+      const fiber = yield* runScheduleLoop.pipe(
+        Effect.provideService(ScheduleService, h.service),
+        Effect.forkChild,
+      );
+      yield* TestClock.adjust("60 seconds");
+      yield* Effect.yieldNow;
+      assert.strictEqual(h.created.length, 1);
+      const stored = Array.from(h.store.values())[0];
+      assert.strictEqual(stored?.lastRunStatus, "succeeded");
+      assert.strictEqual(stored?.runs[0]?.reason, "scheduled");
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
 });
