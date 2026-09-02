@@ -8,7 +8,6 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/conversation";
-import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
 import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat-state";
 
 import { useChatSession } from "./chat-session-context";
@@ -42,13 +41,7 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
 // Pure view over a store snapshot: message stream, then retry/error lines, then
 // pending agent request cards. Only the last message can be streaming, so only
 // it gets streaming affordances.
-function ChatTranscriptView({
-  snapshot,
-  onRespond,
-}: {
-  snapshot: ChatStoreState;
-  onRespond: (requestId: string, response: AgentResponse) => void;
-}) {
+function ChatTranscriptView({ snapshot }: { snapshot: ChatStoreState }) {
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
   return (
@@ -85,7 +78,7 @@ function ChatTranscriptView({
         )}
         {snapshot.error && <ModelErrorCard error={snapshot.error} />}
         {snapshot.pendingRequests.map((request) => (
-          <AgentRequestView key={request.id} request={request} onRespond={onRespond} />
+          <AgentRequestView key={request.id} request={request} />
         ))}
       </ConversationContent>
       <ConversationScrollButton />
@@ -97,7 +90,7 @@ function ChatTranscriptView({
 // message updates re-render only the transcript, never its siblings (the
 // composer subscribes narrowly on its own).
 export function ChatTranscript() {
-  const { store, respondToRequest } = useChatSession();
+  const { store } = useChatSession();
   const snapshot = useStore(store);
-  return <ChatTranscriptView snapshot={snapshot} onRespond={respondToRequest} />;
+  return <ChatTranscriptView snapshot={snapshot} />;
 }
