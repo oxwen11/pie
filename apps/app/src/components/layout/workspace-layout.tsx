@@ -9,20 +9,25 @@ import { ResizablePanel } from "@/components/layout/resizable-panel";
 
 const MIN_SPLIT_WIDTH = 24 * 16 + 6;
 
-export function FileWorkspaceLayout({
-  preview,
-  tree,
-  treeLabel,
-}: {
+export type WorkspaceLayoutProps = {
   preview: ReactNode;
   tree: ReactNode;
   treeLabel: string;
-}) {
+  toolbar?: ReactNode;
+};
+
+export function WorkspaceLayout({
+  preview,
+  tree,
+  treeLabel,
+  toolbar,
+}: WorkspaceLayoutProps): ReactNode {
   const isMobile = useIsMobile();
   const [isNarrow, setIsNarrow] = useState(false);
   const [treeOpen, setTreeOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const drawerId = useId();
+  const overlayTrigger = toolbar === undefined;
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -41,23 +46,36 @@ export function FileWorkspaceLayout({
   }, []);
 
   const useDrawer = isMobile || isNarrow;
+  useLayoutEffect(() => {
+    if (!useDrawer) setTreeOpen(false);
+  }, [useDrawer]);
+  const drawerTrigger = useDrawer ? (
+    <Button
+      aria-controls={drawerId}
+      aria-expanded={treeOpen}
+      aria-haspopup="dialog"
+      aria-label={`Open file tree for ${treeLabel}`}
+      className={overlayTrigger ? "absolute end-11 top-1.5 z-10" : undefined}
+      onClick={() => setTreeOpen(true)}
+      size="icon-xs"
+      variant="ghost"
+    >
+      <FilesIcon className="size-3.5" />
+    </Button>
+  ) : null;
 
   return (
     <div ref={containerRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {toolbar !== undefined ? (
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2">
+          {toolbar}
+          {drawerTrigger}
+        </div>
+      ) : null}
       {useDrawer ? (
         <>
           {preview}
-          <Button
-            aria-controls={drawerId}
-            aria-expanded={treeOpen}
-            aria-label={`Open file tree for ${treeLabel}`}
-            className="absolute end-11 top-1.5 z-10"
-            onClick={() => setTreeOpen(true)}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <FilesIcon className="size-3.5" />
-          </Button>
+          {overlayTrigger ? drawerTrigger : null}
           <Sheet onOpenChange={setTreeOpen} open={treeOpen}>
             <SheetPopup className="w-[min(90vw,24rem)]" id={drawerId} side="right">
               <SheetHeader className="border-b p-3">
