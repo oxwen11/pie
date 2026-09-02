@@ -127,4 +127,71 @@ describe("Chat pending prompt", () => {
     live(2, { type: "session.crashed", reason: "boom", phase: "crashed" });
     expect(chat.store.getState().pendingPrompt).toEqual({ steering: [], followUp: [] });
   });
+
+  it("optimistically replaces the pending prompt", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, {
+      type: "session.queue.updated",
+      steering: ["steer me"],
+      followUp: ["later"],
+      phase: "running",
+    });
+
+    await chat.replaceQueue({ steering: ["steer me"], followUp: ["edited"] });
+
+    expect(transport.replaceQueueCalls).toEqual([{ steering: ["steer me"], followUp: ["edited"] }]);
+    expect(chat.store.getState().pendingPrompt).toEqual({
+      steering: ["steer me"],
+      followUp: ["edited"],
+    });
+    expect(chat.store.getState().status).toBe("ready");
+  });
+
+  it("rolls back the pending prompt when replaceQueue fails", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, {
+      type: "session.queue.updated",
+      steering: [],
+      followUp: ["later"],
+      phase: "running",
+    });
+    transport.replaceQueueError = new Error("rewrite failed");
+
+    await expect(chat.replaceQueue({ steering: [], followUp: [] })).rejects.toThrow(
+      "rewrite failed",
+    );
+
+    expect(chat.store.getState().pendingPrompt).toEqual({ steering: [], followUp: ["later"] });
+    expect(chat.store.getState().status).toBe("ready");
+    expect(chat.store.getState().error).toBeUndefined();
+  });
+
+  it("ignores queue_update while replaceQueue is in flight", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, {
+      type: "session.queue.updated",
+      steering: [],
+      followUp: ["later"],
+      phase: "running",
+    });
+    let release: () => void = () => undefined;
+    transport.replaceQueueGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const pending = chat.replaceQueue({ steering: [], followUp: ["kept"] });
+    live(2, {
+      type: "session.queue.updated",
+      steering: [],
+      followUp: [],
+      phase: "running",
+    });
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual(["kept"]);
+    release();
+    await pending;
+    expect(chat.store.getState().pendingPrompt.followUp).toEqual(["kept"]);
+  });
 });

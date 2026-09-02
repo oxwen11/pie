@@ -110,7 +110,7 @@ Stable handles (from source, not guesses):
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
 | Session send | button **Send message**; while streaming: **Steer message**, **Stop generating**, **Send message** |
-| Session queue | header lists **Steering** (lines labeled **Steer**) then **Queued follow-ups**; not transcript bubbles |
+| Session queue | Frame above composer: **N queued messages**, one row each; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer**; not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
