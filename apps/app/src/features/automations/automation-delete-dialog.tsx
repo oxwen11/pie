@@ -30,7 +30,7 @@ export function AutomationDeleteDialog({
     >
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete automation</DialogTitle>
+          <DialogTitle>Delete schedule</DialogTitle>
           <DialogDescription>
             {name} will stop creating sessions. Sessions it already created stay in the sidebar.
           </DialogDescription>

@@ -78,7 +78,7 @@ function RootLayout() {
             <CardPanel
               heading={
                 automationsRoute !== null
-                  ? "Automations"
+                  ? "Schedule"
                   : sessionRef === null
                     ? "New chat"
                     : (sessionTitle ?? "New chat")

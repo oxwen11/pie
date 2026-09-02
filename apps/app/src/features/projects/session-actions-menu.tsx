@@ -85,7 +85,7 @@ export function SessionActionsMenu({ session }: { readonly session: SessionSumma
               }}
             >
               <Clock />
-              Automate…
+              Schedule…
             </MenuItem>
           )}
           <MenuItem

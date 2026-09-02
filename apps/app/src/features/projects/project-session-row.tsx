@@ -44,7 +44,7 @@ export function ProjectSessionRow({ session }: { readonly session: SessionSummar
         {createdByAutomation.data === true ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
-            title="Created by an automation"
+            title="Created by a schedule"
           >
             <Clock aria-hidden className="size-3.5 opacity-70" />
           </span>

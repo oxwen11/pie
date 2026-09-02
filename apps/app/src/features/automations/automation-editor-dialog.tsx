@@ -38,9 +38,7 @@ export function AutomationEditorDialog({
     >
       <DialogPopup className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {editor.mode === "create" ? "New automation" : "Edit automation"}
-          </DialogTitle>
+          <DialogTitle>{editor.mode === "create" ? "New schedule" : "Edit schedule"}</DialogTitle>
           <DialogDescription>
             When this is due, pie starts a session in the project and sends the prompt.
           </DialogDescription>

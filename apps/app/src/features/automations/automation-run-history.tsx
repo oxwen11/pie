@@ -67,7 +67,7 @@ export function AutomationRunHistory({
               <EmptyHeader>
                 <EmptyTitle>No runs yet</EmptyTitle>
                 <EmptyDescription>
-                  Run now, or wait until this automation is due. Each fire is recorded here.
+                  Run now, or wait until this schedule is due. Each fire is recorded here.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

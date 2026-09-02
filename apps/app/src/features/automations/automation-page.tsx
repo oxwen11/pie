@@ -94,14 +94,14 @@ export function AutomationPage({
         return;
       }
       if (created.lastRunStatus === "skipped") {
-        toast.error("Automation did not start a session (skipped).");
+        toast.error("Schedule did not start a session (skipped).");
         return;
       }
       if (created.lastRunStatus === "failed") {
-        toast.error(created.lastError ?? "Automation failed to start a session.");
+        toast.error(created.lastError ?? "Schedule failed to start a session.");
       }
     },
-    onError: (error) => toast.error(`Failed to create automation: ${error.message}`),
+    onError: (error) => toast.error(`Failed to create schedule: ${error.message}`),
   });
 
   const update = useMutation({
@@ -125,7 +125,7 @@ export function AutomationPage({
       setEditing(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
     },
-    onError: (error) => toast.error(`Failed to update automation: ${error.message}`),
+    onError: (error) => toast.error(`Failed to update schedule: ${error.message}`),
   });
 
   const remove = useMutation({
@@ -134,7 +134,7 @@ export function AutomationPage({
       setDeleting(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
     },
-    onError: (error) => toast.error(`Failed to delete automation: ${error.message}`),
+    onError: (error) => toast.error(`Failed to delete schedule: ${error.message}`),
   });
 
   const runNow = useMutation({
@@ -152,14 +152,14 @@ export function AutomationPage({
         return;
       }
       if (result.automation.lastRunStatus === "skipped") {
-        toast.error("Automation did not start a session (skipped).");
+        toast.error("Schedule did not start a session (skipped).");
         return;
       }
       if (result.automation.lastRunStatus === "failed") {
-        toast.error(result.automation.lastError ?? "Automation failed to start a session.");
+        toast.error(result.automation.lastError ?? "Schedule failed to start a session.");
       }
     },
-    onError: (error) => toast.error(`Failed to run automation: ${error.message}`),
+    onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
   });
 
   const items = automations.data ?? [];
@@ -200,7 +200,7 @@ export function AutomationPage({
     return (
       <Empty>
         <EmptyHeader>
-          <EmptyTitle>Could not load automations</EmptyTitle>
+          <EmptyTitle>Could not load schedules</EmptyTitle>
           <EmptyDescription>{automations.error.message}</EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -220,11 +220,11 @@ export function AutomationPage({
             projects.length === 0
               ? "Import a project first"
               : atLimit
-                ? `You can have at most ${MAX_AUTOMATIONS} automations`
+                ? `You can have at most ${MAX_AUTOMATIONS} schedules`
                 : undefined
           }
         >
-          New automation
+          New schedule
         </Button>
       </div>
 
@@ -234,11 +234,11 @@ export function AutomationPage({
             <EmptyMedia variant="icon">
               <Clock aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>No automations yet</EmptyTitle>
+            <EmptyTitle>No schedules yet</EmptyTitle>
             <EmptyDescription>
               {projects.length === 0
-                ? "Import a project from the sidebar, then create an automation to start a session later."
-                : "An automation creates a new session in a project and sends the prompt when it is due."}
+                ? "Import a project from the sidebar, then create a schedule to start a session later."
+                : "A schedule creates a new session in a project and sends the prompt when it is due."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

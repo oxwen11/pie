@@ -282,7 +282,7 @@ function DraftRoute() {
               size="sm"
               variant="ghost"
             >
-              Automate…
+              Schedule…
             </Button>
           </div>
         </CardFrameHeader>

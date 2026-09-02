@@ -66,7 +66,7 @@ export function AutomationCard({
           {summary !== null ? <div className="text-muted-foreground text-sm">{summary}</div> : null}
         </div>
         <Switch
-          aria-label={automation.enabled ? "Pause automation" : "Enable automation"}
+          aria-label={automation.enabled ? "Pause schedule" : "Enable schedule"}
           checked={automation.enabled}
           disabled={updating}
           onCheckedChange={onToggle}

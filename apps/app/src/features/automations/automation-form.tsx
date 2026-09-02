@@ -386,7 +386,7 @@ export function AutomationForm({
           type="datetime-local"
           value={form.expiresAt}
         />
-        <FieldDescription>Optional. After this time the automation pauses itself.</FieldDescription>
+        <FieldDescription>Optional. After this time the schedule pauses itself.</FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="automation-max-runs">Stop after N runs</FieldLabel>
@@ -400,7 +400,7 @@ export function AutomationForm({
           value={form.maxRuns}
         />
         <FieldDescription>
-          Optional. After this many fires the automation pauses itself.
+          Optional. After this many fires the schedule pauses itself.
         </FieldDescription>
       </Field>
       <Field>
@@ -476,7 +476,7 @@ export function AutomationForm({
             <div className="min-w-0">
               <FieldLabel htmlFor="automation-run-now">Run now</FieldLabel>
               <FieldDescription>
-                Start a session as soon as this automation is created.
+                Start a session as soon as this schedule is created.
               </FieldDescription>
             </div>
             <Switch
