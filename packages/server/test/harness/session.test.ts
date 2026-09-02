@@ -55,6 +55,9 @@ const runtimeFrom = (
     supportsSteering: false,
     supportsPermissions: false,
   }),
+  getMessages: Effect.succeed([]),
+  getModelState: Effect.succeed({}),
+  setModel: (model) => Effect.succeed(model),
   close: options.closes ? Ref.update(options.closes, (count) => count + 1) : Effect.void,
 });
 
