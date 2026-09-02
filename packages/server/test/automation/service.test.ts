@@ -390,16 +390,16 @@ describe("AutomationService", () => {
       },
     });
     const created = await run(
-      h.service.create(cronInput({ session: { type: "create" }, spec: { kind: "manual" } })),
+      h.service.create(cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } })),
     );
     await run(h.service.runNow(created.id));
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(1);
-    expect(h.store.get(created.id)?.session).toEqual({ type: "create", sessionId: "sess-1" });
+    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-1" });
     archived = true;
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(2);
-    expect(h.store.get(created.id)?.session).toEqual({ type: "create", sessionId: "sess-2" });
+    expect(h.store.get(created.id)?.session).toEqual({ policy: "owned", sessionId: "sess-2" });
   });
 
   it("reuses a preselected session without creating first", async () => {
@@ -411,7 +411,7 @@ describe("AutomationService", () => {
     const created = await run(
       h.service.create(
         cronInput({
-          session: { type: "reuse", sessionId: "picked-session" },
+          session: { policy: "existing", sessionId: "picked-session" },
           spec: { kind: "manual" },
         }),
       ),
@@ -419,7 +419,7 @@ describe("AutomationService", () => {
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(0);
     expect(h.store.get(created.id)?.session).toEqual({
-      type: "reuse",
+      policy: "existing",
       sessionId: "picked-session",
     });
   });
@@ -432,7 +432,7 @@ describe("AutomationService", () => {
       run(
         missing.service.create(
           cronInput({
-            session: { type: "reuse", sessionId: "missing" },
+            session: { policy: "existing", sessionId: "missing" },
             spec: { kind: "manual" },
           }),
         ),
@@ -445,7 +445,7 @@ describe("AutomationService", () => {
       run(
         archived.service.create(
           cronInput({
-            session: { type: "reuse", sessionId: "old" },
+            session: { policy: "existing", sessionId: "old" },
             spec: { kind: "manual" },
           }),
         ),

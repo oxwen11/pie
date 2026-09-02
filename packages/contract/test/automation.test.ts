@@ -30,7 +30,7 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS },
-        session: { type: "reuse", sessionId: UUID },
+        session: { policy: "existing", sessionId: UUID },
         expiresAt: "2026-12-01T00:00:00.000Z",
         maxRuns: 3,
         runNow: true,
@@ -42,7 +42,7 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "manual" },
-        session: { type: "create" },
+        session: { policy: "owned" },
       }),
     ).toBe(true);
     expect(
@@ -51,7 +51,7 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "manual" },
-        session: { type: "each-run" },
+        session: { policy: "isolated" },
       }),
     ).toBe(true);
     expect(
@@ -60,7 +60,7 @@ describe("CreateAutomationInput", () => {
         projectId: UUID,
         prompt: "review",
         spec: { kind: "manual" },
-        session: { type: "reuse" },
+        session: { policy: "existing" },
       }),
     ).toBe(false);
     expect(
@@ -110,18 +110,20 @@ describe("CreateAutomationInput", () => {
 });
 
 describe("AutomationSession helpers", () => {
-  it("defaults omitted session to each-run and persists create/reuse", () => {
-    expect(automationSessionOf({})).toEqual({ type: "each-run" });
-    expect(reuseSessionIdOf({ type: "reuse", sessionId: UUID })).toBe(UUID);
-    expect(reuseSessionIdOf({ type: "create", sessionId: UUID })).toBe(UUID);
-    expect(reuseSessionIdOf({ type: "each-run" })).toBeUndefined();
-    expect(persistAutomationSession({ type: "each-run" })).toEqual({});
-    expect(persistAutomationSession({ type: "create" })).toEqual({ session: { type: "create" } });
-    expect(bindAutomationSession({ type: "create" }, UUID)).toEqual({
-      type: "create",
+  it("defaults omitted session to isolated and persists owned/existing", () => {
+    expect(automationSessionOf({})).toEqual({ policy: "isolated" });
+    expect(reuseSessionIdOf({ policy: "existing", sessionId: UUID })).toBe(UUID);
+    expect(reuseSessionIdOf({ policy: "owned", sessionId: UUID })).toBe(UUID);
+    expect(reuseSessionIdOf({ policy: "isolated" })).toBeUndefined();
+    expect(persistAutomationSession({ policy: "isolated" })).toEqual({});
+    expect(persistAutomationSession({ policy: "owned" })).toEqual({
+      session: { policy: "owned" },
+    });
+    expect(bindAutomationSession({ policy: "owned" }, UUID)).toEqual({
+      policy: "owned",
       sessionId: UUID,
     });
-    expect(bindAutomationSession({ type: "each-run" }, UUID)).toBeUndefined();
+    expect(bindAutomationSession({ policy: "isolated" }, UUID)).toBeUndefined();
   });
 });
 

@@ -51,47 +51,47 @@ export const AutomationSpecSchema = Schema.Union([
 ]);
 export type AutomationSpec = typeof AutomationSpecSchema.Type;
 
-export const AutomationSessionEachRunSchema = Schema.Struct({
-  type: Schema.Literal("each-run"),
+export const AutomationSessionIsolatedSchema = Schema.Struct({
+  policy: Schema.Literal("isolated"),
 });
-export const AutomationSessionCreateSchema = Schema.Struct({
-  type: Schema.Literal("create"),
+export const AutomationSessionOwnedSchema = Schema.Struct({
+  policy: Schema.Literal("owned"),
   sessionId: Schema.optionalKey(Schema.String),
 });
-export const AutomationSessionReuseSchema = Schema.Struct({
-  type: Schema.Literal("reuse"),
+export const AutomationSessionExistingSchema = Schema.Struct({
+  policy: Schema.Literal("existing"),
   sessionId: Schema.String,
 });
 export const AutomationSessionSchema = Schema.Union([
-  AutomationSessionEachRunSchema,
-  AutomationSessionCreateSchema,
-  AutomationSessionReuseSchema,
+  AutomationSessionIsolatedSchema,
+  AutomationSessionOwnedSchema,
+  AutomationSessionExistingSchema,
 ]);
 export type AutomationSession = typeof AutomationSessionSchema.Type;
 
 export function automationSessionOf(automation: {
   readonly session?: AutomationSession;
 }): AutomationSession {
-  return automation.session ?? { type: "each-run" };
+  return automation.session ?? { policy: "isolated" };
 }
 
 export function reuseSessionIdOf(session: AutomationSession): string | undefined {
-  return session.type === "each-run" ? undefined : session.sessionId;
+  return session.policy === "isolated" ? undefined : session.sessionId;
 }
 
 export function persistAutomationSession(session: AutomationSession | undefined): {
   readonly session?: AutomationSession;
 } {
-  return session !== undefined && session.type !== "each-run" ? { session } : {};
+  return session !== undefined && session.policy !== "isolated" ? { session } : {};
 }
 
 export function bindAutomationSession(
   session: AutomationSession,
   sessionId: string,
 ): AutomationSession | undefined {
-  if (session.type === "each-run") return undefined;
-  if (session.type === "create") return { type: "create", sessionId };
-  return { type: "reuse", sessionId };
+  if (session.policy === "isolated") return undefined;
+  if (session.policy === "owned") return { policy: "owned", sessionId };
+  return { policy: "existing", sessionId };
 }
 
 export const AutomationPauseReasonSchema = Schema.Literals([

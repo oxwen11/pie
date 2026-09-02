@@ -661,7 +661,7 @@ export const makeAutomationService = (deps: {
           automationId: automation.id,
           sessionId: outcome.ref.sessionId,
           reason,
-          sessionType: snapshot.session.type,
+          sessionPolicy: snapshot.session.policy,
           specKind: snapshot.spec.kind,
         },
       });
@@ -775,7 +775,7 @@ export const makeAutomationService = (deps: {
           annotations: {
             automationId: id,
             specKind: input.spec.kind,
-            sessionType: automationSessionOf(automation).type,
+            sessionPolicy: automationSessionOf(automation).policy,
             ...(input.runNow === true ? { runNow: true } : undefined),
           },
         });
