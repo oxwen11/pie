@@ -4,7 +4,17 @@ import path from "node:path";
 
 import { isSessionScopedEvent, type SessionRef } from "@getpie/contract";
 import type { UIMessage } from "ai";
-import { Effect, Fiber, FileSystem, Layer, Logger, References, type Scope, Stream } from "effect";
+import {
+  Crypto,
+  Effect,
+  Fiber,
+  FileSystem,
+  Layer,
+  Logger,
+  References,
+  type Scope,
+  Stream,
+} from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { structured, type LogRecord } from "../log-record";
@@ -26,7 +36,9 @@ describe("PiAgentSessionService", () => {
 
   const run = <A, E>(
     opts: SessionServiceRunOpts,
-    program: (fixture: Fixture) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem>,
+    program: (
+      fixture: Fixture,
+    ) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>,
   ) => runFixture(home, opts, program);
 
   it("create passes the cwd through, generates a uuid sessionId, persists metadata", async () => {
