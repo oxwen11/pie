@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "prebuild": "pnpm --filter @getpie/ui cn-build",
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",

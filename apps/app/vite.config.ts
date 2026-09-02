@@ -7,8 +7,6 @@ import { isRunningFromAgent } from "agent-cli-detector";
 import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "vite";
 
-import { cnBuildPlugin } from "../../packages/ui/vite-cn-build-plugin";
-
 /**
  * The dev server the browser talks to. The pie server no longer embeds Vite,
  * so this proxies the two prefixes it owns — which also keeps the app
@@ -60,7 +58,6 @@ export default defineConfig({
     },
   },
   plugins: [
-    cnBuildPlugin(),
     codeInspectorPlugin({ bundler: "vite" }),
     tanstackRouter({
       target: "react",

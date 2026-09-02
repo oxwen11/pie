@@ -9,8 +9,6 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
-import { cnBuildPlugin } from "../../packages/ui/vite-cn-build-plugin";
-
 const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
 
@@ -98,7 +96,6 @@ export default defineConfig({
       },
     },
     plugins: [
-      cnBuildPlugin(),
       devOverlayCsp(),
       codeInspectorPlugin({ bundler: "vite" }),
       tanstackRouter({
