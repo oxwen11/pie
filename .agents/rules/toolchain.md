@@ -44,8 +44,9 @@
   tool (`aqua:vercel-labs/agent-browser` in `mise.toml`). After
   `pie-verify web|desktop launch`, call `agent-browser` — the repo shim
   (`tools/verify/bin/agent-browser`, on PATH via mise `[env] _.path`)
-  loads `AGENT_BROWSER_SESSION` / `AGENT_BROWSER_CDP` from the current
-  run. Do not `npm i -g agent-browser`. `pie-verify cli` has no browser. Isolation roots are
+  loads the current run's native agent-browser env (session, namespace,
+  sockets, Chrome or CDP) and execs the mise binary. Do not `npm i -g
+  agent-browser`. `pie-verify cli` has no browser. Isolation roots are
   `/tmp/pie-verify-web|cli|desktop` (override with `VERIFY_PIE_ROOT` /
   `VERIFY_PIE_CLI_ROOT` / `VERIFY_PIE_DESKTOP_ROOT`). The skill trees under
   `.agents/skills/verify-pie{,-cli,-desktop}` are cold-start recipes and

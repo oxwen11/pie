@@ -30,12 +30,12 @@ agent-browser get title
 pnpm exec pie-verify desktop cleanup
 ```
 
-After launch, **`agent-browser` is enough**. The repo shim
-(`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads
-`AGENT_BROWSER_SESSION` / `AGENT_BROWSER_CDP` from the current run and execs
-the mise binary (`aqua:vercel-labs/agent-browser`) with your argv unchanged.
-`agent-browser` already reads those env vars — you do not pass `--session` on
-every command. Always pass an explicit `open` URL. `web env` / `desktop env`
+After launch, **`agent-browser` is enough**. Launch writes a native env file
+(`session`, `namespace`, sockets, screenshots/downloads, idle timeout off,
+plus Chrome args for web or CDP + `PIN_TAB` for desktop). The repo shim
+(`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads that
+env and execs the mise binary (`aqua:vercel-labs/agent-browser`) with your
+argv unchanged. Always pass an explicit `open` URL. `web env` / `desktop env`
 remain an optional dump. `cli` has no page.
 
 Cold-start recipes and feature maps stay in the skill trees

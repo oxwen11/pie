@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { DESKTOP, WEB } from "../identity.ts";
 import { writeRunMeta, type DesktopRunMeta, type WebRunMeta } from "../meta.ts";
+import { agentBrowserIsolation } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
 import { cliSurface } from "../surfaces/cli.ts";
 import {
@@ -63,45 +64,59 @@ describe("parseEnvArgs", () => {
   });
 });
 
+function withFakeBrowser<T>(fn: () => T): T {
+  const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
+  const previousChrome = process.env.VERIFY_PIE_CHROME;
+  process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+  process.env.VERIFY_PIE_CHROME = "/tmp/fake-chrome";
+  try {
+    return fn();
+  } finally {
+    if (previousBin === undefined) {
+      delete process.env.VERIFY_PIE_AGENT_BROWSER;
+    } else {
+      process.env.VERIFY_PIE_AGENT_BROWSER = previousBin;
+    }
+    if (previousChrome === undefined) {
+      delete process.env.VERIFY_PIE_CHROME;
+    } else {
+      process.env.VERIFY_PIE_CHROME = previousChrome;
+    }
+  }
+}
+
 describe("browserEnvForRun", () => {
-  it("exports the Vite origin and web session", () => {
+  it("exports the Vite origin and web isolation", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(dir, "meta.json"), webMeta());
-    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
-    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
-    try {
-      expect(browserEnvForRun(WEB, dir)).toEqual({
+    withFakeBrowser(() => {
+      const isolation = agentBrowserIsolation(dir);
+      expect(browserEnvForRun(WEB, dir)).toMatchObject({
         AGENT_BROWSER: "/tmp/fake-agent-browser",
         AGENT_BROWSER_SESSION: WEB.browserSession,
+        AGENT_BROWSER_NAMESPACE: WEB.browserSession,
+        AGENT_BROWSER_CONFIG: isolation.configPath,
+        AGENT_BROWSER_SOCKET_DIR: isolation.socketDir,
+        AGENT_BROWSER_EXECUTABLE_PATH: "/tmp/fake-chrome",
+        AGENT_BROWSER_ARGS: "--no-sandbox,--disable-dev-shm-usage",
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.VERIFY_PIE_AGENT_BROWSER;
-      } else {
-        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
-      }
-    }
+    });
   });
 
   it("exports desktop CDP and session", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(dir, "meta.json"), desktopMeta());
-    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
-    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
-    try {
-      expect(browserEnvForRun(DESKTOP, dir)).toEqual({
+    withFakeBrowser(() => {
+      expect(browserEnvForRun(DESKTOP, dir)).toMatchObject({
         AGENT_BROWSER: "/tmp/fake-agent-browser",
         AGENT_BROWSER_SESSION: DESKTOP.browserSession,
+        AGENT_BROWSER_NAMESPACE: DESKTOP.browserSession,
         AGENT_BROWSER_CDP: "9223",
+        AGENT_BROWSER_PIN_TAB: "true",
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.VERIFY_PIE_AGENT_BROWSER;
-      } else {
-        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
-      }
-    }
+      expect(browserEnvForRun(DESKTOP, dir).AGENT_BROWSER_ARGS).toBeUndefined();
+    });
   });
 
   it("refuses the CLI surface", () => {
@@ -110,24 +125,26 @@ describe("browserEnvForRun", () => {
 });
 
 describe("writeBrowserEnvFile", () => {
-  it("writes export lines next to meta.json", () => {
+  it("writes export lines and config next to meta.json", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(dir, "meta.json"), webMeta());
-    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
-    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
-    try {
+    withFakeBrowser(() => {
       writeBrowserEnvFile(WEB, dir);
       const text = fs.readFileSync(path.join(dir, "agent-browser.env"), "utf8");
       expect(text).toContain("export AGENT_BROWSER='/tmp/fake-agent-browser'");
       expect(text).toContain(`export AGENT_BROWSER_SESSION='${WEB.browserSession}'`);
+      expect(text).toContain(`export AGENT_BROWSER_NAMESPACE='${WEB.browserSession}'`);
       expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
-    } finally {
-      if (previous === undefined) {
-        delete process.env.VERIFY_PIE_AGENT_BROWSER;
-      } else {
-        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
-      }
-    }
+      expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
+      expect(text).toContain("unset AGENT_BROWSER_CDP");
+      const config = JSON.parse(fs.readFileSync(path.join(dir, "agent-browser.json"), "utf8")) as {
+        session: string;
+        idleTimeout: string;
+      };
+      expect(config.session).toBe(WEB.browserSession);
+      expect(config.idleTimeout).toBe("0");
+      expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
+    });
   });
 
   it("skips the CLI surface", () => {
@@ -141,21 +158,13 @@ describe("resolveActiveBrowserEnv", () => {
   it("uses the only current surface", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(dir, "meta.json"), webMeta());
-    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
-    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
-    try {
-      expect(resolveActiveBrowserEnv({ webRun: dir, desktopRun: undefined })).toEqual({
+    withFakeBrowser(() => {
+      expect(resolveActiveBrowserEnv({ webRun: dir, desktopRun: undefined })).toMatchObject({
         AGENT_BROWSER: "/tmp/fake-agent-browser",
         AGENT_BROWSER_SESSION: WEB.browserSession,
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.VERIFY_PIE_AGENT_BROWSER;
-      } else {
-        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
-      }
-    }
+    });
   });
 
   it("refuses when both surfaces are current", () => {
@@ -173,9 +182,7 @@ describe("resolveActiveBrowserEnv", () => {
     const desktopDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(webDir, "meta.json"), webMeta());
     writeRunMeta(path.join(desktopDir, "meta.json"), desktopMeta());
-    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
-    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
-    try {
+    withFakeBrowser(() => {
       expect(
         resolveActiveBrowserEnv({
           surface: "desktop",
@@ -185,14 +192,9 @@ describe("resolveActiveBrowserEnv", () => {
       ).toMatchObject({
         AGENT_BROWSER_SESSION: DESKTOP.browserSession,
         AGENT_BROWSER_CDP: "9223",
+        AGENT_BROWSER_PIN_TAB: "true",
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.VERIFY_PIE_AGENT_BROWSER;
-      } else {
-        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
-      }
-    }
+    });
   });
 
   it("passes through when no verify run is current", () => {

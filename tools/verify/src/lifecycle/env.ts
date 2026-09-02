@@ -4,13 +4,16 @@ import path from "node:path";
 import { DESKTOP, WEB, type SurfaceIdentity } from "../identity.ts";
 import { expectMeta, readRunMeta } from "../meta.ts";
 import {
+  applyBrowserEnv,
+  browserConfigForEnv,
+  ensureBrowserEnvDirs,
   formatBrowserEnv,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   type BrowserEnvVars,
 } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
-import { currentRun, writeText } from "../runtime/fs.ts";
+import { currentRun, writeJson, writeText } from "../runtime/fs.ts";
 import { runCommandInherit } from "../runtime/process.ts";
 import type { Surface } from "../surface.ts";
 
@@ -40,13 +43,18 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       );
     case "web": {
       const web = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "web");
-      return resolveBrowserEnv({ session: identity.browserSession, appUrl: web.appUrl });
+      return resolveBrowserEnv({
+        session: identity.browserSession,
+        appUrl: web.appUrl,
+        runDir,
+      });
     }
     case "desktop": {
       const desktop = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "desktop");
       return resolveBrowserEnv({
         session: identity.browserSession,
         cdpPort: desktop.cdpPort,
+        runDir,
       });
     }
     default: {
@@ -61,10 +69,10 @@ export function writeBrowserEnvFile(identity: SurfaceIdentity, runDir: string): 
   if (identity.id === "cli") {
     return;
   }
-  writeText(
-    path.join(runDir, "agent-browser.env"),
-    formatBrowserEnv(browserEnvForRun(identity, runDir), "export"),
-  );
+  const vars = browserEnvForRun(identity, runDir);
+  ensureBrowserEnvDirs(vars);
+  writeJson(vars.AGENT_BROWSER_CONFIG, browserConfigForEnv(vars));
+  writeText(path.join(runDir, "agent-browser.env"), formatBrowserEnv(vars, "export"));
   writeIsolationShim(identity);
 }
 
@@ -155,15 +163,8 @@ export function execIsolatedAgentBrowser(args: string[]): void {
   const real = resolveAgentBrowserBin();
   const env: NodeJS.ProcessEnv = { ...process.env, AGENT_BROWSER: real };
   if (active !== undefined) {
-    env.AGENT_BROWSER_SESSION = active.AGENT_BROWSER_SESSION;
-    if (active.AGENT_BROWSER_CDP !== undefined) {
-      env.AGENT_BROWSER_CDP = active.AGENT_BROWSER_CDP;
-    } else {
-      delete env.AGENT_BROWSER_CDP;
-    }
-    if (active.PIE_VERIFY_APP_URL !== undefined) {
-      env.PIE_VERIFY_APP_URL = active.PIE_VERIFY_APP_URL;
-    }
+    ensureBrowserEnvDirs(active);
+    applyBrowserEnv(active, env);
   }
   const status = runCommandInherit(real, args, { env });
   if (status !== 0) {

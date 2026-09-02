@@ -76,8 +76,9 @@ agent-browser open http://localhost:4190/
 agent-browser find role button --name "Import project" click
 ```
 
-The repo shim (`tools/verify/bin/agent-browser`) loads the current run into
-`AGENT_BROWSER_SESSION` and execs the mise binary. Always pass an explicit
-`open` URL. Prefer `find` / `wait` over `snapshot` + `@eN`.
+The repo shim (`tools/verify/bin/agent-browser`) loads the current run's native
+agent-browser env (session, namespace, sockets, Chrome) and execs the mise
+binary. Always pass an explicit `open` URL. Prefer `find` / `wait` over
+`snapshot` + `@eN`.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.
