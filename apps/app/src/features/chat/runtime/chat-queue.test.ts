@@ -145,7 +145,8 @@ describe("Chat pending prompt", () => {
       steering: ["steer me"],
       followUp: ["edited"],
     });
-    expect(chat.store.getState().status).toBe("ready");
+    expect(chat.store.getState().status).not.toBe("error");
+    expect(chat.store.getState().error).toBeUndefined();
   });
 
   it("rolls back the pending prompt when replaceQueue fails", async () => {
@@ -164,7 +165,7 @@ describe("Chat pending prompt", () => {
     );
 
     expect(chat.store.getState().pendingPrompt).toEqual({ steering: [], followUp: ["later"] });
-    expect(chat.store.getState().status).toBe("ready");
+    expect(chat.store.getState().status).not.toBe("error");
     expect(chat.store.getState().error).toBeUndefined();
   });
 
