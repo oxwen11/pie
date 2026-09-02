@@ -49,6 +49,7 @@ const runtimeFrom = (
   events: streamFromQueueOne(queue).pipe(Stream.map((body) => ({ sessionId: nativeId, body }))),
   prompt: () => Effect.succeed({ turnId: "turn-1", started: true }),
   interrupt: Effect.void,
+  replaceQueue: () => Effect.void,
   respondToAgentRequest: () => Effect.void,
   getCapabilities: Effect.succeed({
     supportsResume: true,

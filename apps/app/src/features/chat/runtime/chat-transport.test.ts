@@ -79,6 +79,7 @@ const baseSession = {
   getSnapshot: async () => snapshot,
   prompt: unexpectedCall,
   interrupt: unexpectedCall,
+  replaceQueue: unexpectedCall,
   getMessages: unexpectedCall,
   respondToAgentRequest: unexpectedCall,
   subscribe: unexpectedCall,
@@ -303,6 +304,23 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
     await transport.interrupt();
 
     expect(calls).toEqual([{ ref }]);
+  });
+
+  it("replaces the bound session queue", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        replaceQueue: async (input: unknown) => {
+          calls.push(input);
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+
+    await transport.replaceQueue({ steering: ["steer"], followUp: ["later"] });
+
+    expect(calls).toEqual([{ ref, steering: ["steer"], followUp: ["later"] }]);
   });
 
   it("submits prompts fire-and-forget with the optimistic message id", async () => {

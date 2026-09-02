@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
   // Entry names are the oxlint plugin names and the package.json export
   // subpaths (`@getpie/oxlint/pie`, …). Dist files stay gitignored; the
-  // repo-root `.oxlintrc.json` loads them through those exports.
+  // repo-root `oxlint.config.mts` loads them through those exports.
   entry: {
     pie: "./node-import-style.ts",
     "pie-boundaries": "./feature-boundaries.ts",
