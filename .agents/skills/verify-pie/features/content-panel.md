@@ -20,11 +20,9 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 ## Driving it with agent-browser
 
 ```bash
-eval "$(pnpm exec pie-verify web env --export)"
 # on a session route
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" \
-  find --name "Toggle content panel" click
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Choose what to show alongside the chat."
+agent-browser find --name "Toggle content panel" click
+agent-browser wait --text "Choose what to show alongside the chat."
 ```
 
 1. Pressed toggle; complementary/`data-slot="content-panel"` is in the tree (or the empty copy is visible). Hidden unmounts the column — it is not merely CSS-hidden.

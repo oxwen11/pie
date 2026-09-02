@@ -85,6 +85,24 @@ export function bootstrapPackage() {
   execCli(process.argv.slice(2));
 }
 
+export function bootstrapAgentBrowser() {
+  const { node, pathEnv } = resolveNode24();
+  const result = childProcess.spawnSync(
+    node,
+    [
+      "--experimental-strip-types",
+      "--no-warnings=ExperimentalWarning",
+      path.join(packageRoot, "src/agent-browser.ts"),
+      ...process.argv.slice(2),
+    ],
+    {
+      stdio: "inherit",
+      env: { ...process.env, PATH: pathEnv },
+    },
+  );
+  process.exitCode = result.status ?? 1;
+}
+
 export function bootstrapSurface(surface, binImportMetaUrl) {
   const extraEnv = {};
   if (binImportMetaUrl !== undefined) {

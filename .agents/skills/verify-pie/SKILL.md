@@ -67,45 +67,28 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 ## Drive
 
-`pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with agent-browser itself.** Do not treat `pie-verify web browser snapshot` as the recipe — that wrapper only prepends `--session` and will track upstream argv. Do not `npm i -g agent-browser`, and do not call `agent-browser` on PATH (a leftover global can steal another session).
+`pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with `agent-browser`.** After launch you do **not** `eval` env or pass `--session` on every command.
 
-`agent-browser` is a mise tool (`aqua:vercel-labs/agent-browser` in `mise.toml`). Chrome at `/usr/local/bin/google-chrome` is used when present.
+`agent-browser` already reads `AGENT_BROWSER_SESSION` (and desktop `AGENT_BROWSER_CDP`) from the environment. Launch writes those into the current run; the repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads the current run and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
-### Load the isolated env
+Chrome at `/usr/local/bin/google-chrome` is used when present. First machine only: `pnpm exec agent-browser install` (or `pie-verify web browser install`) if the packaged CLI says no browser is available. Recipe docs: `agent-browser skills get core`.
 
 ```bash
 pnpm exec pie-verify web launch
 pnpm exec pie-verify web doctor   # if launch reused an existing run
-eval "$(pnpm exec pie-verify web env --export)"
-# same lines are also written to /tmp/pie-verify-web/current/agent-browser.env
+agent-browser open http://localhost:4190/
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
+agent-browser wait --text "Import this folder"
 ```
 
-`env --export` prints:
+`agent-browser session` must print `pie-verify-web`. If it prints `default`, you hit the raw mise binary — use `pnpm exec agent-browser` or `/tmp/pie-verify-web/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=web` (or clean up one).
 
-| Variable | Value |
-| --- | --- |
-| `AGENT_BROWSER` | mise-resolved binary (not PATH) |
-| `AGENT_BROWSER_SESSION` | `pie-verify-web` (override `VERIFY_PIE_BROWSER_SESSION`) |
-| `PIE_VERIFY_APP_URL` | `http://localhost:4190/` from the current run |
+**Always pass an explicit URL to `open`** — there is no default. Open **`http://localhost:4190/`**, never 4180, and never `http://127.0.0.1:4190/`. Vite binds `[::1]:4190` here.
 
-First machine only (no run required): `pnpm exec pie-verify web browser install` if the packaged CLI says no browser is available. After `eval`, recipe docs are `"$AGENT_BROWSER" skills get core`.
-
-### Call agent-browser
-
-Pass `--session` on every command. **Always pass an explicit URL to `open`** — there is no default.
-
-```bash
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
-# or a route: open "http://localhost:4190/draft"
-
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import your first project"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import this folder"
-```
+`pie-verify web env --export` is optional (debug, or a shell that is not using the repo shim).
 
 Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use `snapshot` when you need to read the tree (evidence, or a listbox that has not settled). Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
-
-Open **`http://localhost:4190/`**, never 4180, and never `http://127.0.0.1:4190/`. Vite binds `[::1]:4190` here.
 
 ### UI rules
 
@@ -180,10 +163,10 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm exec pie-verify web launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. Writes `agent-browser.env`. |
+| `pnpm exec pie-verify web launch` | Isolated serve + Vite. Writes `agent-browser.env` and `/tmp/pie-verify-web/bin/agent-browser`. |
 | `pnpm exec pie-verify web doctor` | Read-only worth-driving check. |
-| `pnpm exec pie-verify web env [--export]` | Isolation for agent-browser (`AGENT_BROWSER`, session, Vite URL). |
-| `pnpm exec pie-verify web browser` | Thin exec forward (prepends `--session` only). Prefer `$AGENT_BROWSER` after `env`. |
+| `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
+| `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 

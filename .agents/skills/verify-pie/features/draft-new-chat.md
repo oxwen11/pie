@@ -21,9 +21,8 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 Prerequisite: a Project (see [import-project.md](import-project.md)). Isolated launch + import of `verify-pie-sample` is enough. That sample is **not** a git repo, so you should see **Not a Git repository** and no worktree picker.
 
 ```bash
-eval "$(pnpm exec pie-verify web env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "http://localhost:4190/draft"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Ask Pi anything..."
+agent-browser open http://localhost:4190/draft
+agent-browser wait --text "Ask Pi anything..."
 ```
 
 1. Confirm card heading **New chat** and the project name as supporting text once a project is selected.

@@ -72,13 +72,12 @@ Isolated launch/doctor/drive belongs in `.agents/skills/verify-pie`. This
 recipe is the two-process pair only. After `pie-verify web launch`:
 
 ```bash
-eval "$(pnpm exec pie-verify web env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+agent-browser open http://localhost:4190/
+agent-browser find role button --name "Import project" click
 ```
 
-`agent-browser` is a mise tool (`aqua:vercel-labs/agent-browser`) — do not
-install it via npm and do not call it on PATH. Always pass an explicit `open`
-URL. Prefer `find` / `wait` over `snapshot` + `@eN`.
+The repo shim (`tools/verify/bin/agent-browser`) loads the current run into
+`AGENT_BROWSER_SESSION` and execs the mise binary. Always pass an explicit
+`open` URL. Prefer `find` / `wait` over `snapshot` + `@eN`.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.

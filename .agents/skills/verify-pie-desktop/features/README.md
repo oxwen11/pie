@@ -2,7 +2,7 @@
 
 Source of truth for what a pie desktop proof must cover.
 
-Primary surface: Electron window hosting `@getpie/app`. Harness: Playwright e2e (scripted, test mode) or **agent-browser** after `eval "$(pnpm exec pie-verify desktop env --export)"`. Steps are in the parent `SKILL.md` Drive section.
+Primary surface: Electron window hosting `@getpie/app`. Harness: Playwright e2e (scripted, test mode) or **`agent-browser`** after `pie-verify desktop launch`. Steps are in the parent `SKILL.md` Drive section.
 
 | Feature | File | User entry |
 | --- | --- | --- |

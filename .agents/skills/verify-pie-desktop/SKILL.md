@@ -52,7 +52,7 @@ Checks, in order:
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
 5. Ticket: anonymous **401**, bearer **200**.
-6. Doctor attaches agent-browser to CDP (session `pie-verify-desktop`). That session is **not** `pie-verify-web`. Override with `VERIFY_PIE_DESKTOP_BROWSER_SESSION` if needed. After `env --export`, `"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" get title` / `get url` work.
+6. Doctor attaches agent-browser to CDP (session `pie-verify-desktop`). That session is **not** `pie-verify-web`. Override with `VERIFY_PIE_DESKTOP_BROWSER_SESSION` if needed. After launch, `agent-browser get title` / `get url` work.
 
 Splash copy: `aria-label="Starting Pie"`. Failure dialog: **Pie could not start**. Overlay: **Reconnecting…**, **The local server stopped**, **Retry**, **Quit**. Window title **Pie**, `#root`. Doctor does not require the splash to have cleared — that is the window-connects feature.
 
@@ -65,24 +65,19 @@ Prefer **Playwright** (`apps/desktop/e2e/`) when the change is "does the window 
 cd apps/desktop && pnpm e2e -- desktop-rpc.spec.ts -g "renders in the background without taking focus and connects to the server"
 ```
 
-For a **real** isolated window (import, overlay, attach), drive **agent-browser** against the Electron CDP port. Do not curl `/json/version`. Do not treat `pie-verify desktop browser snapshot` as the recipe — that wrapper only prepends `--session` and `--cdp`.
+For a **real** isolated window (import, overlay, attach), drive **`agent-browser`** against the Electron CDP port. Do not curl `/json/version`. After launch you do **not** `eval` env or pass `--session` / `--cdp` on every command — the repo shim loads `AGENT_BROWSER_SESSION` and `AGENT_BROWSER_CDP` from the current run.
 
 ```bash
 pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor   # attaches session pie-verify-desktop to CDP
-eval "$(pnpm exec pie-verify desktop env --export)"
-# same lines are also written to /tmp/pie-verify-desktop/current/agent-browser.env
-
+agent-browser get title
 # if doctor did not run:
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" --cdp "$AGENT_BROWSER_CDP" \
-  connect "$AGENT_BROWSER_CDP"
-
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" get title
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import your first project"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+agent-browser connect 9223
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
 ```
 
-`env --export` prints `AGENT_BROWSER` (mise binary), `AGENT_BROWSER_SESSION` (`pie-verify-desktop`), and `AGENT_BROWSER_CDP` (usually `9223`). After `eval`, `"$AGENT_BROWSER" skills get electron` is the install-versioned attach recipe.
+`agent-browser session` must print `pie-verify-desktop`. If it prints `default`, use `pnpm exec agent-browser` or `/tmp/pie-verify-desktop/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=desktop`. `agent-browser skills get electron` is the install-versioned attach recipe.
 
 After connect, selectors match `.cursor/skills/verify-pie` (same `@getpie/app`). Prefer `find` / `wait --text` over `snapshot` + `@eN`. CDP Enter still does not submit TipTap — click send. Draft send has no `aria-label`. Do not `open http://localhost:5173/` and call that desktop.
 
@@ -103,7 +98,7 @@ pnpm exec pie-verify desktop evidence note "…"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `$AGENT_BROWSER` after `env`, not those evidence helpers.
+`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
 ## Cleanup
 
@@ -123,10 +118,10 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm exec pie-verify desktop launch` | Isolated electron-vite + daemon. `--replace` cleans ours first. Writes `agent-browser.env`. |
+| `pnpm exec pie-verify desktop launch` | Isolated electron-vite + daemon. Writes `agent-browser.env` and `/tmp/pie-verify-desktop/bin/agent-browser`. |
 | `pnpm exec pie-verify desktop doctor` | Read-only worth-driving check (attaches CDP). |
-| `pnpm exec pie-verify desktop env [--export]` | Isolation for agent-browser (`AGENT_BROWSER`, session, CDP port). |
-| `pnpm exec pie-verify desktop browser` | Thin exec forward (`--session` + `--cdp`). Prefer `$AGENT_BROWSER` after `env`. |
+| `pnpm exec pie-verify desktop env [--export]` | Optional dump of the same isolation the shim loads. |
+| `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 

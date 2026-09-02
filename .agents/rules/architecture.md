@@ -13,7 +13,7 @@
 | `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
 | `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
 | `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
-| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. Isolation via `web env` / `desktop env`; drive the page with the mise `agent-browser` binary. Not the product CLI. |
+| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run). Not the product CLI. |
 
 `tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
 

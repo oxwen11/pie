@@ -13,7 +13,9 @@ import {
   driveHintLines,
   parseEnvArgs,
   printEnv,
+  resolveActiveBrowserEnv,
   writeBrowserEnvFile,
+  writeIsolationShim,
 } from "./env.ts";
 
 function webMeta(): WebRunMeta {
@@ -135,16 +137,91 @@ describe("writeBrowserEnvFile", () => {
   });
 });
 
-describe("driveHintLines", () => {
-  it("teaches eval + open for web", () => {
-    const lines = driveHintLines(WEB);
-    expect(lines.some((line) => line.includes("env --export"))).toBe(true);
-    expect(lines.some((line) => line.includes('open "$PIE_VERIFY_APP_URL"'))).toBe(true);
+describe("resolveActiveBrowserEnv", () => {
+  it("uses the only current surface", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
+    writeRunMeta(path.join(dir, "meta.json"), webMeta());
+    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    try {
+      expect(resolveActiveBrowserEnv({ webRun: dir, desktopRun: undefined })).toEqual({
+        AGENT_BROWSER: "/tmp/fake-agent-browser",
+        AGENT_BROWSER_SESSION: WEB.browserSession,
+        PIE_VERIFY_APP_URL: "http://localhost:4190/",
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.VERIFY_PIE_AGENT_BROWSER;
+      } else {
+        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
+      }
+    }
   });
 
-  it("teaches eval + connect for desktop", () => {
+  it("refuses when both surfaces are current", () => {
+    const webDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
+    const desktopDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
+    writeRunMeta(path.join(webDir, "meta.json"), webMeta());
+    writeRunMeta(path.join(desktopDir, "meta.json"), desktopMeta());
+    expect(() => resolveActiveBrowserEnv({ webRun: webDir, desktopRun: desktopDir })).toThrow(
+      /both current/,
+    );
+  });
+
+  it("honors PIE_VERIFY_SURFACE when both runs exist", () => {
+    const webDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
+    const desktopDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
+    writeRunMeta(path.join(webDir, "meta.json"), webMeta());
+    writeRunMeta(path.join(desktopDir, "meta.json"), desktopMeta());
+    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    try {
+      expect(
+        resolveActiveBrowserEnv({
+          surface: "desktop",
+          webRun: webDir,
+          desktopRun: desktopDir,
+        }),
+      ).toMatchObject({
+        AGENT_BROWSER_SESSION: DESKTOP.browserSession,
+        AGENT_BROWSER_CDP: "9223",
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.VERIFY_PIE_AGENT_BROWSER;
+      } else {
+        process.env.VERIFY_PIE_AGENT_BROWSER = previous;
+      }
+    }
+  });
+
+  it("passes through when no verify run is current", () => {
+    expect(resolveActiveBrowserEnv({ webRun: undefined, desktopRun: undefined })).toBeUndefined();
+  });
+});
+
+describe("writeIsolationShim", () => {
+  it("writes a sourced wrapper under the isolation root", () => {
+    writeIsolationShim(WEB);
+    const dest = path.join(WEB.root, "bin/agent-browser");
+    const text = fs.readFileSync(dest, "utf8");
+    expect(text).toContain(path.join(WEB.currentLink, "agent-browser.env"));
+    expect(text).toContain('exec "$AGENT_BROWSER" "$@"');
+    expect(fs.statSync(dest).mode & 0o111).not.toBe(0);
+  });
+});
+
+describe("driveHintLines", () => {
+  it("teaches bare agent-browser for web", () => {
+    const lines = driveHintLines(WEB);
+    expect(lines.some((line) => line.includes("agent-browser open http://localhost:4190/"))).toBe(
+      true,
+    );
+  });
+
+  it("teaches bare agent-browser for desktop", () => {
     const lines = driveHintLines(DESKTOP);
-    expect(lines.some((line) => line.includes('connect "$AGENT_BROWSER_CDP"'))).toBe(true);
+    expect(lines.some((line) => line.includes("agent-browser get title"))).toBe(true);
   });
 });
 

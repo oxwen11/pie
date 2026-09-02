@@ -21,12 +21,11 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 
 ```bash
 pnpm exec pie-verify web doctor
-eval "$(pnpm exec pie-verify web env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
+agent-browser open http://localhost:4190/
 # wait for empty heading or the draft composer — not the root-route flash
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import your first project"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import this folder"
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
+agent-browser wait --text "Import this folder"
 ```
 
 Empty home:

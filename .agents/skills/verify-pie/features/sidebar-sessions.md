@@ -21,10 +21,9 @@ Always visible on `/draft` and `/session/*` (web inset sidebar). On a narrow vie
 Need at least one Project and one Session (import + draft send).
 
 ```bash
-eval "$(pnpm exec pie-verify web env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find --name "New chat" click
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --url "**/draft*"
+agent-browser open http://localhost:4190/
+agent-browser find --name "New chat" click
+agent-browser wait --url "**/draft*"
 ```
 
 1. **New chat** → URL `/draft`, heading **New chat**.

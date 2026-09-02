@@ -16,11 +16,9 @@ Empty isolated home: heading **Import your first project**, button **Import proj
 ## Driving it
 
 ```bash
-eval "$(pnpm exec pie-verify desktop env --export)"
-# doctor already attached; if not:
-# "$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" --cdp "$AGENT_BROWSER_CDP" connect "$AGENT_BROWSER_CDP"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --text "Import your first project"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+# doctor already attached; if not: agent-browser connect 9223
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
 ```
 
 Then the same clicks as web verify-pie:

@@ -15,9 +15,8 @@ CLI.
 ```bash
 pnpm exec pie-verify web launch
 pnpm exec pie-verify web doctor
-eval "$(pnpm exec pie-verify web env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" open "$PIE_VERIFY_APP_URL"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" find role button --name "Import project" click
+agent-browser open http://localhost:4190/
+agent-browser find role button --name "Import project" click
 pnpm exec pie-verify web cleanup
 
 pnpm exec pie-verify cli launch
@@ -27,20 +26,17 @@ pnpm exec pie-verify cli cleanup
 
 pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor
-eval "$(pnpm exec pie-verify desktop env --export)"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" --cdp "$AGENT_BROWSER_CDP" \
-  connect "$AGENT_BROWSER_CDP"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" get title
+agent-browser get title
 pnpm exec pie-verify desktop cleanup
 ```
 
-`web env` / `desktop env` print the mise-managed `agent-browser` binary
-(`aqua:vercel-labs/agent-browser`, not a pnpm dep), the isolated session
-(`pie-verify-web` / `pie-verify-desktop`), the Vite origin (web), and the
-run's CDP port (desktop). Call that binary directly. Always pass an explicit
-`open` URL. `web browser` / `desktop browser` remain a thin exec forward
-(`--session`, desktop also `--cdp`) for `install` / evidence internals.
-`cli` has no page.
+After launch, **`agent-browser` is enough**. The repo shim
+(`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads
+`AGENT_BROWSER_SESSION` / `AGENT_BROWSER_CDP` from the current run and execs
+the mise binary (`aqua:vercel-labs/agent-browser`) with your argv unchanged.
+`agent-browser` already reads those env vars — you do not pass `--session` on
+every command. Always pass an explicit `open` URL. `web env` / `desktop env`
+remain an optional dump. `cli` has no page.
 
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers

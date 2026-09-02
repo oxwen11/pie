@@ -20,11 +20,9 @@
 ## Driving it with agent-browser
 
 ```bash
-eval "$(pnpm exec pie-verify web env --export)"
 # after a draft send, or:
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" \
-  open "http://localhost:4190/session/<sessionId>?projectId=<projectId>"
-"$AGENT_BROWSER" --session "$AGENT_BROWSER_SESSION" wait --url "**/session/**"
+agent-browser open "http://localhost:4190/session/<sessionId>?projectId=<projectId>"
+agent-browser wait --url "**/session/**"
 ```
 
 Follow-up prompt:
