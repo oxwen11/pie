@@ -25,6 +25,14 @@ export function ChatSessionProvider({
     [chat],
   );
   const interrupt = useCallback(() => chat.interrupt(), [chat]);
+  const replaceQueue = useCallback<ChatSessionValue["replaceQueue"]>(
+    (pending) => {
+      chat.replaceQueue(pending).catch((error: unknown) => {
+        console.error("Failed to replace queue", error);
+      });
+    },
+    [chat],
+  );
   const respondToRequest = useCallback<ChatSessionValue["respondToRequest"]>(
     (requestId, response) => {
       chat.respondToAgentRequest(requestId, response).catch((error: unknown) => {
@@ -40,10 +48,11 @@ export function ChatSessionProvider({
       store: chat.store,
       prompt,
       interrupt,
+      replaceQueue,
       respondToRequest,
       turnInProgress,
     }),
-    [sessionRef.sessionId, chat, prompt, interrupt, respondToRequest, turnInProgress],
+    [sessionRef.sessionId, chat, prompt, interrupt, replaceQueue, respondToRequest, turnInProgress],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

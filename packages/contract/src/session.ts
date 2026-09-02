@@ -11,6 +11,7 @@ import {
   type ListSessionsOutput,
   PromptInputSchema,
   PromptOutputSchema,
+  ReplaceQueueInputSchema,
   RefInputSchema,
   RenameSessionInputSchema,
   ResolveRefInputSchema,
@@ -40,6 +41,7 @@ export const sessionContract = {
   resolveRef: base.input(ResolveRefInputSchema).output(SessionRefSchema),
 
   prompt: base.input(PromptInputSchema).output(PromptOutputSchema),
+  replaceQueue: base.input(ReplaceQueueInputSchema),
   interrupt: base.input(RefInputSchema),
   respondToAgentRequest: base.input(RespondToAgentRequestInputSchema),
   getStatus: base.input(RefInputSchema).output(SessionStatusSchema),

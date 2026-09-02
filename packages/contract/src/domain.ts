@@ -374,10 +374,11 @@ export type ActivePromptSnapshot = {
 // Pi's in-memory message queue as this server last saw it. Always present
 // (empty arrays when idle). Not persisted — a server restart drops it; a
 // browser refresh hydrates it from the live snapshot while the Pi child lives.
-export type SessionPendingPrompt = {
-  readonly steering: ReadonlyArray<string>;
-  readonly followUp: ReadonlyArray<string>;
-};
+export const SessionPendingPromptSchema = Schema.Struct({
+  steering: Schema.Array(Schema.String),
+  followUp: Schema.Array(Schema.String),
+});
+export type SessionPendingPrompt = typeof SessionPendingPromptSchema.Type;
 
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
@@ -456,6 +457,16 @@ export const PromptOutputSchema = Schema.Struct({
   started: Schema.Boolean,
 });
 export type PromptOutput = typeof PromptOutputSchema.Type;
+
+// Full replace of Pi's native queue (clear_queue, then steer / follow_up
+// each remaining line). Items have no ids — address them by index in these
+// arrays. Empty arrays clear the queue.
+export const ReplaceQueueInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  steering: Schema.Array(Schema.String),
+  followUp: Schema.Array(Schema.String),
+});
+export type ReplaceQueueInput = typeof ReplaceQueueInputSchema.Type;
 
 // ---------------------------------------------------------------------------
 // Session capabilities

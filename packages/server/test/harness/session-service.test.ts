@@ -408,6 +408,33 @@ describe("PiAgentSessionService", () => {
     expect(result).toEqual([]);
   });
 
+  it("replaceQueue with empty arrays succeeds with nothing running", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        yield* fixture.service.close(ref);
+        yield* fixture.service.replaceQueue({ ref, steering: [], followUp: [] });
+        return fixture.spy.resume;
+      }),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("replaceQueue with remaining items fails closed instead of starting an agent", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        yield* fixture.service.close(ref);
+        const err = yield* Effect.flip(
+          fixture.service.replaceQueue({ ref, steering: ["steer"], followUp: [] }),
+        );
+        return { err, resume: fixture.spy.resume };
+      }),
+    );
+    expect(result.err._tag).toBe("SessionClosed");
+    expect(result.resume).toEqual([]);
+  });
+
   it("respondToAgentRequest reports the request as gone with nothing running", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
