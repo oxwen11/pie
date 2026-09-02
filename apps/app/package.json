@@ -41,6 +41,7 @@
     "react-error-boundary": "catalog:",
     "react-resizable-panels": "^4.12.3",
     "sonner": "^2.0.8",
+    "streamdown": "2.6.0",
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:",
     "tw-shimmer": "^0.4.12",

@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { createRouterClient } from "@orpc/server";
 import { Effect, Layer, ManagedRuntime } from "effect";
 
+import { SessionImageAssetsLayer } from "../src/assets";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
@@ -64,10 +65,12 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     Layer.provide(worktreeProvided),
     Layer.provide(NodeServices.layer),
   );
+  const sessionImageAssetsLayer = SessionImageAssetsLayer.pipe(Layer.provide(harnessSessionLayer));
   const pullRequestLayer =
     options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
+    sessionImageAssetsLayer,
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,

@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -45,13 +45,23 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
-  const [clients] = useState(() => createAppClients(server));
-  return <AppRuntime {...clients} />;
+  const clients = useMemo(() => createAppClients(server), [server]);
+  const connectionKey = server
+    ? `${server.httpBaseUrl}\u0000${server.wsBaseUrl}\u0000${server.token}`
+    : "browser";
+  return <AppRuntime key={connectionKey} {...clients} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
-function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
-  const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+function AppRuntime({
+  httpBaseUrl,
+  orpcClient,
+  queryClient,
+  orpcQueryUtils,
+}: AppClients): ReactElement {
+  const [router] = useState(() =>
+    createRouter({ httpBaseUrl, orpcClient, queryClient, orpcQueryUtils }),
+  );
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),

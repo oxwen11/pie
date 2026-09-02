@@ -2,14 +2,15 @@ import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequ
 import { Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
+import { SessionImageAssets } from "../assets";
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
 import { corsHeaders, isLoopbackHost } from "./cors";
 import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` must present
-   * `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
+   * When set, every `/api/*` request except `/api/health` and signed asset GETs
+   * must present `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
    */
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
@@ -40,7 +41,7 @@ export const makeRequestApp = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | SessionImageAssets
 > =>
   route(options).pipe(
     /**
@@ -58,7 +59,10 @@ export const makeRequestApp = (
         ? Effect.void
         : HttpServerRequest.HttpServerRequest.pipe(
             Effect.flatMap((request) => {
-              const path = new URL(request.url, "http://localhost").pathname;
+              const requestPath = new URL(request.url, "http://localhost").pathname;
+              const path = requestPath.startsWith("/api/assets/")
+                ? "/api/assets/<redacted>"
+                : requestPath;
               const annotations = {
                 event: "http.refused",
                 status: response.status,
@@ -91,7 +95,7 @@ const route = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | SessionImageAssets
 > =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -123,6 +127,22 @@ const route = (
     // it holds a token, and it discloses nothing.
     if (request.method === "GET" && pathname === "/api/health") {
       return withCors(HttpServerResponse.text("ok"));
+    }
+
+    const assetMatch = pathname.match(/^\/api\/assets\/([^/]+)\/[^/]+$/);
+    if (request.method === "GET" && assetMatch?.[1]) {
+      const assets = yield* SessionImageAssets;
+      const content = yield* assets.contentForToken(assetMatch[1]);
+      if (content === null) return withCors(notFound);
+      return withCors(
+        HttpServerResponse.uint8Array(content.bytes, {
+          headers: {
+            "cache-control": "private, no-store",
+            "content-type": content.mediaType,
+            "x-content-type-options": "nosniff",
+          },
+        }),
+      );
     }
 
     if (

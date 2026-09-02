@@ -137,19 +137,61 @@ describe("createPiTransform", () => {
       dynamic: false,
     });
 
-    const result = { content: [{ type: "text", text: "ok" }], details: {} };
     const done = [
       ...t(
         e({
           type: "tool_execution_end",
           toolCallId: "c1",
           toolName: "bash",
-          result,
+          result: {
+            content: [
+              { type: "text", text: "ok" },
+              { type: "image", data: "AAA", mimeType: "image/png" },
+            ],
+            details: {},
+          },
           isError: false,
         }),
       ),
     ];
-    expect(done[0]).toMatchObject({ type: "tool-output-available", output: result });
+    expect(done).toEqual([
+      {
+        type: "tool-output-available",
+        toolCallId: "c1",
+        output: { content: [{ type: "text", text: "ok" }], details: {} },
+        providerExecuted: true,
+        dynamic: false,
+      },
+      { type: "file", mediaType: "image/png", url: "data:image/png;base64,AAA" },
+    ]);
+  });
+
+  it("does not adapt SVG tool content to an AI SDK file part", () => {
+    const t = createPiTransform("s1");
+    const done = [
+      ...t(
+        e({
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "read",
+          result: {
+            content: [{ type: "image", data: "PHN2Zy8+", mimeType: "image/svg+xml" }],
+            details: {},
+          },
+          isError: false,
+        }),
+      ),
+    ];
+
+    expect(done).toEqual([
+      {
+        type: "tool-output-available",
+        toolCallId: "c1",
+        output: { content: [], details: {} },
+        providerExecuted: true,
+        dynamic: false,
+      },
+    ]);
   });
 
   it("maps tool failures to tool-output-error and extension tools to dynamic", () => {

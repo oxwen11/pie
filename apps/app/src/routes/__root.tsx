@@ -31,6 +31,7 @@ import type { AppClients } from "@/lib/orpc";
 import { sameSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
+  httpBaseUrl: string;
   orpcClient: AppClients["orpcClient"];
   orpcQueryUtils: AppClients["orpcQueryUtils"];
   queryClient: QueryClient;

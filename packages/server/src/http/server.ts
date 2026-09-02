@@ -18,8 +18,8 @@ export type ManagedServer = Server & {
 
 export type CreateServerOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` must present
-   * `Authorization: Bearer <token>`, and every WebSocket upgrade must carry a
+   * When set, every `/api/*` request except `/api/health` and signed asset GETs
+   * must present `Authorization: Bearer <token>`, and every WebSocket upgrade must carry a
    * valid single-use `?ticket=`. Unset (browser mode) disables both.
    */
   authToken?: string | undefined;
