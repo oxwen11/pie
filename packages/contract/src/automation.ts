@@ -148,7 +148,7 @@ export const AutomationRunSnapshotSchema = Schema.Struct({
   prompt: Schema.String,
   projectId: Schema.String,
   spec: AutomationSpecSchema,
-  session: AutomationSessionSchema,
+  session: Schema.optionalKey(AutomationSessionSchema),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),

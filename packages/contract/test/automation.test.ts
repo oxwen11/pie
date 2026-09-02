@@ -196,4 +196,34 @@ describe("Automation", () => {
     expect(decoded.lastRunStatus).toBe("running");
     expect(decoded.runs[0]?.status).toBe("running");
   });
+
+  it("reads a run snapshot that predates session policy", () => {
+    expect(
+      accepts(AutomationSchema, {
+        id: UUID,
+        name: "Legacy",
+        projectId: UUID,
+        prompt: "review",
+        spec: { kind: "manual" },
+        enabled: true,
+        createdAt: "2026-08-27T08:00:00.000Z",
+        updatedAt: "2026-08-27T08:00:00.000Z",
+        nextRunAt: null,
+        runs: [
+          {
+            id: "run-1",
+            startedAt: "2026-08-27T08:00:00.000Z",
+            reason: "manual",
+            status: "succeeded",
+            snapshot: {
+              name: "Legacy",
+              prompt: "review",
+              projectId: UUID,
+              spec: { kind: "manual" },
+            },
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
 });

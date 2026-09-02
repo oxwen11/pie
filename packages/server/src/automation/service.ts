@@ -416,7 +416,7 @@ export const makeAutomationService = (deps: {
   > =>
     Effect.gen(function* () {
       const project = yield* projects.findById(snapshot.projectId);
-      const reuseSessionId = reuseSessionIdOf(snapshot.session);
+      const reuseSessionId = reuseSessionIdOf(automationSessionOf(snapshot));
       if (reuseSessionId !== undefined) {
         const ref = { projectId: snapshot.projectId, sessionId: reuseSessionId };
         const found = yield* sessions.find(ref);
@@ -641,7 +641,7 @@ export const makeAutomationService = (deps: {
         {
           ...automation,
           ...persistAutomationSession(
-            bindAutomationSession(snapshot.session, outcome.ref.sessionId),
+            bindAutomationSession(automationSessionOf(snapshot), outcome.ref.sessionId),
           ),
         },
         {
@@ -663,7 +663,7 @@ export const makeAutomationService = (deps: {
           automationId: automation.id,
           sessionId: outcome.ref.sessionId,
           reason,
-          sessionPolicy: snapshot.session.policy,
+          sessionPolicy: automationSessionOf(snapshot).policy,
           specKind: snapshot.spec.kind,
         },
       });
