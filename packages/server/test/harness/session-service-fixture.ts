@@ -127,9 +127,9 @@ export const run = <A, E>(
             supportsSteering: false,
             supportsPermissions: false,
           }),
-          ...(opts.history !== undefined
-            ? { getMessages: Effect.succeed(opts.history) }
-            : undefined),
+          getMessages: Effect.succeed(opts.history ?? []),
+          getModelState: Effect.succeed({}),
+          setModel: (model) => Effect.succeed(model),
           close: Effect.sync(() => {
             spy.close.push(sessionId);
           }).pipe(

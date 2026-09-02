@@ -53,10 +53,6 @@ export const SessionRequestReplied = defineEvent({
   type: "session.request.replied",
   schema: { ...sid, requestId: Schema.String },
 });
-export const SessionRequestRejected = defineEvent({
-  type: "session.request.rejected",
-  schema: { ...sid, requestId: Schema.String, reason: Schema.optionalKey(Schema.String) },
-});
 export const SessionQueueUpdated = defineEvent({
   type: "session.queue.updated",
   schema: {
@@ -95,7 +91,6 @@ export const SessionEventDefs = [
   SessionTurnEnded,
   SessionRequestAsked,
   SessionRequestReplied,
-  SessionRequestRejected,
   SessionQueueUpdated,
   SessionCrashed,
 ] as const;

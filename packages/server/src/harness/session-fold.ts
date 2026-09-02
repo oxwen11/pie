@@ -121,12 +121,6 @@ export const toWireBody = (
       return { type: "session.request.asked", request: event.request };
     case "session.request.replied":
       return { type: "session.request.replied", requestId: event.requestId };
-    case "session.request.rejected":
-      return {
-        type: "session.request.rejected",
-        requestId: event.requestId,
-        ...(event.reason !== undefined ? { reason: event.reason } : undefined),
-      };
     case "session.queue.updated":
       return {
         type: "session.queue.updated",
