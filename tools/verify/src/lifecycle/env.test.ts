@@ -128,23 +128,32 @@ describe("writeBrowserEnvFile", () => {
   it("writes export lines and config next to meta.json", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
     writeRunMeta(path.join(dir, "meta.json"), webMeta());
-    withFakeBrowser(() => {
-      writeBrowserEnvFile(WEB, dir);
-      const text = fs.readFileSync(path.join(dir, "agent-browser.env"), "utf8");
-      expect(text).toContain("export AGENT_BROWSER='/tmp/fake-agent-browser'");
-      expect(text).toContain(`export AGENT_BROWSER_SESSION='${WEB.browserSession}'`);
-      expect(text).toContain(`export AGENT_BROWSER_NAMESPACE='${WEB.browserSession}'`);
-      expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
-      expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
-      expect(text).toContain("unset AGENT_BROWSER_CDP");
-      const config = JSON.parse(fs.readFileSync(path.join(dir, "agent-browser.json"), "utf8")) as {
-        session: string;
-        idleTimeout: string;
-      };
-      expect(config.session).toBe(WEB.browserSession);
-      expect(config.idleTimeout).toBe("0");
-      expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
-    });
+    const isolation = agentBrowserIsolation(dir);
+    try {
+      withFakeBrowser(() => {
+        writeBrowserEnvFile(WEB, dir);
+        const text = fs.readFileSync(path.join(dir, "agent-browser.env"), "utf8");
+        expect(text).toContain("export AGENT_BROWSER='/tmp/fake-agent-browser'");
+        expect(text).toContain(`export AGENT_BROWSER_SESSION='${WEB.browserSession}'`);
+        expect(text).toContain(`export AGENT_BROWSER_NAMESPACE='${WEB.browserSession}'`);
+        expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
+        expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
+        expect(text).toContain("unset AGENT_BROWSER_CDP");
+        const config = JSON.parse(
+          fs.readFileSync(path.join(dir, "agent-browser.json"), "utf8"),
+        ) as {
+          session: string;
+          idleTimeout: string;
+        };
+        expect(config.session).toBe(WEB.browserSession);
+        expect(config.idleTimeout).toBe("0");
+        expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
+        expect(text).toContain(`export AGENT_BROWSER_SOCKET_DIR='${isolation.socketDir}'`);
+        expect(isolation.socketDir.startsWith("/tmp/pvs-")).toBe(true);
+      });
+    } finally {
+      fs.rmSync(isolation.socketDir, { recursive: true, force: true });
+    }
   });
 
   it("skips the CLI surface", () => {

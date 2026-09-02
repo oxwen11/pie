@@ -10,7 +10,9 @@ export {
 } from "./daemon.ts";
 export type { DaemonRecord } from "./daemon.ts";
 export {
+  AGENT_BROWSER_UNIX_SOCKET_MAX,
   agentBrowser,
+  agentBrowserDaemonSocketPath,
   agentBrowserIsolation,
   applyBrowserEnv,
   browserConfigForEnv,
@@ -18,11 +20,13 @@ export {
   buildAgentBrowserArgv,
   ensureBrowserEnvDirs,
   formatBrowserEnv,
+  isManagedAgentBrowserSocketDir,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   resolveIsolatedChromeExecutable,
   saveScreenshot,
   saveSnapshot,
+  shortAgentBrowserSocketDir,
 } from "./browser.ts";
 export type {
   AgentBrowserConfig,
