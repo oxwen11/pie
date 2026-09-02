@@ -1,5 +1,5 @@
 import type { SessionRef } from "@getpie/contract";
-import { Context, Effect, Layer, Semaphore } from "effect";
+import { Context, Effect, Layer, Semaphore, SynchronizedRef } from "effect";
 
 export type SessionMetadataLocksShape = {
   readonly withLock: <A, E, R>(
@@ -15,24 +15,36 @@ export class SessionMetadataLocks extends Context.Service<
   SessionMetadataLocksShape
 >()("SessionMetadataLocks") {}
 
-const makeSessionMetadataLocks = (): SessionMetadataLocksShape => {
-  const locks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
-  return {
-    withLock: (ref, effect) => {
-      const key = `${ref.projectId}\0${ref.sessionId}`;
-      const lock = locks.get(key) ?? Semaphore.makeUnsafe(1);
-      locks.set(key, lock);
-      return lock.withPermit(effect);
-    },
-    release: (ref) =>
-      Effect.sync(() => {
-        locks.delete(`${ref.projectId}\0${ref.sessionId}`);
-      }),
-    size: Effect.sync(() => locks.size),
-  };
-};
+const refKey = (ref: SessionRef): string => `${ref.projectId}\0${ref.sessionId}`;
 
 export const SessionMetadataLocksLayer: Layer.Layer<SessionMetadataLocks> = Layer.effect(
   SessionMetadataLocks,
-  Effect.sync(makeSessionMetadataLocks),
+  Effect.gen(function* () {
+    const table = yield* SynchronizedRef.make<ReadonlyMap<string, Semaphore.Semaphore>>(new Map());
+
+    const semaphoreFor = (key: string) =>
+      SynchronizedRef.modifyEffect(table, (current) => {
+        const existing = current.get(key);
+        if (existing !== undefined) {
+          return Effect.succeed([existing, current] as const);
+        }
+        return Semaphore.make(1).pipe(
+          Effect.map((created) => [created, new Map([...current, [key, created]])] as const),
+        );
+      });
+
+    return {
+      withLock: (ref, effect) =>
+        semaphoreFor(refKey(ref)).pipe(Effect.flatMap((lock) => lock.withPermit(effect))),
+      release: (ref) =>
+        SynchronizedRef.update(table, (current) => {
+          const key = refKey(ref);
+          if (!current.has(key)) return current;
+          const next = new Map(current);
+          next.delete(key);
+          return next;
+        }),
+      size: SynchronizedRef.get(table).pipe(Effect.map((current) => current.size)),
+    } satisfies SessionMetadataLocksShape;
+  }),
 );
