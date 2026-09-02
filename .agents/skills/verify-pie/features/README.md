@@ -8,7 +8,7 @@ Primary surface: Vite app at `http://localhost:4190/`. After `pie-verify web lau
 | --- | --- | --- |
 | Import a local folder as a Project | [import-project.md](import-project.md) | Empty `/draft`, or sidebar **Import project** |
 | Start a new chat | [draft-new-chat.md](draft-new-chat.md) | `/` → `/draft`, **New chat**, or per-project compose |
-| Talk in a session | [session-chat.md](session-chat.md) | After send, or a sidebar session row |
+| Talk in a session | [session-chat.md](session-chat.md) | After send, or a sidebar session row. Streaming: Send queues a follow-up; **Steer** submits this draft |
 | Find and manage sessions | [sidebar-sessions.md](sidebar-sessions.md) | Left **Projects** list |
 | Content panel beside chat | [content-panel.md](content-panel.md) | **Toggle content panel** on a session |
 
