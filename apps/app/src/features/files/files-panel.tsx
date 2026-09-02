@@ -8,10 +8,10 @@ import type { PanelHandle } from "@/components/layout/content-panel/model/panel"
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 import { PanelEmptyState } from "@/components/layout/panel-empty-state";
+import { WorkspaceLayout } from "@/components/layout/workspace-layout";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
-import { FileWorkspaceLayout } from "./file-workspace-layout";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export const filesPanel = definePanel({
@@ -72,7 +72,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
   );
 
   return (
-    <FileWorkspaceLayout
+    <WorkspaceLayout
       preview={
         <FileState icon={FileTextIcon} prominentIcon title="打开文件">
           从工作区目录树中选择文件

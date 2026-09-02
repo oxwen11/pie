@@ -16,7 +16,7 @@ The UI already uses compound components in several places, but the architecture 
 
 - [x] Remove the dead `UIMessage` / `message` prop chain from `AssistantMessage` → `ToolBatch` → `ToolPart`.
 - [x] Remove agent-request response callback drilling from `ChatTranscript` → `AgentRequestView` → request-specific views.
-- [ ] Consolidate the duplicated responsive File/Review workspace layouts into one shared layout boundary.
+- [x] Consolidate the duplicated responsive File/Review workspace layouts into one shared layout boundary.
 - [ ] Remove current-session detection prop drilling through the projects sidebar with a narrowly scoped provider or equivalent boundary.
 - [ ] Stop passing the Content Panel session object through outlet children when the existing Content Panel context already provides it.
 - [ ] Consolidate `FileState`, `ReviewState`, and `WorkspaceState` into one shared state presentation component.
@@ -45,8 +45,9 @@ The UI already uses compound components in several places, but the architecture 
 
 ## Work Log
 
-| Date       | Action                                                               | Learnings                                                                                                     |
-| ---------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 2026-08-23 | Identified via UI component architecture review                      | The first safe slice is deleting a prop chain that has no behavior.                                           |
-| 2026-08-23 | Removed dead `message` props from the assistant transcript tool path | `ToolPart` never consumed the message; `AssistantMessage` and `ToolBatch` only forwarded it.                  |
-| 2026-08-23 | Moved agent-request response ownership to `AgentRequestView`         | The transcript remains a pure snapshot view while request leaves retain an explicit action prop at one level. |
+| Date       | Action                                                               | Learnings                                                                                                                                                |
+| ---------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-23 | Identified via UI component architecture review                      | The first safe slice is deleting a prop chain that has no behavior.                                                                                      |
+| 2026-08-23 | Removed dead `message` props from the assistant transcript tool path | `ToolPart` never consumed the message; `AssistantMessage` and `ToolBatch` only forwarded it.                                                             |
+| 2026-08-23 | Moved agent-request response ownership to `AgentRequestView`         | The transcript remains a pure snapshot view while request leaves retain an explicit action prop at one level.                                            |
+| 2026-08-23 | Consolidated responsive File/Review workspace layouts                | One app-level layout now owns width observation, drawer behavior, and split sizing while explicit labels and trigger placement remain at each call site. |
