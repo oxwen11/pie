@@ -129,7 +129,6 @@ Standards:
   - Sessions: `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` after a successful draft send. Title is the prompt text.
 - Logs for a failed connect: `/tmp/pie-verify-web/runs/<id>/logs/{server,vite}.log` and `$PIE_HOME/logs/pie.log`. Copy into evidence if you cite them; cleanup deletes the run dir.
 - No mocks. There is no test-mode server in this recipe. A dry-run name does not exist — if you skip `pi`, observe that skip (no `agentSessionId` in the session file, error card in the transcript).
-- When the proof backs a GitHub issue or PR, upload the stills with `gh --attach` (root `AGENTS.md`, UI evidence). Do not commit them.
 
 ## Cleanup
 

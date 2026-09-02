@@ -37,37 +37,17 @@ two-process note.
 `apps/desktop/src` has its own layering contract in `apps/desktop/AGENTS.md` —
 read it before touching that app.
 
-## GitHub
+## Pull requests
 
-**Merge.** Use **squash merge** — one commit per PR keeps `main` readable.
-Don't mix merge-commit / rebase merges in the repo. Squash rewrites the
-branch tip out of `main`'s history, so deleting the local feature branch
-needs `git branch -D` — the changes are already on `main`, so it's safe.
+Use **squash merge** — one commit per PR keeps `main` readable. Don't mix
+merge-commit / rebase merges in the repo. Squash rewrites the branch tip out
+of `main`'s history, so deleting the local feature branch needs `git branch -D`
+— the changes are already on `main`, so it's safe.
 
-**UI evidence.** A visual issue or a visual change is not done as text.
-The GitHub issue, pull request, or comment must include an image or a
-short video so a reviewer sees the problem or the result without running
-the branch. Layout, styling, empty/error states, composer, and desktop
-chrome all count. Capture stills from the verify loop; record only when
-the thing is motion or a repro.
-
-| | |
-| -------------------------------- | ------------------------------------------------------------------------------------------ |
-| Capture                          | `pnpm exec pie-verify web evidence screenshot` (or `desktop`)                              |
-| Upload (`gh` ≥ 2.99.0)           | repeat `--attach` on `gh issue` / `gh pr` `create`, `edit`, and `comment`                  |
-| Body                             | keep Markdown as written; a local path already in it is rewritten in place                 |
-| Alt                              | `#` after the path: `--attach './before.png#Draft empty state'`                            |
-| Formats                          | PNG, JPEG, GIF, WebP, SVG, MP4, MOV, WebM                                                  |
-| Don't                            | commit the media; file or merge a visual report with prose only                            |
-
-Unreferenced `--attach` files are appended at the end of the body. Upgrade
-`gh` if the flag is missing. Example:
-
-```bash
-gh pr create --body-file /tmp/pr.md \
-  --attach './before.png#Draft empty state' \
-  --attach './after.webm#Import then send'
-```
+A UI change or UI bug needs an image or short video on the GitHub issue,
+PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh` ≥
+2.99.0). Capture with `pie-verify web|desktop evidence screenshot`; do not
+commit the files.
 
 ## Going deeper
 

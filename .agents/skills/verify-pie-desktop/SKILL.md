@@ -93,7 +93,7 @@ pnpm exec pie-verify desktop evidence note "…"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` and `desktop browser` use the mise-managed `agent-browser` with session `pie-verify-desktop` and `--cdp <port>` — they do not curl `/json/version`. When the proof backs a GitHub issue or PR, upload the stills with `gh --attach` (root `AGENTS.md`, UI evidence). Do not commit them.
+`daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` and `desktop browser` use the mise-managed `agent-browser` with session `pie-verify-desktop` and `--cdp <port>` — they do not curl `/json/version`.
 
 ## Cleanup
 
