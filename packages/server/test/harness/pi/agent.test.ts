@@ -25,6 +25,8 @@ const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", pr
 const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
+let steering = [];
+let followUp = [];
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
 const availableModels = [
   { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
@@ -61,14 +63,23 @@ rl.on("line", (line) => {
     return;
   }
   if (msg.type === "steer") {
+    steering.push(msg.message);
     send({ id: msg.id, type: "response", command: "steer", success: true });
-    send({ type: "queue_update", steering: [msg.message], followUp: [] });
+    send({ type: "queue_update", steering, followUp });
     if (holding) { holding = false; settle(); }
     return;
   }
   if (msg.type === "follow_up") {
+    followUp.push(msg.message);
     send({ id: msg.id, type: "response", command: "follow_up", success: true });
-    send({ type: "queue_update", steering: [], followUp: [msg.message] });
+    send({ type: "queue_update", steering, followUp });
+    return;
+  }
+  if (msg.type === "clear_queue") {
+    steering = [];
+    followUp = [];
+    send({ id: msg.id, type: "response", command: "clear_queue", success: true, data: { steering, followUp } });
+    send({ type: "queue_update", steering, followUp });
     return;
   }
   if (msg.type === "abort") {
@@ -309,6 +320,26 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         assert.deepEqual(event.body.followUp, ["later"]);
       }
       yield* session.close;
+    }),
+  );
+
+  it.effect("rewrites the native queue via replaceQueue", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      yield* agent.session.prompt({ sessionId, text: "hold" });
+      const collected = yield* Effect.forkChild(
+        Stream.runCollect(Stream.take(agent.session.queueUpdates(sessionId), 4)),
+      );
+      yield* agent.session.prompt({ sessionId, text: "one", delivery: "followUp" });
+      yield* agent.session.prompt({ sessionId, text: "two", delivery: "followUp" });
+      yield* agent.session.replaceQueue(sessionId, { steering: [], followUp: ["kept"] });
+      const updates = Array.from(yield* Fiber.join(collected));
+      assert.deepEqual(updates.at(-1), { steering: [], followUp: ["kept"] });
+      assert.ok(
+        updates.some((queue) => queue.steering.length === 0 && queue.followUp.length === 0),
+      );
+      yield* agent.session.abort(sessionId);
     }),
   );
 

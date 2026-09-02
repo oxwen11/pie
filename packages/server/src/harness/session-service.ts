@@ -4,6 +4,7 @@ import type {
   CreateSessionOutput,
   CreateWorktreeInput,
   PromptInput,
+  ReplaceQueueInput,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
@@ -38,10 +39,9 @@ import type {
   CapabilityUnsupported,
   HarnessSessionNotFound,
   ResumeSessionError,
-  SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import { AgentRequestUnavailable, SessionNotResumable } from "./errors";
+import { AgentRequestUnavailable, SessionClosed, SessionNotResumable } from "./errors";
 import type { PiAgentShape } from "./pi/agent";
 import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
@@ -168,6 +168,9 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly interrupt: (
     ref: SessionRef,
+  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
+  readonly replaceQueue: (
+    input: ReplaceQueueInput,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     ref: SessionRef,
@@ -655,6 +658,22 @@ export const makePiAgentSessionService = (deps: {
         Effect.andThen(manager.peek(ref)),
         Effect.flatMap((runtime) => runtime?.interrupt ?? Effect.void),
         inSession(ref),
+      ),
+
+    replaceQueue: (input) =>
+      readMetadata(input.ref).pipe(
+        Effect.andThen(manager.peek(input.ref)),
+        Effect.flatMap((runtime) => {
+          if (runtime) {
+            return runtime.replaceQueue({
+              steering: input.steering,
+              followUp: input.followUp,
+            });
+          }
+          if (input.steering.length === 0 && input.followUp.length === 0) return Effect.void;
+          return Effect.fail(new SessionClosed({ sessionId: input.ref.sessionId }));
+        }),
+        inSession(input.ref),
       ),
 
     respondToAgentRequest: (ref, requestId, response) =>
