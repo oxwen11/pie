@@ -3,6 +3,7 @@ import type {
   PullRequestActionApplied,
   PullRequestExpected,
   PullRequestRef,
+  PullRequestSessionStatus,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 import { Context, Effect, Layer } from "effect";
@@ -14,6 +15,7 @@ import {
   type PullRequestReadFailure,
   makeGitHubCliAdapter,
 } from "./github-cli";
+import { foldSessionStatuses, type PullRequestSessionWorkspace } from "./statuses";
 
 const samePullRequest = (left: PullRequestRef, right: PullRequestRef): boolean =>
   left.host === right.host &&
@@ -35,6 +37,9 @@ export class PullRequestService extends Context.Service<
       expected: PullRequestExpected,
       action: PullRequestAction,
     ) => Effect.Effect<PullRequestActionApplied, PullRequestActionFailure>;
+    readonly sessionStatuses: (
+      workspaces: ReadonlyArray<PullRequestSessionWorkspace>,
+    ) => Effect.Effect<ReadonlyArray<PullRequestSessionStatus>, PullRequestReadFailure>;
   }
 >()("PullRequestService") {}
 
@@ -86,6 +91,9 @@ export const PullRequestServiceLayer: Layer.Layer<
         };
       });
 
-    return { current, runAction };
+    const sessionStatuses = (workspaces: ReadonlyArray<PullRequestSessionWorkspace>) =>
+      foldSessionStatuses(workspaces, current);
+
+    return { current, runAction, sessionStatuses };
   }),
 );
