@@ -1,3 +1,4 @@
+import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
@@ -9,8 +10,8 @@ export default defineConfig({
   format: ["esm"],
   deps: {
     // Inline everything so the forked artifact needs no node_modules resolution.
-    // `vite` is the exception: server.ts imports it lazily only in dev, and the
-    // `NODE_ENV=production` define below dead-code-eliminates that branch.
+    // `vite` stays external: nothing in this package imports it. The UI is a
+    // prebuilt static bundle (`http/ui.ts`); `apps/app` runs its own `vite dev`.
     alwaysBundle: [/.*/],
     neverBundle: ["vite"],
     onlyBundle: false,
@@ -20,5 +21,6 @@ export default defineConfig({
   shims: true,
   env: {
     NODE_ENV: "production",
+    PIE_DAEMON_COMPATIBILITY_KEY: resolveDaemonCompatibilityKey(),
   },
 });

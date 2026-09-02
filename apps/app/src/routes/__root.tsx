@@ -25,6 +25,7 @@ import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
+import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
 import { sameSessionRef } from "@/lib/session-ref";
@@ -35,7 +36,14 @@ export interface RouterAppContext {
   queryClient: QueryClient;
 }
 
-contentPanel.registerAll([filesPanel, filePanel, reviewPanel, terminalPanel, browserPanel]);
+contentPanel.registerAll([
+  filesPanel,
+  filePanel,
+  reviewPanel,
+  pullRequestPanel,
+  terminalPanel,
+  browserPanel,
+]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,

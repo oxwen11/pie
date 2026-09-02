@@ -1,40 +1,62 @@
 import type { SessionSummary } from "@getpie/contract";
+import type { PullRequestLifecycle } from "@getpie/contract/pull-request";
 import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
 
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";
+import { SessionPullRequestIndicator } from "@/features/projects/session-pull-request-indicator";
 import { SessionStatusIndicator } from "@/features/projects/session-status-indicator";
+
+export type SessionPullRequest = {
+  readonly lifecycle: PullRequestLifecycle;
+  readonly url: string;
+};
 
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
   active,
   isActive,
+  pullRequest,
   session,
 }: {
   readonly active: boolean;
   readonly isActive: () => boolean;
+  readonly pullRequest: SessionPullRequest | undefined;
   readonly session: SessionSummary;
 }) {
   const navigate = useNavigate();
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        isActive={active}
-        onClick={() => {
-          navigate({
-            to: "/session/$sessionId",
-            params: { sessionId: session.sessionId },
-            search: { projectId: session.projectId },
-          }).catch((error: unknown) => {
-            console.error("Failed to open session", error);
-          });
-        }}
+      <SessionActionsMenu
+        isActive={isActive}
+        session={session}
+        render={
+          <SidebarMenuButton
+            // Hover-only archive must not keep the default pe-8 gap; a PR icon
+            // is a lasting action and still needs that padding.
+            className={
+              pullRequest === undefined
+                ? "md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
+                : undefined
+            }
+            isActive={active}
+            onClick={() => {
+              navigate({
+                to: "/session/$sessionId",
+                params: { sessionId: session.sessionId },
+                search: { projectId: session.projectId },
+              }).catch((error: unknown) => {
+                console.error("Failed to open session", error);
+              });
+            }}
+          />
+        }
       >
         <SessionStatusIndicator phase={session.status?.phase} />
-        <span className="truncate">{session.title ?? "New chat"}</span>
-      </SidebarMenuButton>
-      <SessionActionsMenu isActive={isActive} session={session} />
+        <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
+      </SessionActionsMenu>
+      <SessionPullRequestIndicator lifecycle={pullRequest?.lifecycle} url={pullRequest?.url} />
     </SidebarMenuItem>
   );
 }

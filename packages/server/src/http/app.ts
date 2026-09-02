@@ -16,6 +16,8 @@ export type RequestAppOptions = {
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
   readonly tickets: TicketStore;
+  /** Present only for authenticated daemon mode. Must return before shutdown starts. */
+  readonly shutdown: (() => void) | undefined;
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -131,6 +133,15 @@ const route = (
       return withCors(unauthorized);
     }
 
+    if (
+      request.method === "POST" &&
+      pathname === "/api/shutdown" &&
+      options.shutdown !== undefined
+    ) {
+      options.shutdown();
+      return withCors(HttpServerResponse.text("shutting down", { status: 202 }));
+    }
+
     if (request.method === "POST" && pathname === "/api/ws-ticket") {
       return withCors(HttpServerResponse.jsonUnsafe({ ticket: options.tickets.issue() }));
     }
@@ -139,10 +150,11 @@ const route = (
       return withCors(notFound);
     }
 
-    // The dev branch of the UI app writes its own bytes to the raw response, so
-    // a header added to the value it returns would never reach the socket. Set
-    // them on the socket as well; node merges `setHeader` into `writeHead`, so
-    // the static branch below still ends up with exactly one of each.
+    // `options.ui` serves the prebuilt bundle (or a 503) and returns an
+    // `HttpServerResponse`, so `withCors` below is what reaches the socket. The
+    // headers are also stamped on the node response as a belt-and-braces for
+    // any write-through; node merges `setHeader` into `writeHead`, so the
+    // static path still ends up with exactly one of each.
     if (headers) {
       const nodeResponse = NodeHttpServerRequest.toServerResponse(request);
       for (const [name, value] of Object.entries(headers)) {

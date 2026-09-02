@@ -1,5 +1,6 @@
 import url from "node:url";
 
+import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -8,6 +9,7 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
+const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
 
 // The dev overlays (react-grab, react-scan) reach outside the origin on boot,
@@ -51,17 +53,17 @@ function devOverlayCsp(): Plugin {
 
 export default defineConfig({
   main: {
+    define: {
+      "process.env.PIE_DAEMON_COMPATIBILITY_KEY": JSON.stringify(DAEMON_COMPATIBILITY_KEY),
+    },
     build: {
       outDir: "dist/main",
       // electron-vite externalizes every production dependency by default, but
-      // `@getpie/server/daemon` resolves to TypeScript source and so must be
-      // compiled into the main bundle. Left external, the packaged app imports
-      // it at runtime from inside the asar's node_modules, where Node refuses
-      // to strip types (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING).
-      // Unpackaged runs get away with it only because pnpm's symlink puts the
-      // real file outside node_modules.
+      // Server source must be compiled into Main. Core's built compatibility
+      // module is bundled too so the define above replaces its environment read
+      // with this artifact's static key rather than consulting runtime env.
       externalizeDeps: {
-        exclude: ["@getpie/server"],
+        exclude: ["@getpie/core", "@getpie/server"],
       },
     },
   },

@@ -3,8 +3,8 @@ import type { CSSProperties } from "react";
 import type { Platform } from "@/platform";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
-/** Matches `ShellSidebarPanel` / `ShellMainPanel` `md:py-1.5` and `md:ps-1.5`. */
-const SHELL_GUTTER_PX = 6;
+/** Matches `ShellSidebarPanel` / `ShellMainPanel` `md:py-1` and `md:ps-1`. */
+const SHELL_GUTTER_PX = 4;
 
 /** Electron `trafficLightPosition.x` (see `main-window.ts`). */
 const MACOS_TRAFFIC_LIGHT_X_PX = 22;

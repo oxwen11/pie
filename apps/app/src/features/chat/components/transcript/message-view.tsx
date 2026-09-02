@@ -39,7 +39,7 @@ function CollapsibleAssistantMessage({
 }) {
   const summary = useMemo(() => splitSummary(message.parts), [message.parts]);
   if (isStreaming || !summary) {
-    return <AssistantMessage message={message} parts={message.parts} isStreaming={isStreaming} />;
+    return <AssistantMessage parts={message.parts} isStreaming={isStreaming} />;
   }
   return (
     <div>
@@ -49,15 +49,10 @@ function CollapsibleAssistantMessage({
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
         <CollapsibleContent className="mt-2 space-y-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
-          <AssistantMessage
-            message={message}
-            parts={summary.workParts}
-            isStreaming={false}
-            showActions={false}
-          />
+          <AssistantMessage parts={summary.workParts} isStreaming={false} showActions={false} />
         </CollapsibleContent>
       </Collapsible>
-      <AssistantMessage message={message} parts={summary.answerParts} isStreaming={false} />
+      <AssistantMessage parts={summary.answerParts} isStreaming={false} />
     </div>
   );
 }

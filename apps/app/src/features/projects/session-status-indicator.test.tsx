@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { SessionPullRequestIndicator } from "./session-pull-request-indicator";
 import { SessionStatusIndicator } from "./session-status-indicator";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -27,38 +28,115 @@ afterEach(() => {
   container = undefined;
 });
 
+const PR_URL = "https://github.com/getpie/pie/pull/42";
+
+const renderPullRequestIndicator = (
+  lifecycle: Parameters<typeof SessionPullRequestIndicator>[0]["lifecycle"],
+  url: string | undefined = PR_URL,
+) => {
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(createElement(SessionPullRequestIndicator, { lifecycle, url }));
+  });
+  return container;
+};
+
 describe("SessionStatusIndicator", () => {
-  it("shows a loading spinner while running", () => {
+  it("shows the pie loader while running", () => {
     const node = renderIndicator("running");
     const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
-    const spinner = node.querySelector<SVGElement>("[role=status]");
+    const loader = node.querySelector<HTMLSpanElement>("[data-slot=pie-loader]");
     expect(slot?.dataset.state).toBe("loading");
     expect(slot?.getAttribute("title")).toBe("A turn is running in this session");
-    expect(spinner?.classList.contains("animate-spin")).toBe(true);
-    expect(spinner?.getAttribute("aria-label")).toBe("A turn is running in this session");
+    expect(loader).not.toBeNull();
+    expect(loader?.getAttribute("role")).toBe("status");
+    expect(loader?.getAttribute("aria-label")).toBe("A turn is running in this session");
+    // Size comes from the --dot-grid-size theme value in index.css, not an inline override.
+    expect(loader?.style.getPropertyValue("--dot-grid-size")).toBe("");
   });
 
-  it("shows an amber dot while waiting for user action", () => {
+  it("shows an accessible amber dot while waiting for user action", () => {
     const node = renderIndicator("requires_action");
-    const dot = node.querySelector<HTMLSpanElement>("span > span");
+    const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
+    const dot = slot?.querySelector<HTMLSpanElement>("span");
+    expect(slot?.getAttribute("role")).toBe("img");
+    expect(slot?.getAttribute("aria-label")).toBe("Waiting for your action");
+    expect(slot?.getAttribute("title")).toBe("Waiting for your action");
     expect(dot?.className).toContain("bg-warning");
-    expect(dot?.getAttribute("title")).toBe("Waiting for your action");
+    expect(dot?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("shows a red dot when the session crashed", () => {
+  it("shows an accessible red dot when the session crashed", () => {
     const node = renderIndicator("crashed");
-    const dot = node.querySelector<HTMLSpanElement>("span > span");
+    const slot = node.querySelector<HTMLSpanElement>("[data-slot=session-status]");
+    const dot = slot?.querySelector<HTMLSpanElement>("span");
+    expect(slot?.getAttribute("role")).toBe("img");
+    expect(slot?.getAttribute("aria-label")).toBe("Session crashed");
+    expect(slot?.getAttribute("title")).toBe("Session crashed");
     expect(dot?.className).toContain("bg-destructive");
-    expect(dot?.getAttribute("title")).toBe("Session crashed");
+    expect(dot?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("reserves a fixed slot for idle or missing status", () => {
     for (const phase of ["idle", undefined] as const) {
       const node = renderIndicator(phase);
       const slot = node.querySelector("span");
-      expect(slot?.className).toContain("size-3");
-      expect(slot?.className).toContain("me-2");
+      expect(slot?.className).toContain("size-[1em]");
+      expect(slot?.className).toContain("shrink-0");
       expect(slot?.querySelector("span")).toBeNull();
     }
+  });
+});
+
+describe("SessionPullRequestIndicator", () => {
+  it("uses distinct accessible icons for open, draft, closed, and merged PRs", () => {
+    const cases = [
+      [
+        { type: "open", draft: false },
+        "Open pull request",
+        "lucide-git-pull-request",
+        "text-pull-request-open",
+      ],
+      [
+        { type: "open", draft: true },
+        "Draft pull request",
+        "lucide-git-pull-request-draft",
+        "text-pull-request-draft",
+      ],
+      [
+        { type: "closed" },
+        "Closed pull request",
+        "lucide-git-pull-request-closed",
+        "text-pull-request-closed",
+      ],
+      [{ type: "merged" }, "Pull request merged", "lucide-git-merge", "text-pull-request-merged"],
+    ] as const;
+
+    for (const [lifecycle, label, iconClass, colorClass] of cases) {
+      const node = renderPullRequestIndicator(lifecycle);
+      const indicator = node.querySelector('[data-slot="sidebar-menu-action"]');
+      expect(indicator?.tagName).toBe("SPAN");
+      expect(indicator?.getAttribute("aria-label")).toBe(label);
+      expect(indicator?.getAttribute("title")).toBe(label);
+      expect(indicator?.getAttribute("role")).toBe("img");
+      expect(indicator?.classList.contains(colorClass)).toBe(true);
+      expect(indicator?.querySelector("svg")?.classList.contains(iconClass)).toBe(true);
+      act(() => root?.unmount());
+      node.remove();
+      root = undefined;
+      container = undefined;
+    }
+  });
+
+  it("renders nothing without a current pull request status", () => {
+    expect(renderPullRequestIndicator(undefined, undefined).childElementCount).toBe(0);
+  });
+
+  it("renders no link to navigate to the pull request", () => {
+    const node = renderPullRequestIndicator({ type: "open", draft: false });
+    expect(node.querySelector("a")).toBeNull();
+    expect(node.querySelector("button")).toBeNull();
   });
 });

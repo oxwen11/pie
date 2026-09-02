@@ -55,6 +55,32 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
+  it("round-trips pull request refs and omits an empty list", async () => {
+    const pullRequestRefs = [
+      { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
+      { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+    ];
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequestRefs });
+        return yield* repo.read("proj-a", "sess-1");
+      }),
+    );
+    expect(read.pullRequestRefs).toEqual(pullRequestRefs);
+
+    await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write({ ...read, pullRequestRefs: [] });
+      }),
+    );
+    const raw = JSON.parse(
+      await fs.readFile(path.join(home, "storage", "sessions", "proj-a", "sess-1.json"), "utf8"),
+    ) as { readonly data: Record<string, unknown> };
+    expect(raw.data).not.toHaveProperty("pullRequestRefs");
+  });
+
   it("strips unknown extra fields on read and never writes them back", async () => {
     const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
     await fs.mkdir(path.dirname(file), { recursive: true });

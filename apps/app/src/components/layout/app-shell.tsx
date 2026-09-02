@@ -5,6 +5,7 @@ import { createContext, type ReactNode, use, useCallback, useMemo } from "react"
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -45,10 +46,7 @@ export function AppShellSidebar({ children }: AppShellSidebarProps) {
   const { contentPanel } = useAppShell();
   if (isMobile) return children;
   return (
-    <>
-      <ShellSidebarPanel>{children}</ShellSidebarPanel>
-      <ShellSeparator disabled={contentPanel.maximized} />
-    </>
+    <ShellSidebarPanel separatorDisabled={contentPanel.maximized}>{children}</ShellSidebarPanel>
   );
 }
 
@@ -130,13 +128,14 @@ export function AppShellBody({ children }: AppShellBodyProps) {
         {children}
         {hasVisibleContentPanel && (
           <>
-            <ShellSeparator />
+            <ShellSeparator joined />
             <ShellContentPanel>
               <ContentPanelOutlet />
             </ShellContentPanel>
           </>
         )}
       </ShellGroup>
+      <ShellContentPanelToggle />
     </AppShellContext>
   );
 }
