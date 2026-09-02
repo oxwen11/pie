@@ -11,6 +11,10 @@ import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
 import type { PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
+import {
+  makeSessionMetadataLocks,
+  type SessionMetadataLocks,
+} from "../../src/harness/session-locks";
 import { makePiAgentSessionManager } from "../../src/harness/session-manager";
 import {
   type PiAgentSessionRepositoryShape,
@@ -32,6 +36,7 @@ export type Fixture = {
   readonly service: PiAgentSessionServiceShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
+  readonly locks: SessionMetadataLocks;
   readonly spy: Spy;
   /**
    * A second service over the same storage and the same adapter — what a
@@ -190,6 +195,7 @@ export const run = <A, E>(
                     ),
                 }
               : stored;
+            const locks = makeSessionMetadataLocks();
             const service = makePiAgentSessionService({
               manager,
               pi,
@@ -208,8 +214,9 @@ export const run = <A, E>(
                 projectId === "proj-a"
                   ? Effect.succeed("/tmp/pie-app")
                   : Effect.fail(new ProjectNotFound({ projectId })),
+              locks,
             });
-            return { service, repo, bus, spy, restart: build };
+            return { service, repo, bus, locks, spy, restart: build };
           });
         return yield* program(yield* build);
       }),

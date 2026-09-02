@@ -197,11 +197,13 @@ describe("PiAgentSessionService", () => {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.delete(ref);
         const listed = yield* fixture.service.list("proj-a", false);
-        return { listed, closeSpy: fixture.spy.close };
+        const lockSize = yield* fixture.locks.size;
+        return { listed, closeSpy: fixture.spy.close, lockSize };
       }),
     );
     expect(result.closeSpy).toEqual([]);
     expect(result.listed).toHaveLength(0);
+    expect(result.lockSize).toBe(0);
   });
 
   it("list returns one summary per session, keyed by server sessionId", async () => {
