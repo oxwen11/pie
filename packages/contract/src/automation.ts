@@ -10,6 +10,7 @@ export const MAX_AUTOMATION_PROMPT_CHARS = 25_000;
 export const MAX_AUTOMATIONS = 50;
 export const MIN_AUTOMATION_EVERY_MS = 60_000;
 export const MAX_AUTOMATION_EVERY_MS = 365 * 24 * 60 * 60 * 1000;
+export const MAX_AUTOMATION_MAX_RUNS = 10_000;
 export const AUTOMATION_CIRCUIT_FAILURES = 3;
 
 export const AutomationCronSpecSchema = Schema.Struct({
@@ -59,6 +60,7 @@ export const AutomationPauseReasonSchema = Schema.Literals([
   "failureCircuit",
   "project_missing",
   "invalid_spec",
+  "max_runs",
 ]);
 export type AutomationPauseReason = typeof AutomationPauseReasonSchema.Type;
 
@@ -97,6 +99,7 @@ export const AutomationSkipReasonSchema = Schema.Literals([
   "project_missing",
   "queue_overflow",
   "expired",
+  "max_runs",
 ]);
 export type AutomationSkipReason = typeof AutomationSkipReasonSchema.Type;
 
@@ -126,6 +129,12 @@ export const AutomationRunSchema = Schema.Struct({
 });
 export type AutomationRun = typeof AutomationRunSchema.Type;
 
+const automationMaxRuns = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
+  Schema.isLessThanOrEqualTo(MAX_AUTOMATION_MAX_RUNS),
+);
+
 export const AutomationSchema = Schema.Struct({
   id: Schema.String.check(Schema.isUUID()),
   name: Schema.String,
@@ -135,6 +144,10 @@ export const AutomationSchema = Schema.Struct({
   enabled: Schema.Boolean,
   outputMode: Schema.optionalKey(AutomationOutputModeSchema),
   expiresAt: Schema.optionalKey(Schema.String),
+  maxRuns: Schema.optionalKey(automationMaxRuns),
+  firedCount: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  ),
   pauseReason: Schema.optionalKey(AutomationPauseReasonSchema),
   consecutiveFailures: Schema.optionalKey(Schema.Number),
   mergedSessionId: Schema.optionalKey(Schema.String),
@@ -151,6 +164,40 @@ export const AutomationSchema = Schema.Struct({
   runs: Schema.Array(AutomationRunSchema),
 });
 export type Automation = typeof AutomationSchema.Type;
+
+export function countsTowardMaxRuns(status: AutomationRunStatus): boolean {
+  return (
+    status === "running" ||
+    status === "succeeded" ||
+    status === "failed" ||
+    status === "interrupted"
+  );
+}
+
+export function countFiredRuns(
+  runs: ReadonlyArray<{ readonly status: AutomationRunStatus }>,
+): number {
+  let n = 0;
+  for (const run of runs) {
+    if (countsTowardMaxRuns(run.status)) n += 1;
+  }
+  return n;
+}
+
+export function firedRunCount(automation: {
+  readonly firedCount?: number;
+  readonly runs: ReadonlyArray<{ readonly status: AutomationRunStatus }>;
+}): number {
+  return automation.firedCount ?? countFiredRuns(automation.runs);
+}
+
+export function reachedMaxRuns(automation: {
+  readonly maxRuns?: number;
+  readonly firedCount?: number;
+  readonly runs: ReadonlyArray<{ readonly status: AutomationRunStatus }>;
+}): boolean {
+  return automation.maxRuns !== undefined && firedRunCount(automation) >= automation.maxRuns;
+}
 
 const automationName = Schema.String.check(
   Schema.isTrimmed(),
@@ -172,6 +219,8 @@ export const CreateAutomationInputSchema = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   outputMode: Schema.optionalKey(AutomationOutputModeSchema),
   expiresAt: Schema.optionalKey(Schema.String),
+  maxRuns: Schema.optionalKey(automationMaxRuns),
+  runNow: Schema.optionalKey(Schema.Boolean),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
@@ -186,6 +235,7 @@ export const UpdateAutomationInputSchema = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   outputMode: Schema.optionalKey(AutomationOutputModeSchema),
   expiresAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  maxRuns: Schema.optionalKey(Schema.NullOr(automationMaxRuns)),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultOnceLocal,
   defaultAutomationForm,
+  formatFiredCap,
   formatLastRun,
   formatNextRun,
   formatRunDuration,
@@ -105,7 +106,11 @@ describe("formatNextRun", () => {
     expect(formatNextRun("2026-08-27T09:00:00.000Z", false)).toBe("Paused");
     expect(formatNextRun(null, false, "failureCircuit")).toBe("Paused after repeated failures");
     expect(formatNextRun(null, false, "expired")).toBe("Expired");
+    expect(formatNextRun(null, false, "max_runs", 1)).toBe("Stopped after 1 run");
+    expect(formatNextRun(null, false, "max_runs", 24)).toBe("Stopped after 24 runs");
     expect(formatNextRun(null, true)).toBe("Run now only");
+    expect(formatFiredCap(3, 24)).toBe("3 / 24 runs");
+    expect(formatFiredCap(1, 1)).toBe("1 / 1 run");
   });
 });
 
@@ -115,6 +120,7 @@ describe("formatRunStatus", () => {
     expect(formatRunStatus("succeeded")).toBe("Succeeded");
     expect(formatRunStatus("missed")).toBe("Missed");
     expect(formatSkipReason("queue_overflow")).toBe("already running");
+    expect(formatSkipReason("max_runs")).toBe("run limit reached");
   });
 });
 

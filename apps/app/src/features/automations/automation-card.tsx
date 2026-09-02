@@ -1,8 +1,9 @@
-import type { Automation } from "@getpie/contract";
+import { firedRunCount, type Automation } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Switch } from "@getpie/ui/components/switch";
 
 import {
+  formatFiredCap,
   formatLastRun,
   formatNextRun,
   formatRunSummary,
@@ -44,8 +45,18 @@ export function AutomationCard({
             {projectName} · {formatSpec(automation.spec)}
           </div>
           <div className="text-muted-foreground text-sm">
-            {formatNextRun(automation.nextRunAt, automation.enabled, automation.pauseReason)}
+            {formatNextRun(
+              automation.nextRunAt,
+              automation.enabled,
+              automation.pauseReason,
+              automation.maxRuns,
+            )}
           </div>
+          {automation.maxRuns !== undefined ? (
+            <div className="text-muted-foreground text-sm">
+              {formatFiredCap(firedRunCount(automation), automation.maxRuns)}
+            </div>
+          ) : null}
           {lastRun !== null ? <div className="text-muted-foreground text-sm">{lastRun}</div> : null}
           {summary !== null ? <div className="text-muted-foreground text-sm">{summary}</div> : null}
         </div>

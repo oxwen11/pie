@@ -1,5 +1,9 @@
 import type { Project, Automation, AutomationSpec } from "@getpie/contract";
-import { MAX_AUTOMATION_NAME_CHARS, MAX_AUTOMATION_PROMPT_CHARS } from "@getpie/contract";
+import {
+  MAX_AUTOMATION_MAX_RUNS,
+  MAX_AUTOMATION_NAME_CHARS,
+  MAX_AUTOMATION_PROMPT_CHARS,
+} from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -37,6 +41,8 @@ export type AutomationFormSubmit = {
   readonly worktree: boolean;
   readonly outputMode: "independent" | "merged";
   readonly expiresAt: string | null;
+  readonly maxRuns: number | null;
+  readonly runNow: boolean;
 };
 
 export type AutomationFormProps = {
@@ -61,6 +67,8 @@ function formFromAutomation(
     worktree: initial.worktree !== undefined,
     reuseSession: initial.outputMode === "merged",
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
+    maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
+    runNow: false,
     ...formFromSpec(initial.spec, base),
   };
 }
@@ -75,9 +83,18 @@ export function AutomationForm({
   const [form, setForm] = useState(() => formFromAutomation(projects, initial));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = initial !== undefined;
+  const creating = initial === undefined;
   const everyAmount = Number(form.everyAmount);
+  const maxRunsTrimmed = form.maxRuns.trim();
+  const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
+  const maxRunsValid =
+    maxRunsNumber === null ||
+    (Number.isInteger(maxRunsNumber) &&
+      maxRunsNumber >= 1 &&
+      maxRunsNumber <= MAX_AUTOMATION_MAX_RUNS);
   const canSubmit =
     !submitting &&
+    maxRunsValid &&
     form.name.trim().length > 0 &&
     form.projectId.length > 0 &&
     form.prompt.trim().length > 0 &&
@@ -107,6 +124,8 @@ export function AutomationForm({
             worktree: form.worktree,
             outputMode: form.reuseSession ? "merged" : "independent",
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
+            maxRuns: maxRunsNumber,
+            runNow: creating && form.runNow,
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -314,6 +333,21 @@ export function AutomationForm({
         <FieldDescription>Optional. After this time the automation pauses itself.</FieldDescription>
       </Field>
       <Field>
+        <FieldLabel htmlFor="automation-max-runs">Stop after N runs</FieldLabel>
+        <Input
+          id="automation-max-runs"
+          max={MAX_AUTOMATION_MAX_RUNS}
+          min={1}
+          onChange={(event) => setForm((current) => ({ ...current, maxRuns: event.target.value }))}
+          placeholder="Unlimited"
+          type="number"
+          value={form.maxRuns}
+        />
+        <FieldDescription>
+          Optional. After this many fires the automation pauses itself.
+        </FieldDescription>
+      </Field>
+      <Field>
         <div className="flex w-full items-center justify-between gap-3">
           <div className="min-w-0">
             <FieldLabel htmlFor="automation-reuse">Reuse one session</FieldLabel>
@@ -340,6 +374,23 @@ export function AutomationForm({
           />
         </div>
       </Field>
+      {creating ? (
+        <Field>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="min-w-0">
+              <FieldLabel htmlFor="automation-run-now">Run now</FieldLabel>
+              <FieldDescription>
+                Start a session as soon as this automation is created.
+              </FieldDescription>
+            </div>
+            <Switch
+              checked={form.runNow}
+              id="automation-run-now"
+              onCheckedChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
+            />
+          </div>
+        </Field>
+      ) : null}
       {error !== null ? <FieldError>{error}</FieldError> : null}
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="outline">

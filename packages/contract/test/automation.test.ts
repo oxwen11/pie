@@ -3,9 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   AutomationSchema,
+  countFiredRuns,
   CreateAutomationInputSchema,
+  firedRunCount,
   MAX_AUTOMATION_EVERY_MS,
+  MAX_AUTOMATION_MAX_RUNS,
   MIN_AUTOMATION_EVERY_MS,
+  reachedMaxRuns,
+  UpdateAutomationInputSchema,
 } from "../src/automation";
 
 const UUID = "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61";
@@ -23,6 +28,8 @@ describe("CreateAutomationInput", () => {
         spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS },
         outputMode: "merged",
         expiresAt: "2026-12-01T00:00:00.000Z",
+        maxRuns: 3,
+        runNow: true,
       }),
     ).toBe(true);
     expect(
@@ -53,6 +60,40 @@ describe("CreateAutomationInput", () => {
       }),
     ).toBe(false);
   });
+
+  it("rejects a maxRuns outside 1…10000", () => {
+    const base = {
+      name: "Capped",
+      projectId: UUID,
+      prompt: "review",
+      spec: { kind: "manual" },
+    };
+    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 1 })).toBe(true);
+    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 0 })).toBe(false);
+    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 1.5 })).toBe(false);
+    expect(
+      accepts(CreateAutomationInputSchema, { ...base, maxRuns: MAX_AUTOMATION_MAX_RUNS + 1 }),
+    ).toBe(false);
+    expect(accepts(UpdateAutomationInputSchema, { id: UUID, maxRuns: null })).toBe(true);
+  });
+});
+
+describe("maxRuns helpers", () => {
+  it("counts running, succeeded, failed, and interrupted only", () => {
+    expect(
+      countFiredRuns([
+        { status: "running" },
+        { status: "succeeded" },
+        { status: "failed" },
+        { status: "interrupted" },
+        { status: "missed" },
+        { status: "skipped" },
+      ]),
+    ).toBe(4);
+    expect(firedRunCount({ runs: [{ status: "succeeded" }], firedCount: 12 })).toBe(12);
+    expect(reachedMaxRuns({ maxRuns: 1, runs: [{ status: "running" }] })).toBe(true);
+    expect(reachedMaxRuns({ maxRuns: 2, firedCount: 1, runs: [] })).toBe(false);
+  });
 });
 
 describe("Automation", () => {
@@ -68,6 +109,8 @@ describe("Automation", () => {
         createdAt: "2026-08-27T08:00:00.000Z",
         updatedAt: "2026-08-27T08:00:00.000Z",
         nextRunAt: null,
+        maxRuns: 4,
+        firedCount: 1,
         runs: [
           {
             id: "run-1",

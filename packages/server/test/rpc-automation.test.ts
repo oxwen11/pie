@@ -18,9 +18,11 @@ describe("automation router", () => {
         projectId: project.id,
         prompt: "Summarize what changed yesterday.",
         spec: { kind: "cron", expr: "0 9 * * *" },
+        maxRuns: 2,
       });
       expect(created.name).toBe("Daily review");
       expect(created.enabled).toBe(true);
+      expect(created.maxRuns).toBe(2);
       expect(created.nextRunAt).toBeTruthy();
       expect(created.runs).toEqual([]);
 
@@ -63,6 +65,40 @@ describe("automation router", () => {
       await expect(h.client.automation.list()).resolves.toEqual([]);
       if (fired.ref !== undefined) {
         await h.client.agent.session.close({ ref: fired.ref });
+      }
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it("creates with runNow and opens a session", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-project-"));
+    const h = await makeRpcTestHarness(home, { executable: writeFakePiExecutable() });
+    try {
+      const project = await h.client.project.create({ path: workspace });
+      const created = await h.client.automation.create({
+        name: "Immediate",
+        projectId: project.id,
+        prompt: "Say hello.",
+        spec: { kind: "manual" },
+        maxRuns: 1,
+        runNow: true,
+      });
+      expect(created.lastSessionId).toBeTruthy();
+      expect(created.firedCount).toBe(1);
+      expect(created.pauseReason).toBe("max_runs");
+      expect(created.enabled).toBe(false);
+      const sessions = await h.client.agent.session.list({
+        projectId: project.id,
+        archived: false,
+      });
+      expect(sessions).toHaveLength(1);
+      expect(created.lastSessionId).toBe(sessions[0]?.sessionId);
+      if (created.lastSessionId !== undefined) {
+        await h.client.agent.session.close({
+          ref: { projectId: project.id, sessionId: created.lastSessionId },
+        });
       }
     } finally {
       await h.dispose();

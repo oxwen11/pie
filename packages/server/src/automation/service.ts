@@ -12,7 +12,13 @@ import type {
   SessionRef,
   UpdateAutomationInput,
 } from "@getpie/contract";
-import { AUTOMATION_CIRCUIT_FAILURES, MAX_AUTOMATIONS } from "@getpie/contract";
+import {
+  AUTOMATION_CIRCUIT_FAILURES,
+  countsTowardMaxRuns,
+  firedRunCount,
+  MAX_AUTOMATIONS,
+  reachedMaxRuns,
+} from "@getpie/contract";
 import { Context, Crypto, Effect, Layer, Result, Semaphore } from "effect";
 
 import {
@@ -157,15 +163,21 @@ const withoutLastError = (automation: Automation): Omit<Automation, "lastError">
   return rest;
 };
 
-const appendRun = (automation: Automation, run: AutomationRun, nowIso: string): Automation => ({
-  ...withoutLastError(automation),
-  updatedAt: nowIso,
-  lastRunAt: run.startedAt,
-  lastRunStatus: run.status,
-  runs: [run, ...automation.runs].slice(0, MAX_RUNS),
-  ...(run.sessionId !== undefined ? { lastSessionId: run.sessionId } : undefined),
-  ...(run.status === "failed" && run.error !== undefined ? { lastError: run.error } : undefined),
-});
+const appendRun = (automation: Automation, run: AutomationRun, nowIso: string): Automation => {
+  const nextFiredCount = countsTowardMaxRuns(run.status)
+    ? firedRunCount(automation) + 1
+    : automation.firedCount;
+  return {
+    ...withoutLastError(automation),
+    updatedAt: nowIso,
+    lastRunAt: run.startedAt,
+    lastRunStatus: run.status,
+    runs: [run, ...automation.runs].slice(0, MAX_RUNS),
+    ...(nextFiredCount !== undefined ? { firedCount: nextFiredCount } : undefined),
+    ...(run.sessionId !== undefined ? { lastSessionId: run.sessionId } : undefined),
+    ...(run.status === "failed" && run.error !== undefined ? { lastError: run.error } : undefined),
+  };
+};
 
 const patchRun = (
   automation: Automation,
@@ -274,13 +286,15 @@ export const makeAutomationService = (deps: {
     firedAt: number,
     disableOnce: boolean,
     pauseReason?: AutomationPauseReason,
-  ): Effect.Effect<Automation> =>
-    persistAdvance(
-      appendRun(automation, run, new Date(firedAt).toISOString()),
+  ): Effect.Effect<Automation> => {
+    const recorded = appendRun(automation, run, new Date(firedAt).toISOString());
+    return persistAdvance(
+      recorded,
       firedAt,
       disableOnce,
-      pauseReason,
+      pauseReason ?? (reachedMaxRuns(recorded) && !disableOnce ? "max_runs" : undefined),
     );
+  };
 
   const finishRun = (
     automationId: string,
@@ -304,7 +318,7 @@ export const makeAutomationService = (deps: {
           ? (current.consecutiveFailures ?? 0) + 1
           : 0;
       const tripped = outcome.status === "failed" && failures >= AUTOMATION_CIRCUIT_FAILURES;
-      const next: Automation = {
+      const settled: Automation = {
         ...patchRun(
           current,
           runId,
@@ -324,6 +338,15 @@ export const makeAutomationService = (deps: {
             }
           : undefined),
       };
+      const atCap = !tripped && reachedMaxRuns(settled) && settled.enabled;
+      const next = atCap
+        ? {
+            ...settled,
+            enabled: false,
+            nextRunAt: null,
+            pauseReason: "max_runs" as const,
+          }
+        : settled;
       yield* repo.write(next);
       yield* logAutomation({
         event: "automation.settled",
@@ -344,6 +367,12 @@ export const makeAutomationService = (deps: {
           message: "automation paused after consecutive failures",
           level: "warn",
           annotations: { automationId, failures },
+        });
+      } else if (atCap) {
+        yield* logAutomation({
+          event: "automation.paused",
+          message: "automation paused",
+          annotations: { automationId, pauseReason: "max_runs" },
         });
       }
     }).pipe(Effect.ignore);
@@ -417,6 +446,44 @@ export const makeAutomationService = (deps: {
       const startedIso = new Date(startedAt).toISOString();
       const snapshot = snapshotOf(automation);
       const disableOnce = snapshot.spec.kind === "once";
+
+      if (reachedMaxRuns(automation)) {
+        const skipped = yield* record(
+          automation,
+          {
+            id: runId,
+            startedAt: startedIso,
+            reason,
+            status: "skipped",
+            skipReason: "max_runs",
+            snapshot,
+          },
+          startedAt,
+          false,
+          "max_runs",
+        );
+        yield* repo.write(skipped);
+        yield* logAutomation({
+          event: "automation.skipped",
+          message: "automation run skipped",
+          annotations: {
+            automationId: automation.id,
+            reason,
+            skipReason: "max_runs",
+          },
+        });
+        if (automation.pauseReason !== "max_runs") {
+          yield* logAutomation({
+            event: "automation.paused",
+            message: "automation paused",
+            annotations: {
+              automationId: automation.id,
+              pauseReason: "max_runs",
+            },
+          });
+        }
+        return { automation: skipped };
+      }
 
       if (inFlight.has(automation.id) || automation.lastRunStatus === "running") {
         const skipped = yield* record(
@@ -557,6 +624,16 @@ export const makeAutomationService = (deps: {
             error: outcome.error,
           },
         });
+        if (failed.pauseReason === "max_runs") {
+          yield* logAutomation({
+            event: "automation.paused",
+            message: "automation paused",
+            annotations: {
+              automationId: automation.id,
+              pauseReason: "max_runs",
+            },
+          });
+        }
         return { automation: failed };
       }
 
@@ -590,6 +667,16 @@ export const makeAutomationService = (deps: {
           specKind: snapshot.spec.kind,
         },
       });
+      if (started.pauseReason === "max_runs") {
+        yield* logAutomation({
+          event: "automation.paused",
+          message: "automation paused",
+          annotations: {
+            automationId: automation.id,
+            pauseReason: "max_runs",
+          },
+        });
+      }
       const prompt = sessions.prompt({
         ref: outcome.ref,
         parts: [{ type: "text", text: snapshot.prompt }],
@@ -656,6 +743,7 @@ export const makeAutomationService = (deps: {
           runs: [],
           ...(input.outputMode !== undefined ? { outputMode: input.outputMode } : undefined),
           ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
+          ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
           ...(worktree !== undefined ? { worktree } : undefined),
           ...(input.provider !== undefined ? { provider: input.provider } : undefined),
           ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
@@ -668,15 +756,25 @@ export const makeAutomationService = (deps: {
             automationId: id,
             specKind: input.spec.kind,
             outputMode: outputModeOf(automation),
+            ...(input.runNow === true ? { runNow: true } : undefined),
           },
         });
+        if (input.runNow === true) {
+          const fired = yield* fire(automation, "manual", { skipIfBusy: false });
+          return fired.automation;
+        }
         return automation;
       }),
 
     update: (input) =>
       Effect.gen(function* () {
         const current = yield* repo.read(input.id);
-        const { pauseReason: _pauseReason, expiresAt: _expiresAt, ...currentRest } = current;
+        const {
+          pauseReason: _pauseReason,
+          expiresAt: _expiresAt,
+          maxRuns: _maxRuns,
+          ...currentRest
+        } = current;
         const updatedAt = now();
         const spec = input.spec ?? current.spec;
         const expiresAt =
@@ -685,6 +783,12 @@ export const makeAutomationService = (deps: {
             : input.expiresAt === null
               ? undefined
               : input.expiresAt;
+        const maxRuns =
+          input.maxRuns === undefined
+            ? current.maxRuns
+            : input.maxRuns === null
+              ? undefined
+              : input.maxRuns;
         if (input.spec !== undefined || input.expiresAt !== undefined || input.enabled === true) {
           yield* tryValidate(spec, updatedAt, expiresAt);
         }
@@ -704,6 +808,7 @@ export const makeAutomationService = (deps: {
           nextRunAt: enabled ? iso(next) : current.nextRunAt,
           ...(outputMode !== undefined ? { outputMode } : undefined),
           ...(expiresAt !== undefined ? { expiresAt } : undefined),
+          ...(maxRuns !== undefined ? { maxRuns } : undefined),
           ...(worktree !== undefined ? { worktree } : undefined),
           ...(provider !== undefined ? { provider } : undefined),
           ...(modelId !== undefined ? { modelId } : undefined),
@@ -715,28 +820,43 @@ export const makeAutomationService = (deps: {
                 ? { pauseReason: current.pauseReason }
                 : undefined),
         };
-        yield* repo.write(updated);
+        const atCapPause = reachedMaxRuns(updated) && updated.enabled;
+        const persisted = atCapPause
+          ? {
+              ...updated,
+              enabled: false,
+              nextRunAt: null,
+              pauseReason: "max_runs" as const,
+            }
+          : updated;
+        yield* repo.write(persisted);
         yield* logAutomation({
-          event:
-            input.enabled === true
+          event: atCapPause
+            ? "automation.paused"
+            : input.enabled === true
               ? "automation.enabled"
               : input.enabled === false
                 ? "automation.paused"
                 : "automation.updated",
-          message:
-            input.enabled === true
+          message: atCapPause
+            ? "automation paused"
+            : input.enabled === true
               ? "automation enabled"
               : input.enabled === false
                 ? "automation paused"
                 : "automation updated",
           annotations: {
             automationId: input.id,
-            ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
-            ...(input.enabled === false ? { pauseReason: "manual" } : undefined),
+            ...(input.enabled !== undefined ? { enabled: persisted.enabled } : undefined),
+            ...(atCapPause
+              ? { pauseReason: "max_runs" }
+              : input.enabled === false
+                ? { pauseReason: "manual" }
+                : undefined),
             ...(input.spec !== undefined ? { specKind: spec.kind } : undefined),
           },
         });
-        return updated;
+        return persisted;
       }),
 
     delete: (id) =>

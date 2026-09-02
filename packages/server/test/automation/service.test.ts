@@ -536,4 +536,66 @@ describe("AutomationService", () => {
       _tag: "StoreWriteError",
     });
   });
+
+  it("create with runNow fires immediately and returns the session", async () => {
+    const h = setup();
+    const created = await run(
+      h.service.create(cronInput({ spec: { kind: "manual" }, runNow: true })),
+    );
+    expect(h.created).toEqual([{ projectId: PROJECT_ID, title: "Morning review" }]);
+    expect(created.lastRunStatus).toBe("running");
+    expect(created.lastSessionId).toBe("sess-1");
+    expect(created.runs[0]?.reason).toBe("manual");
+    expect(h.store.get(created.id)?.lastRunStatus).toBe("succeeded");
+  });
+
+  it("create without runNow does not start a session", async () => {
+    const h = setup();
+    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
+    expect(h.created).toHaveLength(0);
+    expect(created.runs).toEqual([]);
+    expect(created.lastSessionId).toBeUndefined();
+  });
+
+  it("pauses after reaching maxRuns and does not fire again", async () => {
+    const h = setup();
+    const created = await run(
+      h.service.create(
+        cronInput({
+          spec: { kind: "cron", expr: "* * * * *" },
+          maxRuns: 1,
+        }),
+      ),
+    );
+    h.setNow(created.nextRunAt!);
+    await run(h.service.tick());
+    const afterFire = h.store.get(created.id);
+    expect(h.created).toHaveLength(1);
+    expect(afterFire?.firedCount).toBe(1);
+    expect(afterFire?.enabled).toBe(false);
+    expect(afterFire?.pauseReason).toBe("max_runs");
+    expect(afterFire?.nextRunAt).toBeNull();
+    h.setNow("2026-08-27T09:00:00.000Z");
+    await run(h.service.tick());
+    expect(h.created).toHaveLength(1);
+    const skipped = await run(h.service.runNow(created.id));
+    expect(h.created).toHaveLength(1);
+    expect(skipped.ref).toBeUndefined();
+    expect(skipped.automation.lastRunStatus).toBe("skipped");
+    expect(skipped.automation.runs[0]?.skipReason).toBe("max_runs");
+  });
+
+  it("pauses immediately when update sets maxRuns already reached", async () => {
+    const h = setup();
+    const created = await run(h.service.create(cronInput({ spec: { kind: "manual" } })));
+    await run(h.service.runNow(created.id));
+    const capped = await run(h.service.update({ id: created.id, maxRuns: 1 }));
+    expect(capped.enabled).toBe(false);
+    expect(capped.pauseReason).toBe("max_runs");
+    expect(capped.maxRuns).toBe(1);
+    const raised = await run(h.service.update({ id: created.id, maxRuns: 2, enabled: true }));
+    expect(raised.enabled).toBe(true);
+    expect(raised.pauseReason).toBeUndefined();
+    expect(raised.maxRuns).toBe(2);
+  });
 });

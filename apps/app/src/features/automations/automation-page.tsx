@@ -59,11 +59,30 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         spec: value.spec,
         outputMode: value.outputMode,
         ...(value.expiresAt !== null ? { expiresAt: value.expiresAt } : undefined),
+        ...(value.maxRuns !== null ? { maxRuns: value.maxRuns } : undefined),
+        ...(value.runNow ? { runNow: true } : undefined),
         ...(value.worktree ? { worktree: {} } : undefined),
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setEditor(null);
-      return invalidate();
+      void invalidate();
+      if (created.lastSessionId !== undefined) {
+        navigate({
+          to: "/session/$sessionId",
+          params: { sessionId: created.lastSessionId },
+          search: { projectId: created.projectId },
+        }).catch((error: unknown) => {
+          console.error("Failed to open the automation session", error);
+        });
+        return;
+      }
+      if (created.lastRunStatus === "skipped") {
+        toast.error("Automation did not start a session (skipped).");
+        return;
+      }
+      if (created.lastRunStatus === "failed") {
+        toast.error(created.lastError ?? "Automation failed to start a session.");
+      }
     },
     onError: (error) => toast.error(`Failed to create automation: ${error.message}`),
   });
@@ -82,6 +101,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
         ...(input.outputMode !== undefined ? { outputMode: input.outputMode } : undefined),
         ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
+        ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
         ...(input.worktree === true ? { worktree: {} } : undefined),
       }),
     onSuccess: () => {

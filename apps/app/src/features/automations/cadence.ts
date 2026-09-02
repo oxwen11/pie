@@ -72,6 +72,8 @@ export type AutomationFormValues = {
   readonly everyUnit: AutomationEveryUnit;
   readonly runAt: string;
   readonly expiresAt: string;
+  readonly maxRuns: string;
+  readonly runNow: boolean;
   readonly worktree: boolean;
   readonly reuseSession: boolean;
 };
@@ -95,6 +97,8 @@ export function defaultAutomationForm(projectId: string): AutomationFormValues {
     everyUnit: "hours",
     runAt: "",
     expiresAt: "",
+    maxRuns: "",
+    runNow: false,
     worktree: false,
     reuseSession: false,
   };
@@ -315,16 +319,24 @@ export function formatNextRun(
   nextRunAt: string | null,
   enabled: boolean,
   pauseReason?: AutomationPauseReason,
+  maxRuns?: number,
 ): string {
   if (!enabled) {
     if (pauseReason === "failureCircuit") return "Paused after repeated failures";
     if (pauseReason === "expired") return "Expired";
+    if (pauseReason === "max_runs") {
+      return maxRuns === 1 ? "Stopped after 1 run" : `Stopped after ${maxRuns ?? "N"} runs`;
+    }
     if (pauseReason === "project_missing") return "Paused (project missing)";
     if (pauseReason === "invalid_spec") return "Paused (invalid cadence)";
     return "Paused";
   }
   if (nextRunAt === null) return "Run now only";
   return new Date(nextRunAt).toLocaleString();
+}
+
+export function formatFiredCap(firedCount: number, maxRuns: number): string {
+  return `${firedCount} / ${maxRuns} run${maxRuns === 1 ? "" : "s"}`;
 }
 
 export function formatRunStatus(status: AutomationRunStatus): string {
@@ -341,6 +353,7 @@ export function formatSkipReason(reason: AutomationSkipReason): string {
   if (reason === "stale") return "too late";
   if (reason === "project_missing") return "project missing";
   if (reason === "queue_overflow") return "already running";
+  if (reason === "max_runs") return "run limit reached";
   return "expired";
 }
 
