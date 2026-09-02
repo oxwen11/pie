@@ -23,6 +23,7 @@ export * from "./errors";
 
 export type {
   PromptReceipt,
+  RuntimePromptReceipt,
   UserInput,
   CreateSessionInput,
   ResumeSessionInput,

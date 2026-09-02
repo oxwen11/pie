@@ -1,15 +1,10 @@
 import { createAgentSessionServices } from "@earendil-works/pi-coding-agent";
-import type { AgentModel } from "@getpie/contract";
+import type { ListAgentModelsOutput } from "@getpie/contract";
 import { Effect } from "effect";
 
 import { AgentOperationError } from "../errors";
 import { toAgentModel } from "./model-mapping";
 import { resolveDefaultPiModel } from "./resolve-default-model";
-
-export type PiModelCatalog = {
-  readonly models: ReadonlyArray<AgentModel>;
-  readonly defaultModel: AgentModel | undefined;
-};
 
 const listModelsError = (cause: unknown) =>
   new AgentOperationError({
@@ -19,13 +14,13 @@ const listModelsError = (cause: unknown) =>
   });
 
 /**
- * Cold model catalogue: same source as `pi --list-models` and RPC
- * `get_available_models` (`ModelRuntime.getAvailable()`), without spawning
- * `pi --mode rpc` or opening a live AgentSession.
+ * Available models plus Pi's startup default, from one
+ * `createAgentSessionServices` load — same source as `pi --list-models` and
+ * RPC `get_available_models`, without spawning `pi --mode rpc`.
  */
 export function listAvailablePiModels(
   cwd: string,
-): Effect.Effect<PiModelCatalog, AgentOperationError> {
+): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
   return Effect.gen(function* () {
     const services = yield* Effect.tryPromise({
       try: () => createAgentSessionServices({ cwd }),
@@ -36,7 +31,7 @@ export function listAvailablePiModels(
       catch: listModelsError,
     });
     const models = available.map(toAgentModel);
-    const defaultModel = resolveDefaultPiModel(services, available);
-    return { models, defaultModel };
+    const defaultModel = resolveDefaultPiModel(models, services.settingsManager);
+    return defaultModel === undefined ? { models } : { models, defaultModel };
   }).pipe(Effect.withSpan("pi.listAvailableModels", { attributes: { cwd } }));
 }

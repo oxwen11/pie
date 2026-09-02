@@ -194,6 +194,7 @@ export const SessionScopedEventTypes = [
   "session.request.asked",
   "session.request.replied",
   "session.request.rejected",
+  "session.queue.updated",
   "session.crashed",
 ] as const;
 export type SessionScopedEventType = (typeof SessionScopedEventTypes)[number];
@@ -248,6 +249,13 @@ export type SessionScopedEventBody =
       readonly type: "session.request.rejected";
       readonly requestId: string;
       readonly reason?: string;
+    }
+  // Pi's native message queue, projected from `queue_update`. Full replace
+  // (no item ids): `steering` then `followUp`, matching Pi TUI order.
+  | {
+      readonly type: "session.queue.updated";
+      readonly steering: ReadonlyArray<string>;
+      readonly followUp: ReadonlyArray<string>;
     }
   | { readonly type: "session.crashed"; readonly reason: string };
 
@@ -363,10 +371,19 @@ export type ActivePromptSnapshot = {
 // Runtime snapshot
 // ---------------------------------------------------------------------------
 
+// Pi's in-memory message queue as this server last saw it. Always present
+// (empty arrays when idle). Not persisted — a server restart drops it; a
+// browser refresh hydrates it from the live snapshot while the Pi child lives.
+export type SessionPendingPrompt = {
+  readonly steering: ReadonlyArray<string>;
+  readonly followUp: ReadonlyArray<string>;
+};
+
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;
   readonly pendingRequests: ReadonlyArray<AgentRequest>;
+  readonly pendingPrompt: SessionPendingPrompt;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
@@ -416,6 +433,9 @@ export const CreateWorktreeInputSchema = Schema.Struct({
 });
 export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
+export const PromptDeliverySchema = Schema.Literals(["steer", "followUp"]);
+export type PromptDelivery = typeof PromptDeliverySchema.Type;
+
 export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
@@ -423,10 +443,18 @@ export const PromptInputSchema = Schema.Struct({
   // `session.prompt.submitted` so the sender can recognise (and skip) its own
   // prompt while other clients render it. Absent → the server mints one.
   messageId: Schema.optionalKey(Schema.NonEmptyString),
+  // When the session is already running: `followUp` queues for after the
+  // current run's tools; `steer` injects before the next LLM call. Absent →
+  // the server keeps today's behavior (idle `prompt`, active `steer`).
+  delivery: Schema.optionalKey(PromptDeliverySchema),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 
-export const PromptOutputSchema = Schema.Struct({ turnId: Schema.String });
+export const PromptOutputSchema = Schema.Struct({
+  turnId: Schema.String,
+  // Whether this call opened a new turn. Queued follow-ups/steers are false.
+  started: Schema.Boolean,
+});
 export type PromptOutput = typeof PromptOutputSchema.Type;
 
 // ---------------------------------------------------------------------------

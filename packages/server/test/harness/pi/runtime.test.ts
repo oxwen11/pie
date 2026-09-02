@@ -33,6 +33,7 @@ const makeFakeProcess = Effect.gen(function* () {
         }),
       getEntries: () => unexpected(),
       requestPermission: () => Stream.empty,
+      queueUpdates: () => Stream.empty,
       awaitTermination: () => Deferred.await(termination),
       respondPermission: () => unexpected(),
       interrupt: () => unexpected(),
