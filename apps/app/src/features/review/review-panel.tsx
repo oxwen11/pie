@@ -14,7 +14,15 @@ import { useCallback, useMemo, useState } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
-import { WorkspaceLayout } from "@/components/layout/workspace-layout";
+import {
+  WorkspaceLayout,
+  WorkspaceLayoutBody,
+  WorkspaceLayoutPreview,
+  WorkspaceLayoutSeparator,
+  WorkspaceLayoutToolbar,
+  WorkspaceLayoutTree,
+  WorkspaceLayoutTreeTrigger,
+} from "@/components/layout/workspace-layout";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -232,28 +240,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   };
 
   return (
-    <WorkspaceLayout
-      tree={
-        <ReviewTreePane
-          files={review.data?.files ?? []}
-          onSelectFile={selectFile}
-          sessionId={panel.sessionKey}
-          tree={tree}
-          workspaceName={workspaceName}
-          workspacePath={workspacePath}
-        />
-      }
-      treeLabel={workspaceName}
-      preview={
-        <ReviewDiffPane
-          diffs={diffs}
-          key={`${mode}:${other ?? ""}`}
-          locateRequest={locateRequest}
-          path={selectedPath}
-          review={review}
-        />
-      }
-      toolbar={
+    <WorkspaceLayout>
+      <WorkspaceLayoutToolbar>
         <ReviewToolbar
           branch={repositoryBranch}
           heading={heading}
@@ -264,8 +252,31 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           other={other}
           refreshing={refreshing}
         />
-      }
-    />
+        <WorkspaceLayoutTreeTrigger label={workspaceName} />
+      </WorkspaceLayoutToolbar>
+      <WorkspaceLayoutBody>
+        <WorkspaceLayoutPreview>
+          <ReviewDiffPane
+            diffs={diffs}
+            key={`${mode}:${other ?? ""}`}
+            locateRequest={locateRequest}
+            path={selectedPath}
+            review={review}
+          />
+        </WorkspaceLayoutPreview>
+        <WorkspaceLayoutSeparator />
+        <WorkspaceLayoutTree>
+          <ReviewTreePane
+            files={review.data?.files ?? []}
+            onSelectFile={selectFile}
+            sessionId={panel.sessionKey}
+            tree={tree}
+            workspaceName={workspaceName}
+            workspacePath={workspacePath}
+          />
+        </WorkspaceLayoutTree>
+      </WorkspaceLayoutBody>
+    </WorkspaceLayout>
   );
 }
 

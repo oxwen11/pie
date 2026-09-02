@@ -3,7 +3,15 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { WorkspaceLayout } from "./workspace-layout";
+import {
+  WorkspaceLayout,
+  WorkspaceLayoutBody,
+  WorkspaceLayoutPreview,
+  WorkspaceLayoutSeparator,
+  WorkspaceLayoutToolbar,
+  WorkspaceLayoutTree,
+  WorkspaceLayoutTreeTrigger,
+} from "./workspace-layout";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -71,17 +79,32 @@ afterEach(() => {
 });
 
 function renderLayout(options?: { label?: string; toolbar?: boolean }): void {
+  const label = options?.label ?? "Project";
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   act(() =>
     root?.render(
-      <WorkspaceLayout
-        preview={<div>Preview</div>}
-        toolbar={options?.toolbar ? <div>Toolbar</div> : undefined}
-        tree={<div>Tree</div>}
-        treeLabel={options?.label ?? "Project"}
-      />,
+      <WorkspaceLayout>
+        {options?.toolbar ? (
+          <WorkspaceLayoutToolbar>
+            <div>Toolbar</div>
+            <WorkspaceLayoutTreeTrigger label={label} />
+          </WorkspaceLayoutToolbar>
+        ) : null}
+        <WorkspaceLayoutBody>
+          <WorkspaceLayoutPreview>
+            <div>Preview</div>
+          </WorkspaceLayoutPreview>
+          {options?.toolbar ? null : (
+            <WorkspaceLayoutTreeTrigger className="absolute end-11 top-1.5 z-10" label={label} />
+          )}
+          <WorkspaceLayoutSeparator />
+          <WorkspaceLayoutTree>
+            <div>Tree</div>
+          </WorkspaceLayoutTree>
+        </WorkspaceLayoutBody>
+      </WorkspaceLayout>,
     ),
   );
 }
