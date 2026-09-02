@@ -1,7 +1,7 @@
 import type { SessionRef } from "@getpie/contract";
-import { Effect, Semaphore } from "effect";
+import { Context, Effect, Layer, Semaphore } from "effect";
 
-export type SessionMetadataLocks = {
+export type SessionMetadataLocksShape = {
   readonly withLock: <A, E, R>(
     ref: SessionRef,
     effect: Effect.Effect<A, E, R>,
@@ -10,7 +10,12 @@ export type SessionMetadataLocks = {
   readonly size: Effect.Effect<number>;
 };
 
-export const makeSessionMetadataLocks = (): SessionMetadataLocks => {
+export class SessionMetadataLocks extends Context.Service<
+  SessionMetadataLocks,
+  SessionMetadataLocksShape
+>()("SessionMetadataLocks") {}
+
+const makeSessionMetadataLocks = (): SessionMetadataLocksShape => {
   const locks = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
   return {
     withLock: (ref, effect) => {
@@ -26,3 +31,8 @@ export const makeSessionMetadataLocks = (): SessionMetadataLocks => {
     size: Effect.sync(() => locks.size),
   };
 };
+
+export const SessionMetadataLocksLayer: Layer.Layer<SessionMetadataLocks> = Layer.effect(
+  SessionMetadataLocks,
+  Effect.sync(makeSessionMetadataLocks),
+);
