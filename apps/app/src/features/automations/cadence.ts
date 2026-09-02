@@ -2,6 +2,7 @@ import type {
   AutomationPauseReason,
   AutomationRunReason,
   AutomationRunStatus,
+  AutomationSession,
   AutomationSkipReason,
   AutomationSpec,
 } from "@getpie/contract";
@@ -59,6 +60,10 @@ export function isAutomationEveryUnit(value: string): value is AutomationEveryUn
   return EVERY_UNIT_OPTIONS.some((option) => option.value === value);
 }
 
+export type AutomationSessionPick = "create" | "existing";
+
+export const CREATE_ON_FIRST_RUN_VALUE = "create";
+
 export type AutomationFormValues = {
   readonly name: string;
   readonly projectId: string;
@@ -76,6 +81,8 @@ export type AutomationFormValues = {
   readonly runNow: boolean;
   readonly worktree: boolean;
   readonly reuseSession: boolean;
+  readonly sessionPick: AutomationSessionPick;
+  readonly sessionId: string;
 };
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -101,7 +108,53 @@ export function defaultAutomationForm(projectId: string): AutomationFormValues {
     runNow: false,
     worktree: false,
     reuseSession: false,
+    sessionPick: "create",
+    sessionId: "",
   };
+}
+
+export function sessionFromForm(
+  form: Pick<AutomationFormValues, "reuseSession" | "sessionPick" | "sessionId">,
+  listedIds?: ReadonlySet<string>,
+): AutomationSession {
+  if (!form.reuseSession) return { policy: "isolated" };
+  if (
+    form.sessionPick === "existing" &&
+    form.sessionId !== "" &&
+    (listedIds === undefined || listedIds.has(form.sessionId))
+  ) {
+    return { policy: "existing", sessionId: form.sessionId };
+  }
+  return { policy: "owned" };
+}
+
+export function sessionSelectValue(
+  form: Pick<AutomationFormValues, "sessionPick" | "sessionId">,
+  listedIds?: ReadonlySet<string>,
+): string {
+  if (
+    form.sessionPick === "existing" &&
+    form.sessionId !== "" &&
+    (listedIds === undefined || listedIds.has(form.sessionId))
+  ) {
+    return form.sessionId;
+  }
+  return CREATE_ON_FIRST_RUN_VALUE;
+}
+
+export function formatSessionReuse(
+  session: AutomationSession | undefined,
+  titleById: ReadonlyMap<string, string>,
+): string | null {
+  const resolved = session ?? { policy: "isolated" };
+  if (resolved.policy === "isolated") return null;
+  const sessionId = resolved.sessionId;
+  if (sessionId !== undefined) {
+    const title = titleById.get(sessionId);
+    if (title !== undefined) return `Reuses ${title}`;
+  }
+  if (resolved.policy === "owned") return "Creates a session on first run";
+  return "Reuses a session";
 }
 
 export function localDateTimeToIso(value: string): string {

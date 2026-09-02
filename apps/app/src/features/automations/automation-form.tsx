@@ -1,8 +1,10 @@
 import type { Project, Automation, AutomationSession, AutomationSpec } from "@getpie/contract";
 import {
+  automationSessionOf,
   MAX_AUTOMATION_MAX_RUNS,
   MAX_AUTOMATION_NAME_CHARS,
   MAX_AUTOMATION_PROMPT_CHARS,
+  reuseSessionIdOf,
 } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
@@ -16,12 +18,14 @@ import {
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
 import { Textarea } from "@getpie/ui/components/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
   CADENCE_OPTIONS,
+  CREATE_ON_FIRST_RUN_VALUE,
   EVERY_UNIT_OPTIONS,
-  type AutomationFormValues,
   WEEKDAY_OPTIONS,
   defaultOnceLocal,
   defaultAutomationForm,
@@ -30,6 +34,8 @@ import {
   isAutomationCadence,
   isAutomationEveryUnit,
   localDateTimeToIso,
+  sessionFromForm,
+  sessionSelectValue,
   specFromForm,
 } from "./cadence";
 
@@ -45,35 +51,47 @@ export type AutomationFormSubmit = {
   readonly runNow: boolean;
 };
 
+export type AutomationFormDefaults = {
+  readonly projectId?: string;
+  readonly sessionId?: string;
+};
+
 export type AutomationFormProps = {
   readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
   readonly initial?: Automation;
+  readonly defaults?: AutomationFormDefaults;
   readonly submitting?: boolean;
   readonly onSubmit: (value: AutomationFormSubmit) => void;
   readonly onCancel: () => void;
 };
 
-function sessionFromForm(reuseSession: boolean, initial?: Automation): AutomationSession {
-  if (!reuseSession) return { policy: "isolated" };
-  if (initial?.session?.policy === "existing" || initial?.session?.policy === "owned") {
-    return initial.session;
-  }
-  return { policy: "owned" };
-}
-
 function formFromAutomation(
   projects: ReadonlyArray<Pick<Project, "id" | "name">>,
   initial?: Automation,
+  defaults?: AutomationFormDefaults,
 ): AutomationFormValues {
-  const projectId = initial?.projectId ?? projects[0]?.id ?? "";
+  const projectId = initial?.projectId ?? defaults?.projectId ?? projects[0]?.id ?? "";
   const base = defaultAutomationForm(projectId);
-  if (initial === undefined) return base;
+  if (initial === undefined) {
+    const sessionId = defaults?.sessionId ?? "";
+    if (sessionId === "") return base;
+    return {
+      ...base,
+      reuseSession: true,
+      sessionPick: "existing",
+      sessionId,
+    };
+  }
+  const session = automationSessionOf(initial);
+  const boundId = reuseSessionIdOf(session);
   return {
     ...base,
     name: initial.name,
     prompt: initial.prompt,
     worktree: initial.worktree !== undefined,
-    reuseSession: initial.session !== undefined && initial.session.policy !== "isolated",
+    reuseSession: session.policy !== "isolated",
+    sessionPick: boundId !== undefined ? "existing" : "create",
+    sessionId: boundId ?? "",
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
@@ -84,14 +102,38 @@ function formFromAutomation(
 export function AutomationForm({
   projects,
   initial,
+  defaults,
   submitting = false,
   onSubmit,
   onCancel,
 }: AutomationFormProps) {
-  const [form, setForm] = useState(() => formFromAutomation(projects, initial));
+  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const [form, setForm] = useState(() => formFromAutomation(projects, initial, defaults));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = initial !== undefined;
   const creating = initial === undefined;
+  const sessions = useQuery({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
+      input: { projectId: form.projectId, archived: false },
+    }),
+    enabled: form.reuseSession && form.projectId.length > 0,
+  });
+  const listed = sessions.data ?? [];
+  const listedIds = sessions.isSuccess
+    ? new Set(listed.map((session) => session.sessionId))
+    : undefined;
+  const selectedSessionValue = sessionSelectValue(form, listedIds);
+  const sessionItems = [
+    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
+    ...listed.map((session) => ({
+      label: session.title ?? "New chat",
+      value: session.sessionId,
+    })),
+    ...(selectedSessionValue !== CREATE_ON_FIRST_RUN_VALUE &&
+    !listed.some((session) => session.sessionId === selectedSessionValue)
+      ? [{ label: "Selected session", value: selectedSessionValue }]
+      : []),
+  ];
   const everyAmount = Number(form.everyAmount);
   const maxRunsTrimmed = form.maxRuns.trim();
   const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
@@ -130,7 +172,7 @@ export function AutomationForm({
             prompt: form.prompt.trim(),
             spec,
             worktree: form.worktree,
-            session: sessionFromForm(form.reuseSession, initial),
+            session: sessionFromForm(form, listedIds),
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
@@ -157,7 +199,12 @@ export function AutomationForm({
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
             if (typeof next === "string") {
-              setForm((current) => ({ ...current, projectId: next }));
+              setForm((current) => ({
+                ...current,
+                projectId: next,
+                sessionPick: "create",
+                sessionId: "",
+              }));
             }
           }}
           value={form.projectId === "" ? null : form.projectId}
@@ -372,6 +419,46 @@ export function AutomationForm({
           />
         </div>
       </Field>
+      {form.reuseSession ? (
+        <Field>
+          <FieldLabel htmlFor="automation-session">Session</FieldLabel>
+          <Select
+            disabled={form.projectId.length === 0}
+            items={sessionItems}
+            onValueChange={(next) => {
+              if (typeof next !== "string") return;
+              if (next === CREATE_ON_FIRST_RUN_VALUE) {
+                setForm((current) => ({
+                  ...current,
+                  sessionPick: "create",
+                  sessionId: "",
+                }));
+                return;
+              }
+              setForm((current) => ({
+                ...current,
+                sessionPick: "existing",
+                sessionId: next,
+              }));
+            }}
+            value={selectedSessionValue}
+          >
+            <SelectTrigger id="automation-session">
+              <SelectValue placeholder="Create on first run" />
+            </SelectTrigger>
+            <SelectContent>
+              {sessionItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription>
+            Create a chat on the first run, or keep prompting an existing one.
+          </FieldDescription>
+        </Field>
+      ) : null}
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
           <FieldLabel htmlFor="automation-worktree">Isolated worktree</FieldLabel>

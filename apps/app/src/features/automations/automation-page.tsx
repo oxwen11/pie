@@ -8,7 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
 import { useState } from "react";
@@ -21,17 +21,34 @@ import { AutomationDeleteDialog } from "./automation-delete-dialog";
 import { AutomationEditorDialog, type AutomationEditorState } from "./automation-editor-dialog";
 import type { AutomationFormSubmit } from "./automation-form";
 import { AutomationRunHistory } from "./automation-run-history";
+import { formatSessionReuse } from "./cadence";
+
+export type AutomationCreateDefaults = {
+  readonly projectId?: string;
+  readonly sessionId?: string;
+};
 
 export type AutomationPageProps = {
   readonly projects: ReadonlyArray<Project>;
   readonly projectsReady: boolean;
+  readonly createOpen: boolean;
+  readonly createDefaults?: AutomationCreateDefaults;
+  readonly onOpenCreate: () => void;
+  readonly onCloseCreate: () => void;
 };
 
-export function AutomationPage({ projects, projectsReady }: AutomationPageProps) {
+export function AutomationPage({
+  projects,
+  projectsReady,
+  createOpen,
+  createDefaults,
+  onOpenCreate,
+  onCloseCreate,
+}: AutomationPageProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [editor, setEditor] = useState<AutomationEditorState | null>(null);
+  const [editing, setEditing] = useState<Automation | null>(null);
   const [deleting, setDeleting] = useState<Automation | null>(null);
   const [history, setHistory] = useState<Automation | null>(null);
 
@@ -64,7 +81,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         ...(value.worktree ? { worktree: {} } : undefined),
       }),
     onSuccess: (created) => {
-      setEditor(null);
+      onCloseCreate();
       void invalidate();
       if (created.lastSessionId !== undefined) {
         navigate({
@@ -105,7 +122,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         ...(input.worktree === true ? { worktree: {} } : undefined),
       }),
     onSuccess: () => {
-      setEditor(null);
+      setEditing(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
     },
     onError: (error) => toast.error(`Failed to update automation: ${error.message}`),
@@ -146,6 +163,30 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
   });
 
   const items = automations.data ?? [];
+  const projectIds = [...new Set(items.map((item) => item.projectId))];
+  const sessionLists = useQueries({
+    queries: projectIds.map((projectId) =>
+      orpcQueryUtils.agent.session.list.queryOptions({
+        input: { projectId, archived: false },
+      }),
+    ),
+  });
+  const sessionTitleById = new Map<string, string>();
+  for (const query of sessionLists) {
+    for (const session of query.data ?? []) {
+      sessionTitleById.set(session.sessionId, session.title ?? "New chat");
+    }
+  }
+  const editor: AutomationEditorState | null =
+    editing !== null
+      ? { mode: "edit", automation: editing }
+      : createOpen
+        ? {
+            mode: "create",
+            projectId: createDefaults?.projectId,
+            sessionId: createDefaults?.sessionId,
+          }
+        : null;
   const historyAutomation =
     history === null ? null : (items.find((item) => item.id === history.id) ?? history);
   const atLimit = items.length >= MAX_AUTOMATIONS;
@@ -174,7 +215,7 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
         </p>
         <Button
           disabled={!canCreate}
-          onClick={() => setEditor({ mode: "create" })}
+          onClick={onOpenCreate}
           title={
             projects.length === 0
               ? "Import a project first"
@@ -208,13 +249,14 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
               automation={automation}
               key={automation.id}
               onDelete={() => setDeleting(automation)}
-              onEdit={() => setEditor({ mode: "edit", automation })}
+              onEdit={() => setEditing(automation)}
               onHistory={() => setHistory(automation)}
               onRunNow={() => runNow.mutate(automation.id)}
               onToggle={(enabled) => update.mutate({ id: automation.id, enabled })}
               projectName={
                 projects.find((item) => item.id === automation.projectId)?.name ?? "Unknown project"
               }
+              sessionLine={formatSessionReuse(automation.session, sessionTitleById)}
               running={runNow.isPending}
               updating={update.isPending}
             />
@@ -225,7 +267,13 @@ export function AutomationPage({ projects, projectsReady }: AutomationPageProps)
       {editor !== null ? (
         <AutomationEditorDialog
           editor={editor}
-          onClose={() => setEditor(null)}
+          onClose={() => {
+            if (editor.mode === "create") {
+              onCloseCreate();
+              return;
+            }
+            setEditing(null);
+          }}
           onSubmit={(value) => {
             if (editor.mode === "create") {
               create.mutate(value);

@@ -14,6 +14,7 @@ import {
 export type AutomationCardProps = {
   readonly automation: Automation;
   readonly projectName: string;
+  readonly sessionLine: string | null;
   readonly updating: boolean;
   readonly running: boolean;
   readonly onToggle: (enabled: boolean) => void;
@@ -26,6 +27,7 @@ export type AutomationCardProps = {
 export function AutomationCard({
   automation,
   projectName,
+  sessionLine,
   updating,
   running,
   onToggle,
@@ -52,6 +54,9 @@ export function AutomationCard({
               automation.maxRuns,
             )}
           </div>
+          {sessionLine !== null ? (
+            <div className="text-muted-foreground text-sm">{sessionLine}</div>
+          ) : null}
           {automation.maxRuns !== undefined ? (
             <div className="text-muted-foreground text-sm">
               {formatFiredCap(firedRunCount(automation), automation.maxRuns)}

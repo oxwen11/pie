@@ -40,7 +40,7 @@ function AutomationsNavItem() {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} render={<Link to="/automations" />}>
+      <SidebarMenuButton isActive={active} render={<Link search={{}} to="/automations" />}>
         <Clock />
         <span>Automations</span>
       </SidebarMenuButton>

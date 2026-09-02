@@ -3,7 +3,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/me
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext, useRouter } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, Ellipsis, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -69,6 +69,25 @@ export function SessionActionsMenu({ session }: { readonly session: SessionSumma
             <Pencil />
             Rename
           </MenuItem>
+          {session.archived ? null : (
+            <MenuItem
+              onClick={() => {
+                navigate({
+                  to: "/automations",
+                  search: {
+                    create: true,
+                    projectId: session.projectId,
+                    sessionId: session.sessionId,
+                  },
+                }).catch((error: unknown) => {
+                  console.error("Failed to open the automation editor", error);
+                });
+              }}
+            >
+              <Clock />
+              Automate…
+            </MenuItem>
+          )}
           <MenuItem
             disabled={setArchived.isPending}
             onClick={() => setArchived.mutate(!session.archived)}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CREATE_ON_FIRST_RUN_VALUE,
   defaultOnceLocal,
   defaultAutomationForm,
   formatFiredCap,
@@ -10,9 +11,12 @@ import {
   formatRunReason,
   formatRunStatus,
   formatRunSummary,
+  formatSessionReuse,
   formatSkipReason,
   formatSpec,
   formFromSpec,
+  sessionFromForm,
+  sessionSelectValue,
   specFromForm,
   summarizeRuns,
 } from "./cadence";
@@ -177,5 +181,59 @@ describe("defaultOnceLocal", () => {
   it("picks 9:00 tomorrow in local time", () => {
     const from = new Date(2026, 7, 27, 15, 45, 0);
     expect(defaultOnceLocal(from)).toBe("2026-08-28T09:00");
+  });
+});
+
+describe("sessionFromForm", () => {
+  const reuse = {
+    reuseSession: true,
+    sessionPick: "existing" as const,
+    sessionId: "sess-1",
+  };
+
+  it("maps reuse off to isolated", () => {
+    expect(
+      sessionFromForm({ reuseSession: false, sessionPick: "existing", sessionId: "sess-1" }),
+    ).toEqual({
+      policy: "isolated",
+    });
+  });
+
+  it("maps create-on-first to owned", () => {
+    expect(sessionFromForm({ reuseSession: true, sessionPick: "create", sessionId: "" })).toEqual({
+      policy: "owned",
+    });
+  });
+
+  it("maps a listed pick to existing", () => {
+    expect(sessionFromForm(reuse, new Set(["sess-1"]))).toEqual({
+      policy: "existing",
+      sessionId: "sess-1",
+    });
+  });
+
+  it("falls back to owned when the pick is no longer listed", () => {
+    expect(sessionFromForm(reuse, new Set(["other"]))).toEqual({ policy: "owned" });
+  });
+
+  it("keeps a pick while the list is still loading", () => {
+    expect(sessionFromForm(reuse)).toEqual({ policy: "existing", sessionId: "sess-1" });
+    expect(sessionSelectValue(reuse)).toBe("sess-1");
+    expect(sessionSelectValue(reuse, new Set(["other"]))).toBe(CREATE_ON_FIRST_RUN_VALUE);
+  });
+});
+
+describe("formatSessionReuse", () => {
+  it("labels isolated, create-on-first, and a known title", () => {
+    expect(formatSessionReuse({ policy: "isolated" }, new Map())).toBeNull();
+    expect(formatSessionReuse({ policy: "owned" }, new Map())).toBe(
+      "Creates a session on first run",
+    );
+    expect(
+      formatSessionReuse({ policy: "owned", sessionId: "s1" }, new Map([["s1", "Nightly"]])),
+    ).toBe("Reuses Nightly");
+    expect(formatSessionReuse({ policy: "existing", sessionId: "missing" }, new Map())).toBe(
+      "Reuses a session",
+    );
   });
 });

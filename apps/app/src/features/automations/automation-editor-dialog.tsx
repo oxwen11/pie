@@ -11,7 +11,7 @@ import {
 import { AutomationForm, type AutomationFormSubmit } from "./automation-form";
 
 export type AutomationEditorState =
-  | { readonly mode: "create" }
+  | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
   | { readonly mode: "edit"; readonly automation: Automation };
 
 export type AutomationEditorDialogProps = {
@@ -47,6 +47,11 @@ export function AutomationEditorDialog({
         </DialogHeader>
         <DialogPanel>
           <AutomationForm
+            defaults={
+              editor.mode === "create"
+                ? { projectId: editor.projectId, sessionId: editor.sessionId }
+                : undefined
+            }
             initial={editor.mode === "edit" ? editor.automation : undefined}
             onCancel={onClose}
             onSubmit={onSubmit}
