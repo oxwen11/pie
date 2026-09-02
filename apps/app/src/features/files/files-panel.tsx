@@ -15,7 +15,14 @@ import { useCallback } from "react";
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
-import { WorkspaceLayout } from "@/components/layout/workspace-layout";
+import {
+  WorkspaceLayout,
+  WorkspaceLayoutBody,
+  WorkspaceLayoutPreview,
+  WorkspaceLayoutSeparator,
+  WorkspaceLayoutTree,
+  WorkspaceLayoutTreeTrigger,
+} from "@/components/layout/workspace-layout";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -79,15 +86,21 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
   );
 
   return (
-    <WorkspaceLayout
-      preview={
-        <FileState icon={FileTextIcon} prominentIcon title="打开文件">
-          从工作区目录树中选择文件
-        </FileState>
-      }
-      tree={treePane}
-      treeLabel={workspaceName}
-    />
+    <WorkspaceLayout>
+      <WorkspaceLayoutBody>
+        <WorkspaceLayoutPreview>
+          <FileState icon={FileTextIcon} prominentIcon title="打开文件">
+            从工作区目录树中选择文件
+          </FileState>
+        </WorkspaceLayoutPreview>
+        <WorkspaceLayoutTreeTrigger
+          className="absolute end-11 top-1.5 z-10"
+          label={workspaceName}
+        />
+        <WorkspaceLayoutSeparator />
+        <WorkspaceLayoutTree>{treePane}</WorkspaceLayoutTree>
+      </WorkspaceLayoutBody>
+    </WorkspaceLayout>
   );
 }
 
