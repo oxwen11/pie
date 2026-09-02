@@ -12,6 +12,7 @@
     "./globals.css": "./src/globals.css"
   },
   "scripts": {
+    "cn-build": "cn build --content \"src/**/*.{ts,tsx}\" --content \"../../apps/app/src/**/*.{ts,tsx}\" -o src/lib/cn-tables.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "git clean -xdf node_modules dist .turbo"

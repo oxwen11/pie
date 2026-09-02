@@ -71,8 +71,9 @@ const [value, setValue] = useControllableState({
 ## Styling — cn, ordering, CVA
 
 `cn` (from the `cn` package, re-exported via `@getpie/ui/lib/utils`) joins
-conditionals and resolves conflicting Tailwind utilities (last one wins). Class
-order is fixed:
+conditionals and resolves conflicting Tailwind utilities (last one wins).
+Tables are compiled by `pnpm --filter @getpie/ui cn-build` (also runs via turbo
+and the Vite plugin). Class order is fixed:
 
 ```tsx
 className={cn(
