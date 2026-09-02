@@ -5,7 +5,7 @@ import {
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
 import { cn } from "@getpie/ui/lib/utils";
-import type { ToolUIPart, UIMessage } from "ai";
+import type { ToolUIPart } from "ai";
 import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -62,12 +62,10 @@ function buildTriggerPhrase(label: BatchTriggerLabel): string {
 // shouldShimmer is computed by the parent from `isTrailing && isStreaming` —
 // the batch stays agnostic of either signal alone.
 export function ToolBatch({
-  message,
   parts,
   shouldShimmer = false,
   className,
 }: {
-  message: UIMessage;
   parts: IndexedBatchPart[];
   shouldShimmer?: boolean;
   className?: string;
@@ -110,7 +108,7 @@ export function ToolBatch({
             );
           }
           const toolPart = part as ToolUIPart;
-          return <ToolPart key={toolPart.toolCallId} message={message} part={toolPart} />;
+          return <ToolPart key={toolPart.toolCallId} part={toolPart} />;
         })}
       </CollapsibleContent>
     </Collapsible>
