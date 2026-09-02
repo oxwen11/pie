@@ -15,12 +15,10 @@ export type SessionPullRequest = {
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
   active,
-  isActive,
   pullRequest,
   session,
 }: {
   readonly active: boolean;
-  readonly isActive: () => boolean;
   readonly pullRequest: SessionPullRequest | undefined;
   readonly session: SessionSummary;
 }) {
@@ -29,7 +27,6 @@ export function ProjectSessionRow({
   return (
     <SidebarMenuItem>
       <SessionActionsMenu
-        isActive={isActive}
         session={session}
         render={
           <SidebarMenuButton

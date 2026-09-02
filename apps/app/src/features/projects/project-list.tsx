@@ -1,4 +1,3 @@
-import type { SessionRef } from "@getpie/contract";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -17,13 +16,7 @@ import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group
 import { useProjects } from "@/features/projects/use-projects";
 
 /** Every imported project, each rendering its own session list. */
-export function ProjectList({
-  isSessionActive,
-  onImport,
-}: {
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly onImport: () => void;
-}) {
+export function ProjectList({ onImport }: { readonly onImport: () => void }) {
   const projects = useProjects();
 
   return (
@@ -47,11 +40,7 @@ export function ProjectList({
         <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
           <SidebarGroupContent className="flex flex-col gap-2">
             {(projects.data ?? []).map((project) => (
-              <ProjectSessionsGroup
-                key={project.id}
-                isSessionActive={isSessionActive}
-                project={project}
-              />
+              <ProjectSessionsGroup key={project.id} project={project} />
             ))}
           </SidebarGroupContent>
         </CollapsiblePanel>

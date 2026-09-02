@@ -1,4 +1,3 @@
-import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
@@ -22,13 +21,7 @@ import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
-export function AppSidebar({
-  isSessionActive,
-  onNewChat,
-}: {
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly onNewChat: () => void;
-}) {
+export function AppSidebar({ onNewChat }: { readonly onNewChat: () => void }) {
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
@@ -66,7 +59,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
+        <ProjectList onImport={() => setImportOpen(true)} />
       </SidebarContent>
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}

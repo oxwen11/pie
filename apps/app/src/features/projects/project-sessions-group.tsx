@@ -1,4 +1,4 @@
-import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import type { Project, SessionSummary } from "@getpie/contract";
 import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import {
   Collapsible,
@@ -15,6 +15,7 @@ import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
+import { useCurrentSession } from "@/features/projects/current-session";
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import {
   ProjectSessionRow,
@@ -50,14 +51,9 @@ const selectNewestFirst = (
  * panel is open (two icon entities, not a rotation). This component owns only
  * grouping and fetching; each row composes its own navigation and actions.
  */
-export function ProjectSessionsGroup({
-  isSessionActive,
-  project,
-}: {
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly project: Project;
-}) {
+export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
   const navigate = useNavigate();
+  const isSessionActive = useCurrentSession();
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
@@ -127,7 +123,6 @@ export function ProjectSessionsGroup({
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
-                    isActive={() => isSessionActive(session)}
                     pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}
                   />

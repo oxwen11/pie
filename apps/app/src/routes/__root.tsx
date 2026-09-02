@@ -22,6 +22,7 @@ import { ContentPanelSessionProvider } from "@/components/layout/content-panel/r
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
+import { CurrentSessionProvider } from "@/features/projects/current-session";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
@@ -101,7 +102,9 @@ function RootLayout() {
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            <CurrentSessionProvider isSessionActive={isSessionActive}>
+              <AppSidebar onNewChat={handleNewChat} />
+            </CurrentSessionProvider>
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
