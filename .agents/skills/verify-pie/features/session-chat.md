@@ -7,9 +7,11 @@
 - **Open from a URL** with `?projectId=` (fast path) or bare `/session/<id>` (`session.resolveRef` then prepare).
 - **Transcript** — user bubbles (right, primary), assistant + tool/reasoning. Empty settled history renders nothing; loading shows **Loading earlier messages…**; failed history shows **Earlier messages couldn't be loaded...**.
 - **Composer** — same TipTap stack as draft, no draft placeholder. Submit keymap is Enter; **click Send message**. Footer shows the current git branch, **Not a Git repository**, or **Workspace unavailable**.
-- **Stop** — while `status === "streaming"`, the same button is **Stop generating**.
+- **Streaming toolbar** — while `status === "streaming"`, three controls: **Steer message**, **Stop generating**, **Send message**. Stop only aborts the current run.
+- **Follow-up** — Send / Enter while a turn is running queues `delivery: "followUp"`. The draft is **not** a transcript bubble; it appears in a **Queued follow-ups** list above the composer.
+- **Steer** — **Steer message** submits the **current draft** as `delivery: "steer"` (inject before the next LLM call). One shot, not a mode: the next Send stays follow-up. Steering lines appear first, labeled **Steer**.
 - **Model select** — live session toolbar; same combobox as draft.
-- **In-flight** — **Thinking…** status after submit, before tokens.
+- **In-flight** — **Thinking…** / **working…** status after submit, before tokens.
 
 ## How to get to it (user POV)
 
@@ -25,21 +27,29 @@ agent-browser open "http://localhost:4190/session/<sessionId>?projectId=<project
 agent-browser wait --url "**/session/**"
 ```
 
-Follow-up prompt:
+Follow-up prompt (idle session — Pi finished or failed):
 
 1. Snapshot: heading is the first-prompt title; supporting text is the project name; composer at the bottom.
 2. Click the contenteditable. Type a second distinctive line.
 3. Click **Send message** (not Enter).
 4. User bubble appears. **Thinking…** may follow.
 
+Queue + Steer (only when a turn is actually streaming — hold-open fake Pi, or a long real turn):
+
+1. Snapshot: **Steer message**, **Stop generating**, and **Send message** are all present. Steer and Send are disabled while the draft is empty.
+2. Type a distinctive follow-up. Click **Send message** (not Steer). The line appears under **Queued follow-ups** with no Steer label. The draft clears. The user bubble must **not** gain that text.
+3. Type a distinctive steer line. Click **Steer message**. The line appears under **Steering** with a **Steer** label. The draft clears. Steer is not pressed / not a toggle.
+4. Type another line and click **Send message** again. It joins **Queued follow-ups**. The previous steer line stays labeled.
+
 Proof:
 
 - URL still `/session/<same-id>?projectId=<same-id>`.
-- Both user texts are in the transcript snapshot.
+- Both user texts are in the transcript snapshot (idle follow-up), or only the first prompt is a bubble (queued path).
 - Session JSON under `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` still exists (title may stay the first prompt unless renamed).
 - If Pi runs: assistant text or tool cards. If not: **Model request failed** / **Model usage limit reached** — that is the isolated-home default, not a navigation bug.
+- Queued path: fake-pi / child log shows `follow_up` then `steer` (not two `steer`s). Header lists steering first, then follow-ups.
 
-Stop (only when a turn is actually streaming): click **Stop generating**; button returns to **Send message**.
+Stop (only when a turn is actually streaming): click **Stop generating**; Steer / Stop disappear and Send remains **Send message**. The queue header is unchanged (Pi does not clear it on abort).
 
 ## Gotchas
 
