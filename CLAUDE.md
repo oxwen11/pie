@@ -44,6 +44,11 @@ merge-commit / rebase merges in the repo. Squash rewrites the branch tip out
 of `main`'s history, so deleting the local feature branch needs `git branch -D`
 — the changes are already on `main`, so it's safe.
 
+A UI change or UI bug needs an image or short video on the GitHub issue,
+PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh` ≥
+2.99.0). Capture with `pie-verify web|desktop evidence screenshot`; do not
+commit the files.
+
 ## Going deeper
 
 - `CONTEXT.md` — glossary. Read it before naming anything in the session domain;
