@@ -12,6 +12,7 @@ import { Archive, ArchiveRestore, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { useCurrentSession } from "@/features/projects/current-session";
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
 
 /** Session mutations live behind one actions-menu capability boundary. The
@@ -20,12 +21,10 @@ import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
  *  without opening the menu. */
 export function SessionActionsMenu({
   children,
-  isActive,
   render,
   session,
 }: {
   readonly children: ReactNode;
-  readonly isActive: () => boolean;
   readonly render: ReactElement;
   readonly session: SessionSummary;
 }) {
@@ -33,6 +32,7 @@ export function SessionActionsMenu({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
+  const isSessionActive = useCurrentSession();
 
   const setArchived = useMutation({
     mutationFn: (archived: boolean) =>
@@ -53,7 +53,7 @@ export function SessionActionsMenu({
         queryClient.invalidateQueries({ queryKey: listKey(true) }),
       ]);
 
-      if (archived && isActive()) {
+      if (archived && isSessionActive(session)) {
         return Promise.all([
           refreshLists,
           navigate({ to: "/draft", search: { projectId: session.projectId } }),
