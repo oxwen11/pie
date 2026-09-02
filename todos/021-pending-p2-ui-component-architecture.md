@@ -18,7 +18,7 @@ The UI already uses compound components in several places, but the architecture 
 - [x] Remove agent-request response callback drilling from `ChatTranscript` → `AgentRequestView` → request-specific views.
 - [x] Consolidate the duplicated responsive File/Review workspace layouts into one shared layout boundary.
 - [x] Remove current-session detection prop drilling through the projects sidebar with a narrowly scoped provider or equivalent boundary.
-- [ ] Stop passing the Content Panel session object through outlet children when the existing Content Panel context already provides it.
+- [x] Stop passing the Content Panel session object through outlet children when the existing Content Panel context already provides it.
 - [ ] Consolidate `FileState`, `ReviewState`, and `WorkspaceState` into one shared state presentation component.
 - [ ] Decompose `ReviewToolbar` into focused, explicitly composable controls while preserving controlled state ownership.
 - [ ] Clean up the `PromptInput` and `ToolHeader` public APIs, including unused props and unnecessary mode/configuration surface.
@@ -52,3 +52,4 @@ The UI already uses compound components in several places, but the architecture 
 | 2026-08-23 | Moved agent-request response ownership to `AgentRequestView`              | The transcript remains a pure snapshot view while request leaves retain an explicit action prop at one level.                                            |
 | 2026-08-23 | Consolidated responsive File/Review workspace layouts                     | One app-level layout now owns width observation, drawer behavior, and split sizing while explicit labels and trigger placement remain at each call site. |
 | 2026-08-23 | Removed current-session detection prop drilling from the projects sidebar | A projects-scoped provider keeps route identity at the root while rows and archive actions read a complete `SessionRef` checker locally.                 |
+| 2026-08-23 | Stopped forwarding the Content Panel session through outlet internals     | Outlet children now read the existing bound session hook instead of repeating the same object as props.                                                  |
