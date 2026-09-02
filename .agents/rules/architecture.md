@@ -35,7 +35,9 @@ the same files. Do not copy a skill into `.cursor/skills` as a second original.
   live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
   and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
   translation, metadata persistence, wire vocabulary validation, collection
-  events). `session.ts`, `session-fold.ts` and `session-repository.ts` are
+  events). That face is assembled from `SessionMetadata`, `SessionLifecycle`,
+  and `SessionTurn` Context services; `session-repository.ts` is a Context
+  service like `ProjectRepository`. `session.ts` and `session-fold.ts` stay
   private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
   optionally owns a runtime: observing a session costs no process until a prompt
   or history read acquires one. The RPC router contributes only `projectId →
