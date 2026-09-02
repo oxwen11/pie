@@ -116,12 +116,11 @@ describe("SessionPullRequestIndicator", () => {
 
     for (const [lifecycle, label, iconClass, colorClass] of cases) {
       const node = renderPullRequestIndicator(lifecycle);
-      const indicator = node.querySelector("a");
+      const indicator = node.querySelector('[data-slot="sidebar-menu-action"]');
+      expect(indicator?.tagName).toBe("SPAN");
       expect(indicator?.getAttribute("aria-label")).toBe(label);
       expect(indicator?.getAttribute("title")).toBe(label);
-      expect(indicator?.getAttribute("href")).toBe(PR_URL);
-      expect(indicator?.getAttribute("target")).toBe("_blank");
-      expect(indicator?.getAttribute("rel")).toBe("noreferrer");
+      expect(indicator?.getAttribute("role")).toBe("img");
       expect(indicator?.classList.contains(colorClass)).toBe(true);
       expect(indicator?.querySelector("svg")?.classList.contains(iconClass)).toBe(true);
       act(() => root?.unmount());
@@ -133,5 +132,11 @@ describe("SessionPullRequestIndicator", () => {
 
   it("renders nothing without a current pull request status", () => {
     expect(renderPullRequestIndicator(undefined, undefined).childElementCount).toBe(0);
+  });
+
+  it("renders no link to navigate to the pull request", () => {
+    const node = renderPullRequestIndicator({ type: "open", draft: false });
+    expect(node.querySelector("a")).toBeNull();
+    expect(node.querySelector("button")).toBeNull();
   });
 });
