@@ -1,21 +1,26 @@
 export {
+  PiAgentSessionService,
+  type PiAgentSessionServiceShape,
+  PiAgentSessionServiceLayer,
+  type CreatePiSessionInput,
+} from "./session-service";
+export { PiAgentSessionManager, PiAgentSessionManagerLayer } from "./session-manager";
+export { PiAgentService, PiAgentServiceLayer } from "./agent-service";
+export { PiAgent, type PiAgentShape, cachePiAgentAvailability, makePiAgent } from "./pi/agent";
+
+export {
   isSessionEvent,
   type SessionEnvelope,
   type SessionEnvelopeBody,
   type SessionEnvelopeDraft,
   type SessionEvent,
+  SessionEventDefs,
+  GlobalEventDefs,
 } from "./events/framework";
-export * from "./event-manifest";
-export * from "./errors";
-export * from "./executable";
-export * from "./queue-stream";
-export * from "./session-io";
-export * from "./session-manager";
-export * from "./session-service";
-export * from "./agent-service";
-export { PiAgent, type PiAgentShape, cachePiAgentAvailability } from "./pi/agent";
 export { type PiAgentRuntime } from "./pi/runtime";
-export type { AvailabilityResult, SessionInfoResult, AgentSessionInfo } from "./pi/types";
+
+export * from "./errors";
+
 export type {
   PromptReceipt,
   UserInput,

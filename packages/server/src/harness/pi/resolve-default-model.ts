@@ -1,7 +1,6 @@
-import type { AgentSessionServices } from "@earendil-works/pi-coding-agent";
 import type { AgentModel } from "@getpie/contract";
 
-import { toAgentModel } from "./model-mapping";
+import { toAgentModel, type PiModelRef } from "./model-mapping";
 
 /**
  * Default model IDs per provider — kept in sync with Pi's `defaultModelPerProvider`
@@ -50,10 +49,22 @@ const defaultModelPerProvider: DefaultModelPerProvider = {
   "xiaomi-token-plan-sgp": "mimo-v2.5-pro",
 };
 
+export type ResolveDefaultPiModelServices = {
+  readonly settingsManager: {
+    readonly getDefaultProvider: () => string | undefined;
+    readonly getDefaultModel: () => string | undefined;
+  };
+  readonly modelRuntime: {
+    readonly getModel: (provider: string, modelId: string) => PiModelRef | undefined;
+    readonly hasConfiguredAuth: (provider: string) => boolean;
+  };
+};
+
 /** Mirrors Pi `findInitialModel` for a fresh session (no CLI args, no scoped models). */
-export async function resolveDefaultPiModel(
-  services: AgentSessionServices,
-): Promise<AgentModel | undefined> {
+export function resolveDefaultPiModel(
+  services: ResolveDefaultPiModelServices,
+  available: ReadonlyArray<PiModelRef>,
+): AgentModel | undefined {
   const { settingsManager, modelRuntime } = services;
   const defaultProvider = settingsManager.getDefaultProvider();
   const defaultModelId = settingsManager.getDefaultModel();
@@ -64,14 +75,13 @@ export async function resolveDefaultPiModel(
     }
   }
 
-  const availableModels = [...(await modelRuntime.getAvailable())];
-  if (availableModels.length === 0) return undefined;
+  if (available.length === 0) return undefined;
 
   for (const provider of Object.keys(defaultModelPerProvider)) {
     const defaultId = defaultModelPerProvider[provider];
-    const match = availableModels.find((m) => m.provider === provider && m.id === defaultId);
+    const match = available.find((m) => m.provider === provider && m.id === defaultId);
     if (match) return toAgentModel(match);
   }
 
-  return toAgentModel(availableModels[0]!);
+  return toAgentModel(available[0]!);
 }
