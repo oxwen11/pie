@@ -16,7 +16,6 @@ import { PiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
 import type { UserInput } from "../../src/harness/session-io";
-import { SessionLifecycleLayer } from "../../src/harness/session-lifecycle";
 import {
   SessionMetadataLocks,
   SessionMetadataLocksLayer,
@@ -35,9 +34,8 @@ import {
 import {
   type PiAgentSessionServiceShape,
   PiAgentSessionService,
-  PiAgentSessionServiceFromPartsLayer,
+  PiAgentSessionServiceCoreLayer,
 } from "../../src/harness/session-service";
-import { SessionTurnLayer } from "../../src/harness/session-turn";
 import { ProjectService } from "../../src/project/service";
 import { NodePlatformLayer } from "../platform";
 
@@ -255,9 +253,7 @@ export const run = <A, E>(
               (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
           });
           const locksLayer = SessionMetadataLocksLayer;
-          const graph = Layer.mergeAll(PiAgentSessionServiceFromPartsLayer, locksLayer).pipe(
-            Layer.provide(SessionTurnLayer),
-            Layer.provide(SessionLifecycleLayer),
+          const graph = Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
             Layer.provide(SessionMetadataLayer),
             Layer.provide(locksLayer),
             Layer.provide(Layer.succeed(PiAgentSessionRepository, repo)),
