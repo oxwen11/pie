@@ -35,12 +35,13 @@ import { ProjectService } from "../project/service";
 import type { Session } from "../types";
 import type {
   AgentOperationError,
+  CapabilityUnsupported,
   HarnessSessionNotFound,
   ResumeSessionError,
   SessionClosed,
   TurnAlreadyRunning,
 } from "./errors";
-import { AgentRequestUnavailable, CapabilityUnsupported, SessionNotResumable } from "./errors";
+import { AgentRequestUnavailable, SessionNotResumable } from "./errors";
 import type { PiAgentShape } from "./pi/agent";
 import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
@@ -141,7 +142,6 @@ export type PiAgentSessionServiceShape = {
     | StoreReadError
     | StoreWriteError
     | ResumeSessionError
-    | CapabilityUnsupported
     | SessionClosed
     | AgentOperationError
   >;
@@ -187,7 +187,6 @@ export type PiAgentSessionServiceShape = {
     | StoreReadError
     | StoreWriteError
     | ResumeSessionError
-    | CapabilityUnsupported
     | SessionClosed
     | AgentOperationError
   >;
@@ -201,7 +200,6 @@ export type PiAgentSessionServiceShape = {
     | StoreReadError
     | StoreWriteError
     | ResumeSessionError
-    | CapabilityUnsupported
     | SessionClosed
     | AgentOperationError
   >;
@@ -255,8 +253,6 @@ export const makePiAgentSessionService = (deps: {
   };
 
   const readMetadata = (ref: SessionRef) => repo.read(ref.projectId, ref.sessionId);
-
-  const sessionNeverOpened = (metadata: Session): boolean => metadata.agentSessionId === undefined;
 
   const modelStateFromMetadata = (metadata: Session): AgentModelState => ({
     ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
@@ -330,24 +326,13 @@ export const makePiAgentSessionService = (deps: {
     cwd: string,
   ): Effect.Effect<
     ReadonlyArray<UIMessage>,
-    ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError
+    ResumeSessionError | SessionClosed | AgentOperationError
   > => {
     const cold = pi.getMessages;
     if (cold) return cold(agentSessionId, cwd);
     return manager
       .ensureRuntime({ sessionId: agentSessionId, cwd }, ref)
-      .pipe(
-        Effect.flatMap(
-          (
-            runtime,
-          ): Effect.Effect<
-            ReadonlyArray<UIMessage>,
-            CapabilityUnsupported | SessionClosed | AgentOperationError
-          > =>
-            runtime.getMessages ??
-            Effect.fail(new CapabilityUnsupported({ capability: "getMessages" })),
-        ),
-      );
+      .pipe(Effect.flatMap((runtime) => runtime.getMessages));
   };
 
   const runtimeInput = (agentSessionId: string, cwd: string) => ({
@@ -359,13 +344,9 @@ export const makePiAgentSessionService = (deps: {
     ref: SessionRef,
     agentSessionId: string,
     cwd: string,
-    run: (
-      runtime: PiAgentRuntime,
-    ) => Effect.Effect<A, CapabilityUnsupported | SessionClosed | AgentOperationError | E>,
-  ): Effect.Effect<
-    A,
-    ResumeSessionError | CapabilityUnsupported | SessionClosed | AgentOperationError | E
-  > => manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
+    run: (runtime: PiAgentRuntime) => Effect.Effect<A, SessionClosed | AgentOperationError | E>,
+  ): Effect.Effect<A, ResumeSessionError | SessionClosed | AgentOperationError | E> =>
+    manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
 
   const readAndStampTitleFromFirstPrompt = (ref: SessionRef, parts: PromptInput["parts"]) =>
     withMetadataMutation(
@@ -594,7 +575,7 @@ export const makePiAgentSessionService = (deps: {
     getMessages: (ref) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) => {
-          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+          if (metadata.agentSessionId === undefined) {
             return Effect.succeed<ReadonlyArray<UIMessage>>([]);
           }
           const agentSessionId = metadata.agentSessionId;
@@ -677,7 +658,7 @@ export const makePiAgentSessionService = (deps: {
     getModelState: (ref) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) => {
-          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+          if (metadata.agentSessionId === undefined) {
             return Effect.succeed(modelStateFromMetadata(metadata));
           }
           const agentSessionId = metadata.agentSessionId;
@@ -687,9 +668,7 @@ export const makePiAgentSessionService = (deps: {
                 ref,
                 agentSessionId,
                 resolved.cwd,
-                (runtime) =>
-                  runtime.getModelState ??
-                  Effect.fail(new CapabilityUnsupported({ capability: "getModelState" })),
+                (runtime) => runtime.getModelState,
               ),
             ),
           );
@@ -707,7 +686,7 @@ export const makePiAgentSessionService = (deps: {
               provider: model.provider,
               modelId: model.modelId,
             });
-            if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+            if (metadata.agentSessionId === undefined) {
               return persistModel.pipe(Effect.as(model satisfies AgentModelState));
             }
             const agentSessionId = metadata.agentSessionId;
@@ -716,9 +695,7 @@ export const makePiAgentSessionService = (deps: {
                 persistModel.pipe(
                   Effect.andThen(
                     withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
-                      runtime.setModel
-                        ? runtime.setModel(model)
-                        : Effect.fail(new CapabilityUnsupported({ capability: "setModel" })),
+                      runtime.setModel(model),
                     ),
                   ),
                 ),
@@ -731,7 +708,7 @@ export const makePiAgentSessionService = (deps: {
     getSessionInfo: (ref) =>
       readMetadata(ref).pipe(
         Effect.flatMap((metadata) => {
-          if (sessionNeverOpened(metadata) || metadata.agentSessionId === undefined) {
+          if (metadata.agentSessionId === undefined) {
             return Effect.succeed<SessionInfoResult>({ _tag: "unsupported" });
           }
           const agentSessionId = metadata.agentSessionId;

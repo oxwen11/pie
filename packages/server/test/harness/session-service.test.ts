@@ -380,18 +380,6 @@ describe("PiAgentSessionService", () => {
     expect(result.resume).toEqual([]);
   });
 
-  it("getMessages fails CapabilityUnsupported when the harness has no history read", async () => {
-    const err = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
-        yield* Effect.sleep("50 millis");
-        return yield* Effect.flip(fixture.service.getMessages(ref));
-      }),
-    );
-    expect(err._tag).toBe("CapabilityUnsupported");
-  });
-
   it("interrupt succeeds with nothing running instead of starting an agent", async () => {
     const result = await run({}, (fixture) =>
       Effect.gen(function* () {
