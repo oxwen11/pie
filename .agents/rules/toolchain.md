@@ -15,8 +15,12 @@
   reorders imports and stays a root-only script. Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
   `anti-slop` / `anti-slop-effect`) as TypeScript. `@getpie/oxlint#build`
-  emits them to `dist/`; the root `.oxlintrc.json` loads them as
-  `@getpie/oxlint/<plugin>` (root depends on the workspace package). Plugin
+  emits them to `dist/`; the root `oxlint.config.mts` loads them as
+  `@getpie/oxlint/<plugin>` (root depends on the workspace package).
+  That file extends `ultracite/oxlint/{core,react,vitest}` and overlays pie
+  plugins plus `oxlint.deferred.mts` (Ultracite rules not yet adopted). Do not
+  run `ultracite init` — it would overwrite AGENTS.md, editor settings, and
+  oxfmt options. Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is
   ignored as generated output. Effect service
   types keep the `Shape` suffix (`Context.Service<Self, Shape>`), so
