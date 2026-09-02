@@ -1,4 +1,9 @@
-import type { AgentResponse, AgentModelState, SessionCapabilities } from "@getpie/contract";
+import type {
+  AgentResponse,
+  AgentModelState,
+  SessionCapabilities,
+  SessionPendingPrompt,
+} from "@getpie/contract";
 import { SessionCapabilitiesSchema } from "@getpie/contract";
 import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
@@ -62,6 +67,9 @@ export type PiAgentRuntime = {
     SessionClosed | TurnAlreadyRunning | AgentOperationError
   >;
   readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
+  readonly replaceQueue: (
+    pending: SessionPendingPrompt,
+  ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     requestId: string,
     response: AgentResponse,
@@ -169,6 +177,14 @@ export const makePiAgentRuntime = (
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
     });
 
+    const replaceQueue: PiAgentRuntime["replaceQueue"] = (pending) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        yield* process.session
+          .replaceQueue(sessionId, pending)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "replace-queue", cause)));
+      });
+
     yield* Scope.addFinalizer(scope, close);
     yield* process.session.awaitTermination(sessionId).pipe(
       Effect.catch((cause) => crash(cause)),
@@ -254,6 +270,7 @@ export const makePiAgentRuntime = (
           return receipt;
         }),
       interrupt,
+      replaceQueue,
       respondToAgentRequest: (requestId, response) =>
         process.session.respondPermission(sessionId, requestId, response).pipe(
           Effect.mapError((cause) =>
