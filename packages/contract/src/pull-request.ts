@@ -90,6 +90,7 @@ export type PullRequestSnapshot = typeof PullRequestSnapshotSchema.Type;
 export const PullRequestSessionStatusSchema = Schema.Struct({
   ref: SessionRefSchema,
   lifecycle: PullRequestLifecycleSchema,
+  url: Schema.String,
 });
 export type PullRequestSessionStatus = typeof PullRequestSessionStatusSchema.Type;
 

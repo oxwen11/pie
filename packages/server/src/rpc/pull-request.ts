@@ -1,12 +1,12 @@
 import type { SessionRef } from "@getpie/contract";
-import type { PullRequestLifecycle, PullRequestRef } from "@getpie/contract/pull-request";
+import type { PullRequestRef, PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { pullRequestContract } from "@getpie/contract/pull-request";
 import { Effect } from "effect";
 
 import { ProjectNotFound, SessionNotFound, StoreReadError } from "../errors";
 import { PiAgentSessionService } from "../harness";
 import { PullRequestService } from "../pull-request";
-import { pickSessionPullRequestLifecycle } from "../pull-request/pick-lifecycle";
+import { pickSessionPullRequest } from "../pull-request/pick-lifecycle";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
 import { resolveWorkspaceCwd } from "./resolve-workspace";
@@ -141,19 +141,21 @@ export const pullRequestRouter = orpc.router({
     );
     const snapshotsByCwd = new Map(cwdSnapshots);
 
-    const statuses: Array<{ ref: SessionRef; lifecycle: PullRequestLifecycle }> = [];
+    const statuses: Array<PullRequestSessionStatus> = [];
     for (const { cwd, ref, pullRequestRefs } of workspaces) {
       if (pullRequestRefs.length === 0) {
         const snapshot = snapshotsByCwd.get(cwd);
-        if (snapshot) statuses.push({ ref, lifecycle: snapshot.lifecycle });
+        if (snapshot) statuses.push({ ref, lifecycle: snapshot.lifecycle, url: snapshot.url });
         continue;
       }
-      const lifecycle = pickSessionPullRequestLifecycle(
+      const snapshot = pickSessionPullRequest(
         pullRequestRefs.map(
           (pullRequest) => snapshotsByKey.get(pullRequestKey(pullRequest)) ?? null,
         ),
       );
-      if (lifecycle !== undefined) statuses.push({ ref, lifecycle });
+      if (snapshot !== undefined) {
+        statuses.push({ ref, lifecycle: snapshot.lifecycle, url: snapshot.url });
+      }
     }
     return statuses;
   }),

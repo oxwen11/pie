@@ -1,10 +1,9 @@
 import type { SessionRef } from "@getpie/contract";
-import { skipToken, useQuery, type QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   useMatch,
   useNavigate,
-  useRouteContext,
   useRouter,
 } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -27,7 +26,6 @@ import { useProjectSessionTitle } from "@/features/projects/use-project-sessions
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
-import { pullRequestHeaderStatus } from "@/features/pull-request/pull-request-presentation";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
 import { sameSessionRef } from "@/lib/session-ref";
@@ -57,7 +55,6 @@ function RootLayout() {
   // (multi-tab / desktop), independent of which route is mounted.
   useSessionListSync();
   const navigate = useNavigate();
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
 
   // This is the shell's one route-identity seam: the content panel, active
   // sidebar row, and card heading all derive from the same authoritative ref.
@@ -75,14 +72,6 @@ function RootLayout() {
       shouldThrow: false,
     }) ?? null;
   const sessionRef = sessionRoute?.loaderData?.ref ?? null;
-  const pullRequestStatus = useQuery({
-    ...orpcQueryUtils.pullRequest.current.queryOptions({
-      input: sessionRef === null ? skipToken : { ref: sessionRef },
-    }),
-    select: pullRequestHeaderStatus,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-  }).data;
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,
@@ -118,7 +107,6 @@ function RootLayout() {
             <CardPanel
               heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
               supportingText={project?.name}
-              status={pullRequestStatus}
             />
           </AppShellMain>
         </AppShellBody>

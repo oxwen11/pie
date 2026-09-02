@@ -1,15 +1,15 @@
-import type { PullRequestLifecycle, PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
 
 /** Prefer the last still-open PR; otherwise the last resolved snapshot. */
-export const pickSessionPullRequestLifecycle = (
+export const pickSessionPullRequest = (
   snapshots: ReadonlyArray<PullRequestSnapshot | null>,
-): PullRequestLifecycle | undefined => {
-  let last: PullRequestLifecycle | undefined;
-  let lastOpen: PullRequestLifecycle | undefined;
+): PullRequestSnapshot | undefined => {
+  let last: PullRequestSnapshot | undefined;
+  let lastOpen: PullRequestSnapshot | undefined;
   for (const snapshot of snapshots) {
     if (snapshot === null) continue;
-    last = snapshot.lifecycle;
-    if (snapshot.lifecycle.type === "open") lastOpen = snapshot.lifecycle;
+    last = snapshot;
+    if (snapshot.lifecycle.type === "open") lastOpen = snapshot;
   }
   return lastOpen ?? last;
 };

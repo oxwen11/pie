@@ -5,6 +5,7 @@ import {
   ContextMenuPopup,
   ContextMenuTrigger,
 } from "@getpie/ui/components/context-menu";
+import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Pencil } from "lucide-react";
@@ -15,7 +16,8 @@ import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
- *  children render inside it. */
+ *  children render inside it. A hover `SidebarMenuAction` archives (or restores)
+ *  without opening the menu. */
 export function SessionActionsMenu({
   children,
   isActive,
@@ -63,6 +65,9 @@ export function SessionActionsMenu({
     onError: (error) => toast.error(`Failed to update session: ${error.message}`),
   });
 
+  const archiveLabel = session.archived ? "Restore" : "Archive";
+  const ArchiveIcon = session.archived ? ArchiveRestore : Archive;
+
   return (
     <>
       <ContextMenu>
@@ -79,11 +84,21 @@ export function SessionActionsMenu({
             disabled={setArchived.isPending}
             onClick={() => setArchived.mutate(!session.archived)}
           >
-            {session.archived ? <ArchiveRestore /> : <Archive />}
-            {session.archived ? "Restore" : "Archive"}
+            <ArchiveIcon />
+            {archiveLabel}
           </ContextMenuItem>
         </ContextMenuPopup>
       </ContextMenu>
+      <SidebarMenuAction
+        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent has-[+[data-sidebar=menu-action]]:right-7"
+        disabled={setArchived.isPending}
+        onClick={() => setArchived.mutate(!session.archived)}
+        showOnHover
+        title={archiveLabel}
+      >
+        <ArchiveIcon />
+        <span className="sr-only">{archiveLabel}</span>
+      </SidebarMenuAction>
       {/* Mounted only while open so the draft title starts from the current
           title every time, and unmounted before the menu's own exit animation
           has anywhere to put focus back. */}
