@@ -8,6 +8,7 @@ import { simpleGit } from "simple-git";
 import { describe, expect, it } from "vitest";
 
 import { PullRequestService } from "../src/pull-request";
+import { foldSessionStatuses } from "../src/pull-request/statuses";
 import { makeRpcTestHarness } from "./rpc-harness";
 
 async function makeRepository(): Promise<string> {
@@ -40,6 +41,7 @@ const snapshot: PullRequestSnapshot = {
 const quietPullRequestLayer = Layer.succeed(PullRequestService, {
   current: () => Effect.succeed(null),
   runAction: () => Effect.die("unexpected pull request action"),
+  sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, () => Effect.succeed(null)),
 });
 
 describe("pull request router", () => {
@@ -47,11 +49,12 @@ describe("pull request router", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
     const workspace = await makeRepository();
     let receivedCwd: string | undefined;
+    const current = (cwd: string) => {
+      receivedCwd = cwd;
+      return Effect.succeed(snapshot);
+    };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
-      current: (cwd) => {
-        receivedCwd = cwd;
-        return Effect.succeed(snapshot);
-      },
+      current,
       runAction: (cwd, _expected, action) => {
         receivedCwd = cwd;
         return Effect.succeed({
@@ -62,6 +65,7 @@ describe("pull request router", () => {
             : { appliedHeadSha: snapshot.head.sha }),
         });
       },
+      sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -98,12 +102,14 @@ describe("pull request router", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
     const workspace = await makeRepository();
     const receivedCwds: Array<string> = [];
+    const current = (cwd: string) => {
+      receivedCwds.push(cwd);
+      return Effect.succeed({ ...snapshot, lifecycle: { type: "merged" } as const });
+    };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
-      current: (cwd) => {
-        receivedCwds.push(cwd);
-        return Effect.succeed({ ...snapshot, lifecycle: { type: "merged" } as const });
-      },
+      current,
       runAction: () => Effect.die("unexpected pull request action"),
+      sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -127,16 +133,18 @@ describe("pull request router", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
     const workspace = await makeRepository();
     const received: Array<{ cwd: string; number: number | undefined }> = [];
+    const current = (cwd: string, pullRequest?: PullRequestSnapshot["ref"]) => {
+      received.push({ cwd, number: pullRequest?.number });
+      return Effect.succeed(
+        pullRequest === undefined
+          ? { ...snapshot, lifecycle: { type: "merged" } as const }
+          : { ...snapshot, lifecycle: { type: "open", draft: false } as const },
+      );
+    };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
-      current: (cwd, pullRequest) => {
-        received.push({ cwd, number: pullRequest?.number });
-        return Effect.succeed(
-          pullRequest === undefined
-            ? { ...snapshot, lifecycle: { type: "merged" } as const }
-            : { ...snapshot, lifecycle: { type: "open", draft: false } as const },
-        );
-      },
+      current,
       runAction: () => Effect.die("unexpected pull request action"),
+      sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
