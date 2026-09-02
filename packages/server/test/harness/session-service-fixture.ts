@@ -24,7 +24,7 @@ import {
 import { NodePlatformLayer } from "../platform";
 
 export type Spy = {
-  open: Array<{ cwd: string }>;
+  open: Array<{ cwd: string; provider?: string; modelId?: string }>;
   resume: Array<{ sessionId: string; cwd: string | undefined }>;
   close: Array<string>;
   prompts: UserInput[];
@@ -157,14 +157,18 @@ export const run = <A, E>(
           });
         const pi = {
           availability,
-          create: ({ cwd }) =>
+          create: (input) =>
             // Pi sees `cwd` and never a `SessionRef` — this line is the probe
             // for whether the identity reaches it anyway.
             whenAvailable(
               Effect.logDebug("pi creating").pipe(
                 Effect.andThen(
                   Effect.sync(() => {
-                    spy.open.push({ cwd });
+                    spy.open.push({
+                      cwd: input.cwd,
+                      ...(input.provider !== undefined ? { provider: input.provider } : undefined),
+                      ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
+                    });
                     opened += 1;
                     return makeSession(`native-${opened}`);
                   }),

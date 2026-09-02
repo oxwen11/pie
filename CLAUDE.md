@@ -39,10 +39,37 @@ read it before touching that app.
 
 ## Pull requests
 
-Use **squash merge** — one commit per PR keeps `main` readable. Don't mix
-merge-commit / rebase merges in the repo. Squash rewrites the branch tip out
-of `main`'s history, so deleting the local feature branch needs `git branch -D`
-— the changes are already on `main`, so it's safe.
+Split large changes and requirements into small slices **before coding**.
+Name the slices and their order first. One concern per PR — a reviewer
+should not need the rest of the feature in their head. Typical seams:
+contract/types → server → UI; extract → rewire → delete. Don't mix
+unrelated fixes, refactors, or docs. A one-line bugfix stays one PR.
+
+For anything that needs more than one slice, land it as a **stack** with
+`gh stack` — not one giant PR, and not disconnected `gh pr create` calls.
+
+```bash
+gh stack init feat/thing       # first slice, based on main
+# commit that slice
+gh stack add feat/thing-ui     # next branch on top
+# commit the next slice
+gh stack submit --auto         # push and open/update the stacked PRs
+```
+
+`gh stack submit` is the create/update step (`--auto` when unattended).
+After trunk moves: `gh stack sync` or `gh stack rebase`. Inspect with
+`gh stack view`.
+
+Use **squash merge** — one commit per PR keeps `main` readable. Merge a
+stack with `gh stack merge --squash` (`--yes` unattended). Don't mix
+merge-commit / rebase merges in the repo. Squash rewrites the branch tip
+out of `main`'s history, so deleting the local feature branch needs
+`git branch -D` — the changes are already on `main`, so it's safe.
+
+A UI change or UI bug needs an image or short video on the GitHub issue,
+PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh` ≥
+2.99.0). Capture with `pie-verify web|desktop evidence screenshot`; do not
+commit the files.
 
 ## Going deeper
 

@@ -30,6 +30,16 @@ const availableModels = [
   { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
   { id: "m2", name: "Model 2", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
 ];
+const providerFlag = process.argv.indexOf("--provider");
+const modelFlag = process.argv.indexOf("--model");
+if (providerFlag !== -1 && modelFlag !== -1) {
+  const provider = process.argv[providerFlag + 1];
+  const modelId = process.argv[modelFlag + 1];
+  const named = availableModels.find((m) => m.provider === provider && m.id === modelId);
+  currentModel = named
+    ? { provider: named.provider, modelId: named.id, name: named.name }
+    : { provider, modelId, name: modelId };
+}
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
@@ -385,6 +395,22 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
       const after = yield* agent.session.getModelState(sessionId);
       assert.deepEqual(after, { provider: "p", modelId: "m2", name: "Model 2" });
+
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("create starts Pi on the requested model", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({
+        cwd: "/tmp",
+        provider: "p",
+        modelId: "m2",
+      });
+
+      const state = yield* agent.session.getModelState(sessionId);
+      assert.deepEqual(state, { provider: "p", modelId: "m2", name: "Model 2" });
 
       yield* agent.session.abort(sessionId);
     }),

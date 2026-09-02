@@ -51,6 +51,51 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
+  it("appends unique pull request refs without replacing earlier ones", async () => {
+    const first = {
+      host: "github.com",
+      owner: "getpie",
+      repository: "pie",
+      number: 99,
+    };
+    const second = { ...first, number: 109 };
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+        });
+        yield* fixture.service.rememberPullRequestRef(ref, first);
+        yield* fixture.service.rememberPullRequestRef(ref, first);
+        yield* fixture.service.rememberPullRequestRef(ref, second);
+        return {
+          listed: yield* fixture.service.pullRequestRefsFor(ref),
+          stored: yield* fixture.repo.read(ref.projectId, ref.sessionId),
+        };
+      }),
+    );
+    expect(result.listed).toEqual([first, second]);
+    expect(result.stored.pullRequestRefs).toEqual([first, second]);
+  });
+
+  it("the first prompt opens Pi with the model stored at create", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          model: { provider: "p", modelId: "m2" },
+        });
+        const before = yield* fixture.service.getModelState(ref);
+        yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
+        yield* Effect.sleep("50 millis");
+        return { before, open: fixture.spy.open };
+      }),
+    );
+    expect(result.before).toEqual({ provider: "p", modelId: "m2" });
+    expect(result.open).toEqual([{ cwd: "/tmp/pie-app", provider: "p", modelId: "m2" }]);
+  });
+
   it("create succeeds without opening Pi even when the agent is unavailable", async () => {
     const result = await run({ unavailable: "not installed" }, (fixture) =>
       Effect.gen(function* () {

@@ -756,10 +756,6 @@ importers:
   tools/typescript: {}
 
   tools/verify:
-    dependencies:
-      agent-browser:
-        specifier: 0.36.0
-        version: 0.36.0
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*
@@ -4626,11 +4622,6 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
-
-  agent-browser@0.36.0:
-    resolution: {integrity: sha512-Ljjj4nRKUEqtrFF0pgev8lxTfC79tNgPj67sNi6BLnUAWIG8y9Cu2VQIeZ0MY3N2fTQagoBlfQ/pUY/4NWPD3w==}
-    engines: {node: '>=24.0.0', pnpm: '>=11.0.0'}
-    hasBin: true
 
   agent-cli-detector@0.1.6:
     resolution: {integrity: sha512-vKrPeEVN3upDF3GjWxsWBbwQgMtNJ8VB1cduPvK3svmmz4ENpS7yaPxbogsbe3w+xp9xp2Cu+0Ar41rjAR4+lA==}
@@ -11933,8 +11924,6 @@ snapshots:
   acorn@8.17.0: {}
 
   agent-base@7.1.4: {}
-
-  agent-browser@0.36.0: {}
 
   agent-cli-detector@0.1.6: {}
 

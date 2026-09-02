@@ -11,14 +11,26 @@ export {
 export type { DaemonRecord } from "./daemon.ts";
 export {
   agentBrowser,
+  agentBrowserIsolation,
+  applyBrowserEnv,
+  browserConfigForEnv,
   browserNeedsIsolation,
   buildAgentBrowserArgv,
-  forwardAgentBrowser,
+  ensureBrowserEnvDirs,
+  formatBrowserEnv,
   resolveAgentBrowserBin,
+  resolveBrowserEnv,
+  resolveIsolatedChromeExecutable,
   saveScreenshot,
   saveSnapshot,
 } from "./browser.ts";
-export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
+export type {
+  AgentBrowserConfig,
+  AgentBrowserOptions,
+  AgentBrowserTarget,
+  BrowserEnvInput,
+  BrowserEnvVars,
+} from "./browser.ts";
 export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";
 export { VerifyError, fail, usage } from "./fail.ts";
 export {

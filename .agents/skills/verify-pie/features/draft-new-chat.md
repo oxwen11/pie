@@ -16,13 +16,13 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 - Sidebar **New chat** (clears to a fresh draft).
 - Per-project compose: **New chat in \<name\>** (sr-only on the folder's pen). Lands on `/draft?projectId=<that project>`.
 
-## Driving it with pie-verify
+## Driving it with agent-browser
 
 Prerequisite: a Project (see [import-project.md](import-project.md)). Isolated launch + import of `verify-pie-sample` is enough. That sample is **not** a git repo, so you should see **Not a Git repository** and no worktree picker.
 
 ```bash
-pnpm exec pie-verify web browser open http://localhost:4190/draft
-pnpm exec pie-verify web browser snapshot
+agent-browser open http://localhost:4190/draft
+agent-browser wait --text "Ask Pi anything..."
 ```
 
 1. Confirm card heading **New chat** and the project name as supporting text once a project is selected.

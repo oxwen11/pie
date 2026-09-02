@@ -1,9 +1,5 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import type {
-  PullRequestLifecycle,
-  PullRequestSessionStatus,
-  PullRequestSnapshot,
-} from "@getpie/contract/pull-request";
+import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -15,24 +11,31 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
-import { ProjectSessionRow } from "@/features/projects/project-session-row";
+import {
+  ProjectSessionRow,
+  type SessionPullRequest,
+} from "@/features/projects/project-session-row";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
-const EMPTY_PULL_REQUEST_STATUSES = new Map<string, PullRequestLifecycle>();
+const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
 
 const selectPullRequestStatuses = (
   statuses: ReadonlyArray<PullRequestSessionStatus>,
-): ReadonlyMap<string, PullRequestLifecycle> =>
-  new Map(statuses.map((status) => [status.ref.sessionId, status.lifecycle]));
+): ReadonlyMap<string, SessionPullRequest> =>
+  new Map(
+    statuses.map((status) => [
+      status.ref.sessionId,
+      { lifecycle: status.lifecycle, url: status.url },
+    ]),
+  );
 
-const selectPullRequestLifecycle = (
-  snapshot: PullRequestSnapshot | null,
-): PullRequestLifecycle | null => snapshot?.lifecycle ?? null;
+const selectPullRequest = (snapshot: PullRequestSnapshot | null): SessionPullRequest | null =>
+  snapshot === null ? null : { lifecycle: snapshot.lifecycle, url: snapshot.url };
 
 // Newest-first: a session is opened right after it is created. Module scope
 // keeps `select` referentially stable across renders.
@@ -67,6 +70,7 @@ export function ProjectSessionsGroup({
   const pullRequestStatuses = useQuery({
     ...orpcQueryUtils.pullRequest.statuses.queryOptions({ input: { refs } }),
     enabled: refs.length > 0,
+    placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
   });
   const activeSession = rows.find(isSessionActive);
@@ -74,11 +78,9 @@ export function ProjectSessionsGroup({
     ...orpcQueryUtils.pullRequest.current.queryOptions({
       input: activeSession === undefined ? skipToken : { ref: activeSession },
     }),
-    select: selectPullRequestLifecycle,
+    select: selectPullRequest,
   });
-  const statusBySessionId = pullRequestStatuses.isError
-    ? EMPTY_PULL_REQUEST_STATUSES
-    : (pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES);
+  const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
 
   return (
     <Collapsible defaultOpen>
@@ -120,20 +122,13 @@ export function ProjectSessionsGroup({
             <SidebarMenu>
               {rows.map((session) => {
                 const active = isSessionActive(session);
-                const listedLifecycle = statusBySessionId.get(session.sessionId);
-                const pullRequestLifecycle = active
-                  ? activePullRequest.isError
-                    ? undefined
-                    : activePullRequest.data === undefined
-                      ? listedLifecycle
-                      : (activePullRequest.data ?? undefined)
-                  : listedLifecycle;
+                const listed = statusBySessionId.get(session.sessionId);
                 return (
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
                     isActive={() => isSessionActive(session)}
-                    pullRequestLifecycle={pullRequestLifecycle ?? undefined}
+                    pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}
                   />
                 );

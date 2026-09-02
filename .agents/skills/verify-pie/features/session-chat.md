@@ -17,12 +17,12 @@
 - Click a session row in the sidebar.
 - Revisit a bookmarked `/session/<uuid>` (optionally `?projectId=`).
 
-## Driving it with pie-verify
+## Driving it with agent-browser
 
 ```bash
 # after a draft send, or:
-pnpm exec pie-verify web browser open 'http://localhost:4190/session/<sessionId>?projectId=<projectId>'
-pnpm exec pie-verify web browser snapshot
+agent-browser open "http://localhost:4190/session/<sessionId>?projectId=<projectId>"
+agent-browser wait --url "**/session/**"
 ```
 
 Follow-up prompt:

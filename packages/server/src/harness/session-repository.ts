@@ -1,3 +1,4 @@
+import { PullRequestRefSchema } from "@getpie/contract/pull-request";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Effect, Option, Schema } from "effect";
 
@@ -11,6 +12,7 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -41,6 +43,9 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
     : undefined),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
+  ...(metadata.pullRequestRefs !== undefined && metadata.pullRequestRefs.length > 0
+    ? { pullRequestRefs: metadata.pullRequestRefs }
+    : undefined),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),

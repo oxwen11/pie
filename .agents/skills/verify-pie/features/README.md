@@ -2,7 +2,7 @@
 
 Source of truth for what a pie web proof must cover. Each file is one user-facing feature. A run that only exercises the easiest entry point is incomplete when the file lists others.
 
-Primary surface: Vite app at `http://localhost:4190/`. Harness: `pnpm exec pie-verify web browser`.
+Primary surface: Vite app at `http://localhost:4190/`. After `pie-verify web launch`, drive with **`agent-browser`** (repo shim loads the current run). Steps are in the parent `SKILL.md` Drive section and each feature file below.
 
 | Feature | File | User entry |
 | --- | --- | --- |

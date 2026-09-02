@@ -14,7 +14,7 @@ export function SessionStatusIndicator({ phase }: { readonly phase: SessionPhase
           data-state="loading"
           title="A turn is running in this session"
         >
-          <PieLoader size={10} aria-label="A turn is running in this session" />
+          <PieLoader aria-label="A turn is running in this session" />
         </span>
       );
     case "requires_action":

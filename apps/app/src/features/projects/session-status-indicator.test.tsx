@@ -28,14 +28,17 @@ afterEach(() => {
   container = undefined;
 });
 
+const PR_URL = "https://github.com/getpie/pie/pull/42";
+
 const renderPullRequestIndicator = (
   lifecycle: Parameters<typeof SessionPullRequestIndicator>[0]["lifecycle"],
+  url: string | undefined = PR_URL,
 ) => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(createElement(SessionPullRequestIndicator, { lifecycle }));
+    root?.render(createElement(SessionPullRequestIndicator, { lifecycle, url }));
   });
   return container;
 };
@@ -50,7 +53,8 @@ describe("SessionStatusIndicator", () => {
     expect(loader).not.toBeNull();
     expect(loader?.getAttribute("role")).toBe("status");
     expect(loader?.getAttribute("aria-label")).toBe("A turn is running in this session");
-    expect(loader?.style.getPropertyValue("--dot-grid-size")).toBe("10px");
+    // Size comes from the --dot-grid-size theme value in index.css, not an inline override.
+    expect(loader?.style.getPropertyValue("--dot-grid-size")).toBe("");
   });
 
   it("shows an accessible amber dot while waiting for user action", () => {
@@ -112,8 +116,11 @@ describe("SessionPullRequestIndicator", () => {
 
     for (const [lifecycle, label, iconClass, colorClass] of cases) {
       const node = renderPullRequestIndicator(lifecycle);
-      const indicator = node.querySelector('[role="img"]');
+      const indicator = node.querySelector('[data-slot="sidebar-menu-action"]');
+      expect(indicator?.tagName).toBe("SPAN");
       expect(indicator?.getAttribute("aria-label")).toBe(label);
+      expect(indicator?.getAttribute("title")).toBe(label);
+      expect(indicator?.getAttribute("role")).toBe("img");
       expect(indicator?.classList.contains(colorClass)).toBe(true);
       expect(indicator?.querySelector("svg")?.classList.contains(iconClass)).toBe(true);
       act(() => root?.unmount());
@@ -124,6 +131,12 @@ describe("SessionPullRequestIndicator", () => {
   });
 
   it("renders nothing without a current pull request status", () => {
-    expect(renderPullRequestIndicator(undefined).childElementCount).toBe(0);
+    expect(renderPullRequestIndicator(undefined, undefined).childElementCount).toBe(0);
+  });
+
+  it("renders no link to navigate to the pull request", () => {
+    const node = renderPullRequestIndicator({ type: "open", draft: false });
+    expect(node.querySelector("a")).toBeNull();
+    expect(node.querySelector("button")).toBeNull();
   });
 });

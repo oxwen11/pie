@@ -40,11 +40,13 @@
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root
   `devDependency`) is the Node 24 TypeScript helper for isolated web / CLI /
   desktop proofs. Skills call one command:
-  `pnpm exec pie-verify web|cli|desktop …`. `agent-browser` is a
-  dependency of `@getpie/verify` (native binary via postinstall). Drive
-  the SPA with `pie-verify web browser` / `pie-verify desktop browser`
-  (isolated session; desktop also injects `--cdp`). Do not call
-  `agent-browser` on PATH. `pie-verify cli` has no browser. Isolation roots are
+  `pnpm exec pie-verify web|cli|desktop …`. `agent-browser` is a mise
+  tool (`aqua:vercel-labs/agent-browser` in `mise.toml`). After
+  `pie-verify web|desktop launch`, call `agent-browser` — the repo shim
+  (`tools/verify/bin/agent-browser`, on PATH via mise `[env] _.path`)
+  loads the current run's native agent-browser env (session, namespace,
+  sockets, Chrome or CDP) and execs the mise binary. Do not `npm i -g
+  agent-browser`. `pie-verify cli` has no browser. Isolation roots are
   `/tmp/pie-verify-web|cli|desktop` (override with `VERIFY_PIE_ROOT` /
   `VERIFY_PIE_CLI_ROOT` / `VERIFY_PIE_DESKTOP_ROOT`). The skill trees under
   `.agents/skills/verify-pie{,-cli,-desktop}` are cold-start recipes and

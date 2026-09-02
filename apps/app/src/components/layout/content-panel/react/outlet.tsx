@@ -67,7 +67,7 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-10">
+    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12">
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last

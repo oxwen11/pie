@@ -11,6 +11,7 @@ import type {
   SessionCapabilities,
   SessionWorkspace,
 } from "@getpie/contract";
+import type { PullRequestRef } from "@getpie/contract/pull-request";
 import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer, Semaphore } from "effect";
 
@@ -84,6 +85,12 @@ const toSessionWorkspace = (metadata: SessionWithCwd): SessionWorkspace => ({
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
 });
 
+const samePullRequestRef = (left: PullRequestRef, right: PullRequestRef): boolean =>
+  left.host === right.host &&
+  left.owner === right.owner &&
+  left.repository === right.repository &&
+  left.number === right.number;
+
 export type CreatePiSessionInput = {
   readonly projectId: string;
   readonly cwd: string;
@@ -120,6 +127,13 @@ export type PiAgentSessionServiceShape = {
   readonly archive: (
     ref: SessionRef,
     archived: boolean,
+  ) => Effect.Effect<void, SessionNotFound | StoreReadError | StoreWriteError>;
+  readonly pullRequestRefsFor: (
+    ref: SessionRef,
+  ) => Effect.Effect<ReadonlyArray<PullRequestRef>, SessionNotFound | StoreReadError>;
+  readonly rememberPullRequestRef: (
+    ref: SessionRef,
+    pullRequest: PullRequestRef,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | StoreWriteError>;
   readonly list: (
     projectId: string,
@@ -526,6 +540,29 @@ export const makePiAgentSessionService = (deps: {
                 )
               : Effect.void;
             return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
+          }),
+        ),
+      ).pipe(inSession(ref)),
+
+    pullRequestRefsFor: (ref) =>
+      readMetadata(ref).pipe(
+        Effect.map((metadata) => metadata.pullRequestRefs ?? []),
+        inSession(ref),
+      ),
+
+    rememberPullRequestRef: (ref, pullRequest) =>
+      withMetadataMutation(
+        ref,
+        readMetadata(ref).pipe(
+          Effect.flatMap((metadata) => {
+            const existing = metadata.pullRequestRefs ?? [];
+            if (existing.some((candidate) => samePullRequestRef(candidate, pullRequest))) {
+              return Effect.void;
+            }
+            return repo.write({
+              ...metadata,
+              pullRequestRefs: [...existing, pullRequest],
+            });
           }),
         ),
       ).pipe(inSession(ref)),
