@@ -2,6 +2,7 @@ import type {
   AgentRequest,
   PromptPart,
   SessionMessageChunkEvent,
+  SessionPendingPrompt,
   SessionPhase,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
@@ -47,6 +48,9 @@ export class FakeTransport implements ChatSessionTransport {
   promptGate: Promise<void> | null = null;
   responded: Array<{ requestId: string; response: AgentResponse }> = [];
   interruptCalls = 0;
+  replaceQueueCalls: SessionPendingPrompt[] = [];
+  replaceQueueError: Error | null = null;
+  replaceQueueGate: Promise<void> | null = null;
 
   subscribe(onEvent: (event: ChatTransportEvent) => void): () => void {
     this.onEvent = onEvent;
@@ -74,6 +78,11 @@ export class FakeTransport implements ChatSessionTransport {
   };
   interrupt = async () => {
     this.interruptCalls += 1;
+  };
+  replaceQueue = async (pending: SessionPendingPrompt) => {
+    this.replaceQueueCalls.push(pending);
+    if (this.replaceQueueGate) await this.replaceQueueGate;
+    if (this.replaceQueueError) throw this.replaceQueueError;
   };
 }
 

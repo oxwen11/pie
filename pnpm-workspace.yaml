@@ -118,4 +118,9 @@ patchedDependencies:
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
+  # Pi 0.84.2's SDK has session.clearQueue() (TUI Escape) but the RPC
+  # command table does not. The patch adds `clear_queue` so pie can
+  # rewrite the native queue (edit/delete a row = clear + re-steer /
+  # re-follow_up). Drop this when a published Pi exposes the command.
+  "@earendil-works/pi-coding-agent@0.84.2": patches/@earendil-works__pi-coding-agent@0.84.2.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

@@ -138,6 +138,7 @@ overrides:
   effect: 4.0.0-rc.110
 
 patchedDependencies:
+  '@earendil-works/pi-coding-agent@0.84.2': 6a737d11996d84d66d801b92de0757b1f314744f71f5daca51b1030399a1f68b
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
 importers:
@@ -523,7 +524,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.84.2
-        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
+        version: 0.84.2(patch_hash=6a737d11996d84d66d801b92de0757b1f314744f71f5daca51b1030399a1f68b)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -541,7 +542,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.84.2
-        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
+        version: 0.84.2(patch_hash=6a737d11996d84d66d801b92de0757b1f314744f71f5daca51b1030399a1f68b)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
       '@effect/platform-node':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -587,7 +588,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.84.2
-        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
+        version: 0.84.2(patch_hash=6a737d11996d84d66d801b92de0757b1f314744f71f5daca51b1030399a1f68b)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
       '@effect/platform-node':
         specifier: 4.0.0-rc.110
         version: 4.0.0-rc.110(effect@4.0.0-rc.110)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -9336,7 +9337,7 @@ snapshots:
     dependencies:
       '@earendil-works/pi-protocol': 0.84.2
 
-  '@earendil-works/pi-coding-agent@0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)':
+  '@earendil-works/pi-coding-agent@0.84.2(patch_hash=6a737d11996d84d66d801b92de0757b1f314744f71f5daca51b1030399a1f68b)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)':
     dependencies:
       '@earendil-works/pi-agent-core': 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)
       '@earendil-works/pi-ai': 0.84.2(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.2))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.2)

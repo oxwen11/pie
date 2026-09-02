@@ -222,6 +222,18 @@ export const sessionRouter = orpc.router({
       }),
     );
   }),
+  replaceQueue: orpc.replaceQueue.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    yield* sessions.replaceQueue(input).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
   respondToAgentRequest: orpc.respondToAgentRequest.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     yield* sessions.respondToAgentRequest(input.ref, input.requestId, input.response).pipe(
