@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   AutomationSchema,
+  automationSessionOf,
   countFiredRuns,
   CreateAutomationInputSchema,
   firedRunCount,
   MAX_AUTOMATION_EVERY_MS,
   MAX_AUTOMATION_MAX_RUNS,
   MIN_AUTOMATION_EVERY_MS,
+  persistAutomationSession,
   reachedMaxRuns,
+  reuseSessionIdOf,
   UpdateAutomationInputSchema,
 } from "../src/automation";
 
@@ -19,17 +22,35 @@ const accepts = <A>(schema: Schema.ConstraintDecoder<A>, value: unknown): boolea
   Exit.isSuccess(Schema.decodeUnknownExit(schema)(value));
 
 describe("CreateAutomationInput", () => {
-  it("accepts every, timezone cron, and reused session", () => {
+  it("accepts every, timezone cron, and a reused session", () => {
     expect(
       accepts(CreateAutomationInputSchema, {
         name: "Nightly",
         projectId: UUID,
         prompt: "review",
         spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS },
-        sessionMode: "reuse",
+        session: { type: "reuse", sessionId: UUID },
         expiresAt: "2026-12-01T00:00:00.000Z",
         maxRuns: 3,
         runNow: true,
+      }),
+    ).toBe(true);
+    expect(
+      accepts(CreateAutomationInputSchema, {
+        name: "First run",
+        projectId: UUID,
+        prompt: "review",
+        spec: { kind: "manual" },
+        session: { type: "reuse" },
+      }),
+    ).toBe(true);
+    expect(
+      accepts(CreateAutomationInputSchema, {
+        name: "Fresh",
+        projectId: UUID,
+        prompt: "review",
+        spec: { kind: "manual" },
+        session: { type: "new" },
       }),
     ).toBe(true);
     expect(
@@ -75,6 +96,16 @@ describe("CreateAutomationInput", () => {
       accepts(CreateAutomationInputSchema, { ...base, maxRuns: MAX_AUTOMATION_MAX_RUNS + 1 }),
     ).toBe(false);
     expect(accepts(UpdateAutomationInputSchema, { id: UUID, maxRuns: null })).toBe(true);
+  });
+});
+
+describe("AutomationSession helpers", () => {
+  it("defaults omitted session to new and persists only reuse", () => {
+    expect(automationSessionOf({})).toEqual({ type: "new" });
+    expect(reuseSessionIdOf({ type: "reuse", sessionId: UUID })).toBe(UUID);
+    expect(reuseSessionIdOf({ type: "new" })).toBeUndefined();
+    expect(persistAutomationSession({ type: "new" })).toEqual({});
+    expect(persistAutomationSession({ type: "reuse" })).toEqual({ session: { type: "reuse" } });
   });
 });
 

@@ -1,10 +1,10 @@
 import type {
   Automation,
-  AutomationSessionMode,
   AutomationPauseReason,
   AutomationRun,
   AutomationRunReason,
   AutomationRunSnapshot,
+  AutomationSession,
   AutomationSkipReason,
   CreateAutomationInput,
   CreateWorktreeInput,
@@ -14,10 +14,13 @@ import type {
 } from "@getpie/contract";
 import {
   AUTOMATION_CIRCUIT_FAILURES,
+  automationSessionOf,
   countsTowardMaxRuns,
   firedRunCount,
   MAX_AUTOMATIONS,
+  persistAutomationSession,
   reachedMaxRuns,
+  reuseSessionIdOf,
 } from "@getpie/contract";
 import { Context, Crypto, Effect, Layer, Result, Semaphore } from "effect";
 
@@ -144,15 +147,12 @@ const compareDue = (a: Automation, b: Automation): number => {
 const titleFromName = (name: string): string =>
   name.length > TITLE_CHARS ? name.slice(0, TITLE_CHARS) : name;
 
-const sessionModeOf = (automation: Pick<Automation, "sessionMode">): AutomationSessionMode =>
-  automation.sessionMode ?? "new";
-
 const snapshotOf = (automation: Automation): AutomationRunSnapshot => ({
   name: automation.name,
   prompt: automation.prompt,
   projectId: automation.projectId,
   spec: automation.spec,
-  sessionMode: sessionModeOf(automation),
+  session: automationSessionOf(automation),
   ...(automation.worktree !== undefined ? { worktree: automation.worktree } : undefined),
   ...(automation.provider !== undefined ? { provider: automation.provider } : undefined),
   ...(automation.modelId !== undefined ? { modelId: automation.modelId } : undefined),
@@ -409,14 +409,14 @@ export const makeAutomationService = (deps: {
 
   const fireSession = (
     snapshot: AutomationRunSnapshot,
-    reuseSessionId: string | undefined,
   ): Effect.Effect<
     SessionRef,
     ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
   > =>
     Effect.gen(function* () {
       const project = yield* projects.findById(snapshot.projectId);
-      if (snapshot.sessionMode === "reuse" && reuseSessionId !== undefined) {
+      const reuseSessionId = reuseSessionIdOf(snapshot.session);
+      if (snapshot.session.type === "reuse" && reuseSessionId !== undefined) {
         const ref = { projectId: snapshot.projectId, sessionId: reuseSessionId };
         const found = yield* sessions.find(ref);
         if (found !== null && !found.archived) {
@@ -547,10 +547,7 @@ export const makeAutomationService = (deps: {
       }
 
       inFlight.add(automation.id);
-      const outcome: FireSessionOutcome = yield* fireSession(
-        snapshot,
-        automation.reuseSessionId,
-      ).pipe(
+      const outcome: FireSessionOutcome = yield* fireSession(snapshot).pipe(
         Effect.map((ref): FireSessionOutcome => ({ kind: "ready", ref })),
         Effect.catchTag("ProjectNotFound", () =>
           Effect.succeed({
@@ -640,8 +637,8 @@ export const makeAutomationService = (deps: {
       const started = yield* record(
         {
           ...automation,
-          ...(snapshot.sessionMode === "reuse"
-            ? { reuseSessionId: outcome.ref.sessionId }
+          ...(snapshot.session.type === "reuse"
+            ? { session: { type: "reuse" as const, sessionId: outcome.ref.sessionId } }
             : undefined),
         },
         {
@@ -663,7 +660,7 @@ export const makeAutomationService = (deps: {
           automationId: automation.id,
           sessionId: outcome.ref.sessionId,
           reason,
-          sessionMode: snapshot.sessionMode,
+          sessionType: snapshot.session.type,
           specKind: snapshot.spec.kind,
         },
       });
@@ -709,6 +706,27 @@ export const makeAutomationService = (deps: {
       });
     });
 
+  const trySession = (
+    projectId: string,
+    session: AutomationSession | undefined,
+  ): Effect.Effect<void, StoreReadError | InvalidAutomation> => {
+    const sessionId = session === undefined ? undefined : reuseSessionIdOf(session);
+    if (session === undefined || session.type === "new" || sessionId === undefined) {
+      return Effect.void;
+    }
+    return sessions.find({ projectId, sessionId }).pipe(
+      Effect.flatMap((found) => {
+        if (found === null) {
+          return Effect.fail(new InvalidAutomation({ reason: "session not found" }));
+        }
+        if (found.archived) {
+          return Effect.fail(new InvalidAutomation({ reason: "session is archived" }));
+        }
+        return Effect.void;
+      }),
+    );
+  };
+
   return {
     list: () =>
       repo
@@ -720,6 +738,7 @@ export const makeAutomationService = (deps: {
     create: (input) =>
       Effect.gen(function* () {
         yield* projects.findById(input.projectId);
+        yield* trySession(input.projectId, input.session);
         const createdAt = now();
         yield* tryValidate(input.spec, createdAt, input.expiresAt);
         const existing = yield* repo.list();
@@ -741,7 +760,7 @@ export const makeAutomationService = (deps: {
           updatedAt: createdIso,
           nextRunAt: iso(next),
           runs: [],
-          ...(input.sessionMode !== undefined ? { sessionMode: input.sessionMode } : undefined),
+          ...persistAutomationSession(input.session),
           ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
           ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
           ...(worktree !== undefined ? { worktree } : undefined),
@@ -755,7 +774,7 @@ export const makeAutomationService = (deps: {
           annotations: {
             automationId: id,
             specKind: input.spec.kind,
-            sessionMode: sessionModeOf(automation),
+            sessionType: automationSessionOf(automation).type,
             ...(input.runNow === true ? { runNow: true } : undefined),
           },
         });
@@ -773,6 +792,7 @@ export const makeAutomationService = (deps: {
           pauseReason: _pauseReason,
           expiresAt: _expiresAt,
           maxRuns: _maxRuns,
+          session: currentSession,
           ...currentRest
         } = current;
         const updatedAt = now();
@@ -789,6 +809,9 @@ export const makeAutomationService = (deps: {
             : input.maxRuns === null
               ? undefined
               : input.maxRuns;
+        if (input.session !== undefined) {
+          yield* trySession(current.projectId, input.session);
+        }
         if (input.spec !== undefined || input.expiresAt !== undefined || input.enabled === true) {
           yield* tryValidate(spec, updatedAt, expiresAt);
         }
@@ -797,7 +820,7 @@ export const makeAutomationService = (deps: {
         const provider = input.provider ?? current.provider;
         const modelId = input.modelId ?? current.modelId;
         const enabled = input.enabled ?? current.enabled;
-        const sessionMode = input.sessionMode ?? current.sessionMode;
+        const session = input.session ?? currentSession;
         const updated: Automation = {
           ...currentRest,
           name: input.name ?? current.name,
@@ -806,7 +829,7 @@ export const makeAutomationService = (deps: {
           enabled,
           updatedAt: new Date(updatedAt).toISOString(),
           nextRunAt: enabled ? iso(next) : current.nextRunAt,
-          ...(sessionMode !== undefined ? { sessionMode } : undefined),
+          ...persistAutomationSession(session),
           ...(expiresAt !== undefined ? { expiresAt } : undefined),
           ...(maxRuns !== undefined ? { maxRuns } : undefined),
           ...(worktree !== undefined ? { worktree } : undefined),

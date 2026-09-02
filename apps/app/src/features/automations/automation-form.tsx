@@ -1,4 +1,4 @@
-import type { Project, Automation, AutomationSessionMode, AutomationSpec } from "@getpie/contract";
+import type { Project, Automation, AutomationSession, AutomationSpec } from "@getpie/contract";
 import {
   MAX_AUTOMATION_MAX_RUNS,
   MAX_AUTOMATION_NAME_CHARS,
@@ -39,7 +39,7 @@ export type AutomationFormSubmit = {
   readonly prompt: string;
   readonly spec: AutomationSpec;
   readonly worktree: boolean;
-  readonly sessionMode: AutomationSessionMode;
+  readonly session: AutomationSession;
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
@@ -53,6 +53,12 @@ export type AutomationFormProps = {
   readonly onCancel: () => void;
 };
 
+function sessionFromForm(reuseSession: boolean, initial?: Automation): AutomationSession {
+  if (!reuseSession) return { type: "new" };
+  const sessionId = initial?.session?.type === "reuse" ? initial.session.sessionId : undefined;
+  return sessionId !== undefined ? { type: "reuse", sessionId } : { type: "reuse" };
+}
+
 function formFromAutomation(
   projects: ReadonlyArray<Pick<Project, "id" | "name">>,
   initial?: Automation,
@@ -65,7 +71,7 @@ function formFromAutomation(
     name: initial.name,
     prompt: initial.prompt,
     worktree: initial.worktree !== undefined,
-    reuseSession: initial.sessionMode === "reuse",
+    reuseSession: initial.session?.type === "reuse",
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
@@ -122,7 +128,7 @@ export function AutomationForm({
             prompt: form.prompt.trim(),
             spec,
             worktree: form.worktree,
-            sessionMode: form.reuseSession ? "reuse" : "new",
+            session: sessionFromForm(form.reuseSession, initial),
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,

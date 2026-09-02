@@ -51,8 +51,34 @@ export const AutomationSpecSchema = Schema.Union([
 ]);
 export type AutomationSpec = typeof AutomationSpecSchema.Type;
 
-export const AutomationSessionModeSchema = Schema.Literals(["new", "reuse"]);
-export type AutomationSessionMode = typeof AutomationSessionModeSchema.Type;
+export const AutomationSessionNewSchema = Schema.Struct({
+  type: Schema.Literal("new"),
+});
+export const AutomationSessionReuseSchema = Schema.Struct({
+  type: Schema.Literal("reuse"),
+  sessionId: Schema.optionalKey(Schema.String),
+});
+export const AutomationSessionSchema = Schema.Union([
+  AutomationSessionNewSchema,
+  AutomationSessionReuseSchema,
+]);
+export type AutomationSession = typeof AutomationSessionSchema.Type;
+
+export function automationSessionOf(automation: {
+  readonly session?: AutomationSession;
+}): AutomationSession {
+  return automation.session ?? { type: "new" };
+}
+
+export function reuseSessionIdOf(session: AutomationSession): string | undefined {
+  return session.type === "reuse" ? session.sessionId : undefined;
+}
+
+export function persistAutomationSession(session: AutomationSession | undefined): {
+  readonly session?: AutomationSession;
+} {
+  return session?.type === "reuse" ? { session } : {};
+}
 
 export const AutomationPauseReasonSchema = Schema.Literals([
   "manual",
@@ -108,7 +134,7 @@ export const AutomationRunSnapshotSchema = Schema.Struct({
   prompt: Schema.String,
   projectId: Schema.String,
   spec: AutomationSpecSchema,
-  sessionMode: AutomationSessionModeSchema,
+  session: AutomationSessionSchema,
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
@@ -142,7 +168,7 @@ export const AutomationSchema = Schema.Struct({
   prompt: Schema.String,
   spec: AutomationSpecSchema,
   enabled: Schema.Boolean,
-  sessionMode: Schema.optionalKey(AutomationSessionModeSchema),
+  session: Schema.optionalKey(AutomationSessionSchema),
   expiresAt: Schema.optionalKey(Schema.String),
   maxRuns: Schema.optionalKey(automationMaxRuns),
   firedCount: Schema.optionalKey(
@@ -150,7 +176,6 @@ export const AutomationSchema = Schema.Struct({
   ),
   pauseReason: Schema.optionalKey(AutomationPauseReasonSchema),
   consecutiveFailures: Schema.optionalKey(Schema.Number),
-  reuseSessionId: Schema.optionalKey(Schema.String),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
   provider: Schema.optionalKey(Schema.NonEmptyString),
   modelId: Schema.optionalKey(Schema.NonEmptyString),
@@ -217,7 +242,7 @@ export const CreateAutomationInputSchema = Schema.Struct({
   prompt: automationPrompt,
   spec: AutomationSpecSchema,
   enabled: Schema.optionalKey(Schema.Boolean),
-  sessionMode: Schema.optionalKey(AutomationSessionModeSchema),
+  session: Schema.optionalKey(AutomationSessionSchema),
   expiresAt: Schema.optionalKey(Schema.String),
   maxRuns: Schema.optionalKey(automationMaxRuns),
   runNow: Schema.optionalKey(Schema.Boolean),
@@ -233,7 +258,7 @@ export const UpdateAutomationInputSchema = Schema.Struct({
   prompt: Schema.optionalKey(automationPrompt),
   spec: Schema.optionalKey(AutomationSpecSchema),
   enabled: Schema.optionalKey(Schema.Boolean),
-  sessionMode: Schema.optionalKey(AutomationSessionModeSchema),
+  session: Schema.optionalKey(AutomationSessionSchema),
   expiresAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   maxRuns: Schema.optionalKey(Schema.NullOr(automationMaxRuns)),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),

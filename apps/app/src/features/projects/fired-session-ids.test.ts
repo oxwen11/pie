@@ -22,7 +22,7 @@ describe("collectFiredSessionIds", () => {
         ...base,
         id: "00000000-0000-0000-0000-0000000000aa",
         lastSessionId: "sess-last",
-        reuseSessionId: "sess-reuse",
+        session: { type: "reuse", sessionId: "sess-reuse" },
         runs: [
           {
             id: "run-1",

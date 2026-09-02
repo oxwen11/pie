@@ -382,7 +382,7 @@ describe("AutomationService", () => {
     expect(after?.runs[0]?.skipReason).toBe("expired");
   });
 
-  it("reuses one session in reuse mode and creates again after archive", async () => {
+  it("reuses one session and creates again after archive", async () => {
     let archived = false;
     const h = setup({
       sessions: {
@@ -390,16 +390,67 @@ describe("AutomationService", () => {
       },
     });
     const created = await run(
-      h.service.create(cronInput({ sessionMode: "reuse", spec: { kind: "manual" } })),
+      h.service.create(cronInput({ session: { type: "reuse" }, spec: { kind: "manual" } })),
     );
     await run(h.service.runNow(created.id));
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(1);
-    expect(h.store.get(created.id)?.reuseSessionId).toBe("sess-1");
+    expect(h.store.get(created.id)?.session).toEqual({ type: "reuse", sessionId: "sess-1" });
     archived = true;
     await run(h.service.runNow(created.id));
     expect(h.created).toHaveLength(2);
-    expect(h.store.get(created.id)?.reuseSessionId).toBe("sess-2");
+    expect(h.store.get(created.id)?.session).toEqual({ type: "reuse", sessionId: "sess-2" });
+  });
+
+  it("reuses a preselected session without creating first", async () => {
+    const h = setup({
+      sessions: {
+        find: () => Effect.succeed({ archived: false }),
+      },
+    });
+    const created = await run(
+      h.service.create(
+        cronInput({
+          session: { type: "reuse", sessionId: "picked-session" },
+          spec: { kind: "manual" },
+        }),
+      ),
+    );
+    await run(h.service.runNow(created.id));
+    expect(h.created).toHaveLength(0);
+    expect(h.store.get(created.id)?.session).toEqual({
+      type: "reuse",
+      sessionId: "picked-session",
+    });
+  });
+
+  it("rejects a missing or archived reuse session on create", async () => {
+    const missing = setup({
+      sessions: { find: () => Effect.succeed(null) },
+    });
+    await expect(
+      run(
+        missing.service.create(
+          cronInput({
+            session: { type: "reuse", sessionId: "missing" },
+            spec: { kind: "manual" },
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ _tag: "InvalidAutomation" });
+    const archived = setup({
+      sessions: { find: () => Effect.succeed({ archived: true }) },
+    });
+    await expect(
+      run(
+        archived.service.create(
+          cronInput({
+            session: { type: "reuse", sessionId: "old" },
+            spec: { kind: "manual" },
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ _tag: "InvalidAutomation" });
   });
 
   it("opens the failure circuit after three settled failures", async () => {

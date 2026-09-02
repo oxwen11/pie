@@ -1,4 +1,4 @@
-import type { Automation } from "@getpie/contract";
+import { automationSessionOf, reuseSessionIdOf, type Automation } from "@getpie/contract";
 
 /** Session ids an Automation has created or reused. Origin lives here, not on the session. */
 export function collectFiredSessionIds(
@@ -7,7 +7,8 @@ export function collectFiredSessionIds(
   const ids = new Set<string>();
   for (const automation of automations) {
     if (automation.lastSessionId !== undefined) ids.add(automation.lastSessionId);
-    if (automation.reuseSessionId !== undefined) ids.add(automation.reuseSessionId);
+    const reuseSessionId = reuseSessionIdOf(automationSessionOf(automation));
+    if (reuseSessionId !== undefined) ids.add(reuseSessionId);
     for (const run of automation.runs) {
       if (run.sessionId !== undefined) ids.add(run.sessionId);
     }
