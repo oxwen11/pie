@@ -93,8 +93,8 @@ _Avoid_: inner tabs, sub-tabs, splits
 ## Hub Domain
 
 **Hub**:
-A public HTTPS process (`pie hub serve`) that receives GitHub webhooks and dispatches work to an enrolled pie daemon. Separate composition root from `pie serve` — no oRPC, no UI, no `Project.path`. Design: `docs/design/pie-hub.md`.
-_Avoid_: treating Hub as a second daemon; exposing the local serve/UI process as the webhook target
+A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives GitHub webhooks and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. Design: `docs/design/pie-hub.md`.
+_Avoid_: treating Hub as a second daemon; `pie hub serve`; exposing the local serve/UI process as the webhook target
 
 **Relationship**:
 The daemon's long-lived Hub identity after `pie hub connect`. The daemon generates and stores the credential; the human CLI login is a different secret used only to mint a one-time enrollment token.
