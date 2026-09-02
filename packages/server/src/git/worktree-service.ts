@@ -6,17 +6,15 @@ import { simpleGit } from "simple-git";
 import { Paths } from "../config/paths";
 import {
   GitBranchExists,
-  GitError,
   GitInvalidBranchName,
   GitInvalidWorktreeKey,
-  GitNotRepository,
   GitRefNotFound,
   GitWorktreePathExists,
-  WorkspaceNotDirectory,
   WorkspacePathEscape,
-  WorkspaceReadError,
 } from "../errors";
+import { contains } from "../path-safety";
 import type { GitFailure } from "./service";
+import { isUnsafeRef, makeGitHelpers } from "./shared";
 import {
   generateWorktreeBranchName,
   isValidBranchName,
@@ -42,30 +40,6 @@ const WORKTREE_KEY_LENGTH = 4;
 const WORKTREE_KEY_BYTE_LIMIT =
   Math.floor(256 / WORKTREE_KEY_ALPHABET.length) * WORKTREE_KEY_ALPHABET.length;
 
-const contains = (parent: string, child: string): boolean => {
-  const relative = path.relative(parent, child);
-  return (
-    relative === "" ||
-    (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
-  );
-};
-
-const isNotRepositoryMessage = (cause: unknown): boolean => {
-  const message = cause instanceof Error ? cause.message : String(cause);
-  return /not a git repository/i.test(message);
-};
-
-/** Reject anything that is not a listed ref name — no `../`, flags, or rev magic. */
-const isUnsafeRef = (ref: string): boolean =>
-  ref === "" ||
-  ref.startsWith("-") ||
-  ref.includes("..") ||
-  ref.includes("\\") ||
-  ref.includes("\0") ||
-  ref.includes(":") ||
-  ref.includes("@{") ||
-  /\s/.test(ref);
-
 const dieRng = (what: string) => (cause: unknown) =>
   Effect.die(new Error(`invariant: platform RNG failed minting a ${what}`, { cause }));
 
@@ -90,41 +64,7 @@ export const WorktreeServiceLayer: Layer.Layer<
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
-
-    const readError = (relativePath: string) => (cause: unknown) =>
-      new WorkspaceReadError({ path: relativePath, cause });
-
-    const gitError = (cwd: string) => (cause: unknown) =>
-      isNotRepositoryMessage(cause) ? new GitNotRepository({ cwd }) : new GitError({ cwd, cause });
-
-    const raw = (cwd: string, args: readonly string[]) =>
-      Effect.tryPromise({
-        try: () => simpleGit(cwd).raw([...args]),
-        catch: gitError(cwd),
-      });
-
-    const resolveRoot = (cwd: string) =>
-      Effect.gen(function* () {
-        if (!path.isAbsolute(cwd)) {
-          return yield* new WorkspacePathEscape({ cwd, path: "." });
-        }
-        const realRoot = yield* fs.realPath(cwd).pipe(Effect.mapError(readError(".")));
-        const info = yield* fs.stat(realRoot).pipe(Effect.mapError(readError(".")));
-        if (info.type !== "Directory") {
-          return yield* new WorkspaceNotDirectory({ path: "." });
-        }
-        return realRoot;
-      });
-
-    const resolveRepoRoot = (cwd: string) =>
-      raw(cwd, ["rev-parse", "--show-toplevel"]).pipe(
-        Effect.map((value) => value.trim()),
-        Effect.flatMap((toplevel) =>
-          toplevel === ""
-            ? Effect.fail(new GitNotRepository({ cwd }))
-            : Effect.succeed(path.resolve(toplevel)),
-        ),
-      );
+    const { readError, gitError, raw, resolveRoot, resolveRepoRoot } = makeGitHelpers(fs);
 
     const listRefs = (cwd: string) =>
       raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
