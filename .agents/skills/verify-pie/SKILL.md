@@ -67,18 +67,35 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 ## Drive
 
-Harness: `@getpie/verify` wraps the mise-managed **agent-browser** (`pie-verify web browser`, session `pie-verify-web`). Do not `npm i -g agent-browser`, do not export `AGENT_BROWSER_SESSION`, and do not call `agent-browser` on PATH — that splits the proof across two CLIs and can steal another session.
+`pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with `agent-browser`.** After launch you do **not** `eval` env or pass `--session` on every command.
 
-Chrome at `/usr/local/bin/google-chrome` is used when present. First machine: `pnpm exec pie-verify web browser install` if the packaged CLI says no browser is available. Recipe docs: `pnpm exec pie-verify web browser skills get core`.
+Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, sockets / screenshots / downloads under `$runDir/agent-browser/`, idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
-Recipe for every drive:
+First machine only: `pnpm exec agent-browser install` if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
+
+```bash
+pnpm exec pie-verify web launch
+pnpm exec pie-verify web doctor   # if launch reused an existing run
+agent-browser open http://localhost:4190/
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
+agent-browser wait --text "Import this folder"
+```
+
+`agent-browser session` must print `pie-verify-web`. If it prints `default`, you hit the raw mise binary — use `pnpm exec agent-browser` or `/tmp/pie-verify-web/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=web` (or clean up one).
+
+**Always pass an explicit URL to `open`** — there is no default. Open **`http://localhost:4190/`**, never 4180, and never `http://127.0.0.1:4190/`. Vite binds `[::1]:4190` here.
+
+`pie-verify web env --export` is optional (debug, or a shell that is not using the repo shim).
+
+Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use `snapshot` when you need to read the tree (evidence, or a listbox that has not settled). Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
+
+### UI rules
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Open the **Vite** origin: `pnpm exec pie-verify web browser open` (defaults to `http://localhost:4190/`).
-3. `pnpm exec pie-verify web browser snapshot` — click `@eN` refs, not coordinates. Folder rows in the import dialog may be missing from `snapshot -i` until the listing settles; use a full `snapshot` if the listbox looks empty.
-4. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
-5. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
-6. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
+2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+3. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
+4. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
 Stable handles (from source, not guesses):
 
@@ -146,9 +163,10 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm exec pie-verify web launch` | Isolated serve + Vite. `--replace` cleans a live run of ours first. |
+| `pnpm exec pie-verify web launch` | Isolated serve + Vite. Writes `agent-browser.env` and `/tmp/pie-verify-web/bin/agent-browser`. |
 | `pnpm exec pie-verify web doctor` | Read-only worth-driving check. |
-| `pnpm exec pie-verify web browser` | Mise-managed `agent-browser` with session `pie-verify-web`. `open` defaults to `http://localhost:4190/`. |
+| `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
+| `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 

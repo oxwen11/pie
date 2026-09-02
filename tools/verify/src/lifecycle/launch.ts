@@ -18,6 +18,7 @@ import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/proce
 import { ensureSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
+import { writeBrowserEnvFile } from "./env.ts";
 import { recordedPids } from "./pids.ts";
 import { applyPortPlan, portPlan } from "./ports.ts";
 
@@ -59,6 +60,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     const kind = await classifyRun(surface, existing, meta, request.mode);
     switch (kind) {
       case "reuse":
+        writeBrowserEnvFile(identity, existing);
         return;
       case "live":
         if (request.replace) {
@@ -122,6 +124,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
 
   try {
     await surface.spawn(ctx);
+    writeBrowserEnvFile(identity, runDir);
   } catch (error) {
     tailFailure(runDir, pieHome);
     copyFailureLogs(runDir, path.join(identity.root, "last-failure"));

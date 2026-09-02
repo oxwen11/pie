@@ -4,6 +4,7 @@
   "private": true,
   "description": "Isolated launch/doctor/drive/cleanup for pie web, CLI, and desktop proofs (bin pie-verify)",
   "bin": {
+    "agent-browser": "./bin/agent-browser",
     "pie-verify": "./bin/pie-verify.mjs"
   },
   "type": "module",

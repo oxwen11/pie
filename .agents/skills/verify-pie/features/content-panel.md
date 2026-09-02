@@ -17,13 +17,12 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 2. Click **Toggle content panel**.
 3. Pick **Files** / **Review** / **Terminal** / **Browser**, or use **Open a panel** after the first tab exists.
 
-## Driving it with pie-verify
+## Driving it with agent-browser
 
 ```bash
 # on a session route
-pnpm exec pie-verify web browser snapshot
-# click Toggle content panel
-pnpm exec pie-verify web browser snapshot
+agent-browser find --name "Toggle content panel" click
+agent-browser wait --text "Choose what to show alongside the chat."
 ```
 
 1. Pressed toggle; complementary/`data-slot="content-panel"` is in the tree (or the empty copy is visible). Hidden unmounts the column — it is not merely CSS-hidden.

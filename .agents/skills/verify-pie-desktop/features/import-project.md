@@ -15,7 +15,13 @@ Empty isolated home: heading **Import your first project**, button **Import proj
 
 ## Driving it
 
-`pnpm exec pie-verify desktop browser connect` (doctor already did this), then the same clicks as web verify-pie:
+```bash
+# doctor already attached; if not: agent-browser connect 9223
+agent-browser wait --text "Import your first project"
+agent-browser find role button --name "Import project" click
+```
+
+Then the same clicks as web verify-pie:
 
 1. **Import project**
 2. Type `verify-pie-desktop-sample`, enter that folder
