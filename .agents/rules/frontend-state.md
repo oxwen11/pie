@@ -35,7 +35,7 @@ for per-agent tool rendering.
   files are the whole allow-list today. `routes/__root.tsx` is the shell's one
   route-identity seam for the card: it reads the authoritative session-route
   loader ref and binds the card heading and `ContentPanelSessionProvider`.
-  Sidebar modules (`AppSidebar` and the project/automation entries it composes)
+  Sidebar modules (`AppSidebar` and the project/schedule entries it composes)
   read the route and navigate themselves — do not thread route callbacks or
   active flags into them. `AppShell` owns `SidebarProvider`, its viewport wrapper, and
   sidebar persistence because those are shell implementation details; the

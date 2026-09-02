@@ -1,13 +1,13 @@
 import type {
-  AutomationPauseReason,
-  AutomationRunReason,
-  AutomationRunStatus,
-  AutomationSession,
-  AutomationSkipReason,
-  AutomationSpec,
+  SchedulePauseReason,
+  ScheduleRunReason,
+  ScheduleRunStatus,
+  ScheduleSession,
+  ScheduleSkipReason,
+  ScheduleSpec,
 } from "@getpie/contract";
 
-export type AutomationCadence =
+export type ScheduleCadence =
   | "manual"
   | "every"
   | "hourly"
@@ -17,10 +17,10 @@ export type AutomationCadence =
   | "once"
   | "cron";
 
-export type AutomationEveryUnit = "minutes" | "hours" | "days";
+export type ScheduleEveryUnit = "minutes" | "hours" | "days";
 
 export const CADENCE_OPTIONS: ReadonlyArray<{
-  readonly value: AutomationCadence;
+  readonly value: ScheduleCadence;
   readonly label: string;
 }> = [
   { value: "manual", label: "Manual" },
@@ -34,7 +34,7 @@ export const CADENCE_OPTIONS: ReadonlyArray<{
 ];
 
 export const EVERY_UNIT_OPTIONS: ReadonlyArray<{
-  readonly value: AutomationEveryUnit;
+  readonly value: ScheduleEveryUnit;
   readonly label: string;
 }> = [
   { value: "minutes", label: "Minutes" },
@@ -52,36 +52,36 @@ export const WEEKDAY_OPTIONS: ReadonlyArray<{ readonly value: string; readonly l
   { value: "0", label: "Sunday" },
 ];
 
-export function isAutomationCadence(value: string): value is AutomationCadence {
+export function isScheduleCadence(value: string): value is ScheduleCadence {
   return CADENCE_OPTIONS.some((option) => option.value === value);
 }
 
-export function isAutomationEveryUnit(value: string): value is AutomationEveryUnit {
+export function isScheduleEveryUnit(value: string): value is ScheduleEveryUnit {
   return EVERY_UNIT_OPTIONS.some((option) => option.value === value);
 }
 
-export type AutomationSessionPick = "create" | "existing";
+export type ScheduleSessionPick = "create" | "existing";
 
 export const CREATE_ON_FIRST_RUN_VALUE = "create";
 
-export type AutomationFormValues = {
+export type ScheduleFormValues = {
   readonly name: string;
   readonly projectId: string;
   readonly prompt: string;
-  readonly cadence: AutomationCadence;
+  readonly cadence: ScheduleCadence;
   readonly time: string;
   readonly weekday: string;
   readonly cron: string;
   readonly timeZone: string;
   readonly everyAmount: string;
-  readonly everyUnit: AutomationEveryUnit;
+  readonly everyUnit: ScheduleEveryUnit;
   readonly runAt: string;
   readonly expiresAt: string;
   readonly maxRuns: string;
   readonly runNow: boolean;
   readonly worktree: boolean;
   readonly reuseSession: boolean;
-  readonly sessionPick: AutomationSessionPick;
+  readonly sessionPick: ScheduleSessionPick;
   readonly sessionId: string;
 };
 
@@ -90,7 +90,7 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
-export function defaultAutomationForm(projectId: string): AutomationFormValues {
+export function defaultScheduleForm(projectId: string): ScheduleFormValues {
   return {
     name: "",
     projectId,
@@ -114,9 +114,9 @@ export function defaultAutomationForm(projectId: string): AutomationFormValues {
 }
 
 export function sessionFromForm(
-  form: Pick<AutomationFormValues, "reuseSession" | "sessionPick" | "sessionId">,
+  form: Pick<ScheduleFormValues, "reuseSession" | "sessionPick" | "sessionId">,
   listedIds?: ReadonlySet<string>,
-): AutomationSession {
+): ScheduleSession {
   if (!form.reuseSession) return { policy: "isolated" };
   if (
     form.sessionPick === "existing" &&
@@ -129,7 +129,7 @@ export function sessionFromForm(
 }
 
 export function sessionSelectValue(
-  form: Pick<AutomationFormValues, "sessionPick" | "sessionId">,
+  form: Pick<ScheduleFormValues, "sessionPick" | "sessionId">,
   listedIds?: ReadonlySet<string>,
 ): string {
   if (
@@ -143,7 +143,7 @@ export function sessionSelectValue(
 }
 
 export function formatSessionReuse(
-  session: AutomationSession | undefined,
+  session: ScheduleSession | undefined,
   titleById: ReadonlyMap<string, string>,
 ): string | null {
   const resolved = session ?? { policy: "isolated" };
@@ -191,7 +191,7 @@ function parseTime(time: string): ClockTime {
   return { hour, minute };
 }
 
-export function everyMsFromForm(amount: string, unit: AutomationEveryUnit): number {
+export function everyMsFromForm(amount: string, unit: ScheduleEveryUnit): number {
   const n = Number(amount);
   if (!Number.isInteger(n) || n < 1) {
     throw new Error("interval must be a positive integer");
@@ -203,7 +203,7 @@ export function everyMsFromForm(amount: string, unit: AutomationEveryUnit): numb
 
 export type SplitEveryMs = {
   readonly amount: string;
-  readonly unit: AutomationEveryUnit;
+  readonly unit: ScheduleEveryUnit;
 };
 
 export function splitEveryMs(everyMs: number): SplitEveryMs {
@@ -212,7 +212,7 @@ export function splitEveryMs(everyMs: number): SplitEveryMs {
   return { amount: String(Math.max(1, Math.round(everyMs / MINUTE_MS))), unit: "minutes" };
 }
 
-export function specFromForm(form: AutomationFormValues): AutomationSpec {
+export function specFromForm(form: ScheduleFormValues): ScheduleSpec {
   if (form.cadence === "manual") return { kind: "manual" };
   if (form.cadence === "once") return { kind: "once", runAt: localDateTimeToIso(form.runAt) };
   if (form.cadence === "every") {
@@ -233,10 +233,10 @@ export function specFromForm(form: AutomationFormValues): AutomationSpec {
 }
 
 export function formFromSpec(
-  spec: AutomationSpec,
-  base: AutomationFormValues,
+  spec: ScheduleSpec,
+  base: ScheduleFormValues,
 ): Pick<
-  AutomationFormValues,
+  ScheduleFormValues,
   "cadence" | "time" | "weekday" | "cron" | "timeZone" | "everyAmount" | "everyUnit" | "runAt"
 > {
   if (spec.kind === "manual") {
@@ -352,7 +352,7 @@ export function formFromSpec(
   };
 }
 
-export function formatSpec(spec: AutomationSpec): string {
+export function formatSpec(spec: ScheduleSpec): string {
   if (spec.kind === "manual") return "Manual";
   if (spec.kind === "once") return `Once at ${new Date(spec.runAt).toLocaleString()}`;
   if (spec.kind === "every") {
@@ -360,7 +360,7 @@ export function formatSpec(spec: AutomationSpec): string {
     const unit = split.amount === "1" ? split.unit.slice(0, -1) : split.unit;
     return `Every ${split.amount} ${unit}`;
   }
-  const matched = formFromSpec(spec, defaultAutomationForm(""));
+  const matched = formFromSpec(spec, defaultScheduleForm(""));
   if (matched.cadence === "hourly") return "Hourly";
   if (matched.cadence === "daily") return `Daily at ${matched.time}`;
   if (matched.cadence === "weekdays") return `Weekdays at ${matched.time}`;
@@ -371,7 +371,7 @@ export function formatSpec(spec: AutomationSpec): string {
 export function formatNextRun(
   nextRunAt: string | null,
   enabled: boolean,
-  pauseReason?: AutomationPauseReason,
+  pauseReason?: SchedulePauseReason,
   maxRuns?: number,
 ): string {
   if (!enabled) {
@@ -392,7 +392,7 @@ export function formatFiredCap(firedCount: number, maxRuns: number): string {
   return `${firedCount} / ${maxRuns} run${maxRuns === 1 ? "" : "s"}`;
 }
 
-export function formatRunStatus(status: AutomationRunStatus): string {
+export function formatRunStatus(status: ScheduleRunStatus): string {
   if (status === "running") return "Running";
   if (status === "succeeded") return "Succeeded";
   if (status === "failed") return "Failed";
@@ -401,7 +401,7 @@ export function formatRunStatus(status: AutomationRunStatus): string {
   return "Interrupted";
 }
 
-export function formatSkipReason(reason: AutomationSkipReason): string {
+export function formatSkipReason(reason: ScheduleSkipReason): string {
   if (reason === "in_progress") return "already running";
   if (reason === "stale") return "too late";
   if (reason === "project_missing") return "project missing";
@@ -410,14 +410,14 @@ export function formatSkipReason(reason: AutomationSkipReason): string {
   return "expired";
 }
 
-export function formatRunReason(reason: AutomationRunReason): string {
+export function formatRunReason(reason: ScheduleRunReason): string {
   if (reason === "manual") return "Run now";
   if (reason === "missed_recovery") return "Missed recovery";
   if (reason === "catch_up") return "Catch-up";
   return "Scheduled";
 }
 
-export type AutomationRunSummary = {
+export type ScheduleRunSummary = {
   readonly running: number;
   readonly succeeded: number;
   readonly failed: number;
@@ -427,8 +427,8 @@ export type AutomationRunSummary = {
 };
 
 export function summarizeRuns(
-  runs: ReadonlyArray<{ readonly status: AutomationRunStatus }>,
-): AutomationRunSummary {
+  runs: ReadonlyArray<{ readonly status: ScheduleRunStatus }>,
+): ScheduleRunSummary {
   const summary = {
     running: 0,
     succeeded: 0,
@@ -443,7 +443,7 @@ export function summarizeRuns(
   return summary;
 }
 
-export function formatRunSummary(summary: AutomationRunSummary): string | null {
+export function formatRunSummary(summary: ScheduleRunSummary): string | null {
   const parts: string[] = [];
   if (summary.running > 0) parts.push(`${summary.running} running`);
   if (summary.succeeded > 0) parts.push(`${summary.succeeded} succeeded`);
@@ -454,35 +454,35 @@ export function formatRunSummary(summary: AutomationRunSummary): string | null {
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-export function formatLastRun(automation: {
-  readonly lastRunStatus?: AutomationRunStatus;
+export function formatLastRun(schedule: {
+  readonly lastRunStatus?: ScheduleRunStatus;
   readonly lastRunAt?: string;
   readonly lastError?: string;
   readonly runs: ReadonlyArray<{
     readonly missedCount?: number;
-    readonly skipReason?: AutomationSkipReason;
+    readonly skipReason?: ScheduleSkipReason;
   }>;
 }): string | null {
-  if (automation.lastRunStatus === undefined || automation.lastRunAt === undefined) return null;
-  const when = new Date(automation.lastRunAt).toLocaleString();
-  if (automation.lastRunStatus === "running") return `Running since ${when}`;
-  if (automation.lastRunStatus === "succeeded") return `Last run ${when}`;
-  if (automation.lastRunStatus === "interrupted") return `Interrupted ${when}`;
-  if (automation.lastRunStatus === "missed") {
-    const missed = automation.runs[0]?.missedCount;
+  if (schedule.lastRunStatus === undefined || schedule.lastRunAt === undefined) return null;
+  const when = new Date(schedule.lastRunAt).toLocaleString();
+  if (schedule.lastRunStatus === "running") return `Running since ${when}`;
+  if (schedule.lastRunStatus === "succeeded") return `Last run ${when}`;
+  if (schedule.lastRunStatus === "interrupted") return `Interrupted ${when}`;
+  if (schedule.lastRunStatus === "missed") {
+    const missed = schedule.runs[0]?.missedCount;
     return missed !== undefined && missed > 0
       ? `Missed ${missed} run${missed === 1 ? "" : "s"} ${when}`
       : `Missed ${when}`;
   }
-  if (automation.lastRunStatus === "skipped") {
-    const reason = automation.runs[0]?.skipReason;
+  if (schedule.lastRunStatus === "skipped") {
+    const reason = schedule.runs[0]?.skipReason;
     return reason === undefined
       ? `Skipped ${when}`
       : `Skipped (${formatSkipReason(reason)}) ${when}`;
   }
-  return automation.lastError === undefined
+  return schedule.lastError === undefined
     ? `Failed ${when}`
-    : `Failed ${when}: ${automation.lastError}`;
+    : `Failed ${when}: ${schedule.lastError}`;
 }
 
 export function formatRunDuration(

@@ -1,8 +1,4 @@
-import {
-  MAX_AUTOMATION_EVERY_MS,
-  MIN_AUTOMATION_EVERY_MS,
-  type AutomationSpec,
-} from "@getpie/contract";
+import { MAX_SCHEDULE_EVERY_MS, MIN_SCHEDULE_EVERY_MS, type ScheduleSpec } from "@getpie/contract";
 
 import {
   applyOneShotJitter,
@@ -19,7 +15,7 @@ export const MIN_WAKE_MS = 1_000;
 export const MAX_WAKE_MS = 60_000;
 export const MAX_DUE_WALK = 1_000;
 
-export function validateSpec(spec: AutomationSpec, now: number): void {
+export function validateSpec(spec: ScheduleSpec, now: number): void {
   if (spec.kind === "cron") {
     parseCron(spec.expr);
     if (spec.timeZone !== undefined) assertTimeZone(spec.timeZone);
@@ -34,10 +30,10 @@ export function validateSpec(spec: AutomationSpec, now: number): void {
   }
   if (
     spec.kind === "every" &&
-    (spec.everyMs < MIN_AUTOMATION_EVERY_MS || spec.everyMs > MAX_AUTOMATION_EVERY_MS)
+    (spec.everyMs < MIN_SCHEDULE_EVERY_MS || spec.everyMs > MAX_SCHEDULE_EVERY_MS)
   ) {
     throw new Error(
-      `everyMs must be between ${MIN_AUTOMATION_EVERY_MS} and ${MAX_AUTOMATION_EVERY_MS}`,
+      `everyMs must be between ${MIN_SCHEDULE_EVERY_MS} and ${MAX_SCHEDULE_EVERY_MS}`,
     );
   }
 }
@@ -50,7 +46,7 @@ export function validateExpiresAt(expiresAt: string | undefined, now: number): v
   }
 }
 
-export function computeNextRunAt(spec: AutomationSpec, id: string, now: number): number | null {
+export function computeNextRunAt(spec: ScheduleSpec, id: string, now: number): number | null {
   if (spec.kind === "manual") return null;
   if (spec.kind === "once") {
     const runAt = parseRunAt(spec.runAt);
@@ -61,7 +57,7 @@ export function computeNextRunAt(spec: AutomationSpec, id: string, now: number):
   return applyRecurringJitter(spec.expr, id, now, spec.timeZone);
 }
 
-export function countDueSlots(spec: AutomationSpec, fromMs: number, now: number): number {
+export function countDueSlots(spec: ScheduleSpec, fromMs: number, now: number): number {
   if (fromMs > now) return 0;
   if (spec.kind === "manual") return 0;
   if (spec.kind === "once") return 1;
@@ -79,7 +75,7 @@ export function countDueSlots(spec: AutomationSpec, fromMs: number, now: number)
   return count;
 }
 
-export function countMissedSlots(spec: AutomationSpec, fromMs: number, now: number): number {
+export function countMissedSlots(spec: ScheduleSpec, fromMs: number, now: number): number {
   return Math.max(0, countDueSlots(spec, fromMs, now) - 1);
 }
 

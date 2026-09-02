@@ -31,16 +31,16 @@ function NewChatNavItem() {
   );
 }
 
-function AutomationsNavItem() {
+function SchedulesNavItem() {
   const active =
     useMatch({
-      from: "/automations",
+      from: "/schedules",
       shouldThrow: false,
     }) !== undefined;
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton isActive={active} render={<Link search={{}} to="/automations" />}>
+      <SidebarMenuButton isActive={active} render={<Link search={{}} to="/schedules" />}>
         <Clock />
         <span>Scheduled</span>
       </SidebarMenuButton>
@@ -76,7 +76,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <NewChatNavItem />
-              <AutomationsNavItem />
+              <SchedulesNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -1,4 +1,4 @@
-import type { Automation, AutomationRun, AutomationRunStatus } from "@getpie/contract";
+import type { Schedule, ScheduleRun, ScheduleRunStatus } from "@getpie/contract";
 import { Badge } from "@getpie/ui/components/badge";
 import { Button } from "@getpie/ui/components/button";
 import {
@@ -13,8 +13,8 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/com
 
 import { formatRunDuration, formatRunReason, formatRunStatus, formatSkipReason } from "./cadence";
 
-export type AutomationRunHistoryProps = {
-  readonly automation: Automation;
+export type ScheduleRunHistoryProps = {
+  readonly schedule: Schedule;
   readonly projectName: string;
   readonly nowMs: number;
   readonly onClose: () => void;
@@ -22,7 +22,7 @@ export type AutomationRunHistoryProps = {
 };
 
 function statusVariant(
-  status: AutomationRunStatus,
+  status: ScheduleRunStatus,
 ): "info" | "success" | "error" | "secondary" | "warning" {
   if (status === "running") return "info";
   if (status === "succeeded") return "success";
@@ -31,7 +31,7 @@ function statusVariant(
   return "warning";
 }
 
-function runDetail(run: AutomationRun): string | null {
+function runDetail(run: ScheduleRun): string | null {
   if (run.error !== undefined) return run.error;
   if (run.skipReason !== undefined) return formatSkipReason(run.skipReason);
   if (run.missedCount !== undefined && run.missedCount > 0) {
@@ -40,13 +40,13 @@ function runDetail(run: AutomationRun): string | null {
   return null;
 }
 
-export function AutomationRunHistory({
-  automation,
+export function ScheduleRunHistory({
+  schedule,
   projectName,
   nowMs,
   onClose,
   onOpenSession,
-}: AutomationRunHistoryProps) {
+}: ScheduleRunHistoryProps) {
   return (
     <Dialog
       onOpenChange={(open) => {
@@ -56,13 +56,13 @@ export function AutomationRunHistory({
     >
       <DialogPopup className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{automation.name}</DialogTitle>
+          <DialogTitle>{schedule.name}</DialogTitle>
           <DialogDescription>
             Recent runs in {projectName}. The server keeps the last 20.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          {automation.runs.length === 0 ? (
+          {schedule.runs.length === 0 ? (
             <Empty>
               <EmptyHeader>
                 <EmptyTitle>No runs yet</EmptyTitle>
@@ -73,7 +73,7 @@ export function AutomationRunHistory({
             </Empty>
           ) : (
             <ol className="flex flex-col gap-3">
-              {automation.runs.map((run) => {
+              {schedule.runs.map((run) => {
                 const duration = formatRunDuration(run.startedAt, run.finishedAt, nowMs);
                 const detail = runDetail(run);
                 const sessionId = run.sessionId;

@@ -1,15 +1,13 @@
-import { automationSessionOf, reuseSessionIdOf, type Automation } from "@getpie/contract";
+import { scheduleSessionOf, reuseSessionIdOf, type Schedule } from "@getpie/contract";
 
-/** Session ids an Automation has created or reused. Origin lives here, not on the session. */
-export function collectFiredSessionIds(
-  automations: ReadonlyArray<Automation>,
-): ReadonlySet<string> {
+/** Session ids a Schedule has created or reused. Origin lives here, not on the session. */
+export function collectFiredSessionIds(schedules: ReadonlyArray<Schedule>): ReadonlySet<string> {
   const ids = new Set<string>();
-  for (const automation of automations) {
-    if (automation.lastSessionId !== undefined) ids.add(automation.lastSessionId);
-    const reuseSessionId = reuseSessionIdOf(automationSessionOf(automation));
+  for (const schedule of schedules) {
+    if (schedule.lastSessionId !== undefined) ids.add(schedule.lastSessionId);
+    const reuseSessionId = reuseSessionIdOf(scheduleSessionOf(schedule));
     if (reuseSessionId !== undefined) ids.add(reuseSessionId);
-    for (const run of automation.runs) {
+    for (const run of schedule.runs) {
       if (run.sessionId !== undefined) ids.add(run.sessionId);
     }
   }

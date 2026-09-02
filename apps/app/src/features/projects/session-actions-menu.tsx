@@ -84,14 +84,14 @@ export function SessionActionsMenu({
             <ContextMenuItem
               onClick={() => {
                 navigate({
-                  to: "/automations",
+                  to: "/schedules",
                   search: {
                     create: true,
                     projectId: session.projectId,
                     sessionId: session.sessionId,
                   },
                 }).catch((error: unknown) => {
-                  console.error("Failed to open the automation editor", error);
+                  console.error("Failed to open the schedule editor", error);
                 });
               }}
             >

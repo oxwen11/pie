@@ -1,4 +1,4 @@
-import type { Automation, SessionSummary } from "@getpie/contract";
+import type { Schedule, SessionSummary } from "@getpie/contract";
 import type { PullRequestLifecycle } from "@getpie/contract/pull-request";
 import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
@@ -31,14 +31,14 @@ export function ProjectSessionRow({
   const navigate = useNavigate();
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   // Closes over this row's sessionId so only a boolean change re-renders.
-  const selectCreatedByAutomation = useCallback(
-    (automations: ReadonlyArray<Automation>) =>
-      collectFiredSessionIds(automations).has(session.sessionId),
+  const selectCreatedBySchedule = useCallback(
+    (schedules: ReadonlyArray<Schedule>) =>
+      collectFiredSessionIds(schedules).has(session.sessionId),
     [session.sessionId],
   );
-  const createdByAutomation = useQuery({
-    ...orpcQueryUtils.automation.list.queryOptions(),
-    select: selectCreatedByAutomation,
+  const createdBySchedule = useQuery({
+    ...orpcQueryUtils.schedule.list.queryOptions(),
+    select: selectCreatedBySchedule,
     refetchInterval: 10_000,
   });
 
@@ -71,7 +71,7 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
-        {createdByAutomation.data === true ? (
+        {createdBySchedule.data === true ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
             title="Created by a schedule"

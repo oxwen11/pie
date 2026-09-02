@@ -66,9 +66,13 @@ describe("PiAgentSessionService", () => {
     );
 
     expect(result.stored.title).toBe("Morning review");
+    expect(result.stored).not.toHaveProperty("schedule");
+    expect(result.stored).not.toHaveProperty("scheduleId");
     expect(result.stored).not.toHaveProperty("automation");
     expect(result.stored).not.toHaveProperty("automationId");
     expect(result.listed[0]?.title).toBe("Morning review");
+    expect(result.listed[0]).not.toHaveProperty("schedule");
+    expect(result.listed[0]).not.toHaveProperty("scheduleId");
     expect(result.listed[0]).not.toHaveProperty("automation");
     expect(result.listed[0]).not.toHaveProperty("automationId");
   });

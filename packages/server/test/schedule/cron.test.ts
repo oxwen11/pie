@@ -6,7 +6,7 @@ import {
   nextOccurrence,
   parseCron,
   parseRunAt,
-} from "../../src/automation/cron";
+} from "../../src/schedule/cron";
 
 describe("parseCron", () => {
   it("accepts a 5-field expression", () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CREATE_ON_FIRST_RUN_VALUE,
   defaultOnceLocal,
-  defaultAutomationForm,
+  defaultScheduleForm,
   formatFiredCap,
   formatLastRun,
   formatNextRun,
@@ -23,7 +23,7 @@ import {
 
 describe("specFromForm", () => {
   it("builds daily and weekday cron from a time picker", () => {
-    const base = defaultAutomationForm("proj");
+    const base = defaultScheduleForm("proj");
     expect(specFromForm({ ...base, cadence: "daily", time: "09:30" })).toEqual({
       kind: "cron",
       expr: "30 9 * * *",
@@ -43,7 +43,7 @@ describe("specFromForm", () => {
   });
 
   it("builds an interval spec from amount and unit", () => {
-    const base = defaultAutomationForm("proj");
+    const base = defaultScheduleForm("proj");
     expect(
       specFromForm({ ...base, cadence: "every", everyAmount: "15", everyUnit: "minutes" }),
     ).toEqual({ kind: "every", everyMs: 15 * 60_000 });
@@ -56,7 +56,7 @@ describe("specFromForm", () => {
   });
 
   it("attaches a timezone only on custom cron", () => {
-    const base = defaultAutomationForm("proj");
+    const base = defaultScheduleForm("proj");
     expect(
       specFromForm({ ...base, cadence: "cron", cron: "0 9 * * 1-5", timeZone: "UTC" }),
     ).toEqual({ kind: "cron", expr: "0 9 * * 1-5", timeZone: "UTC" });
@@ -67,7 +67,7 @@ describe("specFromForm", () => {
   });
 
   it("round-trips preset cron expressions", () => {
-    const base = defaultAutomationForm("proj");
+    const base = defaultScheduleForm("proj");
     const specs = [
       specFromForm({ ...base, cadence: "hourly" }),
       specFromForm({ ...base, cadence: "daily", time: "09:00" }),
@@ -85,7 +85,7 @@ describe("specFromForm", () => {
   });
 
   it("keeps a timezone cron on the custom cadence", () => {
-    const base = defaultAutomationForm("proj");
+    const base = defaultScheduleForm("proj");
     const form = formFromSpec({ kind: "cron", expr: "0 9 * * *", timeZone: "UTC" }, base);
     expect(form.cadence).toBe("cron");
     expect(form.timeZone).toBe("UTC");
@@ -106,7 +106,7 @@ describe("formatSpec", () => {
 });
 
 describe("formatNextRun", () => {
-  it("labels paused, expired, and manual automations", () => {
+  it("labels paused, expired, and manual schedules", () => {
     expect(formatNextRun("2026-08-27T09:00:00.000Z", false)).toBe("Paused");
     expect(formatNextRun(null, false, "failureCircuit")).toBe("Paused after repeated failures");
     expect(formatNextRun(null, false, "expired")).toBe("Expired");

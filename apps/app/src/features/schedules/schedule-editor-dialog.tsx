@@ -1,4 +1,4 @@
-import type { Automation, Project } from "@getpie/contract";
+import type { Schedule, Project } from "@getpie/contract";
 import {
   Dialog,
   DialogDescription,
@@ -8,27 +8,27 @@ import {
   DialogTitle,
 } from "@getpie/ui/components/dialog";
 
-import { AutomationForm, type AutomationFormSubmit } from "./automation-form";
+import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
 
-export type AutomationEditorState =
+export type ScheduleEditorState =
   | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
-  | { readonly mode: "edit"; readonly automation: Automation };
+  | { readonly mode: "edit"; readonly schedule: Schedule };
 
-export type AutomationEditorDialogProps = {
-  readonly editor: AutomationEditorState;
+export type ScheduleEditorDialogProps = {
+  readonly editor: ScheduleEditorState;
   readonly projects: ReadonlyArray<Project>;
   readonly submitting: boolean;
   readonly onClose: () => void;
-  readonly onSubmit: (value: AutomationFormSubmit) => void;
+  readonly onSubmit: (value: ScheduleFormSubmit) => void;
 };
 
-export function AutomationEditorDialog({
+export function ScheduleEditorDialog({
   editor,
   projects,
   submitting,
   onClose,
   onSubmit,
-}: AutomationEditorDialogProps) {
+}: ScheduleEditorDialogProps) {
   return (
     <Dialog
       onOpenChange={(open) => {
@@ -44,13 +44,13 @@ export function AutomationEditorDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          <AutomationForm
+          <ScheduleForm
             defaults={
               editor.mode === "create"
                 ? { projectId: editor.projectId, sessionId: editor.sessionId }
                 : undefined
             }
-            initial={editor.mode === "edit" ? editor.automation : undefined}
+            initial={editor.mode === "edit" ? editor.schedule : undefined}
             onCancel={onClose}
             onSubmit={onSubmit}
             projects={projects}

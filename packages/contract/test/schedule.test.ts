@@ -2,34 +2,34 @@ import { Exit, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
-  AutomationSchema,
-  automationSessionOf,
+  ScheduleSchema,
+  scheduleSessionOf,
   countFiredRuns,
-  CreateAutomationInputSchema,
+  CreateScheduleInputSchema,
   firedRunCount,
-  MAX_AUTOMATION_EVERY_MS,
-  MAX_AUTOMATION_MAX_RUNS,
-  MIN_AUTOMATION_EVERY_MS,
-  persistAutomationSession,
+  MAX_SCHEDULE_EVERY_MS,
+  MAX_SCHEDULE_MAX_RUNS,
+  MIN_SCHEDULE_EVERY_MS,
+  persistScheduleSession,
   reachedMaxRuns,
   reuseSessionIdOf,
-  bindAutomationSession,
-  UpdateAutomationInputSchema,
-} from "../src/automation";
+  bindScheduleSession,
+  UpdateScheduleInputSchema,
+} from "../src/schedule";
 
 const UUID = "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61";
 
 const accepts = <A>(schema: Schema.ConstraintDecoder<A>, value: unknown): boolean =>
   Exit.isSuccess(Schema.decodeUnknownExit(schema)(value));
 
-describe("CreateAutomationInput", () => {
+describe("CreateScheduleInput", () => {
   it("accepts every, timezone cron, and a reused session", () => {
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "Nightly",
         projectId: UUID,
         prompt: "review",
-        spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS },
+        spec: { kind: "every", everyMs: MIN_SCHEDULE_EVERY_MS },
         session: { policy: "existing", sessionId: UUID },
         expiresAt: "2026-12-01T00:00:00.000Z",
         maxRuns: 3,
@@ -37,7 +37,7 @@ describe("CreateAutomationInput", () => {
       }),
     ).toBe(true);
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "First run",
         projectId: UUID,
         prompt: "review",
@@ -46,7 +46,7 @@ describe("CreateAutomationInput", () => {
       }),
     ).toBe(true);
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "Fresh",
         projectId: UUID,
         prompt: "review",
@@ -55,7 +55,7 @@ describe("CreateAutomationInput", () => {
       }),
     ).toBe(true);
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "Bare reuse",
         projectId: UUID,
         prompt: "review",
@@ -64,7 +64,7 @@ describe("CreateAutomationInput", () => {
       }),
     ).toBe(false);
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "TZ",
         projectId: UUID,
         prompt: "review",
@@ -75,19 +75,19 @@ describe("CreateAutomationInput", () => {
 
   it("rejects an interval below the minimum", () => {
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "Too fast",
         projectId: UUID,
         prompt: "review",
-        spec: { kind: "every", everyMs: MIN_AUTOMATION_EVERY_MS - 1 },
+        spec: { kind: "every", everyMs: MIN_SCHEDULE_EVERY_MS - 1 },
       }),
     ).toBe(false);
     expect(
-      accepts(CreateAutomationInputSchema, {
+      accepts(CreateScheduleInputSchema, {
         name: "Too slow",
         projectId: UUID,
         prompt: "review",
-        spec: { kind: "every", everyMs: MAX_AUTOMATION_EVERY_MS + 1 },
+        spec: { kind: "every", everyMs: MAX_SCHEDULE_EVERY_MS + 1 },
       }),
     ).toBe(false);
   });
@@ -99,31 +99,31 @@ describe("CreateAutomationInput", () => {
       prompt: "review",
       spec: { kind: "manual" },
     };
-    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 1 })).toBe(true);
-    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 0 })).toBe(false);
-    expect(accepts(CreateAutomationInputSchema, { ...base, maxRuns: 1.5 })).toBe(false);
+    expect(accepts(CreateScheduleInputSchema, { ...base, maxRuns: 1 })).toBe(true);
+    expect(accepts(CreateScheduleInputSchema, { ...base, maxRuns: 0 })).toBe(false);
+    expect(accepts(CreateScheduleInputSchema, { ...base, maxRuns: 1.5 })).toBe(false);
     expect(
-      accepts(CreateAutomationInputSchema, { ...base, maxRuns: MAX_AUTOMATION_MAX_RUNS + 1 }),
+      accepts(CreateScheduleInputSchema, { ...base, maxRuns: MAX_SCHEDULE_MAX_RUNS + 1 }),
     ).toBe(false);
-    expect(accepts(UpdateAutomationInputSchema, { id: UUID, maxRuns: null })).toBe(true);
+    expect(accepts(UpdateScheduleInputSchema, { id: UUID, maxRuns: null })).toBe(true);
   });
 });
 
-describe("AutomationSession helpers", () => {
+describe("ScheduleSession helpers", () => {
   it("defaults omitted session to isolated and persists owned/existing", () => {
-    expect(automationSessionOf({})).toEqual({ policy: "isolated" });
+    expect(scheduleSessionOf({})).toEqual({ policy: "isolated" });
     expect(reuseSessionIdOf({ policy: "existing", sessionId: UUID })).toBe(UUID);
     expect(reuseSessionIdOf({ policy: "owned", sessionId: UUID })).toBe(UUID);
     expect(reuseSessionIdOf({ policy: "isolated" })).toBeUndefined();
-    expect(persistAutomationSession({ policy: "isolated" })).toEqual({});
-    expect(persistAutomationSession({ policy: "owned" })).toEqual({
+    expect(persistScheduleSession({ policy: "isolated" })).toEqual({});
+    expect(persistScheduleSession({ policy: "owned" })).toEqual({
       session: { policy: "owned" },
     });
-    expect(bindAutomationSession({ policy: "owned" }, UUID)).toEqual({
+    expect(bindScheduleSession({ policy: "owned" }, UUID)).toEqual({
       policy: "owned",
       sessionId: UUID,
     });
-    expect(bindAutomationSession({ policy: "isolated" }, UUID)).toBeUndefined();
+    expect(bindScheduleSession({ policy: "isolated" }, UUID)).toBeUndefined();
   });
 });
 
@@ -145,10 +145,10 @@ describe("maxRuns helpers", () => {
   });
 });
 
-describe("Automation", () => {
+describe("Schedule", () => {
   it("accepts the run lifecycle statuses", () => {
     expect(
-      accepts(AutomationSchema, {
+      accepts(ScheduleSchema, {
         id: UUID,
         name: "Nightly",
         projectId: UUID,
@@ -173,7 +173,7 @@ describe("Automation", () => {
   });
 
   it("maps the retired started status to running", () => {
-    const decoded = Schema.decodeUnknownSync(AutomationSchema)({
+    const decoded = Schema.decodeUnknownSync(ScheduleSchema)({
       id: UUID,
       name: "Nightly",
       projectId: UUID,
@@ -199,7 +199,7 @@ describe("Automation", () => {
 
   it("reads a run snapshot that predates session policy", () => {
     expect(
-      accepts(AutomationSchema, {
+      accepts(ScheduleSchema, {
         id: UUID,
         name: "Legacy",
         projectId: UUID,

@@ -1,5 +1,5 @@
 export { CronError, parseCron, nextOccurrence, parseRunAt, assertTimeZone } from "./cron";
-export { runAutomationLoop, AUTOMATION_TICK_INTERVAL } from "./daemon";
+export { runScheduleLoop, SCHEDULE_TICK_INTERVAL } from "./daemon";
 export {
   CATCH_UP_MS,
   LATE_MS,
@@ -9,11 +9,11 @@ export {
   countMissedSlots,
   nextWakeDelayMs,
 } from "./next-run";
-export { AutomationRepository, AutomationRepositoryLayer } from "./repository";
+export { ScheduleRepository, ScheduleRepositoryLayer } from "./repository";
 export {
-  makeAutomationService,
-  AutomationService,
-  AutomationServiceLayer,
+  makeScheduleService,
+  ScheduleService,
+  ScheduleServiceLayer,
   type FireResult,
-  type AutomationServiceShape,
+  type ScheduleServiceShape,
 } from "./service";

@@ -268,10 +268,10 @@ function DraftRoute() {
               onClick={() => {
                 if (selected === null) return;
                 navigate({
-                  to: "/automations",
+                  to: "/schedules",
                   search: { create: true, projectId: selected.id },
                 }).catch((error: unknown) => {
-                  console.error("Failed to open the automation editor", error);
+                  console.error("Failed to open the schedule editor", error);
                 });
               }}
               size="sm"

@@ -8,19 +8,19 @@ import {
   DialogTitle,
 } from "@getpie/ui/components/dialog";
 
-export type AutomationDeleteDialogProps = {
+export type ScheduleDeleteDialogProps = {
   readonly name: string;
   readonly pending: boolean;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 };
 
-export function AutomationDeleteDialog({
+export function ScheduleDeleteDialog({
   name,
   pending,
   onCancel,
   onConfirm,
-}: AutomationDeleteDialogProps) {
+}: ScheduleDeleteDialogProps) {
   return (
     <Dialog
       onOpenChange={(open) => {

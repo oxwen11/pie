@@ -5,11 +5,6 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { Context, Effect, Layer } from "effect";
 
-import {
-  runAutomationLoop,
-  AutomationRepositoryLayer,
-  AutomationServiceLayer,
-} from "../automation";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
@@ -24,6 +19,7 @@ import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
+import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -81,16 +77,16 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
 const PiAgentServiceProvided = PiAgentServiceLayer;
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
-const AutomationServiceProvided = AutomationServiceLayer.pipe(
-  Layer.provide(AutomationRepositoryLayer),
+const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
+  Layer.provide(ScheduleRepositoryLayer),
   Layer.provide(ProjectServiceProvided),
   Layer.provide(PiAgentSessionServiceProvided),
   Layer.provide(PathsLayer),
   Layer.provide(PlatformLayer),
 );
 
-const AutomationDaemonLayer = Layer.effectDiscard(runAutomationLoop.pipe(Effect.forkScoped)).pipe(
-  Layer.provide(AutomationServiceProvided),
+const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
+  Layer.provide(ScheduleServiceProvided),
 );
 
 export const AgentRuntimeLayer = Layer.mergeAll(
@@ -98,8 +94,8 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
   ProjectServiceProvided,
-  AutomationServiceProvided,
-  AutomationDaemonLayer,
+  ScheduleServiceProvided,
+  ScheduleDaemonLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

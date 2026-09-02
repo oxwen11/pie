@@ -67,9 +67,9 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
-  const automationsRoute =
+  const schedulesRoute =
     useMatch({
-      from: "/automations",
+      from: "/schedules",
       shouldThrow: false,
     }) ?? null;
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
@@ -85,13 +85,13 @@ function RootLayout() {
           <AppShellMain>
             <CardPanel
               heading={
-                automationsRoute !== null
+                schedulesRoute !== null
                   ? "Schedule"
                   : sessionRef === null
                     ? "New chat"
                     : (sessionTitle ?? "New chat")
               }
-              supportingText={automationsRoute !== null ? undefined : project?.name}
+              supportingText={schedulesRoute !== null ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>

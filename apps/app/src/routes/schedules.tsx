@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { AutomationPage } from "@/features/automations/automation-page";
 import { useProjects } from "@/features/projects/use-projects";
+import { SchedulePage } from "@/features/schedules/schedule-page";
 
-type AutomationsSearch = {
+type SchedulesSearch = {
   readonly create?: true;
   readonly projectId?: string;
   readonly sessionId?: string;
@@ -12,37 +12,37 @@ type AutomationsSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const optional = <K extends keyof AutomationsSearch>(
+const optional = <K extends keyof SchedulesSearch>(
   key: K,
-  value: AutomationsSearch[K],
-): Pick<AutomationsSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<AutomationsSearch, K>);
+  value: SchedulesSearch[K],
+): Pick<SchedulesSearch, K> | undefined =>
+  value === undefined ? undefined : ({ [key]: value } as Pick<SchedulesSearch, K>);
 
-export const Route = createFileRoute("/automations")({
-  validateSearch: (search: Record<string, unknown>): AutomationsSearch => ({
+export const Route = createFileRoute("/schedules")({
+  validateSearch: (search: Record<string, unknown>): SchedulesSearch => ({
     ...optional("create", search.create === true || search.create === "true" ? true : undefined),
     ...optional("projectId", asText(search.projectId)),
     ...optional("sessionId", asText(search.sessionId)),
   }),
-  component: AutomationsRoute,
+  component: SchedulesRoute,
 });
 
-function AutomationsRoute() {
+function SchedulesRoute() {
   const projects = useProjects();
   const search = Route.useSearch();
   const navigate = useNavigate();
   return (
-    <AutomationPage
+    <SchedulePage
       createDefaults={{ projectId: search.projectId, sessionId: search.sessionId }}
       createOpen={search.create === true}
       onCloseCreate={() => {
-        navigate({ to: "/automations", search: {}, replace: true }).catch((error: unknown) => {
-          console.error("Failed to close the automation editor", error);
+        navigate({ to: "/schedules", search: {}, replace: true }).catch((error: unknown) => {
+          console.error("Failed to close the schedule editor", error);
         });
       }}
       onOpenCreate={() => {
-        navigate({ to: "/automations", search: { create: true } }).catch((error: unknown) => {
-          console.error("Failed to open the automation editor", error);
+        navigate({ to: "/schedules", search: { create: true } }).catch((error: unknown) => {
+          console.error("Failed to open the schedule editor", error);
         });
       }}
       projects={projects.data ?? []}

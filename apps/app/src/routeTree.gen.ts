@@ -10,8 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AutomationsRouteImport } from './routes/automations'
 import { Route as DraftRouteImport } from './routes/draft'
+import { Route as SchedulesRouteImport } from './routes/schedules'
 import { Route as SessionSessionIdRouteImport } from './routes/session/$sessionId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -19,14 +19,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AutomationsRoute = AutomationsRouteImport.update({
-  id: '/automations',
-  path: '/automations',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DraftRoute = DraftRouteImport.update({
   id: '/draft',
   path: '/draft',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchedulesRoute = SchedulesRouteImport.update({
+  id: '/schedules',
+  path: '/schedules',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionSessionIdRoute = SessionSessionIdRouteImport.update({
@@ -37,35 +37,35 @@ const SessionSessionIdRoute = SessionSessionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/automations': typeof AutomationsRoute
   '/draft': typeof DraftRoute
+  '/schedules': typeof SchedulesRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/automations': typeof AutomationsRoute
   '/draft': typeof DraftRoute
+  '/schedules': typeof SchedulesRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/automations': typeof AutomationsRoute
   '/draft': typeof DraftRoute
+  '/schedules': typeof SchedulesRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/automations' | '/draft' | '/session/$sessionId'
+  fullPaths: '/' | '/draft' | '/schedules' | '/session/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/automations' | '/draft' | '/session/$sessionId'
-  id: '__root__' | '/' | '/automations' | '/draft' | '/session/$sessionId'
+  to: '/' | '/draft' | '/schedules' | '/session/$sessionId'
+  id: '__root__' | '/' | '/draft' | '/schedules' | '/session/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AutomationsRoute: typeof AutomationsRoute
   DraftRoute: typeof DraftRoute
+  SchedulesRoute: typeof SchedulesRoute
   SessionSessionIdRoute: typeof SessionSessionIdRoute
 }
 
@@ -78,18 +78,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/automations': {
-      id: '/automations'
-      path: '/automations'
-      fullPath: '/automations'
-      preLoaderRoute: typeof AutomationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/draft': {
       id: '/draft'
       path: '/draft'
       fullPath: '/draft'
       preLoaderRoute: typeof DraftRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schedules': {
+      id: '/schedules'
+      path: '/schedules'
+      fullPath: '/schedules'
+      preLoaderRoute: typeof SchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/session/$sessionId': {
@@ -104,8 +104,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AutomationsRoute: AutomationsRoute,
   DraftRoute: DraftRoute,
+  SchedulesRoute: SchedulesRoute,
   SessionSessionIdRoute: SessionSessionIdRoute,
 }
 export const routeTree = rootRouteImport

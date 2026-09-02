@@ -1,4 +1,4 @@
-import type { Automation } from "@getpie/contract";
+import type { Schedule } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import { collectFiredSessionIds } from "./fired-session-ids";
@@ -17,7 +17,7 @@ const base = {
 
 describe("collectFiredSessionIds", () => {
   it("collects last, reused, and run session ids", () => {
-    const automations: ReadonlyArray<Automation> = [
+    const schedules: ReadonlyArray<Schedule> = [
       {
         ...base,
         id: "00000000-0000-0000-0000-0000000000aa",
@@ -34,15 +34,15 @@ describe("collectFiredSessionIds", () => {
         ],
       },
     ];
-    expect(collectFiredSessionIds(automations)).toEqual(
+    expect(collectFiredSessionIds(schedules)).toEqual(
       new Set(["sess-last", "sess-reuse", "sess-run"]),
     );
   });
 
   it("returns an empty set when no session ids are recorded", () => {
-    const automations: ReadonlyArray<Automation> = [
+    const schedules: ReadonlyArray<Schedule> = [
       { ...base, id: "00000000-0000-0000-0000-0000000000bb" },
     ];
-    expect(collectFiredSessionIds(automations).size).toBe(0);
+    expect(collectFiredSessionIds(schedules).size).toBe(0);
   });
 });

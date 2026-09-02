@@ -1,9 +1,9 @@
-import type { Project, Automation, AutomationSession, AutomationSpec } from "@getpie/contract";
+import type { Project, Schedule, ScheduleSession, ScheduleSpec } from "@getpie/contract";
 import {
-  automationSessionOf,
-  MAX_AUTOMATION_MAX_RUNS,
-  MAX_AUTOMATION_NAME_CHARS,
-  MAX_AUTOMATION_PROMPT_CHARS,
+  scheduleSessionOf,
+  MAX_SCHEDULE_MAX_RUNS,
+  MAX_SCHEDULE_NAME_CHARS,
+  MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
@@ -26,53 +26,53 @@ import {
   CADENCE_OPTIONS,
   CREATE_ON_FIRST_RUN_VALUE,
   EVERY_UNIT_OPTIONS,
-  type AutomationFormValues,
+  type ScheduleFormValues,
   WEEKDAY_OPTIONS,
   defaultOnceLocal,
-  defaultAutomationForm,
+  defaultScheduleForm,
   formFromSpec,
   isoToLocalDateTime,
-  isAutomationCadence,
-  isAutomationEveryUnit,
+  isScheduleCadence,
+  isScheduleEveryUnit,
   localDateTimeToIso,
   sessionFromForm,
   sessionSelectValue,
   specFromForm,
 } from "./cadence";
 
-export type AutomationFormSubmit = {
+export type ScheduleFormSubmit = {
   readonly name: string;
   readonly projectId: string;
   readonly prompt: string;
-  readonly spec: AutomationSpec;
+  readonly spec: ScheduleSpec;
   readonly worktree: boolean;
-  readonly session: AutomationSession;
+  readonly session: ScheduleSession;
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
 };
 
-export type AutomationFormDefaults = {
+export type ScheduleFormDefaults = {
   readonly projectId?: string;
   readonly sessionId?: string;
 };
 
-export type AutomationFormProps = {
+export type ScheduleFormProps = {
   readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
-  readonly initial?: Automation;
-  readonly defaults?: AutomationFormDefaults;
+  readonly initial?: Schedule;
+  readonly defaults?: ScheduleFormDefaults;
   readonly submitting?: boolean;
-  readonly onSubmit: (value: AutomationFormSubmit) => void;
+  readonly onSubmit: (value: ScheduleFormSubmit) => void;
   readonly onCancel: () => void;
 };
 
-function formFromAutomation(
+function formFromSchedule(
   projects: ReadonlyArray<Pick<Project, "id" | "name">>,
-  initial?: Automation,
-  defaults?: AutomationFormDefaults,
-): AutomationFormValues {
+  initial?: Schedule,
+  defaults?: ScheduleFormDefaults,
+): ScheduleFormValues {
   const projectId = initial?.projectId ?? defaults?.projectId ?? projects[0]?.id ?? "";
-  const base = defaultAutomationForm(projectId);
+  const base = defaultScheduleForm(projectId);
   if (initial === undefined) {
     const sessionId = defaults?.sessionId ?? "";
     if (sessionId === "") return base;
@@ -83,7 +83,7 @@ function formFromAutomation(
       sessionId,
     };
   }
-  const session = automationSessionOf(initial);
+  const session = scheduleSessionOf(initial);
   const boundId = reuseSessionIdOf(session);
   return {
     ...base,
@@ -100,16 +100,16 @@ function formFromAutomation(
   };
 }
 
-export function AutomationForm({
+export function ScheduleForm({
   projects,
   initial,
   defaults,
   submitting = false,
   onSubmit,
   onCancel,
-}: AutomationFormProps) {
+}: ScheduleFormProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const [form, setForm] = useState(() => formFromAutomation(projects, initial, defaults));
+  const [form, setForm] = useState(() => formFromSchedule(projects, initial, defaults));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = initial !== undefined;
   const creating = initial === undefined;
@@ -142,7 +142,7 @@ export function AutomationForm({
     maxRunsNumber === null ||
     (Number.isInteger(maxRunsNumber) &&
       maxRunsNumber >= 1 &&
-      maxRunsNumber <= MAX_AUTOMATION_MAX_RUNS);
+      maxRunsNumber <= MAX_SCHEDULE_MAX_RUNS);
   const canSubmit =
     !submitting &&
     maxRunsValid &&
@@ -184,17 +184,17 @@ export function AutomationForm({
       }}
     >
       <Field>
-        <FieldLabel htmlFor="automation-name">Name</FieldLabel>
+        <FieldLabel htmlFor="schedule-name">Name</FieldLabel>
         <Input
-          id="automation-name"
-          maxLength={MAX_AUTOMATION_NAME_CHARS}
+          id="schedule-name"
+          maxLength={MAX_SCHEDULE_NAME_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
           required
           value={form.name}
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="automation-project">Project</FieldLabel>
+        <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
         <Select
           disabled={projectLocked || projects.length === 0}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
@@ -210,7 +210,7 @@ export function AutomationForm({
           }}
           value={form.projectId === "" ? null : form.projectId}
         >
-          <SelectTrigger id="automation-project">
+          <SelectTrigger id="schedule-project">
             <SelectValue placeholder="Select a project" />
           </SelectTrigger>
           <SelectContent>
@@ -223,10 +223,10 @@ export function AutomationForm({
         </Select>
       </Field>
       <Field>
-        <FieldLabel htmlFor="automation-prompt">Prompt</FieldLabel>
+        <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
         <Textarea
-          id="automation-prompt"
-          maxLength={MAX_AUTOMATION_PROMPT_CHARS}
+          id="schedule-prompt"
+          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
           required
           rows={5}
@@ -238,7 +238,7 @@ export function AutomationForm({
         <Select
           items={CADENCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
           onValueChange={(next) => {
-            if (typeof next !== "string" || !isAutomationCadence(next)) return;
+            if (typeof next !== "string" || !isScheduleCadence(next)) return;
             setForm((current) => ({
               ...current,
               cadence: next,
@@ -262,9 +262,9 @@ export function AutomationForm({
       {form.cadence === "every" ? (
         <div className="grid grid-cols-2 gap-3">
           <Field>
-            <FieldLabel htmlFor="automation-every-amount">Every</FieldLabel>
+            <FieldLabel htmlFor="schedule-every-amount">Every</FieldLabel>
             <Input
-              id="automation-every-amount"
+              id="schedule-every-amount"
               min={1}
               onChange={(event) =>
                 setForm((current) => ({ ...current, everyAmount: event.target.value }))
@@ -275,20 +275,20 @@ export function AutomationForm({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="automation-every-unit">Unit</FieldLabel>
+            <FieldLabel htmlFor="schedule-every-unit">Unit</FieldLabel>
             <Select
               items={EVERY_UNIT_OPTIONS.map((option) => ({
                 label: option.label,
                 value: option.value,
               }))}
               onValueChange={(next) => {
-                if (typeof next === "string" && isAutomationEveryUnit(next)) {
+                if (typeof next === "string" && isScheduleEveryUnit(next)) {
                   setForm((current) => ({ ...current, everyUnit: next }));
                 }
               }}
               value={form.everyUnit}
             >
-              <SelectTrigger id="automation-every-unit">
+              <SelectTrigger id="schedule-every-unit">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -304,9 +304,9 @@ export function AutomationForm({
       ) : null}
       {form.cadence === "daily" || form.cadence === "weekdays" || form.cadence === "weekly" ? (
         <Field>
-          <FieldLabel htmlFor="automation-time">Time</FieldLabel>
+          <FieldLabel htmlFor="schedule-time">Time</FieldLabel>
           <Input
-            id="automation-time"
+            id="schedule-time"
             onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}
             type="time"
             value={form.time}
@@ -315,7 +315,7 @@ export function AutomationForm({
       ) : null}
       {form.cadence === "weekly" ? (
         <Field>
-          <FieldLabel htmlFor="automation-weekday">Weekday</FieldLabel>
+          <FieldLabel htmlFor="schedule-weekday">Weekday</FieldLabel>
           <Select
             items={WEEKDAY_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
             onValueChange={(next) => {
@@ -325,7 +325,7 @@ export function AutomationForm({
             }}
             value={form.weekday}
           >
-            <SelectTrigger id="automation-weekday">
+            <SelectTrigger id="schedule-weekday">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -340,9 +340,9 @@ export function AutomationForm({
       ) : null}
       {form.cadence === "once" ? (
         <Field>
-          <FieldLabel htmlFor="automation-once">Run at</FieldLabel>
+          <FieldLabel htmlFor="schedule-once">Run at</FieldLabel>
           <Input
-            id="automation-once"
+            id="schedule-once"
             onChange={(event) => setForm((current) => ({ ...current, runAt: event.target.value }))}
             required
             type="datetime-local"
@@ -353,9 +353,9 @@ export function AutomationForm({
       {form.cadence === "cron" ? (
         <>
           <Field>
-            <FieldLabel htmlFor="automation-cron">Cron</FieldLabel>
+            <FieldLabel htmlFor="schedule-cron">Cron</FieldLabel>
             <Input
-              id="automation-cron"
+              id="schedule-cron"
               onChange={(event) => setForm((current) => ({ ...current, cron: event.target.value }))}
               placeholder="0 9 * * 1-5"
               required
@@ -363,9 +363,9 @@ export function AutomationForm({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="automation-timezone">Timezone</FieldLabel>
+            <FieldLabel htmlFor="schedule-timezone">Timezone</FieldLabel>
             <Input
-              id="automation-timezone"
+              id="schedule-timezone"
               onChange={(event) =>
                 setForm((current) => ({ ...current, timeZone: event.target.value }))
               }
@@ -377,9 +377,9 @@ export function AutomationForm({
         </>
       ) : null}
       <Field>
-        <FieldLabel htmlFor="automation-expires">Expires</FieldLabel>
+        <FieldLabel htmlFor="schedule-expires">Expires</FieldLabel>
         <Input
-          id="automation-expires"
+          id="schedule-expires"
           onChange={(event) =>
             setForm((current) => ({ ...current, expiresAt: event.target.value }))
           }
@@ -389,10 +389,10 @@ export function AutomationForm({
         <FieldDescription>Optional. After this time the schedule pauses itself.</FieldDescription>
       </Field>
       <Field>
-        <FieldLabel htmlFor="automation-max-runs">Stop after N runs</FieldLabel>
+        <FieldLabel htmlFor="schedule-max-runs">Stop after N runs</FieldLabel>
         <Input
-          id="automation-max-runs"
-          max={MAX_AUTOMATION_MAX_RUNS}
+          id="schedule-max-runs"
+          max={MAX_SCHEDULE_MAX_RUNS}
           min={1}
           onChange={(event) => setForm((current) => ({ ...current, maxRuns: event.target.value }))}
           placeholder="Unlimited"
@@ -406,14 +406,14 @@ export function AutomationForm({
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
           <div className="min-w-0">
-            <FieldLabel htmlFor="automation-reuse">Reuse one session</FieldLabel>
+            <FieldLabel htmlFor="schedule-reuse">Reuse one session</FieldLabel>
             <FieldDescription>
               Keep sending prompts to the same chat instead of creating a new one.
             </FieldDescription>
           </div>
           <Switch
             checked={form.reuseSession}
-            id="automation-reuse"
+            id="schedule-reuse"
             onCheckedChange={(checked) =>
               setForm((current) => ({ ...current, reuseSession: checked }))
             }
@@ -422,7 +422,7 @@ export function AutomationForm({
       </Field>
       {form.reuseSession ? (
         <Field>
-          <FieldLabel htmlFor="automation-session">Session</FieldLabel>
+          <FieldLabel htmlFor="schedule-session">Session</FieldLabel>
           <Select
             disabled={form.projectId.length === 0}
             items={sessionItems}
@@ -444,7 +444,7 @@ export function AutomationForm({
             }}
             value={selectedSessionValue}
           >
-            <SelectTrigger id="automation-session">
+            <SelectTrigger id="schedule-session">
               <SelectValue placeholder="Create on first run" />
             </SelectTrigger>
             <SelectContent>
@@ -462,10 +462,10 @@ export function AutomationForm({
       ) : null}
       <Field>
         <div className="flex w-full items-center justify-between gap-3">
-          <FieldLabel htmlFor="automation-worktree">Isolated worktree</FieldLabel>
+          <FieldLabel htmlFor="schedule-worktree">Isolated worktree</FieldLabel>
           <Switch
             checked={form.worktree}
-            id="automation-worktree"
+            id="schedule-worktree"
             onCheckedChange={(checked) => setForm((current) => ({ ...current, worktree: checked }))}
           />
         </div>
@@ -474,14 +474,14 @@ export function AutomationForm({
         <Field>
           <div className="flex w-full items-center justify-between gap-3">
             <div className="min-w-0">
-              <FieldLabel htmlFor="automation-run-now">Run now</FieldLabel>
+              <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
               <FieldDescription>
                 Start a session as soon as this schedule is created.
               </FieldDescription>
             </div>
             <Switch
               checked={form.runNow}
-              id="automation-run-now"
+              id="schedule-run-now"
               onCheckedChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
             />
           </div>

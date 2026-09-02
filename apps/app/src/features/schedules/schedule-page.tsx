@@ -1,5 +1,5 @@
-import type { Project, Automation } from "@getpie/contract";
-import { MAX_AUTOMATIONS } from "@getpie/contract";
+import type { Project, Schedule } from "@getpie/contract";
+import { MAX_SCHEDULES } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
@@ -16,44 +16,44 @@ import { toast } from "sonner";
 
 import Loader from "@/components/loader";
 
-import { AutomationCard } from "./automation-card";
-import { AutomationDeleteDialog } from "./automation-delete-dialog";
-import { AutomationEditorDialog, type AutomationEditorState } from "./automation-editor-dialog";
-import type { AutomationFormSubmit } from "./automation-form";
-import { AutomationRunHistory } from "./automation-run-history";
 import { formatSessionReuse } from "./cadence";
+import { ScheduleCard } from "./schedule-card";
+import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
+import { ScheduleEditorDialog, type ScheduleEditorState } from "./schedule-editor-dialog";
+import type { ScheduleFormSubmit } from "./schedule-form";
+import { ScheduleRunHistory } from "./schedule-run-history";
 
-export type AutomationCreateDefaults = {
+export type ScheduleCreateDefaults = {
   readonly projectId?: string;
   readonly sessionId?: string;
 };
 
-export type AutomationPageProps = {
+export type SchedulePageProps = {
   readonly projects: ReadonlyArray<Project>;
   readonly projectsReady: boolean;
   readonly createOpen: boolean;
-  readonly createDefaults?: AutomationCreateDefaults;
+  readonly createDefaults?: ScheduleCreateDefaults;
   readonly onOpenCreate: () => void;
   readonly onCloseCreate: () => void;
 };
 
-export function AutomationPage({
+export function SchedulePage({
   projects,
   projectsReady,
   createOpen,
   createDefaults,
   onOpenCreate,
   onCloseCreate,
-}: AutomationPageProps) {
+}: SchedulePageProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState<Automation | null>(null);
-  const [deleting, setDeleting] = useState<Automation | null>(null);
-  const [history, setHistory] = useState<Automation | null>(null);
+  const [editing, setEditing] = useState<Schedule | null>(null);
+  const [deleting, setDeleting] = useState<Schedule | null>(null);
+  const [history, setHistory] = useState<Schedule | null>(null);
 
-  const automations = useQuery({
-    ...orpcQueryUtils.automation.list.queryOptions(),
+  const schedules = useQuery({
+    ...orpcQueryUtils.schedule.list.queryOptions(),
     refetchInterval: (query) => {
       const items = query.state.data;
       if (items === undefined) return false;
@@ -63,13 +63,13 @@ export function AutomationPage({
 
   const invalidate = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() }),
+      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() }),
       queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() }),
     ]);
 
   const create = useMutation({
-    mutationFn: (value: AutomationFormSubmit) =>
-      orpcQueryUtils.automation.create.call({
+    mutationFn: (value: ScheduleFormSubmit) =>
+      orpcQueryUtils.schedule.create.call({
         name: value.name,
         projectId: value.projectId,
         prompt: value.prompt,
@@ -89,7 +89,7 @@ export function AutomationPage({
           params: { sessionId: created.lastSessionId },
           search: { projectId: created.projectId },
         }).catch((error: unknown) => {
-          console.error("Failed to open the automation session", error);
+          console.error("Failed to open the schedule session", error);
         });
         return;
       }
@@ -106,11 +106,11 @@ export function AutomationPage({
 
   const update = useMutation({
     mutationFn: (
-      input: { readonly id: string } & Partial<AutomationFormSubmit> & {
+      input: { readonly id: string } & Partial<ScheduleFormSubmit> & {
           readonly enabled?: boolean;
         },
     ) =>
-      orpcQueryUtils.automation.update.call({
+      orpcQueryUtils.schedule.update.call({
         id: input.id,
         ...(input.name !== undefined ? { name: input.name } : undefined),
         ...(input.prompt !== undefined ? { prompt: input.prompt } : undefined),
@@ -123,22 +123,22 @@ export function AutomationPage({
       }),
     onSuccess: () => {
       setEditing(null);
-      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
+      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
     },
     onError: (error) => toast.error(`Failed to update schedule: ${error.message}`),
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => orpcQueryUtils.automation.delete.call({ id }),
+    mutationFn: (id: string) => orpcQueryUtils.schedule.delete.call({ id }),
     onSuccess: () => {
       setDeleting(null);
-      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.automation.list.key() });
+      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
     },
     onError: (error) => toast.error(`Failed to delete schedule: ${error.message}`),
   });
 
   const runNow = useMutation({
-    mutationFn: (id: string) => orpcQueryUtils.automation.runNow.call({ id }),
+    mutationFn: (id: string) => orpcQueryUtils.schedule.runNow.call({ id }),
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
@@ -147,22 +147,22 @@ export function AutomationPage({
           params: { sessionId: result.ref.sessionId },
           search: { projectId: result.ref.projectId },
         }).catch((error: unknown) => {
-          console.error("Failed to open the automation session", error);
+          console.error("Failed to open the schedule session", error);
         });
         return;
       }
-      if (result.automation.lastRunStatus === "skipped") {
+      if (result.schedule.lastRunStatus === "skipped") {
         toast.error("Schedule did not start a session (skipped).");
         return;
       }
-      if (result.automation.lastRunStatus === "failed") {
-        toast.error(result.automation.lastError ?? "Schedule failed to start a session.");
+      if (result.schedule.lastRunStatus === "failed") {
+        toast.error(result.schedule.lastError ?? "Schedule failed to start a session.");
       }
     },
     onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
   });
 
-  const items = automations.data ?? [];
+  const items = schedules.data ?? [];
   const projectIds = [...new Set(items.map((item) => item.projectId))];
   const sessionLists = useQueries({
     queries: projectIds.map((projectId) =>
@@ -177,9 +177,9 @@ export function AutomationPage({
       sessionTitleById.set(session.sessionId, session.title ?? "New chat");
     }
   }
-  const editor: AutomationEditorState | null =
+  const editor: ScheduleEditorState | null =
     editing !== null
-      ? { mode: "edit", automation: editing }
+      ? { mode: "edit", schedule: editing }
       : createOpen
         ? {
             mode: "create",
@@ -187,21 +187,21 @@ export function AutomationPage({
             sessionId: createDefaults?.sessionId,
           }
         : null;
-  const historyAutomation =
+  const historySchedule =
     history === null ? null : (items.find((item) => item.id === history.id) ?? history);
-  const atLimit = items.length >= MAX_AUTOMATIONS;
+  const atLimit = items.length >= MAX_SCHEDULES;
   const canCreate = projectsReady && projects.length > 0 && !atLimit;
 
-  if (!projectsReady || automations.isPending) {
+  if (!projectsReady || schedules.isPending) {
     return <Loader />;
   }
 
-  if (automations.isError) {
+  if (schedules.isError) {
     return (
       <Empty>
         <EmptyHeader>
           <EmptyTitle>Could not load schedules</EmptyTitle>
-          <EmptyDescription>{automations.error.message}</EmptyDescription>
+          <EmptyDescription>{schedules.error.message}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -220,7 +220,7 @@ export function AutomationPage({
             projects.length === 0
               ? "Import a project first"
               : atLimit
-                ? `You can have at most ${MAX_AUTOMATIONS} schedules`
+                ? `You can have at most ${MAX_SCHEDULES} schedules`
                 : undefined
           }
         >
@@ -244,19 +244,19 @@ export function AutomationPage({
         </Empty>
       ) : (
         <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
-          {items.map((automation) => (
-            <AutomationCard
-              automation={automation}
-              key={automation.id}
-              onDelete={() => setDeleting(automation)}
-              onEdit={() => setEditing(automation)}
-              onHistory={() => setHistory(automation)}
-              onRunNow={() => runNow.mutate(automation.id)}
-              onToggle={(enabled) => update.mutate({ id: automation.id, enabled })}
+          {items.map((schedule) => (
+            <ScheduleCard
+              schedule={schedule}
+              key={schedule.id}
+              onDelete={() => setDeleting(schedule)}
+              onEdit={() => setEditing(schedule)}
+              onHistory={() => setHistory(schedule)}
+              onRunNow={() => runNow.mutate(schedule.id)}
+              onToggle={(enabled) => update.mutate({ id: schedule.id, enabled })}
               projectName={
-                projects.find((item) => item.id === automation.projectId)?.name ?? "Unknown project"
+                projects.find((item) => item.id === schedule.projectId)?.name ?? "Unknown project"
               }
-              sessionLine={formatSessionReuse(automation.session, sessionTitleById)}
+              sessionLine={formatSessionReuse(schedule.session, sessionTitleById)}
               running={runNow.isPending}
               updating={update.isPending}
             />
@@ -265,7 +265,7 @@ export function AutomationPage({
       )}
 
       {editor !== null ? (
-        <AutomationEditorDialog
+        <ScheduleEditorDialog
           editor={editor}
           onClose={() => {
             if (editor.mode === "create") {
@@ -279,38 +279,38 @@ export function AutomationPage({
               create.mutate(value);
               return;
             }
-            update.mutate({ id: editor.automation.id, ...value });
+            update.mutate({ id: editor.schedule.id, ...value });
           }}
           projects={projects}
           submitting={create.isPending || update.isPending}
         />
       ) : null}
 
-      {historyAutomation !== null ? (
-        <AutomationRunHistory
-          automation={historyAutomation}
+      {historySchedule !== null ? (
+        <ScheduleRunHistory
+          schedule={historySchedule}
           nowMs={Date.now()}
           onClose={() => setHistory(null)}
           onOpenSession={(sessionId) => {
-            const projectId = historyAutomation.projectId;
+            const projectId = historySchedule.projectId;
             setHistory(null);
             navigate({
               to: "/session/$sessionId",
               params: { sessionId },
               search: { projectId },
             }).catch((error: unknown) => {
-              console.error("Failed to open the automation session", error);
+              console.error("Failed to open the schedule session", error);
             });
           }}
           projectName={
-            projects.find((item) => item.id === historyAutomation.projectId)?.name ??
+            projects.find((item) => item.id === historySchedule.projectId)?.name ??
             "Unknown project"
           }
         />
       ) : null}
 
       {deleting !== null ? (
-        <AutomationDeleteDialog
+        <ScheduleDeleteDialog
           name={deleting.name}
           onCancel={() => setDeleting(null)}
           onConfirm={() => remove.mutate(deleting.id)}

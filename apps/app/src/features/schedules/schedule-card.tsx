@@ -1,4 +1,4 @@
-import { firedRunCount, type Automation } from "@getpie/contract";
+import { firedRunCount, type Schedule } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Switch } from "@getpie/ui/components/switch";
 
@@ -11,8 +11,8 @@ import {
   summarizeRuns,
 } from "./cadence";
 
-export type AutomationCardProps = {
-  readonly automation: Automation;
+export type ScheduleCardProps = {
+  readonly schedule: Schedule;
   readonly projectName: string;
   readonly sessionLine: string | null;
   readonly updating: boolean;
@@ -24,8 +24,8 @@ export type AutomationCardProps = {
   readonly onDelete: () => void;
 };
 
-export function AutomationCard({
-  automation,
+export function ScheduleCard({
+  schedule,
   projectName,
   sessionLine,
   updating,
@@ -35,39 +35,39 @@ export function AutomationCard({
   onHistory,
   onEdit,
   onDelete,
-}: AutomationCardProps) {
-  const lastRun = formatLastRun(automation);
-  const summary = formatRunSummary(summarizeRuns(automation.runs));
+}: ScheduleCardProps) {
+  const lastRun = formatLastRun(schedule);
+  const summary = formatRunSummary(summarizeRuns(schedule.runs));
   return (
     <li className="border-border bg-card flex flex-col gap-3 rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate font-medium">{automation.name}</div>
+          <div className="truncate font-medium">{schedule.name}</div>
           <div className="text-muted-foreground truncate text-sm">
-            {projectName} · {formatSpec(automation.spec)}
+            {projectName} · {formatSpec(schedule.spec)}
           </div>
           <div className="text-muted-foreground text-sm">
             {formatNextRun(
-              automation.nextRunAt,
-              automation.enabled,
-              automation.pauseReason,
-              automation.maxRuns,
+              schedule.nextRunAt,
+              schedule.enabled,
+              schedule.pauseReason,
+              schedule.maxRuns,
             )}
           </div>
           {sessionLine !== null ? (
             <div className="text-muted-foreground text-sm">{sessionLine}</div>
           ) : null}
-          {automation.maxRuns !== undefined ? (
+          {schedule.maxRuns !== undefined ? (
             <div className="text-muted-foreground text-sm">
-              {formatFiredCap(firedRunCount(automation), automation.maxRuns)}
+              {formatFiredCap(firedRunCount(schedule), schedule.maxRuns)}
             </div>
           ) : null}
           {lastRun !== null ? <div className="text-muted-foreground text-sm">{lastRun}</div> : null}
           {summary !== null ? <div className="text-muted-foreground text-sm">{summary}</div> : null}
         </div>
         <Switch
-          aria-label={automation.enabled ? "Pause schedule" : "Enable schedule"}
-          checked={automation.enabled}
+          aria-label={schedule.enabled ? "Pause schedule" : "Enable schedule"}
+          checked={schedule.enabled}
           disabled={updating}
           onCheckedChange={onToggle}
         />

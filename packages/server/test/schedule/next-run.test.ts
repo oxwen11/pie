@@ -12,7 +12,7 @@ import {
   nextWakeDelayMs,
   validateExpiresAt,
   validateSpec,
-} from "../../src/automation/next-run";
+} from "../../src/schedule/next-run";
 
 const NOW = Date.parse("2026-08-27T08:00:00.000Z");
 
