@@ -248,15 +248,14 @@ export function applyBrowserEnv(vars: BrowserEnvVars, env: NodeJS.ProcessEnv): v
   }
 }
 
-function isolationUnsets(vars: BrowserEnvVars): string[] {
-  const keys = [...BROWSER_ENV_UNSET];
-  for (const key of BROWSER_ENV_KEYS) {
-    const value = vars[key];
-    if (value === undefined || value === "") {
-      keys.push(key);
-    }
-  }
-  return keys;
+function isolationUnsets(vars: BrowserEnvVars) {
+  return [
+    ...BROWSER_ENV_UNSET,
+    ...BROWSER_ENV_KEYS.filter((key) => {
+      const value = vars[key];
+      return value === undefined || value === "";
+    }),
+  ];
 }
 
 function shellQuote(value: string): string {
