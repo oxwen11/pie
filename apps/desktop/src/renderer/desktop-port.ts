@@ -1,16 +1,15 @@
-import { DESKTOP_PORT_CHANNEL } from "../shared/desktop-channel";
+import { DESKTOP_PORT_CHANNEL, DESKTOP_PORT_READY } from "../shared/desktop-channel";
 
 const PORT_TIMEOUT_MS = 15_000;
 
 /**
- * The preload installs its IPC relay before page scripts run, but Main only
- * transfers the port after `did-finish-load`. The renderer must therefore wait
- * for the relayed window message even though the preload is already active.
+ * Main transfers the port after `did-finish-load`. Vite can run this module
+ * after that event, so preload queues the port until we announce ready.
  */
 export function waitForDesktopPort(): Promise<MessagePort> {
   return new Promise((resolve, reject) => {
     const onMessage = (event: MessageEvent): void => {
-      if (event.data?.type !== DESKTOP_PORT_CHANNEL) return;
+      if (event.source !== window || event.data?.type !== DESKTOP_PORT_CHANNEL) return;
       const [port] = event.ports;
       if (!port) return;
 
@@ -25,5 +24,6 @@ export function waitForDesktopPort(): Promise<MessagePort> {
     }, PORT_TIMEOUT_MS);
 
     window.addEventListener("message", onMessage);
+    window.postMessage({ type: DESKTOP_PORT_READY }, "*");
   });
 }

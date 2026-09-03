@@ -7,7 +7,7 @@ lifecycle and connection topology**.
 It sits between two existing designs and should be read with them:
 
 - [`2026-07-14-desktop-embedding-comparison.md`](./2026-07-14-desktop-embedding-comparison.md) — how the UI gets into the Electron window (out of scope here).
-- [`2026-07-19-remote-ssh-server-design.md`](./2026-07-19-remote-ssh-server-design.md) — the **SSH-tunnel remote model** (v1 implemented on branch `t3code/multi-server-ssh`). This document defers to it for everything "remote" and only unifies the _local_ launch path with it.
+- [`2026-08-26-remote-ssh-server-design.md`](./2026-08-26-remote-ssh-server-design.md) — the **SSH-tunnel remote model**. This document defers to it for everything "remote" and only unifies the _local_ launch path with it.
 
 ## The problem (local plane)
 
@@ -34,14 +34,15 @@ instances with different configs and no coordination:
 
 ## The key realization: the remote plane already got this right
 
-The SSH-remote design (already landing) treats a remote `pie serve` as a
+The SSH-remote design treats a remote `pie daemon` as a
 **single-instance daemon discovered through files**:
-`~/.pie/ssh-launch/<stateKey>/` holds `pid`, `port`, and `token`, and the
-launch script _reuses_ a healthy running server instead of starting a second one.
-The client reaches it purely over `ssh -L` and only ever talks to `127.0.0.1`.
-"Internet from anywhere" is already solved there by **SSH + Tailscale** (a tailnet
-MagicDNS host is just an ordinary SSH host) — no relay, no inbound ports, leaning
-entirely on the user's existing SSH trust.
+`~/.pie/daemon/daemon.pid` holds pid, address, and token (same as local).
+`~/.pie/ssh-launch/<stateKey>/` holds only the runner script and log. The
+launch script _reuses_ a healthy running daemon instead of starting a second
+one. The client reaches it purely over `ssh -L` and only ever talks to
+`127.0.0.1`. "Internet from anywhere" is already solved there by **SSH +
+Tailscale** (a tailnet MagicDNS host is just an ordinary SSH host) — no relay,
+no inbound ports, leaning entirely on the user's existing SSH trust.
 
 So the topology principle is not new — it is **already implemented remotely** and
 merely missing locally:
@@ -320,7 +321,7 @@ Phases 1–4.
 
 ## References
 
-- [`2026-07-19-remote-ssh-server-design.md`](./2026-07-19-remote-ssh-server-design.md) — the authoritative remote model this design defers to.
+- [`2026-08-26-remote-ssh-server-design.md`](./2026-08-26-remote-ssh-server-design.md) — the authoritative remote model this design defers to.
 - [`2026-07-14-desktop-embedding-comparison.md`](./2026-07-14-desktop-embedding-comparison.md) — UI-into-window; port/readiness/auth per project.
 - Prior art read from source: opencode (`packages/server` + `lildax` split,
   `utilityProcess` sidecar), paseo (`@getpaseo/server` resident daemon,

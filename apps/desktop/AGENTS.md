@@ -11,6 +11,8 @@ src/main/index.ts
   -> src/main/desktop-runtime.ts
        -> application
        -> server
+       -> ssh
+       -> tailscale
        -> rpc
        -> electron adapters
 ```
@@ -20,9 +22,11 @@ Allowed production dependencies:
 - `src/main/index.ts` imports only `desktop-runtime.ts`.
 - `desktop-runtime.ts` and `desktop-runtime-glue.ts` may import every Main module because they are the composition root. `desktop-runtime-glue.ts` holds the subset of glue Layers that need to stay importable from tests without pulling in `electron/main-window.ts` (see "Tag and Layer ownership" below).
 - `desktop-config.ts` has no dependencies of its own (besides the shared `APP_ORIGIN` constant) and may be depended on by any Main module.
-- `application/**` may depend on server interfaces, shared desktop types, and Effect core.
+- `application/**` may depend on server interfaces (`LocalServer`, `DesktopSsh`, `DesktopTailscale`), shared desktop types, and Effect core. It must not import `@getpie/ssh` or `@getpie/tailscale` — consume them through those Tags (which re-export the types the application needs).
+- `ssh/desktop-ssh.ts` (`DesktopSsh` Tag): persist saved hosts and open/close tunnels via `@getpie/ssh`. May import `@getpie/ssh`, Effect platform, and `desktop-config`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
+- `tailscale/` (`DesktopTailscale` Tag): probe the Tailscale CLI, list MagicDNS peers as SSH hosts, and opt-in Serve. May import `@getpie/tailscale`, Effect platform, and `desktop-config`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
 - `server/local-server.ts` may depend on Effect core and shared desktop types.
-- Server platform adapters (including `server/local-server-live.ts`) may depend on server-owned ports, `desktop-config.ts`, Effect platform, and the CLI handshake.
+- Server platform adapters (including `server/local-server-live.ts`) may depend on server-owned ports, `desktop-config.ts`, Effect platform, the CLI handshake, and `tailscale/allowed-hosts.ts` (MagicDNS → `PIE_ALLOWED_HOSTS`).
 - `rpc/**` may depend on the application interface, the shared contract, oRPC, and Effect core.
 - `electron/**` may depend on Electron, `desktop-config.ts`, other `electron/**` modules, and generic callbacks supplied by the composition root.
 - `preload/**` may depend only on Electron and transport constants from `shared/**`.
@@ -42,7 +46,7 @@ Keep implementation adapters behind interfaces owned by the module that consumes
 
 ### Tag and Layer ownership
 
-Most capability modules (`LocalServer`, `DesktopApplication`, `RendererChannel`, `MainWindow`, `DesktopConfig`) are exposed as an Effect `Context.Service` Tag rather than a plain interface, so the composition root can wire them as a Layer graph instead of threading constructor parameters by hand.
+Most capability modules (`LocalServer`, `DesktopSsh`, `DesktopTailscale`, `DesktopApplication`, `RendererChannel`, `MainWindow`, `DesktopConfig`) are exposed as an Effect `Context.Service` Tag rather than a plain interface, so the composition root can wire them as a Layer graph instead of threading constructor parameters by hand.
 
 - The Tag and its factory function live together in the module that owns the capability (e.g. `LocalServer` and `makeLocalServer` in `server/local-server.ts`). The factory keeps taking plain parameters and stays the unit tests target — Layer wiring is a thin wrapper around it, not a replacement for it.
 - The `Live` Layer for a Tag lives next to the Tag **only if building it needs nothing the module isn't already allowed to import** (e.g. `MainWindowLive` in `electron/main-window.ts` only needs `DesktopConfig` and `RendererChannel`, both already-allowed electron/** dependencies).

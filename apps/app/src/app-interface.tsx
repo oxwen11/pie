@@ -8,7 +8,7 @@ import "./index.css";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
-import { createAppClients, type AppClients } from "./lib/orpc";
+import { createAppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
@@ -28,7 +28,20 @@ declare global {
 // the default init fires a version check at react-grab.com, which the Electron
 // renderer's CSP blocks with a console error.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
+  void import("react-grab/core").then(({ init }) => {
+    // Banner is a CSS-styled console.log with an inline SVG. Chromium's
+    // ELECTRON_ENABLE_LOGGING dumps that as a multi-kilobyte TTY blob.
+    const log = console.log.bind(console);
+    console.log = (...args: unknown[]) => {
+      if (typeof args[0] === "string" && args[0].includes("%cReact Grab")) return;
+      log(...args);
+    };
+    try {
+      init({ telemetry: false });
+    } finally {
+      console.log = log;
+    }
+  });
 }
 
 // Dev only: highlights components as they re-render so you can spot wasted
@@ -39,18 +52,23 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
 // Its own version check has no opt-out and is patched out instead — see
 // `patches/react-scan@0.5.7.patch`.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
+  // react-scan's intro is another %c console.log; hideIntro skips it.
+  Object.assign(window, { hideIntro: true });
   void import("react-scan").then(({ scan }) => scan());
 }
 
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
-  const [clients] = useState(() => createAppClients(server));
-  return <AppRuntime {...clients} />;
+  // Daemon respawn mints a new ticket token. Keep clients tied to that identity
+  // so getTicket cannot keep posting the previous Bearer.
+  const identity = server ? `${server.httpBaseUrl}\0${server.token}` : "default";
+  return <AppRuntime key={identity} server={server} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
-function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
+function AppRuntime({ server }: { server?: ServerConnection }): ReactElement {
+  const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => createAppClients(server));
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(

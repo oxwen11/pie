@@ -89,3 +89,9 @@ _Avoid_: panel object, panel controller
 **Tab strip**:
 The host's row of open panels — the only place a tab is drawn. A panel that wants several of something opens several panels rather than growing tabs of its own.
 _Avoid_: inner tabs, sub-tabs, splits
+
+## Environments (desktop)
+
+**Environment**:
+A pie daemon the desktop app is talking to. `local` is this computer's daemon and does not need OpenSSH. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel, and only exists when this computer has an OpenSSH client on PATH. A Tailscale MagicDNS name is an ordinary SSH host on the tailnet — the renderer still talks only to `127.0.0.1` after the tunnel is up. Opt-in `tailscale serve` can reverse-proxy this computer's loopback daemon at the MagicDNS HTTPS name; CORS trusts that name via `PIE_ALLOWED_HOSTS`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
+_Avoid_: server (ambiguous with the HTTP process), remote machine, workspace, connection (the token+URL triple is `ServerConnection`)

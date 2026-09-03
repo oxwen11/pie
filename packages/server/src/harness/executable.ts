@@ -3,8 +3,8 @@ import path from "node:path";
 import { Effect, FileSystem } from "effect";
 
 /**
- * Locating a CLI executable on PATH before spawning it. Pi resolves its own
- * binary via `resolvePiExecutable`; this helper is shared for cheap
+ * Locating a CLI executable on PATH before spawning it. Pi is the host
+ * `pi` binary (`resolvePiExecutable`); this helper is shared for cheap
  * availability checks — a PATH lookup answers "can we spawn this command"
  * without starting a process that was never going to succeed.
  *

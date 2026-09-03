@@ -13,6 +13,8 @@ import {
   makeDesktopApplication,
 } from "../application/desktop-application";
 import type { LocalServer } from "../server/local-server";
+import { disabledDesktopSsh } from "../ssh/desktop-ssh";
+import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
 import { makeDesktopRpcServer } from "./desktop-rpc-server";
 
 type DesktopClient = RouterContractClient<DesktopContract>;
@@ -62,6 +64,9 @@ function makeHarness(
   };
   const base = makeDesktopApplication({
     server,
+    ssh: disabledDesktopSsh(),
+    tailscale: disabledDesktopTailscale(),
+    initialRemotes: [],
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -115,6 +120,14 @@ describe("Desktop MessagePort RPC", () => {
         statusRevision: 0,
         // Literal would pin this to the developer's OS; see desktop-application.test.ts.
         os: expect.stringMatching(/^(macos|windows|linux)$/),
+        sshClient: { available: true },
+        tailscaleClient: { available: true },
+        environments: {
+          revision: 0,
+          activeId: "local",
+          connectingLabel: null,
+          remotes: [],
+        },
       });
       await expect(h.client.server.connection()).resolves.toEqual({
         httpBaseUrl: "http://127.0.0.1:43123",

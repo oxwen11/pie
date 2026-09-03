@@ -1,11 +1,12 @@
 import url from "node:url";
 
-import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { isRunningFromAgent } from "agent-cli-detector";
 import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "vite";
+
+import { tailwindcssVite } from "./tailwindcss-vite";
 
 /**
  * The dev server the browser talks to. The pie server no longer embeds Vite,
@@ -58,7 +59,7 @@ export default defineConfig({
     },
   },
   plugins: [
-    codeInspectorPlugin({ bundler: "vite" }),
+    codeInspectorPlugin({ bundler: "vite", hideConsole: true }),
     tanstackRouter({
       target: "react",
       autoCodeSplitting: true,
@@ -66,6 +67,6 @@ export default defineConfig({
       generatedRouteTree: url.fileURLToPath(new URL("./src/routeTree.gen.ts", import.meta.url)),
     }),
     react(),
-    tailwindcss(),
+    ...tailwindcssVite(),
   ],
 });

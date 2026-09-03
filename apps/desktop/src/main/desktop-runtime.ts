@@ -6,6 +6,7 @@ import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { resolveDevelopmentScope } from "@getpie/core/development-scope";
 import { resolvePieHome } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
+import { SshPasswordPrompt } from "@getpie/ssh";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
 
@@ -16,7 +17,9 @@ import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
+import { DesktopSshLive } from "./ssh/desktop-ssh";
 import { formatStartupFailure } from "./startup-failure";
+import { DesktopTailscaleLive } from "./tailscale/desktop-tailscale";
 
 function makeRuntime(devUrl: string | undefined) {
   // The Node platform services: the daemon launcher's file state and token
@@ -33,6 +36,7 @@ function makeRuntime(devUrl: string | undefined) {
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     devUrl,
+    userDataPath: app.getPath("userData"),
   });
 
   return ManagedRuntime.make(
@@ -40,6 +44,9 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(RendererChannelLive),
       Layer.provide(DesktopApplicationLive),
       Layer.provide(LocalServerLive),
+      Layer.provide(DesktopSshLive),
+      Layer.provide(DesktopTailscaleLive),
+      Layer.provide(SshPasswordPrompt.disabledLayer),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
       Layer.provideMerge(DesktopObservabilityLive),
@@ -49,6 +56,7 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
+  console.error(`[pie] desktop runtime starting pid=${String(process.pid)}`);
   const isE2E = process.env["PIE_E2E"] === "1";
   if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
 
@@ -130,6 +138,11 @@ export function startDesktopRuntime(): void {
   };
 
   if (!app.requestSingleInstanceLock()) {
+    // electron-vite prints "starting electron app..." then this process exits
+    // with no other log, which looks like a failed boot.
+    console.error(
+      "Pie is already running for this worktree (single-instance lock). Quit the other window and retry.",
+    );
     allowQuit = true;
     app.quit();
     return;
