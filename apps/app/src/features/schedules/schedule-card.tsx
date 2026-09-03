@@ -22,41 +22,40 @@ export function ScheduleCard({
   onToggle,
 }: ScheduleCardProps) {
   return (
-    <li
-      className={cn(
-        "border-border bg-card rounded-xl border",
-        selected && "border-foreground/30 bg-muted/40",
-      )}
-      data-state={selected ? "selected" : undefined}
-    >
-      <div className="flex items-start">
+    <li>
+      <div
+        className={cn(
+          "hover:bg-accent/50 has-data-checked:border-primary/48 has-data-checked:bg-accent/50 flex items-center gap-6 rounded-lg border p-3",
+          selected && "bg-accent/50",
+        )}
+        data-state={selected ? "selected" : undefined}
+      >
         <button
           aria-pressed={selected}
-          className="focus-visible:ring-ring min-w-0 flex-1 rounded-s-xl p-4 text-left focus-visible:ring-2 focus-visible:outline-none"
+          className="focus-visible:ring-ring flex min-w-0 flex-1 flex-col gap-1 rounded-md text-left focus-visible:ring-2 focus-visible:outline-none"
           onClick={onSelect}
           type="button"
         >
-          <div className="truncate font-medium">{schedule.name}</div>
-          <div className="text-muted-foreground truncate text-sm">
+          <p className="truncate">{schedule.name}</p>
+          <p className="text-muted-foreground truncate text-xs">
             {projectName} · {formatSpec(schedule.spec)}
-          </div>
-          <div className="text-muted-foreground text-sm">
+          </p>
+          <p className="text-muted-foreground truncate text-xs">
             {formatNextRun(
               schedule.nextRunAt,
               schedule.enabled,
               schedule.pauseReason,
               schedule.maxRuns,
             )}
-          </div>
+          </p>
         </button>
-        <div className="p-4 ps-0">
-          <Switch
-            aria-label={schedule.enabled ? "Pause schedule" : "Enable schedule"}
-            checked={schedule.enabled}
-            disabled={updating}
-            onCheckedChange={onToggle}
-          />
-        </div>
+        <Switch
+          aria-label={schedule.enabled ? "Pause schedule" : "Enable schedule"}
+          checked={schedule.enabled}
+          className="[--thumb-size:--spacing(4)] sm:[--thumb-size:--spacing(3)]"
+          disabled={updating}
+          onCheckedChange={onToggle}
+        />
       </div>
     </li>
   );
