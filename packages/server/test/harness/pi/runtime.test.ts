@@ -37,6 +37,7 @@ const makeFakeProcess = Effect.gen(function* () {
       awaitTermination: () => Deferred.await(termination),
       respondPermission: () => unexpected(),
       interrupt: () => unexpected(),
+      replaceQueue: () => unexpected(),
       abort: () => Ref.update(abortCalls, (count) => count + 1),
       getModelState: () => unexpected(),
       setModel: () => unexpected(),
