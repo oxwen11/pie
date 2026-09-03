@@ -3,28 +3,14 @@
 import "zod/compile";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
-import {
-  resolveDaemonDirectory,
-  resolveDaemonLocation,
-  resolveOrSpawnDaemon,
-  statusDaemon,
-  stopDaemon,
-} from "@getpie/server/daemon";
+import { resolveDaemonDirectory, statusDaemon, stopDaemon } from "@getpie/server/daemon";
 import { resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
 import { Effect, Option } from "effect";
 import { Command } from "effect/unstable/cli";
 
 import pkg from "../../package.json" with { type: "json" };
-
-/**
- * argv that re-launches this very CLI in foreground `serve` mode. The daemon is
- * just `pie serve` spawned detached — no second bundle, and `execArgv`
- * carries the dev loader (e.g. tsx) so it works from source too.
- */
-function serverArgv(): string[] {
-  return [process.execPath, ...process.execArgv, process.argv[1] ?? "", "serve"];
-}
+import { resolveCliDaemon } from "./daemon";
+import { runCommand } from "./session-cli";
 
 type DaemonStartInput = {
   readonly port: Option.Option<number>;
@@ -43,12 +29,7 @@ const startDaemon = (input: DaemonStartInput) =>
     // resolved here: the daemon's policy is static, and any extra origins are
     // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
     const { port } = resolveServeConfig(input);
-    const handle = yield* resolveOrSpawnDaemon({
-      ...resolveDaemonLocation(),
-      requiredCompatibilityKey: embeddedDaemonCompatibilityKey(),
-      serverArgv: serverArgv(),
-      port,
-    });
+    const handle = yield* resolveCliDaemon(port);
     console.log(
       handle.reused
         ? `pie daemon already running at ${handle.address} (pid ${handle.pid})`
@@ -73,6 +54,7 @@ const statusHandler = () =>
     const status = yield* statusDaemon(resolveDaemonDirectory());
     if (!status.running) {
       console.log("pie daemon is not running");
+      console.log("Start it with: pie daemon start");
       return;
     }
     console.log(`pie daemon running at ${status.record.address} (pid ${status.record.pid})`);
@@ -98,7 +80,7 @@ const daemon = Command.make("daemon", serveFlags, startDaemon).pipe(
 // Bare `pie` defaults to daemon startup.
 const pie = Command.make("pie", serveFlags, startDaemon).pipe(
   Command.withDescription("Pie local server"),
-  Command.withSubcommands([serve, daemon]),
+  Command.withSubcommands([serve, daemon, runCommand]),
 );
 
 Command.run(pie, { version: pkg.version }).pipe(
