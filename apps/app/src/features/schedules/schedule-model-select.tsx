@@ -87,8 +87,8 @@ export function ScheduleModelSelect({
       value={value}
     >
       <ModelSelectorTrigger
+        aria-label="Model"
         className="data-placeholder:text-muted-foreground min-w-0"
-        id="schedule-model"
         render={<Button size="sm" variant="ghost" />}
       >
         <ModelSelectorValue placeholder="Default">
