@@ -52,6 +52,7 @@ describe("createAppClients", () => {
       orpcQueryUtils.git.review.key(),
       orpcQueryUtils.git.diff.key(),
       orpcQueryUtils.fs.readTree.key(),
+      orpcQueryUtils.fs.readFileString.key(),
     ]) {
       expect(queryClient.getQueryDefaults(key).meta).toEqual({ errorMode: "inline" });
     }

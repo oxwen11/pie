@@ -162,7 +162,10 @@ export const WorktreeServiceLayer: Layer.Layer<
             return yield* new WorkspacePathEscape({ cwd: worktreePath, path: "." });
           }
           const realPath = yield* fs.realPath(worktreePath).pipe(Effect.mapError(readError(".")));
-          if (!contains(paths.worktreesDir, realPath)) {
+          const realWorktreesDir = yield* fs
+            .realPath(paths.worktreesDir)
+            .pipe(Effect.mapError(readError(".")));
+          if (!contains(realWorktreesDir, realPath)) {
             return yield* new WorkspacePathEscape({ cwd: paths.worktreesDir, path: worktreePath });
           }
           const repoRoot = yield* resolveRepoRoot(realPath);
