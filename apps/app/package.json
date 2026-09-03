@@ -35,7 +35,7 @@
     "@tiptap/react": "catalog:tiptap",
     "ai": "catalog:",
     "lucide-react": "catalog:",
-    "motion": "^13.1.1",
+    "motion": "^13.2.0",
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "react-error-boundary": "catalog:",
@@ -55,7 +55,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "code-inspector-plugin": "latest",
-    "react-doctor": "^0.9.12",
+    "react-doctor": "^0.9.13",
     "react-grab": "^0.1.50",
     "react-scan": "catalog:"
   }
