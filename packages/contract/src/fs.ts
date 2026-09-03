@@ -1,4 +1,3 @@
-import { type } from "@orpc/contract";
 import { Schema } from "effect";
 
 import {
@@ -17,6 +16,18 @@ export const FsReadFileInputSchema = withWorkspaceQuery({
   path: Schema.String,
 });
 export type FsReadFileInput = typeof FsReadFileInputSchema.Type;
+
+export const FilePreviewTextSchema = Schema.Struct({
+  kind: Schema.Literal("text"),
+  content: Schema.String,
+});
+export const FilePreviewImageSchema = Schema.Struct({
+  kind: Schema.Literal("image"),
+  mimeType: Schema.String,
+  data: Schema.String,
+});
+export const FilePreviewSchema = Schema.Union([FilePreviewTextSchema, FilePreviewImageSchema]);
+export type FilePreview = typeof FilePreviewSchema.Type;
 
 export const WorkspaceTreeEntrySchema = Schema.Union([
   Schema.Struct({ path: Schema.String, type: Schema.Literal("directory") }),
@@ -70,7 +81,7 @@ const readTreeErrors = {
  * directory names only.
  */
 export const fsContract = {
-  readFileString: oc.input(FsReadFileInputSchema).errors(readFileErrors).output(type<string>()),
+  readFileString: oc.input(FsReadFileInputSchema).errors(readFileErrors).output(FilePreviewSchema),
   /** Recursively index a workspace for the read-only Content Panel Explorer. */
   readTree: oc.input(WorkspaceQuerySchema).errors(readTreeErrors).output(WorkspaceTreeResultSchema),
   /** Browse immediate subdirectories of `path` (default: the home directory). Hidden directories are opt-in. */

@@ -1,3 +1,4 @@
+import buffer from "node:buffer";
 import path from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Stream, type PlatformError } from "effect";
@@ -11,7 +12,7 @@ import {
   WorkspacePathEscape,
   WorkspaceReadError,
 } from "../errors";
-import { contains, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
+import { contains, detectImageMimeType, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
 import { resolveWorkspaceRoot, workspaceReadError } from "../workspace-root";
 
 /** Largest file we will render as text; larger files are rejected, not truncated. */
@@ -56,6 +57,10 @@ type ReadFileError =
   | WorkspaceBinaryFile
   | WorkspaceReadError;
 
+export type WorkspaceFilePreview =
+  | { readonly kind: "text"; readonly content: string }
+  | { readonly kind: "image"; readonly mimeType: string; readonly data: string };
+
 type ReadTreeError = WorkspacePathEscape | WorkspaceNotDirectory | WorkspaceReadError;
 
 export type WorkspaceSymlinkTarget = "file" | "directory" | "broken" | "outside" | "other";
@@ -87,6 +92,10 @@ export class FileSystemService extends Context.Service<
   FileSystemService,
   {
     readonly readFileString: (cwd: string, path: string) => Effect.Effect<string, ReadFileError>;
+    readonly readFilePreview: (
+      cwd: string,
+      path: string,
+    ) => Effect.Effect<WorkspaceFilePreview, ReadFileError>;
     readonly readTree: (cwd: string) => Effect.Effect<WorkspaceTreeResult, ReadTreeError>;
   }
 >()("FileSystemService") {}
@@ -251,50 +260,81 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
           return { entries };
         });
 
+      const previewFromBytes = (
+        bytes: Uint8Array,
+        relativePath: string,
+      ): Effect.Effect<WorkspaceFilePreview, WorkspaceBinaryFile> => {
+        const mimeType = detectImageMimeType(bytes);
+        if (mimeType !== undefined) {
+          return Effect.succeed({
+            kind: "image",
+            mimeType,
+            data: buffer.Buffer.from(bytes).toString("base64"),
+          });
+        }
+        if (bytes.includes(NUL_BYTE) || hasBinaryMagicPrefix(bytes)) {
+          return Effect.fail(new WorkspaceBinaryFile({ path: relativePath }));
+        }
+        try {
+          return Effect.succeed({
+            kind: "text",
+            content: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+          });
+        } catch {
+          return Effect.fail(new WorkspaceBinaryFile({ path: relativePath }));
+        }
+      };
+
+      const readFilePreview = (
+        cwd: string,
+        relativePath: string,
+      ): Effect.Effect<WorkspaceFilePreview, ReadFileError> =>
+        Effect.gen(function* () {
+          const realTarget = yield* resolveFileWithin(cwd, relativePath);
+          const info = yield* fs
+            .stat(realTarget)
+            .pipe(Effect.mapError(fileReadError(relativePath)));
+          if (info.type !== "File") {
+            return yield* new WorkspaceNotFile({ path: relativePath });
+          }
+          const size = Number(info.size);
+          if (size > MAX_FILE_BYTES) {
+            return yield* new WorkspaceFileTooLarge({
+              path: relativePath,
+              size,
+              limit: MAX_FILE_BYTES,
+            });
+          }
+          const chunks = yield* fs
+            .stream(realTarget, { bytesToRead: MAX_FILE_BYTES + 1 })
+            .pipe(Stream.runCollect, Effect.mapError(fileReadError(relativePath)));
+          const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+          if (byteLength > MAX_FILE_BYTES) {
+            return yield* new WorkspaceFileTooLarge({
+              path: relativePath,
+              size: Math.max(size, byteLength),
+              limit: MAX_FILE_BYTES,
+            });
+          }
+          const bytes = new Uint8Array(byteLength);
+          let offset = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          return yield* previewFromBytes(bytes, relativePath);
+        });
+
       return {
+        readFilePreview,
         readFileString: (cwd, relativePath) =>
-          Effect.gen(function* () {
-            const realTarget = yield* resolveFileWithin(cwd, relativePath);
-            const info = yield* fs
-              .stat(realTarget)
-              .pipe(Effect.mapError(fileReadError(relativePath)));
-            if (info.type !== "File") {
-              return yield* new WorkspaceNotFile({ path: relativePath });
-            }
-            const size = Number(info.size);
-            if (size > MAX_FILE_BYTES) {
-              return yield* new WorkspaceFileTooLarge({
-                path: relativePath,
-                size,
-                limit: MAX_FILE_BYTES,
-              });
-            }
-            const chunks = yield* fs
-              .stream(realTarget, { bytesToRead: MAX_FILE_BYTES + 1 })
-              .pipe(Stream.runCollect, Effect.mapError(fileReadError(relativePath)));
-            const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-            if (byteLength > MAX_FILE_BYTES) {
-              return yield* new WorkspaceFileTooLarge({
-                path: relativePath,
-                size: Math.max(size, byteLength),
-                limit: MAX_FILE_BYTES,
-              });
-            }
-            const bytes = new Uint8Array(byteLength);
-            let offset = 0;
-            for (const chunk of chunks) {
-              bytes.set(chunk, offset);
-              offset += chunk.byteLength;
-            }
-            if (bytes.includes(NUL_BYTE) || hasBinaryMagicPrefix(bytes)) {
-              return yield* new WorkspaceBinaryFile({ path: relativePath });
-            }
-            try {
-              return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-            } catch {
-              return yield* new WorkspaceBinaryFile({ path: relativePath });
-            }
-          }),
+          readFilePreview(cwd, relativePath).pipe(
+            Effect.flatMap((preview) =>
+              preview.kind === "text"
+                ? Effect.succeed(preview.content)
+                : Effect.fail(new WorkspaceBinaryFile({ path: relativePath })),
+            ),
+          ),
         readTree,
       };
     }),

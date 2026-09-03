@@ -53,6 +53,9 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
     const readFile = (cwd: string, relativePath: string) =>
       FileSystemService.use((service) => service.readFileString(cwd, relativePath));
 
+    const readPreview = (cwd: string, relativePath: string) =>
+      FileSystemService.use((service) => service.readFilePreview(cwd, relativePath));
+
     const readTree = (cwd: string) => FileSystemService.use((service) => service.readTree(cwd));
 
     const readError = (cwd: string, relativePath: string) =>
@@ -92,6 +95,20 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
         const fs = yield* FileSystem.FileSystem;
         yield* fs.writeFile(path.join(cwd, "large.txt"), new Uint8Array(2 * 1024 * 1024 + 1));
         assert.equal(yield* readError(cwd, "large.txt"), "WorkspaceFileTooLarge");
+      }),
+    );
+
+    it.effect("previews png bytes as an image instead of rejecting them", () =>
+      Effect.gen(function* () {
+        const { cwd } = yield* workspace;
+        const fs = yield* FileSystem.FileSystem;
+        const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00);
+        yield* fs.writeFile(path.join(cwd, "dot.png"), png);
+        const preview = yield* readPreview(cwd, "dot.png");
+        assert.equal(preview.kind, "image");
+        if (preview.kind !== "image") return;
+        assert.equal(preview.mimeType, "image/png");
+        assert.equal(yield* readError(cwd, "dot.png"), "WorkspaceBinaryFile");
       }),
     );
 
