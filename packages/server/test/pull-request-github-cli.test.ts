@@ -7,9 +7,14 @@ import {
   currentPullRequestArgs,
   makeGitHubCliAdapter,
   pullRequestActionArgs,
+  pullRequestDiffArgs,
 } from "../src/pull-request/github-cli";
 
 describe("GitHub CLI command construction", () => {
+  it("reads the current branch pull request patch without color", () => {
+    expect(pullRequestDiffArgs()).toEqual(["pr", "diff", "--color", "never"]);
+  });
+
   it("uses one fixed current-PR read without an auth preflight", () => {
     expect(currentPullRequestArgs()).toEqual([
       "pr",

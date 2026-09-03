@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   actionConfirmationTitle,
   checksSummaryLabel,
+  countDiffFiles,
   mergeMethodActionLabel,
   pullRequestActionInput,
   pullRequestSessionState,
@@ -53,6 +54,15 @@ describe("pull request presentation", () => {
     expect(actionConfirmationTitle({ type: "enable-auto-merge", method: "rebase" })).toBe(
       "Enable auto-merge · Rebase",
     );
+  });
+
+  it("counts files in a git patch", () => {
+    expect(countDiffFiles("")).toBe(0);
+    expect(
+      countDiffFiles(
+        "diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\ndiff --git a/b.ts b/b.ts\n",
+      ),
+    ).toBe(2);
   });
 
   it("does not require a head commit to disable auto-merge", () => {
