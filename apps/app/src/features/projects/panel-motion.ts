@@ -22,7 +22,7 @@
  * cost dominates there — so it earns its place on the small-sidebar case, not
  * the large one.
  *
- * `cn()` is tailwind-merge, so `transition-[opacity,translate]` replaces the
+ * `cn()` resolves Tailwind conflicts, so `transition-[opacity,translate]` replaces the
  * vendored `transition-[height]` and `duration-150` replaces its `duration-200`.
  * The panel's own `h-(--collapsible-panel-height)` and `data-*-style:h-0` stay —
  * they just no longer interpolate, so the height snaps and the motion is

@@ -262,6 +262,23 @@ function DraftRoute() {
                 ) : null}
               </>
             ) : null}
+            <Button
+              className="ms-auto"
+              disabled={selected === null}
+              onClick={() => {
+                if (selected === null) return;
+                navigate({
+                  to: "/schedules",
+                  search: { create: true, projectId: selected.id },
+                }).catch((error: unknown) => {
+                  console.error("Failed to open the schedule editor", error);
+                });
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              Schedule…
+            </Button>
           </div>
         </CardFrameHeader>
         <Card
