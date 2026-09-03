@@ -51,7 +51,7 @@ function runWithTimeout(run: RunCommand, file: string, args: readonly string[], 
   return run(file, args).pipe(
     Effect.timeoutOption(timeoutMs),
     Effect.map(Option.getOrUndefined),
-    Effect.catch(() => Effect.succeed(undefined)),
+    Effect.orElseSucceed(() => undefined),
   );
 }
 

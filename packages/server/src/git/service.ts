@@ -138,7 +138,7 @@ export const GitServiceLayer: Layer.Layer<
           "refs/remotes/origin/HEAD",
         ]).pipe(
           Effect.map((value) => value.trim()),
-          Effect.catch(() => Effect.succeed("")),
+          Effect.orElseSucceed(() => ""),
         );
         if (remoteHead.startsWith("refs/remotes/")) {
           return remoteHead.slice("refs/remotes/".length);
@@ -270,7 +270,7 @@ export const GitServiceLayer: Layer.Layer<
     const readBlobText = (cwd: string, treeish: string, blobPath: string) =>
       Effect.gen(function* () {
         const sizeRaw = yield* raw(cwd, ["cat-file", "-s", `${treeish}:${blobPath}`]).pipe(
-          Effect.catch(() => Effect.succeed("")),
+          Effect.orElseSucceed(() => ""),
         );
         if (sizeRaw.trim() === "") return null;
         const size = Number(sizeRaw.trim());
