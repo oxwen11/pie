@@ -76,7 +76,7 @@ export type ScheduleFormValues = {
   readonly reuseSession: boolean;
   readonly sessionPick: ScheduleSessionPick;
   readonly sessionId: string;
-  /** Empty strings mean "use the project's default model". */
+  /** Empty strings mean "not chosen yet" — the server's default model applies. */
   readonly modelProvider: string;
   readonly modelId: string;
 };
