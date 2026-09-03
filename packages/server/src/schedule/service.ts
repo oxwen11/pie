@@ -14,7 +14,7 @@ import { ProjectService } from "../project";
 import type { FireResult } from "./fire";
 import * as mutations from "./mutations";
 import { ScheduleRepository } from "./repository";
-import { ScheduleRuntime, ScheduleRuntimeLayer } from "./runtime";
+import { ScheduleRuntime, ScheduleRuntimeLayer, type ScheduleServiceEnv } from "./runtime";
 import { tick } from "./tick";
 
 export type { FireResult };
@@ -70,8 +70,8 @@ export const ScheduleServiceLayer: Layer.Layer<
       Context.add(ScheduleRuntime, runtime),
     );
     // Shape stays R-free. Modules yield* services; this seam provides them.
-    const provide = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
-      effect.pipe(Effect.provide(env)) as Effect.Effect<A, E>;
+    const provide = <A, E>(effect: Effect.Effect<A, E, ScheduleServiceEnv>): Effect.Effect<A, E> =>
+      effect.pipe(Effect.provide(env));
     return {
       list: Effect.fn("ScheduleService.list")(function* () {
         return yield* provide(mutations.list());
