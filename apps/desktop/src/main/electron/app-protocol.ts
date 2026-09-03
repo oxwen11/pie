@@ -2,17 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
-import { Data, Effect, Scope } from "effect";
+import { Effect, Schema, Scope } from "effect";
 import { net, protocol } from "electron";
 
 export const SCHEME = "pie";
 export const HOST = "app";
 export const APP_ORIGIN = `${SCHEME}://${HOST}`;
 
-export class ProtocolRegistrationError extends Data.TaggedError("ProtocolRegistrationError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
+export class ProtocolRegistrationError extends Schema.TaggedError<ProtocolRegistrationError>()(
+  "ProtocolRegistrationError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {}
 
 /** Must run before app.whenReady(). */
 export function registerAppScheme(): void {

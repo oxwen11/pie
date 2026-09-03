@@ -6,7 +6,7 @@ import type {
   PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
-import { Data, Effect, Ref, Result, Stream } from "effect";
+import { Effect, Ref, Result, Schema, Stream } from "effect";
 import type { PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -104,13 +104,20 @@ export const pullRequestActionArgs = (
   ];
 };
 
-class GitHubCliTimedOut extends Data.TaggedError("GitHubCliTimedOut") {}
-class GitHubCliOutputTooLarge extends Data.TaggedError("GitHubCliOutputTooLarge") {}
-class GitHubCliIoError extends Data.TaggedError("GitHubCliIoError")<{
-  readonly phase: "spawn" | "stdout" | "stderr" | "exit";
-}> {}
+class GitHubCliTimedOut extends Schema.TaggedError<GitHubCliTimedOut>()("GitHubCliTimedOut", {}) {}
+class GitHubCliOutputTooLarge extends Schema.TaggedError<GitHubCliOutputTooLarge>()(
+  "GitHubCliOutputTooLarge",
+  {},
+) {}
+class GitHubCliIoError extends Schema.TaggedError<GitHubCliIoError>()("GitHubCliIoError", {
+  phase: Schema.Literals(["spawn", "stdout", "stderr", "exit"]),
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
-class GitHubCliExecutableMissing extends Data.TaggedError("GitHubCliExecutableMissing") {}
+class GitHubCliExecutableMissing extends Schema.TaggedError<GitHubCliExecutableMissing>()(
+  "GitHubCliExecutableMissing",
+  {},
+) {}
 
 type GitHubCliExecutionError =
   | GitHubCliTimedOut
@@ -142,11 +149,10 @@ const isMissingExecutable = (error: PlatformError.PlatformError): boolean =>
 const spawnError = (error: PlatformError.PlatformError): GitHubCliExecutionError =>
   isMissingExecutable(error)
     ? new GitHubCliExecutableMissing()
-    : new GitHubCliIoError({ phase: "spawn" });
+    : new GitHubCliIoError({ phase: "spawn", cause: error });
 
-const streamError =
-  (phase: "stdout" | "stderr" | "exit") => (_error: PlatformError.PlatformError) =>
-    new GitHubCliIoError({ phase });
+const streamError = (phase: "stdout" | "stderr" | "exit") => (error: PlatformError.PlatformError) =>
+  new GitHubCliIoError({ phase, cause: error });
 
 const executeGh = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
@@ -331,7 +337,7 @@ export const makeGitHubCliAdapter = (
           if (stdout === null) return Effect.succeed(null);
           return Effect.try({
             try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
-            catch: () => new PullRequestInvalidResponse(),
+            catch: (cause) => new PullRequestInvalidResponse({ cause }),
           });
         },
       ),
@@ -376,7 +382,7 @@ export const makeGitHubCliAdapter = (
           if (result.exitCode !== 0) return mapFailedRead(result);
           return Effect.try({
             try: () => normalizeGitHubViewerPullRequestsJson(JSON.parse(result.stdout) as unknown),
-            catch: () => new PullRequestInvalidResponse(),
+            catch: (cause) => new PullRequestInvalidResponse({ cause }),
           });
         },
       ),
@@ -391,7 +397,7 @@ export const makeGitHubCliAdapter = (
           if (stdout === null) return Effect.succeed(null);
           return Effect.try({
             try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
-            catch: () => new PullRequestInvalidResponse(),
+            catch: (cause) => new PullRequestInvalidResponse({ cause }),
           });
         },
       ),
