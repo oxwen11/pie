@@ -8,7 +8,7 @@ import {
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -80,6 +80,25 @@ export function SessionActionsMenu({
             <Pencil />
             Rename
           </ContextMenuItem>
+          {session.archived ? null : (
+            <ContextMenuItem
+              onClick={() => {
+                navigate({
+                  to: "/schedules",
+                  search: {
+                    create: true,
+                    projectId: session.projectId,
+                    sessionId: session.sessionId,
+                  },
+                }).catch((error: unknown) => {
+                  console.error("Failed to open the schedule editor", error);
+                });
+              }}
+            >
+              <Clock />
+              Schedule…
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             disabled={setArchived.isPending}
             onClick={() => setArchived.mutate(!session.archived)}

@@ -16,6 +16,8 @@ export class Paths extends Context.Service<
     readonly projectsFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
+    /** `storage/schedules/` — one `<scheduleId>.json` per application-level Schedule. */
+    readonly schedulesDir: string;
     /** `worktrees/` — git worktree checkouts, grouped per repository. */
     readonly worktreesDir: string;
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
@@ -34,6 +36,7 @@ const resolve = (home: string) => ({
   home,
   projectsFile: path.join(home, "storage", "projects.json"),
   sessionsDir: path.join(home, "storage", "sessions"),
+  schedulesDir: path.join(home, "storage", "schedules"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
 });

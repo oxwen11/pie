@@ -6,6 +6,18 @@ export class ProjectNotFound extends Data.TaggedError("ProjectNotFound")<{
   readonly projectId: string;
 }> {}
 
+export class ScheduleNotFound extends Data.TaggedError("ScheduleNotFound")<{
+  readonly scheduleId: string;
+}> {}
+
+export class ScheduleLimitReached extends Data.TaggedError("ScheduleLimitReached")<{
+  readonly limit: number;
+}> {}
+
+export class InvalidSchedule extends Data.TaggedError("InvalidSchedule")<{
+  readonly reason: string;
+}> {}
+
 export class StoreReadError extends Data.TaggedError("StoreReadError")<{
   readonly file: string;
   readonly cause: unknown;
