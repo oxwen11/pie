@@ -14,7 +14,7 @@ import { usePlatform } from "@/platform-context";
 import { isDesktopHost } from "@/platform-host";
 
 export interface CardPanelProps {
-  readonly heading: string;
+  readonly heading?: string;
   readonly supportingText?: string;
 }
 
@@ -57,9 +57,11 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
             layout={reduceMotion ? false : "position"}
             transition={chromeTransition}
           >
-            <span className="min-w-0 truncate font-medium" title={heading}>
-              {heading}
-            </span>
+            {heading !== undefined ? (
+              <span className="min-w-0 truncate font-medium" title={heading}>
+                {heading}
+              </span>
+            ) : null}
             {supportingText !== undefined && (
               <span
                 className="text-muted-foreground max-w-[50%] min-w-0 truncate"

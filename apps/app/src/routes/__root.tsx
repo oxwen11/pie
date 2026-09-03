@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch } from "@tanstack/react-router";
+import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
 
 import {
   AppShell,
@@ -67,11 +67,15 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
-  const schedulesRoute =
-    useMatch({
-      from: "/schedules",
-      shouldThrow: false,
-    }) ?? null;
+  const cardHeading = useRouterState({
+    select: (state): string | false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const heading = state.matches[index]?.staticData.cardHeading;
+        if (heading !== undefined) return heading;
+      }
+      return undefined;
+    },
+  });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
 
@@ -85,13 +89,12 @@ function RootLayout() {
           <AppShellMain>
             <CardPanel
               heading={
-                schedulesRoute !== null
-                  ? "Schedule"
-                  : sessionRef === null
-                    ? "New chat"
-                    : (sessionTitle ?? "New chat")
+                cardHeading === false
+                  ? undefined
+                  : (cardHeading ??
+                    (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
               }
-              supportingText={schedulesRoute !== null ? undefined : project?.name}
+              supportingText={cardHeading !== undefined ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>
