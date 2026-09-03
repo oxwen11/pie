@@ -284,7 +284,7 @@ export interface GitHubCliAdapter {
     pullRequest: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly runAction: (input: {
-    readonly cwd: string;
+    readonly cwd?: string;
     readonly url: string;
     readonly action: PullRequestAction;
     readonly expectedHeadSha?: string;
@@ -398,7 +398,9 @@ export const makeGitHubCliAdapter = (
     );
 
   const runAction: GitHubCliAdapter["runAction"] = ({ action, cwd, expectedHeadSha, url }) =>
-    executeGh(spawner, pullRequestActionArgs(url, action, expectedHeadSha), { cwd }).pipe(
+    executeGh(spawner, pullRequestActionArgs(url, action, expectedHeadSha), {
+      ...(cwd === undefined ? undefined : { cwd }),
+    }).pipe(
       Effect.mapError(mapExecutionActionError),
       Effect.flatMap((result): Effect.Effect<void, PullRequestCliActionFailure> => {
         if (result.exitCode === 0) return Effect.void;

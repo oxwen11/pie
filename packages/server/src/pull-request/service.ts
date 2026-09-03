@@ -26,6 +26,9 @@ const samePullRequest = (left: PullRequestRef, right: PullRequestRef): boolean =
   left.number === right.number;
 
 export type PullRequestActionFailure = PullRequestReadFailure | PullRequestCliActionFailure;
+export type PullRequestActionTarget =
+  | { readonly cwd: string }
+  | { readonly pullRequest: PullRequestRef };
 
 export class PullRequestService extends Context.Service<
   PullRequestService,
@@ -43,7 +46,7 @@ export class PullRequestService extends Context.Service<
       pullRequest: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly runAction: (
-      cwd: string,
+      target: PullRequestActionTarget,
       expected: PullRequestExpected,
       action: PullRequestAction,
     ) => Effect.Effect<PullRequestActionApplied, PullRequestActionFailure>;
@@ -70,19 +73,19 @@ export const PullRequestServiceLayer: Layer.Layer<
     const detail = (pullRequest: PullRequestRef) => cli.detail(pullRequest);
 
     const runAction = (
-      cwd: string,
+      target: PullRequestActionTarget,
       expected: PullRequestExpected,
       action: PullRequestAction,
     ): Effect.Effect<PullRequestActionApplied, PullRequestActionFailure> =>
       Effect.gen(function* () {
-        const snapshot = yield* current(cwd);
+        const snapshot = yield* "cwd" in target ? current(target.cwd) : detail(target.pullRequest);
         if (snapshot === null || !samePullRequest(snapshot.ref, expected.pullRequest)) {
           return yield* new PullRequestStaleContext();
         }
         const expectedHeadSha = "headSha" in expected ? expected.headSha : undefined;
         yield* cli
           .runAction({
-            cwd,
+            ...("cwd" in target ? { cwd: target.cwd } : undefined),
             url: snapshot.url,
             action,
             ...(expectedHeadSha === undefined ? undefined : { expectedHeadSha }),

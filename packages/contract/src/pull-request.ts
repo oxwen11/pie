@@ -100,10 +100,11 @@ const ExpectedPullRequestHeadSchema = Schema.Struct({
   pullRequest: PullRequestRefSchema,
   headSha: Schema.String,
 });
+const PullRequestActionRefSchema = Schema.Union([SessionRefSchema, PullRequestRefSchema]);
 
 export const PullRequestActionInputSchema = Schema.Union([
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("merge"),
@@ -111,7 +112,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("enable-auto-merge"),
@@ -119,7 +120,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestSchema,
     action: Schema.Struct({ type: Schema.Literal("disable-auto-merge") }),
   }),

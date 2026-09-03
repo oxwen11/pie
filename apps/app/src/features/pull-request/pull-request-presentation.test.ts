@@ -85,6 +85,13 @@ describe("pull request presentation", () => {
       expected: { pullRequest: snapshot.ref, headSha: "head-a" },
       action: { type: "merge", method: "squash" },
     });
+    expect(
+      pullRequestActionInput(snapshot.ref, snapshot, { type: "merge", method: "squash" }),
+    ).toEqual({
+      ref: snapshot.ref,
+      expected: { pullRequest: snapshot.ref, headSha: "head-a" },
+      action: { type: "merge", method: "squash" },
+    });
   });
 
   it("labels checks, merge methods, and confirmation titles", () => {

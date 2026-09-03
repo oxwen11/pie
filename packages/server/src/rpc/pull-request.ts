@@ -99,8 +99,11 @@ export const pullRequestRouter = orpc.router({
   }),
   runAction: orpc.runAction.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
-    const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
-    return yield* service.runAction(cwd, input.expected, input.action).pipe(
+    const target =
+      "sessionId" in input.ref
+        ? { cwd: yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors) }
+        : { pullRequest: input.ref };
+    return yield* service.runAction(target, input.expected, input.action).pipe(
       Effect.catchTags({
         ...pullRequestReadErrorHandlers(errors),
         PullRequestStaleContext: () =>

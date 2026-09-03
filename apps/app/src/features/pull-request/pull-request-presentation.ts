@@ -66,7 +66,7 @@ export function pullRequestSessionState(
 }
 
 export const pullRequestActionInput = (
-  ref: SessionRef,
+  ref: SessionRef | PullRequestRef,
   snapshot: PullRequestSnapshot,
   action: PullRequestAction,
 ): PullRequestActionInput => {

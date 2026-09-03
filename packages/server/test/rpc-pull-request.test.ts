@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestRef, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { Effect, Layer } from "effect";
 import { simpleGit } from "simple-git";
 import { describe, expect, it } from "vitest";
@@ -68,8 +68,8 @@ describe("pull request router", () => {
         receivedCwd = cwd;
         return Effect.succeed({ patch: "diff --git a/a.txt b/a.txt\n", truncated: false });
       },
-      runAction: (cwd, _expected, action) => {
-        receivedCwd = cwd;
+      runAction: (target, _expected, action) => {
+        receivedCwd = "cwd" in target ? target.cwd : undefined;
         return Effect.succeed({
           pullRequest: snapshot.ref,
           action: action.type,
@@ -232,11 +232,19 @@ describe("pull request router", () => {
       updatedAt: snapshot.updatedAt,
     };
     const detailed = { ...snapshot, body: "## Summary" };
+    let actionTarget: { readonly pullRequest: PullRequestRef } | undefined;
     const pullRequestLayer = Layer.succeed(PullRequestService, {
       current: () => Effect.die("unexpected current"),
       diff: () => Effect.die("unexpected pull request diff"),
       diffFor: () => Effect.die("unexpected pull request diffFor"),
-      runAction: () => Effect.die("unexpected pull request action"),
+      runAction: (target, _expected, action) => {
+        actionTarget = "pullRequest" in target ? target : undefined;
+        return Effect.succeed({
+          pullRequest: snapshot.ref,
+          action: action.type,
+          appliedHeadSha: snapshot.head.sha,
+        });
+      },
       sessionStatuses: () => Effect.die("unexpected statuses"),
       list: () => Effect.succeed([item]),
       detail: (pullRequest) =>
@@ -248,6 +256,18 @@ describe("pull request router", () => {
       await expect(
         harness.client.pullRequest.detail({ pullRequest: snapshot.ref }),
       ).resolves.toEqual(detailed);
+      await expect(
+        harness.client.pullRequest.runAction({
+          ref: snapshot.ref,
+          expected: { pullRequest: snapshot.ref, headSha: snapshot.head.sha },
+          action: { type: "merge", method: "squash" },
+        }),
+      ).resolves.toEqual({
+        pullRequest: snapshot.ref,
+        action: "merge",
+        appliedHeadSha: snapshot.head.sha,
+      });
+      expect(actionTarget).toEqual({ pullRequest: snapshot.ref });
     } finally {
       await harness.dispose();
     }

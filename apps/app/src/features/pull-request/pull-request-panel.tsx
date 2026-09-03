@@ -12,6 +12,7 @@ import type { PanelHandle } from "@/components/layout/content-panel/model/panel"
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
+import { pullRequestActionError } from "./pull-request-action-error";
 import { PullRequestInspect } from "./pull-request-inspect";
 import { PullRequestPanelState } from "./pull-request-panel-state";
 import { pullRequestActionInput } from "./pull-request-presentation";
@@ -151,27 +152,5 @@ function pullRequestErrorMessage(error: Error): string {
       return "The installed gh version returned data pie could not understand.";
     default:
       return error.message;
-  }
-}
-
-function pullRequestActionError(error: Error): string {
-  if (!(error instanceof ORPCError)) return `Pull request action failed: ${error.message}`;
-  switch (error.code) {
-    case "STALE_CONTEXT":
-      return "The pull request changed. Refresh and confirm the action again.";
-    case "UNSUPPORTED_ACTION":
-      return "Update GitHub CLI before performing this action safely.";
-    case "OUTCOME_UNKNOWN":
-      return "Could not confirm whether GitHub applied the action. Check GitHub before retrying.";
-    case "HOST_UNAVAILABLE":
-      return "GitHub could not be reached before the action started. Try again later.";
-    case "INVALID_RESPONSE":
-      return "GitHub returned data pie could not safely use. Refresh before retrying.";
-    case "UNAUTHENTICATED":
-      return "Run gh auth login, then try again.";
-    case "RATE_LIMITED":
-      return "GitHub rate limiting is active. Wait, then retry.";
-    default:
-      return "GitHub rejected the pull request action.";
   }
 }
