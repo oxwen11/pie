@@ -121,8 +121,8 @@ export const SessionMetadataLayer: Layer.Layer<
       readMetadata,
       ensureCwd,
 
-      workspaceFor: (ref) =>
-        readMetadata(ref).pipe(
+      workspaceFor: Effect.fn("SessionMetadata.workspaceFor")(function* (ref: SessionRef) {
+        return yield* readMetadata(ref).pipe(
           Effect.flatMap((metadata) =>
             metadata.cwd !== undefined
               ? Effect.succeed(toSessionWorkspace(metadata as SessionWithCwd))
@@ -131,10 +131,11 @@ export const SessionMetadataLayer: Layer.Layer<
                 ),
           ),
           inSession(ref),
-        ),
+        );
+      }),
 
-      rename: (ref, title) =>
-        withMetadataMutation(
+      rename: Effect.fn("SessionMetadata.rename")(function* (ref: SessionRef, title: string) {
+        yield* withMetadataMutation(
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) =>
@@ -145,10 +146,11 @@ export const SessionMetadataLayer: Layer.Layer<
                     .pipe(Effect.andThen(bus.publish({ ref, type: "session.renamed", title }))),
             ),
           ),
-        ).pipe(inSession(ref)),
+        ).pipe(inSession(ref));
+      }),
 
-      archive: (ref, archived) =>
-        withMetadataMutation(
+      archive: Effect.fn("SessionMetadata.archive")(function* (ref: SessionRef, archived: boolean) {
+        yield* withMetadataMutation(
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
@@ -169,16 +171,23 @@ export const SessionMetadataLayer: Layer.Layer<
               return persist.pipe(Effect.andThen(close), Effect.andThen(publish));
             }),
           ),
-        ).pipe(inSession(ref)),
+        ).pipe(inSession(ref));
+      }),
 
-      pullRequestRefsFor: (ref) =>
-        readMetadata(ref).pipe(
+      pullRequestRefsFor: Effect.fn("SessionMetadata.pullRequestRefsFor")(function* (
+        ref: SessionRef,
+      ) {
+        return yield* readMetadata(ref).pipe(
           Effect.map((metadata) => metadata.pullRequestRefs ?? []),
           inSession(ref),
-        ),
+        );
+      }),
 
-      rememberPullRequestRef: (ref, pullRequest) =>
-        withMetadataMutation(
+      rememberPullRequestRef: Effect.fn("SessionMetadata.rememberPullRequestRef")(function* (
+        ref: SessionRef,
+        pullRequest: Parameters<SessionMetadataShape["rememberPullRequestRef"]>[1],
+      ) {
+        yield* withMetadataMutation(
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
@@ -192,10 +201,11 @@ export const SessionMetadataLayer: Layer.Layer<
               });
             }),
           ),
-        ).pipe(inSession(ref)),
+        ).pipe(inSession(ref));
+      }),
 
-      list: (projectId, archived) =>
-        repo.list(projectId).pipe(
+      list: Effect.fn("SessionMetadata.list")(function* (projectId: string, archived: boolean) {
+        return yield* repo.list(projectId).pipe(
           Effect.map((sessions) =>
             sessions.filter((metadata) => (metadata.archived ?? false) === archived),
           ),
@@ -225,7 +235,8 @@ export const SessionMetadataLayer: Layer.Layer<
                 ),
             ),
           ),
-        ),
+        );
+      }),
 
       readAndStampTitleFromFirstPrompt: (ref, parts) =>
         withMetadataMutation(

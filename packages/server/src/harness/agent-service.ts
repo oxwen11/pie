@@ -13,7 +13,9 @@ export class PiAgentService extends Context.Service<PiAgentService, PiAgentServi
 ) {}
 
 export const makePiAgentService = (): PiAgentServiceShape => ({
-  listModels: (cwd) => listAvailablePiModels(cwd),
+  listModels: Effect.fn("PiAgentService.listModels")(function* (cwd: string) {
+    return yield* listAvailablePiModels(cwd);
+  }),
 });
 
 export const PiAgentServiceLayer = Layer.succeed(PiAgentService, makePiAgentService());
