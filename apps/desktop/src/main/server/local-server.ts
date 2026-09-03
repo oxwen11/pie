@@ -1,11 +1,11 @@
 import {
   Clock,
   Context,
-  Data,
   Deferred,
   Effect,
   Queue,
   Result,
+  Schema,
   Scope,
   Stream,
   SubscriptionRef,
@@ -24,20 +24,26 @@ const DEFAULTS = {
   stableAfterMs: 10_000,
 };
 
-export class ServerSpawnError extends Data.TaggedError("ServerSpawnError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
+export class ServerSpawnError extends Schema.TaggedError<ServerSpawnError>()("ServerSpawnError", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
-export class ServerReadyTimeout extends Data.TaggedError("ServerReadyTimeout")<{
-  readonly timeoutMs: number;
-  readonly message: string;
-}> {}
+export class ServerReadyTimeout extends Schema.TaggedError<ServerReadyTimeout>()(
+  "ServerReadyTimeout",
+  {
+    timeoutMs: Schema.Number,
+    message: Schema.String,
+  },
+) {}
 
-export class ServerExitedBeforeReady extends Data.TaggedError("ServerExitedBeforeReady")<{
-  readonly exitCode: number | null;
-  readonly message: string;
-}> {}
+export class ServerExitedBeforeReady extends Schema.TaggedError<ServerExitedBeforeReady>()(
+  "ServerExitedBeforeReady",
+  {
+    exitCode: Schema.NullOr(Schema.Number),
+    message: Schema.String,
+  },
+) {}
 
 export type ServerStartError = ServerSpawnError | ServerReadyTimeout | ServerExitedBeforeReady;
 

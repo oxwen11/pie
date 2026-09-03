@@ -3,13 +3,14 @@
  * so the two calendars stay the same dialect; they are not a shared module.
  */
 
-export class CronError extends Error {
-  readonly code: string;
+import { Schema } from "effect";
 
-  constructor(code: string, message: string) {
-    super(`${code}: ${message}`);
-    this.name = "CronError";
-    this.code = code;
+export class CronError extends Schema.TaggedError<CronError>()("CronError", {
+  code: Schema.String,
+  reason: Schema.String,
+}) {
+  override get message() {
+    return `${this.code}: ${this.reason}`;
   }
 }
 
@@ -31,13 +32,16 @@ const THIRTY_MIN_MS = 30 * 60 * 1000;
 export function parseCron(cron: string): CronExpr {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) {
-    throw new CronError(
-      "INVALID_CRON",
-      "expected 5-field cron: minute hour day-of-month month day-of-week",
-    );
+    throw new CronError({
+      code: "INVALID_CRON",
+      reason: "expected 5-field cron: minute hour day-of-month month day-of-week",
+    });
   }
   if (/[a-zA-Z?#LW]/.test(cron)) {
-    throw new CronError("INVALID_CRON", "names and extensions (L, W, ?, #) are not supported");
+    throw new CronError({
+      code: "INVALID_CRON",
+      reason: "names and extensions (L, W, ?, #) are not supported",
+    });
   }
   return {
     minute: parseField(parts[0]!, 0, 59),
@@ -56,12 +60,12 @@ function parseField(raw: string, min: number, max: number): Field {
   for (const item of raw.split(",")) {
     const stepMatch = /^(\*|\d+(?:-\d+)?)(?:\/(\d+))?$/.exec(item);
     if (!stepMatch) {
-      throw new CronError("INVALID_CRON", `invalid field: ${item}`);
+      throw new CronError({ code: "INVALID_CRON", reason: `invalid field: ${item}` });
     }
     const range = stepMatch[1]!;
     const step = stepMatch[2] ? Number(stepMatch[2]) : 1;
     if (!Number.isInteger(step) || step <= 0) {
-      throw new CronError("INVALID_CRON", `invalid step: ${item}`);
+      throw new CronError({ code: "INVALID_CRON", reason: `invalid step: ${item}` });
     }
     let start = min;
     let end = max;
@@ -71,7 +75,7 @@ function parseField(raw: string, min: number, max: number): Field {
       end = bounds.length === 2 ? bounds[1]! : start;
     }
     if (start < min || end > max || start > end) {
-      throw new CronError("INVALID_CRON", `field out of range: ${item}`);
+      throw new CronError({ code: "INVALID_CRON", reason: `field out of range: ${item}` });
     }
     for (let n = start; n <= end; n += step) values.add(n);
   }
@@ -106,7 +110,7 @@ export function assertTimeZone(timeZone: string): void {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone }).format();
   } catch {
-    throw new CronError("INVALID_TIMEZONE", `unknown time zone: ${timeZone}`);
+    throw new CronError({ code: "INVALID_TIMEZONE", reason: `unknown time zone: ${timeZone}` });
   }
 }
 
@@ -129,7 +133,10 @@ export function partsInTimeZone(ms: number, timeZone: string): WallClock {
       ? WEEKDAY_INDEX[weekdayName as keyof typeof WEEKDAY_INDEX]
       : undefined;
   if (weekday === undefined) {
-    throw new CronError("INVALID_TIMEZONE", `could not read weekday in ${timeZone}`);
+    throw new CronError({
+      code: "INVALID_TIMEZONE",
+      reason: `could not read weekday in ${timeZone}`,
+    });
   }
   return {
     month: Number(value("month")),
@@ -186,7 +193,7 @@ export function nextOccurrence(cron: string, afterMs: number, timeZone?: string)
     }
     return t;
   }
-  throw new CronError("INVALID_CRON", `no next occurrence for ${cron}`);
+  throw new CronError({ code: "INVALID_CRON", reason: `no next occurrence for ${cron}` });
 }
 
 export function previousOccurrence(
@@ -320,11 +327,11 @@ export function applyOneShotJitter(runAt: number, taskId: string, createdAt: num
 
 export function parseRunAt(value: string): number {
   if (!/(Z|[+-]\d{2}:\d{2})$/.test(value)) {
-    throw new CronError("INVALID_RUN_AT", "run_at must include a timezone");
+    throw new CronError({ code: "INVALID_RUN_AT", reason: "run_at must include a timezone" });
   }
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) {
-    throw new CronError("INVALID_RUN_AT", `invalid timestamp: ${value}`);
+    throw new CronError({ code: "INVALID_RUN_AT", reason: `invalid timestamp: ${value}` });
   }
   return ms;
 }
