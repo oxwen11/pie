@@ -12,14 +12,16 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
 import { useState } from "react";
+import { Group, Separator } from "react-resizable-panels";
 import { toast } from "sonner";
 
+import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
 
 import { formatSessionReuse } from "./cadence";
 import { ScheduleCard } from "./schedule-card";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
-import { ScheduleEditorDialog, type ScheduleEditorState } from "./schedule-editor-dialog";
+import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
 import type { ScheduleFormSubmit } from "./schedule-form";
 import { ScheduleRunHistory } from "./schedule-run-history";
 
@@ -207,8 +209,8 @@ export function SchedulePage({
     );
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+  const list = (
+    <>
       <div className="flex items-start justify-between gap-3 px-6 py-4">
         <p className="text-muted-foreground text-sm">
           Create a session on a cadence. These live on the server, not inside a chat.
@@ -263,28 +265,59 @@ export function SchedulePage({
           ))}
         </ul>
       )}
+    </>
+  );
 
-      {editor !== null ? (
-        <ScheduleEditorDialog
-          editor={editor}
-          onClose={() => {
-            if (editor.mode === "create") {
-              onCloseCreate();
-              return;
-            }
-            setEditing(null);
-          }}
-          onSubmit={(value) => {
-            if (editor.mode === "create") {
-              create.mutate(value);
-              return;
-            }
-            update.mutate({ id: editor.schedule.id, ...value });
-          }}
-          projects={projects}
-          submitting={create.isPending || update.isPending}
-        />
-      ) : null}
+  const editorPanel =
+    editor === null ? null : (
+      <ScheduleEditorPanel
+        editor={editor}
+        onClose={() => {
+          if (editor.mode === "create") {
+            onCloseCreate();
+            return;
+          }
+          setEditing(null);
+        }}
+        onSubmit={(value) => {
+          if (editor.mode === "create") {
+            create.mutate(value);
+            return;
+          }
+          update.mutate({ id: editor.schedule.id, ...value });
+        }}
+        projects={projects}
+        submitting={create.isPending || update.isPending}
+      />
+    );
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {editorPanel === null ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{list}</div>
+      ) : (
+        <Group
+          className="flex min-h-0 flex-1"
+          orientation="horizontal"
+          resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
+        >
+          <ResizablePanel className="flex min-w-0 flex-col" minSize="16rem">
+            {list}
+          </ResizablePanel>
+          <Separator
+            aria-label="Resize schedule editor"
+            className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
+          />
+          <ResizablePanel
+            className="flex min-w-0 flex-col"
+            defaultSize="28rem"
+            maxSize="50%"
+            minSize="18rem"
+          >
+            {editorPanel}
+          </ResizablePanel>
+        </Group>
+      )}
 
       {historySchedule !== null ? (
         <ScheduleRunHistory
