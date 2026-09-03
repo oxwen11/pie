@@ -6,7 +6,11 @@ import * as m from "motion/react-m";
 
 import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
 
-const EDITOR_TRANSITION = { type: "tween", duration: 0.2, ease: "easeInOut" } as const;
+const EDITOR_TRANSITION = {
+  type: "tween",
+  duration: 0.45,
+  ease: [0.32, 0.72, 0, 1],
+} as const;
 
 export type ScheduleEditorState =
   | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
@@ -32,7 +36,7 @@ export function ScheduleEditorPanel({
     <m.aside
       aria-label={editor.mode === "create" ? "New schedule" : "Edit schedule"}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-      initial={{ opacity: 0, x: 32 }}
+      initial={{ opacity: 0, x: "100%" }}
       animate={{ opacity: 1, x: 0 }}
       transition={reduceMotion ? { duration: 0 } : EDITOR_TRANSITION}
     >
