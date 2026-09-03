@@ -92,7 +92,10 @@ export function createAppClients(server?: ServerConnection): AppClients {
     meta: { errorMode: "inline" as const },
   };
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.diff.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.list.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.detail.key(), pullRequestDefaults);
 
   // These queries render their own error state in the workspace panels.
   for (const key of [
