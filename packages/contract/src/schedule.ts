@@ -302,8 +302,8 @@ export const UpdateScheduleInputSchema = Schema.Struct({
   expiresAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   maxRuns: Schema.optionalKey(Schema.NullOr(scheduleMaxRuns)),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
-  provider: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
-  modelId: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+  provider: Schema.optionalKey(Schema.NonEmptyString),
+  modelId: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type UpdateScheduleInput = typeof UpdateScheduleInputSchema.Type;
 

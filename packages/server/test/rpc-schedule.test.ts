@@ -72,13 +72,6 @@ describe("schedule router", () => {
       });
       expect(modeled.provider).toBe("anthropic");
       expect(modeled.modelId).toBe("claude-sonnet-4-5");
-      const cleared = await h.client.schedule.update({
-        id: created.id,
-        provider: null,
-        modelId: null,
-      });
-      expect(cleared).not.toHaveProperty("provider");
-      expect(cleared).not.toHaveProperty("modelId");
 
       await h.client.schedule.delete({ id: created.id });
       await expect(h.client.schedule.list()).resolves.toEqual([]);
