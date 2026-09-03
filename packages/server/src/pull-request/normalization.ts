@@ -206,22 +206,21 @@ const offeredActions = (
   ];
 };
 
+const normalizeLifecycle = (state: string, isDraft: boolean): PullRequestSnapshot["lifecycle"] => {
+  if (state === "OPEN") return { type: "open", draft: isDraft };
+  if (state === "CLOSED") return { type: "closed" };
+  if (state === "MERGED") return { type: "merged" };
+  throw new InvalidPullRequestJsonError("state is unsupported");
+};
+
 export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnapshot {
   const record = asRecord(input, "pull request");
   const number = requiredNumber(record, "number");
   const url = requiredString(record, "url");
-  const state = requiredString(record, "state");
-  const isDraft = requiredBoolean(record, "isDraft");
-  const lifecycle: PullRequestSnapshot["lifecycle"] =
-    state === "OPEN"
-      ? { type: "open", draft: isDraft }
-      : state === "CLOSED"
-        ? { type: "closed" }
-        : state === "MERGED"
-          ? { type: "merged" }
-          : (() => {
-              throw new InvalidPullRequestJsonError("state is unsupported");
-            })();
+  const lifecycle = normalizeLifecycle(
+    requiredString(record, "state"),
+    requiredBoolean(record, "isDraft"),
+  );
   const mergeable = (() => {
     switch (requiredString(record, "mergeable")) {
       case "MERGEABLE":
@@ -271,16 +270,6 @@ export function normalizeGitHubPullRequestDetailJson(input: unknown): PullReques
   };
 }
 
-const normalizeListLifecycle = (
-  state: string,
-  isDraft: boolean,
-): PullRequestListItem["lifecycle"] => {
-  if (state === "OPEN") return { type: "open", draft: isDraft };
-  if (state === "CLOSED") return { type: "closed" };
-  if (state === "MERGED") return { type: "merged" };
-  throw new InvalidPullRequestJsonError("state is unsupported");
-};
-
 const normalizeViewerPullRequestNode = (value: unknown): PullRequestListItem => {
   const record = asRecord(value, "pull request");
   const number = requiredNumber(record, "number");
@@ -297,7 +286,7 @@ const normalizeViewerPullRequestNode = (value: unknown): PullRequestListItem => 
     authorLogin,
     headBranch: optionalString(record, "headRefName") ?? "",
     baseBranch: requiredString(record, "baseRefName"),
-    lifecycle: normalizeListLifecycle(
+    lifecycle: normalizeLifecycle(
       requiredString(record, "state"),
       requiredBoolean(record, "isDraft"),
     ),

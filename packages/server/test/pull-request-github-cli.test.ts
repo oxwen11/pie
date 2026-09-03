@@ -4,12 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   CURRENT_PULL_REQUEST_FIELDS,
-  DETAIL_PULL_REQUEST_FIELDS,
   currentPullRequestArgs,
   makeGitHubCliAdapter,
   PULL_REQUEST_LIST_QUERY,
   pullRequestActionArgs,
-  pullRequestDetailArgs,
   pullRequestDiffArgs,
   pullRequestListArgs,
 } from "../src/pull-request/github-cli";
@@ -34,23 +32,6 @@ describe("GitHub CLI command construction", () => {
       "graphql",
       "-f",
       `query=${PULL_REQUEST_LIST_QUERY}`,
-    ]);
-  });
-
-  it("reads a pull request detail by URL including the body", () => {
-    expect(
-      pullRequestDetailArgs({
-        host: "github.com",
-        owner: "getpie",
-        repository: "pie",
-        number: 42,
-      }),
-    ).toEqual([
-      "pr",
-      "view",
-      "https://github.com/getpie/pie/pull/42",
-      "--json",
-      DETAIL_PULL_REQUEST_FIELDS.join(","),
     ]);
   });
 
@@ -121,6 +102,44 @@ describe("GitHub CLI command construction", () => {
         stdin: "ignore",
       },
     });
+  });
+
+  it("lists the viewer's pull requests without a workspace cwd", async () => {
+    const output = JSON.stringify({ data: { viewer: { pullRequests: { nodes: [] } } } });
+    let recorded:
+      | Parameters<ChildProcessSpawner.ChildProcessSpawner["Service"]["spawn"]>[0]
+      | null = null;
+    const handle = ChildProcessSpawner.makeHandle({
+      pid: ChildProcessSpawner.ProcessId(3),
+      exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      isRunning: Effect.succeed(false),
+      kill: () => Effect.void,
+      stdin: Sink.drain,
+      stdout: Stream.succeed(new TextEncoder().encode(output)),
+      stderr: Stream.empty,
+      all: Stream.succeed(new TextEncoder().encode(output)),
+      getInputFd: () => Sink.drain,
+      getOutputFd: () => Stream.empty,
+      unref: Effect.succeed(Effect.void),
+    });
+    const spawner = ChildProcessSpawner.make((command) => {
+      recorded = command;
+      return Effect.succeed(handle);
+    });
+
+    await Effect.runPromise(makeGitHubCliAdapter(spawner).list());
+
+    expect(recorded).toMatchObject({
+      _tag: "StandardCommand",
+      command: "gh",
+      args: pullRequestListArgs(),
+      options: {
+        env: { GH_PROMPT_DISABLED: "1" },
+        extendEnv: true,
+        stdin: "ignore",
+      },
+    });
+    expect(recorded).not.toMatchObject({ options: { cwd: expect.anything() } });
   });
 
   it("pins merge and auto-merge to the expected head commit", () => {

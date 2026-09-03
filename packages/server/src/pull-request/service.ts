@@ -1,5 +1,3 @@
-import os from "node:os";
-
 import type {
   PullRequestAction,
   PullRequestActionApplied,
@@ -65,8 +63,8 @@ export const PullRequestServiceLayer: Layer.Layer<
 
     const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
     const diff = (cwd: string) => cli.diff(cwd);
-    const list = () => cli.list(os.homedir());
-    const detail = (pullRequest: PullRequestRef) => cli.detail(os.homedir(), pullRequest);
+    const list = () => cli.list();
+    const detail = (pullRequest: PullRequestRef) => cli.detail(pullRequest);
 
     const runAction = (
       cwd: string,

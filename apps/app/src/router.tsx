@@ -22,4 +22,8 @@ declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createRouter>;
   }
+  interface StaticDataRouteOption {
+    /** Card title. `false` hides it. Unset keeps the session / new-chat heading. */
+    readonly cardHeading?: string | false;
+  }
 }
