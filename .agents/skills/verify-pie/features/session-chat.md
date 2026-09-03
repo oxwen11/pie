@@ -7,7 +7,7 @@
 - **Open from a URL** with `?projectId=` (fast path) or bare `/session/<id>` (`session.resolveRef` then prepare).
 - **Transcript** — user bubbles (right, primary), assistant + tool/reasoning. Empty settled history renders nothing; loading shows **Loading earlier messages…**; failed history shows **Earlier messages couldn't be loaded...**.
 - **Composer** — same TipTap stack as draft, no draft placeholder. Submit keymap is Enter; **click Send message**. Footer shows the current git branch, **Not a Git repository**, or **Workspace unavailable**.
-- **Streaming toolbar** — while `status === "streaming"`, three controls: **Steer message**, **Stop generating**, **Send message**. Stop only aborts the current run.
+- **Streaming toolbar** — while `status === "streaming"` and the draft is empty: **Steer message** (disabled) and **Stop generating** (primary). Typing a draft lights **Send message** (queues a follow-up) and keeps Stop as a ghost action. Stop only aborts the current run.
 - **Follow-up** — Send / Enter while a turn is running queues `delivery: "followUp"`. The draft is **not** a transcript bubble; it appears as a row in the **queued messages** Frame above the composer.
 - **Steer** — **Steer message** submits the **current draft** as `delivery: "steer"` (inject before the next LLM call). One shot, not a mode: the next Send stays follow-up. Steering rows appear first, labeled **Steer**.
 - **Queue rows** — each queued line is its own row. Send while streaming queues as follow-up. **Send** on a follow-up row (`Steer queued message`) promotes that line to steering (labeled **Steer**). **Edit queued message** rewrites that line; **Remove queued message** drops it. Edits, deletes, and promote rewrite Pi's native queue (`clear_queue`, then remaining `steer` / `follow_up`). Empty Frame is omitted. Steering rows have no Send.
@@ -37,8 +37,8 @@ Follow-up prompt (idle session — Pi finished or failed):
 
 Queue + Steer (only when a turn is actually streaming — hold-open fake Pi, or a long real turn):
 
-1. Snapshot: **Steer message**, **Stop generating**, and **Send message** are all present. Steer and Send are disabled while the draft is empty.
-2. Type a distinctive follow-up. Click **Send message** (not Steer). The line appears as its own row under **queued messages** with no Steer label. The draft clears. The user bubble must **not** gain that text.
+1. Snapshot: **Steer message** and **Stop generating** are present. **Send message** is absent while the draft is empty. Steer is disabled.
+2. Type a distinctive follow-up. **Send message** appears enabled. Click **Send message** (not Steer). The line appears as its own row under **queued messages** with no Steer label. The draft clears. The user bubble must **not** gain that text. Send disappears again (empty draft, still streaming).
 3. Type a distinctive steer line. Click **Steer message**. The line appears first, labeled **Steer**. The draft clears. Steer is not pressed / not a toggle.
 4. Type another line and click **Send message** again. It joins the queue as another row. The previous steer line stays labeled.
 5. Click **Steer queued message** (**Send**) on a follow-up row. That row moves up, labeled **Steer**. The composer Send stays follow-up. Transcript bubbles do not gain the text. The fake-pi / child log shows `clear_queue`, then `steer` for that line and `follow_up` for the rest.

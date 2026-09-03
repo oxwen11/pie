@@ -92,6 +92,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
     meta: { errorMode: "inline" as const },
   };
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.diff.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
 
   // These queries render their own error state in the workspace panels.
@@ -99,6 +100,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
     orpcQueryUtils.git.review.key(),
     orpcQueryUtils.git.diff.key(),
     orpcQueryUtils.fs.readTree.key(),
+    orpcQueryUtils.fs.readFileString.key(),
   ]) {
     queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
   }

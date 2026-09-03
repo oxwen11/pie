@@ -254,7 +254,15 @@ export const GitServiceLayer: Layer.Layer<
       });
 
     const readWorktreeText = (cwd: string, relativePath: string) =>
-      workspace.readFileString(cwd, relativePath);
+      workspace
+        .readFileString(cwd, relativePath)
+        .pipe(
+          Effect.flatMap((preview) =>
+            preview.kind === "text"
+              ? Effect.succeed(preview.content)
+              : Effect.fail(new WorkspaceBinaryFile({ path: relativePath })),
+          ),
+        );
 
     const toBlobPath = (cwd: string, repoRoot: string, relativePath: string): string =>
       toPosixPath(path.relative(repoRoot, path.resolve(cwd, relativePath)));

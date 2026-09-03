@@ -38,6 +38,9 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.current.key())).toMatchObject(
       pullRequestDefaults,
     );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.diff.key())).toMatchObject(
+      pullRequestDefaults,
+    );
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
       pullRequestDefaults,
     );
@@ -52,6 +55,7 @@ describe("createAppClients", () => {
       orpcQueryUtils.git.review.key(),
       orpcQueryUtils.git.diff.key(),
       orpcQueryUtils.fs.readTree.key(),
+      orpcQueryUtils.fs.readFileString.key(),
     ]) {
       expect(queryClient.getQueryDefaults(key).meta).toEqual({ errorMode: "inline" });
     }
