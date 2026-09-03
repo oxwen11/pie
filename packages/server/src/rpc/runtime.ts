@@ -16,7 +16,7 @@ import {
 } from "../harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
-import { resolvePiExecutable } from "../harness/pi/resolve-executable";
+import { resolvePiExecutableEffect } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
@@ -27,62 +27,50 @@ const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeC
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
-const piExecutable = resolvePiExecutable();
-const piProcessOptions = { executable: piExecutable };
+const Infra = Layer.mergeAll(PlatformLayer, PathsLayer, EventBusLayer);
 
 export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
   PiProcessTag,
-  makePiProcess(piProcessOptions),
+  Effect.gen(function* () {
+    const executable = yield* resolvePiExecutableEffect;
+    return yield* makePiProcess({ executable });
+  }),
 ).pipe(Layer.provide(NodeProcessLayer));
 
 const PiAgentProvided = Layer.effect(
   PiAgent,
   Effect.gen(function* () {
     const process = yield* PiProcessTag;
-    const pi = yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
-    return pi;
+    const executable = yield* resolvePiExecutableEffect;
+    return yield* cachePiAgentAvailability(makePiAgent(process, { executable }));
   }),
-).pipe(Layer.provide(PiProcessLayer), Layer.provide(PlatformLayer));
+).pipe(Layer.provideMerge(PiProcessLayer), Layer.provideMerge(Infra));
 
-const PiAgentSessionManagerProvided = PiAgentSessionManagerLayer.pipe(
-  Layer.provide(PiAgentProvided),
-  Layer.provide(EventBusLayer),
-  Layer.provide(PlatformLayer),
-);
-const GitProvided = GitServiceLayer.pipe(
-  Layer.provide(FileSystemServiceLayer),
-  Layer.provide(PlatformLayer),
-);
-const WorktreeProvided = WorktreeServiceLayer.pipe(
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
-);
-
+const FileSystemProvided = FileSystemServiceLayer.pipe(Layer.provideMerge(Infra));
+const GitProvided = GitServiceLayer.pipe(Layer.provideMerge(FileSystemProvided));
+const WorktreeProvided = WorktreeServiceLayer.pipe(Layer.provideMerge(Infra));
 const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(ProjectRepositoryLayer),
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
+  Layer.provideMerge(Infra),
 );
-
+const PiAgentSessionManagerProvided = PiAgentSessionManagerLayer.pipe(
+  Layer.provide(PiAgentProvided),
+  Layer.provideMerge(Infra),
+);
 const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PiAgentSessionManagerProvided),
   Layer.provide(PiAgentProvided),
-  Layer.provide(EventBusLayer),
   Layer.provide(ProjectServiceProvided),
-  Layer.provide(PathsLayer),
   Layer.provide(WorktreeProvided),
-  Layer.provide(PlatformLayer),
+  Layer.provideMerge(Infra),
 );
-
 const PiAgentServiceProvided = PiAgentServiceLayer;
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
-
 const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
   Layer.provide(ScheduleRepositoryLayer),
   Layer.provide(ProjectServiceProvided),
   Layer.provide(PiAgentSessionServiceProvided),
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
+  Layer.provideMerge(Infra),
 );
 
 const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
@@ -98,7 +86,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   ScheduleDaemonLayer,
   PiAgentProvided,
   PiProcessLayer,
-  FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
+  FileSystemProvided,
   GitProvided,
   WorktreeProvided,
   PullRequestServiceProvided,
