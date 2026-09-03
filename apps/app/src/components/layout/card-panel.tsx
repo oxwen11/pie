@@ -16,9 +16,10 @@ import { isDesktopHost } from "@/platform-host";
 export interface CardPanelProps {
   readonly heading?: string;
   readonly supportingText?: string;
+  readonly hideHeader?: boolean;
 }
 
-export function CardPanel({ heading, supportingText }: CardPanelProps) {
+export function CardPanel({ heading, supportingText, hideHeader = false }: CardPanelProps) {
   const { state, isMobile } = useSidebar();
   const hasContentPanelToggle = useContentPanel() !== null;
   const desktop = isDesktopHost(usePlatform());
@@ -26,9 +27,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
   const webCollapsedChrome = collapsedDesktop && !desktop;
   const reduceMotion = useReducedMotion() === true;
   const chromeTransition = reduceMotion ? { duration: 0 } : undefined;
-  const showTitle = heading !== undefined;
-  const showChrome = isMobile || webCollapsedChrome;
-  const showHeader = showTitle || showChrome;
+  const showHeader = !hideHeader || isMobile || webCollapsedChrome;
 
   return (
     <SidebarInset
@@ -44,7 +43,7 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
           className={cn(
             SHELL_TITLEBAR_HEADER_CLASS,
             "[-webkit-app-region:drag]",
-            showTitle && "shadow-[inset_0_-1px_0_var(--color-border)]",
+            !hideHeader && "shadow-[inset_0_-1px_0_var(--color-border)]",
             desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
           )}
         >
@@ -57,15 +56,17 @@ export function CardPanel({ heading, supportingText }: CardPanelProps) {
                 <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
               </div>
             ) : null}
-            {showTitle ? (
+            {!hideHeader ? (
               <m.div
                 className={SHELL_TITLEBAR_LABEL_CLASS}
                 layout={reduceMotion ? false : "position"}
                 transition={chromeTransition}
               >
-                <span className="min-w-0 truncate font-medium" title={heading}>
-                  {heading}
-                </span>
+                {heading !== undefined ? (
+                  <span className="min-w-0 truncate font-medium" title={heading}>
+                    {heading}
+                  </span>
+                ) : null}
                 {supportingText !== undefined && (
                   <span
                     className="text-muted-foreground max-w-[50%] min-w-0 truncate"
