@@ -95,7 +95,7 @@ export const runServe = (input: ServeInput) =>
       Effect.logError("server startup failed", Cause.fail(error)).pipe(
         Effect.annotateLogs({
           event: "server.startup_failed",
-          phase: error.phase,
+          phase: error._tag === "ServerStartupError" ? error.phase : "config",
           pid: process.pid,
         }),
       ),

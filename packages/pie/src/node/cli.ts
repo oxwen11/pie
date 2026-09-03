@@ -28,7 +28,7 @@ const startDaemon = (input: DaemonStartInput) =>
     // Same flag > env > default port precedence as `pie serve`. CORS is not
     // resolved here: the daemon's policy is static, and any extra origins are
     // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
-    const { port } = resolveServeConfig(input);
+    const { port } = yield* resolveServeConfig(input);
     const handle = yield* resolveCliDaemon(port);
     yield* Console.log(
       handle.reused
