@@ -86,7 +86,7 @@ function RootLayout() {
             <CardPanel
               heading={
                 schedulesRoute !== null
-                  ? "Schedule"
+                  ? undefined
                   : sessionRef === null
                     ? "New chat"
                     : (sessionTitle ?? "New chat")
