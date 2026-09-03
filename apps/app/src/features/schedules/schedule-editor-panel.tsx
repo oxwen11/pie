@@ -1,6 +1,6 @@
 import type { Project, Schedule } from "@getpie/contract";
 
-import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
+import { ScheduleCreateForm, ScheduleEditForm, type ScheduleFormSubmit } from "./schedule-form";
 import {
   SchedulePanel,
   SchedulePanelBody,
@@ -39,19 +39,24 @@ export function ScheduleEditorPanel({
         <p className="text-muted-foreground mb-4 text-sm">
           When this is due, pie starts a session in the project and sends the prompt.
         </p>
-        <ScheduleForm
-          key={editor.mode === "edit" ? editor.schedule.id : "create"}
-          defaults={
-            editor.mode === "create"
-              ? { projectId: editor.projectId, sessionId: editor.sessionId }
-              : undefined
-          }
-          initial={editor.mode === "edit" ? editor.schedule : undefined}
-          onCancel={onClose}
-          onSubmit={onSubmit}
-          projects={projects}
-          submitting={submitting}
-        />
+        {editor.mode === "create" ? (
+          <ScheduleCreateForm
+            defaults={{ projectId: editor.projectId, sessionId: editor.sessionId }}
+            onCancel={onClose}
+            onSubmit={onSubmit}
+            projects={projects}
+            submitting={submitting}
+          />
+        ) : (
+          <ScheduleEditForm
+            key={editor.schedule.id}
+            onCancel={onClose}
+            onSubmit={onSubmit}
+            projects={projects}
+            schedule={editor.schedule}
+            submitting={submitting}
+          />
+        )}
       </SchedulePanelBody>
     </SchedulePanel>
   );
