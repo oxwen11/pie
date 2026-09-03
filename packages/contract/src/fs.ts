@@ -17,16 +17,14 @@ export const FsReadFileInputSchema = withWorkspaceQuery({
 });
 export type FsReadFileInput = typeof FsReadFileInputSchema.Type;
 
-export const FilePreviewTextSchema = Schema.Struct({
-  kind: Schema.Literal("text"),
-  content: Schema.String,
-});
-export const FilePreviewImageSchema = Schema.Struct({
-  kind: Schema.Literal("image"),
-  mimeType: Schema.String,
-  data: Schema.String,
-});
-export const FilePreviewSchema = Schema.Union([FilePreviewTextSchema, FilePreviewImageSchema]);
+export const FilePreviewSchema = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("text"), content: Schema.String }),
+  Schema.Struct({
+    kind: Schema.Literal("image"),
+    mimeType: Schema.String,
+    data: Schema.String,
+  }),
+]);
 export type FilePreview = typeof FilePreviewSchema.Type;
 
 export const WorkspaceTreeEntrySchema = Schema.Union([

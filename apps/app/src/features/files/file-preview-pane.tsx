@@ -53,7 +53,13 @@ export function FilePreviewPane({
           {fileErrorMessage(file.error)}
         </FileState>
       ) : file.data?.kind === "image" ? (
-        <ImagePreview data={file.data.data} mimeType={file.data.mimeType} path={path} />
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <img
+            alt={path.split(/[\\/]/).at(-1) || path}
+            className="max-h-full max-w-full object-contain"
+            src={`data:${file.data.mimeType};base64,${file.data.data}`}
+          />
+        </div>
       ) : (
         <div className="min-h-0 flex-1">
           <Suspense
@@ -72,19 +78,6 @@ export function FilePreviewPane({
           </Suspense>
         </div>
       )}
-    </div>
-  );
-}
-
-function ImagePreview({ path, mimeType, data }: { path: string; mimeType: string; data: string }) {
-  const name = path.split(/[\\/]/).at(-1) || path;
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
-      <img
-        alt={name}
-        className="max-h-full max-w-full object-contain"
-        src={`data:${mimeType};base64,${data}`}
-      />
     </div>
   );
 }

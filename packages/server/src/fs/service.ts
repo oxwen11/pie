@@ -91,8 +91,7 @@ interface ScanCandidate {
 export class FileSystemService extends Context.Service<
   FileSystemService,
   {
-    readonly readFileString: (cwd: string, path: string) => Effect.Effect<string, ReadFileError>;
-    readonly readFilePreview: (
+    readonly readFileString: (
       cwd: string,
       path: string,
     ) => Effect.Effect<WorkspaceFilePreview, ReadFileError>;
@@ -285,7 +284,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
         }
       };
 
-      const readFilePreview = (
+      const readFileString = (
         cwd: string,
         relativePath: string,
       ): Effect.Effect<WorkspaceFilePreview, ReadFileError> =>
@@ -326,15 +325,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
         });
 
       return {
-        readFilePreview,
-        readFileString: (cwd, relativePath) =>
-          readFilePreview(cwd, relativePath).pipe(
-            Effect.flatMap((preview) =>
-              preview.kind === "text"
-                ? Effect.succeed(preview.content)
-                : Effect.fail(new WorkspaceBinaryFile({ path: relativePath })),
-            ),
-          ),
+        readFileString,
         readTree,
       };
     }),

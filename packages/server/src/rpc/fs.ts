@@ -19,7 +19,7 @@ export const fsRouter = orpc.router({
   readFileString: orpc.readFileString.effect(function* ({ input, errors }) {
     const fs = yield* FileSystemService;
     const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
-    return yield* fs.readFilePreview(cwd, input.path).pipe(
+    return yield* fs.readFileString(cwd, input.path).pipe(
       Effect.catchTags({
         WorkspacePathEscape: (error) =>
           Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
