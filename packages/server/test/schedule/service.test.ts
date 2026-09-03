@@ -148,6 +148,7 @@ const stubSessions = (opts: {
     rememberPullRequestRef: unused,
     getMessages: unused,
     interrupt: unused,
+    replaceQueue: unused,
     respondToAgentRequest: unused,
     getCapabilities: unused,
     getModelState: unused,
