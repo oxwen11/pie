@@ -26,11 +26,12 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
 // handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
-// turn queues Send as a Pi follow-up. Steer submits the same draft as a
-// steer (inject before the next LLM call) — one shot, not a mode. prompt
-// comes from ChatSessionProvider — not props. The CardFrame header lists
-// queued prompts as editable rows (steering first); the footer shows the
-// session workspace's git availability and current branch.
+// turn queues Send as a Pi follow-up — Send only appears once the draft has
+// content (empty streaming shows Stop in the primary slot). Steer submits
+// the same draft as a steer (inject before the next LLM call) — one shot,
+// not a mode. prompt comes from ChatSessionProvider — not props. The
+// CardFrame header lists queued prompts as editable rows (steering first);
+// the footer shows the session workspace's git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -115,16 +116,18 @@ export function ChatInputComposer({
                   <PromptInputButton
                     aria-label="Stop generating"
                     onClick={() => void interrupt()}
-                    variant="ghost"
+                    variant={hasContent ? "ghost" : "default"}
                   >
                     <SquareIcon className="size-4" />
                   </PromptInputButton>
                 </>
               ) : null}
-              <PromptInputSubmit
-                aria-label="Send message"
-                disabled={!hasContent || workspaceUnavailable}
-              />
+              {!canInterrupt || hasContent ? (
+                <PromptInputSubmit
+                  aria-label="Send message"
+                  disabled={!hasContent || workspaceUnavailable}
+                />
+              ) : null}
             </div>
           </PromptInputToolbar>
         </ChatInputProvider>
