@@ -32,35 +32,29 @@ interface ModelGroup {
 // live session. Options come from Pi's `get_available_models` — never hardcoded.
 // Model ids are scoped to their provider; the pair always travels together.
 // Models are grouped by provider and the popup filters as you type.
-// `clearLabel` adds a first option standing for "no model chosen"; picking it
-// calls onChange with empty ids so the host can fall back to its default.
 export function ModelSelect({
   models,
   providerId,
   modelId,
   onChange,
-  clearLabel,
   id,
 }: {
   models: ReadonlyArray<AgentModel>;
   providerId: string | undefined;
   modelId: string | undefined;
   onChange: (providerId: string, modelId: string) => void;
-  clearLabel?: string;
   id?: string;
 }) {
   const filter = useComboboxFilter();
 
   const options = useMemo<ModelOption[]>(
-    () => [
-      ...(clearLabel !== undefined ? [{ provider: "", modelId: "", label: clearLabel }] : []),
-      ...models.map((model) => ({
+    () =>
+      models.map((model) => ({
         provider: model.provider,
         modelId: model.modelId,
         label: model.name ?? model.modelId,
       })),
-    ],
-    [clearLabel, models],
+    [models],
   );
 
   const groups = useMemo<ModelGroup[]>(() => {
@@ -75,9 +69,8 @@ export function ModelSelect({
 
   const value = useMemo(
     () =>
-      options.find(
-        (option) => option.provider === (providerId ?? "") && option.modelId === (modelId ?? ""),
-      ) ?? null,
+      options.find((option) => option.provider === providerId && option.modelId === modelId) ??
+      null,
     [options, providerId, modelId],
   );
 
@@ -132,9 +125,7 @@ export function ModelSelect({
           <ComboboxList>
             {(group: ModelGroup) => (
               <ComboboxGroup items={group.items} key={group.provider}>
-                {group.provider !== "" ? (
-                  <ComboboxGroupLabel>{group.provider}</ComboboxGroupLabel>
-                ) : null}
+                <ComboboxGroupLabel>{group.provider}</ComboboxGroupLabel>
                 <ComboboxCollection>
                   {(option: ModelOption) => (
                     <ComboboxItem key={`${option.provider}:${option.modelId}`} value={option}>

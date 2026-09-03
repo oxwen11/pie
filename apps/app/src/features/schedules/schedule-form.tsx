@@ -49,7 +49,7 @@ export type ScheduleFormSubmit = {
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
-  /** null means "use the project's default model". */
+  /** The chosen pair; null only when no models are available at all. */
   readonly model: { readonly provider: string; readonly modelId: string } | null;
 };
 
@@ -127,20 +127,31 @@ export function ScheduleForm({
     enabled: form.projectId.length > 0,
   });
   const listedModels = models.data?.models ?? [];
+  // Draft logic: an explicit choice wins, otherwise the server's default model
+  // is the selection. Derived at render, never mirrored into form state.
+  const effectiveModel =
+    form.modelProvider !== "" && form.modelId !== ""
+      ? { provider: form.modelProvider, modelId: form.modelId }
+      : models.data?.defaultModel !== undefined
+        ? {
+            provider: models.data.defaultModel.provider,
+            modelId: models.data.defaultModel.modelId,
+          }
+        : null;
   // Keep a stored pair selectable even if the model is no longer listed, mirroring
   // the "Selected session" fallback below.
   const modelOptions =
-    form.modelProvider !== "" &&
-    form.modelId !== "" &&
+    effectiveModel !== null &&
     !listedModels.some(
-      (model) => model.provider === form.modelProvider && model.modelId === form.modelId,
+      (model) =>
+        model.provider === effectiveModel.provider && model.modelId === effectiveModel.modelId,
     )
       ? [
           ...listedModels,
           {
-            provider: form.modelProvider,
-            modelId: form.modelId,
-            name: `${form.modelProvider}/${form.modelId}`,
+            provider: effectiveModel.provider,
+            modelId: effectiveModel.modelId,
+            name: `${effectiveModel.provider}/${effectiveModel.modelId}`,
           },
         ]
       : listedModels;
@@ -176,7 +187,8 @@ export function ScheduleForm({
     form.prompt.trim().length > 0 &&
     (form.cadence !== "once" || form.runAt.length > 0) &&
     (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1));
+    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
+    (listedModels.length === 0 || effectiveModel !== null);
 
   return (
     <form
@@ -202,10 +214,7 @@ export function ScheduleForm({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
-            model:
-              form.modelProvider !== "" && form.modelId !== ""
-                ? { provider: form.modelProvider, modelId: form.modelId }
-                : null,
+            model: effectiveModel,
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -257,20 +266,16 @@ export function ScheduleForm({
         <FieldLabel htmlFor="schedule-model">Model</FieldLabel>
         {models.isLoading ? null : (
           <ModelSelect
-            clearLabel="Project default"
             id="schedule-model"
-            modelId={form.modelId === "" ? undefined : form.modelId}
+            modelId={effectiveModel?.modelId}
             models={modelOptions}
             onChange={(provider, modelId) =>
               setForm((current) => ({ ...current, modelProvider: provider, modelId }))
             }
-            providerId={form.modelProvider === "" ? undefined : form.modelProvider}
+            providerId={effectiveModel?.provider}
           />
         )}
-        <FieldDescription>
-          Used when the schedule starts a session. The project default applies when nothing is
-          picked.
-        </FieldDescription>
+        <FieldDescription>Used when the schedule starts a session.</FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
