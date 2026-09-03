@@ -1,6 +1,16 @@
-import { Cause, Context, Effect, Option, Scope } from "effect";
+import { Cause, Context, Effect, Option, Redacted, Scope } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
+import {
+  npmPackageVersion,
+  optionString,
+  pieAllowedHosts,
+  pieAuthToken,
+  pieCorsOrigins,
+  pieDaemonCompatibilityKey,
+  piePort,
+  nodeEnv,
+} from "../config/env";
 import { PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { formatReadyLine } from "./handshake";
@@ -8,32 +18,6 @@ import { listenServer } from "./listen";
 import { createServer, ServerStartupError } from "./server";
 
 const DEFAULT_PORT = 4000;
-
-/**
- * Read the token, then scrub it. The agent spawns a shell for every tool call
- * and children inherit this environment — an agent-run command must not be
- * able to read the credential that guards the agent. Kept env-only (never a
- * flag) so it stays out of the process list.
- */
-function takeAuthToken(): string | undefined {
-  const token = process.env.PIE_AUTH_TOKEN;
-  delete process.env.PIE_AUTH_TOKEN;
-  return token;
-}
-
-function listFromEnv(name: string): string[] {
-  return (process.env[name] ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
-function portFromEnv(): number {
-  const raw = process.env.PIE_PORT;
-  if (raw === undefined) return process.env.NODE_ENV === "development" ? 0 : DEFAULT_PORT;
-  const port = Number.parseInt(raw, 10);
-  return Number.isInteger(port) && port >= 0 ? port : DEFAULT_PORT;
-}
 
 export const serveFlags = {
   port: Flag.integer("port").pipe(
@@ -66,17 +50,21 @@ type ServeConfig = {
 
 /**
  * Resolve the effective port and CORS origins from parsed flags, falling back
- * to `PIE_*` env and finally the defaults — precedence flag > env > default.
- * Pure so the precedence can be tested without booting a server.
+ * to `PIE_*` config and finally the defaults — precedence flag > config > default.
  */
-export function resolveServeConfig(input: ServeInput): ServeConfig {
-  return {
-    port: Option.getOrElse(input.port, portFromEnv),
-    corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),
-    allowedHosts:
-      input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("PIE_ALLOWED_HOSTS"),
-  };
-}
+export const resolveServeConfig = (input: ServeInput): Effect.Effect<ServeConfig> =>
+  Effect.gen(function* () {
+    const envPort = yield* piePort;
+    const envName = yield* nodeEnv;
+    const corsFromEnv = yield* pieCorsOrigins;
+    const hostsFromEnv = yield* pieAllowedHosts;
+    const defaultPort = envName === "development" ? 0 : DEFAULT_PORT;
+    return {
+      port: Option.getOrElse(input.port, () => Option.getOrElse(envPort, () => defaultPort)),
+      corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : corsFromEnv,
+      allowedHosts: input.allowedHost.length > 0 ? input.allowedHost : hostsFromEnv,
+    };
+  });
 
 /**
  * Boot the HTTP server and keep the process alive until interrupted.
@@ -118,8 +106,14 @@ export const runServe = (input: ServeInput) =>
 
 const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
-    const authToken = takeAuthToken();
-    const { port: requestedPort, corsOrigins, allowedHosts } = resolveServeConfig(input);
+    const token = yield* pieAuthToken;
+    const authToken = Option.match(token, {
+      onNone: () => undefined,
+      onSome: Redacted.value,
+    });
+    const { port: requestedPort, corsOrigins, allowedHosts } = yield* resolveServeConfig(input);
+    const compatibilityKey = optionString(yield* pieDaemonCompatibilityKey);
+    const version = optionString(yield* npmPackageVersion);
 
     // The first line of every run, and the one that dates the file. It also
     // records the shape of the run — auth on or off, which origins are allowed
@@ -130,11 +124,11 @@ const serveWith = (input: ServeInput) =>
         event: "server.starting",
         requestedPort,
         authenticated: authToken !== undefined,
-        compatibilityKey: process.env.PIE_DAEMON_COMPATIBILITY_KEY,
+        compatibilityKey,
         corsOrigins,
         allowedHosts,
         pid: process.pid,
-        version: process.env.npm_package_version,
+        version,
         node: process.version,
       }),
     );
