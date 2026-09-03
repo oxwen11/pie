@@ -34,16 +34,22 @@ export const SessionMetadataLocksLayer: Layer.Layer<SessionMetadataLocks> = Laye
       });
 
     return {
-      withLock: (ref, effect) =>
-        semaphoreFor(refKey(ref)).pipe(Effect.flatMap((lock) => lock.withPermit(effect))),
-      release: (ref) =>
-        SynchronizedRef.update(table, (current) => {
+      withLock: Effect.fn("SessionMetadataLocks.withLock")(function* <A, E, R>(
+        ref: SessionRef,
+        effect: Effect.Effect<A, E, R>,
+      ) {
+        const lock = yield* semaphoreFor(refKey(ref));
+        return yield* lock.withPermit(effect);
+      }),
+      release: Effect.fn("SessionMetadataLocks.release")(function* (ref: SessionRef) {
+        yield* SynchronizedRef.update(table, (current) => {
           const key = refKey(ref);
           if (!current.has(key)) return current;
           const next = new Map(current);
           next.delete(key);
           return next;
-        }),
+        });
+      }),
       size: SynchronizedRef.get(table).pipe(Effect.map((current) => current.size)),
     } satisfies SessionMetadataLocksShape;
   }),
