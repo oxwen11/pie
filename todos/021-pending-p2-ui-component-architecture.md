@@ -20,7 +20,7 @@ The UI already uses compound components in several places, but the architecture 
 - [x] Remove current-session detection prop drilling through the projects sidebar with a narrowly scoped provider or equivalent boundary.
 - [x] Stop passing the Content Panel session object through outlet children when the existing Content Panel context already provides it.
 - [x] Consolidate `FileState`, `ReviewState`, and `WorkspaceState` into one shared state presentation component.
-- [ ] Decompose `ReviewToolbar` into focused, explicitly composable controls while preserving controlled state ownership.
+- [x] Decompose `ReviewToolbar` into focused, explicitly composable controls while preserving controlled state ownership.
 - [ ] Clean up the `PromptInput` and `ToolHeader` public APIs, including unused props and unnecessary mode/configuration surface.
 - [ ] Correct and verify the `Branch` and `WebPreview` compound-component contracts, including controlled state and child/state synchronization.
 
@@ -54,3 +54,4 @@ The UI already uses compound components in several places, but the architecture 
 | 2026-08-23 | Removed current-session detection prop drilling from the projects sidebar | A projects-scoped provider keeps route identity at the root while rows and archive actions read a complete `SessionRef` checker locally.                 |
 | 2026-08-23 | Stopped forwarding the Content Panel session through outlet internals     | Outlet children now read the existing bound session hook instead of repeating the same object as props.                                                  |
 | 2026-08-23 | Consolidated File/Review/Workspace empty states                           | One app-level `WorkspaceState` now owns empty/error presentation; features pass icon and variant.                                                        |
+| 2026-08-23 | Split `ReviewToolbar` into composable controls                            | Mode, branch, heading, and refresh stay independently controlled; the toolbar is only a layout row.                                                      |

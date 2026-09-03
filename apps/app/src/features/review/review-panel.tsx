@@ -27,7 +27,13 @@ import { WorkspaceState } from "@/components/workspace-state";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
-import { ReviewToolbar } from "./review-toolbar";
+import {
+  ReviewBranchSelect,
+  ReviewModeSelect,
+  ReviewRefreshButton,
+  ReviewToolbar,
+  ReviewToolbarHeading,
+} from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 
 export interface ReviewPayload {
@@ -250,16 +256,15 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   return (
     <WorkspaceLayout>
       <WorkspaceLayoutToolbar>
-        <ReviewToolbar
-          branch={repositoryBranch}
-          heading={heading}
-          mode={mode}
-          onModeChange={setMode}
-          onOtherChange={setOther}
-          onRefresh={refresh}
-          other={other}
-          refreshing={refreshing}
-        />
+        <ReviewToolbar>
+          <ReviewModeSelect onValueChange={setMode} value={mode} />
+          {mode === "branch" ? (
+            <ReviewBranchSelect branch={repositoryBranch} onValueChange={setOther} value={other} />
+          ) : (
+            <ReviewToolbarHeading>{heading}</ReviewToolbarHeading>
+          )}
+          <ReviewRefreshButton loading={refreshing} onClick={refresh} />
+        </ReviewToolbar>
         <WorkspaceLayoutTreeTrigger label={workspaceName} />
       </WorkspaceLayoutToolbar>
       <WorkspaceLayoutBody>
