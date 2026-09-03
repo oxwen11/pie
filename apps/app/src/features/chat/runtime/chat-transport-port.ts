@@ -1,5 +1,6 @@
 import type {
   PromptPart,
+  SessionPendingPrompt,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
@@ -65,6 +66,12 @@ export interface ChatSessionTransport {
   }): Promise<{ readonly turnId: string; readonly started: boolean }>;
   /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
   interrupt(): Promise<void>;
+  /**
+   * Replace Pi's native queue (clear, then steer / follow-up the remaining
+   * lines). Empty arrays clear the queue. Items have no ids — address them
+   * by index in `steering` / `followUp`.
+   */
+  replaceQueue(pending: SessionPendingPrompt): Promise<void>;
   /**
    * The session's native history as final-form UIMessages, or `null` when Pi
    * serves no history for this session — capability absence is a normal outcome

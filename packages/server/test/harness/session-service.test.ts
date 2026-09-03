@@ -4,7 +4,17 @@ import path from "node:path";
 
 import { isSessionScopedEvent, type SessionRef } from "@getpie/contract";
 import type { UIMessage } from "ai";
-import { Effect, Fiber, FileSystem, Layer, Logger, References, type Scope, Stream } from "effect";
+import {
+  Crypto,
+  Effect,
+  Fiber,
+  FileSystem,
+  Layer,
+  Logger,
+  References,
+  type Scope,
+  Stream,
+} from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { structured, type LogRecord } from "../log-record";
@@ -26,7 +36,9 @@ describe("PiAgentSessionService", () => {
 
   const run = <A, E>(
     opts: SessionServiceRunOpts,
-    program: (fixture: Fixture) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem>,
+    program: (
+      fixture: Fixture,
+    ) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>,
   ) => runFixture(home, opts, program);
 
   it("create passes the cwd through, generates a uuid sessionId, persists metadata", async () => {
@@ -223,11 +235,13 @@ describe("PiAgentSessionService", () => {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
         yield* fixture.service.delete(ref);
         const listed = yield* fixture.service.list("proj-a", false);
-        return { listed, closeSpy: fixture.spy.close };
+        const lockSize = yield* fixture.locks.size;
+        return { listed, closeSpy: fixture.spy.close, lockSize };
       }),
     );
     expect(result.closeSpy).toEqual([]);
     expect(result.listed).toHaveLength(0);
+    expect(result.lockSize).toBe(0);
   });
 
   it("list returns one summary per session, keyed by server sessionId", async () => {
@@ -418,6 +432,33 @@ describe("PiAgentSessionService", () => {
     // The turn it would have stopped died with the process; resuming one in
     // order to interrupt it would be absurd.
     expect(result).toEqual([]);
+  });
+
+  it("replaceQueue with empty arrays succeeds with nothing running", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        yield* fixture.service.close(ref);
+        yield* fixture.service.replaceQueue({ ref, steering: [], followUp: [] });
+        return fixture.spy.resume;
+      }),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("replaceQueue with remaining items fails closed instead of starting an agent", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        yield* fixture.service.close(ref);
+        const err = yield* Effect.flip(
+          fixture.service.replaceQueue({ ref, steering: ["steer"], followUp: [] }),
+        );
+        return { err, resume: fixture.spy.resume };
+      }),
+    );
+    expect(result.err._tag).toBe("SessionClosed");
+    expect(result.resume).toEqual([]);
   });
 
   it("respondToAgentRequest reports the request as gone with nothing running", async () => {

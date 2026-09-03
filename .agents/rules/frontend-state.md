@@ -5,7 +5,7 @@ at render with `useMemo`. Server state stays in TanStack Query, client state in
 Zustand, and selections store an id, not the object.
 
 `eslint-plugin-react-you-might-not-need-an-effect` enforces this, loaded as an
-oxlint JS plugin (`jsPlugins` in `.oxlintrc.json`) with all nine rules at
+oxlint JS plugin (`jsPlugins` in `oxlint.config.mts`) with all nine rules at
 `error`. `packages/ui/src/{components,hooks,ai-elements}/**` is exempt: those
 files are vendored or ported from upstream (`docs/adr/0001`), so a fix there is
 discarded on the next refresh and belongs upstream instead. A host-pushed value
