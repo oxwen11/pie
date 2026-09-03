@@ -51,7 +51,11 @@ export default defineConfig({
   },
   resolve: {
     tsconfigPaths: true,
-    alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
+    alias: {
+      "@": url.fileURLToPath(new URL("./src", import.meta.url)),
+      clsx: "cn",
+      "tailwind-merge": "cn",
+    },
   },
   plugins: [
     codeInspectorPlugin({ bundler: "vite" }),
