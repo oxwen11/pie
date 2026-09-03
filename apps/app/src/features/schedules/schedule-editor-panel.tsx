@@ -1,8 +1,16 @@
 import type { Schedule, Project } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { XIcon } from "lucide-react";
+import { useReducedMotion } from "motion/react";
+import * as m from "motion/react-m";
 
 import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
+
+const EDITOR_TRANSITION = {
+  type: "tween",
+  duration: 0.45,
+  ease: [0.32, 0.72, 0, 1],
+} as const;
 
 export type ScheduleEditorState =
   | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
@@ -23,10 +31,14 @@ export function ScheduleEditorPanel({
   onClose,
   onSubmit,
 }: ScheduleEditorPanelProps) {
+  const reduceMotion = useReducedMotion() === true;
   return (
-    <aside
+    <m.aside
       aria-label={editor.mode === "create" ? "New schedule" : "Edit schedule"}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-s"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      initial={{ opacity: 0, x: "100%" }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={reduceMotion ? { duration: 0 } : EDITOR_TRANSITION}
     >
       <header className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
         <h2 className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -60,6 +72,6 @@ export function ScheduleEditorPanel({
           submitting={submitting}
         />
       </div>
-    </aside>
+    </m.aside>
   );
 }
