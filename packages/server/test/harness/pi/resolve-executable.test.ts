@@ -1,7 +1,7 @@
 import path from "node:path";
 import url from "node:url";
 
-import { Effect } from "effect";
+import { ConfigProvider, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +9,7 @@ import {
   piAvailabilityTarget,
   resolveBundledPiCli,
   resolvePiExecutable,
+  resolvePiExecutableEffect,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
@@ -28,6 +29,18 @@ describe("resolvePiExecutable", () => {
       command: "/opt/pi",
       prefixArgs: [],
     });
+  });
+
+  it("reads PIE_PI_EXECUTABLE from ConfigProvider", () => {
+    expect(
+      Effect.runSync(
+        resolvePiExecutableEffect.pipe(
+          Effect.provide(
+            ConfigProvider.layer(ConfigProvider.fromUnknown({ PIE_PI_EXECUTABLE: "/opt/pi" })),
+          ),
+        ),
+      ),
+    ).toEqual({ command: "/opt/pi", prefixArgs: [] });
   });
 
   it("falls back to bundled pi-coding-agent via Node", () => {
