@@ -32,27 +32,35 @@ interface ModelGroup {
 // live session. Options come from Pi's `get_available_models` — never hardcoded.
 // Model ids are scoped to their provider; the pair always travels together.
 // Models are grouped by provider and the popup filters as you type.
+// `clearLabel` adds a first option standing for "no model chosen"; picking it
+// calls onChange with empty ids so the host can fall back to its default.
 export function ModelSelect({
   models,
   providerId,
   modelId,
   onChange,
+  clearLabel,
+  id,
 }: {
   models: ReadonlyArray<AgentModel>;
   providerId: string | undefined;
   modelId: string | undefined;
   onChange: (providerId: string, modelId: string) => void;
+  clearLabel?: string;
+  id?: string;
 }) {
   const filter = useComboboxFilter();
 
   const options = useMemo<ModelOption[]>(
-    () =>
-      models.map((model) => ({
+    () => [
+      ...(clearLabel !== undefined ? [{ provider: "", modelId: "", label: clearLabel }] : []),
+      ...models.map((model) => ({
         provider: model.provider,
         modelId: model.modelId,
         label: model.name ?? model.modelId,
       })),
-    [models],
+    ],
+    [clearLabel, models],
   );
 
   const groups = useMemo<ModelGroup[]>(() => {
@@ -67,8 +75,9 @@ export function ModelSelect({
 
   const value = useMemo(
     () =>
-      options.find((option) => option.provider === providerId && option.modelId === modelId) ??
-      null,
+      options.find(
+        (option) => option.provider === (providerId ?? "") && option.modelId === (modelId ?? ""),
+      ) ?? null,
     [options, providerId, modelId],
   );
 
@@ -95,6 +104,7 @@ export function ModelSelect({
     >
       <ComboboxTrigger
         className="data-placeholder:text-muted-foreground min-w-0"
+        id={id}
         render={<Button size="sm" variant="ghost" />}
       >
         <ComboboxValue placeholder="Default">
@@ -122,7 +132,9 @@ export function ModelSelect({
           <ComboboxList>
             {(group: ModelGroup) => (
               <ComboboxGroup items={group.items} key={group.provider}>
-                <ComboboxGroupLabel>{group.provider}</ComboboxGroupLabel>
+                {group.provider !== "" ? (
+                  <ComboboxGroupLabel>{group.provider}</ComboboxGroupLabel>
+                ) : null}
                 <ComboboxCollection>
                   {(option: ModelOption) => (
                     <ComboboxItem key={`${option.provider}:${option.modelId}`} value={option}>

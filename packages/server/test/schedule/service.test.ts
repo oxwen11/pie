@@ -298,6 +298,32 @@ describe("ScheduleService", () => {
     }),
   );
 
+  it.effect("stores the chosen model and clears it back to the default", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+      );
+      assert.strictEqual(h.store.get(created.id)?.provider, "anthropic");
+      assert.strictEqual(h.store.get(created.id)?.modelId, "claude-sonnet-4-5");
+      const changed = yield* h.service.update({
+        id: created.id,
+        provider: "openai",
+        modelId: "gpt-5",
+      });
+      assert.strictEqual(changed.provider, "openai");
+      assert.strictEqual(changed.modelId, "gpt-5");
+      const cleared = yield* h.service.update({
+        id: created.id,
+        provider: null,
+        modelId: null,
+      });
+      assert.strictEqual(cleared.provider, undefined);
+      assert.strictEqual(cleared.modelId, undefined);
+    }),
+  );
+
   it.effect("settles a still-running session after TestClock advances the poll", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
