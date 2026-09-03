@@ -19,35 +19,30 @@ import { useComboboxFilter } from "@getpie/ui/components/combobox";
 import { ChevronsUpDownIcon, SearchIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
-interface ModelOption {
+type ModelOption = {
   provider: string;
   modelId: string;
   label: string;
-}
+};
 
-interface ModelGroup {
+type ModelGroup = {
   provider: string;
   items: ModelOption[];
-}
+};
 
-// Product composition of the compound ModelSelector. Options come from Pi's
-// get_available_models — never hardcoded. The provider+modelId pair travels together.
-export function ModelSelect({
+export function ScheduleModelSelect({
   models,
   providerId,
   modelId,
   onChange,
-  id,
 }: {
   models: ReadonlyArray<AgentModel>;
   providerId: string | undefined;
   modelId: string | undefined;
-  onChange: (providerId: string, modelId: string) => void;
-  id?: string;
+  onChange: (provider: string, modelId: string) => void;
 }) {
   const filter = useComboboxFilter();
-
-  const options = useMemo<ModelOption[]>(
+  const options = useMemo(
     () =>
       models.map((model) => ({
         provider: model.provider,
@@ -56,24 +51,21 @@ export function ModelSelect({
       })),
     [models],
   );
-
   const groups = useMemo<ModelGroup[]>(() => {
     const byProvider = new Map<string, ModelOption[]>();
     for (const option of options) {
-      const groupItems = byProvider.get(option.provider) ?? [];
-      groupItems.push(option);
-      byProvider.set(option.provider, groupItems);
+      const items = byProvider.get(option.provider) ?? [];
+      items.push(option);
+      byProvider.set(option.provider, items);
     }
     return [...byProvider].map(([provider, items]) => ({ items, provider }));
   }, [options]);
-
   const value = useMemo(
     () =>
       options.find((option) => option.provider === providerId && option.modelId === modelId) ??
       null,
     [options, providerId, modelId],
   );
-
   const matchesQuery = useCallback(
     (option: ModelOption, query: string) =>
       filter.contains(option.label, query) ||
@@ -96,7 +88,7 @@ export function ModelSelect({
     >
       <ModelSelectorTrigger
         className="data-placeholder:text-muted-foreground min-w-0"
-        id={id}
+        id="schedule-model"
         render={<Button size="sm" variant="ghost" />}
       >
         <ModelSelectorValue placeholder="Default">

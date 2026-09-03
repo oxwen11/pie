@@ -22,8 +22,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { ModelSelect } from "@/components/model-select";
-
 import {
   CREATE_ON_FIRST_RUN_VALUE,
   type ScheduleFormValues,
@@ -38,6 +36,7 @@ import {
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
+import { ScheduleModelSelect } from "./schedule-model-select";
 
 export type ScheduleFormSubmit = {
   readonly name: string;
@@ -245,8 +244,7 @@ export function ScheduleForm({
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-model">Model</FieldLabel>
-        <ModelSelect
-          id="schedule-model"
+        <ScheduleModelSelect
           modelId={model?.modelId}
           models={modelOptions}
           onChange={(provider, modelId) =>
