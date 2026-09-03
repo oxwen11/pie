@@ -376,7 +376,7 @@ Layer.sync(ScheduleRuntime, () => ({
   - 6: Context service ids `pie/…`.
   - 8: `AgentRuntimeLayer` `provideMerge` Infra; Pi executable resolved in `Layer.effect`.
   - 10: `ScheduleService` `provide` constrained to `ScheduleServiceEnv` (no `as`).
-  - 11: `openScopedSubscription` uses `Stream.unwrapScoped`; `http/server.ts` `Scope.makeUnsafe` kept with a comment (request fibers outlive the creating fiber).
+  - 11: Effect 4 has `Stream.unwrap` (not `unwrapScoped`). The subscribe RPC returns an AsyncGenerator that outlives the opening Effect, so the explicit `Scope.make` + `Stream.ensuring` stays. `http/server.ts` `Scope.makeUnsafe` kept with a comment (request fibers outlive the creating fiber).
   - 20: `drainQueue` uses `Queue.takeAll`.
   - 21: `rpc/stream.ts` stays as the oRPC AsyncGenerator seam over `Stream.toAsyncIterable` (oRPC validates `AsyncIteratorObject`).
   - 24: pie CLI user output uses Effect `Console.log`.
