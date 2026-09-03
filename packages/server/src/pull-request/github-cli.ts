@@ -1,10 +1,11 @@
 import type {
   PullRequestAction,
+  PullRequestDiff,
   PullRequestMergeMethod,
   PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
-import { Data, Effect, Ref, Stream } from "effect";
+import { Data, Effect, Ref, Result, Stream } from "effect";
 import type { PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -23,8 +24,10 @@ import {
 import { normalizeGitHubPullRequestJson } from "./normalization";
 
 const COMMAND_TIMEOUT = "30 seconds";
+const DIFF_TIMEOUT = "60 seconds";
 const FORCE_KILL_AFTER = "2 seconds";
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const DIFF_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 
 export const CURRENT_PULL_REQUEST_FIELDS = [
   "number",
@@ -55,6 +58,8 @@ export const currentPullRequestArgs = (pullRequest?: PullRequestRef): ReadonlyAr
         "--json",
         CURRENT_PULL_REQUEST_FIELDS.join(","),
       ];
+
+export const pullRequestDiffArgs = (): ReadonlyArray<string> => ["pr", "diff", "--color", "never"];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -128,8 +133,14 @@ const executeGh = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   cwd: string,
   args: ReadonlyArray<string>,
-): Effect.Effect<GitHubCliResult, GitHubCliExecutionError> =>
-  Effect.scoped(
+  limits?: {
+    readonly timeout?: typeof COMMAND_TIMEOUT | typeof DIFF_TIMEOUT;
+    readonly maxOutputBytes?: number;
+  },
+): Effect.Effect<GitHubCliResult, GitHubCliExecutionError> => {
+  const timeout = limits?.timeout ?? COMMAND_TIMEOUT;
+  const maxOutputBytes = limits?.maxOutputBytes ?? MAX_OUTPUT_BYTES;
+  return Effect.scoped(
     Effect.gen(function* () {
       const child = yield* spawner
         .spawn(
@@ -156,9 +167,7 @@ const executeGh = (
           Effect.gen(function* () {
             const accepted = yield* Ref.modify(totalBytes, (current) => {
               const next = current + chunk.byteLength;
-              return next > MAX_OUTPUT_BYTES
-                ? ([false, current] as const)
-                : ([true, next] as const);
+              return next > maxOutputBytes ? ([false, current] as const) : ([true, next] as const);
             });
             if (!accepted) return yield* new GitHubCliOutputTooLarge();
             chunks.push(Uint8Array.from(chunk));
@@ -184,10 +193,11 @@ const executeGh = (
     }),
   ).pipe(
     Effect.timeoutOrElse({
-      duration: COMMAND_TIMEOUT,
+      duration: timeout,
       orElse: () => Effect.fail(new GitHubCliTimedOut()),
     }),
   );
+};
 
 const isUnauthenticated = (stderr: string): boolean =>
   /not logged into any github hosts|gh auth login|authentication required|bad credentials|http 401/i.test(
@@ -204,6 +214,11 @@ const isUnsupportedContext = (stderr: string): boolean =>
 
 const isNoPullRequest = (stderr: string): boolean =>
   /no pull requests found(?: for branch)?|could not find pull request/i.test(stderr);
+
+const isDiffTooLarge = (stderr: string): boolean =>
+  /http 406|too many files|exceeds.*(?:file|diff).*limit|diff(?:erence)? is too large/i.test(
+    stderr,
+  );
 
 const isUnsupportedHeadFlag = (stderr: string): boolean =>
   /unknown flag:\s*--match-head-commit|unknown shorthand flag.*match-head-commit/i.test(stderr);
@@ -241,6 +256,7 @@ export interface GitHubCliAdapter {
     cwd: string,
     pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
+  readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
   readonly runAction: (input: {
     readonly cwd: string;
     readonly url: string;
@@ -261,8 +277,8 @@ const mapExecutionActionError = (error: GitHubCliExecutionError): PullRequestCli
 
 export const makeGitHubCliAdapter = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-): GitHubCliAdapter => ({
-  current: (cwd, pullRequest) =>
+): GitHubCliAdapter => {
+  const current: GitHubCliAdapter["current"] = (cwd, pullRequest) =>
     executeGh(spawner, cwd, currentPullRequestArgs(pullRequest)).pipe(
       Effect.mapError(mapExecutionReadError),
       Effect.flatMap(
@@ -284,8 +300,35 @@ export const makeGitHubCliAdapter = (
           });
         },
       ),
-    ),
-  runAction: ({ action, cwd, expectedHeadSha, url }) =>
+    );
+
+  const diff: GitHubCliAdapter["diff"] = (cwd) =>
+    Effect.gen(function* () {
+      const attempted = yield* executeGh(spawner, cwd, pullRequestDiffArgs(), {
+        timeout: DIFF_TIMEOUT,
+        maxOutputBytes: DIFF_MAX_OUTPUT_BYTES,
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempted)) {
+        if (attempted.failure._tag === "GitHubCliOutputTooLarge") {
+          return { patch: "", truncated: true };
+        }
+        return yield* Effect.fail(mapExecutionReadError(attempted.failure));
+      }
+      const result = attempted.success;
+      if (result.exitCode === 0) return { patch: result.stdout, truncated: false };
+      if (isNoPullRequest(result.stderr)) return { patch: "", truncated: false };
+      if (isUnauthenticated(result.stderr)) {
+        return yield* new PullRequestUnauthenticated();
+      }
+      if (isRateLimited(result.stderr)) return yield* new PullRequestRateLimited();
+      if (isUnsupportedContext(result.stderr)) {
+        return yield* new PullRequestUnsupportedContext();
+      }
+      if (isDiffTooLarge(result.stderr)) return { patch: "", truncated: true };
+      return yield* new PullRequestHostUnavailable();
+    });
+
+  const runAction: GitHubCliAdapter["runAction"] = ({ action, cwd, expectedHeadSha, url }) =>
     executeGh(spawner, cwd, pullRequestActionArgs(url, action, expectedHeadSha)).pipe(
       Effect.mapError(mapExecutionActionError),
       Effect.flatMap((result): Effect.Effect<void, PullRequestCliActionFailure> => {
@@ -306,5 +349,7 @@ export const makeGitHubCliAdapter = (
         }
         return Effect.fail(new PullRequestActionOutcomeUnknown());
       }),
-    ),
-});
+    );
+
+  return { current, diff, runAction };
+};

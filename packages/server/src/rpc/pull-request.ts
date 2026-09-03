@@ -56,6 +56,11 @@ export const pullRequestRouter = orpc.router({
     }
     return snapshot;
   }),
+  diff: orpc.diff.effect(function* ({ input, errors }) {
+    const service = yield* PullRequestService;
+    const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
+    return yield* service.diff(cwd).pipe(catchCurrentRead(errors));
+  }),
   statuses: orpc.statuses.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
     const sessions = yield* PiAgentSessionService;

@@ -134,6 +134,12 @@ export const PullRequestActionAppliedSchema = Schema.Struct({
 });
 export type PullRequestActionApplied = typeof PullRequestActionAppliedSchema.Type;
 
+export const PullRequestDiffSchema = Schema.Struct({
+  patch: Schema.String,
+  truncated: Schema.Boolean,
+});
+export type PullRequestDiff = typeof PullRequestDiffSchema.Type;
+
 const sessionNotFound = {
   data: toStandardSchema(Schema.Struct({ message: Schema.String })),
 };
@@ -167,6 +173,10 @@ export const pullRequestContract = {
     .input(Schema.Struct({ ref: SessionRefSchema }))
     .errors(currentErrors)
     .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
+  diff: oc
+    .input(Schema.Struct({ ref: SessionRefSchema }))
+    .errors(currentErrors)
+    .output(PullRequestDiffSchema),
   statuses: oc
     .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema) }))
     .errors(currentErrors)
