@@ -1,6 +1,7 @@
 import type {
   PullRequestAction,
   PullRequestActionApplied,
+  PullRequestDiff,
   PullRequestExpected,
   PullRequestRef,
   PullRequestSessionStatus,
@@ -32,6 +33,7 @@ export class PullRequestService extends Context.Service<
       cwd: string,
       pullRequest?: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
+    readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
     readonly runAction: (
       cwd: string,
       expected: PullRequestExpected,
@@ -54,6 +56,7 @@ export const PullRequestServiceLayer: Layer.Layer<
     const cli = makeGitHubCliAdapter(spawner);
 
     const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
+    const diff = (cwd: string) => cli.diff(cwd);
 
     const runAction = (
       cwd: string,
@@ -94,6 +97,6 @@ export const PullRequestServiceLayer: Layer.Layer<
     const sessionStatuses = (workspaces: ReadonlyArray<PullRequestSessionWorkspace>) =>
       foldSessionStatuses(workspaces, current);
 
-    return { current, runAction, sessionStatuses };
+    return { current, diff, runAction, sessionStatuses };
   }),
 );
