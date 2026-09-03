@@ -1,26 +1,42 @@
 import path from "node:path";
 
 import type { UIMessage } from "ai";
-import { Crypto, Effect, FileSystem, type Scope, Stream } from "effect";
+import { Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "effect";
 
 import { ProjectNotFound, StoreWriteError } from "../../src/errors";
-import { type EventBusShape, makeEventBus } from "../../src/events/event-bus";
+import { EventBus, type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type { GitFailure } from "../../src/git/service";
-import type { GitWorktreeCreateResult, GitWorktreeFailure } from "../../src/git/worktree-service";
+import {
+  WorktreeService,
+  type GitWorktreeCreateResult,
+  type GitWorktreeFailure,
+} from "../../src/git/worktree-service";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
-import type { PiAgentShape } from "../../src/harness/pi/agent";
+import { PiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import type { SessionInfoResult } from "../../src/harness/pi/types";
 import type { UserInput } from "../../src/harness/session-io";
-import { makePiAgentSessionManager } from "../../src/harness/session-manager";
+import {
+  SessionMetadataLocks,
+  SessionMetadataLocksLayer,
+  type SessionMetadataLocksShape,
+} from "../../src/harness/session-locks";
+import {
+  makePiAgentSessionManager,
+  PiAgentSessionManager,
+} from "../../src/harness/session-manager";
+import { SessionMetadataLayer } from "../../src/harness/session-metadata";
 import {
   type PiAgentSessionRepositoryShape,
   makePiAgentSessionRepository,
+  PiAgentSessionRepository,
 } from "../../src/harness/session-repository";
 import {
   type PiAgentSessionServiceShape,
-  makePiAgentSessionService,
+  PiAgentSessionService,
+  PiAgentSessionServiceCoreLayer,
 } from "../../src/harness/session-service";
+import { ProjectService } from "../../src/project/service";
 import { NodePlatformLayer } from "../platform";
 
 export type Spy = {
@@ -34,6 +50,7 @@ export type Fixture = {
   readonly service: PiAgentSessionServiceShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
+  readonly locks: SessionMetadataLocksShape;
   readonly spy: Spy;
   /**
    * A second service over the same storage and the same adapter — what a
@@ -41,7 +58,11 @@ export type Fixture = {
    * nothing is live, and the spy keeps counting across both so "how many
    * processes has this session cost" stays answerable.
    */
-  readonly restart: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem>;
+  readonly restart: Effect.Effect<
+    Fixture,
+    never,
+    Scope.Scope | FileSystem.FileSystem | Crypto.Crypto
+  >;
 };
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -69,10 +90,28 @@ export type SessionServiceRunOpts = {
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
 
+const testProjectService = ProjectService.of({
+  list: () => Effect.succeed([]),
+  findById: (projectId) =>
+    projectId === "proj-a"
+      ? Effect.succeed({
+          id: projectId,
+          name: "a",
+          path: "/tmp/pie-app",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        })
+      : Effect.fail(new ProjectNotFound({ projectId })),
+  findByPath: () => Effect.succeed(undefined),
+  create: () => Effect.die("unused"),
+  remove: () => Effect.die("unused"),
+});
+
 export const run = <A, E>(
   home: string,
   opts: SessionServiceRunOpts,
-  program: (fixture: Fixture) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem>,
+  program: (
+    fixture: Fixture,
+  ) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>,
 ) =>
   Effect.runPromise(
     Effect.scoped(
@@ -121,6 +160,7 @@ export const run = <A, E>(
                 });
               },
           interrupt: Effect.void,
+          replaceQueue: () => Effect.void,
           respondToAgentRequest: () => Effect.void,
           getCapabilities: Effect.succeed({
             supportsResume: true,
@@ -187,44 +227,52 @@ export const run = <A, E>(
             : undefined),
           getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
         } satisfies PiAgentShape;
-        const crypto = yield* Crypto.Crypto;
-        const build: Effect.Effect<Fixture, never, Scope.Scope | FileSystem.FileSystem> =
-          Effect.gen(function* () {
-            const bus = yield* makeEventBus();
-            const manager = yield* makePiAgentSessionManager(pi, bus);
-            const stored = yield* makePiAgentSessionRepository(
-              path.join(home, "storage", "sessions"),
-            );
-            const repo: PiAgentSessionRepositoryShape = opts.failWrite
-              ? {
-                  ...stored,
-                  write: () =>
-                    Effect.fail(
-                      new StoreWriteError({ file: "sessions", cause: new Error("full") }),
-                    ),
-                }
-              : stored;
-            const service = makePiAgentSessionService({
-              manager,
-              pi,
-              repo,
-              bus,
-              worktrees: {
-                create:
-                  opts.worktreeCreate ??
-                  (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
-                remove:
-                  opts.worktreeRemove ??
-                  (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
-              },
-              newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
-              projectPathFor: (projectId) =>
-                projectId === "proj-a"
-                  ? Effect.succeed("/tmp/pie-app")
-                  : Effect.fail(new ProjectNotFound({ projectId })),
-            });
-            return { service, repo, bus, spy, restart: build };
+        const build: Effect.Effect<
+          Fixture,
+          never,
+          Scope.Scope | FileSystem.FileSystem | Crypto.Crypto
+        > = Effect.gen(function* () {
+          const crypto = yield* Crypto.Crypto;
+          const bus = yield* makeEventBus();
+          const manager = yield* makePiAgentSessionManager(pi, bus);
+          const stored = yield* makePiAgentSessionRepository(
+            path.join(home, "storage", "sessions"),
+          );
+          const repo: PiAgentSessionRepositoryShape = opts.failWrite
+            ? {
+                ...stored,
+                write: () =>
+                  Effect.fail(new StoreWriteError({ file: "sessions", cause: new Error("full") })),
+              }
+            : stored;
+          const worktrees = WorktreeService.of({
+            create:
+              opts.worktreeCreate ??
+              (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
+            remove:
+              opts.worktreeRemove ??
+              (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
           });
+          const locksLayer = SessionMetadataLocksLayer;
+          const graph = Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
+            Layer.provide(SessionMetadataLayer),
+            Layer.provide(locksLayer),
+            Layer.provide(Layer.succeed(PiAgentSessionRepository, repo)),
+            Layer.provide(Layer.succeed(PiAgentSessionManager, manager)),
+            Layer.provide(Layer.succeed(PiAgent, pi)),
+            Layer.provide(Layer.succeed(EventBus, bus)),
+            Layer.provide(Layer.succeed(ProjectService, testProjectService)),
+            Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+            Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
+          );
+          const { service, locks } = yield* Effect.gen(function* () {
+            return {
+              service: yield* PiAgentSessionService,
+              locks: yield* SessionMetadataLocks,
+            };
+          }).pipe(Effect.provide(graph));
+          return { service, repo, bus, locks, spy, restart: build };
+        });
         return yield* program(yield* build);
       }),
     ).pipe(Effect.provide(NodePlatformLayer)),

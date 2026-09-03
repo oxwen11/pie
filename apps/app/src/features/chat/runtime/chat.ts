@@ -1,5 +1,6 @@
 import type {
   PromptPart,
+  SessionPendingPrompt,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -108,6 +109,10 @@ export class Chat {
   // server says in the meantime — snapshot phase, settled transcript — has
   // seen it, and neither may erase the optimistic bubble it put on screen.
   #promptsInFlight = 0;
+  // replaceQueue writes the chosen list first; Pi then emits an empty
+  // queue_update from clear_queue before the remaining lines are rewritten.
+  // Ignore those intermediates so the row the user just edited does not flash.
+  #queueWritesInFlight = 0;
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -212,10 +217,12 @@ export class Chat {
         this.#state.removePendingRequest(event.requestId);
         break;
       case "session.queue.updated":
-        this.#state.setPendingPrompt({
-          steering: event.steering,
-          followUp: event.followUp,
-        });
+        if (this.#queueWritesInFlight === 0) {
+          this.#state.setPendingPrompt({
+            steering: event.steering,
+            followUp: event.followUp,
+          });
+        }
         break;
       case "session.crashed":
         for (const fold of this.#turnFolds.values()) fold.close();
@@ -638,6 +645,23 @@ export class Chat {
       console.error("Failed to interrupt session", interruptError);
       this.#state.error =
         interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+    }
+  };
+
+  // The user already chose the next list (edit / delete a row). Write it
+  // locally first; roll back on RPC failure. Do not flip status to error —
+  // a failed queue rewrite is not a model error.
+  replaceQueue = async (pending: SessionPendingPrompt): Promise<void> => {
+    const previous = this.#state.pendingPrompt;
+    this.#state.setPendingPrompt(pending);
+    this.#queueWritesInFlight += 1;
+    try {
+      await this.#transport.replaceQueue(pending);
+    } catch (replaceError) {
+      this.#state.setPendingPrompt(previous);
+      throw replaceError;
+    } finally {
+      this.#queueWritesInFlight -= 1;
     }
   };
 

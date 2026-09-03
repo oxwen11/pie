@@ -59,6 +59,30 @@ rl.on("line", (line) => {
     return;
   }
 
+  if (msg.type === "clear_queue") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "clear_queue",
+      success: true,
+      data: { steering: [], followUp: [] },
+    });
+    send({ type: "queue_update", steering: [], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "steer") {
+    send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering: [msg.message], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "follow_up") {
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering: [], followUp: [msg.message] });
+    return;
+  }
+
   if (msg.type !== "prompt") return;
 
   send({ id: msg.id, type: "response", command: "prompt", success: true });

@@ -8,7 +8,7 @@ import { FileSystem } from "effect/FileSystem";
 import { FileSystemService } from "../fs";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { catchWorkspaceResolveErrors, resolveWorkspaceCwd } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
 
 const orpc = implement(fsContract).$context<RpcContext>();
 
@@ -18,7 +18,7 @@ const IGNORED_DIRS = new Set(["node_modules"]);
 export const fsRouter = orpc.router({
   readFileString: orpc.readFileString.effect(function* ({ input, errors }) {
     const fs = yield* FileSystemService;
-    const cwd = yield* resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
     return yield* fs.readFileString(cwd, input.path).pipe(
       Effect.catchTags({
         WorkspacePathEscape: (error) =>
@@ -41,7 +41,7 @@ export const fsRouter = orpc.router({
   }),
   readTree: orpc.readTree.effect(function* ({ input, errors }) {
     const fs = yield* FileSystemService;
-    const cwd = yield* resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));
+    const cwd = yield* resolveWorkspaceCwdOrFail(input, errors);
     const tree = yield* fs.readTree(cwd).pipe(
       Effect.catchTags({
         WorkspacePathEscape: (error) =>

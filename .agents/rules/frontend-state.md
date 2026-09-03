@@ -5,7 +5,7 @@ at render with `useMemo`. Server state stays in TanStack Query, client state in
 Zustand, and selections store an id, not the object.
 
 `eslint-plugin-react-you-might-not-need-an-effect` enforces this, loaded as an
-oxlint JS plugin (`jsPlugins` in `.oxlintrc.json`) with all nine rules at
+oxlint JS plugin (`jsPlugins` in `oxlint.config.mts`) with all nine rules at
 `error`. `packages/ui/src/{components,hooks,ai-elements}/**` is exempt: those
 files are vendored or ported from upstream (`docs/adr/0001`), so a fix there is
 discarded on the next refresh and belongs upstream instead. A host-pushed value
@@ -33,9 +33,11 @@ for per-agent tool rendering.
 - **Only composition roots may combine features**: `routes/`,
   `app-interface.tsx`, and the app shell in `components/layout/`. Those four
   files are the whole allow-list today. `routes/__root.tsx` is the shell's one
-  route-identity seam: it reads the authoritative session-route loader ref and
-  composes the project sidebar, card heading, and `ContentPanelSessionProvider`
-  binding from it. `AppShell` owns `SidebarProvider`, its viewport wrapper, and
+  route-identity seam for the card: it reads the authoritative session-route
+  loader ref and binds the card heading and `ContentPanelSessionProvider`.
+  Sidebar modules (`AppSidebar` and the project/schedule entries it composes)
+  read the route and navigate themselves — do not thread route callbacks or
+  active flags into them. `AppShell` owns `SidebarProvider`, its viewport wrapper, and
   sidebar persistence because those are shell implementation details; the
   session-bound content provider is composed beneath it around `AppShellBody`.
   The body stays structural through `AppShellSidebar`/`AppShellMain` children;

@@ -1,3 +1,4 @@
+import type { SessionPendingPrompt } from "@getpie/contract";
 import { createContext, useContext } from "react";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -9,6 +10,7 @@ export type ChatSessionValue = {
   store: StoreApi<ChatStoreState>;
   prompt: (text: string, delivery?: "steer" | "followUp") => void;
   interrupt: () => Promise<void>;
+  replaceQueue: (pending: SessionPendingPrompt) => void;
   respondToRequest: (requestId: string, response: AgentResponse) => void;
   turnInProgress: boolean;
 };

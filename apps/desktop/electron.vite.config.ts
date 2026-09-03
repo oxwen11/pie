@@ -89,7 +89,11 @@ export default defineConfig({
       "import.meta.env.PIE_RUN_IN_AGENT": JSON.stringify(RUNNING_IN_AGENT),
     },
     resolve: {
-      alias: { "@": url.fileURLToPath(new URL("../app/src/", import.meta.url)) },
+      alias: {
+        "@": url.fileURLToPath(new URL("../app/src/", import.meta.url)),
+        clsx: "cn",
+        "tailwind-merge": "cn",
+      },
     },
     plugins: [
       devOverlayCsp(),
