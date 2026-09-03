@@ -67,7 +67,7 @@ export const makeEventBus = (
               Effect.andThen(remove(subscriber)),
               Effect.as([undefined, "closed"] as const),
             ),
-      ).pipe(Effect.catch(() => Effect.void));
+      ).pipe(Effect.ignore);
 
     const deliver = (subscriber: Subscriber, event: ServerEvent) => {
       if (!matches(subscriber.scope, event)) return Effect.void;
@@ -101,7 +101,7 @@ export const makeEventBus = (
             Effect.andThen(remove(subscriber)),
             Effect.as([undefined, "closed"] as const),
           );
-      }).pipe(Effect.catch(() => Effect.void));
+      }).pipe(Effect.ignore);
     };
 
     const publish = Effect.fn("EventBus.publish")(function* (event: ServerEvent) {

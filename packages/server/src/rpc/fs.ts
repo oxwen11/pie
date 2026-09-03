@@ -68,7 +68,7 @@ export const fsRouter = orpc.router({
       (name) =>
         fs.stat(path.join(dir, name)).pipe(
           Effect.map((info) => info.type === "Directory"),
-          Effect.catch(() => Effect.succeed(false)),
+          Effect.orElseSucceed(() => false),
           Effect.map((isDirectory) => ({ name, isDirectory })),
         ),
       { concurrency: 32 },

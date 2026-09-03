@@ -150,10 +150,10 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
                 if (info.type === "Directory") return "directory";
                 return "other";
               }),
-              Effect.catch(() => Effect.succeed<WorkspaceSymlinkTarget>("broken")),
+              Effect.orElseSucceed((): WorkspaceSymlinkTarget => "broken"),
             );
           }),
-          Effect.catch(() => Effect.succeed<WorkspaceSymlinkTarget>("broken")),
+          Effect.orElseSucceed((): WorkspaceSymlinkTarget => "broken"),
         );
 
       const readTree = (cwd: string): Effect.Effect<WorkspaceTreeResult, ReadTreeError> =>
@@ -195,7 +195,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
                 }
                 // Keep the directory itself visible if one subtree becomes
                 // unreadable or disappears during a scan; omit only descendants.
-                return listDirectory.pipe(Effect.catch(() => Effect.succeed<ScanCandidate[]>([])));
+                return listDirectory.pipe(Effect.orElseSucceed((): ScanCandidate[] => []));
               },
               { concurrency: SCAN_CONCURRENCY },
             );
@@ -224,7 +224,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
                     }
                     return undefined;
                   }),
-                  Effect.catch(() => Effect.succeed(undefined)),
+                  Effect.orElseSucceed(() => undefined),
                 );
 
                 return fs.readLink(candidate.absolutePath).pipe(
