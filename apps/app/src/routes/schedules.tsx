@@ -19,7 +19,7 @@ const optional = <K extends keyof SchedulesSearch>(
   value === undefined ? undefined : ({ [key]: value } as Pick<SchedulesSearch, K>);
 
 export const Route = createFileRoute("/schedules")({
-  staticData: { cardHeading: "Schedule" },
+  staticData: { cardHeading: false, cardHeader: false },
   validateSearch: (search: Record<string, unknown>): SchedulesSearch => ({
     ...optional("create", search.create === true || search.create === "true" ? true : undefined),
     ...optional("projectId", asText(search.projectId)),

@@ -76,6 +76,15 @@ function RootLayout() {
       return undefined;
     },
   });
+  const cardHeader = useRouterState({
+    select: (state): false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const header = state.matches[index]?.staticData.cardHeader;
+        if (header !== undefined) return header;
+      }
+      return undefined;
+    },
+  });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
 
@@ -94,6 +103,7 @@ function RootLayout() {
                   : (cardHeading ??
                     (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
               }
+              hideHeader={cardHeader === false}
               supportingText={cardHeading !== undefined ? undefined : project?.name}
             />
           </AppShellMain>

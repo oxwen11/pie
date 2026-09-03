@@ -25,5 +25,7 @@ declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
     /** Card title. `false` hides it. Unset keeps the session / new-chat heading. */
     readonly cardHeading?: string | false;
+    /** `false` hides the card header except where shell controls are required. */
+    readonly cardHeader?: false;
   }
 }
