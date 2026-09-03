@@ -38,21 +38,21 @@ catalogs:
   # `@effect/platform-node-shared` is transitive-only and is listed so the
   # override below can pin it; no workspace package.json depends on it.
   effect:
-    effect: 4.0.0-rc.110
-    "@effect/platform-node": 4.0.0-rc.110
-    "@effect/platform-node-shared": 4.0.0-rc.110
-    "@effect/vitest": 4.0.0-rc.110
+    effect: 4.0.0-rc.112
+    "@effect/platform-node": 4.0.0-rc.112
+    "@effect/platform-node-shared": 4.0.0-rc.112
+    "@effect/vitest": 4.0.0-rc.112
   # oRPC must move as one family: exact pins (no caret) because prerelease
   # caret ranges admit the 2.0.0 stable release, and a mixed tree crashes at
   # runtime (stable client imports ORPC_HEADER, absent from the beta contract).
   # The published beta packages depend on each other with exact versions, so
   # pinning the direct deps here is sufficient — no override needed.
   orpc:
-    "@orpc/client": 2.0.0-beta.28
-    "@orpc/contract": 2.0.0-beta.28
-    "@orpc/experimental-effect": 2.0.0-beta.28
-    "@orpc/server": 2.0.0-beta.28
-    "@orpc/tanstack-query": 2.0.0-beta.28
+    "@orpc/client": 2.0.0-beta.32
+    "@orpc/contract": 2.0.0-beta.32
+    "@orpc/experimental-effect": 2.0.0-beta.32
+    "@orpc/server": 2.0.0-beta.32
+    "@orpc/tanstack-query": 2.0.0-beta.32
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
   # split that singleton, so the family upgrades together.
   tiptap:
@@ -77,7 +77,7 @@ catalogs:
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
-  # e.g. @effect/platform-node-shared@rc.110 peer-wants effect@^4.0.0-rc.110,
+  # e.g. @effect/platform-node-shared@rc.112 peer-wants effect@^4.0.0-rc.112,
   # which without the override would auto-install a second effect runtime;
   # electron-vite/vite-plus would similarly resolve their own vite/vitest.
   vite: "catalog:"
