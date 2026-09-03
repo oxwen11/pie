@@ -82,7 +82,7 @@ export type SessionMetadataShape = {
 };
 
 export class SessionMetadata extends Context.Service<SessionMetadata, SessionMetadataShape>()(
-  "SessionMetadata",
+  "pie/SessionMetadata",
 ) {}
 
 export const SessionMetadataLayer: Layer.Layer<

@@ -13,7 +13,7 @@ export type SessionMetadataLocksShape = {
 export class SessionMetadataLocks extends Context.Service<
   SessionMetadataLocks,
   SessionMetadataLocksShape
->()("SessionMetadataLocks") {}
+>()("pie/SessionMetadataLocks") {}
 
 const refKey = (ref: SessionRef): string => `${ref.projectId}\0${ref.sessionId}`;
 

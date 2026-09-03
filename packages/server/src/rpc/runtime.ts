@@ -21,7 +21,7 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
 
-export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
+export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("pie/PiProcess") {}
 
 const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeCrypto.layer);
 
