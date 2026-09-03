@@ -27,7 +27,7 @@ import {
 import { FileSystemService } from "../fs";
 import { contains, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
 import { parseNameStatus, parseNulPaths } from "./name-status";
-import { isUnsafeRef, makeGitHelpers } from "./shared";
+import { isUnsafeRef, makeGitHelpers, parseRefNames } from "./shared";
 
 /** GitService always runs against a resolved absolute cwd — not a session ref. */
 export type GitReviewCwdQuery = {
@@ -112,7 +112,7 @@ export const GitServiceLayer: Layer.Layer<
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
-    const { gitError, raw, resolveRoot, resolveRepoRoot } = makeGitHelpers(fs);
+    const { gitError, raw, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
 
     const toWorkspacePath = (cwd: string, repoRoot: string, gitPath: string): string | null => {
       if (path.isAbsolute(gitPath) || gitPath.split(/[\\/]/).includes("..")) return null;
@@ -130,36 +130,6 @@ export const GitServiceLayer: Layer.Layer<
       return { path: nextPath, status: file.status, oldPath };
     };
 
-    const parseRefNames = (output: string): string[] => {
-      const names: string[] = [];
-      for (const line of output.split("\n")) {
-        const ref = line.trim();
-        if (ref.startsWith("refs/heads/")) {
-          names.push(ref.slice("refs/heads/".length));
-        } else if (ref.startsWith("refs/remotes/")) {
-          names.push(ref.slice("refs/remotes/".length));
-        }
-      }
-      return names;
-    };
-
-    const listRefs = (cwd: string) =>
-      raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
-        Effect.map((output) => {
-          const local: string[] = [];
-          const remotes: string[] = [];
-          for (const line of output.split("\n")) {
-            const ref = line.trim();
-            if (ref.startsWith("refs/heads/")) {
-              local.push(ref.slice("refs/heads/".length));
-            } else if (ref.startsWith("refs/remotes/")) {
-              remotes.push(ref.slice("refs/remotes/".length));
-            }
-          }
-          return { local, remotes, all: [...local, ...remotes] };
-        }),
-      );
-
     const resolvePreferredCompareRef = (cwd: string) =>
       Effect.gen(function* () {
         const remoteHead = yield* raw(cwd, [
@@ -174,7 +144,7 @@ export const GitServiceLayer: Layer.Layer<
           return remoteHead.slice("refs/remotes/".length);
         }
         const local = yield* raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads"]);
-        const names = new Set(parseRefNames(local));
+        const names = new Set(parseRefNames(local).all);
         for (const name of DEFAULT_BRANCH_NAMES) {
           if (names.has(name)) return name;
         }

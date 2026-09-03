@@ -88,15 +88,25 @@ Existing e2e worth knowing:
 
 ## Evidence
 
+Desktop is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+
 ```bash
 pnpm exec pie-verify desktop evidence init
-pnpm exec pie-verify desktop evidence screenshot <name>
-pnpm exec pie-verify desktop evidence snapshot <name>
+EVIDENCE="$(pnpm exec pie-verify desktop evidence path)"
+pnpm exec pie-verify desktop evidence screenshot <feature>-before
+pnpm exec pie-verify desktop evidence snapshot <feature>-before
+agent-browser record start "$EVIDENCE/<feature>.webm"
+# …drive…
+agent-browser record stop
+pnpm exec pie-verify desktop evidence screenshot <feature>-after
+pnpm exec pie-verify desktop evidence snapshot <feature>-after
 pnpm exec pie-verify desktop evidence curl
 pnpm exec pie-verify desktop evidence side-effects
-pnpm exec pie-verify desktop evidence note "…"
+pnpm exec pie-verify desktop evidence note "<feature>.webm: what the clip shows"
 pnpm exec pie-verify desktop evidence path
 ```
+
+`agent-browser record` runs against the CDP-attached session (`pie-verify-desktop`). If it refuses on that attach, record the launcher's display instead — `ffmpeg -f x11grab -i "$DISPLAY" "$EVIDENCE/<feature>.mp4"` on the `$DISPLAY` / Xvfb launch used — and say so in `evidence note`. A green Playwright e2e run is not a substitute for the screenshots and video.
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
@@ -123,6 +133,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify desktop env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
+| `agent-browser record start <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate
