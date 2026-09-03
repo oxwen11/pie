@@ -8,4 +8,4 @@ export const streamFromQueueOne = <A, E>(
 
 /** Removes currently buffered values without waiting for future offers. */
 export const drainQueue = <A, E>(queue: Queue.Dequeue<A, E>): Effect.Effect<void> =>
-  Queue.takeAll(queue).pipe(Effect.asVoid);
+  Queue.clear(queue).pipe(Effect.asVoid);

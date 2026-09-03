@@ -378,7 +378,7 @@ Layer.sync(ScheduleRuntime, () => ({
   - 10: `ScheduleService` `provide` constrained to `ScheduleServiceEnv` (no `as`).
   - 11: `openScopedSubscription` uses `Stream.unwrapScoped`; `http/server.ts` `Scope.makeUnsafe` kept with a comment (request fibers outlive the creating fiber).
   - 20: `drainQueue` uses `Queue.takeAll`.
-  - 21: subscribe uses `Stream.toAsyncIterable` directly; `rpc/stream.ts` removed.
+  - 21: `rpc/stream.ts` stays as the oRPC AsyncGenerator seam over `Stream.toAsyncIterable` (oRPC validates `AsyncIteratorObject`).
   - 24: pie CLI user output uses Effect `Console.log`.
   - 28 (session-service): scoped temp dirs via `makeTempDirectoryScoped`.
 - 2026-09-03: Finding 7 wontfix here: `XxxLayer` already exports tag+implementation as two symbols; moving 23 services to `static readonly layer` is a no-runtime rename that would churn every `Layer.provide` site. Revisit if a service is added in a new package.
