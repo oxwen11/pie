@@ -69,6 +69,28 @@ describe("createServer auth", () => {
     expect(body.ticket).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("bootstraps the daemon-served SPA without making Origin an auth credential", async () => {
+    const base = await start({ authToken: TOKEN });
+    const bootstrap = await fetch(`${base}/api/bootstrap`);
+    expect(bootstrap.status).toBe(200);
+    await expect(bootstrap.json()).resolves.toEqual({ token: TOKEN });
+
+    const ticket = await fetch(`${base}/api/ws-ticket`, {
+      method: "POST",
+      headers: { origin: "http://localhost:4190" },
+    });
+    expect(ticket.status).toBe(401);
+  });
+
+  it("does not expose bootstrap through an allowed cross-origin response", async () => {
+    const base = await start({ authToken: TOKEN, corsOrigins: ["https://example.test"] });
+    const response = await fetch(`${base}/api/bootstrap`, {
+      headers: { origin: "https://example.test" },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
   it("invokes shutdown only through the authenticated daemon route", async () => {
     let shutdown = false;
     const base = await start({ authToken: TOKEN, shutdown: () => (shutdown = true) });
