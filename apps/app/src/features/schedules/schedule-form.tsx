@@ -6,6 +6,12 @@ import {
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
+import {
+  PromptInputBox,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -17,7 +23,6 @@ import {
   SelectValue,
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
-import { Textarea } from "@getpie/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
@@ -243,26 +248,29 @@ export function ScheduleForm({
         </Select>
       </Field>
       <Field>
-        <FieldLabel htmlFor="schedule-model">Model</FieldLabel>
-        <ScheduleModelSelect
-          modelId={model?.modelId}
-          models={modelOptions}
-          onChange={(provider, modelId) =>
-            setForm((current) => ({ ...current, model: { provider, modelId } }))
-          }
-          providerId={model?.provider}
-        />
-      </Field>
-      <Field>
         <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
-        <Textarea
-          id="schedule-prompt"
-          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
-          onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-          required
-          rows={5}
-          value={form.prompt}
-        />
+        <PromptInputBox>
+          <PromptInputTextarea
+            id="schedule-prompt"
+            maxLength={MAX_SCHEDULE_PROMPT_CHARS}
+            onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+            placeholder=""
+            required
+            value={form.prompt}
+          />
+          <PromptInputToolbar>
+            <PromptInputTools>
+              <ScheduleModelSelect
+                modelId={model?.modelId}
+                models={modelOptions}
+                onChange={(provider, modelId) =>
+                  setForm((current) => ({ ...current, model: { provider, modelId } }))
+                }
+                providerId={model?.provider}
+              />
+            </PromptInputTools>
+          </PromptInputToolbar>
+        </PromptInputBox>
       </Field>
       <ScheduleFormCadenceFields form={form} setForm={setForm} />
       <ScheduleFormLimitsFields form={form} setForm={setForm} />

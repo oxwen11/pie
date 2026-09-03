@@ -8,18 +8,23 @@ import { ArrowUpIcon, SquareIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, KeyboardEventHandler } from "react";
 import { Children, useMemo } from "react";
 
+const promptInputSurface = cn(
+  "bg-background w-full divide-y rounded-xl",
+  "[--composer-ring:rgba(0,0,0,0.05)] dark:[--composer-ring:rgba(255,255,255,0.08)]",
+  "shadow-[0_18px_47px_0_rgba(0,0,0,0.03),0_7.5px_19px_0_rgba(0,0,0,0.02),0_4px_10.5px_0_rgba(0,0,0,0.02),0_2.3px_5.8px_0_rgba(0,0,0,0.01),0_1.2px_3.1px_0_rgba(0,0,0,0.01),0_0.5px_1.3px_0_rgba(0,0,0,0.01),0_0_0_1px_var(--composer-ring)]",
+);
+
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
-  <form
-    className={cn(
-      "bg-background w-full divide-y rounded-xl",
-      "[--composer-ring:rgba(0,0,0,0.05)] dark:[--composer-ring:rgba(255,255,255,0.08)]",
-      "shadow-[0_18px_47px_0_rgba(0,0,0,0.03),0_7.5px_19px_0_rgba(0,0,0,0.02),0_4px_10.5px_0_rgba(0,0,0,0.02),0_2.3px_5.8px_0_rgba(0,0,0,0.01),0_1.2px_3.1px_0_rgba(0,0,0,0.01),0_0.5px_1.3px_0_rgba(0,0,0,0.01),0_0_0_1px_var(--composer-ring)]",
-      className,
-    )}
-    {...props}
-  />
+  <form className={cn(promptInputSurface, className)} {...props} />
+);
+
+/** Same chrome as PromptInput when the composer already lives inside a form. */
+export type PromptInputBoxProps = HTMLAttributes<HTMLDivElement>;
+
+export const PromptInputBox = ({ className, ...props }: PromptInputBoxProps) => (
+  <div className={cn(promptInputSurface, className)} {...props} />
 );
 
 export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
