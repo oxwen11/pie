@@ -1,4 +1,5 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import { collectFiredSessionIds } from "@getpie/contract";
 import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import {
   Collapsible,
@@ -12,7 +13,7 @@ import {
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
@@ -20,6 +21,7 @@ import {
   ProjectSessionRow,
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
+import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
@@ -50,15 +52,11 @@ const selectNewestFirst = (
  * panel is open (two icon entities, not a rotation). This component owns only
  * grouping and fetching; each row composes its own navigation and actions.
  */
-export function ProjectSessionsGroup({
-  isSessionActive,
-  project,
-}: {
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly project: Project;
-}) {
-  const navigate = useNavigate();
+export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const router = useRouter();
+  const isSessionActive = (ref: SessionRef) =>
+    sameSessionRef(ref, sessionRefFromRouterMatches(router.state.matches));
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -81,6 +79,11 @@ export function ProjectSessionsGroup({
     select: selectPullRequest,
   });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
+  const firedSessionIds = useQuery({
+    ...orpcQueryUtils.schedule.list.queryOptions(),
+    select: collectFiredSessionIds,
+    refetchInterval: 10_000,
+  });
 
   return (
     <Collapsible defaultOpen>
@@ -102,13 +105,7 @@ export function ProjectSessionsGroup({
         </SidebarGroupLabel>
         <SidebarGroupAction
           className="top-1 right-1"
-          onClick={() => {
-            navigate({ to: "/draft", search: { projectId: project.id } }).catch(
-              (error: unknown) => {
-                console.error("Failed to start a draft chat", error);
-              },
-            );
-          }}
+          render={<Link to="/draft" search={{ projectId: project.id }} />}
           title={`New chat in ${project.name}`}
         >
           <SquarePen />
@@ -127,6 +124,7 @@ export function ProjectSessionsGroup({
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
+                    createdBySchedule={firedSessionIds.data?.has(session.sessionId) === true}
                     isActive={() => isSessionActive(session)}
                     pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}

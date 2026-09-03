@@ -13,7 +13,8 @@
     "./pull-request": "./src/pull-request.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
-    "./session-events": "./src/session-events.ts"
+    "./session-events": "./src/session-events.ts",
+    "./schedule": "./src/schedule.ts"
   },
   "scripts": {
     "test": "vitest run",

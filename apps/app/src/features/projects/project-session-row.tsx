@@ -2,6 +2,7 @@ import type { SessionSummary } from "@getpie/contract";
 import type { PullRequestLifecycle } from "@getpie/contract/pull-request";
 import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
+import { Clock } from "lucide-react";
 
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";
 import { SessionPullRequestIndicator } from "@/features/projects/session-pull-request-indicator";
@@ -15,11 +16,13 @@ export type SessionPullRequest = {
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
   active,
+  createdBySchedule = false,
   isActive,
   pullRequest,
   session,
 }: {
   readonly active: boolean;
+  readonly createdBySchedule?: boolean;
   readonly isActive: () => boolean;
   readonly pullRequest: SessionPullRequest | undefined;
   readonly session: SessionSummary;
@@ -55,6 +58,14 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
+        {createdBySchedule ? (
+          <span
+            className="text-muted-foreground inline-flex shrink-0"
+            title="Created by a schedule"
+          >
+            <Clock aria-hidden className="size-3.5 opacity-70" />
+          </span>
+        ) : null}
       </SessionActionsMenu>
       <SessionPullRequestIndicator lifecycle={pullRequest?.lifecycle} url={pullRequest?.url} />
     </SidebarMenuItem>

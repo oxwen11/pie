@@ -143,6 +143,13 @@ export interface PiProcess {
       response: AgentResponse,
     ) => Effect.Effect<boolean, HarnessSessionNotFound | AgentRequestUnavailable>;
     readonly interrupt: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
+    // Pi has no per-item dequeue. Rewrite the whole queue: clear_queue, then
+    // steer / follow_up each remaining line. Serialized with prompt via the
+    // request gate so a concurrent send cannot interleave.
+    readonly replaceQueue: (
+      sessionId: string,
+      pending: SessionPendingPrompt,
+    ) => Effect.Effect<void, HarnessSessionNotFound | PiTransportFailure>;
     readonly abort: (sessionId: string) => Effect.Effect<void, HarnessSessionNotFound>;
     readonly getModelState: (
       sessionId: string,
@@ -676,6 +683,25 @@ export const makePiProcessWithDependencies = <R>(
             return true;
           }),
         interrupt,
+        replaceQueue: (sessionId, pending) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) =>
+              session.requestGate.withPermit(
+                Effect.gen(function* () {
+                  yield* session.transport.command<{
+                    readonly steering: ReadonlyArray<string>;
+                    readonly followUp: ReadonlyArray<string>;
+                  }>({ type: "clear_queue" });
+                  for (const message of pending.steering) {
+                    yield* session.transport.command({ type: "steer", message });
+                  }
+                  for (const message of pending.followUp) {
+                    yield* session.transport.command({ type: "follow_up", message });
+                  }
+                }),
+              ),
+            ),
+          ),
         abort,
         getModelState: (sessionId) =>
           getSession(sessionId).pipe(
