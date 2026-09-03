@@ -97,6 +97,14 @@ export function checkStatusLabel(status: PullRequestCheckStatus): string {
   }
 }
 
+export function countDiffFiles(patch: string): number {
+  let count = 0;
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("diff --git ")) count += 1;
+  }
+  return count;
+}
+
 export function mergeMethodLabel(method: PullRequestMergeMethod): string {
   switch (method) {
     case "merge":
