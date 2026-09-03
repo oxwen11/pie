@@ -22,7 +22,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
+import { ModelSelect } from "@/components/model-select";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
@@ -295,10 +295,9 @@ function DraftRoute() {
             <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
-                <DraftModelSelect
-                  projectId={selected?.id}
-                  providerId={draftModel?.provider}
+                <ModelSelect
                   modelId={draftModel?.modelId}
+                  models={modelsQuery.data?.models ?? []}
                   onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
@@ -308,6 +307,7 @@ function DraftRoute() {
                       console.error("Failed to set the draft model", error);
                     });
                   }}
+                  providerId={draftModel?.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit
