@@ -19,7 +19,7 @@ import Loader from "@/components/loader";
 import { formatSessionReuse } from "./cadence";
 import { ScheduleCard } from "./schedule-card";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
-import { ScheduleEditorDialog, type ScheduleEditorState } from "./schedule-editor-dialog";
+import { ScheduleEditorSheet, type ScheduleEditorState } from "./schedule-editor-sheet";
 import type { ScheduleFormSubmit } from "./schedule-form";
 import { ScheduleRunHistory } from "./schedule-run-history";
 
@@ -265,7 +265,7 @@ export function SchedulePage({
       )}
 
       {editor !== null ? (
-        <ScheduleEditorDialog
+        <ScheduleEditorSheet
           editor={editor}
           onClose={() => {
             if (editor.mode === "create") {

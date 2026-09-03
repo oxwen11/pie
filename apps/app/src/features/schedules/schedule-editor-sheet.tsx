@@ -1,12 +1,12 @@
 import type { Schedule, Project } from "@getpie/contract";
 import {
-  Dialog,
-  DialogDescription,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-} from "@getpie/ui/components/dialog";
+  Sheet,
+  SheetDescription,
+  SheetHeader,
+  SheetPanel,
+  SheetPopup,
+  SheetTitle,
+} from "@getpie/ui/components/sheet";
 
 import { ScheduleForm, type ScheduleFormSubmit } from "./schedule-form";
 
@@ -14,7 +14,7 @@ export type ScheduleEditorState =
   | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
   | { readonly mode: "edit"; readonly schedule: Schedule };
 
-export type ScheduleEditorDialogProps = {
+export type ScheduleEditorSheetProps = {
   readonly editor: ScheduleEditorState;
   readonly projects: ReadonlyArray<Project>;
   readonly submitting: boolean;
@@ -22,28 +22,28 @@ export type ScheduleEditorDialogProps = {
   readonly onSubmit: (value: ScheduleFormSubmit) => void;
 };
 
-export function ScheduleEditorDialog({
+export function ScheduleEditorSheet({
   editor,
   projects,
   submitting,
   onClose,
   onSubmit,
-}: ScheduleEditorDialogProps) {
+}: ScheduleEditorSheetProps) {
   return (
-    <Dialog
+    <Sheet
       onOpenChange={(open) => {
         if (!open && !submitting) onClose();
       }}
       open
     >
-      <DialogPopup className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editor.mode === "create" ? "New schedule" : "Edit schedule"}</DialogTitle>
-          <DialogDescription>
+      <SheetPopup className="w-[min(92vw,30rem)]">
+        <SheetHeader>
+          <SheetTitle>{editor.mode === "create" ? "New schedule" : "Edit schedule"}</SheetTitle>
+          <SheetDescription>
             When this is due, pie starts a session in the project and sends the prompt.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
+          </SheetDescription>
+        </SheetHeader>
+        <SheetPanel>
           <ScheduleForm
             defaults={
               editor.mode === "create"
@@ -56,8 +56,8 @@ export function ScheduleEditorDialog({
             projects={projects}
             submitting={submitting}
           />
-        </DialogPanel>
-      </DialogPopup>
-    </Dialog>
+        </SheetPanel>
+      </SheetPopup>
+    </Sheet>
   );
 }
