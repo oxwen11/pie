@@ -91,7 +91,7 @@ function RootLayout() {
             <CardPanel
               heading={
                 pullRequestsRoute !== null
-                  ? "Pull Request"
+                  ? undefined
                   : schedulesRoute !== null
                     ? "Schedule"
                     : sessionRef === null
