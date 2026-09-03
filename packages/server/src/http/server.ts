@@ -250,6 +250,9 @@ const buildServer = (
 
     // Closing this scope interrupts any request fiber still in flight; its
     // release sits between the listeners stopping and the runtime going.
+    // `makeUnsafe` is required: this scope outlives the request that created
+    // the server and is closed in the acquireRelease finalizer, so Layer.scoped
+    // cannot own it.
     const requestScope = yield* Effect.acquireRelease(
       Effect.sync(() => Scope.makeUnsafe()),
       (scope) => Scope.close(scope, Exit.void),

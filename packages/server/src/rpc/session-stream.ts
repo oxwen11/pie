@@ -1,5 +1,5 @@
 import type { SubscribeStreamEvent, SubscriptionScope } from "@getpie/contract";
-import { Effect, Exit, Scope, Stream } from "effect";
+import { Effect, Stream } from "effect";
 
 import type { EventBusShape } from "../events";
 
@@ -12,10 +12,4 @@ export const openScopedSubscription = (
   bus: EventBusShape,
   scope: SubscriptionScope,
 ): Effect.Effect<Stream.Stream<SubscribeStreamEvent>> =>
-  Effect.gen(function* () {
-    const subscriptionScope = yield* Scope.make();
-    const stream = yield* bus
-      .subscribe(scope)
-      .pipe(Effect.provideService(Scope.Scope, subscriptionScope));
-    return stream.pipe(Stream.ensuring(Scope.close(subscriptionScope, Exit.void)));
-  });
+  Effect.succeed(Stream.unwrap(bus.subscribe(scope)));
