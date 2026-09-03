@@ -1,6 +1,8 @@
 import type {
   PullRequestCheck,
   PullRequestCheckStatus,
+  PullRequestDetail,
+  PullRequestListItem,
   PullRequestMergeMethod,
   PullRequestOfferedAction,
   PullRequestRef,
@@ -36,6 +38,14 @@ const requiredNumber = (record: Record<string, unknown>, field: string): number 
   const value = record[field];
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw new InvalidPullRequestJsonError(`${field} must be a positive integer`);
+  }
+  return value;
+};
+
+const requiredNonNegativeInteger = (record: Record<string, unknown>, field: string): number => {
+  const value = record[field];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new InvalidPullRequestJsonError(`${field} must be a non-negative integer`);
   }
   return value;
 };
@@ -250,4 +260,63 @@ export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnaps
     offeredActions: offeredActions(lifecycle, mergeable, autoMerge),
     updatedAt: requiredString(record, "updatedAt"),
   };
+}
+
+export function normalizeGitHubPullRequestDetailJson(input: unknown): PullRequestDetail {
+  const snapshot = normalizeGitHubPullRequestJson(input);
+  const record = asRecord(input, "pull request");
+  return {
+    snapshot,
+    body: optionalString(record, "body") ?? "",
+  };
+}
+
+const normalizeListLifecycle = (
+  state: string,
+  isDraft: boolean,
+): PullRequestListItem["lifecycle"] => {
+  if (state === "OPEN") return { type: "open", draft: isDraft };
+  if (state === "CLOSED") return { type: "closed" };
+  if (state === "MERGED") return { type: "merged" };
+  throw new InvalidPullRequestJsonError("state is unsupported");
+};
+
+const normalizeViewerPullRequestNode = (value: unknown): PullRequestListItem => {
+  const record = asRecord(value, "pull request");
+  const number = requiredNumber(record, "number");
+  const url = requiredString(record, "url");
+  const author = record.author;
+  const authorLogin =
+    author === null || author === undefined
+      ? ""
+      : requiredString(asRecord(author, "author"), "login");
+  return {
+    ref: parsePullRequestRef(url, number),
+    title: requiredString(record, "title"),
+    url,
+    authorLogin,
+    headBranch: optionalString(record, "headRefName") ?? "",
+    baseBranch: requiredString(record, "baseRefName"),
+    lifecycle: normalizeListLifecycle(
+      requiredString(record, "state"),
+      requiredBoolean(record, "isDraft"),
+    ),
+    additions: requiredNonNegativeInteger(record, "additions"),
+    deletions: requiredNonNegativeInteger(record, "deletions"),
+    updatedAt: requiredString(record, "updatedAt"),
+  };
+};
+
+export function normalizeGitHubViewerPullRequestsJson(
+  input: unknown,
+): ReadonlyArray<PullRequestListItem> {
+  const root = asRecord(input, "github response");
+  const data = asRecord(root.data, "data");
+  const viewer = asRecord(data.viewer, "viewer");
+  const pullRequests = asRecord(viewer.pullRequests, "pullRequests");
+  const nodes = pullRequests.nodes;
+  if (!Array.isArray(nodes)) {
+    throw new InvalidPullRequestJsonError("pullRequests.nodes must be an array");
+  }
+  return nodes.filter((node) => node !== null).map(normalizeViewerPullRequestNode);
 }

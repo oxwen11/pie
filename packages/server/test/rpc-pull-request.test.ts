@@ -38,11 +38,17 @@ const snapshot: PullRequestSnapshot = {
   updatedAt: "2026-08-30T00:00:00Z",
 };
 
+const unusedList = {
+  list: () => Effect.succeed([]),
+  detail: () => Effect.succeed(null),
+};
+
 const quietPullRequestLayer = Layer.succeed(PullRequestService, {
   current: () => Effect.succeed(null),
   diff: () => Effect.succeed({ patch: "", truncated: false }),
   runAction: () => Effect.die("unexpected pull request action"),
   sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, () => Effect.succeed(null)),
+  ...unusedList,
 });
 
 describe("pull request router", () => {
@@ -71,6 +77,7 @@ describe("pull request router", () => {
         });
       },
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedList,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -121,6 +128,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedList,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -157,6 +165,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedList,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -201,6 +210,41 @@ describe("pull request router", () => {
           ref: { projectId: crypto.randomUUID(), sessionId: crypto.randomUUID() },
         }),
       ).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("lists and details pull requests without a session", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
+    const item = {
+      ref: snapshot.ref,
+      title: snapshot.title,
+      url: snapshot.url,
+      authorLogin: "getpie",
+      headBranch: snapshot.head.branch,
+      baseBranch: snapshot.baseBranch,
+      lifecycle: snapshot.lifecycle,
+      additions: 4,
+      deletions: 1,
+      updatedAt: snapshot.updatedAt,
+    };
+    const detail = { snapshot, body: "## Summary" };
+    const pullRequestLayer = Layer.succeed(PullRequestService, {
+      current: () => Effect.die("unexpected current"),
+      diff: () => Effect.die("unexpected pull request diff"),
+      runAction: () => Effect.die("unexpected pull request action"),
+      sessionStatuses: () => Effect.die("unexpected statuses"),
+      list: () => Effect.succeed([item]),
+      detail: (pullRequest) =>
+        Effect.succeed(pullRequest.number === snapshot.ref.number ? detail : null),
+    });
+    const harness = await makeRpcTestHarness(home, { pullRequestLayer });
+    try {
+      await expect(harness.client.pullRequest.list()).resolves.toEqual([item]);
+      await expect(
+        harness.client.pullRequest.detail({ pullRequest: snapshot.ref }),
+      ).resolves.toEqual(detail);
     } finally {
       await harness.dispose();
     }

@@ -1,8 +1,12 @@
+import os from "node:os";
+
 import type {
   PullRequestAction,
   PullRequestActionApplied,
+  PullRequestDetail,
   PullRequestDiff,
   PullRequestExpected,
+  PullRequestListItem,
   PullRequestRef,
   PullRequestSessionStatus,
   PullRequestSnapshot,
@@ -34,6 +38,10 @@ export class PullRequestService extends Context.Service<
       pullRequest?: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+    readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
+    readonly detail: (
+      pullRequest: PullRequestRef,
+    ) => Effect.Effect<PullRequestDetail | null, PullRequestReadFailure>;
     readonly runAction: (
       cwd: string,
       expected: PullRequestExpected,
@@ -57,6 +65,8 @@ export const PullRequestServiceLayer: Layer.Layer<
 
     const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
     const diff = (cwd: string) => cli.diff(cwd);
+    const list = () => cli.list(os.homedir());
+    const detail = (pullRequest: PullRequestRef) => cli.detail(os.homedir(), pullRequest);
 
     const runAction = (
       cwd: string,
@@ -97,6 +107,6 @@ export const PullRequestServiceLayer: Layer.Layer<
     const sessionStatuses = (workspaces: ReadonlyArray<PullRequestSessionWorkspace>) =>
       foldSessionStatuses(workspaces, current);
 
-    return { current, diff, runAction, sessionStatuses };
+    return { current, diff, list, detail, runAction, sessionStatuses };
   }),
 );

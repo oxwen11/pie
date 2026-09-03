@@ -4,10 +4,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   CURRENT_PULL_REQUEST_FIELDS,
+  DETAIL_PULL_REQUEST_FIELDS,
   currentPullRequestArgs,
   makeGitHubCliAdapter,
+  PULL_REQUEST_LIST_QUERY,
   pullRequestActionArgs,
+  pullRequestDetailArgs,
   pullRequestDiffArgs,
+  pullRequestListArgs,
 } from "../src/pull-request/github-cli";
 
 describe("GitHub CLI command construction", () => {
@@ -21,6 +25,32 @@ describe("GitHub CLI command construction", () => {
       "view",
       "--json",
       CURRENT_PULL_REQUEST_FIELDS.join(","),
+    ]);
+  });
+
+  it("lists the authenticated user's open pull requests through GraphQL", () => {
+    expect(pullRequestListArgs()).toEqual([
+      "api",
+      "graphql",
+      "-f",
+      `query=${PULL_REQUEST_LIST_QUERY}`,
+    ]);
+  });
+
+  it("reads a pull request detail by URL including the body", () => {
+    expect(
+      pullRequestDetailArgs({
+        host: "github.com",
+        owner: "getpie",
+        repository: "pie",
+        number: 42,
+      }),
+    ).toEqual([
+      "pr",
+      "view",
+      "https://github.com/getpie/pie/pull/42",
+      "--json",
+      DETAIL_PULL_REQUEST_FIELDS.join(","),
     ]);
   });
 

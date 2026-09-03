@@ -72,6 +72,11 @@ function RootLayout() {
       from: "/schedules",
       shouldThrow: false,
     }) ?? null;
+  const pullRequestsRoute =
+    useMatch({
+      from: "/pull-requests",
+      shouldThrow: false,
+    }) ?? null;
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
 
@@ -85,13 +90,17 @@ function RootLayout() {
           <AppShellMain>
             <CardPanel
               heading={
-                schedulesRoute !== null
-                  ? "Schedule"
-                  : sessionRef === null
-                    ? "New chat"
-                    : (sessionTitle ?? "New chat")
+                pullRequestsRoute !== null
+                  ? "Pull Request"
+                  : schedulesRoute !== null
+                    ? "Schedule"
+                    : sessionRef === null
+                      ? "New chat"
+                      : (sessionTitle ?? "New chat")
               }
-              supportingText={schedulesRoute !== null ? undefined : project?.name}
+              supportingText={
+                pullRequestsRoute !== null || schedulesRoute !== null ? undefined : project?.name
+              }
             />
           </AppShellMain>
         </AppShellBody>

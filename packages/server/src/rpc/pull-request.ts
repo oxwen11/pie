@@ -86,6 +86,14 @@ export const pullRequestRouter = orpc.router({
     );
     return yield* service.sessionStatuses(workspaces).pipe(catchCurrentRead(errors));
   }),
+  list: orpc.list.effect(function* ({ errors }) {
+    const service = yield* PullRequestService;
+    return yield* service.list().pipe(catchCurrentRead(errors));
+  }),
+  detail: orpc.detail.effect(function* ({ input, errors }) {
+    const service = yield* PullRequestService;
+    return yield* service.detail(input.pullRequest).pipe(catchCurrentRead(errors));
+  }),
   runAction: orpc.runAction.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);

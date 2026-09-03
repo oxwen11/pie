@@ -134,6 +134,26 @@ export const PullRequestActionAppliedSchema = Schema.Struct({
 });
 export type PullRequestActionApplied = typeof PullRequestActionAppliedSchema.Type;
 
+export const PullRequestListItemSchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  title: Schema.String,
+  url: Schema.String,
+  authorLogin: Schema.String,
+  headBranch: Schema.String,
+  baseBranch: Schema.String,
+  lifecycle: PullRequestLifecycleSchema,
+  additions: Schema.Number,
+  deletions: Schema.Number,
+  updatedAt: Schema.String,
+});
+export type PullRequestListItem = typeof PullRequestListItemSchema.Type;
+
+export const PullRequestDetailSchema = Schema.Struct({
+  snapshot: PullRequestSnapshotSchema,
+  body: Schema.String,
+});
+export type PullRequestDetail = typeof PullRequestDetailSchema.Type;
+
 export const PullRequestDiffSchema = Schema.Struct({
   patch: Schema.String,
   truncated: Schema.Boolean,
@@ -146,6 +166,15 @@ const sessionNotFound = {
 
 const currentErrors = {
   SESSION_NOT_FOUND: sessionNotFound,
+  MISSING_GH: {},
+  UNAUTHENTICATED: {},
+  RATE_LIMITED: {},
+  UNSUPPORTED_CONTEXT: {},
+  HOST_UNAVAILABLE: {},
+  INVALID_RESPONSE: {},
+};
+
+const listErrors = {
   MISSING_GH: {},
   UNAUTHENTICATED: {},
   RATE_LIMITED: {},
@@ -181,6 +210,11 @@ export const pullRequestContract = {
     .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema) }))
     .errors(currentErrors)
     .output(Schema.Array(PullRequestSessionStatusSchema)),
+  list: oc.errors(listErrors).output(Schema.Array(PullRequestListItemSchema)),
+  detail: oc
+    .input(Schema.Struct({ pullRequest: PullRequestRefSchema }))
+    .errors(listErrors)
+    .output(Schema.Union([PullRequestDetailSchema, Schema.Null])),
   runAction: oc
     .input(PullRequestActionInputSchema)
     .errors(actionErrors)
