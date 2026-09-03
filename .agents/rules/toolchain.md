@@ -37,7 +37,8 @@
 - **Tests:** Vitest 5 (catalog pin). No root vitest workspace; every package
   has its own config and goes through turbo so per-package hashes stay
   independent. Configs turn on `fsModuleCache` so transforms persist across
-  those separate processes; artifacts land in `.vitest/` (gitignored). Layout
+  those separate processes (`node_modules/.vitest-cache`). Reporters write
+  under `.vitest/` (gitignored). Layout
   is inconsistent — `server`/`contract`/`effect-json-store` use `test/`,
   everyone else colocates `src/**/*.test.ts` behind an explicit `include`, so
   a test file placed elsewhere is silently ignored. `server`, `contract`,
