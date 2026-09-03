@@ -369,7 +369,7 @@ Layer.sync(ScheduleRuntime, () => ({
 
 - 2026-09-03: 审计完成，建立本 ticket。仓库 Issues 功能关闭，故落在 `todos/`。
 - 2026-09-03: Stack landed against `main` (not piled on merged PR 160):
-  - 1: `Effect.fn` on server service-shape methods (Project, Git, Worktree, FS, Schedule, EventBus, Session*, PullRequest, PiAgentService).
+  - 1: `Effect.fn` on server service-shape methods that were `=> Effect.gen` (Project, Git, Worktree, FS, Schedule, EventBus, SessionMetadata/Locks, PullRequest, PiAgentService, `PiAgentSessionService.prompt`). Remaining session-service methods stay pipe+`inSession`; wrapping them as `Effect.fn` needs `)().pipe(inSession)` at every call and is a no-runtime rename of thin delegates.
   - 2+13: `Data.TaggedError` → `Schema.TaggedError` + `Schema.Defect` causes; CronError / InvalidPullRequestJsonError tagged; GitHub CLI IO keeps `cause`. Anonymous `Effect.catch(() => Effect.void / succeed(x))` leftovers are `Effect.ignore` / `Effect.orElseSucceed`. `rpc/fs.ts` `READ_FAILED` mapError still drops platform cause — the contract error data has no `cause` field.
   - 3: `PIE_*` via Effect `Config` / `pie/PrintLogs` Reference; tests inject `ConfigProvider.fromUnknown`.
   - 4+5+15+26: `forkDetach` → `forkIn(ownerScope)`; in-flight ids are `Ref<HashSet>`; schedule loop `catchCause` logs Cause; session-service tests are `@effect/vitest` + `TestClock`.
