@@ -43,9 +43,10 @@
   everyone else colocates `src/**/*.test.ts` behind an explicit `include`, so
   a test file placed elsewhere is silently ignored. `server`, `contract`,
   `core`, and `effect-json-store` enable `test.typecheck`, so type errors fail
-  the run. `server` sets `fileParallelism: false` because git worktree
+  the run.   `server` sets `fileParallelism: false` because git worktree
   fixtures contend on temp dirs — do not flip it without splitting those
-  files into their own project. `apps/desktop/e2e/` is Playwright and not in
+  files into their own project — and uses a 30s `testTimeout` because
+  those same git fixtures stall when turbo runs every package at once. `apps/desktop/e2e/` is Playwright and not in
   CI. `tools/testing/fake-claude.mjs` is referenced by relative path from
   both server tests and desktop e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
