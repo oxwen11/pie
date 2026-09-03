@@ -42,11 +42,27 @@ describe("desktop RPC schemas", () => {
         status: "starting",
         statusRevision: 0,
         os: "macos",
+        sshClient: { available: true },
+        tailscaleClient: { available: true },
+        environments: {
+          revision: 0,
+          activeId: "local",
+          connectingLabel: null,
+          remotes: [],
+        },
       }),
     ).toEqual({
       status: "starting",
       statusRevision: 0,
       os: "macos",
+      sshClient: { available: true },
+      tailscaleClient: { available: true },
+      environments: {
+        revision: 0,
+        activeId: "local",
+        connectingLabel: null,
+        remotes: [],
+      },
     });
     expect(Schema.decodeUnknownSync(StatusSubscribeInputSchema)({ after: 12 })).toEqual({
       after: 12,
