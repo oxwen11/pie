@@ -6,7 +6,6 @@
   "type": "module",
   "main": "./dist/main/index.js",
   "scripts": {
-    "prebuild": "pnpm --filter @getpie/ui cn-build",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "build:unpack": "electron-builder --dir",

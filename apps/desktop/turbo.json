@@ -3,18 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "cache": false,
-      "dependsOn": ["@getpie/ui#cn-build", "^build"]
+      "cache": false
     },
     "dev": {
-      "dependsOn": ["@getpie/ui#cn-build", "@getpie/server#build"],
+      "dependsOn": ["@getpie/server#build"],
       "passThroughEnv": ["*"]
-    },
-    "typecheck": {
-      "dependsOn": ["@getpie/ui#cn-build", "^build"]
-    },
-    "test": {
-      "dependsOn": ["@getpie/ui#cn-build", "^build"]
     },
     "build:unpack": {
       "cache": false,
