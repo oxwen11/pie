@@ -73,6 +73,16 @@ issue, PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh`
 `agent-browser record start|stop` per `.agents/rules/verify-evidence.md`; do
 not commit the files.
 
+## Cursor Cloud specific instructions
+
+Repo-managed Cloud Agent setup lives in `.cursor/environment.json` and
+overrides any dashboard personal/team environment. `install` is mise (Node
+24 + pnpm from `mise.toml`) then `pnpm install --frozen-lockfile`.
+
+The environment starts two terminals: pie server on `:4180` and Vite on
+`:4190`. Drive `http://localhost:4190/` — not 4180 (built bundle / 503) and
+not 4000 (daemon). See `.agents/skills/verify`.
+
 ## Going deeper
 
 - `CONTEXT.md` — glossary. Read it before naming anything in the session domain;
