@@ -42,7 +42,7 @@ type ServeInput = {
   readonly allowedHost: ReadonlyArray<string>;
 };
 
-type ServeConfig = {
+export type ServeConfig = {
   readonly port: number;
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
@@ -52,7 +52,7 @@ type ServeConfig = {
  * Resolve the effective port and CORS origins from parsed flags, falling back
  * to `PIE_*` config and finally the defaults — precedence flag > config > default.
  */
-export const resolveServeConfig = (input: ServeInput): Effect.Effect<ServeConfig> =>
+export const resolveServeConfig = (input: ServeInput) =>
   Effect.gen(function* () {
     const envPort = yield* piePort;
     const envName = yield* nodeEnv;
