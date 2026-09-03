@@ -1,5 +1,5 @@
 import { sessionContract } from "@getpie/contract/session";
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 
 import {
   GitBranchExists,
@@ -19,7 +19,6 @@ import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
 import { openScopedSubscription } from "./session-stream";
-import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
@@ -303,7 +302,7 @@ export const sessionRouter = orpc.router({
   subscribe: orpc.subscribe.effect(function* ({ input }) {
     const bus = yield* EventBus;
     const stream = yield* openScopedSubscription(bus, input.scope);
-    return streamToAsyncGenerator(stream);
+    return Stream.toAsyncIterable(stream);
   }),
 });
 
