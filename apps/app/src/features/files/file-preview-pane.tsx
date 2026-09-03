@@ -4,10 +4,10 @@ import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { RefreshCwIcon } from "lucide-react";
+import { FileCodeIcon, RefreshCwIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
 
-import { FileState } from "./file-state";
+import { WorkspaceState } from "@/components/workspace-state";
 
 const FilePreviewAdapter = lazy(() =>
   import("./file-preview-adapter").then((module) => ({ default: module.FilePreviewAdapter })),
@@ -49,9 +49,13 @@ export function FilePreviewPane({
           <Spinner className="text-muted-foreground size-4" />
         </div>
       ) : file.isError ? (
-        <FileState title={fileErrorTitle(file.error)} onRetry={() => void file.refetch()}>
+        <WorkspaceState
+          icon={FileCodeIcon}
+          title={fileErrorTitle(file.error)}
+          onRetry={() => void file.refetch()}
+        >
           {fileErrorMessage(file.error)}
-        </FileState>
+        </WorkspaceState>
       ) : file.data?.kind === "image" ? (
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
           <img

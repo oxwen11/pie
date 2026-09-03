@@ -1,12 +1,4 @@
 import type { Project } from "@getpie/contract";
-import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FilesIcon, FileTextIcon } from "lucide-react";
@@ -23,9 +15,9 @@ import {
   WorkspaceLayoutTree,
   WorkspaceLayoutTreeTrigger,
 } from "@/components/layout/workspace-layout";
+import { WorkspaceState } from "@/components/workspace-state";
 
 import { filePanel } from "./file-panel";
-import { FileState } from "./file-state";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export const filesPanel = definePanel({
@@ -63,7 +55,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
 
   if (panel === null) {
     return (
-      <WorkspaceState title="Workspace unavailable">
+      <WorkspaceState icon={FilesIcon} title="Workspace unavailable">
         This session no longer resolves to an imported project.
       </WorkspaceState>
     );
@@ -89,9 +81,9 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     <WorkspaceLayout>
       <WorkspaceLayoutBody>
         <WorkspaceLayoutPreview>
-          <FileState icon={FileTextIcon} prominentIcon title="打开文件">
+          <WorkspaceState icon={FileTextIcon} title="打开文件" variant="prominent">
             从工作区目录树中选择文件
-          </FileState>
+          </WorkspaceState>
         </WorkspaceLayoutPreview>
         <WorkspaceLayoutTreeTrigger
           className="absolute end-11 top-1.5 z-10"
@@ -101,34 +93,5 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
         <WorkspaceLayoutTree>{treePane}</WorkspaceLayoutTree>
       </WorkspaceLayoutBody>
     </WorkspaceLayout>
-  );
-}
-
-function WorkspaceState({
-  title,
-  children,
-  onRetry,
-}: {
-  title: string;
-  children: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <Empty className="py-8 md:py-8">
-      <EmptyMedia variant="icon">
-        <FilesIcon />
-      </EmptyMedia>
-      <EmptyContent>
-        <div>
-          <EmptyTitle className="text-base">{title}</EmptyTitle>
-          <EmptyDescription>{children}</EmptyDescription>
-        </div>
-        {onRetry ? (
-          <Button onClick={onRetry} size="sm" variant="outline">
-            Try again
-          </Button>
-        ) : null}
-      </EmptyContent>
-    </Empty>
   );
 }
