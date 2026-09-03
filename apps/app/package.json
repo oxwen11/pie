@@ -57,6 +57,7 @@
     "code-inspector-plugin": "latest",
     "react-doctor": "^0.9.13",
     "react-grab": "^0.1.50",
-    "react-scan": "catalog:"
+    "react-scan": "catalog:",
+    "vitest": "catalog:"
   }
 }

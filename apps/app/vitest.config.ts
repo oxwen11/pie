@@ -8,4 +8,7 @@ export default defineConfig({
   resolve: {
     alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  test: {
+    fsModuleCache: true,
+  },
 });

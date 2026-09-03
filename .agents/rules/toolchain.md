@@ -34,13 +34,21 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** no root vitest workspace; every package has its own config and goes
-  through turbo. Layout is inconsistent — `server`/`contract`/`harness` use
-  `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
-  `include`, so a test file placed elsewhere is silently ignored. `server` and
-  `harness` enable `test.typecheck`, so type errors fail the run.
-  `apps/desktop/e2e/` is Playwright and not in CI. `tools/testing/fake-claude.mjs`
-  is referenced by relative path from both server tests and desktop e2e.
+- **Tests:** Vitest 5 (catalog pin). No root vitest workspace; every package
+  has its own config and goes through turbo so per-package hashes stay
+  independent. Configs turn on `fsModuleCache` so transforms persist across
+  those separate processes; artifacts land in `.vitest/` (gitignored). Layout
+  is inconsistent — `server`/`contract`/`effect-json-store` use `test/`,
+  everyone else colocates `src/**/*.test.ts` behind an explicit `include`, so
+  a test file placed elsewhere is silently ignored. `server`, `contract`,
+  `core`, and `effect-json-store` enable `test.typecheck`, so type errors fail
+  the run. `server` sets `fileParallelism: false` because git worktree
+  fixtures contend on temp dirs — do not flip it without splitting those
+  files into their own project. `apps/desktop/e2e/` is Playwright and not in
+  CI. `tools/testing/fake-claude.mjs` is referenced by relative path from
+  both server tests and desktop e2e. `@effect/vitest` still peers
+  `vitest <5`; `packageExtensions` widens that until the Effect catalog
+  moves.
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root
   `devDependency`) is the Node 24 TypeScript helper for isolated web / CLI /
   desktop proofs. Skills call one command:
