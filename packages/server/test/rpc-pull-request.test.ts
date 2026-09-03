@@ -40,6 +40,7 @@ const snapshot: PullRequestSnapshot = {
 
 const quietPullRequestLayer = Layer.succeed(PullRequestService, {
   current: () => Effect.succeed(null),
+  diff: () => Effect.succeed({ patch: "", truncated: false }),
   runAction: () => Effect.die("unexpected pull request action"),
   sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, () => Effect.succeed(null)),
 });
@@ -55,6 +56,10 @@ describe("pull request router", () => {
     };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
       current,
+      diff: (cwd) => {
+        receivedCwd = cwd;
+        return Effect.succeed({ patch: "diff --git a/a.txt b/a.txt\n", truncated: false });
+      },
       runAction: (cwd, _expected, action) => {
         receivedCwd = cwd;
         return Effect.succeed({
@@ -78,6 +83,11 @@ describe("pull request router", () => {
       await expect(harness.client.pullRequest.current({ ref: created.ref })).resolves.toEqual(
         snapshot,
       );
+      await expect(harness.client.pullRequest.diff({ ref: created.ref })).resolves.toEqual({
+        patch: "diff --git a/a.txt b/a.txt\n",
+        truncated: false,
+      });
+      expect(receivedCwd).toBe(created.workspace.cwd);
       expect(created.workspace.cwd).not.toBe(workspace);
       expect(receivedCwd).toBe(created.workspace.cwd);
 
@@ -108,6 +118,7 @@ describe("pull request router", () => {
     };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
       current,
+      diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
     });
@@ -143,6 +154,7 @@ describe("pull request router", () => {
     };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
       current,
+      diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
     });

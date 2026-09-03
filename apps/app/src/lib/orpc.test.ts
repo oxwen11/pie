@@ -38,6 +38,9 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.current.key())).toMatchObject(
       pullRequestDefaults,
     );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.diff.key())).toMatchObject(
+      pullRequestDefaults,
+    );
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
       pullRequestDefaults,
     );
