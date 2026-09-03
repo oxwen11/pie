@@ -1,6 +1,5 @@
-import type { Project, Schedule } from "@getpie/contract";
-
-import { ScheduleCreateForm, ScheduleEditForm, type ScheduleFormSubmit } from "./schedule-form";
+import { useSchedule } from "./schedule-context";
+import { ScheduleCreateForm, ScheduleEditForm } from "./schedule-form";
 import {
   SchedulePanel,
   SchedulePanelBody,
@@ -9,54 +8,50 @@ import {
   SchedulePanelTitle,
 } from "./schedule-panel";
 
-export type ScheduleEditorState =
-  | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
-  | { readonly mode: "edit"; readonly schedule: Schedule };
-
-export type ScheduleEditorPanelProps = {
-  readonly editor: ScheduleEditorState;
-  readonly projects: ReadonlyArray<Project>;
-  readonly submitting: boolean;
-  readonly onClose: () => void;
-  readonly onSubmit: (value: ScheduleFormSubmit) => void;
-};
-
-export function ScheduleEditorPanel({
-  editor,
-  projects,
-  submitting,
-  onClose,
-  onSubmit,
-}: ScheduleEditorPanelProps) {
-  const heading = editor.mode === "create" ? "New schedule" : "Edit schedule";
+export function ScheduleEditorPanel() {
+  const { actions, meta } = useSchedule();
+  if (meta.createOpen) {
+    return (
+      <SchedulePanel aria-label="New schedule">
+        <SchedulePanelHeader>
+          <SchedulePanelTitle>New schedule</SchedulePanelTitle>
+          <SchedulePanelClose disabled={meta.submitting} onClick={actions.closeCreate} />
+        </SchedulePanelHeader>
+        <SchedulePanelBody>
+          <p className="text-muted-foreground mb-4 text-sm">
+            When this is due, pie starts a session in the project and sends the prompt.
+          </p>
+          <ScheduleCreateForm
+            defaults={meta.createDefaults}
+            onCancel={actions.closeCreate}
+            onSubmit={actions.create}
+            projects={meta.projects}
+            submitting={meta.submitting}
+          />
+        </SchedulePanelBody>
+      </SchedulePanel>
+    );
+  }
+  const schedule = meta.editing;
+  if (schedule === undefined) return null;
   return (
-    <SchedulePanel aria-label={heading}>
+    <SchedulePanel aria-label="Edit schedule">
       <SchedulePanelHeader>
-        <SchedulePanelTitle>{heading}</SchedulePanelTitle>
-        <SchedulePanelClose disabled={submitting} onClick={onClose} />
+        <SchedulePanelTitle>Edit schedule</SchedulePanelTitle>
+        <SchedulePanelClose disabled={meta.submitting} onClick={actions.cancelEdit} />
       </SchedulePanelHeader>
       <SchedulePanelBody>
         <p className="text-muted-foreground mb-4 text-sm">
           When this is due, pie starts a session in the project and sends the prompt.
         </p>
-        {editor.mode === "create" ? (
-          <ScheduleCreateForm
-            defaults={{ projectId: editor.projectId, sessionId: editor.sessionId }}
-            onCancel={onClose}
-            onSubmit={onSubmit}
-            projects={projects}
-            submitting={submitting}
-          />
-        ) : (
-          <ScheduleEditForm
-            key={editor.schedule.id}
-            onCancel={onClose}
-            onSubmit={onSubmit}
-            projects={projects}
-            schedule={editor.schedule}
-            submitting={submitting}
-          />
-        )}
+        <ScheduleEditForm
+          key={schedule.id}
+          onCancel={actions.cancelEdit}
+          onSubmit={(value) => actions.save(schedule.id, value)}
+          projects={meta.projects}
+          schedule={schedule}
+          submitting={meta.submitting}
+        />
       </SchedulePanelBody>
     </SchedulePanel>
   );
