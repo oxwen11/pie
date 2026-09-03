@@ -1,7 +1,6 @@
 import type {
   PullRequestCheck,
   PullRequestCheckStatus,
-  PullRequestDetail,
   PullRequestListItem,
   PullRequestMergeMethod,
   PullRequestOfferedAction,
@@ -258,14 +257,6 @@ export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnaps
     autoMerge,
     offeredActions: offeredActions(lifecycle, mergeable, autoMerge),
     updatedAt: requiredString(record, "updatedAt"),
-  };
-}
-
-export function normalizeGitHubPullRequestDetailJson(input: unknown): PullRequestDetail {
-  const snapshot = normalizeGitHubPullRequestJson(input);
-  const record = asRecord(input, "pull request");
-  return {
-    snapshot,
     body: optionalString(record, "body") ?? "",
   };
 }

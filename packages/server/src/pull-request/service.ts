@@ -1,7 +1,6 @@
 import type {
   PullRequestAction,
   PullRequestActionApplied,
-  PullRequestDetail,
   PullRequestDiff,
   PullRequestExpected,
   PullRequestListItem,
@@ -36,10 +35,13 @@ export class PullRequestService extends Context.Service<
       pullRequest?: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+    readonly diffFor: (
+      pullRequest: PullRequestRef,
+    ) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
     readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
     readonly detail: (
       pullRequest: PullRequestRef,
-    ) => Effect.Effect<PullRequestDetail | null, PullRequestReadFailure>;
+    ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly runAction: (
       cwd: string,
       expected: PullRequestExpected,
@@ -63,6 +65,7 @@ export const PullRequestServiceLayer: Layer.Layer<
 
     const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
     const diff = (cwd: string) => cli.diff(cwd);
+    const diffFor = (pullRequest: PullRequestRef) => cli.diffFor(pullRequest);
     const list = () => cli.list();
     const detail = (pullRequest: PullRequestRef) => cli.detail(pullRequest);
 
@@ -105,6 +108,6 @@ export const PullRequestServiceLayer: Layer.Layer<
     const sessionStatuses = (workspaces: ReadonlyArray<PullRequestSessionWorkspace>) =>
       foldSessionStatuses(workspaces, current);
 
-    return { current, diff, list, detail, runAction, sessionStatuses };
+    return { current, diff, diffFor, list, detail, runAction, sessionStatuses };
   }),
 );

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   InvalidPullRequestJsonError,
-  normalizeGitHubPullRequestDetailJson,
   normalizeGitHubPullRequestJson,
   normalizeGitHubViewerPullRequestsJson,
 } from "../src/pull-request/normalization";
@@ -112,13 +111,12 @@ describe("normalizeGitHubPullRequestJson", () => {
   });
 });
 
-describe("normalizeGitHubPullRequestDetailJson", () => {
-  it("keeps the snapshot and treats a missing body as empty", () => {
-    expect(normalizeGitHubPullRequestDetailJson({ ...openFixture, body: "## Summary" })).toEqual({
-      snapshot: normalizeGitHubPullRequestJson(openFixture),
-      body: "## Summary",
-    });
-    expect(normalizeGitHubPullRequestDetailJson({ ...openFixture, body: null }).body).toBe("");
+describe("pull request body", () => {
+  it("treats a missing body as empty", () => {
+    expect(normalizeGitHubPullRequestJson({ ...openFixture, body: "## Summary" }).body).toBe(
+      "## Summary",
+    );
+    expect(normalizeGitHubPullRequestJson({ ...openFixture, body: null }).body).toBe("");
   });
 });
 

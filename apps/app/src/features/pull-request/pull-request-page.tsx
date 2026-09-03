@@ -1,9 +1,9 @@
 import type {
+  PullRequestDiff,
   PullRequestListItem,
   PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
-import { Response } from "@getpie/ui/ai-elements/response";
 import {
   Empty,
   EmptyDescription,
@@ -14,14 +14,15 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/components/input-group";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { ExternalLinkIcon, GitPullRequestIcon, SearchIcon } from "lucide-react";
+import { GitPullRequestIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 
 import Loader from "@/components/loader";
 
-import { PullRequestChecks } from "./pull-request-checks";
+import { PullRequestInspect } from "./pull-request-inspect";
+import { PullRequestPanelState } from "./pull-request-panel-state";
 import {
   filterPullRequestItems,
   pullRequestRepositoryLabel,
@@ -39,6 +40,11 @@ export function PullRequestPage() {
   const selected = selectedPullRequest(items, visible, selectedRef);
   const detail = useQuery(
     orpcQueryUtils.pullRequest.detail.queryOptions({
+      input: selected === undefined ? skipToken : { pullRequest: selected.ref },
+    }),
+  );
+  const diff = useQuery(
+    orpcQueryUtils.pullRequest.diff.queryOptions({
       input: selected === undefined ? skipToken : { pullRequest: selected.ref },
     }),
   );
@@ -105,12 +111,16 @@ export function PullRequestPage() {
           </ul>
         )}
       </div>
-      <PullRequestDetailPane
-        body={detail.data?.body ?? ""}
-        errorMessage={detail.error?.message}
-        item={selected}
+      <PullRequestPageDetail
+        diff={diff}
+        error={detail.error}
+        onRefresh={() => {
+          void detail.refetch();
+          void diff.refetch();
+        }}
         pending={detail.isPending && detail.data === undefined}
-        snapshot={detail.data?.snapshot}
+        refreshing={detail.isFetching || diff.isFetching}
+        snapshot={detail.data ?? undefined}
       />
     </div>
   );
@@ -152,66 +162,44 @@ function PullRequestListRow({
   );
 }
 
-function PullRequestDetailPane({
-  body,
-  errorMessage,
-  item,
+function PullRequestPageDetail({
+  diff,
+  error,
+  onRefresh,
   pending,
+  refreshing,
   snapshot,
 }: {
-  body: string;
-  errorMessage: string | undefined;
-  item: PullRequestListItem | undefined;
+  diff: UseQueryResult<PullRequestDiff>;
+  error: Error | null;
+  onRefresh: () => void;
   pending: boolean;
-  snapshot: PullRequestSnapshot | undefined;
+  refreshing: boolean;
+  snapshot: PullRequestSnapshot | null | undefined;
 }) {
-  if (item === undefined) {
+  if (pending) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center justify-center">
+        <Spinner className="text-muted-foreground size-4" />
+      </div>
+    );
+  }
+  if (error !== null && snapshot === undefined) {
+    return (
+      <PullRequestPanelState title="Unable to load pull request">
+        <p>{error.message}</p>
+      </PullRequestPanelState>
+    );
+  }
+  if (snapshot === null || snapshot === undefined) {
     return <div className="min-w-0 flex-1" />;
   }
-
   return (
-    <article className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <header className="flex flex-col gap-2 border-b px-6 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-lg font-semibold text-pretty">{item.title}</h1>
-          <a
-            className="text-muted-foreground hover:bg-accent inline-flex size-7 shrink-0 items-center justify-center rounded-md"
-            href={item.url}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <ExternalLinkIcon className="size-3.5" />
-            <span className="sr-only">Open on GitHub</span>
-          </a>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          {item.authorLogin.length > 0 ? `${item.authorLogin} · ` : ""}
-          {pullRequestRepositoryLabel(item.ref)}#{item.ref.number}
-        </p>
-        <p className="text-muted-foreground font-mono text-xs">
-          {item.headBranch.length > 0 ? item.headBranch : "unknown"}
-          {" > "}
-          {item.baseBranch}
-          <span className="ms-3 tabular-nums">
-            <span className="text-success">+{item.additions}</span>
-            <span className="text-destructive">-{item.deletions}</span>
-          </span>
-        </p>
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-4">
-        {pending ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner className="text-muted-foreground size-4" />
-          </div>
-        ) : errorMessage !== undefined ? (
-          <p className="text-muted-foreground text-sm">{errorMessage}</p>
-        ) : (
-          <div className="flex flex-col gap-6">
-            {body.length > 0 ? <Response animated={false}>{body}</Response> : null}
-            {snapshot === undefined ? null : <PullRequestChecks snapshot={snapshot} />}
-          </div>
-        )}
-      </div>
-    </article>
+    <PullRequestInspect
+      diff={diff}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      snapshot={snapshot}
+    />
   );
 }

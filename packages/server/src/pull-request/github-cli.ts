@@ -1,6 +1,5 @@
 import type {
   PullRequestAction,
-  PullRequestDetail,
   PullRequestDiff,
   PullRequestListItem,
   PullRequestMergeMethod,
@@ -24,7 +23,6 @@ import {
   PullRequestUnsupportedContext,
 } from "./errors";
 import {
-  normalizeGitHubPullRequestDetailJson,
   normalizeGitHubPullRequestJson,
   normalizeGitHubViewerPullRequestsJson,
 } from "./normalization";
@@ -77,7 +75,10 @@ export const pullRequestListArgs = (): ReadonlyArray<string> => [
   `query=${PULL_REQUEST_LIST_QUERY}`,
 ];
 
-export const pullRequestDiffArgs = (): ReadonlyArray<string> => ["pr", "diff", "--color", "never"];
+export const pullRequestDiffArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
+  pullRequest === undefined
+    ? ["pr", "diff", "--color", "never"]
+    : ["pr", "diff", pullRequestViewUrl(pullRequest), "--color", "never"];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -275,10 +276,13 @@ export interface GitHubCliAdapter {
     pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+  readonly diffFor: (
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
   readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
   readonly detail: (
     pullRequest: PullRequestRef,
-  ) => Effect.Effect<PullRequestDetail | null, PullRequestReadFailure>;
+  ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly runAction: (input: {
     readonly cwd: string;
     readonly url: string;
@@ -333,10 +337,10 @@ export const makeGitHubCliAdapter = (
       ),
     );
 
-  const diff: GitHubCliAdapter["diff"] = (cwd) =>
+  const runDiff = (args: ReadonlyArray<string>, cwd?: string) =>
     Effect.gen(function* () {
-      const attempted = yield* executeGh(spawner, pullRequestDiffArgs(), {
-        cwd,
+      const attempted = yield* executeGh(spawner, args, {
+        ...(cwd === undefined ? undefined : { cwd }),
         timeout: DIFF_TIMEOUT,
         maxOutputBytes: DIFF_MAX_OUTPUT_BYTES,
       }).pipe(Effect.result);
@@ -360,6 +364,10 @@ export const makeGitHubCliAdapter = (
       return yield* new PullRequestHostUnavailable();
     });
 
+  const diff: GitHubCliAdapter["diff"] = (cwd) => runDiff(pullRequestDiffArgs(), cwd);
+  const diffFor: GitHubCliAdapter["diffFor"] = (pullRequest) =>
+    runDiff(pullRequestDiffArgs(pullRequest));
+
   const list: GitHubCliAdapter["list"] = () =>
     executeGh(spawner, pullRequestListArgs()).pipe(
       Effect.mapError(mapExecutionReadError),
@@ -378,13 +386,15 @@ export const makeGitHubCliAdapter = (
     executeGh(spawner, currentPullRequestArgs(pullRequest)).pipe(
       Effect.mapError(mapExecutionReadError),
       Effect.flatMap(readStdout),
-      Effect.flatMap((stdout): Effect.Effect<PullRequestDetail | null, PullRequestReadFailure> => {
-        if (stdout === null) return Effect.succeed(null);
-        return Effect.try({
-          try: () => normalizeGitHubPullRequestDetailJson(JSON.parse(stdout) as unknown),
-          catch: () => new PullRequestInvalidResponse(),
-        });
-      }),
+      Effect.flatMap(
+        (stdout): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
+          if (stdout === null) return Effect.succeed(null);
+          return Effect.try({
+            try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
     );
 
   const runAction: GitHubCliAdapter["runAction"] = ({ action, cwd, expectedHeadSha, url }) =>
@@ -410,5 +420,5 @@ export const makeGitHubCliAdapter = (
       }),
     );
 
-  return { current, diff, list, detail, runAction };
+  return { current, diff, diffFor, list, detail, runAction };
 };

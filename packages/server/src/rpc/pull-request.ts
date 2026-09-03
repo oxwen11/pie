@@ -58,6 +58,9 @@ export const pullRequestRouter = orpc.router({
   }),
   diff: orpc.diff.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
+    if ("pullRequest" in input) {
+      return yield* service.diffFor(input.pullRequest).pipe(catchCurrentRead(errors));
+    }
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
     return yield* service.diff(cwd).pipe(catchCurrentRead(errors));
   }),

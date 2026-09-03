@@ -17,6 +17,17 @@ describe("GitHub CLI command construction", () => {
     expect(pullRequestDiffArgs()).toEqual(["pr", "diff", "--color", "never"]);
   });
 
+  it("reads a pull request patch by URL", () => {
+    expect(
+      pullRequestDiffArgs({
+        host: "github.com",
+        owner: "getpie",
+        repository: "pie",
+        number: 42,
+      }),
+    ).toEqual(["pr", "diff", "https://github.com/getpie/pie/pull/42", "--color", "never"]);
+  });
+
   it("uses one fixed current-PR read without an auth preflight", () => {
     expect(currentPullRequestArgs()).toEqual([
       "pr",

@@ -1,13 +1,10 @@
 import type { PullRequestAction, PullRequestActionInput } from "@getpie/contract/pull-request";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@getpie/ui/components/alert";
 import { Button } from "@getpie/ui/components/button";
-import { Separator } from "@getpie/ui/components/separator";
 import { Spinner } from "@getpie/ui/components/spinner";
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@getpie/ui/components/tabs";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { ExternalLinkIcon, GitPullRequestIcon, RefreshCwIcon } from "lucide-react";
+import { GitPullRequestIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -15,12 +12,9 @@ import type { PanelHandle } from "@/components/layout/content-panel/model/panel"
 import { definePanel } from "@/components/layout/content-panel/react/view";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
-import { PullRequestActions } from "./pull-request-actions";
-import { PullRequestChecks } from "./pull-request-checks";
-import { PullRequestDiffPane } from "./pull-request-diff-pane";
+import { PullRequestInspect } from "./pull-request-inspect";
 import { PullRequestPanelState } from "./pull-request-panel-state";
-import { countDiffFiles, pullRequestActionInput } from "./pull-request-presentation";
-import { PullRequestSummary } from "./pull-request-summary";
+import { pullRequestActionInput } from "./pull-request-presentation";
 
 export const pullRequestPanel = definePanel({
   type: "pull-request",
@@ -105,91 +99,17 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
     setIntent(pullRequestActionInput(instance.sessionRef, snapshot, next));
   };
 
-  const fileCount = diff.data === undefined ? undefined : countDiffFiles(diff.data.patch);
-  const refreshing = pullRequest.isFetching || diff.isFetching;
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
-        <GitPullRequestIcon className="text-muted-foreground size-4" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={snapshot.title}>
-          {snapshot.title}
-        </span>
-        <Button
-          aria-label="Refresh pull request"
-          loading={refreshing}
-          onClick={refresh}
-          size="icon-xs"
-          variant="ghost"
-        >
-          <RefreshCwIcon />
-        </Button>
-        <Button
-          render={
-            <a
-              aria-label="Open pull request on GitHub"
-              href={snapshot.url}
-              rel="noreferrer"
-              target="_blank"
-            />
-          }
-          size="xs"
-          variant="outline"
-        >
-          Open
-          <ExternalLinkIcon />
-        </Button>
-      </div>
-
-      <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="overview">
-        <div className="flex h-9 shrink-0 items-center border-b px-3">
-          <TabsList variant="underline">
-            <TabsTab value="overview">Overview</TabsTab>
-            <TabsTab value="files">
-              Files
-              {fileCount === undefined ? null : (
-                <span className="text-muted-foreground">{fileCount}</span>
-              )}
-            </TabsTab>
-          </TabsList>
-        </div>
-
-        <TabsPanel className="min-h-0 flex-1 overflow-y-auto p-4" value="overview">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            {postActionRefreshFailed ? (
-              <Alert variant="warning">
-                <AlertTitle>Action applied; status refresh failed</AlertTitle>
-                <AlertDescription>
-                  The write succeeded on GitHub, but this snapshot is stale.
-                </AlertDescription>
-                <AlertAction>
-                  <Button onClick={refresh} size="xs" variant="outline">
-                    Retry
-                  </Button>
-                </AlertAction>
-              </Alert>
-            ) : null}
-
-            <PullRequestSummary snapshot={snapshot} />
-            <Separator />
-            <PullRequestChecks snapshot={snapshot} />
-            <PullRequestActions
-              disabled={action.isPending}
-              onAction={beginAction}
-              snapshot={snapshot}
-            />
-          </div>
-        </TabsPanel>
-
-        <TabsPanel className="flex min-h-0 flex-1 flex-col overflow-hidden" value="files">
-          <PullRequestDiffPane
-            baseBranch={snapshot.baseBranch}
-            diff={diff}
-            key={snapshot.head.sha}
-          />
-        </TabsPanel>
-      </Tabs>
-
+    <>
+      <PullRequestInspect
+        actionPending={action.isPending}
+        diff={diff}
+        onAction={beginAction}
+        onRefresh={refresh}
+        postActionRefreshFailed={postActionRefreshFailed}
+        refreshing={pullRequest.isFetching || diff.isFetching}
+        snapshot={snapshot}
+      />
       {intent !== null ? (
         <ConfirmPullRequestAction
           input={intent}
@@ -198,7 +118,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
           onConfirm={() => action.mutate(intent)}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

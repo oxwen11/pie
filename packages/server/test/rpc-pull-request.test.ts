@@ -36,11 +36,13 @@ const snapshot: PullRequestSnapshot = {
   autoMerge: null,
   offeredActions: [],
   updatedAt: "2026-08-30T00:00:00Z",
+  body: "",
 };
 
-const unusedList = {
+const unusedInbox = {
   list: () => Effect.succeed([]),
   detail: () => Effect.succeed(null),
+  diffFor: () => Effect.die("unexpected pull request diffFor"),
 };
 
 const quietPullRequestLayer = Layer.succeed(PullRequestService, {
@@ -48,7 +50,7 @@ const quietPullRequestLayer = Layer.succeed(PullRequestService, {
   diff: () => Effect.succeed({ patch: "", truncated: false }),
   runAction: () => Effect.die("unexpected pull request action"),
   sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, () => Effect.succeed(null)),
-  ...unusedList,
+  ...unusedInbox,
 });
 
 describe("pull request router", () => {
@@ -77,7 +79,7 @@ describe("pull request router", () => {
         });
       },
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
-      ...unusedList,
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -128,7 +130,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
-      ...unusedList,
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -165,7 +167,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
-      ...unusedList,
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -229,22 +231,23 @@ describe("pull request router", () => {
       deletions: 1,
       updatedAt: snapshot.updatedAt,
     };
-    const detail = { snapshot, body: "## Summary" };
+    const detailed = { ...snapshot, body: "## Summary" };
     const pullRequestLayer = Layer.succeed(PullRequestService, {
       current: () => Effect.die("unexpected current"),
       diff: () => Effect.die("unexpected pull request diff"),
+      diffFor: () => Effect.die("unexpected pull request diffFor"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: () => Effect.die("unexpected statuses"),
       list: () => Effect.succeed([item]),
       detail: (pullRequest) =>
-        Effect.succeed(pullRequest.number === snapshot.ref.number ? detail : null),
+        Effect.succeed(pullRequest.number === snapshot.ref.number ? detailed : null),
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
       await expect(harness.client.pullRequest.list()).resolves.toEqual([item]);
       await expect(
         harness.client.pullRequest.detail({ pullRequest: snapshot.ref }),
-      ).resolves.toEqual(detail);
+      ).resolves.toEqual(detailed);
     } finally {
       await harness.dispose();
     }

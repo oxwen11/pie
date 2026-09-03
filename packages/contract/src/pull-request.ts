@@ -84,6 +84,7 @@ export const PullRequestSnapshotSchema = Schema.Struct({
   autoMerge: Schema.Union([Schema.Struct({ method: PullRequestMergeMethodSchema }), Schema.Null]),
   offeredActions: Schema.Array(PullRequestOfferedActionSchema),
   updatedAt: Schema.String,
+  body: Schema.String,
 });
 export type PullRequestSnapshot = typeof PullRequestSnapshotSchema.Type;
 
@@ -148,12 +149,6 @@ export const PullRequestListItemSchema = Schema.Struct({
 });
 export type PullRequestListItem = typeof PullRequestListItemSchema.Type;
 
-export const PullRequestDetailSchema = Schema.Struct({
-  snapshot: PullRequestSnapshotSchema,
-  body: Schema.String,
-});
-export type PullRequestDetail = typeof PullRequestDetailSchema.Type;
-
 export const PullRequestDiffSchema = Schema.Struct({
   patch: Schema.String,
   truncated: Schema.Boolean,
@@ -203,7 +198,12 @@ export const pullRequestContract = {
     .errors(currentErrors)
     .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   diff: oc
-    .input(Schema.Struct({ ref: SessionRefSchema }))
+    .input(
+      Schema.Union([
+        Schema.Struct({ ref: SessionRefSchema }),
+        Schema.Struct({ pullRequest: PullRequestRefSchema }),
+      ]),
+    )
     .errors(currentErrors)
     .output(PullRequestDiffSchema),
   statuses: oc
@@ -214,7 +214,7 @@ export const pullRequestContract = {
   detail: oc
     .input(Schema.Struct({ pullRequest: PullRequestRefSchema }))
     .errors(listErrors)
-    .output(Schema.Union([PullRequestDetailSchema, Schema.Null])),
+    .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   runAction: oc
     .input(PullRequestActionInputSchema)
     .errors(actionErrors)

@@ -25,6 +25,7 @@ const snapshot: PullRequestSnapshot = {
   autoMerge: null,
   offeredActions: [],
   updatedAt: "2026-08-30T00:00:00Z",
+  body: "",
 };
 
 const listItem: PullRequestListItem = {
