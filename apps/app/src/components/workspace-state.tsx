@@ -7,27 +7,30 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { GitCompareIcon, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function ReviewState({
-  title,
-  children,
-  onRetry,
-  icon: Icon = GitCompareIcon,
-  prominentIcon = false,
-}: {
+export type WorkspaceStateProps = {
   title: string;
   children: ReactNode;
   onRetry?: () => void;
-  icon?: LucideIcon;
-  prominentIcon?: boolean;
-}) {
+  icon: LucideIcon;
+  variant?: "default" | "prominent";
+};
+
+export function WorkspaceState({
+  title,
+  children,
+  onRetry,
+  icon: Icon,
+  variant = "default",
+}: WorkspaceStateProps): ReactNode {
+  const prominent = variant === "prominent";
   return (
     <Empty className="py-8 md:py-8">
       <EmptyHeader>
-        <EmptyMedia className={prominentIcon ? "size-12" : undefined} variant="icon">
-          <Icon className={prominentIcon ? "size-6" : undefined} />
+        <EmptyMedia className={prominent ? "size-12" : undefined} variant="icon">
+          <Icon className={prominent ? "size-6" : undefined} />
         </EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{children}</EmptyDescription>
