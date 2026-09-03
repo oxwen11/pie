@@ -177,7 +177,7 @@ export type PiAgentSessionServiceShape = {
 export class PiAgentSessionService extends Context.Service<
   PiAgentSessionService,
   PiAgentSessionServiceShape
->()("PiAgentSessionService") {}
+>()("pie/PiAgentSessionService") {}
 
 const toUserInput = (
   parts: PromptInput["parts"],

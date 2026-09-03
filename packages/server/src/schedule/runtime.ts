@@ -11,7 +11,7 @@ export type ScheduleRuntimeShape = {
 };
 
 export class ScheduleRuntime extends Context.Service<ScheduleRuntime, ScheduleRuntimeShape>()(
-  "ScheduleRuntime",
+  "pie/ScheduleRuntime",
 ) {}
 
 export const ScheduleRuntimeLayer: Layer.Layer<ScheduleRuntime> = Layer.effect(
