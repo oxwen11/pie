@@ -18,7 +18,7 @@ import { fire } from "./fire";
 import { iso, nextWakeDelayMs } from "./next-run";
 import { ScheduleRepository } from "./repository";
 import { compareSchedules, tryNextRun, tryValidate } from "./run-record";
-import { logSchedule, newScheduleId, ScheduleRuntime } from "./runtime";
+import { logSchedule, newScheduleId, releaseInFlight } from "./runtime";
 import { trySession } from "./session";
 
 export const list = () =>
@@ -206,7 +206,6 @@ export const runNow = (id: string) =>
 export const recover = () =>
   Effect.gen(function* () {
     const repo = yield* ScheduleRepository;
-    const runtime = yield* ScheduleRuntime;
     const tickedAt = yield* Clock.currentTimeMillis;
     const finishedAt = new Date(tickedAt).toISOString();
     const schedules = yield* repo.list();
@@ -228,8 +227,7 @@ export const recover = () =>
               : run,
           ),
         };
-        runtime.inFlight.delete(schedule.id);
-        return repo.write(next);
+        return releaseInFlight(schedule.id).pipe(Effect.andThen(repo.write(next)));
       },
       { concurrency: 1, discard: true },
     );
