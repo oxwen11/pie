@@ -76,6 +76,9 @@ export type ScheduleFormValues = {
   readonly reuseSession: boolean;
   readonly sessionPick: ScheduleSessionPick;
   readonly sessionId: string;
+  /** Empty strings mean "use the project's default model". */
+  readonly modelProvider: string;
+  readonly modelId: string;
 };
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -103,6 +106,8 @@ export function defaultScheduleForm(projectId: string): ScheduleFormValues {
     reuseSession: false,
     sessionPick: "create",
     sessionId: "",
+    modelProvider: "",
+    modelId: "",
   };
 }
 

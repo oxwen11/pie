@@ -22,6 +22,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { ModelSelect } from "@/components/model-select";
+
 import {
   CREATE_ON_FIRST_RUN_VALUE,
   type ScheduleFormValues,
@@ -47,6 +49,8 @@ export type ScheduleFormSubmit = {
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
+  /** null means "use the project's default model". */
+  readonly model: { readonly provider: string; readonly modelId: string } | null;
 };
 
 export type ScheduleFormDefaults = {
@@ -93,6 +97,8 @@ function formFromSchedule(
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
+    modelProvider: initial.provider ?? "",
+    modelId: initial.modelId ?? "",
     ...formFromSpec(initial.spec, base),
   };
 }
@@ -116,6 +122,28 @@ export function ScheduleForm({
     }),
     enabled: form.reuseSession && form.projectId.length > 0,
   });
+  const models = useQuery({
+    ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
+    enabled: form.projectId.length > 0,
+  });
+  const listedModels = models.data?.models ?? [];
+  // Keep a stored pair selectable even if the model is no longer listed, mirroring
+  // the "Selected session" fallback below.
+  const modelOptions =
+    form.modelProvider !== "" &&
+    form.modelId !== "" &&
+    !listedModels.some(
+      (model) => model.provider === form.modelProvider && model.modelId === form.modelId,
+    )
+      ? [
+          ...listedModels,
+          {
+            provider: form.modelProvider,
+            modelId: form.modelId,
+            name: `${form.modelProvider}/${form.modelId}`,
+          },
+        ]
+      : listedModels;
   const listed = sessions.data ?? [];
   const listedIds = sessions.isSuccess
     ? new Set(listed.map((session) => session.sessionId))
@@ -174,6 +202,10 @@ export function ScheduleForm({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
+            model:
+              form.modelProvider !== "" && form.modelId !== ""
+                ? { provider: form.modelProvider, modelId: form.modelId }
+                : null,
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -202,6 +234,8 @@ export function ScheduleForm({
                 projectId: next,
                 sessionPick: "create",
                 sessionId: "",
+                modelProvider: "",
+                modelId: "",
               }));
             }
           }}
@@ -218,6 +252,25 @@ export function ScheduleForm({
             ))}
           </SelectContent>
         </Select>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="schedule-model">Model</FieldLabel>
+        {models.isLoading ? null : (
+          <ModelSelect
+            clearLabel="Project default"
+            id="schedule-model"
+            modelId={form.modelId === "" ? undefined : form.modelId}
+            models={modelOptions}
+            onChange={(provider, modelId) =>
+              setForm((current) => ({ ...current, modelProvider: provider, modelId }))
+            }
+            providerId={form.modelProvider === "" ? undefined : form.modelProvider}
+          />
+        )}
+        <FieldDescription>
+          Used when the schedule starts a session. The project default applies when nothing is
+          picked.
+        </FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>

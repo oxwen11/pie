@@ -1,8 +1,7 @@
 import type { SessionRef } from "@getpie/contract";
 
+import { ModelSelect } from "@/components/model-select";
 import { useSessionModels } from "@/features/chat/hooks/use-session-models";
-
-import { ModelSelect } from "./model-select";
 
 export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
   const { models, providerId, modelId, isLoading, setModel, isSettingModel } =
