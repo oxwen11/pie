@@ -1,4 +1,4 @@
-import type { SessionRef } from "@getpie/contract";
+import type { SessionPendingPrompt, SessionRef } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import type { AgentResponse } from "./agent-requests";
@@ -21,8 +21,9 @@ class FakeTransport implements ChatSessionTransport {
       this.disposed += 1;
     };
   }
-  prompt = async () => ({ turnId: "turn-receipt" });
+  prompt = async () => ({ turnId: "turn-receipt", started: true });
   interrupt = async () => {};
+  replaceQueue = async (_pending: SessionPendingPrompt) => {};
   getMessages = async () => null;
   respondToAgentRequest = async (_requestId: string, _response: AgentResponse) => {};
 }

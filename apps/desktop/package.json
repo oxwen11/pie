@@ -24,6 +24,7 @@
     "@effect/platform-node": "catalog:effect",
     "@electron-toolkit/utils": "^4.0.0",
     "@getpie/app": "workspace:*",
+    "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
@@ -54,7 +55,6 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "tailwindcss": "catalog:tailwind",
-    "zod": "catalog:",
     "zustand": "catalog:"
   }
 }

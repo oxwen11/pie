@@ -1,5 +1,6 @@
 import type {
   PromptPart,
+  SessionPendingPrompt,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -34,8 +35,8 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
       return "ready";
     case "crashed":
       return "error";
-    // requires_action keeps "streaming": the turn is still open, the composer
-    // stays blocked either way.
+    // requires_action keeps "streaming": the turn is still open. Send still
+    // queues a follow-up; Stop remains available.
     default:
       return "streaming";
   }
@@ -108,6 +109,10 @@ export class Chat {
   // server says in the meantime — snapshot phase, settled transcript — has
   // seen it, and neither may erase the optimistic bubble it put on screen.
   #promptsInFlight = 0;
+  // replaceQueue writes the chosen list first; Pi then emits an empty
+  // queue_update from clear_queue before the remaining lines are rewritten.
+  // Ignore those intermediates so the row the user just edited does not flash.
+  #queueWritesInFlight = 0;
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -211,12 +216,21 @@ export class Chat {
       case "session.request.rejected":
         this.#state.removePendingRequest(event.requestId);
         break;
+      case "session.queue.updated":
+        if (this.#queueWritesInFlight === 0) {
+          this.#state.setPendingPrompt({
+            steering: event.steering,
+            followUp: event.followUp,
+          });
+        }
+        break;
       case "session.crashed":
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
         // The server projection drops its pending requests on crash; a card
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
+        this.#state.clearPendingPrompt();
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -251,6 +265,7 @@ export class Chat {
     // so stop rendering a spinner that would never resolve.
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
+    this.#state.clearPendingPrompt();
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -333,6 +348,7 @@ export class Chat {
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
+    this.#state.setPendingPrompt(snapshot.pendingPrompt);
 
     const activeTurn = snapshot.activeTurn;
 
@@ -577,13 +593,33 @@ export class Chat {
   // Public surface
   // ---------------------------------------------------------------------
 
-  // Fire-and-forget: push the optimistic user message, submit the RPC, and
-  // let the subscription carry the reply back like any other client's turn.
-  prompt = async (text: string): Promise<void> => {
+  // Fire-and-forget: idle prompts push an optimistic user message; a turn
+  // already in flight is a Pi queue write (no transcript bubble — only
+  // `session.queue.updated` updates `pendingPrompt`). Default delivery is
+  // follow-up; the composer passes `steer` when the user clicks Steer.
+  prompt = async (text: string, delivery?: "steer" | "followUp"): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
     this.#state.retryNotice = undefined;
     this.#state.error = undefined;
+
+    const busy = this.#state.status === "submitted" || this.#state.status === "streaming";
+    if (busy) {
+      try {
+        await this.#transport.prompt({
+          messageId,
+          parts,
+          delivery: delivery ?? "followUp",
+        });
+      } catch (promptError) {
+        this.#state.error =
+          promptError instanceof Error ? promptError : new Error(String(promptError));
+        this.#setStatus("error");
+        throw promptError;
+      }
+      return;
+    }
+
     this.#state.pushMessage(toUserMessage(messageId, parts));
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
@@ -609,6 +645,23 @@ export class Chat {
       console.error("Failed to interrupt session", interruptError);
       this.#state.error =
         interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+    }
+  };
+
+  // The user already chose the next list (edit / delete a row). Write it
+  // locally first; roll back on RPC failure. Do not flip status to error —
+  // a failed queue rewrite is not a model error.
+  replaceQueue = async (pending: SessionPendingPrompt): Promise<void> => {
+    const previous = this.#state.pendingPrompt;
+    this.#state.setPendingPrompt(pending);
+    this.#queueWritesInFlight += 1;
+    try {
+      await this.#transport.replaceQueue(pending);
+    } catch (replaceError) {
+      this.#state.setPendingPrompt(previous);
+      throw replaceError;
+    } finally {
+      this.#queueWritesInFlight -= 1;
     }
   };
 

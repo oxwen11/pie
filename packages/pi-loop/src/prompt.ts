@@ -51,7 +51,7 @@ export function assertPromptSize(prompt: string): void {
 }
 
 export function previewPrompt(prompt: string, max = 80): string {
-  return prompt.replace(/\s+/g, " ").trim().slice(0, max);
+  return prompt.replaceAll(/\s+/g, " ").trim().slice(0, max);
 }
 
 function readLoopMd(filePath: string): string | null {

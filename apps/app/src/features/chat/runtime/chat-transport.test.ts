@@ -16,6 +16,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
+  pendingPrompt: { steering: [], followUp: [] },
   cursor: 0,
 };
 
@@ -56,7 +57,9 @@ const hangingIterableOf = (
         index += 1;
         if (item) return Promise.resolve({ done: false as const, value: item });
         onDrained();
-        return new Promise<never>(() => undefined);
+        return new Promise<never>(() => {
+          /* never settles */
+        });
       },
     };
   },
@@ -76,12 +79,16 @@ const baseSession = {
   getSnapshot: async () => snapshot,
   prompt: unexpectedCall,
   interrupt: unexpectedCall,
+  replaceQueue: unexpectedCall,
   getMessages: unexpectedCall,
   respondToAgentRequest: unexpectedCall,
   subscribe: unexpectedCall,
 };
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 
 describe("OrpcChatSessionTransport subscription", () => {
   it("emits attached (subscription first, then snapshot) and forwards session-scoped events", async () => {
@@ -123,7 +130,9 @@ describe("OrpcChatSessionTransport subscription", () => {
     const transport = new OrpcChatSessionTransport(client, ref);
     const unsubscribe = transport.subscribe((event) => received.push(event));
     await streamDone;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(snapshotSawSubscription).toBe(true);
     expect(received.map((event) => event.type)).toEqual([
       "attached",
@@ -262,7 +271,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
       },
     } satisfies ChatTransportClient;
     const transport = new OrpcChatSessionTransport(client, ref);
-    expect(await transport.getMessages()).toBeNull();
+    await expect(transport.getMessages()).resolves.toBeNull();
   });
 
   it("treats NOT_FOUND on respond as resolution (another client answered first)", async () => {
@@ -297,6 +306,23 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
     expect(calls).toEqual([{ ref }]);
   });
 
+  it("replaces the bound session queue", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        replaceQueue: async (input: unknown) => {
+          calls.push(input);
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+
+    await transport.replaceQueue({ steering: ["steer"], followUp: ["later"] });
+
+    expect(calls).toEqual([{ ref, steering: ["steer"], followUp: ["later"] }]);
+  });
+
   it("submits prompts fire-and-forget with the optimistic message id", async () => {
     const calls: unknown[] = [];
     const client = {
@@ -304,7 +330,7 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
         ...baseSession,
         prompt: async (input: unknown) => {
           calls.push(input);
-          return { turnId: "turn-9" };
+          return { turnId: "turn-9", started: true };
         },
       },
     } satisfies ChatTransportClient;
@@ -314,6 +340,34 @@ describe("OrpcChatSessionTransport RPC mapping", () => {
       parts: [{ type: "text", text: "hi" }],
     });
     expect(receipt.turnId).toBe("turn-9");
+    expect(receipt.started).toBe(true);
     expect(calls).toEqual([{ ref, parts: [{ type: "text", text: "hi" }], messageId: "message-1" }]);
+  });
+
+  it("forwards followUp delivery on the prompt RPC", async () => {
+    const calls: unknown[] = [];
+    const client = {
+      session: {
+        ...baseSession,
+        prompt: async (input: unknown) => {
+          calls.push(input);
+          return { turnId: "turn-9", started: false };
+        },
+      },
+    } satisfies ChatTransportClient;
+    const transport = new OrpcChatSessionTransport(client, ref);
+    await transport.prompt({
+      messageId: "message-2",
+      parts: [{ type: "text", text: "later" }],
+      delivery: "followUp",
+    });
+    expect(calls).toEqual([
+      {
+        ref,
+        parts: [{ type: "text", text: "later" }],
+        messageId: "message-2",
+        delivery: "followUp",
+      },
+    ]);
   });
 });

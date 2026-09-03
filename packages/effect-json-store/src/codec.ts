@@ -17,7 +17,7 @@ import {
  * Any schema whose decode/encode needs no services. Documents and collections
  * require this so their methods never leak a requirements channel.
  */
-export type AnySchema = Schema.Codec<unknown, unknown, never, never>;
+export type AnySchema = Schema.Codec<unknown, unknown>;
 
 /**
  * One superseded version: its schema, plus the migration out of it. `migrate`
@@ -49,7 +49,7 @@ export interface FileCodec {
    * is unambiguous). A file at an older version is migrated in memory and
    * written back atomically before returning.
    */
-  readonly load: (file: string) => Effect.Effect<unknown | undefined, JsonStoreLoadError>;
+  readonly load: (file: string) => Effect.Effect<unknown, JsonStoreLoadError>;
   /** Encode with the current schema (doubles as validation) and write atomically. */
   readonly save: (
     file: string,

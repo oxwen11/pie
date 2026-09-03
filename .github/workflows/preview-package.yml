@@ -1,0 +1,97 @@
+name: Preview package
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["!**"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  CI: "true"
+
+concurrency:
+  group: preview-package-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish @getpie/cli preview
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
+    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
+    steps:
+      # A push to a branch with an open PR targeting main is already published
+      # by the pull_request run of this workflow (same SHA, plus the PR comment),
+      # so gate the push run to skip the duplicate publish. API failure fails
+      # open: publish anyway rather than lose the preview.
+      - name: Skip duplicate publish when a PR run covers this SHA
+        id: pr-gate
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prs="$(curl -fsS \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            || echo '[]')"
+          count="$(printf '%s' "$prs" | python3 -c '
+          import json, sys
+          pulls = json.load(sys.stdin)
+          print(sum(1 for p in pulls if p.get("state") == "open" and p.get("base", {}).get("ref") == "main"))
+          ')"
+          if [ "$count" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Open PR to main covers this SHA; the pull_request run publishes it."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pr-gate.outputs.skip != 'true'
+        with:
+          persist-credentials: false
+
+      - name: Prepare persistent CI caches
+        if: steps.pr-gate.outputs.skip != 'true'
+        run: |
+          cache_root="${RUNNER_WORKSPACE}/../.pie-ci-cache"
+          mkdir -p "${cache_root}/pnpm-store" "${cache_root}/turbo"
+          {
+            echo "PNPM_STORE_DIR=${cache_root}/pnpm-store"
+            echo "TURBO_CACHE_DIR=${cache_root}/turbo"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup project toolchain
+        if: steps.pr-gate.outputs.skip != 'true'
+        run: |
+          {
+            echo "/usr/local/bin"
+            echo "${HOME}/.local/share/mise/shims"
+          } >> "$GITHUB_PATH"
+          export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
+          mise install --locked
+        shell: bash
+
+      - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
+        if: steps.pr-gate.outputs.skip != 'true'
+
+      - run: pnpm turbo run build --filter=@getpie/cli
+        if: steps.pr-gate.outputs.skip != 'true'
+
+      # Preview tarball for this commit/branch. Not npm. Needs the pkg-pr-new
+      # GitHub App on oxwen11/pie: https://github.com/apps/pkg-pr-new
+      # Compact URLs need the package to already exist on npm, so stay long-form.
+      - name: Publish preview to pkg.pr.new
+        if: steps.pr-gate.outputs.skip != 'true'
+        run: >
+          pnpm dlx pkg-pr-new publish
+          --pnpm --bin --previewVersion --no-template --no-compact
+          ./packages/pie

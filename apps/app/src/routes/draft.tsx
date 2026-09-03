@@ -18,7 +18,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
@@ -46,8 +46,11 @@ type DraftSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const optional = <K extends string, V extends string>(key: K, value: V | undefined) =>
-  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
+const optional = <K extends keyof DraftSearch>(
+  key: K,
+  value: DraftSearch[K],
+): Pick<DraftSearch, K> | undefined =>
+  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
@@ -75,29 +78,20 @@ function DraftRoute() {
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
-
-  useEffect(() => {
-    if (!defaultModel || search.provider || search.modelId) return;
-    void navigate({
-      to: "/draft",
-      search: (prev) => ({
-        ...prev,
-        provider: defaultModel.provider,
-        modelId: defaultModel.modelId,
-      }),
-      replace: true,
-    });
-  }, [defaultModel, navigate, search.modelId, search.provider]);
+  const draftModel =
+    search.provider !== undefined && search.modelId !== undefined
+      ? { provider: search.provider, modelId: search.modelId }
+      : defaultModel;
 
   const startSession = useMutation({
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       if (!selected) throw new Error("No project selected");
       const created = await orpcQueryUtils.agent.session.create.call({
         projectId: selected.id,
-        ...(search.provider && search.modelId
-          ? { provider: search.provider, modelId: search.modelId }
-          : {}),
-        ...(worktree !== undefined ? { worktree } : {}),
+        ...(draftModel !== undefined
+          ? { provider: draftModel.provider, modelId: draftModel.modelId }
+          : undefined),
+        ...(worktree !== undefined ? { worktree } : undefined),
       });
       return { created, text };
     },
@@ -128,10 +122,12 @@ function DraftRoute() {
           console.error("Failed to start session prompt", error);
         });
 
-      void navigate({
+      navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
         search: { projectId: created.ref.projectId },
+      }).catch((error: unknown) => {
+        console.error("Failed to open the new session", error);
       });
     },
     onError: (error) => {
@@ -151,6 +147,10 @@ function DraftRoute() {
         toast.error("Pick a project before sending.");
         return false;
       }
+      if (draftWorktree.gitState === "workspace-unavailable") {
+        toast.error("The selected project folder is unavailable.");
+        return false;
+      }
       if (startSession.isPending) return false;
       if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
         toast.error("Pick a base branch for the worktree.");
@@ -158,7 +158,9 @@ function DraftRoute() {
       }
       startSession.mutate({
         text,
-        ...(draftWorktree.worktree !== undefined ? { worktree: draftWorktree.worktree } : {}),
+        ...(draftWorktree.worktree !== undefined
+          ? { worktree: draftWorktree.worktree }
+          : undefined),
       });
       return false;
     },
@@ -204,9 +206,15 @@ function DraftRoute() {
         {importOpen && (
           <ImportProjectDialog
             onClose={() => setImportOpen(false)}
-            onImported={(project) =>
-              navigate({ to: "/draft", search: { projectId: project.id }, replace: true })
-            }
+            onImported={(project) => {
+              navigate({
+                to: "/draft",
+                search: { projectId: project.id },
+                replace: true,
+              }).catch((error: unknown) => {
+                console.error("Failed to open the imported project", error);
+              });
+            }}
           />
         )}
       </Empty>
@@ -224,11 +232,19 @@ function DraftRoute() {
                   to: "/draft",
                   search: { projectId: next },
                   replace: true,
+                }).catch((error: unknown) => {
+                  console.error("Failed to select draft project", error);
                 });
               }}
               projects={projects.data}
               value={selected?.id ?? null}
             />
+            {draftWorktree.gitState === "not-repository" ? (
+              <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
+            ) : null}
+            {draftWorktree.gitState === "workspace-unavailable" ? (
+              <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
+            ) : null}
             {draftWorktree.gitAvailable ? (
               <>
                 <DraftWorkspaceSelect
@@ -238,18 +254,31 @@ function DraftRoute() {
                 />
                 {draftWorktree.mode === "worktree" ? (
                   <DraftWorktreeBaseSelect
-                    branch={draftWorktree.gitBranch.data}
-                    disabled={
-                      startSession.isPending ||
-                      selected === null ||
-                      draftWorktree.gitBranch.isPending
-                    }
+                    branch={draftWorktree.repositoryBranch}
+                    disabled={startSession.isPending || selected === null}
                     onValueChange={draftWorktree.setWorktreeBaseOverride}
                     value={draftWorktree.worktreeBase}
                   />
                 ) : null}
               </>
             ) : null}
+            <Button
+              className="ms-auto"
+              disabled={selected === null}
+              onClick={() => {
+                if (selected === null) return;
+                navigate({
+                  to: "/schedules",
+                  search: { create: true, projectId: selected.id },
+                }).catch((error: unknown) => {
+                  console.error("Failed to open the schedule editor", error);
+                });
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              Schedule…
+            </Button>
           </div>
         </CardFrameHeader>
         <Card
@@ -268,21 +297,24 @@ function DraftRoute() {
               <PromptInputTools>
                 <DraftModelSelect
                   projectId={selected?.id}
-                  providerId={search.provider}
-                  modelId={search.modelId}
-                  onChange={(provider, modelId) =>
+                  providerId={draftModel?.provider}
+                  modelId={draftModel?.modelId}
+                  onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
                       search: (prev) => ({ ...prev, provider, modelId }),
                       replace: true,
-                    })
-                  }
+                    }).catch((error: unknown) => {
+                      console.error("Failed to set the draft model", error);
+                    });
+                  }}
                 />
               </PromptInputTools>
               <PromptInputSubmit
                 disabled={
                   !hasContent ||
                   !selected ||
+                  draftWorktree.gitState === "workspace-unavailable" ||
                   startSession.isPending ||
                   (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }

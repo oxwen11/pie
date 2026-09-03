@@ -1,5 +1,6 @@
 export {
   type DaemonLocation,
+  developmentDaemonEnvironment,
   resolveDaemonDirectory,
   resolveDaemonLocation,
   resolvePieHome,

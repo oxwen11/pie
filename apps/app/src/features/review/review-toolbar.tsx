@@ -1,4 +1,4 @@
-import type { GitBranch, GitReviewMode } from "@getpie/contract/git";
+import type { GitRepositoryBranch, GitReviewMode } from "@getpie/contract/git";
 import { Button } from "@getpie/ui/components/button";
 import {
   Select,
@@ -53,7 +53,7 @@ export function ReviewToolbar({
 }: {
   mode: GitReviewMode;
   other: string | undefined;
-  branch: GitBranch | undefined;
+  branch: GitRepositoryBranch | undefined;
   heading: string;
   refreshing: boolean;
   onModeChange: (mode: GitReviewMode) => void;

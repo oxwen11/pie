@@ -98,7 +98,9 @@ async function eventually(assertion: () => void | Promise<void>): Promise<void> 
       return;
     } catch (error) {
       lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
     }
   }
   throw lastError;
@@ -190,6 +192,7 @@ describe("Desktop MessagePort RPC", () => {
       ...application,
       // Simulates a handler failing with an expected oRPC error; the
       // application type does not model it, hence the cast.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- handler error type is not on the application contract
       quit: Effect.fail(new ORPCError("NOT_FOUND")) as unknown as Effect.Effect<void>,
     }));
     try {

@@ -54,6 +54,12 @@ export interface OneShotTask extends LoopTaskBase {
   expiresAt: null;
 }
 
+type LoopCommandArgs = {
+  interval?: string;
+  prompt: string;
+  maintenance: boolean;
+};
+
 export interface DynamicTask extends LoopTaskBase {
   kind: "dynamic";
   expiresAt: number;
@@ -162,7 +168,7 @@ export class SessionLoopScheduler {
     this.drain();
   }
 
-  parseLoopArgs(args: string): { interval?: string; prompt: string; maintenance: boolean } {
+  parseLoopArgs(args: string): LoopCommandArgs {
     const trimmed = args.trim();
     if (!trimmed) return { prompt: this.maintenancePrompt(), maintenance: true };
     const leading = parseLeadingInterval(trimmed);
@@ -297,7 +303,7 @@ export class SessionLoopScheduler {
     this.assertActive();
     const flight = this.inFlight;
     const task = flight ? this.tasks.get(flight.taskId) : undefined;
-    if (!flight || !task || task.kind !== "dynamic") {
+    if (!flight || task?.kind !== "dynamic") {
       throw new LoopError(
         "NO_ACTIVE_DYNAMIC_LOOP",
         "schedule_wakeup is only valid during a scheduled dynamic iteration",

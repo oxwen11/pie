@@ -16,6 +16,8 @@ export class Paths extends Context.Service<
     readonly projectsFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
+    /** `storage/schedules/` — one `<scheduleId>.json` per application-level Schedule. */
+    readonly schedulesDir: string;
     /** `worktrees/` — git worktree checkouts, grouped per repository. */
     readonly worktreesDir: string;
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
@@ -34,6 +36,7 @@ const resolve = (home: string) => ({
   home,
   projectsFile: path.join(home, "storage", "projects.json"),
   sessionsDir: path.join(home, "storage", "sessions"),
+  schedulesDir: path.join(home, "storage", "schedules"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
 });
@@ -93,6 +96,21 @@ export type DaemonLocation = {
 export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): DaemonLocation {
   const home = resolvePieHome(env);
   return { home, daemonDir: explicitPath(env.PIE_DAEMON_DIR) ?? path.join(home, "daemon") };
+}
+
+/**
+ * Preserve an explicit daemon directory; otherwise scope only development
+ * lifecycle state under the canonical development home. Desktop computes the
+ * checkout identity, while this module remains the sole owner of home/daemon
+ * path policy.
+ */
+export function developmentDaemonEnvironment(
+  env: NodeJS.ProcessEnv,
+  scope: string | undefined,
+): NodeJS.ProcessEnv {
+  if (explicitPath(env.PIE_DAEMON_DIR) !== undefined || scope === undefined) return env;
+  const home = resolvePieHome({ ...env, NODE_ENV: "development" });
+  return { ...env, PIE_DAEMON_DIR: path.join(home, "daemons", scope) };
 }
 
 /** `resolveDaemonLocation().daemonDir`, for callers that need only the directory. */

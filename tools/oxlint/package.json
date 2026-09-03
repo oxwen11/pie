@@ -3,13 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./pie": "./dist/pie.mjs",
+    "./pie-boundaries": "./dist/pie-boundaries.mjs",
+    "./pie-query": "./dist/pie-query.mjs",
+    "./anti-slop": "./dist/anti-slop.mjs",
+    "./anti-slop-effect": "./dist/anti-slop-effect.mjs"
+  },
   "scripts": {
+    "build": "tsdown",
+    "lint": "oxlint --fix \"$(cd ../.. && pwd)\"",
+    "lint:check": "oxlint --deny-warnings \"$(cd ../.. && pwd)\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "git clean -xdf node_modules .turbo"
+    "typecheck": "tsc --noEmit",
+    "clean": "git clean -xdf node_modules dist .turbo"
   },
   "devDependencies": {
-    "oxlint": "^1.78.0",
+    "@getpie/typescript": "workspace:*",
+    "@oxlint/plugins": "1.80.0",
+    "@types/node": "catalog:",
+    "oxlint": "^1.80.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

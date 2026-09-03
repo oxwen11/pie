@@ -6,12 +6,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./domain": "./src/domain.ts",
     "./fs": "./src/fs.ts",
     "./git": "./src/git.ts",
     "./project": "./src/project.ts",
+    "./pull-request": "./src/pull-request.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
-    "./session-events": "./src/session-events.ts"
+    "./session-events": "./src/session-events.ts",
+    "./schedule": "./src/schedule.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -21,6 +24,7 @@
   },
   "dependencies": {
     "@orpc/contract": "catalog:orpc",
+    "@orpc/experimental-effect": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
     "zod": "catalog:"

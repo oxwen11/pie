@@ -1,6 +1,4 @@
-import "@orpc/experimental-effect/extensions/effect";
 import { sessionContract } from "@getpie/contract/session";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import {
@@ -19,6 +17,7 @@ import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { openScopedSubscription } from "./session-stream";
 import { streamToAsyncGenerator } from "./stream";
 
@@ -71,8 +70,8 @@ export const sessionRouter = orpc.router({
         sessions.create({
           projectId: input.projectId,
           cwd: project.path,
-          ...(model !== undefined ? { model } : {}),
-          ...(input.worktree !== undefined ? { worktree: input.worktree } : {}),
+          ...(model !== undefined ? { model } : undefined),
+          ...(input.worktree !== undefined ? { worktree: input.worktree } : undefined),
         }),
       ),
       Effect.catchTags({
@@ -159,7 +158,6 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
         AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -186,6 +184,12 @@ export const sessionRouter = orpc.router({
         // Metadata gone → NOT_FOUND; native session not open → SESSION_NOT_ACTIVE.
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        StoreReadError: (e) =>
+          Effect.fail(errors.INTERNAL({ message: `session store read failed: ${e.file}` })),
+        StoreWriteError: (e) =>
+          Effect.fail(errors.INTERNAL({ message: `session store write failed: ${e.file}` })),
         HarnessSessionNotFound: (e) =>
           Effect.fail(
             errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
@@ -209,6 +213,18 @@ export const sessionRouter = orpc.router({
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     yield* sessions.interrupt(input.ref).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
+  replaceQueue: orpc.replaceQueue.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    yield* sessions.replaceQueue(input).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
@@ -250,7 +266,6 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
         AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
         HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
@@ -275,7 +290,6 @@ export const sessionRouter = orpc.router({
             Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
           AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
           ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-          CapabilityUnsupported: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
           HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
           SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
           AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),

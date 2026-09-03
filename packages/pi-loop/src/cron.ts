@@ -40,7 +40,11 @@ export interface LeadingInterval {
   prompt: string;
 }
 
-const ZH_UNIT_TO_COMPACT: Record<string, "s" | "m" | "h" | "d"> = {
+interface ZhUnitToCompact {
+  readonly [unit: string]: "s" | "m" | "h" | "d";
+}
+
+const ZH_UNIT_TO_COMPACT: ZhUnitToCompact = {
   秒: "s",
   分: "m",
   分钟: "m",

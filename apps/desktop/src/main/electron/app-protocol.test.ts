@@ -44,7 +44,7 @@ describe("createAppRequestHandler", () => {
 
     const response = await createAppRequestHandler(root, fetch)(new Request("pie://app/asset.js"));
 
-    expect(await response.text()).toBe("asset");
+    await expect(response.text()).resolves.toBe("asset");
     expect(fetch).toHaveBeenCalledWith(url.pathToFileURL(asset).toString());
   });
 
@@ -59,7 +59,7 @@ describe("createAppRequestHandler", () => {
       fetch,
     )(new Request("pie://app/chat/session"));
 
-    expect(await response.text()).toBe("app");
+    await expect(response.text()).resolves.toBe("app");
     expect(fetch).toHaveBeenCalledWith(url.pathToFileURL(entry).toString());
   });
 

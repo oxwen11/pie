@@ -1,13 +1,12 @@
-import "@orpc/experimental-effect/extensions/effect";
 import os from "node:os";
 
 import { agentContract } from "@getpie/contract/agent";
-import { implement } from "@orpc/server";
 import { Effect } from "effect";
 
 import { PiAgentService } from "../harness";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { implement } from "./orpc";
 import { sessionRouter } from "./session";
 
 const orpc = implement(agentContract).$context<RpcContext>();
@@ -15,10 +14,11 @@ const orpc = implement(agentContract).$context<RpcContext>();
 export const agentRouter = orpc.router({
   listModels: orpc.listModels.effect(function* ({ input, errors }) {
     const agent = yield* PiAgentService;
-    const cwd = input.projectId
+    const projectId = input.projectId;
+    const cwd = projectId
       ? yield* ProjectService.pipe(
           Effect.flatMap((projects) =>
-            projects.findById(input.projectId!).pipe(
+            projects.findById(projectId).pipe(
               Effect.map((project) => project.path),
               Effect.catchTags({
                 ProjectNotFound: (e) =>

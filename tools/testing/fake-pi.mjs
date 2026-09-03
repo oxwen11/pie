@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import readline from "node:readline";
 
-const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+const send = (frame) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 
 const logPath = process.env["PIE_E2E_PI_LOG"];
 const configuredResponse = process.env["PIE_E2E_PI_RESPONSE"] ?? "E2E fake Pi reply";
@@ -56,6 +56,30 @@ rl.on("line", (line) => {
       success: true,
       data: { sessionId },
     });
+    return;
+  }
+
+  if (msg.type === "clear_queue") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "clear_queue",
+      success: true,
+      data: { steering: [], followUp: [] },
+    });
+    send({ type: "queue_update", steering: [], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "steer") {
+    send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering: [msg.message], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "follow_up") {
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering: [], followUp: [msg.message] });
     return;
   }
 

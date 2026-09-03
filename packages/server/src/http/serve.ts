@@ -58,16 +58,18 @@ type ServeInput = {
   readonly allowedHost: ReadonlyArray<string>;
 };
 
+type ServeConfig = {
+  readonly port: number;
+  readonly corsOrigins: readonly string[];
+  readonly allowedHosts: readonly string[];
+};
+
 /**
  * Resolve the effective port and CORS origins from parsed flags, falling back
  * to `PIE_*` env and finally the defaults — precedence flag > env > default.
  * Pure so the precedence can be tested without booting a server.
  */
-export function resolveServeConfig(input: ServeInput): {
-  readonly port: number;
-  readonly corsOrigins: readonly string[];
-  readonly allowedHosts: readonly string[];
-} {
+export function resolveServeConfig(input: ServeInput): ServeConfig {
   return {
     port: Option.getOrElse(input.port, portFromEnv),
     corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),
@@ -128,6 +130,7 @@ const serveWith = (input: ServeInput) =>
         event: "server.starting",
         requestedPort,
         authenticated: authToken !== undefined,
+        compatibilityKey: process.env.PIE_DAEMON_COMPATIBILITY_KEY,
         corsOrigins,
         allowedHosts,
         pid: process.pid,
@@ -136,10 +139,20 @@ const serveWith = (input: ServeInput) =>
       }),
     );
 
-    const effectContext = Context.omit(Scope.Scope)(yield* Effect.context<never>());
+    const effectContext = Context.omit(Scope.Scope)(yield* Effect.context());
     const server = yield* Effect.acquireRelease(
       Effect.tryPromise({
-        try: () => createServer({ authToken, corsOrigins, allowedHosts, effectContext }),
+        try: () =>
+          createServer({
+            authToken,
+            corsOrigins,
+            allowedHosts,
+            effectContext,
+            shutdown:
+              authToken === undefined
+                ? undefined
+                : () => setImmediate(() => process.kill(process.pid, "SIGTERM")),
+          }),
         catch: (cause) => new ServerStartupError({ phase: "create", cause }),
       }),
       // A shutdown failure is logged, not thrown: the process is exiting, and

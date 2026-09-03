@@ -5,7 +5,7 @@ import {
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
 import { cn } from "@getpie/ui/lib/utils";
-import type { ToolUIPart, UIMessage } from "ai";
+import type { ToolUIPart } from "ai";
 import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -15,10 +15,7 @@ import { ToolPart } from "./tool-part";
 import type { BucketKey } from "./tool/bucket";
 import type { IndexedBatchPart } from "./use-tool-batches";
 
-const BUCKET_PHRASES: Record<
-  BucketKey,
-  { done: (count: number) => string; active: (count: number) => string }
-> = {
+const BUCKET_PHRASES = {
   files: {
     done: (n) => `Read ${n} ${plural(n, "file")}`,
     active: (n) => `Reading ${n} ${plural(n, "file")}`,
@@ -39,7 +36,10 @@ const BUCKET_PHRASES: Record<
     done: (n) => `Ran ${n} ${plural(n, "command")}`,
     active: (n) => `Running ${n} ${plural(n, "command")}`,
   },
-};
+} satisfies Record<
+  BucketKey,
+  { done: (count: number) => string; active: (count: number) => string }
+>;
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
   return count === 1 ? singular : pluralForm;
@@ -62,12 +62,10 @@ function buildTriggerPhrase(label: BatchTriggerLabel): string {
 // shouldShimmer is computed by the parent from `isTrailing && isStreaming` —
 // the batch stays agnostic of either signal alone.
 export function ToolBatch({
-  message,
   parts,
   shouldShimmer = false,
   className,
 }: {
-  message: UIMessage;
   parts: IndexedBatchPart[];
   shouldShimmer?: boolean;
   className?: string;
@@ -110,7 +108,7 @@ export function ToolBatch({
             );
           }
           const toolPart = part as ToolUIPart;
-          return <ToolPart key={toolPart.toolCallId} message={message} part={toolPart} />;
+          return <ToolPart key={toolPart.toolCallId} part={toolPart} />;
         })}
       </CollapsibleContent>
     </Collapsible>

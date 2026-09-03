@@ -120,7 +120,7 @@ export function QuestionRequestView({
       return {
         questionId: question.id,
         values: draft.selected.filter((v) => v !== ""),
-        ...(draft.other !== "" ? { other: draft.other } : {}),
+        ...(draft.other !== "" ? { other: draft.other } : undefined),
       };
     });
     onRespond(request.id, { type: "question", answers: builtAnswers });

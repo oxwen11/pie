@@ -55,13 +55,15 @@ export function emptyReviewMessage(review: {
   }
 }
 
+type SplitRefs = {
+  local: string[];
+  remote: string[];
+};
+
 export function splitCompareRefs(
   branches: ReadonlyArray<string>,
   remotes: ReadonlyArray<string>,
-): {
-  local: string[];
-  remote: string[];
-} {
+): SplitRefs {
   const remoteSet = new Set(remotes);
   const local: string[] = [];
   const remote: string[] = [];

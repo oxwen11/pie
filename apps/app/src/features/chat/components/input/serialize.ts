@@ -7,9 +7,11 @@ export type ChatNodeTextSerializer = (node: JSONContent) => string;
 export function getChatText(editor: Editor): string {
   const serializers: Record<string, ChatNodeTextSerializer> = {};
   for (const extension of editor.extensionManager.extensions) {
-    const storage = (
-      editor.storage as unknown as Record<string, { serializeText?: unknown } | undefined>
-    )[extension.name];
+    const storage =
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- TipTap Storage has no string index
+      (editor.storage as unknown as Record<string, { serializeText?: unknown } | undefined>)[
+        extension.name
+      ];
     if (typeof storage?.serializeText === "function") {
       serializers[extension.name] = storage.serializeText as ChatNodeTextSerializer;
     }
@@ -37,7 +39,7 @@ export function serializeDoc(
     }
     if (node.type === "text") {
       const linkHref = node.marks?.find((mark) => mark.type === "link")?.attrs?.href;
-      parts.push(linkHref ? String(linkHref) : (node.text ?? "").replace(/\u00A0/g, " "));
+      parts.push(linkHref ? String(linkHref) : (node.text ?? "").replaceAll("\u00A0", " "));
       return;
     }
     if (node.type === "hardBreak") {
@@ -45,16 +47,15 @@ export function serializeDoc(
       return;
     }
     if (node.type === "codeBlock") {
-      parts.push(
-        "```\n" + (node.content ?? []).map((child) => child.text ?? "").join("") + "\n```",
-      );
+      const body = (node.content ?? []).map((child) => child.text ?? "").join("");
+      parts.push(`\`\`\`\n${body}\n\`\`\``);
       return;
     }
-    node.content?.forEach(visit);
+    for (const child of node.content ?? []) visit(child);
     if (node.type === "paragraph") {
       parts.push("\n");
     }
   };
-  doc.content?.forEach(visit);
+  for (const child of doc.content ?? []) visit(child);
   return parts.join("");
 }

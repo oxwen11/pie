@@ -3,8 +3,9 @@ name: Code check
 on:
   push:
     branches: ["main"]
+  # No base-branch filter: stacked PRs target the layer below them, not main,
+  # and still need the same gate before they can be merged bottom-up.
   pull_request:
-    branches: ["main"]
 
 permissions:
   contents: read
@@ -77,22 +78,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
-      # All three declare `dependsOn: ["^build"]`, so Turborepo builds the
-      # upstream workspace packages on demand and caches the results.
-      # Lint/format only need node_modules and run in parallel with turbo.
+      # `build` / `test` / `typecheck` / `lint:check` all go through turbo.
+      # `lint:check` depends on `@getpie/oxlint#build` so
+      # `@getpie/oxlint/<plugin>` resolves to dist files. Format only
+      # needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail
 
-          pnpm turbo run build test typecheck &
+          pnpm turbo run build test typecheck lint:check &
           turbo_pid=$!
-
-          pnpm run lint:check &
-          lint_pid=$!
 
           pnpm run format:check &
           format_pid=$!
 
           wait "$turbo_pid"
-          wait "$lint_pid"
           wait "$format_pid"

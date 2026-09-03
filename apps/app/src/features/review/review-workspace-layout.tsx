@@ -3,7 +3,9 @@ import { Sheet, SheetHeader, SheetPopup, SheetTitle } from "@getpie/ui/component
 import { useIsMobile } from "@getpie/ui/hooks/use-media-query";
 import { FilesIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { Group, Separator } from "react-resizable-panels";
+
+import { ResizablePanel } from "@/components/layout/resizable-panel";
 
 const MIN_SPLIT_WIDTH = 24 * 16 + 6;
 
@@ -77,25 +79,21 @@ export function ReviewWorkspaceLayout({
           orientation="horizontal"
           resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
         >
-          <Panel
-            className="flex min-w-0 flex-col overflow-hidden"
-            defaultSize="60%"
-            minSize="12rem"
-          >
+          <ResizablePanel className="flex min-w-0 flex-col" defaultSize="60%" minSize="12rem">
             {preview}
-          </Panel>
+          </ResizablePanel>
           <Separator
             aria-label="Resize file tree"
             className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
           />
-          <Panel
-            className="flex min-w-0 flex-col overflow-hidden"
+          <ResizablePanel
+            className="flex min-w-0 flex-col"
             defaultSize="40%"
             maxSize="50%"
             minSize="12rem"
           >
             {files}
-          </Panel>
+          </ResizablePanel>
         </Group>
       )}
     </div>

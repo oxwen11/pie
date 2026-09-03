@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import type { UIMessage } from "ai";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,16 +6,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToolBatch } from "./tool-batch";
 import type { IndexedBatchPart } from "./use-tool-batches";
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- isolate batch chrome from part renderers
 vi.mock("./reasoning-part", () => ({ ReasoningPart: () => null }));
+// oxlint-disable-next-line anti-slop/no-module-mocking -- isolate batch chrome from part renderers
 vi.mock("./tool-part", () => ({ ToolPart: () => createElement("div", null, "tool") }));
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-const message: UIMessage = {
-  id: "message-1",
-  role: "assistant",
-  parts: [],
-};
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const runningParts = (count: number): IndexedBatchPart[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -53,7 +48,7 @@ function render(parts: IndexedBatchPart[], shouldShimmer: boolean): HTMLButtonEl
   }
 
   act(() => {
-    root?.render(createElement(ToolBatch, { message, parts, shouldShimmer }));
+    root?.render(createElement(ToolBatch, { parts, shouldShimmer }));
   });
 
   const trigger = host.querySelector<HTMLButtonElement>("[data-slot='collapsible-trigger']");

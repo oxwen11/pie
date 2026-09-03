@@ -167,8 +167,8 @@ const startProxy = (upstreamPort: number, port = 0): Promise<TcpProxy> =>
         // Destroys live connections and stops accepting new ones: severed
         // clients see a real TCP error, retries see connection refused.
         stop: () =>
-          new Promise((done) => {
-            listener.close(() => done());
+          new Promise((_resolve) => {
+            listener.close(() => _resolve());
             for (const socket of sockets) socket.destroy();
           }),
       });

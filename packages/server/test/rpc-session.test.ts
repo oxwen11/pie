@@ -20,9 +20,11 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
+import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
+import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -105,15 +107,23 @@ async function setup() {
     Layer.provide(NodeServices.layer),
   );
 
+  const scheduleServiceLayer = ScheduleServiceLayer.pipe(
+    Layer.provide(ScheduleRepositoryLayer),
+    Layer.provide(projectServiceLayer),
+    Layer.provide(harnessSessionLayer),
+    Layer.provide(pathsLayer),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    scheduleServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
+    PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     NodeServices.layer,
     Observability.discard,
   );
@@ -206,16 +216,16 @@ describe("agent.session router", () => {
       await client.agent.session.archive({ ref, archived: true });
       const archived = await client.agent.session.list({ projectId: project.id, archived: true });
       expect(archived[0]?.archived).toBe(true);
-      expect(await client.agent.session.list({ projectId: project.id, archived: false })).toEqual(
-        [],
-      );
+      await expect(
+        client.agent.session.list({ projectId: project.id, archived: false }),
+      ).resolves.toEqual([]);
 
       await client.agent.session.archive({ ref, archived: false });
       const restored = await client.agent.session.list({ projectId: project.id, archived: false });
       expect(restored[0]?.archived).toBe(false);
-      expect(await client.agent.session.list({ projectId: project.id, archived: true })).toEqual(
-        [],
-      );
+      await expect(
+        client.agent.session.list({ projectId: project.id, archived: true }),
+      ).resolves.toEqual([]);
 
       await client.agent.session.close({ ref });
       const idle = await client.agent.session.list({ projectId: project.id, archived: false });
@@ -287,6 +297,8 @@ describe("agent.session router", () => {
       expect(afterPrompt.workspace).toEqual(created.workspace);
 
       const branch = await client.git.branch({ ref: created.ref });
+      expect(branch.kind).toBe("repository");
+      if (branch.kind !== "repository") throw new Error("expected repository branch data");
       expect(branch.current).toBe(created.workspace.gitBranch);
       const tree = await client.fs.readTree({ ref: created.ref });
       expect(tree.cwd).toBe(created.workspace.cwd);

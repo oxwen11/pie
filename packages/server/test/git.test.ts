@@ -31,7 +31,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
   const addRemoteMain = (dir: string) =>
     Effect.promise(async () => {
       const git = simpleGit(dir);
-      const sha = (await git.revparse(["main"])).trim();
+      const main = await git.revparse(["main"]);
+      const sha = main.trim();
       await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
       await git.raw(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
     });
@@ -54,6 +55,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
       const dir = yield* repo;
       const git = yield* GitService;
       const branch = yield* git.branch(dir);
+      assert.equal(branch.kind, "repository");
+      if (branch.kind !== "repository") return;
       assert.equal(branch.current, "main");
       assert.equal(branch.defaultBranch, "main");
       assert.ok(branch.branches.includes("main"));
@@ -67,6 +70,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
       yield* addRemoteMain(dir);
       const git = yield* GitService;
       const branch = yield* git.branch(dir);
+      assert.equal(branch.kind, "repository");
+      if (branch.kind !== "repository") return;
       assert.equal(branch.current, "main");
       assert.equal(branch.defaultBranch, "origin/main");
       assert.ok(branch.branches.includes("main"));
@@ -162,7 +167,8 @@ layer(NodePlatformLayer)("GitService", (it) => {
         const git = simpleGit(dir);
         await git.add(["a.txt", "extra.txt"]);
         await git.commit("main moved forward");
-        const sha = (await git.revparse(["main"])).trim();
+        const main = await git.revparse(["main"]);
+        const sha = main.trim();
         await git.raw(["update-ref", "refs/remotes/origin/main", sha]);
         await git.checkout("feature");
       });
@@ -228,7 +234,20 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
-  it.effect("rejects a relative cwd and a non-repository", () =>
+  it.effect("models branch availability without turning it into a failure", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "vibest-not-git-" });
+      const git = yield* GitService;
+
+      assert.deepEqual(yield* git.branch(dir), { kind: "not-repository" });
+      assert.deepEqual(yield* git.branch(path.join(dir, "missing")), {
+        kind: "workspace-unavailable",
+      });
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
+  it.effect("rejects a relative cwd and a non-repository review", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "vibest-not-git-" });

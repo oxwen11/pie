@@ -37,6 +37,8 @@ export type CreateServerOptions = {
   allowedHosts?: readonly string[] | undefined;
   /** The process Effect context. Unset in tests uses Effect defaults. */
   effectContext?: Context.Context<never> | undefined;
+  /** Authenticated daemon-only shutdown callback. */
+  shutdown?: (() => void) | undefined;
 };
 
 /** Startup failed for an operational reason: building the server or binding. */
@@ -115,7 +117,7 @@ function wireServer(options: {
           Effect.annotateLogs({
             event: "ws.disconnected",
             code,
-            ...(reason.length > 0 ? { reason: reason.toString() } : {}),
+            ...(reason.length > 0 ? { reason: reason.toString() } : undefined),
             clients: wss.clients.size,
           }),
         ),
@@ -174,20 +176,18 @@ function wireServer(options: {
     ) {
       rejectUpgrade(socket, "403 Forbidden", "host_or_origin", {
         host: req.headers.host,
-        ...(origin !== undefined ? { origin } : {}),
+        ...(origin !== undefined ? { origin } : undefined),
       });
       return;
     }
 
-    if (authToken !== undefined) {
-      // A WS handshake carries no Authorization header, so the renderer proves
-      // itself with a single-use ticket minted over the authenticated HTTP link.
-      if (!tickets.consume(requestUrl.searchParams.get("ticket"))) {
-        rejectUpgrade(socket, "401 Unauthorized", "invalid_ticket", {
-          presented: requestUrl.searchParams.has("ticket"),
-        });
-        return;
-      }
+    // A WS handshake carries no Authorization header, so the renderer proves
+    // itself with a single-use ticket minted over the authenticated HTTP link.
+    if (authToken !== undefined && !tickets.consume(requestUrl.searchParams.get("ticket"))) {
+      rejectUpgrade(socket, "401 Unauthorized", "invalid_ticket", {
+        presented: requestUrl.searchParams.has("ticket"),
+      });
+      return;
     }
 
     wss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
@@ -208,7 +208,9 @@ const closeWiredServer = ({ server, wss }: WiredServer) =>
       : Promise.resolve();
 
     for (const client of wss.clients) client.terminate();
-    await new Promise<void>((resolve) => wss.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      wss.close(() => resolve());
+    });
     await serverClosed;
   });
 
@@ -229,6 +231,7 @@ const buildServer = (
       corsOrigins = [],
       allowedHosts = [],
       effectContext = Context.empty(),
+      shutdown,
     } = options;
     const runInContext = Effect.runForkWith(effectContext);
 
@@ -250,7 +253,7 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, ui }),
+        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, shutdown, ui }),
         requestScope,
       ),
     );

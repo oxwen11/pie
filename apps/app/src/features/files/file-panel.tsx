@@ -92,7 +92,8 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
 
   const workspaceName = projectName ?? "Workspace";
   const workspacePath = tree.data?.cwd ?? "";
-  const gitBranch = branch.data?.current ?? undefined;
+  const gitBranch =
+    branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const refreshing = file.isFetching || tree.isFetching;
   const refresh = (): void => {
     void Promise.all([file.refetch(), tree.refetch()]);

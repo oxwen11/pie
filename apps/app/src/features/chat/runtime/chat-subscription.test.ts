@@ -12,6 +12,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
+  pendingPrompt: { steering: [], followUp: [] },
   cursor: 0,
 };
 
@@ -26,7 +27,10 @@ const endingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
 // Never yields: the cycle stays parked in the pump until aborted.
 const hangingIterable = (): AsyncIterable<SubscribeStreamEvent> => ({
   [Symbol.asyncIterator]: () => ({
-    next: () => new Promise<never>(() => undefined),
+    next: () =>
+      new Promise<never>(() => {
+        /* never settles */
+      }),
   }),
 });
 
@@ -48,7 +52,10 @@ const iterableOf = (
   },
 });
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
 
 describe("RecoveringSubscription", () => {
   it("start() is idempotent — a second call opens no second stream", async () => {

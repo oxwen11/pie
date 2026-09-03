@@ -45,7 +45,10 @@ export function resolveAssetPath(rendererRoot: string, pathname: string): string
 export type FetchAsset = (url: string) => Promise<Response>;
 
 /** Serve renderer assets with SPA fallback. */
-export function createAppRequestHandler(rendererRoot: string, fetchAsset: FetchAsset = net.fetch) {
+export function createAppRequestHandler(
+  rendererRoot: string,
+  fetchAsset: FetchAsset = (assetUrl) => net.fetch(assetUrl),
+) {
   return async (request: Request): Promise<Response> => {
     const requestUrl = new URL(request.url);
     if (requestUrl.host !== HOST) return new Response("Not found", { status: 404 });

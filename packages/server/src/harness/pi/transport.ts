@@ -9,13 +9,12 @@ import {
   type RpcCommand,
   type RpcExtensionUIResponse,
 } from "./protocol";
+import type { PiExecutable } from "./resolve-executable";
 
 const DEFAULT_QUEUE_CAPACITY = 256;
 const DEFAULT_FORCE_KILL_AFTER = "2 seconds";
 
 export type PiTransportFailure = PiTransportError | PiRpcError | AgentProcessExited;
-
-import type { PiExecutable } from "./resolve-executable";
 
 export interface PiTransportOptions {
   readonly executable?: PiExecutable;
@@ -36,7 +35,6 @@ export interface PiTransport {
   /** Blocking extension-UI requests (confirm/select/input/editor). Single-consumer. */
   readonly uiRequests: Stream.Stream<PiUiRequest, PiTransportFailure>;
   readonly respondUi: (response: RpcExtensionUIResponse) => Effect.Effect<void, PiTransportError>;
-  readonly isTerminated: Effect.Effect<boolean>;
   readonly awaitTermination: Effect.Effect<never, PiTransportFailure>;
 }
 
@@ -87,7 +85,7 @@ export const makePiTransport = (
             ...(options.args ?? []),
           ],
           {
-            ...(options.cwd ? { cwd: options.cwd } : {}),
+            ...(options.cwd ? { cwd: options.cwd } : undefined),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),
@@ -246,7 +244,7 @@ export const makePiTransport = (
             terminate(
               new AgentProcessExited({
                 code,
-                ...(tail.length > 0 ? { stderrTail: tail } : {}),
+                ...(tail.length > 0 ? { stderrTail: tail } : undefined),
               }),
             ),
           ),
@@ -287,7 +285,6 @@ export const makePiTransport = (
       events: Stream.fromQueue(events),
       uiRequests: Stream.fromQueue(uiRequests),
       respondUi: (response) => offerOutgoing({ ...response }),
-      isTerminated: Ref.get(commandState).pipe(Effect.map((state) => state._tag === "Terminated")),
       awaitTermination: Deferred.await(termination),
     } satisfies PiTransport;
   });

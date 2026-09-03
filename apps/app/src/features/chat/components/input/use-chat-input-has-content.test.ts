@@ -9,7 +9,7 @@ import { createChatBaseExtensions } from "./extensions/chat-base-extensions";
 import { useChatInputHasContent } from "./use-chat-input-has-content";
 
 // What `act` checks for before it will flush React work.
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const makeController = (html?: string) => {
   const controller = new ChatInputController({

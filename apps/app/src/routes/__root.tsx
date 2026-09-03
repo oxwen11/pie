@@ -1,12 +1,5 @@
-import type { SessionRef } from "@getpie/contract";
 import type { QueryClient } from "@tanstack/react-query";
-import {
-  createRootRouteWithContext,
-  useMatch,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
-import { useCallback } from "react";
+import { createRootRouteWithContext, useMatch } from "@tanstack/react-router";
 
 import {
   AppShell,
@@ -25,9 +18,9 @@ import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
+import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
-import { sameSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
@@ -35,7 +28,14 @@ export interface RouterAppContext {
   queryClient: QueryClient;
 }
 
-contentPanel.registerAll([filesPanel, filePanel, reviewPanel, terminalPanel, browserPanel]);
+contentPanel.registerAll([
+  filesPanel,
+  filePanel,
+  reviewPanel,
+  pullRequestPanel,
+  terminalPanel,
+  browserPanel,
+]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
@@ -46,12 +46,10 @@ function RootLayout() {
   // Keeps every `session.list` cache converged from the server's events
   // (multi-tab / desktop), independent of which route is mounted.
   useSessionListSync();
-  const navigate = useNavigate();
 
-  // This is the shell's one route-identity seam: the content panel, active
-  // sidebar row, and card heading all derive from the same authoritative ref.
-  // The content panel is bound here rather than in the session route because it
-  // is a peer card whose maximized state controls the whole shell.
+  // This is the shell's one route-identity seam for the card: the content
+  // panel and heading derive from the same authoritative session-route ref.
+  // Sidebar modules read the route themselves and jump without callbacks.
   //
   // A named match, not `useParams({ strict: false })`: this component *is* the
   // root route's, so the nearest match is always the root — which has no params
@@ -69,32 +67,31 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
+  const schedulesRoute =
+    useMatch({
+      from: "/schedules",
+      shouldThrow: false,
+    }) ?? null;
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
-  // Mutations can settle after navigation. Read the router's current match at
-  // call time instead of capturing a render-time `active` boolean.
-  const router = useRouter();
-  const isSessionActive = useCallback(
-    (candidate: SessionRef) => {
-      const current = router.state.matches.find((match) => match.routeId === "/session/$sessionId")
-        ?.loaderData?.ref;
-      return sameSessionRef(candidate, current);
-    },
-    [router],
-  );
-  const handleNewChat = () => navigate({ to: "/draft" });
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            <AppSidebar />
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
-              heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
-              supportingText={project?.name}
+              heading={
+                schedulesRoute !== null
+                  ? "Schedule"
+                  : sessionRef === null
+                    ? "New chat"
+                    : (sessionTitle ?? "New chat")
+              }
+              supportingText={schedulesRoute !== null ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>

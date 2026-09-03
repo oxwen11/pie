@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { Context, Effect, Layer, Logger, Scope } from "effect";
 import { HttpServerResponse } from "effect/unstable/http";
 import { afterEach, describe, expect, it } from "vitest";
-import WebSocket from "ws";
+import { WebSocket } from "ws";
 
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";
@@ -21,7 +21,9 @@ async function start(options: Parameters<typeof createServer>[0] = {}): Promise<
     ...options,
     effectContext: options.effectContext ?? (await discardContext()),
   });
-  await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => {
+    server?.listen(0, "127.0.0.1", resolve);
+  });
   const { port } = server.address() as AddressInfo;
   return `http://127.0.0.1:${port}`;
 }
@@ -65,6 +67,27 @@ describe("createServer auth", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { ticket: string };
     expect(body.ticket).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("invokes shutdown only through the authenticated daemon route", async () => {
+    let shutdown = false;
+    const base = await start({ authToken: TOKEN, shutdown: () => (shutdown = true) });
+    const unauthorized = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(unauthorized.status).toBe(401);
+    expect(shutdown).toBe(false);
+
+    const accepted = await fetch(`${base}/api/shutdown`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(accepted.status).toBe(202);
+    expect(shutdown).toBe(true);
+  });
+
+  it("does not expose shutdown in browser mode", async () => {
+    const base = await start({});
+    const response = await fetch(`${base}/api/shutdown`, { method: "POST" });
+    expect(response.status).toBe(404);
   });
 
   it("requires no token at all when none is configured (browser mode)", async () => {
@@ -123,7 +146,7 @@ describe("createServer WebSocket ticket", () => {
   ): Promise<number> {
     const url = `${base.replace("http://", "ws://")}${path}${query}`;
     const socket = new WebSocket(url, "pie", options);
-    return await new Promise<number>((resolve) => {
+    return new Promise<number>((resolve) => {
       socket.on("open", () => {
         socket.close();
         resolve(200);
@@ -140,12 +163,12 @@ describe("createServer WebSocket ticket", () => {
       headers: { authorization: `Bearer ${TOKEN}` },
     });
     const { ticket } = (await ticketResponse.json()) as { ticket: string };
-    expect(await connect(base, `?ticket=${ticket}`)).toBe(200);
+    await expect(connect(base, `?ticket=${ticket}`)).resolves.toBe(200);
   });
 
   it("rejects an upgrade with no ticket", async () => {
     const base = await start({ authToken: TOKEN });
-    expect(await connect(base, "")).toBe(401);
+    await expect(connect(base, "")).resolves.toBe(401);
   });
 
   it("runs WebSocket callback logs on the supplied Effect context", async () => {
@@ -161,7 +184,7 @@ describe("createServer WebSocket ticket", () => {
     );
     const base = await start({ authToken: TOKEN, effectContext });
 
-    expect(await connect(base, "")).toBe(401);
+    await expect(connect(base, "")).resolves.toBe(401);
     await expect.poll(() => records.length).toBeGreaterThan(0);
 
     const record = records.find(
@@ -177,8 +200,8 @@ describe("createServer WebSocket ticket", () => {
       headers: { authorization: `Bearer ${TOKEN}` },
     });
     const { ticket } = (await ticketResponse.json()) as { ticket: string };
-    expect(await connect(base, `?ticket=${ticket}`, "/wrong-path")).toBe(404);
-    expect(await connect(base, `?ticket=${ticket}`)).toBe(200);
+    await expect(connect(base, `?ticket=${ticket}`, "/wrong-path")).resolves.toBe(404);
+    await expect(connect(base, `?ticket=${ticket}`)).resolves.toBe(200);
   });
 
   it("rejects a replayed ticket", async () => {
@@ -189,17 +212,19 @@ describe("createServer WebSocket ticket", () => {
     });
     const { ticket } = (await ticketResponse.json()) as { ticket: string };
     await connect(base, `?ticket=${ticket}`);
-    expect(await connect(base, `?ticket=${ticket}`)).toBe(401);
+    await expect(connect(base, `?ticket=${ticket}`)).resolves.toBe(401);
   });
 
   it("accepts an upgrade with no ticket when no token is configured (browser mode)", async () => {
     const base = await start({});
-    expect(await connect(base, "")).toBe(200);
+    await expect(connect(base, "")).resolves.toBe(200);
   });
 
   it("rejects a browser Origin outside the allowlist, even in browser mode", async () => {
     const base = await start({});
-    expect(await connect(base, "", "/ws/rpc", { origin: "https://evil.example" })).toBe(403);
+    await expect(connect(base, "", "/ws/rpc", { origin: "https://evil.example" })).resolves.toBe(
+      403,
+    );
   });
 
   it("accepts a proxy-forwarded upgrade whose Host and Origin name an allowed host", async () => {
@@ -208,17 +233,19 @@ describe("createServer WebSocket ticket", () => {
     // the Host but rejecting the Origin would render the app without a
     // working WebSocket.
     const base = await start({ allowedHosts: ["proxy.ts.net"] });
-    expect(
-      await connect(base, "", "/ws/rpc", {
+    await expect(
+      connect(base, "", "/ws/rpc", {
         headers: { host: "proxy.ts.net" },
         origin: "https://proxy.ts.net",
       }),
-    ).toBe(200);
+    ).resolves.toBe(200);
   });
 
   it("keeps rejecting unrelated Origins when allowed hosts are configured", async () => {
     const base = await start({ allowedHosts: ["proxy.ts.net"] });
-    expect(await connect(base, "", "/ws/rpc", { origin: "https://evil.example" })).toBe(403);
+    await expect(connect(base, "", "/ws/rpc", { origin: "https://evil.example" })).resolves.toBe(
+      403,
+    );
   });
 });
 
@@ -228,7 +255,7 @@ describe("createServer staged startup", () => {
   /** Records its disposal so a test can assert it ran, and ran exactly once. */
   function fakeRuntime(released: string[]): RpcRuntime {
     return {
-      context: { "effect/context": Context.empty() } as unknown as RpcRuntime["context"],
+      context: { "effect/context": Context.empty() } as RpcRuntime["context"],
       run: () => Promise.reject(new Error("fake runtime cannot run effects")),
       dispose: async () => {
         released.push("rpcRuntime");
@@ -292,7 +319,9 @@ describe("createServer staged startup", () => {
         },
       },
     );
-    await new Promise<void>((resolve) => managed.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => {
+      managed.listen(0, "127.0.0.1", resolve);
+    });
     managed.once("close", () => released.push("http"));
 
     await managed.dispose();

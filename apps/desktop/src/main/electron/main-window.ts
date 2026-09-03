@@ -1,5 +1,4 @@
 import path from "node:path";
-import url from "node:url";
 
 import { is } from "@electron-toolkit/utils";
 import { Context, Effect, Layer, Scope } from "effect";
@@ -59,12 +58,9 @@ export function makeMainWindow(
         titleBarStyle: "hiddenInset",
         // y=19 centers the ~14px traffic lights on the 26px titlebar centerline.
         trafficLightPosition: { x: 22, y: 19 },
-        ...(process.platform === "linux" ? { icon } : {}),
+        ...(process.platform === "linux" ? { icon } : undefined),
         webPreferences: {
-          preload: path.join(
-            path.dirname(url.fileURLToPath(import.meta.url)),
-            "../preload/index.js",
-          ),
+          preload: path.join(import.meta.dirname, "../preload/index.js"),
           sandbox: true,
           contextIsolation: true,
           nodeIntegration: false,
@@ -139,7 +135,7 @@ export function makeMainWindow(
 }
 
 export function rendererRoot(): string {
-  return path.join(path.dirname(url.fileURLToPath(import.meta.url)), "../renderer");
+  return path.join(import.meta.dirname, "../renderer");
 }
 
 export const MainWindowLive = Layer.effect(

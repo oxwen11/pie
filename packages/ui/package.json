@@ -27,6 +27,7 @@
     "@tiptap/pm": "catalog:tiptap",
     "@tiptap/react": "catalog:tiptap",
     "@tiptap/suggestion": "catalog:tiptap",
+    "cn": "catalog:",
     "react-day-picker": "9.14.0",
     "streamdown": "^2.6.0"
   },
@@ -37,7 +38,6 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "ai": "catalog:",
     "class-variance-authority": "^0.7.1",
-    "clsx": "catalog:",
     "embla-carousel-react": "^8.6.0",
     "hast-util-to-jsx-runtime": "^2.3.6",
     "jsdom": "^26.1.0",
@@ -45,7 +45,6 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "shiki": "4.4.3",
-    "tailwind-merge": "catalog:",
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:",
     "use-stick-to-bottom": "^1.1.6",

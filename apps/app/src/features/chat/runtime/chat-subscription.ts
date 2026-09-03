@@ -1,5 +1,5 @@
 import type { SessionRuntimeSnapshot, SubscribeStreamEvent } from "@getpie/contract";
-import { isSessionScopedEvent } from "@getpie/contract";
+import { isSessionScopedEvent } from "@getpie/contract/session-events";
 
 import { isAbortError, sleep } from "@/lib/utils";
 

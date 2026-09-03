@@ -1,9 +1,11 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
+import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import {
   ShellContentPanel,
   ShellGroup,
@@ -42,12 +44,9 @@ export interface AppShellSidebarProps {
 export function AppShellSidebar({ children }: AppShellSidebarProps) {
   const { isMobile } = useSidebar();
   const { contentPanel } = useAppShell();
-  if (isMobile) return <>{children}</>;
+  if (isMobile) return children;
   return (
-    <>
-      <ShellSidebarPanel>{children}</ShellSidebarPanel>
-      <ShellSeparator disabled={contentPanel.maximized} />
-    </>
+    <ShellSidebarPanel separatorDisabled={contentPanel.maximized}>{children}</ShellSidebarPanel>
   );
 }
 
@@ -90,8 +89,10 @@ export function AppShell({ children }: AppShellProps) {
       defaultOpen={readSidebarCookie()}
       style={shellProviderStyle(platform)}
     >
-      {children}
-      <ShellSidebarToggle />
+      <LazyMotion features={domMax}>
+        {children}
+        <ShellSidebarToggle />
+      </LazyMotion>
     </SidebarProvider>
   );
 }
@@ -127,13 +128,14 @@ export function AppShellBody({ children }: AppShellBodyProps) {
         {children}
         {hasVisibleContentPanel && (
           <>
-            <ShellSeparator />
+            <ShellSeparator joined />
             <ShellContentPanel>
               <ContentPanelOutlet />
             </ShellContentPanel>
           </>
         )}
       </ShellGroup>
+      <ShellContentPanelToggle />
     </AppShellContext>
   );
 }

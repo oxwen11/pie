@@ -1,4 +1,4 @@
-import { eventIterator, oc, type } from "@orpc/contract";
+import { eventIterator, type } from "@orpc/contract";
 
 import {
   AgentModelStateSchema,
@@ -11,6 +11,7 @@ import {
   type ListSessionsOutput,
   PromptInputSchema,
   PromptOutputSchema,
+  ReplaceQueueInputSchema,
   RefInputSchema,
   RenameSessionInputSchema,
   ResolveRefInputSchema,
@@ -22,47 +23,32 @@ import {
   SessionStatusSchema,
   SubscribeInputSchema,
   type SubscribeStreamEvent,
-  toStandardSchema,
 } from "./domain";
+import { oc } from "./orpc";
 
 const base = oc.errors(serverErrors);
 
 export const sessionContract = {
-  create: base
-    .input(toStandardSchema(CreateSessionInputSchema))
-    .output(toStandardSchema(CreateSessionOutputSchema)),
-  prepare: base
-    .input(toStandardSchema(RefInputSchema))
-    .output(toStandardSchema(PrepareSessionOutputSchema)),
-  close: base.input(toStandardSchema(RefInputSchema)),
+  create: base.input(CreateSessionInputSchema).output(CreateSessionOutputSchema),
+  prepare: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
+  close: base.input(RefInputSchema),
 
-  list: base.input(toStandardSchema(ListSessionsInputSchema)).output(type<ListSessionsOutput>()),
-  rename: base.input(toStandardSchema(RenameSessionInputSchema)),
-  archive: base.input(toStandardSchema(ArchiveSessionInputSchema)),
-  delete: base.input(toStandardSchema(RefInputSchema)),
-  getMessages: base.input(toStandardSchema(RefInputSchema)).output(type<SessionMessages>()),
-  resolveRef: base
-    .input(toStandardSchema(ResolveRefInputSchema))
-    .output(toStandardSchema(SessionRefSchema)),
+  list: base.input(ListSessionsInputSchema).output(type<ListSessionsOutput>()),
+  rename: base.input(RenameSessionInputSchema),
+  archive: base.input(ArchiveSessionInputSchema),
+  delete: base.input(RefInputSchema),
+  getMessages: base.input(RefInputSchema).output(type<SessionMessages>()),
+  resolveRef: base.input(ResolveRefInputSchema).output(SessionRefSchema),
 
-  prompt: base
-    .input(toStandardSchema(PromptInputSchema))
-    .output(toStandardSchema(PromptOutputSchema)),
-  interrupt: base.input(toStandardSchema(RefInputSchema)),
-  respondToAgentRequest: base.input(toStandardSchema(RespondToAgentRequestInputSchema)),
-  getStatus: base
-    .input(toStandardSchema(RefInputSchema))
-    .output(toStandardSchema(SessionStatusSchema)),
-  getSnapshot: base.input(toStandardSchema(RefInputSchema)).output(type<SessionRuntimeSnapshot>()),
+  prompt: base.input(PromptInputSchema).output(PromptOutputSchema),
+  replaceQueue: base.input(ReplaceQueueInputSchema),
+  interrupt: base.input(RefInputSchema),
+  respondToAgentRequest: base.input(RespondToAgentRequestInputSchema),
+  getStatus: base.input(RefInputSchema).output(SessionStatusSchema),
+  getSnapshot: base.input(RefInputSchema).output(type<SessionRuntimeSnapshot>()),
 
-  getModelState: base
-    .input(toStandardSchema(RefInputSchema))
-    .output(toStandardSchema(AgentModelStateSchema)),
-  setModel: base
-    .input(toStandardSchema(SetAgentModelInputSchema))
-    .output(toStandardSchema(AgentModelStateSchema)),
+  getModelState: base.input(RefInputSchema).output(AgentModelStateSchema),
+  setModel: base.input(SetAgentModelInputSchema).output(AgentModelStateSchema),
 
-  subscribe: base
-    .input(toStandardSchema(SubscribeInputSchema))
-    .output(eventIterator(type<SubscribeStreamEvent>())),
+  subscribe: base.input(SubscribeInputSchema).output(eventIterator(type<SubscribeStreamEvent>())),
 };
