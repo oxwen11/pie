@@ -60,6 +60,8 @@ export type CreatePiSessionInput = {
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
   readonly worktree?: CreateWorktreeInput;
+  /** Display title written at create so the sidebar can name the row before the first prompt. */
+  readonly title?: string;
 };
 
 export type PiAgentSessionServiceShape = {
@@ -337,6 +339,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   ...(input.model !== undefined
                     ? { provider: input.model.provider, modelId: input.model.modelId }
                     : undefined),
+                  ...(input.title !== undefined ? { title: input.title } : undefined),
                   archived: false,
                 };
                 return repo.write(metadata).pipe(
@@ -346,6 +349,11 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
+                  Effect.andThen(
+                    input.title === undefined
+                      ? Effect.void
+                      : bus.publish({ ref, type: "session.updated", title: input.title }),
+                  ),
                   Effect.andThen(
                     logLifecycle("session.created", "session created", {
                       cwd: sessionWorkspace.cwd,

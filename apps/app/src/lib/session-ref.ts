@@ -10,3 +10,12 @@ export const sameSessionRef = (left: SessionRef, right: SessionRef | null | unde
   right !== undefined &&
   left.projectId === right.projectId &&
   left.sessionId === right.sessionId;
+
+/** The session-route loader ref on live router matches. Read at call time. */
+export const sessionRefFromRouterMatches = (
+  matches: ReadonlyArray<{
+    readonly routeId: string;
+    readonly loaderData?: { readonly ref?: SessionRef };
+  }>,
+): SessionRef | undefined =>
+  matches.find((match) => match.routeId === "/session/$sessionId")?.loaderData?.ref;

@@ -63,6 +63,32 @@ describe("PiAgentSessionService", () => {
     expect(result.stored.archived).toBe(false);
   });
 
+  it("create persists an optional title", async () => {
+    const result = await run({}, (fixture) =>
+      Effect.gen(function* () {
+        const created = yield* fixture.service.create({
+          projectId: "proj-a",
+          cwd: "/tmp/pie-app",
+          title: "Morning review",
+        });
+        const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
+        const listed = yield* fixture.service.list("proj-a", false);
+        return { stored, listed };
+      }),
+    );
+
+    expect(result.stored.title).toBe("Morning review");
+    expect(result.stored).not.toHaveProperty("schedule");
+    expect(result.stored).not.toHaveProperty("scheduleId");
+    expect(result.stored).not.toHaveProperty("automation");
+    expect(result.stored).not.toHaveProperty("automationId");
+    expect(result.listed[0]?.title).toBe("Morning review");
+    expect(result.listed[0]).not.toHaveProperty("schedule");
+    expect(result.listed[0]).not.toHaveProperty("scheduleId");
+    expect(result.listed[0]).not.toHaveProperty("automation");
+    expect(result.listed[0]).not.toHaveProperty("automationId");
+  });
+
   it("appends unique pull request refs without replacing earlier ones", async () => {
     const first = {
       host: "github.com",
