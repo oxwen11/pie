@@ -49,8 +49,8 @@ export type ScheduleFormSubmit = {
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
-  /** The chosen pair; null only when no models are available at all. */
-  readonly model: { readonly provider: string; readonly modelId: string } | null;
+  readonly provider?: string;
+  readonly modelId?: string;
 };
 
 export type ScheduleFormDefaults = {
@@ -97,8 +97,10 @@ function formFromSchedule(
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
-    modelProvider: initial.provider ?? "",
-    modelId: initial.modelId ?? "",
+    model:
+      initial.provider !== undefined && initial.modelId !== undefined
+        ? { provider: initial.provider, modelId: initial.modelId }
+        : undefined,
     ...formFromSpec(initial.spec, base),
   };
 }
@@ -127,33 +129,11 @@ export function ScheduleForm({
     enabled: form.projectId.length > 0,
   });
   const listedModels = models.data?.models ?? [];
-  // Draft logic: an explicit choice wins, otherwise the server's default model
-  // is the selection. Derived at render, never mirrored into form state.
-  const effectiveModel =
-    form.modelProvider !== "" && form.modelId !== ""
-      ? { provider: form.modelProvider, modelId: form.modelId }
-      : models.data?.defaultModel !== undefined
-        ? {
-            provider: models.data.defaultModel.provider,
-            modelId: models.data.defaultModel.modelId,
-          }
-        : null;
-  // Keep a stored pair selectable even if the model is no longer listed, mirroring
-  // the "Selected session" fallback below.
+  const model = form.model ?? models.data?.defaultModel;
   const modelOptions =
-    effectiveModel !== null &&
-    !listedModels.some(
-      (model) =>
-        model.provider === effectiveModel.provider && model.modelId === effectiveModel.modelId,
-    )
-      ? [
-          ...listedModels,
-          {
-            provider: effectiveModel.provider,
-            modelId: effectiveModel.modelId,
-            name: `${effectiveModel.provider}/${effectiveModel.modelId}`,
-          },
-        ]
+    model !== undefined &&
+    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
+      ? [...listedModels, model]
       : listedModels;
   const listed = sessions.data ?? [];
   const listedIds = sessions.isSuccess
@@ -188,7 +168,7 @@ export function ScheduleForm({
     (form.cadence !== "once" || form.runAt.length > 0) &&
     (form.cadence !== "cron" || form.cron.trim().length > 0) &&
     (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
-    (listedModels.length === 0 || effectiveModel !== null);
+    (listedModels.length === 0 || model !== undefined);
 
   return (
     <form
@@ -214,7 +194,9 @@ export function ScheduleForm({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
-            model: effectiveModel,
+            ...(model !== undefined
+              ? { provider: model.provider, modelId: model.modelId }
+              : undefined),
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -243,8 +225,7 @@ export function ScheduleForm({
                 projectId: next,
                 sessionPick: "create",
                 sessionId: "",
-                modelProvider: "",
-                modelId: "",
+                model: undefined,
               }));
             }
           }}
@@ -264,18 +245,15 @@ export function ScheduleForm({
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-model">Model</FieldLabel>
-        {models.isLoading ? null : (
-          <ModelSelect
-            id="schedule-model"
-            modelId={effectiveModel?.modelId}
-            models={modelOptions}
-            onChange={(provider, modelId) =>
-              setForm((current) => ({ ...current, modelProvider: provider, modelId }))
-            }
-            providerId={effectiveModel?.provider}
-          />
-        )}
-        <FieldDescription>Used when the schedule starts a session.</FieldDescription>
+        <ModelSelect
+          id="schedule-model"
+          modelId={model?.modelId}
+          models={modelOptions}
+          onChange={(provider, modelId) =>
+            setForm((current) => ({ ...current, model: { provider, modelId } }))
+          }
+          providerId={model?.provider}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>

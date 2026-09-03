@@ -95,8 +95,6 @@ export const update = (input: UpdateScheduleInput) =>
       expiresAt: _expiresAt,
       maxRuns: _maxRuns,
       session: currentSession,
-      provider: _currentProvider,
-      modelId: _currentModelId,
       ...currentRest
     } = current;
     const updatedAt = yield* Clock.currentTimeMillis;
@@ -121,18 +119,8 @@ export const update = (input: UpdateScheduleInput) =>
     }
     const next = yield* tryNextRun(spec, current.id, updatedAt);
     const worktree = input.worktree ?? current.worktree;
-    const provider =
-      input.provider === undefined
-        ? current.provider
-        : input.provider === null
-          ? undefined
-          : input.provider;
-    const modelId =
-      input.modelId === undefined
-        ? current.modelId
-        : input.modelId === null
-          ? undefined
-          : input.modelId;
+    const provider = input.provider ?? current.provider;
+    const modelId = input.modelId ?? current.modelId;
     const enabled = input.enabled ?? current.enabled;
     const session = input.session ?? currentSession;
     const updated: Schedule = {

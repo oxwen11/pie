@@ -81,8 +81,8 @@ export function SchedulePage({
         ...(value.maxRuns !== null ? { maxRuns: value.maxRuns } : undefined),
         ...(value.runNow ? { runNow: true } : undefined),
         ...(value.worktree ? { worktree: {} } : undefined),
-        ...(value.model !== null
-          ? { provider: value.model.provider, modelId: value.model.modelId }
+        ...(value.provider !== undefined && value.modelId !== undefined
+          ? { provider: value.provider, modelId: value.modelId }
           : undefined),
       }),
     onSuccess: (created) => {
@@ -125,11 +125,8 @@ export function SchedulePage({
         ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
         ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
         ...(input.worktree === true ? { worktree: {} } : undefined),
-        ...(input.model !== undefined
-          ? input.model === null
-            ? { provider: null, modelId: null }
-            : { provider: input.model.provider, modelId: input.model.modelId }
-          : undefined),
+        ...(input.provider !== undefined ? { provider: input.provider } : undefined),
+        ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
       }),
     onSuccess: () => {
       setEditing(null);

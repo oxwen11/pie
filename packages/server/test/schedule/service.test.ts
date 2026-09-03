@@ -298,7 +298,7 @@ describe("ScheduleService", () => {
     }),
   );
 
-  it.effect("stores the chosen model and clears it back to the default", () =>
+  it.effect("stores the chosen model and updates it", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
       const h = yield* harness();
@@ -314,13 +314,6 @@ describe("ScheduleService", () => {
       });
       assert.strictEqual(changed.provider, "openai");
       assert.strictEqual(changed.modelId, "gpt-5");
-      const cleared = yield* h.service.update({
-        id: created.id,
-        provider: null,
-        modelId: null,
-      });
-      assert.strictEqual(cleared.provider, undefined);
-      assert.strictEqual(cleared.modelId, undefined);
     }),
   );
 
