@@ -99,6 +99,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
     orpcQueryUtils.git.review.key(),
     orpcQueryUtils.git.diff.key(),
     orpcQueryUtils.fs.readTree.key(),
+    orpcQueryUtils.fs.readFileString.key(),
   ]) {
     queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
   }
