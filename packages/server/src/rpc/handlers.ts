@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/server";
 import { RPCHandler as WsRPCHandler } from "@orpc/server/websocket";
 import { Cause, Context, Effect, Layer, ManagedRuntime } from "effect";
 import type { WebSocket } from "ws";
@@ -14,10 +15,9 @@ import { AgentRuntimeLayer } from "./runtime";
  * One function here instruments all ~25 procedures at once: no router file
  * knows about logging, and none can forget to.
  *
- * Interrupt-only causes stay silent: oRPC turns declared `ORPCError`s into
- * successes before this runs, so what reaches the tap is either a genuine
- * defect or a client that disconnected mid-call. The latter is routine and
- * must not be reported as a server error.
+ * oRPC turns declared `ORPCError`s into success values before this runs, so
+ * they never hit `tapCause`. Log those as `rpc.error`. Interrupt-only causes
+ * stay silent (client disconnected mid-call). Anything else is a defect.
  *
  * The native span names the procedure for any configured tracer. The failure
  * tap writes the actionable local record, including the procedure and cause.
@@ -26,6 +26,9 @@ export function makeRpcWrap(effectContext: Context.Context<never> = Context.empt
   return <A, E>(effect: Effect.Effect<A, E>, options: { readonly path: ReadonlyArray<string> }) => {
     const procedure = options.path.join(".");
     return effect.pipe(
+      Effect.tap((value) =>
+        value instanceof ORPCError ? logDeclaredRpcError(procedure, value) : Effect.void,
+      ),
       Effect.tapCause((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.void
@@ -38,6 +41,16 @@ export function makeRpcWrap(effectContext: Context.Context<never> = Context.empt
       Effect.provide(effectContext),
     );
   };
+}
+
+function logDeclaredRpcError(procedure: string, error: ORPCError<string, unknown>) {
+  const annotations = {
+    event: "rpc.error" as const,
+    procedure,
+    code: error.code,
+    ...(error.data !== undefined ? { data: error.data } : undefined),
+  };
+  return Effect.logWarning(error.message).pipe(Effect.annotateLogs(annotations));
 }
 
 export type RpcRuntime = {
