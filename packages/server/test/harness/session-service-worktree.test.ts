@@ -29,6 +29,7 @@ describe("PiAgentSessionService worktree create", () => {
   it("creates a worktree at create and does not recreate it on prompt", async () => {
     let creates = 0;
     const bases: Array<string | undefined> = [];
+    const ensured: Array<{ repoCwd: string; path: string; branch: string }> = [];
     const result = await run(
       {
         worktreeCreate: (_cwd, input) => {
@@ -38,6 +39,10 @@ describe("PiAgentSessionService worktree create", () => {
             path: "/tmp/pie-worktree",
             branch: "pie/abcd1234",
           });
+        },
+        worktreeEnsure: (repoCwd, worktreePath, branch) => {
+          ensured.push({ repoCwd, path: worktreePath, branch });
+          return Effect.succeed({ path: worktreePath, branch });
         },
       },
       (fixture) =>
@@ -61,13 +66,48 @@ describe("PiAgentSessionService worktree create", () => {
     );
     expect(creates).toBe(1);
     expect(bases).toEqual(["main"]);
+    expect(ensured).toEqual([
+      { repoCwd: "/tmp/pie-app", path: "/tmp/pie-worktree", branch: "pie/abcd1234" },
+    ]);
     expect(result.created.workspace).toEqual({
       cwd: "/tmp/pie-worktree",
-      gitBranch: "pie/abcd1234",
+      worktree: { branch: "pie/abcd1234" },
     });
     expect(result.afterCreate.cwd).toBe("/tmp/pie-worktree");
-    expect(result.afterCreate.gitBranch).toBe("pie/abcd1234");
+    expect(result.afterCreate.worktree).toEqual({ branch: "pie/abcd1234" });
     expect(result.open).toEqual([{ cwd: "/tmp/pie-worktree" }]);
+  });
+
+  it("recreates the worktree on prepare from the stored worktree branch", async () => {
+    const ensured: Array<{ repoCwd: string; path: string; branch: string }> = [];
+    const result = await run(
+      {
+        worktreeCreate: () =>
+          Effect.succeed({
+            path: "/tmp/pie-worktree",
+            branch: "pie/abcd1234",
+          }),
+        worktreeEnsure: (repoCwd, worktreePath, branch) => {
+          ensured.push({ repoCwd, path: worktreePath, branch });
+          return Effect.succeed({ path: worktreePath, branch });
+        },
+      },
+      (fixture) =>
+        Effect.gen(function* () {
+          const created = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+            worktree: {},
+          });
+          yield* fixture.service.archive(created.ref, true);
+          const workspace = yield* fixture.service.prepare(created.ref);
+          return { created, workspace };
+        }),
+    );
+    expect(ensured).toEqual([
+      { repoCwd: "/tmp/pie-app", path: "/tmp/pie-worktree", branch: "pie/abcd1234" },
+    ]);
+    expect(result.workspace).toEqual(result.created.workspace);
   });
 
   it("does not persist a session when worktree creation fails", async () => {
@@ -108,7 +148,7 @@ describe("PiAgentSessionService worktree create", () => {
     );
     expect(stored.created.workspace).toEqual({ cwd: "/tmp/pie-app" });
     expect(stored.afterPrompt.cwd).toBe("/tmp/pie-app");
-    expect(stored.afterPrompt.gitBranch).toBeUndefined();
+    expect(stored.afterPrompt.worktree).toBeUndefined();
   });
 
   it("removes the worktree when persist fails after create", async () => {

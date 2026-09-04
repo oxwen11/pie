@@ -50,6 +50,12 @@ export class WorktreeService extends Context.Service<
       cwd: string,
       input?: { readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    /** Re-create a pie worktree at `worktreePath` from an existing `branch`. */
+    readonly ensure: (
+      repoCwd: string,
+      worktreePath: string,
+      branch: string,
+    ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
   }
 >()("WorktreeService") {}
@@ -64,7 +70,7 @@ export const WorktreeServiceLayer: Layer.Layer<
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
-    const { readError, gitError, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
+    const { readError, gitError, raw, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
 
     const generateWorktreeKey = (): Effect.Effect<string> =>
       Effect.gen(function* () {
@@ -135,6 +141,46 @@ export const WorktreeServiceLayer: Layer.Layer<
           yield* Effect.tryPromise({
             try: () =>
               simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, startPoint]),
+            catch: gitError(realRoot),
+          });
+          return { path: worktreePath, branch };
+        }),
+
+      ensure: (repoCwd, worktreePath, branch) =>
+        Effect.gen(function* () {
+          if (!isValidBranchName(branch) || isUnsafeRef(branch)) {
+            return yield* new GitInvalidBranchName({ branch });
+          }
+          if (!path.isAbsolute(worktreePath)) {
+            return yield* new WorkspacePathEscape({ cwd: repoCwd, path: worktreePath });
+          }
+          const realRoot = yield* resolveRoot(repoCwd);
+          const exists = yield* fs
+            .exists(worktreePath)
+            .pipe(Effect.mapError(readError(worktreePath)));
+          if (exists) {
+            const info = yield* fs
+              .stat(worktreePath)
+              .pipe(Effect.mapError(readError(worktreePath)));
+            if (info.type !== "Directory") {
+              return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
+            }
+            return { path: worktreePath, branch };
+          }
+          if (!contains(paths.worktreesDir, worktreePath)) {
+            return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+          }
+          const repoRoot = yield* resolveRepoRoot(realRoot);
+          const refs = yield* listRefs(realRoot);
+          if (!refs.all.includes(branch)) {
+            return yield* new GitRefNotFound({ ref: branch });
+          }
+          yield* fs
+            .makeDirectory(path.dirname(worktreePath), { recursive: true })
+            .pipe(Effect.mapError(readError(worktreePath)));
+          yield* raw(repoRoot, ["worktree", "prune"]);
+          yield* Effect.tryPromise({
+            try: () => simpleGit(repoRoot).raw(["worktree", "add", worktreePath, branch]),
             catch: gitError(realRoot),
           });
           return { path: worktreePath, branch };
