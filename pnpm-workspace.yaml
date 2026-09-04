@@ -27,7 +27,10 @@ catalog:
   typescript: ^7.0.2
   uuid: ^14.0.2
   vite: ^8.2.2
-  vitest: 4.1.10
+  # Exact pin: Vitest majors rewrite config defaults (clearMocks, reporters,
+  # artifact root). Catalog + override keep every workspace package and
+  # electron-vite/vite-plus on one copy.
+  vitest: 5.0.0
   ws: ^8.21.3
   zod: ^4.5.4
   zustand: ^5.0.15
@@ -88,6 +91,13 @@ overrides:
   "@effect/platform-node-shared": "catalog:effect"
   "@effect/vitest": "catalog:effect"
   effect: "catalog:effect"
+# @effect/vitest@4.0.0-rc.112 still peers vitest <5. It only imports
+# TestRunner / expect from `vitest` and runs on 5; drop this when the
+# Effect catalog moves.
+packageExtensions:
+  "@effect/vitest":
+    peerDependencies:
+      vitest: ">=4.1.0"
 # pnpm 11+ defaults minimumReleaseAge to 24h; disable it — the same-day
 # dependency bumps this repo does (e.g. claude-agent-sdk) would be blocked.
 minimumReleaseAge: 0
