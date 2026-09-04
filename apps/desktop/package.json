@@ -55,6 +55,7 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "tailwindcss": "catalog:tailwind",
+    "vitest": "catalog:",
     "zustand": "catalog:"
   }
 }
