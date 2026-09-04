@@ -29,6 +29,12 @@ Skill recipes live in `.agents/skills/verify-pie{,-cli,-desktop}`
 (`.cursor/skills/…` are symlinks). `.agents/skills/verify` is the short
 two-process note.
 
+Cloud Agent images may put `/exec-daemon/node` (currently 22) ahead of nvm on
+`PATH`. This repo needs Node 24 (`mise.toml`: 24.19.0) and pnpm 11.24.0 —
+prefix `$HOME/.nvm/versions/node/v24.19.0/bin` before running workspace
+commands. Vite must bind IPv4 (`--host 127.0.0.1 --port 4190`); the default
+`localhost` listen is IPv6-only and `127.0.0.1:4190` health checks fail.
+
 ## Rules
 
 @.agents/rules/architecture.md
