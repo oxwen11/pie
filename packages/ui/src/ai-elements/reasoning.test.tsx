@@ -75,6 +75,28 @@ describe("Reasoning trigger", () => {
     expect(triggerText(el)).toBe("Thought for 4 seconds");
   });
 
+  it("uses the Tool-style control at the left instead of a right-side chevron", async () => {
+    const el = await render(
+      <Reasoning isStreaming={false} defaultOpen={false}>
+        <ReasoningTrigger />
+      </Reasoning>,
+    );
+    const trigger = el.querySelector('[data-slot="collapsible-trigger"]');
+    if (!trigger) throw new Error("Reasoning trigger was not rendered");
+
+    expect(trigger.className).toContain("group");
+    expect(trigger.querySelector(".lucide-square-plus")).not.toBeNull();
+    expect(trigger.querySelector(".lucide-square-minus")).not.toBeNull();
+    expect(trigger.querySelector(".lucide-chevron-down")).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
   it("animates the pie loader while streaming and freezes it once settled", async () => {
     const el = await render(
       <Reasoning isStreaming defaultOpen={false}>
