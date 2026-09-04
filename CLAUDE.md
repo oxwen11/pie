@@ -36,6 +36,7 @@ two-process note.
 @.agents/rules/frontend-state.md
 @.agents/rules/ui-components.md
 @.agents/rules/toolchain.md
+@.agents/rules/verify-evidence.md
 
 `apps/desktop/src` has its own layering contract in `apps/desktop/AGENTS.md` —
 read it before touching that app.
@@ -69,10 +70,21 @@ merge-commit / rebase merges in the repo. Squash rewrites the branch tip
 out of `main`'s history, so deleting the local feature branch needs
 `git branch -D` — the changes are already on `main`, so it's safe.
 
-A UI change or UI bug needs an image or short video on the GitHub issue,
-PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh` ≥
-2.99.0). Capture with `pie-verify web|desktop evidence screenshot`; do not
-commit the files.
+A UI change or UI bug needs screenshots **and** a short video on the GitHub
+issue, PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh`
+≥ 2.99.0). Capture with `pie-verify web|desktop evidence screenshot` and
+`agent-browser record start|stop` per `.agents/rules/verify-evidence.md`; do
+not commit the files.
+
+## Cursor Cloud specific instructions
+
+Repo-managed Cloud Agent setup lives in `.cursor/environment.json` and
+overrides any dashboard personal/team environment. `install` is mise (Node
+24 + pnpm from `mise.toml`) then `pnpm install --frozen-lockfile`.
+
+The environment starts two terminals: pie server on `:4180` and Vite on
+`:4190`. Drive `http://localhost:4190/` — not 4180 (built bundle / 503) and
+not 4000 (daemon). See `.agents/skills/verify`.
 
 ## Going deeper
 

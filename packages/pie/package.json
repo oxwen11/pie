@@ -1,7 +1,7 @@
 {
   "name": "@getpie/cli",
   "version": "0.0.1",
-  "description": "Pie CLI — daemon and serve for the Pi coding agent",
+  "description": "Pie CLI — daemon, serve, and pie run for the Pi coding agent",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oxwen11/pie.git",
@@ -30,6 +30,7 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.2",
     "@effect/platform-node": "catalog:effect",
+    "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
@@ -40,6 +41,8 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
+    "@getpie/client": "workspace:*",
+    "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",

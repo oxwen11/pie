@@ -108,8 +108,9 @@ export function SessionActionsMenu({
           </ContextMenuItem>
         </ContextMenuPopup>
       </ContextMenu>
+      {/* Float over the row (and a trailing PR icon) instead of shifting into a second slot. */}
       <SidebarMenuAction
-        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent has-[+[data-sidebar=menu-action]]:right-7"
+        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent z-10"
         disabled={setArchived.isPending}
         onClick={() => setArchived.mutate(!session.archived)}
         showOnHover

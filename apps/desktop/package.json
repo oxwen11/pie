@@ -46,7 +46,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "code-inspector-plugin": "latest",
-    "electron": "^41.10.7",
+    "electron": "^44.1.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
     "lucide-react": "catalog:",

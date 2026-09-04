@@ -1,6 +1,7 @@
 import type {
   PullRequestCheck,
   PullRequestCheckStatus,
+  PullRequestListItem,
   PullRequestMergeMethod,
   PullRequestOfferedAction,
   PullRequestRef,
@@ -36,6 +37,14 @@ const requiredNumber = (record: Record<string, unknown>, field: string): number 
   const value = record[field];
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw new InvalidPullRequestJsonError(`${field} must be a positive integer`);
+  }
+  return value;
+};
+
+const requiredNonNegativeInteger = (record: Record<string, unknown>, field: string): number => {
+  const value = record[field];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new InvalidPullRequestJsonError(`${field} must be a non-negative integer`);
   }
   return value;
 };
@@ -196,22 +205,21 @@ const offeredActions = (
   ];
 };
 
+const normalizeLifecycle = (state: string, isDraft: boolean): PullRequestSnapshot["lifecycle"] => {
+  if (state === "OPEN") return { type: "open", draft: isDraft };
+  if (state === "CLOSED") return { type: "closed" };
+  if (state === "MERGED") return { type: "merged" };
+  throw new InvalidPullRequestJsonError("state is unsupported");
+};
+
 export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnapshot {
   const record = asRecord(input, "pull request");
   const number = requiredNumber(record, "number");
   const url = requiredString(record, "url");
-  const state = requiredString(record, "state");
-  const isDraft = requiredBoolean(record, "isDraft");
-  const lifecycle: PullRequestSnapshot["lifecycle"] =
-    state === "OPEN"
-      ? { type: "open", draft: isDraft }
-      : state === "CLOSED"
-        ? { type: "closed" }
-        : state === "MERGED"
-          ? { type: "merged" }
-          : (() => {
-              throw new InvalidPullRequestJsonError("state is unsupported");
-            })();
+  const lifecycle = normalizeLifecycle(
+    requiredString(record, "state"),
+    requiredBoolean(record, "isDraft"),
+  );
   const mergeable = (() => {
     switch (requiredString(record, "mergeable")) {
       case "MERGEABLE":
@@ -249,5 +257,46 @@ export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnaps
     autoMerge,
     offeredActions: offeredActions(lifecycle, mergeable, autoMerge),
     updatedAt: requiredString(record, "updatedAt"),
+    body: optionalString(record, "body") ?? "",
   };
+}
+
+const normalizeViewerPullRequestNode = (value: unknown): PullRequestListItem => {
+  const record = asRecord(value, "pull request");
+  const number = requiredNumber(record, "number");
+  const url = requiredString(record, "url");
+  const author = record.author;
+  const authorLogin =
+    author === null || author === undefined
+      ? ""
+      : requiredString(asRecord(author, "author"), "login");
+  return {
+    ref: parsePullRequestRef(url, number),
+    title: requiredString(record, "title"),
+    url,
+    authorLogin,
+    headBranch: optionalString(record, "headRefName") ?? "",
+    baseBranch: requiredString(record, "baseRefName"),
+    lifecycle: normalizeLifecycle(
+      requiredString(record, "state"),
+      requiredBoolean(record, "isDraft"),
+    ),
+    additions: requiredNonNegativeInteger(record, "additions"),
+    deletions: requiredNonNegativeInteger(record, "deletions"),
+    updatedAt: requiredString(record, "updatedAt"),
+  };
+};
+
+export function normalizeGitHubViewerPullRequestsJson(
+  input: unknown,
+): ReadonlyArray<PullRequestListItem> {
+  const root = asRecord(input, "github response");
+  const data = asRecord(root.data, "data");
+  const viewer = asRecord(data.viewer, "viewer");
+  const pullRequests = asRecord(viewer.pullRequests, "pullRequests");
+  const nodes = pullRequests.nodes;
+  if (!Array.isArray(nodes)) {
+    throw new InvalidPullRequestJsonError("pullRequests.nodes must be an array");
+  }
+  return nodes.filter((node) => node !== null).map(normalizeViewerPullRequestNode);
 }
