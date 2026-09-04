@@ -10,6 +10,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+    name: "ui",
     environment: "jsdom",
     fsModuleCache: true,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],

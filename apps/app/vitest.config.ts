@@ -9,6 +9,7 @@ export default defineConfig({
     alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
+    name: "app",
     fsModuleCache: true,
   },
 });

@@ -34,21 +34,26 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** Vitest 5 (catalog pin). No root vitest workspace; every package
-  has its own config and goes through turbo so per-package hashes stay
-  independent. Configs turn on `fsModuleCache` so transforms persist across
-  those separate processes (`node_modules/.vitest-cache`). Reporters write
-  under `.vitest/` (gitignored). Layout
-  is inconsistent — `server`/`contract`/`effect-json-store` use `test/`,
-  everyone else colocates `src/**/*.test.ts` behind an explicit `include`, so
-  a test file placed elsewhere is silently ignored. `server`, `contract`,
-  `core`, and `effect-json-store` enable `test.typecheck`, so type errors fail
-  the run.   `server` sets `fileParallelism: false` because git worktree
-  fixtures contend on temp dirs — do not flip it without splitting those
-  files into their own project — and uses a 30s `testTimeout` because
-  those same git fixtures stall when turbo runs every package at once. `apps/desktop/e2e/` is Playwright and not in
-  CI. `tools/testing/fake-claude.mjs` is referenced by relative path from
-  both server tests and desktop e2e. `@effect/vitest` still peers
+- **Tests:** Vitest 5 (catalog pin). Root `vitest.config.mts` lists every
+  package config as a project; `pnpm test` is one process (`pnpm test --
+  -p server` to scope). Do not `turbo run test` — that task is gone so it
+  cannot fan out 12 Vitest processes beside the workspace. Package `test`
+  scripts stay for `pnpm --filter @getpie/server test`. Each package keeps
+  its own `vitest.config.ts` for environment, include, and timeouts —
+  referenced projects do not inherit those. `pnpm test` runs `@getpie/core`
+  + `@getpie/cli` builds first (cli pulls in app); the pie artifact test
+  reads those `dist/` trees. Configs turn on `fsModuleCache`
+  (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
+  (gitignored). Layout is inconsistent — `server`/`contract`/`effect-json-store`
+  use `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
+  `include`, so a test file placed elsewhere is silently ignored. `server`,
+  `contract`, `core`, and `effect-json-store` enable `test.typecheck`, so type
+  errors fail the run. `server` sets `fileParallelism: false` because git
+  worktree fixtures contend on temp dirs — do not flip it without splitting
+  those files into their own project — and uses a 30s `testTimeout` because
+  those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
+  and not in CI. `tools/testing/fake-claude.mjs` is referenced by relative
+  path from both server tests and desktop e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root
