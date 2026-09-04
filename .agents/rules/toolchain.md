@@ -36,12 +36,14 @@
   them fire inside worktrees.
 - **Tests:** Vitest 5 (catalog pin). Root `vitest.config.mts` lists every
   package config as a project; `pnpm test` is one process (`pnpm test --
-  -p server` to scope). Do not `turbo run test` — that task is gone so it
-  cannot fan out 12 Vitest processes beside the workspace. Package `test`
-  scripts stay for `pnpm --filter @getpie/server test`. Each package keeps
-  its own `vitest.config.ts` for environment, include, and timeouts —
-  referenced projects do not inherit those. `pnpm test` runs `@getpie/core`
-  + `@getpie/cli` builds first (cli pulls in app); the pie artifact test
+  -p server` to scope — `scripts/vitest-run.mjs` strips the `--` pnpm
+  forwards and passes the rest to `vitest run`). Prefer that over
+  `turbo run test`: turbo still discovers each package's `test` script and
+  would spawn 12 Vitest processes. Package scripts stay for
+  `pnpm --filter @getpie/server test`. Each package keeps its own
+  `vitest.config.ts` for environment, include, and timeouts — referenced
+  projects do not inherit those. `pnpm test` runs `@getpie/core` +
+  `@getpie/cli` builds first (cli pulls in app); the pie artifact test
   reads those `dist/` trees. Configs turn on `fsModuleCache`
   (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
   (gitignored). Layout is inconsistent — `server`/`contract`/`effect-json-store`
