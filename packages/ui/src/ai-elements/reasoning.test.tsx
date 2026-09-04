@@ -85,11 +85,15 @@ describe("Reasoning trigger", () => {
     if (!trigger) throw new Error("Reasoning trigger was not rendered");
 
     expect(trigger.className).toContain("group");
+    expect(trigger.className).toContain("leading-5");
+    expect(trigger.className).toContain("gap-2.5");
+    const loader = trigger.querySelector('[data-slot="pie-loader"]');
+    expect(loader?.parentElement?.className).toContain("size-(--dot-grid-size,1em)");
     expect(trigger.querySelector(".lucide-square-plus")?.getAttribute("class")).toContain(
-      "size-3.5",
+      "size-full",
     );
     expect(trigger.querySelector(".lucide-square-minus")?.getAttribute("class")).toContain(
-      "size-3.5",
+      "size-full",
     );
     expect(trigger.querySelector(".lucide-chevron-down")).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
