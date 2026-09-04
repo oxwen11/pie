@@ -17,18 +17,14 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { reconcileSessionRenameSuccess } from "@/features/projects/session-list-cache";
-
 /**
  * Give a session a title of your own. Mount only while open — the draft title
  * resets by unmounting on close, the same way the import dialog resets its
  * browsing state.
  *
- * The server publishes `session.renamed` only after the title is durable, and
- * the app's one global event consumer folds that event into every active or
- * archived session list. Success also performs a guarded local reconciliation
- * for the initiating tab: it repairs a non-replay subscription gap without
- * overwriting a different title that a newer event has already applied.
+ * The server publishes `session.renamed` only after the title is durable. Both
+ * the global subscriber and this initiating mutation invalidate the lists, so
+ * `session.list` remains the single source of truth.
  */
 export function RenameSessionDialog({
   session,
@@ -45,31 +41,26 @@ export function RenameSessionDialog({
   const title = draft.trim();
 
   const rename = useMutation({
-    mutationFn: (variables: {
-      readonly title: string;
-      readonly previousTitle: string | undefined;
-    }) =>
+    mutationFn: (nextTitle: string) =>
       orpcQueryUtils.agent.session.rename.call({
         ref: {
           projectId: session.projectId,
           sessionId: session.sessionId,
         },
-        title: variables.title,
+        title: nextTitle,
       }),
-    onSuccess: (_result, variables) => {
-      const ref = {
-        projectId: session.projectId,
-        sessionId: session.sessionId,
-      };
-      reconcileSessionRenameSuccess(
-        queryClient,
-        (projectId, archived) =>
-          orpcQueryUtils.agent.session.list.queryOptions({ input: { projectId, archived } })
-            .queryKey,
-        ref,
-        variables.previousTitle,
-        variables.title,
-      );
+    onSuccess: (_result, nextTitle) => {
+      for (const archived of [false, true]) {
+        const queryKey = orpcQueryUtils.agent.session.list.queryOptions({
+          input: { projectId: session.projectId, archived },
+        }).queryKey;
+        queryClient.setQueryData<ReadonlyArray<SessionSummary>>(queryKey, (previous) =>
+          previous?.map((row) =>
+            row.sessionId === session.sessionId ? { ...row, title: nextTitle } : row,
+          ),
+        );
+        void queryClient.invalidateQueries({ queryKey });
+      }
       onClose();
     },
     onError: (error) => toast.error(`Failed to rename session: ${error.message}`),
@@ -81,7 +72,7 @@ export function RenameSessionDialog({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            rename.mutate({ title, previousTitle: session.title });
+            rename.mutate(title);
           }}
         >
           <DialogHeader>

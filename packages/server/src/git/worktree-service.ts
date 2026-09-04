@@ -64,23 +64,7 @@ export const WorktreeServiceLayer: Layer.Layer<
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
-    const { readError, gitError, raw, resolveRoot, resolveRepoRoot } = makeGitHelpers(fs);
-
-    const listRefs = (cwd: string) =>
-      raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
-        Effect.map((output) => {
-          const names: string[] = [];
-          for (const line of output.split("\n")) {
-            const ref = line.trim();
-            if (ref.startsWith("refs/heads/")) {
-              names.push(ref.slice("refs/heads/".length));
-            } else if (ref.startsWith("refs/remotes/")) {
-              names.push(ref.slice("refs/remotes/".length));
-            }
-          }
-          return names;
-        }),
-      );
+    const { readError, gitError, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
 
     const generateWorktreeKey = (): Effect.Effect<string> =>
       Effect.gen(function* () {
@@ -139,10 +123,10 @@ export const WorktreeServiceLayer: Layer.Layer<
             return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
           }
           const refs = yield* listRefs(realRoot);
-          if (input?.base !== undefined && !refs.includes(input.base)) {
+          if (input?.base !== undefined && !refs.all.includes(input.base)) {
             return yield* new GitRefNotFound({ ref: input.base });
           }
-          if (refs.includes(branch)) {
+          if (refs.all.includes(branch)) {
             return yield* new GitBranchExists({ cwd: realRoot, branch });
           }
           yield* fs

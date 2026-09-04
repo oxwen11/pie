@@ -343,7 +343,7 @@ importers:
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@electron-toolkit/utils':
         specifier: ^4.0.0
-        version: 4.0.0(electron@41.10.7(supports-color@10.2.2))
+        version: 4.0.0(electron@44.1.1(supports-color@10.2.2))
       '@getpie/app':
         specifier: workspace:*
         version: link:../app
@@ -409,8 +409,8 @@ importers:
         specifier: latest
         version: 2.0.8(@opencode-ai/sdk@1.18.3)(supports-color@10.2.2)
       electron:
-        specifier: ^41.10.7
-        version: 41.10.7(supports-color@10.2.2)
+        specifier: ^44.1.1
+        version: 44.1.1(supports-color@10.2.2)
       electron-builder:
         specifier: ^26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)(supports-color@10.2.2)
@@ -543,6 +543,9 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1(@opentelemetry/api@1.9.1))
+      '@orpc/client':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.32(@opentelemetry/api@1.9.1)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.32(@opentelemetry/api@1.9.1)
@@ -568,6 +571,12 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.10)
+      '@getpie/client':
+        specifier: workspace:*
+        version: link:../client
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@getpie/core':
         specifier: workspace:*
         version: link:../core
@@ -5248,8 +5257,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@41.10.7:
-    resolution: {integrity: sha512-AqIiefddlf5i+HYCGatr8VlBuEbWJpad4/yloBFYcMB2r57j7xhW1ogiJ+BfA5kxQyfmSs5yjwy54Me+wJn1jw==}
+  electron@44.1.1:
+    resolution: {integrity: sha512-N2WCq2sbOkqQgvXJYx2lS6UiO8bF+Yr67trDnS6JKa2WxTCRQsAjGl57SUtdW9h6r5PlduBFjIhxhgd3dzv1hg==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -7842,10 +7851,6 @@ packages:
     resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
     engines: {node: '>=18.17'}
 
-  undici@7.28.0:
-    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.29.0:
     resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
     engines: {node: '>=20.18.1'}
@@ -9131,9 +9136,9 @@ snapshots:
     dependencies:
       '@types/node': 24.13.3
 
-  '@electron-toolkit/utils@4.0.0(electron@41.10.7(supports-color@10.2.2))':
+  '@electron-toolkit/utils@4.0.0(electron@44.1.1(supports-color@10.2.2))':
     dependencies:
-      electron: 41.10.7(supports-color@10.2.2)
+      electron: 44.1.1(supports-color@10.2.2)
 
   '@electron/asar@3.4.1':
     dependencies:
@@ -9170,7 +9175,7 @@ snapshots:
       semver: 7.8.5
       sumchecker: 3.0.1(supports-color@10.2.2)
     optionalDependencies:
-      undici: 7.28.0
+      undici: 7.29.0
     transitivePeerDependencies:
       - supports-color
 
@@ -12777,7 +12782,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@41.10.7(supports-color@10.2.2):
+  electron@44.1.1(supports-color@10.2.2):
     dependencies:
       '@electron-internal/extract-zip': 1.0.4
       '@electron/get': 5.0.0(supports-color@10.2.2)
@@ -13120,9 +13125,9 @@ snapshots:
     dependencies:
       reusify: 1.1.0
 
-  fdir@6.5.0(picomatch@4.0.5):
+  fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
-      picomatch: 4.0.5
+      picomatch: 4.0.7
 
   fetch-blob@3.2.0:
     dependencies:
@@ -15825,8 +15830,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.5)
-      picomatch: 4.0.5
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
 
   tinypool@2.1.0: {}
 
@@ -16013,9 +16018,6 @@ snapshots:
 
   undici@6.27.0: {}
 
-  undici@7.28.0:
-    optional: true
-
   undici@7.29.0: {}
 
   undici@8.10.1: {}
@@ -16195,7 +16197,7 @@ snapshots:
   vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.26
       rolldown: 1.2.4
       tinyglobby: 0.2.17
@@ -16221,7 +16223,7 @@ snapshots:
       magic-string: 0.30.21
       obug: 2.1.4
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       std-env: 4.2.0
       tinybench: 2.9.0
       tinyexec: 1.3.0

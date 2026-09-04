@@ -8,8 +8,9 @@ import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` must present
-   * `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
+   * When set, every `/api/*` request except `/api/health` and the same-origin
+   * browser bootstrap must present `Authorization: Bearer <token>`.
+   * Unset (browser mode) disables the check.
    */
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
@@ -123,6 +124,17 @@ const route = (
     // it holds a token, and it discloses nothing.
     if (request.method === "GET" && pathname === "/api/health") {
       return withCors(HttpServerResponse.text("ok"));
+    }
+
+    // The daemon-served SPA has no native bridge from which to receive the
+    // token. Expose it only on the loopback, same-origin HTTP surface and omit
+    // CORS headers, so cross-origin browser clients cannot read the response.
+    if (
+      request.method === "GET" &&
+      pathname === "/api/bootstrap" &&
+      isLoopbackHost(request.headers.host)
+    ) {
+      return HttpServerResponse.jsonUnsafe({ token: options.authToken ?? null });
     }
 
     if (
