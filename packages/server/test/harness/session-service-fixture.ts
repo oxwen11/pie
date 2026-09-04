@@ -78,7 +78,7 @@ export type SessionServiceRunOpts = {
   // The harness rejects every prompt (a turn is already running).
   promptFails?: boolean;
   // Whether a successful prompt opens a new turn. Queued follow-ups set this
-  // false so the service can skip `session.prompt.submitted`.
+  // false while still broadcasting the accepted user message.
   promptStarted?: boolean;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;

@@ -482,7 +482,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           }
 
           const receipt = yield* deliverPrompt(input.ref, userInput);
-          if (receipt.started) yield* submitted();
+          yield* submitted();
           return receipt;
         }).pipe(inSession(input.ref)),
 

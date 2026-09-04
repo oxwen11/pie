@@ -158,6 +158,10 @@ export class Chat {
     switch (event.type) {
       case "session.message.chunk":
         this.#observeChunk(event.chunk);
+        // A start chunk establishes transcript order synchronously. The async
+        // AI-SDK fold fills this placeholder later; without it, a steer's user
+        // event can append before the preceding assistant segment has folded.
+        if (event.chunk.type === "start") this.#pushAssistantStart(event.chunk);
         // Retry is UI status, not transcript — keep it out of the message fold.
         if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
@@ -498,6 +502,17 @@ export class Chat {
     if (this.#state.messages.some((message) => message.id === messageId)) return false;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     return true;
+  }
+
+  #pushAssistantStart(chunk: Extract<UIMessageChunk, { type: "start" }>): void {
+    if (typeof chunk.messageId !== "string") return;
+    if (this.#state.messages.some((message) => message.id === chunk.messageId)) return;
+    this.#state.pushMessage({
+      id: chunk.messageId,
+      role: "assistant",
+      parts: [],
+      metadata: chunk.messageMetadata,
+    } as UIMessage);
   }
 
   // Policy, not transport: an empty plan carries nothing to review, so it is

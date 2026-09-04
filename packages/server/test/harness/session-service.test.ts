@@ -710,7 +710,7 @@ describe("PiAgentSessionService", () => {
     expect(event && "messageId" in event ? event.messageId : undefined).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it("skips session.prompt.submitted when a follow-up does not start a turn", async () => {
+  it("broadcasts an accepted queued follow-up without starting another turn", async () => {
     const result = await run({ turn: "open", promptStarted: false }, (fixture) =>
       Effect.gen(function* () {
         const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
@@ -729,7 +729,10 @@ describe("PiAgentSessionService", () => {
       }),
     );
     expect(result.receipt).toEqual({ turnId: "turn-1", started: false });
-    expect(result.activePrompt).toBeNull();
+    expect(result.activePrompt).toMatchObject({
+      messageId: "queued-1",
+      parts: [{ type: "text", text: "later" }],
+    });
     expect(result.prompts).toEqual([
       { parts: [{ type: "text", text: "later" }], delivery: "followUp" },
     ]);

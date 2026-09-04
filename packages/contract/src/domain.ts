@@ -215,12 +215,12 @@ export type SessionScopedEventBody =
       readonly turnId: string;
       readonly chunk: UIMessageChunk;
     }
-  // A user prompt was accepted for this session. Published by the session
-  // service *before* the harness call, so it always precedes the turn's own
-  // events in seq order; `messageId` echoes the client-supplied id (or a
-  // server-minted one), letting the prompting client dedupe its optimistic
-  // message while every other client appends it. If the harness then rejects
-  // the prompt, `session.prompt.rejected` compensates.
+  // A user prompt was accepted for this session. Idle prompts publish before
+  // the harness call so they precede the new turn; queued steer/follow-up
+  // prompts publish after the harness admits them. `messageId` echoes the
+  // client-supplied id (or a server-minted one), letting the prompting client
+  // dedupe its optimistic message while every other client appends it. An idle
+  // prompt rejected after publication is compensated by prompt.rejected.
   | {
       readonly type: "session.prompt.submitted";
       readonly messageId: string;
