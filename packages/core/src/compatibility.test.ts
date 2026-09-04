@@ -27,9 +27,16 @@ describe("daemon compatibility key", () => {
 
   it("requires a statically embedded valid key", () => {
     expect(embeddedDaemonCompatibilityKey("githash:d1fb9004")).toBe("githash:d1fb9004");
-    expect(() => embeddedDaemonCompatibilityKey(undefined)).toThrow(
-      new RegExp(DAEMON_COMPATIBILITY_KEY_ENV),
-    );
+    const previous = process.env[DAEMON_COMPATIBILITY_KEY_ENV];
+    delete process.env[DAEMON_COMPATIBILITY_KEY_ENV];
+    try {
+      expect(() => embeddedDaemonCompatibilityKey(undefined)).toThrow(
+        new RegExp(DAEMON_COMPATIBILITY_KEY_ENV),
+      );
+    } finally {
+      if (previous === undefined) delete process.env[DAEMON_COMPATIBILITY_KEY_ENV];
+      else process.env[DAEMON_COMPATIBILITY_KEY_ENV] = previous;
+    }
   });
 
   describe("daemonCompatibilityKeyForBuild", () => {
