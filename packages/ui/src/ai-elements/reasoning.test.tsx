@@ -31,7 +31,8 @@ async function render(ui: ReactElement): Promise<HTMLDivElement> {
 }
 
 function triggerText(el: HTMLDivElement): string {
-  return el.querySelector("p")?.textContent ?? "";
+  // Icons are SVG-only and the loader is aria-hidden, so text content is the label.
+  return el.textContent?.trim() ?? "";
 }
 
 describe("Reasoning trigger", () => {
@@ -51,7 +52,7 @@ describe("Reasoning trigger", () => {
         <ReasoningTrigger />
       </Reasoning>,
     );
-    expect(triggerText(el)).toBe("Thinking...");
+    expect(triggerText(el)).toBe("Thinking…");
 
     await act(async () => {
       root?.render(
@@ -72,6 +73,30 @@ describe("Reasoning trigger", () => {
     );
 
     expect(triggerText(el)).toBe("Thought for 4 seconds");
+  });
+
+  it("animates the pie loader while streaming and freezes it once settled", async () => {
+    const el = await render(
+      <Reasoning isStreaming defaultOpen={false}>
+        <ReasoningTrigger />
+      </Reasoning>,
+    );
+    expect(el.querySelector('[data-slot="pie-dot"]')?.className).toContain("animate-pie-dot-grid");
+    expect(el.querySelector(".shimmer")).not.toBeNull();
+
+    await act(async () => {
+      root?.render(
+        <Reasoning isStreaming={false} defaultOpen={false}>
+          <ReasoningTrigger />
+        </Reasoning>,
+      );
+    });
+
+    expect(el.querySelector('[data-slot="pie-loader"]')).not.toBeNull();
+    expect(el.querySelector('[data-slot="pie-dot"]')?.className).not.toContain(
+      "animate-pie-dot-grid",
+    );
+    expect(el.querySelector(".shimmer")).toBeNull();
   });
 
   it("treats a zero duration as unknown", async () => {
