@@ -89,3 +89,21 @@ _Avoid_: panel object, panel controller
 **Tab strip**:
 The host's row of open panels — the only place a tab is drawn. A panel that wants several of something opens several panels rather than growing tabs of its own.
 _Avoid_: inner tabs, sub-tabs, splits
+
+## Hub Domain
+
+**Hub**:
+A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives GitHub webhooks and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. Design: `docs/design/pie-hub.md`.
+_Avoid_: treating Hub as a second daemon; `pie hub serve`; exposing the local serve/UI process as the webhook target
+
+**Relationship**:
+The daemon's long-lived Hub identity after `pie hub connect`. The daemon generates and stores the credential; the human CLI login is a different secret used only to mint a one-time enrollment token.
+_Avoid_: reusing the local UI bearer token or WebSocket ticket on the Hub socket
+
+**Hub execution**:
+Hub-minted work identified by `executionId`. The daemon turns it into a normal session (`session.create` + `worktree` + `session.prompt`) and maps `executionId → SessionRef`. Idempotent on retry. Offline daemon is `daemon_not_connected` — V1 does not queue.
+_Avoid_: using `executionId` as a SessionRef or wire session identity; calling Hub work a harness job
+
+**Session source**:
+Optional floor field on session metadata, `{ kind: "hub", executionId }`, written only when Hub created the session. Absence means a human-created session.
+_Avoid_: storing GitHub issue numbers on the session record; overlaying `source` from Pi
