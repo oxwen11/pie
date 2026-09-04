@@ -7,11 +7,10 @@ import { applySessionListEvent } from "./session-list-cache";
 
 const RESUBSCRIBE_DELAY_MS = 1000;
 
-// The one always-on consumer of the global (firehose) subscription, called
-// once from the root layout. It keeps every open `agent.session.list` cache
-// converged — across tabs and the desktop app, not just the tab that drove
-// the change — by folding each event through `applySessionListEvent`; chunks
-// and requests still belong to the per-session Chat transport.
+// The one always-on consumer of the global subscription, called once from the
+// root layout. Each connection opens the stream before refreshing the lists,
+// so events arriving during that refresh wait in the stream instead of falling
+// into an uncovered reconnect gap.
 export function useSessionListSync(): void {
   const { orpcClient, orpcQueryUtils, queryClient } = useRouteContext({ from: "__root__" });
   // The cleanup below does own every allocation, but the rule only recognizes
@@ -35,6 +34,12 @@ export function useSessionListSync(): void {
             { scope: { kind: "global" } },
             { signal: abort.signal },
           );
+          // The stream is already registered server-side. Refresh the
+          // authoritative baseline now; events that race the read remain
+          // buffered and apply afterward.
+          await queryClient.invalidateQueries({
+            queryKey: orpcQueryUtils.agent.session.list.key(),
+          });
           for await (const item of stream) {
             if (item.type !== "event") continue;
             applySessionListEvent(queryClient, listKeyFor, item.event);
@@ -43,12 +48,8 @@ export function useSessionListSync(): void {
           if (abort.signal.aborted || isAbortError(error)) return;
         }
         if (abort.signal.aborted) return;
-        // The stream ended (server teardown / dropped connection): phase
-        // transitions may have been missed, so the patched statuses can be
-        // stale — refetch every list rather than trust them.
-        void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() });
-        // Back off, then re-subscribe. Resolves early on abort so unmount
-        // doesn't wait out the delay.
+        // Back off, then repeat the same subscribe-first baseline sequence.
+        // Resolves early on abort so unmount doesn't wait out the delay.
         await sleep(RESUBSCRIBE_DELAY_MS, abort.signal);
       }
     };

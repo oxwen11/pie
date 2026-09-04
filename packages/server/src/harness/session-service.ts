@@ -469,24 +469,21 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
               reason,
             });
 
-          // Idle: fire-and-forget so `submitted` still precedes `turn.started`.
-          // Queued: await the harness — a failed follow-up must fail the RPC
-          // (nothing was submitted, so there is no `rejected` to compensate).
+          // Idle prompts publish the optimistic boundary first, then return the
+          // runtime's real admission receipt. A failure emits the compensating
+          // rejection for every subscriber and still fails the initiating RPC.
           if (!queued) {
-            const turnId = yield* newSessionId;
             yield* submitted();
-            yield* deliverPrompt(input.ref, userInput).pipe(
-              Effect.catch((error: unknown) =>
+            return yield* deliverPrompt(input.ref, userInput).pipe(
+              Effect.tapError((error) =>
                 reject(error instanceof Error ? error.message : String(error)),
               ),
-              Effect.forkDetach,
             );
-            return { turnId, started: true };
           }
 
           const receipt = yield* deliverPrompt(input.ref, userInput);
           if (receipt.started) yield* submitted();
-          return { turnId: receipt.turnId, started: receipt.started };
+          return receipt;
         }).pipe(inSession(input.ref)),
 
       interrupt: (ref: SessionRef) =>
