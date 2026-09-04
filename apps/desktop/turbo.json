@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "cache": false
+      "env": ["PIE_DAEMON_COMPATIBILITY_KEY"]
     },
     "dev": {
       "dependsOn": ["@getpie/server#build"],

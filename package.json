@@ -4,10 +4,10 @@
   "scripts": {
     "dev": "turbo run dev",
     "watch": "turbo watch dev",
-    "build": "turbo run build",
+    "build": "PIE_DAEMON_COMPATIBILITY_KEY=$(node packages/core/print-daemon-compatibility-key.ts) turbo run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "PIE_DAEMON_COMPATIBILITY_KEY=$(node packages/core/print-daemon-compatibility-key.ts) turbo run typecheck",
     "lint": "turbo run lint",
     "lint:check": "turbo run lint:check",
     "format": "oxfmt",

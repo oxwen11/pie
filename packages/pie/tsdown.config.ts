@@ -1,4 +1,4 @@
-import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
+import { daemonCompatibilityKeyForBuild } from "@getpie/core/compatibility";
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
@@ -34,6 +34,6 @@ export default defineConfig({
   clean: true,
   env: {
     NODE_ENV: "production",
-    PIE_DAEMON_COMPATIBILITY_KEY: resolveDaemonCompatibilityKey(),
+    PIE_DAEMON_COMPATIBILITY_KEY: daemonCompatibilityKeyForBuild(),
   },
 });

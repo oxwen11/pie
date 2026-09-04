@@ -2,7 +2,7 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "cache": false,
+      "env": ["PIE_DAEMON_COMPATIBILITY_KEY"],
       "dependsOn": ["^build", "@getpie/app#build"]
     },
     "test": {
