@@ -128,27 +128,24 @@ export const makePiAgentRuntime = (
             : Ref.getAndSet(activeTurn, undefined).pipe(
                 Effect.flatMap((turnId) => {
                   switch (reason._tag) {
-                    case "Crashed":
-                      return emit({
+                    case "Crashed": {
+                      const crashed = emit({
                         type: "session.crashed",
                         sessionId,
                         reason: String(reason.cause),
-                      }).pipe(
-                        Effect.andThen(
-                          turnId
-                            ? emit({
-                                type: "session.turn.ended",
-                                sessionId,
-                                turnId,
-                                outcome: "failed",
-                                error: {
-                                  message: String(reason.cause),
-                                  category: "unknown",
-                                },
-                              })
-                            : Effect.void,
-                        ),
-                      );
+                      });
+                      if (!turnId) return crashed;
+                      return emit({
+                        type: "session.turn.ended",
+                        sessionId,
+                        turnId,
+                        outcome: "failed",
+                        error: {
+                          message: String(reason.cause),
+                          category: "unknown",
+                        },
+                      }).pipe(Effect.andThen(crashed));
+                    }
                     case "Closed":
                       return turnId
                         ? emit({
