@@ -85,8 +85,12 @@ describe("Reasoning trigger", () => {
     if (!trigger) throw new Error("Reasoning trigger was not rendered");
 
     expect(trigger.className).toContain("group");
-    expect(trigger.querySelector(".lucide-square-plus")).not.toBeNull();
-    expect(trigger.querySelector(".lucide-square-minus")).not.toBeNull();
+    expect(trigger.querySelector(".lucide-square-plus")?.getAttribute("class")).toContain(
+      "size-3.5",
+    );
+    expect(trigger.querySelector(".lucide-square-minus")?.getAttribute("class")).toContain(
+      "size-3.5",
+    );
     expect(trigger.querySelector(".lucide-chevron-down")).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
 

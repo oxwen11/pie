@@ -113,15 +113,15 @@ export const ReasoningTrigger = memo(({ className, children, ...props }: Reasoni
     >
       {children ?? (
         <>
-          <span className="relative size-4 shrink-0">
+          <span className="relative size-3.5 shrink-0">
             <PieLoader
               aria-hidden
               animated={isStreaming}
-              className="size-4 group-hover:opacity-0 group-data-[panel-open]:opacity-0"
+              className="size-3.5 group-hover:opacity-0 group-data-[panel-open]:opacity-0"
             />
             <span className="absolute inset-0 opacity-0 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
-              <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
-              <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
+              <SquarePlusIcon className="size-3.5 group-data-[panel-open]:hidden" />
+              <SquareMinusIcon className="hidden size-3.5 group-data-[panel-open]:block" />
             </span>
           </span>
           {isStreaming ? (
