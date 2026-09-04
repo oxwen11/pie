@@ -7,19 +7,22 @@ Turborepo, TypeScript everywhere.
 ## Commands
 
 Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
-`test`, `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing
-turbo skips the upstream tsdown build (including the oxlint plugins).
+`typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing turbo
+skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
+is the root Vitest workspace (`vitest.config.mts` → each package config).
 
-|                                               |                                                      |
-| --------------------------------------------- | ---------------------------------------------------- |
-| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@getpie/server`  |
-| `pnpm check`                                  | lint:check + format:check + typecheck — **no tests** |
-| `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
+|                                 |                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm test`                     | root Vitest workspace; one package: `pnpm --filter @getpie/server test` |
+| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                |
+| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                    |
+| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                        |
 
-`format` is root-only (oxfmt) and not a turbo task. `lint` / `lint:check` go
-through turbo so they wait on `@getpie/oxlint#build` (the oxlint tsdown
-plugins). `test` and `typecheck` are cached, so re-run with `--force` after
-changing something outside their hash inputs. `pnpm clean` runs `turbo run clean` then
+`format` is root-only (oxfmt) and not a turbo task. `test` is the root
+Vitest workspace, not a turbo task. `lint` / `lint:check` go through turbo
+so they wait on `@getpie/oxlint#build` (the oxlint tsdown plugins).
+`typecheck` is cached, so re-run with `--force` after changing something
+outside its hash inputs. `pnpm clean` runs `turbo run clean` then
 `git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.
 Runtime UI checks use `pnpm exec pie-verify web|cli|desktop` (`@getpie/verify`).
 Skill recipes live in `.agents/skills/verify-pie{,-cli,-desktop}`

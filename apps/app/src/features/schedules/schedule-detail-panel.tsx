@@ -1,6 +1,5 @@
 import { firedRunCount, type Schedule } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
-import { XIcon } from "lucide-react";
 
 import {
   formatFiredCap,
@@ -10,6 +9,13 @@ import {
   formatSpec,
   summarizeRuns,
 } from "./cadence";
+import {
+  SchedulePanel,
+  SchedulePanelBody,
+  SchedulePanelClose,
+  SchedulePanelHeader,
+  SchedulePanelTitle,
+} from "./schedule-panel";
 import { ScheduleRunHistory } from "./schedule-run-history";
 
 export type ScheduleDetailPanelProps = {
@@ -40,17 +46,12 @@ export function ScheduleDetailPanel({
   const lastRun = formatLastRun(schedule);
   const summary = formatRunSummary(summarizeRuns(schedule.runs));
   return (
-    <aside
-      aria-label={schedule.name}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-s"
-    >
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{schedule.name}</h2>
-        <Button aria-label="Close" onClick={onClose} size="icon-xs" variant="ghost">
-          <XIcon className="size-3.5" />
-        </Button>
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+    <SchedulePanel aria-label={schedule.name}>
+      <SchedulePanelHeader>
+        <SchedulePanelTitle>{schedule.name}</SchedulePanelTitle>
+        <SchedulePanelClose onClick={onClose} />
+      </SchedulePanelHeader>
+      <SchedulePanelBody className="gap-4">
         <div className="flex flex-col gap-1">
           <div className="text-muted-foreground text-sm">
             {projectName} · {formatSpec(schedule.spec)}
@@ -89,7 +90,7 @@ export function ScheduleDetailPanel({
           <h3 className="text-sm font-medium">Recent runs</h3>
           <ScheduleRunHistory nowMs={nowMs} onOpenSession={onOpenSession} schedule={schedule} />
         </div>
-      </div>
-    </aside>
+      </SchedulePanelBody>
+    </SchedulePanel>
   );
 }
