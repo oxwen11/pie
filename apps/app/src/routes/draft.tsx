@@ -1,4 +1,24 @@
-import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import type {
+  AgentModel,
+  CreateWorktreeInput,
+  ListSessionsOutput,
+  SessionSummary,
+} from "@getpie/contract";
+import {
+  ModelSelector,
+  ModelSelectorCollection,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorGroupLabel,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorName,
+  ModelSelectorPopup,
+  ModelSelectorTrigger,
+  ModelSelectorValue,
+} from "@getpie/ui/ai-elements/model-selector";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -7,6 +27,7 @@ import {
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
+import { useComboboxFilter } from "@getpie/ui/components/combobox";
 import {
   Empty,
   EmptyContent,
@@ -17,12 +38,11 @@ import {
 } from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FolderPlusIcon } from "lucide-react";
-import { useState } from "react";
+import { ChevronsUpDownIcon, FolderPlusIcon, SearchIcon } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
@@ -296,10 +316,9 @@ function DraftRoute() {
             <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
-                <DraftModelSelect
-                  projectId={selected?.id}
-                  providerId={draftModel?.provider}
+                <DraftModelPicker
                   modelId={draftModel?.modelId}
+                  models={modelsQuery.data?.models ?? []}
                   onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
@@ -309,6 +328,7 @@ function DraftRoute() {
                       console.error("Failed to set the draft model", error);
                     });
                   }}
+                  providerId={draftModel?.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit
@@ -325,5 +345,128 @@ function DraftRoute() {
         </Card>
       </CardFrame>
     </div>
+  );
+}
+
+type DraftModelOption = {
+  provider: string;
+  modelId: string;
+  label: string;
+};
+
+type DraftModelGroup = {
+  provider: string;
+  items: DraftModelOption[];
+};
+
+function DraftModelPicker({
+  models,
+  providerId,
+  modelId,
+  onChange,
+}: {
+  models: ReadonlyArray<AgentModel>;
+  providerId: string | undefined;
+  modelId: string | undefined;
+  onChange: (provider: string, modelId: string) => void;
+}) {
+  const filter = useComboboxFilter();
+  const options = useMemo(
+    () =>
+      models.map((model) => ({
+        provider: model.provider,
+        modelId: model.modelId,
+        label: model.name ?? model.modelId,
+      })),
+    [models],
+  );
+  const groups = useMemo<DraftModelGroup[]>(() => {
+    const byProvider = new Map<string, DraftModelOption[]>();
+    for (const option of options) {
+      const items = byProvider.get(option.provider) ?? [];
+      items.push(option);
+      byProvider.set(option.provider, items);
+    }
+    return [...byProvider].map(([provider, items]) => ({ items, provider }));
+  }, [options]);
+  const value = useMemo(
+    () =>
+      options.find((option) => option.provider === providerId && option.modelId === modelId) ??
+      null,
+    [options, providerId, modelId],
+  );
+  const matchesQuery = useCallback(
+    (option: DraftModelOption, query: string) =>
+      filter.contains(option.label, query) ||
+      filter.contains(option.modelId, query) ||
+      filter.contains(option.provider, query),
+    [filter],
+  );
+
+  if (models.length === 0) return null;
+
+  return (
+    <ModelSelector
+      autoHighlight
+      filter={matchesQuery}
+      items={groups}
+      onValueChange={(option) => {
+        if (option) onChange(option.provider, option.modelId);
+      }}
+      value={value}
+    >
+      <ModelSelectorTrigger
+        className="data-placeholder:text-muted-foreground min-w-0"
+        render={<Button size="sm" variant="ghost" />}
+      >
+        <ModelSelectorValue placeholder="Default">
+          {(option: DraftModelOption | null) => (
+            <span className="flex min-w-0 items-center gap-2">
+              {option ? (
+                <>
+                  <ModelSelectorLogo provider={option.provider} />
+                  <ModelSelectorName>{option.label}</ModelSelectorName>
+                </>
+              ) : (
+                <ModelSelectorName>Default</ModelSelectorName>
+              )}
+            </span>
+          )}
+        </ModelSelectorValue>
+        <ChevronsUpDownIcon />
+      </ModelSelectorTrigger>
+      <ModelSelectorPopup>
+        <div className="border-b px-2 py-1.5">
+          <ModelSelectorInput
+            autoFocus
+            className="border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0"
+            placeholder="Search models…"
+            showTrigger={false}
+            size="sm"
+            startAddon={<SearchIcon />}
+          />
+        </div>
+        <ModelSelectorEmpty className="text-muted-foreground text-center text-sm">
+          No matching models.
+        </ModelSelectorEmpty>
+        <div className="min-h-0 flex-1">
+          <ModelSelectorList>
+            {(group: DraftModelGroup) => (
+              <ModelSelectorGroup items={group.items} key={group.provider}>
+                <ModelSelectorGroupLabel>{group.provider}</ModelSelectorGroupLabel>
+                <ModelSelectorCollection>
+                  {(option: DraftModelOption) => (
+                    <ModelSelectorItem key={`${option.provider}:${option.modelId}`} value={option}>
+                      <ModelSelectorLogo provider={option.provider} />
+                      <ModelSelectorName>{option.label}</ModelSelectorName>
+                    </ModelSelectorItem>
+                  )}
+                </ModelSelectorCollection>
+              </ModelSelectorGroup>
+            )}
+          </ModelSelectorList>
+        </div>
+      </ModelSelectorPopup>
+    </ModelSelector>
   );
 }

@@ -81,6 +81,9 @@ export function SchedulePage({
         ...(value.maxRuns !== null ? { maxRuns: value.maxRuns } : undefined),
         ...(value.runNow ? { runNow: true } : undefined),
         ...(value.worktree ? { worktree: {} } : undefined),
+        ...(value.provider !== undefined && value.modelId !== undefined
+          ? { provider: value.provider, modelId: value.modelId }
+          : undefined),
       }),
     onSuccess: (created) => {
       onCloseCreate();
@@ -122,6 +125,8 @@ export function SchedulePage({
         ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
         ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
         ...(input.worktree === true ? { worktree: {} } : undefined),
+        ...(input.provider !== undefined ? { provider: input.provider } : undefined),
+        ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
       }),
     onSuccess: () => {
       setEditing(null);

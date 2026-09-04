@@ -65,6 +65,14 @@ describe("schedule router", () => {
       expect(stored.data).not.toHaveProperty("automation");
       expect(stored.data).not.toHaveProperty("automationId");
 
+      const modeled = await h.client.schedule.update({
+        id: created.id,
+        provider: "anthropic",
+        modelId: "claude-sonnet-4-5",
+      });
+      expect(modeled.provider).toBe("anthropic");
+      expect(modeled.modelId).toBe("claude-sonnet-4-5");
+
       await h.client.schedule.delete({ id: created.id });
       await expect(h.client.schedule.list()).resolves.toEqual([]);
       if (fired.ref !== undefined) {

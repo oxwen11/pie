@@ -6,6 +6,12 @@ import {
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
+import {
+  PromptInputBox,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -17,7 +23,6 @@ import {
   SelectValue,
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
-import { Textarea } from "@getpie/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
@@ -36,6 +41,7 @@ import {
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
+import { ScheduleModelSelect } from "./schedule-model-select";
 
 export type ScheduleFormSubmit = {
   readonly name: string;
@@ -47,6 +53,8 @@ export type ScheduleFormSubmit = {
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
+  readonly provider?: string;
+  readonly modelId?: string;
 };
 
 export type ScheduleFormDefaults = {
@@ -93,6 +101,10 @@ function formFromSchedule(
     expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
     maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
     runNow: false,
+    model:
+      initial.provider !== undefined && initial.modelId !== undefined
+        ? { provider: initial.provider, modelId: initial.modelId }
+        : undefined,
     ...formFromSpec(initial.spec, base),
   };
 }
@@ -116,6 +128,17 @@ export function ScheduleForm({
     }),
     enabled: form.reuseSession && form.projectId.length > 0,
   });
+  const models = useQuery({
+    ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
+    enabled: form.projectId.length > 0,
+  });
+  const listedModels = models.data?.models ?? [];
+  const model = form.model ?? models.data?.defaultModel;
+  const modelOptions =
+    model !== undefined &&
+    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
+      ? [...listedModels, model]
+      : listedModels;
   const listed = sessions.data ?? [];
   const listedIds = sessions.isSuccess
     ? new Set(listed.map((session) => session.sessionId))
@@ -148,7 +171,8 @@ export function ScheduleForm({
     form.prompt.trim().length > 0 &&
     (form.cadence !== "once" || form.runAt.length > 0) &&
     (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1));
+    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
+    (listedModels.length === 0 || model !== undefined);
 
   return (
     <form
@@ -174,6 +198,9 @@ export function ScheduleForm({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
+            ...(model !== undefined
+              ? { provider: model.provider, modelId: model.modelId }
+              : undefined),
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -202,6 +229,7 @@ export function ScheduleForm({
                 projectId: next,
                 sessionPick: "create",
                 sessionId: "",
+                model: undefined,
               }));
             }
           }}
@@ -221,14 +249,28 @@ export function ScheduleForm({
       </Field>
       <Field>
         <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
-        <Textarea
-          id="schedule-prompt"
-          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
-          onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-          required
-          rows={5}
-          value={form.prompt}
-        />
+        <PromptInputBox>
+          <PromptInputTextarea
+            id="schedule-prompt"
+            maxLength={MAX_SCHEDULE_PROMPT_CHARS}
+            onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+            placeholder=""
+            required
+            value={form.prompt}
+          />
+          <PromptInputToolbar>
+            <PromptInputTools>
+              <ScheduleModelSelect
+                modelId={model?.modelId}
+                models={modelOptions}
+                onChange={(provider, modelId) =>
+                  setForm((current) => ({ ...current, model: { provider, modelId } }))
+                }
+                providerId={model?.provider}
+              />
+            </PromptInputTools>
+          </PromptInputToolbar>
+        </PromptInputBox>
       </Field>
       <ScheduleFormCadenceFields form={form} setForm={setForm} />
       <ScheduleFormLimitsFields form={form} setForm={setForm} />

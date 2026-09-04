@@ -1,38 +1,36 @@
 import type { AgentModel } from "@getpie/contract";
-import { Button } from "@getpie/ui/components/button";
 import {
-  Combobox,
-  ComboboxCollection,
-  ComboboxEmpty,
-  ComboboxGroup,
-  ComboboxGroupLabel,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-  ComboboxPopup,
-  ComboboxTrigger,
-  ComboboxValue,
-  useComboboxFilter,
-} from "@getpie/ui/components/combobox";
+  ModelSelector,
+  ModelSelectorCollection,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorGroupLabel,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorName,
+  ModelSelectorPopup,
+  ModelSelectorTrigger,
+  ModelSelectorValue,
+} from "@getpie/ui/ai-elements/model-selector";
+import { Button } from "@getpie/ui/components/button";
+import { useComboboxFilter } from "@getpie/ui/components/combobox";
 import { ChevronsUpDownIcon, SearchIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
-interface ModelOption {
+type ModelOption = {
   provider: string;
   modelId: string;
   label: string;
-}
+};
 
-interface ModelGroup {
+type ModelGroup = {
   provider: string;
   items: ModelOption[];
-}
+};
 
-// Presentational model picker: value/onChange driven so it composes inside a
-// live session. Options come from Pi's `get_available_models` — never hardcoded.
-// Model ids are scoped to their provider; the pair always travels together.
-// Models are grouped by provider and the popup filters as you type.
-export function ModelSelect({
+export function ScheduleModelSelect({
   models,
   providerId,
   modelId,
@@ -41,11 +39,10 @@ export function ModelSelect({
   models: ReadonlyArray<AgentModel>;
   providerId: string | undefined;
   modelId: string | undefined;
-  onChange: (providerId: string, modelId: string) => void;
+  onChange: (provider: string, modelId: string) => void;
 }) {
   const filter = useComboboxFilter();
-
-  const options = useMemo<ModelOption[]>(
+  const options = useMemo(
     () =>
       models.map((model) => ({
         provider: model.provider,
@@ -54,25 +51,21 @@ export function ModelSelect({
       })),
     [models],
   );
-
   const groups = useMemo<ModelGroup[]>(() => {
     const byProvider = new Map<string, ModelOption[]>();
     for (const option of options) {
-      const groupItems = byProvider.get(option.provider) ?? [];
-      groupItems.push(option);
-      byProvider.set(option.provider, groupItems);
+      const items = byProvider.get(option.provider) ?? [];
+      items.push(option);
+      byProvider.set(option.provider, items);
     }
     return [...byProvider].map(([provider, items]) => ({ items, provider }));
   }, [options]);
-
   const value = useMemo(
     () =>
       options.find((option) => option.provider === providerId && option.modelId === modelId) ??
       null,
     [options, providerId, modelId],
   );
-
-  // Search matches the display name, the raw model id, and the provider group.
   const matchesQuery = useCallback(
     (option: ModelOption, query: string) =>
       filter.contains(option.label, query) ||
@@ -84,7 +77,7 @@ export function ModelSelect({
   if (models.length === 0) return null;
 
   return (
-    <Combobox
+    <ModelSelector
       autoHighlight
       filter={matchesQuery}
       items={groups}
@@ -93,20 +86,30 @@ export function ModelSelect({
       }}
       value={value}
     >
-      <ComboboxTrigger
+      <ModelSelectorTrigger
+        aria-label="Model"
         className="data-placeholder:text-muted-foreground min-w-0"
         render={<Button size="sm" variant="ghost" />}
       >
-        <ComboboxValue placeholder="Default">
+        <ModelSelectorValue placeholder="Default">
           {(option: ModelOption | null) => (
-            <span className="truncate">{option ? option.label : "Default"}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              {option ? (
+                <>
+                  <ModelSelectorLogo provider={option.provider} />
+                  <ModelSelectorName>{option.label}</ModelSelectorName>
+                </>
+              ) : (
+                <ModelSelectorName>Default</ModelSelectorName>
+              )}
+            </span>
           )}
-        </ComboboxValue>
+        </ModelSelectorValue>
         <ChevronsUpDownIcon />
-      </ComboboxTrigger>
-      <ComboboxPopup className="min-w-64">
+      </ModelSelectorTrigger>
+      <ModelSelectorPopup>
         <div className="border-b px-2 py-1.5">
-          <ComboboxInput
+          <ModelSelectorInput
             autoFocus
             className="border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0"
             placeholder="Search models…"
@@ -115,26 +118,27 @@ export function ModelSelect({
             startAddon={<SearchIcon />}
           />
         </div>
-        <ComboboxEmpty className="text-muted-foreground text-center text-sm">
+        <ModelSelectorEmpty className="text-muted-foreground text-center text-sm">
           No matching models.
-        </ComboboxEmpty>
+        </ModelSelectorEmpty>
         <div className="min-h-0 flex-1">
-          <ComboboxList>
+          <ModelSelectorList>
             {(group: ModelGroup) => (
-              <ComboboxGroup items={group.items} key={group.provider}>
-                <ComboboxGroupLabel>{group.provider}</ComboboxGroupLabel>
-                <ComboboxCollection>
+              <ModelSelectorGroup items={group.items} key={group.provider}>
+                <ModelSelectorGroupLabel>{group.provider}</ModelSelectorGroupLabel>
+                <ModelSelectorCollection>
                   {(option: ModelOption) => (
-                    <ComboboxItem key={`${option.provider}:${option.modelId}`} value={option}>
-                      {option.label}
-                    </ComboboxItem>
+                    <ModelSelectorItem key={`${option.provider}:${option.modelId}`} value={option}>
+                      <ModelSelectorLogo provider={option.provider} />
+                      <ModelSelectorName>{option.label}</ModelSelectorName>
+                    </ModelSelectorItem>
                   )}
-                </ComboboxCollection>
-              </ComboboxGroup>
+                </ModelSelectorCollection>
+              </ModelSelectorGroup>
             )}
-          </ComboboxList>
+          </ModelSelectorList>
         </div>
-      </ComboboxPopup>
-    </Combobox>
+      </ModelSelectorPopup>
+    </ModelSelector>
   );
 }
