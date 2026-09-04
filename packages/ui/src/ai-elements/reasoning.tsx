@@ -7,11 +7,13 @@ import {
 } from "@getpie/ui/components/collapsible";
 import { useControllableState } from "@getpie/ui/hooks/use-controllable-state";
 import { cn } from "@getpie/ui/lib/utils";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";
 
+import { PieLoader } from "./pie-loader";
 import { Response } from "./response";
+import { Shimmer } from "./shimmer";
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -100,9 +102,7 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 export const ReasoningTrigger = memo(({ className, children, ...props }: ReasoningTriggerProps) => {
   const { isStreaming, isOpen, duration } = useReasoning();
   let label = "Thought";
-  if (isStreaming) {
-    label = "Thinking...";
-  } else if (duration !== undefined && duration >= 1) {
+  if (duration !== undefined && duration >= 1) {
     label = `Thought for ${duration} ${duration === 1 ? "second" : "seconds"}`;
   }
 
@@ -113,8 +113,14 @@ export const ReasoningTrigger = memo(({ className, children, ...props }: Reasoni
     >
       {children ?? (
         <>
-          <BrainIcon className="size-4" />
-          <p>{label}</p>
+          <PieLoader aria-hidden animated={isStreaming} />
+          {isStreaming ? (
+            <Shimmer duration={2} as="span">
+              Thinking…
+            </Shimmer>
+          ) : (
+            <p>{label}</p>
+          )}
           <ChevronDownIcon
             className={cn(
               "text-muted-foreground size-4 transition-transform",
