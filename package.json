@@ -5,7 +5,7 @@
     "dev": "turbo run dev",
     "watch": "turbo watch dev",
     "build": "turbo run build",
-    "test": "node scripts/vitest-run.mjs",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

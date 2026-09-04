@@ -11,12 +11,12 @@ Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
 skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
 is the root Vitest workspace (`vitest.config.mts` → each package config).
 
-|                                 |                                                           |
-| ------------------------------- | --------------------------------------------------------- |
-| `pnpm test`                     | root Vitest projects; scope with `pnpm test -- -p server` |
-| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`  |
-| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**      |
-| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report          |
+|                                 |                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm test`                     | root Vitest workspace; one package: `pnpm --filter @getpie/server test` |
+| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                |
+| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                    |
+| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                        |
 
 `format` is root-only (oxfmt) and not a turbo task. `test` is the root
 Vitest workspace, not a turbo task. `lint` / `lint:check` go through turbo
