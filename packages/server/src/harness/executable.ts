@@ -49,7 +49,7 @@ export const isExecutableFile = (
       (info) => info.type === "File" && (platform === "win32" || (info.mode & 0o111) !== 0),
     ),
     // A candidate that cannot be stat'd (absent, unreadable dir) is not here.
-    Effect.catch(() => Effect.succeed(false)),
+    Effect.orElseSucceed(() => false),
   );
 
 /**

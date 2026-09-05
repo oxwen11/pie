@@ -54,3 +54,19 @@ it.effect("closeSession ends a matching subscriber with its reason", () =>
     }),
   ),
 );
+
+it.effect("closeSession is idempotent after the subscriber queue has ended", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const bus = yield* makeEventBus(8);
+      const stream = yield* bus.subscribe({ kind: "session", ref });
+
+      yield* bus.closeSession(ref, "session_closed");
+      yield* bus.closeSession(ref, "session_deleted");
+      yield* bus.publish(started(1));
+
+      const items = yield* Stream.runCollect(stream);
+      assert.deepEqual(items, [{ type: "closed", reason: "session_closed" }]);
+    }),
+  ),
+);
