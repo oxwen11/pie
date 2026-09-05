@@ -138,7 +138,12 @@ export function ReviewDiffAdapter({
 
   return (
     <div className="h-full min-h-0 w-full">
-      <CodeView className="h-full w-full" items={items} options={options} ref={codeViewRef} />
+      <CodeView
+        className="h-full w-full overflow-auto"
+        items={items}
+        options={options}
+        ref={codeViewRef}
+      />
     </div>
   );
 }
