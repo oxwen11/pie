@@ -46,9 +46,6 @@ export function WorkspaceLayout({
   }, []);
 
   const useDrawer = isMobile || isNarrow;
-  useLayoutEffect(() => {
-    if (!useDrawer) setTreeOpen(false);
-  }, [useDrawer]);
   const drawerTrigger = useDrawer ? (
     <Button
       aria-controls={drawerId}

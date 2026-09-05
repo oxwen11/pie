@@ -174,7 +174,20 @@ describe("WorkspaceLayout", () => {
     expect(document.getElementById(controls ?? "")?.textContent).toContain("Project files");
   });
 
-  it("closes the drawer when the layout crosses back to the split threshold", () => {
+  it("closes the drawer with its accessible close button", () => {
+    width = 389;
+    renderLayout({ toolbar: true });
+    act(() => trigger()?.click());
+    expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
+
+    const closeButton = document.querySelector<HTMLButtonElement>("button[aria-label='Close']");
+    expect(closeButton).not.toBeNull();
+    act(() => closeButton?.click());
+
+    expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("retains drawer state when the layout crosses back to the split threshold", () => {
     width = 389;
     renderLayout({ toolbar: true });
     act(() => trigger()?.click());
@@ -185,7 +198,7 @@ describe("WorkspaceLayout", () => {
     expect(container?.querySelector("[aria-label='Resize file tree']")).not.toBeNull();
 
     fireResize(389);
-    expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("disconnects its resize observer when unmounted", () => {
