@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GlobalEventDefs, SessionEventDefs } from "../../src/harness/event-manifest";
+import { GlobalEventDefs, SessionEventDefs } from "../../src/harness/events/framework";
 
 const RESERVED_VERBS = new Set([
   "created",

@@ -105,6 +105,3 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PlatformLayer,
   NodeHttpPlatform.layer,
 );
-
-// Re-export for tests that cached availability on a shape.
-export const cacheAvailability = cachePiAgentAvailability;
