@@ -1,8 +1,9 @@
 import path from "node:path";
 import url from "node:url";
 
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Option } from "effect";
 
+import { pieE2e, pieE2ePiExecutable, piePiExecutable } from "../../config/env";
 import { findExecutable } from "../executable";
 
 /** How the server spawns `pi --mode rpc`. */
@@ -48,6 +49,27 @@ export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExe
 
   return { command: "pi", prefixArgs: [] };
 }
+
+/** Same resolution as {@link resolvePiExecutable}, via Effect Config. */
+export const resolvePiExecutableEffect: Effect.Effect<PiExecutable> = Effect.gen(function* () {
+  const e2e = yield* pieE2e;
+  const e2eExec = yield* pieE2ePiExecutable;
+  if (e2e === "1" && Option.isSome(e2eExec)) {
+    return { command: e2eExec.value, prefixArgs: [] };
+  }
+
+  const explicit = yield* piePiExecutable;
+  if (Option.isSome(explicit) && explicit.value.trim().length > 0) {
+    return { command: explicit.value.trim(), prefixArgs: [] };
+  }
+
+  const bundled = resolveBundledPiCli();
+  if (bundled) {
+    return { command: process.execPath, prefixArgs: [bundled] };
+  }
+
+  return { command: "pi", prefixArgs: [] };
+});
 
 /** What `availability` should stat or PATH-search. */
 export function piAvailabilityTarget(executable: PiExecutable): string {

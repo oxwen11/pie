@@ -1,5 +1,6 @@
 import { Crypto, Effect, Layer, Logger, References } from "effect";
 
+import { pieLogLevel, piePrintLogs, PrintLogs } from "../config/env";
 import { layerPaths, Paths } from "../config/paths";
 import * as Logging from "./logging";
 
@@ -23,9 +24,14 @@ export function layer() {
           Effect.die(new Error("invariant: platform RNG failed minting a log run id", { cause })),
         ),
       );
-      return Logger.layer(Logging.loggers(logsDir, runId), { mergeWithExisting: false }).pipe(
+      const printLogs = yield* piePrintLogs;
+      const logLevel = yield* pieLogLevel;
+      return Logger.layer(Logging.loggers(logsDir, runId, printLogs), {
+        mergeWithExisting: false,
+      }).pipe(
         Layer.orDie,
-        Layer.merge(Layer.succeed(References.MinimumLogLevel, Logging.minimumLogLevel())),
+        Layer.merge(Layer.succeed(References.MinimumLogLevel, logLevel)),
+        Layer.merge(Layer.succeed(PrintLogs, printLogs)),
       );
     }),
   );
