@@ -12,6 +12,7 @@ import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
+import { useTheme } from "./theme-provider";
 
 declare global {
   interface ImportMetaEnv {
@@ -51,6 +52,7 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
+  const { theme } = useTheme();
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
@@ -66,7 +68,7 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
          */}
-        <Toaster theme="system" />
+        <Toaster theme={theme} />
       </ChatManagerProvider>
     </QueryClientProvider>
   );

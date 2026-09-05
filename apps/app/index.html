@@ -2,6 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      let theme;
+      try {
+        theme = localStorage.getItem("vite-ui-theme");
+      } catch {}
+      document.documentElement.classList.toggle(
+        "dark",
+        theme === "dark" ||
+          (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches),
+      );
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
