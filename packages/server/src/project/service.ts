@@ -26,7 +26,7 @@ export class ProjectService extends Context.Service<
       id: string,
     ) => Effect.Effect<void, StoreReadError | StoreWriteError | ProjectNotFound>;
   }
->()("ProjectService") {}
+>()("pie/ProjectService") {}
 
 export const ProjectServiceLayer: Layer.Layer<
   ProjectService,

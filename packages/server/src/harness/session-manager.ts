@@ -103,7 +103,7 @@ export type PiAgentSessionManagerShape = {
 export class PiAgentSessionManager extends Context.Service<
   PiAgentSessionManager,
   PiAgentSessionManagerShape
->()("PiAgentSessionManager") {}
+>()("pie/PiAgentSessionManager") {}
 
 /**
  * A live session, or the fact that one is on its way out. Both live in the

@@ -23,7 +23,7 @@ export class ProjectRepository extends Context.Service<
     readonly list: () => Effect.Effect<ReadonlyArray<Project>, StoreReadError>;
     readonly save: (projects: ReadonlyArray<Project>) => Effect.Effect<void, StoreWriteError>;
   }
->()("ProjectRepository") {}
+>()("pie/ProjectRepository") {}
 
 export const ProjectRepositoryLayer: Layer.Layer<
   ProjectRepository,

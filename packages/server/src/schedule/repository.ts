@@ -13,7 +13,7 @@ export class ScheduleRepository extends Context.Service<
     readonly write: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
     readonly remove: (id: string) => Effect.Effect<void, StoreWriteError>;
   }
->()("ScheduleRepository") {}
+>()("pie/ScheduleRepository") {}
 
 const isSafeId = (id: string): boolean =>
   id.length > 0 && !/[/\\]/.test(id) && id !== "." && id !== "..";

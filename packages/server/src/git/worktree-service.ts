@@ -52,7 +52,7 @@ export class WorktreeService extends Context.Service<
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
   }
->()("WorktreeService") {}
+>()("pie/WorktreeService") {}
 
 export const WorktreeServiceLayer: Layer.Layer<
   WorktreeService,
