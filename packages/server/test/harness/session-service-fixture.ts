@@ -87,6 +87,11 @@ export type SessionServiceRunOpts = {
     cwd: string,
     input?: { readonly base?: string },
   ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+  worktreeEnsure?: (
+    repoCwd: string,
+    worktreePath: string,
+    branch: string,
+  ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
 
@@ -249,6 +254,9 @@ export const run = <A, E>(
             create:
               opts.worktreeCreate ??
               (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
+            ensure:
+              opts.worktreeEnsure ??
+              ((_, worktreePath, branch) => Effect.succeed({ path: worktreePath, branch })),
             remove:
               opts.worktreeRemove ??
               (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),

@@ -78,6 +78,7 @@ export type PiAgentSessionServiceShape = {
     | StoreWriteError
     | SessionNotResumable
     | AgentOperationError
+    | GitWorktreeFailure
   >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
@@ -111,6 +112,7 @@ export type PiAgentSessionServiceShape = {
     | SessionClosed
     | TurnAlreadyRunning
     | AgentOperationError
+    | GitWorktreeFailure
   >;
   readonly interrupt: (
     ref: SessionRef,
@@ -221,7 +223,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
-    const { readMetadata, ensureCwd, readAndStampTitleFromFirstPrompt } = sessionMetadata;
+    const { readMetadata, ensureCwd, ensureWorktree, readAndStampTitleFromFirstPrompt } =
+      sessionMetadata;
     const withMetadataMutation = locks.withLock;
     const newSessionId = crypto.randomUUIDv4.pipe(
       Effect.catchTag("PlatformError", (cause) =>
@@ -272,9 +275,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       | SessionNotFound
       | SessionClosed
       | TurnAlreadyRunning
+      | GitWorktreeFailure
     > =>
       Effect.gen(function* () {
-        const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
+        const resolved = yield* readMetadata(ref).pipe(
+          Effect.flatMap(ensureCwd),
+          Effect.flatMap(ensureWorktree),
+        );
         const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
         return yield* runtime.prompt(userInput);
       });
@@ -323,7 +330,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     .pipe(
                       Effect.map((created) => ({
                         cwd: created.path,
-                        gitBranch: created.branch,
+                        worktree: { branch: created.branch },
                       })),
                     );
             return materializeWorkspace.pipe(
@@ -333,8 +340,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   projectId: input.projectId,
                   createdAt: new Date().toISOString(),
                   cwd: sessionWorkspace.cwd,
-                  ...(sessionWorkspace.gitBranch !== undefined
-                    ? { gitBranch: sessionWorkspace.gitBranch }
+                  ...(sessionWorkspace.worktree !== undefined
+                    ? { worktree: sessionWorkspace.worktree }
                     : undefined),
                   ...(input.model !== undefined
                     ? { provider: input.model.provider, modelId: input.model.modelId }
@@ -344,7 +351,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                 };
                 return repo.write(metadata).pipe(
                   Effect.tapError(() =>
-                    sessionWorkspace.gitBranch === undefined
+                    sessionWorkspace.worktree === undefined
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
@@ -372,6 +379,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(Effect.flatMap((metadata) => ensureCwd(metadata))),
         ).pipe(
+          Effect.flatMap(ensureWorktree),
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
               return Effect.succeed(toSessionWorkspace(metadata));

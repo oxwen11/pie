@@ -88,4 +88,53 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
       yield* worktrees.remove(created.path);
     }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
   );
+
+  it.effect("ensure is a no-op when the worktree directory still exists", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      const ensured = yield* worktrees.ensure(dir, created.path, created.branch);
+      assert.equal(ensured.path, created.path);
+      assert.equal(ensured.branch, created.branch);
+      yield* worktrees.remove(created.path);
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
+
+  it.effect("ensure re-creates a deleted worktree from the stored branch", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const git = yield* GitService;
+      const created = yield* worktrees.create(dir);
+      yield* Effect.promise(() => fs.promises.rm(created.path, { recursive: true, force: true }));
+      assert.equal(fs.existsSync(created.path), false);
+
+      const ensured = yield* worktrees.ensure(dir, created.path, created.branch);
+      assert.equal(ensured.path, created.path);
+      assert.equal(ensured.branch, created.branch);
+      assert.equal(fs.existsSync(created.path), true);
+
+      const branch = yield* git.branch(created.path);
+      assert.equal(branch.kind, "repository");
+      if (branch.kind !== "repository") return;
+      assert.equal(branch.current, created.branch);
+
+      yield* worktrees.remove(created.path);
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
+
+  it.effect("ensure fails when the stored branch is gone", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      yield* worktrees.remove(created.path);
+      yield* Effect.promise(async () => {
+        await simpleGit(dir).raw(["branch", "-D", created.branch]);
+      });
+      const error = yield* Effect.flip(worktrees.ensure(dir, created.path, created.branch));
+      assert.equal(error._tag, "GitRefNotFound");
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
 });
