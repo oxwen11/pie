@@ -24,7 +24,7 @@ if (sessionId === "missing-session") {
 const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
 const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
-let holding = false;
+let holding = null;
 let steering = [];
 let followUp = [];
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
@@ -66,7 +66,20 @@ rl.on("line", (line) => {
     steering.push(msg.message);
     send({ id: msg.id, type: "response", command: "steer", success: true });
     send({ type: "queue_update", steering, followUp });
-    if (holding) { holding = false; settle(); }
+    if (holding) {
+      const held = holding;
+      holding = null;
+      if (held === "after-message") {
+        send({ type: "message_start", message: { role: "user", content: msg.message, timestamp: 0 } });
+        steering = [];
+        send({ type: "queue_update", steering, followUp });
+        send({ type: "message_start", message: assistant() });
+        upd({ type: "text_start", contentIndex: 0 });
+        upd({ type: "text_delta", contentIndex: 0, delta: "after:" + msg.message });
+        upd({ type: "text_end", contentIndex: 0, content: "" });
+      }
+      settle();
+    }
     return;
   }
   if (msg.type === "follow_up") {
@@ -92,8 +105,16 @@ rl.on("line", (line) => {
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
   send({ id: msg.id, type: "response", command: "prompt", success: true });
   send({ type: "agent_start" });
-  if (text === "hold") { holding = true; return; }
-  if (text === "confirm") { holding = true; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
+  if (text === "hold") { holding = "empty"; return; }
+  if (text === "hold-after-message") {
+    holding = "after-message";
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "before" });
+    upd({ type: "text_end", contentIndex: 0, content: "" });
+    return;
+  }
+  if (text === "confirm") { holding = "empty"; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
   if (text === "tool") {
     send({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls" } });
     send({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", result: { content: [{ type: "text", text: "ok" }] }, isError: false });
@@ -269,6 +290,27 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
       const chunks = yield* Stream.runCollect(first.output);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("keeps consuming the active turn after a delivered steer", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold-after-message" });
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
+
+      const second = yield* agent.session.prompt({ sessionId, text: "new direction" });
+      assert.equal(second.started, false);
+      assert.equal(second.turnId, first.turnId);
+
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.deepEqual(
+        chunks.filter((chunk) => chunk.type === "text-delta").map((chunk) => chunk.delta),
+        ["before", "after:new direction"],
+      );
+      assert.equal(chunks.filter((chunk) => chunk.type === "finish").length, 1);
       yield* agent.session.abort(sessionId);
     }),
   );

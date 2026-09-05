@@ -402,6 +402,55 @@ describe("Chat prompting", () => {
     expect(assistantText(messages[1]!)).toBe("reply");
     expect(chat.store.getState().status).toBe("ready");
   });
+
+  it("renders a delivered steer between two assistant segments and settles the turn", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    live(2, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: {
+        type: "start",
+        messageId: "assistant-1",
+        messageMetadata: { sessionId: "native-1", runId: "run-1", segment: 0 },
+      },
+    });
+    for (const [index, chunk] of textChunks("before", "before steer").entries()) {
+      live(3 + index, { type: "session.message.chunk", turnId: "turn-1", chunk });
+    }
+    live(6, {
+      type: "session.prompt.submitted",
+      messageId: "steer-1",
+      parts: [{ type: "text", text: "change direction" }],
+      phase: "running",
+    });
+    live(7, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: {
+        type: "start",
+        messageId: "assistant-2",
+        messageMetadata: { sessionId: "native-1", runId: "run-1", segment: 1 },
+      },
+    });
+    for (const [index, chunk] of textChunks("after", "after steer").entries()) {
+      live(8 + index, { type: "session.message.chunk", turnId: "turn-1", chunk });
+    }
+    live(11, {
+      type: "session.message.chunk",
+      turnId: "turn-1",
+      chunk: { type: "finish" },
+    });
+    live(12, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
+    await settle();
+
+    const messages = chat.store.getState().messages;
+    expect(messages.map((message) => message.role)).toEqual(["assistant", "user", "assistant"]);
+    expect(assistantText(messages[0]!)).toBe("before steer");
+    expect(assistantText(messages[2]!)).toBe("after steer");
+    expect(chat.store.getState().status).toBe("ready");
+  });
 });
 
 describe("Chat interruption", () => {

@@ -102,10 +102,31 @@ export class ChatState implements AiChatStateSlice {
   // identities — otherwise memos keyed on `message.parts` never recompute.
   upsertMessage = (message: UIMessage) => {
     this.store.setState((s) => {
-      const index = s.messages.findIndex((m) => m.id === message.id);
+      const snapshot = this.snapshot(message);
+      const metadata = snapshot.metadata as { runId?: unknown; segment?: unknown } | undefined;
+      if (typeof metadata?.runId === "string" && typeof metadata.segment === "number") {
+        const { runId, segment } = metadata;
+        const prefixLength = s.messages.reduce((total, candidate) => {
+          const candidateMetadata = candidate.metadata as
+            | { runId?: unknown; segment?: unknown }
+            | undefined;
+          return candidate.role === "assistant" &&
+            candidateMetadata !== undefined &&
+            candidateMetadata.runId === runId &&
+            typeof candidateMetadata.segment === "number" &&
+            candidateMetadata.segment < segment
+            ? total + candidate.parts.length
+            : total;
+        }, 0);
+        if (segment > 0 && prefixLength > 0) {
+          snapshot.parts = snapshot.parts.slice(prefixLength);
+        }
+      }
+
+      const index = s.messages.findIndex((m) => m.id === snapshot.id);
       const next = s.messages.slice();
-      if (index === -1) next.push(this.snapshot(message));
-      else next[index] = this.snapshot(message);
+      if (index === -1) next.push(snapshot);
+      else next[index] = snapshot;
       return { messages: next };
     });
   };
