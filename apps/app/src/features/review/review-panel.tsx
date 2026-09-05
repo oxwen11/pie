@@ -14,13 +14,13 @@ import { useCallback, useState } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { WorkspaceLayout } from "@/components/layout/workspace-layout";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
 import { ReviewState } from "./review-state";
 import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
-import { ReviewWorkspaceLayout } from "./review-workspace-layout";
 
 export interface ReviewPayload {
   readonly mode?: GitReviewMode;
@@ -229,8 +229,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   };
 
   return (
-    <ReviewWorkspaceLayout
-      files={
+    <WorkspaceLayout
+      tree={
         <ReviewTreePane
           files={review.data?.files ?? []}
           onSelectFile={selectFile}
@@ -240,7 +240,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           workspacePath={workspacePath}
         />
       }
-      filesLabel={workspaceName}
+      treeLabel={workspaceName}
       preview={
         <ReviewDiffPane
           diffs={diffs}
