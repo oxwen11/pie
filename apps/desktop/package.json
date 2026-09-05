@@ -36,11 +36,8 @@
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@getpie/ui": "workspace:*",
-    "@orpc/tanstack-query": "catalog:orpc",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "catalog:tailwind",
-    "@tanstack/react-query": "catalog:",
     "@tanstack/router-plugin": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -49,13 +46,9 @@
     "electron": "^44.1.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
-    "lucide-react": "catalog:",
-    "nanoid": "^5.1.16",
-    "p-queue": "catalog:",
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "tailwindcss": "catalog:tailwind",
-    "vitest": "catalog:",
-    "zustand": "catalog:"
+    "vitest": "catalog:"
   }
 }
