@@ -2,13 +2,24 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Pie</title>
     <!-- The renderer talks to Electron Main through pie: and to the spawned
          server over loopback HTTP/WebSocket. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self' pie: http://127.0.0.1:* ws://127.0.0.1:*"
+      content="default-src 'self'; script-src 'self' blob: 'sha256-lGH5QfAKJy6nn7TW7WuMIi+RiSk5tMGseE0U1pV9JLE='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self' pie: http://127.0.0.1:* ws://127.0.0.1:*"
     />
+    <script>
+      let theme;
+      try {
+        theme = localStorage.getItem("vite-ui-theme");
+      } catch {}
+      document.documentElement.classList.toggle(
+        "dark",
+        theme === "dark" ||
+          (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches),
+      );
+    </script>
+    <title>Pie</title>
   </head>
 
   <body>

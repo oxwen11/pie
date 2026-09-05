@@ -208,6 +208,23 @@ logs.
 Browser storage is scoped by origin. The web development/served origins and the
 Desktop `pie://app` origin therefore do not share state.
 
+### Theme preference
+
+| Property      | Current contract                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key           | localStorage `vite-ui-theme`; `ThemeProvider.storageKey` may override it                                                                    |
+| Owner         | `ThemeProvider`                                                                                                                             |
+| Data          | One string: `"system"`, `"light"`, or `"dark"`                                                                                              |
+| Write points  | `setTheme` writes the selected preference directly with browser-managed, origin-scoped last-writer-wins behavior                            |
+| Compatibility | Missing, inaccessible, or unrecognized values fall back to `defaultTheme` without rewriting storage; there is no version or migration chain |
+| Retention     | Retained until browser site data or the Electron profile is cleared; Pie has no separate cleanup or uninstall path                          |
+
+The current application roots use the default key. The early HTML bootstrap
+reads that key before React mounts so a stored renderer preference does not
+flash back to the system theme. Electron's native window background still uses
+the system theme before WebContents loads; synchronizing an explicit preference
+into Electron Main is deferred until the product adds a theme setting.
+
 ### Content panel
 
 | Property      | Current contract                                                                                                                                                   |
