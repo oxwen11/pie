@@ -83,10 +83,15 @@ jobs:
       # `@getpie/oxlint/<plugin>` resolves to dist files. Tests are the
       # root Vitest workspace (`pnpm test`) after `build` so cli/core
       # dist exists. Format only needs node_modules and stays parallel
-      # with typecheck/lint.
+      # with typecheck/lint. The compatibility key is hashed into
+      # server/CLI/desktop `build` so the typecheck graph can reuse
+      # those artifacts without embedding a previous SHA's `githash:`.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail
+
+          export PIE_DAEMON_COMPATIBILITY_KEY
+          PIE_DAEMON_COMPATIBILITY_KEY="$(node packages/core/print-daemon-compatibility-key.ts)"
 
           pnpm turbo run build
 

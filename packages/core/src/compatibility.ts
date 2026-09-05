@@ -13,6 +13,9 @@ export type ResolveDaemonCompatibilityKeyOptions = {
   readonly cwd?: string;
 };
 
+/** Turbo hashes this on server/CLI/desktop `build` so a cached dist cannot keep another SHA's key. */
+export const DAEMON_COMPATIBILITY_KEY_ENV = "PIE_DAEMON_COMPATIBILITY_KEY";
+
 // Keep this intentionally broad: every workspace package may be bundled into
 // the standalone server/CLI/Desktop main artifacts. The only excluded app code
 // is renderer-only UI, whose output cannot change the daemon protocol or
@@ -47,13 +50,23 @@ export function decodeDaemonCompatibilityKey(value: unknown): DaemonCompatibilit
   return value as GitHashDaemonCompatibilityKey;
 }
 
+/** Key to embed in a production artifact: prefer a caller-supplied env value so Turbo can hash it. */
+export function daemonCompatibilityKeyForBuild(
+  options: ResolveDaemonCompatibilityKeyOptions = {},
+): GitHashDaemonCompatibilityKey {
+  const fromEnv = decodeDaemonCompatibilityKey(process.env[DAEMON_COMPATIBILITY_KEY_ENV]);
+  return fromEnv ?? resolveDaemonCompatibilityKey(options);
+}
+
 /** Read the statically embedded key; source entry points must inject it too. */
 export function embeddedDaemonCompatibilityKey(
-  value: unknown = process.env.PIE_DAEMON_COMPATIBILITY_KEY,
+  value: unknown = process.env[DAEMON_COMPATIBILITY_KEY_ENV],
 ): DaemonCompatibilityKey {
   const decoded = decodeDaemonCompatibilityKey(value);
   if (decoded === undefined) {
-    throw new Error("PIE_DAEMON_COMPATIBILITY_KEY must be statically injected as githash:<8-hex>");
+    throw new Error(
+      `${DAEMON_COMPATIBILITY_KEY_ENV} must be statically injected as githash:<8-hex>`,
+    );
   }
   return decoded;
 }

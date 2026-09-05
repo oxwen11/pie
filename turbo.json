@@ -26,8 +26,29 @@
       "dependsOn": ["@getpie/oxlint#build"]
     },
     "lint:check": {
-      "cache": false,
-      "dependsOn": ["@getpie/oxlint#build"]
+      "dependsOn": ["@getpie/oxlint#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/**",
+        "$TURBO_ROOT$/packages/**",
+        "$TURBO_ROOT$/tools/**",
+        "$TURBO_ROOT$/.github/**",
+        "$TURBO_ROOT$/.agents/**",
+        "$TURBO_ROOT$/.githooks/**",
+        "$TURBO_ROOT$/oxlint.config.mts",
+        "$TURBO_ROOT$/oxlint.deferred.mts",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/pnpm-workspace.yaml",
+        "$TURBO_ROOT$/pnpm-lock.yaml",
+        "$TURBO_ROOT$/turbo.json",
+        "$TURBO_ROOT$/vitest.config.mts",
+        "$TURBO_ROOT$/mise.toml",
+        "$TURBO_ROOT$/mise.lock",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/**/dist/**",
+        "!$TURBO_ROOT$/**/.turbo/**",
+        "!$TURBO_ROOT$/**/.vitest/**"
+      ]
     },
     "clean": {
       "cache": false

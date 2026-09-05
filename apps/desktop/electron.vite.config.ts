@@ -1,6 +1,6 @@
 import url from "node:url";
 
-import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
+import { daemonCompatibilityKeyForBuild } from "@getpie/core/compatibility";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -9,7 +9,7 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
-const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
+const DAEMON_COMPATIBILITY_KEY = daemonCompatibilityKeyForBuild();
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
 
 // The dev overlays (react-grab, react-scan) reach outside the origin on boot,

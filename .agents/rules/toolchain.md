@@ -9,8 +9,11 @@
   changing versions. `packages/server` pins the Claude SDK as a literal while
   `packages/pie` uses `catalog:` — bump both together.
 - **Lint:** `lint` / `lint:check` are turbo tasks (`dependsOn:
-  ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
-  oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
+  ["@getpie/oxlint#build"]`) so the oxlint plugins exist before
+  oxlint loads them. `lint` (rewrite) stays uncached; `lint:check`
+  caches with repo-wide source inputs (`apps`/`packages`/`tools`,
+  excluding `node_modules`/`dist`/`.turbo`) because oxlint scans the
+  whole repo from `@getpie/oxlint`. `lint:check` still runs `--deny-warnings`, so the
   whole `suspicious` category fails CI while only warning locally. oxfmt
   reorders imports and stays a root-only script. Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
@@ -48,10 +51,11 @@
   use `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
   `include`, so a test file placed elsewhere is silently ignored. `server`,
   `contract`, `core`, and `effect-json-store` enable `test.typecheck`, so type
-  errors fail the run. `server` sets `fileParallelism: false` because git
-  worktree fixtures contend on temp dirs — do not flip it without splitting
-  those files into their own project — and uses a 30s `testTimeout` because
-  those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
+  errors fail the run. `server` splits git-contention files (`git` /
+  `git worktree add` fixtures) into a `server-git` project with
+  `fileParallelism: false`; the rest of the server suite runs in
+  parallel. Do not fold those files back into the parallel project.
+  Git fixtures use a 30s `testTimeout` because they stall under load. `apps/desktop/e2e/` is Playwright
   and not in CI. `tools/testing/fake-claude.mjs` is referenced by relative
   path from both server tests and desktop e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
