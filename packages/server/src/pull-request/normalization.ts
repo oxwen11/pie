@@ -8,19 +8,24 @@ import type {
   PullRequestReviewDecision,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
+import { Schema } from "effect";
 
 const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
-export class InvalidPullRequestJsonError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidPullRequestJsonError";
+export class InvalidPullRequestJsonError extends Schema.TaggedError<InvalidPullRequestJsonError>()(
+  "InvalidPullRequestJsonError",
+  {
+    reason: Schema.String,
+  },
+) {
+  override get message() {
+    return this.reason;
   }
 }
 
 const asRecord = (value: unknown, field: string): Record<string, unknown> => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new InvalidPullRequestJsonError(`${field} must be an object`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be an object` });
   }
   return value as Record<string, unknown>;
 };
@@ -28,7 +33,7 @@ const asRecord = (value: unknown, field: string): Record<string, unknown> => {
 const requiredString = (record: Record<string, unknown>, field: string): string => {
   const value = record[field];
   if (typeof value !== "string") {
-    throw new InvalidPullRequestJsonError(`${field} must be a string`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be a string` });
   }
   return value;
 };
@@ -36,7 +41,7 @@ const requiredString = (record: Record<string, unknown>, field: string): string 
 const requiredNumber = (record: Record<string, unknown>, field: string): number => {
   const value = record[field];
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
-    throw new InvalidPullRequestJsonError(`${field} must be a positive integer`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be a positive integer` });
   }
   return value;
 };
@@ -44,7 +49,7 @@ const requiredNumber = (record: Record<string, unknown>, field: string): number 
 const requiredNonNegativeInteger = (record: Record<string, unknown>, field: string): number => {
   const value = record[field];
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-    throw new InvalidPullRequestJsonError(`${field} must be a non-negative integer`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be a non-negative integer` });
   }
   return value;
 };
@@ -52,7 +57,7 @@ const requiredNonNegativeInteger = (record: Record<string, unknown>, field: stri
 const requiredBoolean = (record: Record<string, unknown>, field: string): boolean => {
   const value = record[field];
   if (typeof value !== "boolean") {
-    throw new InvalidPullRequestJsonError(`${field} must be a boolean`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be a boolean` });
   }
   return value;
 };
@@ -61,7 +66,7 @@ const optionalString = (record: Record<string, unknown>, field: string): string 
   const value = record[field];
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string") {
-    throw new InvalidPullRequestJsonError(`${field} must be a string or null`);
+    throw new InvalidPullRequestJsonError({ reason: `${field} must be a string or null` });
   }
   return value;
 };
@@ -71,23 +76,25 @@ export const parsePullRequestRef = (value: string, expectedNumber: number): Pull
   try {
     url = new URL(value);
   } catch {
-    throw new InvalidPullRequestJsonError("url must be an absolute URL");
+    throw new InvalidPullRequestJsonError({ reason: "url must be an absolute URL" });
   }
   if (url.protocol !== "https:") {
-    throw new InvalidPullRequestJsonError("pull request url must use https");
+    throw new InvalidPullRequestJsonError({ reason: "pull request url must use https" });
   }
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (parts.length < 4 || parts.at(-2) !== "pull") {
-    throw new InvalidPullRequestJsonError("url is not a pull request URL");
+    throw new InvalidPullRequestJsonError({ reason: "url is not a pull request URL" });
   }
   const number = Number(parts.at(-1));
   const repository = parts.at(-3);
   const owner = parts.at(-4);
   if (!Number.isInteger(number) || number < 1 || number !== expectedNumber) {
-    throw new InvalidPullRequestJsonError("url pull request number does not match number");
+    throw new InvalidPullRequestJsonError({
+      reason: "url pull request number does not match number",
+    });
   }
   if (!owner || !repository) {
-    throw new InvalidPullRequestJsonError("url is missing repository identity");
+    throw new InvalidPullRequestJsonError({ reason: "url is missing repository identity" });
   }
   return { host: url.host, owner, repository, number };
 };
@@ -101,7 +108,9 @@ const normalizeMergeMethod = (value: unknown): PullRequestMergeMethod => {
     case "REBASE":
       return "rebase";
     default:
-      throw new InvalidPullRequestJsonError("autoMergeRequest.mergeMethod is unsupported");
+      throw new InvalidPullRequestJsonError({
+        reason: "autoMergeRequest.mergeMethod is unsupported",
+      });
   }
 };
 
@@ -118,7 +127,7 @@ const normalizeReviewDecision = (value: unknown): PullRequestReviewDecision => {
     case undefined:
       return "none";
     default:
-      throw new InvalidPullRequestJsonError("reviewDecision is unsupported");
+      throw new InvalidPullRequestJsonError({ reason: "reviewDecision is unsupported" });
   }
 };
 
@@ -209,7 +218,7 @@ const normalizeLifecycle = (state: string, isDraft: boolean): PullRequestSnapsho
   if (state === "OPEN") return { type: "open", draft: isDraft };
   if (state === "CLOSED") return { type: "closed" };
   if (state === "MERGED") return { type: "merged" };
-  throw new InvalidPullRequestJsonError("state is unsupported");
+  throw new InvalidPullRequestJsonError({ reason: "state is unsupported" });
 };
 
 export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnapshot {
@@ -232,7 +241,7 @@ export function normalizeGitHubPullRequestJson(input: unknown): PullRequestSnaps
   })();
   const rollup = record.statusCheckRollup;
   if (!Array.isArray(rollup)) {
-    throw new InvalidPullRequestJsonError("statusCheckRollup must be an array");
+    throw new InvalidPullRequestJsonError({ reason: "statusCheckRollup must be an array" });
   }
   const checks = rollup.map(normalizeCheck);
   const autoMergeRecord = record.autoMergeRequest;
@@ -296,7 +305,7 @@ export function normalizeGitHubViewerPullRequestsJson(
   const pullRequests = asRecord(viewer.pullRequests, "pullRequests");
   const nodes = pullRequests.nodes;
   if (!Array.isArray(nodes)) {
-    throw new InvalidPullRequestJsonError("pullRequests.nodes must be an array");
+    throw new InvalidPullRequestJsonError({ reason: "pullRequests.nodes must be an array" });
   }
   return nodes.filter((node) => node !== null).map(normalizeViewerPullRequestNode);
 }

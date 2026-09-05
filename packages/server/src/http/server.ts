@@ -2,7 +2,7 @@ import type { RequestListener, Server } from "node:http";
 import http from "node:http";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Cause, Context, Data, Effect, Exit, Scope } from "effect";
+import { Cause, Context, Effect, Exit, Schema, Scope } from "effect";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
@@ -43,10 +43,13 @@ export type CreateServerOptions = {
 };
 
 /** Startup failed for an operational reason: building the server or binding. */
-export class ServerStartupError extends Data.TaggedError("ServerStartupError")<{
-  readonly phase: "create" | "listen";
-  readonly cause: unknown;
-}> {}
+export class ServerStartupError extends Schema.TaggedError<ServerStartupError>()(
+  "ServerStartupError",
+  {
+    phase: Schema.Literals(["create", "listen"]),
+    cause: Schema.Defect(),
+  },
+) {}
 
 /**
  * The effectful startup stages, injectable so a test can fail any one of them
