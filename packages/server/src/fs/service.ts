@@ -325,8 +325,8 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
         });
 
       return {
-        readFileString,
-        readTree,
+        readFileString: Effect.fn("FileSystemService.readFileString")(readFileString),
+        readTree: Effect.fn("FileSystemService.readTree")(readTree),
       };
     }),
   );

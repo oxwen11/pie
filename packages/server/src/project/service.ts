@@ -47,52 +47,53 @@ export const ProjectServiceLayer: Layer.Layer<
     );
 
     return {
-      list: () => repo.list(),
+      list: Effect.fn("ProjectService.list")(function* () {
+        return yield* repo.list();
+      }),
 
-      findById: (id) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const found = projects.find((p) => p.id === id);
-          if (found === undefined) {
-            return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
-          }
-          return found;
-        }),
+      findById: Effect.fn("ProjectService.findById")(function* (id: string) {
+        const projects = yield* repo.list();
+        const found = projects.find((p) => p.id === id);
+        if (found === undefined) {
+          return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
+        }
+        return found;
+      }),
 
-      findByPath: (workspace) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const target = path.resolve(workspace);
-          return projects.find((p) => path.resolve(p.path) === target);
-        }),
+      findByPath: Effect.fn("ProjectService.findByPath")(function* (workspace: string) {
+        const projects = yield* repo.list();
+        const target = path.resolve(workspace);
+        return projects.find((p) => path.resolve(p.path) === target);
+      }),
 
-      create: (input) =>
-        Effect.gen(function* () {
-          const normalized = path.resolve(input.path);
-          const projects = yield* repo.list();
-          // Reuse an existing project pointing at the same path.
-          const existing = projects.find((p) => path.resolve(p.path) === normalized);
-          if (existing !== undefined) return existing;
+      create: Effect.fn("ProjectService.create")(function* (input: {
+        readonly name?: string;
+        readonly path: string;
+      }) {
+        const normalized = path.resolve(input.path);
+        const projects = yield* repo.list();
+        // Reuse an existing project pointing at the same path.
+        const existing = projects.find((p) => path.resolve(p.path) === normalized);
+        if (existing !== undefined) return existing;
 
-          const project: Project = {
-            id: yield* newId,
-            name: input.name ?? path.basename(normalized),
-            path: normalized,
-            createdAt: new Date().toISOString(),
-          };
-          yield* repo.save([...projects, project]);
-          return project;
-        }),
+        const project: Project = {
+          id: yield* newId,
+          name: input.name ?? path.basename(normalized),
+          path: normalized,
+          createdAt: new Date().toISOString(),
+        };
+        yield* repo.save([...projects, project]);
+        return project;
+      }),
 
-      remove: (id) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const target = projects.find((p) => p.id === id);
-          if (target === undefined) {
-            return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
-          }
-          yield* repo.save(projects.filter((p) => p.id !== id));
-        }),
+      remove: Effect.fn("ProjectService.remove")(function* (id: string) {
+        const projects = yield* repo.list();
+        const target = projects.find((p) => p.id === id);
+        if (target === undefined) {
+          return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
+        }
+        yield* repo.save(projects.filter((p) => p.id !== id));
+      }),
     };
   }),
 );
