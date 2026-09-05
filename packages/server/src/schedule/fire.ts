@@ -20,7 +20,13 @@ import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import { ScheduleRepository } from "./repository";
 import { record, snapshotOf } from "./run-record";
-import { logSchedule, newScheduleId, ScheduleRuntime, type ScheduleRuntimeShape } from "./runtime";
+import {
+  claimInFlight,
+  logSchedule,
+  newScheduleId,
+  releaseInFlight,
+  ScheduleRuntime,
+} from "./runtime";
 import { fireSession, isBusy } from "./session";
 import { settleAfterPrompt } from "./settle";
 
@@ -210,8 +216,9 @@ const conclude = (
           ref: decision.ref,
           parts: [{ type: "text", text: ctx.snapshot.prompt }],
         });
+        const runtime = yield* ScheduleRuntime;
         yield* settleAfterPrompt(ctx.schedule.id, ctx.runId, decision.ref, prompt).pipe(
-          Effect.forkDetach,
+          Effect.forkIn(runtime.scope, { startImmediately: true }),
           Effect.asVoid,
         );
         return { schedule: started, ref: decision.ref };
@@ -225,13 +232,12 @@ const conclude = (
 
 const decide = (
   schedule: Schedule,
-  runtime: ScheduleRuntimeShape,
-): Effect.Effect<FireDecision, never, PiAgentSessionService | ProjectService> =>
+): Effect.Effect<FireDecision, never, PiAgentSessionService | ProjectService | ScheduleRuntime> =>
   Effect.gen(function* () {
     if (reachedMaxRuns(schedule)) {
       return { kind: "skip", skipReason: "max_runs", pauseReason: "max_runs" };
     }
-    if (runtime.inFlight.has(schedule.id) || schedule.lastRunStatus === "running") {
+    if (schedule.lastRunStatus === "running") {
       return { kind: "miss", skipReason: "queue_overflow" };
     }
     const targetId = reuseSessionIdOf(scheduleSessionOf(schedule));
@@ -245,24 +251,29 @@ const decide = (
         return { kind: "skip", skipReason: "in_progress" };
       }
     }
-    runtime.inFlight.add(schedule.id);
+    const claimed = yield* claimInFlight(schedule.id);
+    if (!claimed) {
+      return { kind: "miss", skipReason: "queue_overflow" };
+    }
     return yield* fireSession(snapshotOf(schedule)).pipe(
       Effect.map((ref): FireDecision => ({ kind: "run", ref })),
-      Effect.catchTag("ProjectNotFound", () => {
-        runtime.inFlight.delete(schedule.id);
-        return Effect.succeed({
-          kind: "skip",
-          skipReason: "project_missing",
-          pauseReason: "project_missing",
-        } satisfies FireDecision);
-      }),
-      Effect.catch((error) => {
-        runtime.inFlight.delete(schedule.id);
-        return Effect.succeed({
-          kind: "fail",
-          error: error instanceof Error ? error.message : String(error),
-        } satisfies FireDecision);
-      }),
+      Effect.catchTag("ProjectNotFound", () =>
+        releaseInFlight(schedule.id).pipe(
+          Effect.as({
+            kind: "skip",
+            skipReason: "project_missing",
+            pauseReason: "project_missing",
+          } satisfies FireDecision),
+        ),
+      ),
+      Effect.catch((error) =>
+        releaseInFlight(schedule.id).pipe(
+          Effect.as({
+            kind: "fail",
+            error: error instanceof Error ? error.message : String(error),
+          } satisfies FireDecision),
+        ),
+      ),
     );
   });
 
@@ -275,7 +286,6 @@ export const fire = (
   ScheduleRepository | PiAgentSessionService | ProjectService | ScheduleRuntime | Crypto.Crypto
 > =>
   Effect.gen(function* () {
-    const runtime = yield* ScheduleRuntime;
     const startedAt = yield* Clock.currentTimeMillis;
     const runId = yield* newScheduleId;
     const snapshot = snapshotOf(schedule);
@@ -287,6 +297,6 @@ export const fire = (
       snapshot,
       disableOnce: snapshot.spec.kind === "once",
     };
-    const decision = yield* decide(schedule, runtime);
+    const decision = yield* decide(schedule);
     return yield* conclude(ctx, decision);
   });

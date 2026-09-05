@@ -7,7 +7,7 @@ import type {
   SessionSummary,
 } from "@getpie/contract";
 import { CAPABILITY_UNAVAILABLE_TAG } from "@getpie/contract";
-import { Context, Effect, Fiber, Layer, Logger } from "effect";
+import { Context, Effect, Fiber, Layer, Logger, Ref } from "effect";
 import { TestClock } from "effect/testing";
 
 import { ProjectNotFound, ScheduleNotFound, StoreWriteError } from "../../src/errors";
@@ -897,6 +897,61 @@ describe("ScheduleService", () => {
       assert.strictEqual(stored?.lastRunStatus, "succeeded");
       assert.strictEqual(stored?.runs[0]?.reason, "scheduled");
       yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("daemon keeps looping after a tick defect and logs the Cause", () =>
+    Effect.gen(function* () {
+      const records: Array<LogRecord> = [];
+      let ticks = 0;
+      const schedules = ScheduleService.of({
+        list: unused,
+        get: unused,
+        create: unused,
+        update: unused,
+        delete: unused,
+        runNow: unused,
+        recover: () => Effect.void,
+        tick: () =>
+          Effect.gen(function* () {
+            ticks += 1;
+            if (ticks === 1) {
+              return yield* Effect.die("tick boom");
+            }
+          }),
+        nextWakeDelay: () => Effect.succeed(60_000),
+      });
+      const fiber = yield* captureLogs(
+        runScheduleLoop.pipe(Effect.provideService(ScheduleService, schedules)),
+        records,
+      ).pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      yield* TestClock.adjust("60 seconds");
+      yield* Effect.yieldNow;
+      assert.ok(ticks >= 2, `expected the loop to tick again after the defect, got ${ticks}`);
+      const failed = records.find((record) => record.annotations.event === "schedule.tick_failed");
+      assert.ok(failed, "expected a schedule.tick_failed log");
+      assert.notEqual(failed?.cause, undefined);
+      assert.match(String(failed?.cause), /tick boom/);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("closing the schedule runtime scope interrupts in-flight settle work", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const interrupted = yield* Ref.make(false);
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* harness({
+            prompt: () => Effect.never.pipe(Effect.onInterrupt(() => Ref.set(interrupted, true))),
+          });
+          const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+          yield* h.service.runNow(created.id);
+          yield* Effect.yieldNow;
+        }),
+      );
+      assert.equal(yield* Ref.get(interrupted), true);
     }),
   );
 });
