@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { Context, Effect, Layer, type FileSystem, type Scope } from "effect";
+import { Context, Effect, type FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
@@ -80,5 +80,3 @@ export const cachePiAgentAvailability = (
     (pi as MutableAvailability).availability = Effect.uninterruptible(cachedCheck);
     return pi;
   });
-
-export const PiAgentLayer = (pi: PiAgentShape): Layer.Layer<PiAgent> => Layer.succeed(PiAgent, pi);

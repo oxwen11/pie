@@ -9,7 +9,7 @@ import { ORPCError } from "@orpc/client";
 import { skipToken, useQueries, useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
@@ -147,10 +147,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [instance],
   );
 
-  const heading = useMemo(
-    () => (review.data === undefined ? "" : reviewHeading(review.data)),
-    [review.data],
-  );
+  const heading = review.data === undefined ? "" : reviewHeading(review.data);
 
   if (panel === null) {
     return (
