@@ -51,7 +51,7 @@ export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExe
 }
 
 /** Same resolution as {@link resolvePiExecutable}, via Effect Config. */
-export const resolvePiExecutableEffect: Effect.Effect<PiExecutable> = Effect.gen(function* () {
+export const resolvePiExecutableEffect = Effect.gen(function* () {
   const e2e = yield* pieE2e;
   const e2eExec = yield* pieE2ePiExecutable;
   if (e2e === "1" && Option.isSome(e2eExec)) {

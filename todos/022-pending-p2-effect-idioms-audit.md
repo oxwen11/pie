@@ -368,3 +368,24 @@ Layer.sync(ScheduleRuntime, () => ({
 ## Work Log
 
 - 2026-09-03: 审计完成，建立本 ticket。仓库 Issues 功能关闭，故落在 `todos/`。
+- 2026-09-03: Stack landed against `main` (not piled on merged PR 160):
+  - 1: `Effect.fn` on server service-shape methods (Project, Git, Worktree, FS, Schedule, EventBus, Session*, PullRequest, PiAgentService).
+  - 2+13: `Data.TaggedError` → `Schema.TaggedError` + `Schema.Defect` causes; CronError / InvalidPullRequestJsonError tagged; GitHub CLI IO keeps `cause`.
+  - 3: `PIE_*` via Effect `Config` / `pie/PrintLogs` Reference; tests inject `ConfigProvider.fromUnknown`.
+  - 4+5+15+26: `forkDetach` → `forkIn(ownerScope)`; in-flight ids are `Ref<HashSet>`; schedule loop `catchCause` logs Cause; session-service tests are `@effect/vitest` + `TestClock`.
+  - 6: Context service ids `pie/…`.
+  - 8: `AgentRuntimeLayer` `provideMerge` Infra; Pi executable resolved in `Layer.effect`.
+  - 10: `ScheduleService` `provide` constrained to `ScheduleServiceEnv` (no `as`).
+  - 11: Effect 4 has `Stream.unwrap` (not `unwrapScoped`). The subscribe RPC returns an AsyncGenerator that outlives the opening Effect, so the explicit `Scope.make` + `Stream.ensuring` stays. `http/server.ts` `Scope.makeUnsafe` kept with a comment (request fibers outlive the creating fiber).
+  - 20: `drainQueue` uses `Queue.clear` (non-blocking; `Queue.takeAll` waits for ≥1 message).
+  - 21: `rpc/stream.ts` stays as the oRPC AsyncGenerator seam over `Stream.toAsyncIterable` (oRPC validates `AsyncIteratorObject`).
+  - 24: pie CLI user output uses Effect `Console.log`.
+  - 28 (session-service): scoped temp dirs via `makeTempDirectoryScoped`.
+- 2026-09-03: Finding 7 wontfix here: `XxxLayer` already exports tag+implementation as two symbols; moving 23 services to `static readonly layer` is a no-runtime rename that would churn every `Layer.provide` site. Revisit if a service is added in a new package.
+- 2026-09-03: Finding 9 deferred: `cachePiAgentAvailability` still mutates the PiAgent shape; closing it needs `Effect.cached` at Layer construction (touches every PiAgent test fake).
+- 2026-09-03: Finding 12 deferred: Predicate helpers are local `_tag` guards next to Pi protocol decoding; swapping to `Predicate.hasProperty` is mechanical and independent.
+- 2026-09-03: Finding 14 deferred except schedule runtime (already `Semaphore.make`). Remaining `makeUnsafe` in `session.ts` / `session-manager.ts` / `effect-json-store` collection locks is the Effect-external constructor pattern used at Ref.modify time.
+- 2026-09-03: Findings 18, 19, 22, 23, 25 deferred: Clock/DateTime on session create timestamps; uuid v7 vs Crypto; session-manager lazy-open is the documented retry-on-failure design; JSON.parse skip is intentional protocol noise; MessagePort Scope is desktop-only.
+- 2026-09-03: Finding 27 deferred: desktop `expect(Effect.runPromise).resolves` and daemon liveness still use Promise assertions; session-service (26) is done.
+- 2026-09-03: Finding 16 design: keep the handwritten EventBus. `PubSub.dropping` does not evict a slow subscriber and emit `closed: slow_consumer` — that notification is part of the wire contract (`SubscribeStreamEvent`). Replacing the subscriber table with PubSub would drop that reason or reimplement eviction outside PubSub, which is the current code. Not worth a behavior-risk rewrite.
+- 2026-09-03: Finding 17 design: `createServer` stays Promise-shaped at the Node `http` + `ws` upgrade seam (oRPC owns `upgrade`; Effect `HttpServer.serve` would fight it). Startup failures already map through `ServerStartupError` at `Effect.tryPromise`. A `Layer<Server, ServerStartupError, Scope>` is a follow-up that must keep desktop's Promise call site; do not mix it into this stack.
