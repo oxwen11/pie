@@ -843,6 +843,19 @@ describe("Chat truncated buffers", () => {
 });
 
 describe("Chat lifecycle", () => {
+  it("treats runtime.stopped as idle/ready, not a terminal error", async () => {
+    const { chat, live, attach } = makeChat();
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "t1", phase: "running" });
+    live(2, {
+      type: "session.runtime.stopped",
+      reason: "idle",
+      phase: "idle",
+    });
+    expect(chat.store.getState().status).toBe("ready");
+    expect(chat.store.getState().error).toBeUndefined();
+  });
+
   it("copies the crashed phase into an error status", async () => {
     const { chat, attach, live } = makeChat();
     await attach({});

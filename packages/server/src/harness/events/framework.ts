@@ -65,6 +65,10 @@ export const SessionCrashed = defineEvent({
   type: "session.crashed",
   schema: { ...sid, reason: Schema.String },
 });
+export const SessionRuntimeStopped = defineEvent({
+  type: "session.runtime.stopped",
+  schema: { ...sid, reason: Schema.String },
+});
 export const SessionCreated = defineEvent({
   type: "session.created",
   schema: { sessionId: Schema.String },
@@ -93,6 +97,7 @@ export const SessionEventDefs = [
   SessionRequestReplied,
   SessionQueueUpdated,
   SessionCrashed,
+  SessionRuntimeStopped,
 ] as const;
 export type SessionEvent = EventValue<(typeof SessionEventDefs)[number]>;
 

@@ -47,6 +47,9 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.
 
+**Runtime idle suspend**:
+A held Pi runtime that stays at phase `idle` for `PIE_SESSION_RUNTIME_IDLE_MS` (default 5 minutes; `0` disables) is suspended: the process is killed without sealing the session, and `session.runtime.stopped` is published. The next prompt re-`ensureRuntime`s. Clients clear live turn UI but do not treat this as terminal error.
+
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
 

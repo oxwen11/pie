@@ -232,6 +232,17 @@ export class Chat {
         this.#state.clearPendingRequests();
         this.#state.clearPendingPrompt();
         break;
+      // Server killed an idle Pi process; session stays. Clear live turn UI
+      // the same way as a crash, but phase stays idle → composer ready.
+      // The EventBus subscription keeps flowing; the next prompt re-spawns
+      // the process via ensureRuntime — no client re-attach required.
+      case "session.runtime.stopped":
+        for (const fold of this.#turnFolds.values()) fold.close();
+        this.#turnFolds.clear();
+        this.#state.clearPendingRequests();
+        this.#state.clearPendingPrompt();
+        this.#state.retryNotice = undefined;
+        break;
     }
     // Status is copied off the event (the runtime stamps its post-event
     // phase), never derived from event types here. Lifecycle events only:

@@ -10,6 +10,7 @@ import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "ef
 import type { EventBusShape } from "../events/event-bus";
 import type { ResumeSessionError } from "./errors";
 import type { PiAgentRuntime } from "./pi/runtime";
+import { sessionRuntimeIdleMs } from "./runtime-idle";
 import {
   foldSessionEvent,
   initialSessionState,
@@ -126,20 +127,37 @@ export type PiAgentSessionShape = {
    * rather than racing it.
    */
   readonly releaseRuntime: Effect.Effect<void>;
+  /**
+   * Kill the held Pi runtime without sealing the session, and publish
+   * `session.runtime.stopped`. The next {@link ensureRuntime} may resume.
+   * No-op when nothing is held. Used for idle timeout.
+   */
+  readonly suspendRuntime: (reason?: string) => Effect.Effect<void>;
+};
+
+export type MakePiAgentSessionOptions = {
+  /** Idle kill delay in ms. `0` disables. Defaults to {@link sessionRuntimeIdleMs}. */
+  readonly idleTimeoutMs?: number;
 };
 
 export const makePiAgentSession = (
   ref: SessionRef,
   bus: EventBusShape,
+  options: MakePiAgentSessionOptions = {},
 ): Effect.Effect<PiAgentSessionShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
+    const idleTimeoutMs = options.idleTimeoutMs ?? sessionRuntimeIdleMs();
     const state = yield* Ref.make(initialSessionState);
     const lifecycle = yield* Ref.make<Lifecycle>({
       held: undefined,
       acquiring: undefined,
       sealed: false,
     });
+    // Generation bumps cancel an in-flight idle timer without racing suspend.
+    const idleGeneration = yield* Ref.make(0);
+    // Filled once idle helpers exist; applyWith calls it after every publish.
+    let afterPublish: Effect.Effect<void> = Effect.void;
 
     // Serializes stamp+publish across the drain fiber and `emit` callers:
     // without it two fibers could stamp seqs n/n+1 but publish n+1 first, and
@@ -215,6 +233,7 @@ export const makePiAgentSession = (
                 // After the publish: subscribers are the ones waiting on this,
                 // and the log must not sit in front of them.
                 Effect.andThen(logTurn(wireBody, event.seq)),
+                Effect.andThen(Effect.suspend(() => afterPublish)),
               );
             }),
           ),
@@ -393,6 +412,74 @@ export const makePiAgentSession = (
       Effect.uninterruptible,
     );
 
+    const cancelIdleTimer: Effect.Effect<void> = Ref.update(idleGeneration, (n) => n + 1);
+
+    /**
+     * Drop the held runtime without sealing, publish `session.runtime.stopped`,
+     * leave the session queryable so the next prompt can {@link ensureRuntime}.
+     */
+    const suspendRuntime = (reason = "idle"): Effect.Effect<void> =>
+      identified(
+        cancelIdleTimer.pipe(
+          Effect.andThen(
+            Ref.modify(lifecycle, (current) => {
+              if (current.sealed || !current.held) {
+                return [undefined as Held | undefined, current] as const;
+              }
+              return [current.held, { ...current, held: undefined }] as const;
+            }),
+          ),
+          Effect.flatMap((held) =>
+            held
+              ? shutDown(held).pipe(
+                  Effect.andThen(
+                    apply({
+                      type: "session.runtime.stopped",
+                      sessionId: ref.sessionId,
+                      reason,
+                    }),
+                  ),
+                  Effect.andThen(
+                    Effect.logInfo("session runtime suspended").pipe(
+                      Effect.annotateLogs({ event: "session.runtime.stopped", reason }),
+                    ),
+                  ),
+                )
+              : Effect.void,
+          ),
+          Effect.uninterruptible,
+        ),
+      );
+
+    /** Arm idle kill when we hold a runtime and the fold says idle. */
+    const armIdleTimer: Effect.Effect<void> = Effect.gen(function* () {
+      if (idleTimeoutMs <= 0) return;
+      const held = yield* Ref.get(lifecycle).pipe(Effect.map((current) => current.held));
+      if (!held) return;
+      const phase = yield* Ref.get(state).pipe(Effect.map((current) => current.phase));
+      if (phase !== "idle") return;
+      const generation = yield* Ref.updateAndGet(idleGeneration, (n) => n + 1);
+      yield* Effect.forkIn(
+        identified(
+          Effect.sleep(`${idleTimeoutMs} millis`).pipe(
+            Effect.andThen(Ref.get(idleGeneration)),
+            Effect.flatMap((current) =>
+              current === generation ? suspendRuntime("idle") : Effect.void,
+            ),
+          ),
+        ),
+        ownerScope,
+      );
+    });
+
+    // Wrap ensureRuntime to (re)arm idle once a runtime is held while idle.
+    const ensureRuntimeWithIdle: PiAgentSessionShape["ensureRuntime"] = (acquire) =>
+      ensureRuntime(acquire).pipe(Effect.tap(() => armIdleTimer));
+
+    afterPublish = Ref.get(state).pipe(
+      Effect.flatMap((current) => (current.phase === "idle" ? armIdleTimer : cancelIdleTimer)),
+    );
+
     return {
       ref,
       snapshot: applyLock.withPermit(
@@ -401,7 +488,8 @@ export const makePiAgentSession = (
       status: Ref.get(state).pipe(Effect.map(toStatus)),
       emit: (body) => applyWith(() => body),
       peekRuntime: Ref.get(lifecycle).pipe(Effect.map((current) => current.held?.runtime)),
-      ensureRuntime,
-      releaseRuntime,
+      ensureRuntime: ensureRuntimeWithIdle,
+      releaseRuntime: cancelIdleTimer.pipe(Effect.andThen(releaseRuntime)),
+      suspendRuntime,
     } satisfies PiAgentSessionShape;
   });
