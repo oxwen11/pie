@@ -9,8 +9,13 @@
   changing versions. `packages/server` pins the Claude SDK as a literal while
   `packages/pie` uses `catalog:` — bump both together.
 - **Lint:** `lint` / `lint:check` are turbo tasks (`dependsOn:
-  ["@getpie/oxlint#build"]`, uncached) so the oxlint plugins exist before
-  oxlint loads them. `lint:check` still runs `--deny-warnings`, so the
+  ["@getpie/oxlint#build"]`) so the oxlint plugins exist before
+  oxlint loads them. `lint` (rewrite) stays uncached; `lint:check`
+  caches with repo-wide source inputs (`apps`/`packages`/`tools`,
+  excluding `node_modules`/`dist`/`.turbo`) because oxlint scans the
+  whole repo from `@getpie/oxlint`. Server/CLI/desktop `build` is the
+  other uncached turbo task: those artifacts embed
+  `githash:<HEAD>` and must not restore another SHA's dist. `lint:check` still runs `--deny-warnings`, so the
   whole `suspicious` category fails CI while only warning locally. oxfmt
   reorders imports and stays a root-only script. Custom plugins live in
   `tools/oxlint/` (`pie`, `pie-boundaries`, `pie-query`, vendored
@@ -34,24 +39,23 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** Vitest 5 (catalog pin). Root `vitest.config.mts` lists every
-  package config as a project; `pnpm test` is `vitest run` (one process).
-  One package uses that package's `test` script:
-  `pnpm --filter @getpie/server test`. Prefer those over `turbo run test`
-  — turbo still discovers every package `test` script and would spawn 12
-  Vitest processes. Each package keeps its own `vitest.config.ts` for
-  environment, include, and timeouts — referenced projects do not inherit
-  those. The pie artifact test reads `@getpie/cli` / `@getpie/app` `dist/`;
-  CI runs `turbo run build` before `pnpm test`. Configs turn on `fsModuleCache`
-  (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
-  (gitignored). Layout is inconsistent — `server`/`contract`/`effect-json-store`
-  use `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
-  `include`, so a test file placed elsewhere is silently ignored. `server`,
-  `contract`, `core`, and `effect-json-store` enable `test.typecheck`, so type
-  errors fail the run. `server` sets `fileParallelism: false` because git
-  worktree fixtures contend on temp dirs — do not flip it without splitting
-  those files into their own project — and uses a 30s `testTimeout` because
-  those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
+- **Tests:** Vitest 5 (catalog pin). `pnpm test` is `turbo run test`
+  (`dependsOn: ["^build"]`) so unchanged packages cache and package
+  graphs run in parallel. Each package keeps its own `vitest.config.ts`
+  for environment, include, and timeouts. One package:
+  `pnpm --filter @getpie/server test`. The pie artifact test reads
+  `@getpie/cli` / `@getpie/app` `dist/` via pie's `test` `dependsOn:
+  ["build"]`. Configs turn on `fsModuleCache` (`node_modules/.vitest-cache`).
+  Reporters write under `.vitest/` (gitignored). Layout is inconsistent —
+  `server`/`contract`/`effect-json-store` use `test/`, everyone else
+  colocates `src/**/*.test.ts` behind an explicit `include`, so a test
+  file placed elsewhere is silently ignored. `server`, `contract`,
+  `core`, and `effect-json-store` enable `test.typecheck`, so type
+  errors fail the run. `server` splits git-contention files (`git` /
+  `git worktree add` fixtures) into a `server-git` project with
+  `fileParallelism: false`; the rest of the server suite runs in
+  parallel. Do not fold those files back into the parallel project.
+  Git fixtures use a 30s `testTimeout` because they stall under load. `apps/desktop/e2e/` is Playwright
   and not in CI. `tools/testing/fake-claude.mjs` is referenced by relative
   path from both server tests and desktop e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
