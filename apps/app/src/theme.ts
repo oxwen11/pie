@@ -1,6 +1,12 @@
 const DARK_MODE_QUERY = "(prefers-color-scheme: dark)";
 
+export const DEFAULT_THEME_STORAGE_KEY = "pie:theme";
+
 export type ThemePreference = "dark" | "light" | "system";
+
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "dark" || value === "light" || value === "system";
+}
 
 type ResolvedTheme = Exclude<ThemePreference, "system">;
 

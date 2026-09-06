@@ -9,9 +9,9 @@ let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
 function ThemeProbe(): ReactElement {
-  const { theme, setTheme } = useTheme();
+  const { storageKey, theme, setTheme } = useTheme();
   return (
-    <button type="button" onClick={() => setTheme("light")}>
+    <button data-storage-key={storageKey} type="button" onClick={() => setTheme("light")}>
       {theme}
     </button>
   );
@@ -64,11 +64,12 @@ describe("ThemeProvider", () => {
 
     expect(button?.textContent).toBe("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(localStorage.getItem("vite-ui-theme")).toBe("light");
+    expect(button?.dataset.storageKey).toBe("pie:theme");
+    expect(localStorage.getItem("pie:theme")).toBe("light");
   });
 
   it("restores a stored preference", () => {
-    localStorage.setItem("vite-ui-theme", "dark");
+    localStorage.setItem("pie:theme", "dark");
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -86,14 +87,14 @@ describe("ThemeProvider", () => {
   });
 
   it("supports a custom storage key", () => {
-    localStorage.setItem("pie:theme", "dark");
+    localStorage.setItem("custom-theme", "dark");
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
     act(() => {
       root?.render(
-        <ThemeProvider defaultTheme="light" storageKey="pie:theme">
+        <ThemeProvider defaultTheme="light" storageKey="custom-theme">
           <ThemeProbe />
         </ThemeProvider>,
       );
@@ -101,10 +102,11 @@ describe("ThemeProvider", () => {
 
     const button = container.querySelector("button");
     expect(button?.textContent).toBe("dark");
+    expect(button?.dataset.storageKey).toBe("custom-theme");
 
     act(() => button?.click());
 
-    expect(localStorage.getItem("pie:theme")).toBe("light");
-    expect(localStorage.getItem("vite-ui-theme")).toBeNull();
+    expect(localStorage.getItem("custom-theme")).toBe("light");
+    expect(localStorage.getItem("pie:theme")).toBeNull();
   });
 });

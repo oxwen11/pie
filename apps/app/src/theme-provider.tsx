@@ -8,7 +8,12 @@ import {
   useState,
 } from "react";
 
-import { startThemeSync, type ThemePreference } from "./theme";
+import {
+  DEFAULT_THEME_STORAGE_KEY,
+  isThemePreference,
+  startThemeSync,
+  type ThemePreference,
+} from "./theme";
 
 export type ThemeProviderProps = PropsWithChildren<{
   defaultTheme?: ThemePreference;
@@ -18,6 +23,7 @@ export type ThemeProviderProps = PropsWithChildren<{
 export type ThemeContextValue = {
   theme: ThemePreference;
   setTheme: (theme: ThemePreference) => void;
+  storageKey: string;
 };
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -25,9 +31,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 function readStoredTheme(storageKey: string, defaultTheme: ThemePreference): ThemePreference {
   try {
     const storedTheme = localStorage.getItem(storageKey);
-    if (storedTheme === "dark" || storedTheme === "light" || storedTheme === "system") {
-      return storedTheme;
-    }
+    if (isThemePreference(storedTheme)) return storedTheme;
   } catch {
     // Storage can be unavailable in restricted browser contexts.
   }
@@ -37,7 +41,7 @@ function readStoredTheme(storageKey: string, defaultTheme: ThemePreference): The
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "vite-ui-theme",
+  storageKey = DEFAULT_THEME_STORAGE_KEY,
 }: ThemeProviderProps): ReactElement {
   const [theme, setThemeState] = useState<ThemePreference>(() =>
     readStoredTheme(storageKey, defaultTheme),
@@ -48,6 +52,7 @@ export function ThemeProvider({
   const value = useMemo(
     () => ({
       theme,
+      storageKey,
       setTheme: (nextTheme: ThemePreference) => {
         try {
           localStorage.setItem(storageKey, nextTheme);
