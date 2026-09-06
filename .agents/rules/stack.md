@@ -6,11 +6,16 @@ These differ from what the library names suggest.
   `@effect/schema`); services are `Context.Service<Self, Shape>()("Tag")` with a
   hand-written `Layer`, not `Effect.Service`. Two experimental modules are in
   production use: `effect/unstable/cli` and `effect/unstable/process`.
-  Service-shape methods that are `Effect.gen` bodies use `Effect.fn("pie/Service.method")`.
-  `PIE_*` and other process settings go through Effect `Config` or
-  `Context.Reference` (`pie/PrintLogs`); Electron Main may still read
-  `process.env` (this file's exemption list). Context service ids are
-  namespaced (`pie/EventBus`, `desktop/MainWindow`).
+  Service-shape methods that are `Effect.gen` bodies use
+  `Effect.fn("Service.method")` (e.g. `Effect.fn("GitService.status")`).
+  Server composition-root `PIE_*` settings go through Effect `Config` or
+  `Context.Reference` (`pie/PrintLogs`). Standing exceptions: `config/paths.ts`
+  reads `PIE_HOME`/`PIE_DAEMON_DIR` from `process.env`, `packages/core` reads
+  `PIE_DAEMON_COMPATIBILITY_KEY` from `process.env` (`compatibility.ts`),
+  the `packages/pie` CLI reads `PIE_URL`/`PIE_AUTH_TOKEN` directly
+  (`connect.ts`), and Electron Main may still read `process.env` (this file's
+  exemption list). Context service
+  ids are namespaced (`pie/EventBus`, `desktop/MainWindow`).
 - **oRPC is a locked beta and the transport is WebSocket**, not HTTP: one
   multiplexed connection via `@orpc/client/websocket`, with a lazy `connect`
   factory so each reconnect fetches a fresh ticket (browsers can't set headers on
