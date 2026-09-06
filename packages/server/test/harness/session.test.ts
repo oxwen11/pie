@@ -4,6 +4,7 @@ import { it } from "@effect/vitest";
 import type { AgentRequest, SessionRef } from "@getpie/contract";
 import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
 import type * as Cause from "effect/Cause";
+import { TestClock } from "effect/testing";
 
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
@@ -468,7 +469,6 @@ it.effect("a turn under the buffer caps is not marked truncated", () =>
   ),
 );
 
-
 it.effect("suspendRuntime kills the process, leaves idle, and allows re-acquire", () =>
   run(
     Effect.gen(function* () {
@@ -515,15 +515,9 @@ it.effect("idle timeout suspends a held idle runtime", () =>
       yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
       assert.ok(yield* session.peekRuntime);
 
-      yield* Effect.sleep("100 millis");
-      yield* Effect.eventually(
-        session.peekRuntime.pipe(
-          Effect.filterOrFail(
-            (runtime) => runtime === undefined,
-            () => new Error("runtime still held after idle timeout"),
-          ),
-        ),
-      );
+      // @effect/vitest installs TestClock — real sleeps never fire the idle fiber.
+      yield* TestClock.adjust("100 millis");
+      assert.equal(yield* session.peekRuntime, undefined);
       assert.equal(yield* Ref.get(closes), 1);
       assert.equal((yield* session.status).phase, "idle");
     }),

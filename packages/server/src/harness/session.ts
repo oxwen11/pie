@@ -458,7 +458,10 @@ export const makePiAgentSession = (
       if (!held) return;
       const phase = yield* Ref.get(state).pipe(Effect.map((current) => current.phase));
       if (phase !== "idle") return;
-      const generation = yield* Ref.updateAndGet(idleGeneration, (n) => n + 1);
+      const generation = yield* Ref.modify(idleGeneration, (n) => {
+        const next = n + 1;
+        return [next, next] as const;
+      });
       yield* Effect.forkIn(
         identified(
           Effect.sleep(`${idleTimeoutMs} millis`).pipe(
