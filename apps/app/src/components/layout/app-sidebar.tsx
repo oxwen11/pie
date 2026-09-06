@@ -12,7 +12,7 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
-import { Clock, SquarePen } from "lucide-react";
+import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
@@ -26,6 +26,23 @@ function NewChatNavItem() {
       <SidebarMenuButton render={<Link to="/draft" />}>
         <SquarePen />
         <span>New chat</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PullRequestsNavItem() {
+  const active =
+    useMatch({
+      from: "/pull-requests",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
+        <GitPullRequestIcon />
+        <span>Pull Request</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -77,6 +94,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <NewChatNavItem />
               <SchedulesNavItem />
+              <PullRequestsNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

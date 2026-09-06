@@ -1,0 +1,26 @@
+{
+  "name": "pie",
+  "install": "export PATH=\"$HOME/.local/bin:$PATH\"\nmise trust -y\nmise install\nmise exec -- pnpm install --frozen-lockfile",
+  "ports": [
+    {
+      "name": "pie server",
+      "port": 4180
+    },
+    {
+      "name": "vite app",
+      "port": 4190
+    }
+  ],
+  "terminals": [
+    {
+      "name": "pie server",
+      "description": "API + WS on :4180 (PIE_PORT). Health: curl http://127.0.0.1:4180/api/health. Drive the Vite origin on :4190, not this port — 4180 serves the last built bundle or 503s.",
+      "command": "export PATH=\"$HOME/.local/bin:$PATH\" && mise exec -- pnpm --dir packages/pie dev"
+    },
+    {
+      "name": "vite app",
+      "description": "Vite on :4190, proxies /api and /ws/rpc to the pie server. Open http://localhost:4190/",
+      "command": "export PATH=\"$HOME/.local/bin:$PATH\" && mise exec -- pnpm --dir apps/app dev"
+    }
+  ]
+}

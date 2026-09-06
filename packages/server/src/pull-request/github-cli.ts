@@ -1,10 +1,12 @@
 import type {
   PullRequestAction,
+  PullRequestDiff,
+  PullRequestListItem,
   PullRequestMergeMethod,
   PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
-import { Data, Effect, Ref, Stream } from "effect";
+import { Data, Effect, Ref, Result, Stream } from "effect";
 import type { PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -20,11 +22,20 @@ import {
   PullRequestUnsupportedAction,
   PullRequestUnsupportedContext,
 } from "./errors";
-import { normalizeGitHubPullRequestJson } from "./normalization";
+import {
+  normalizeGitHubPullRequestJson,
+  normalizeGitHubViewerPullRequestsJson,
+} from "./normalization";
 
 const COMMAND_TIMEOUT = "30 seconds";
+const DIFF_TIMEOUT = "60 seconds";
 const FORCE_KILL_AFTER = "2 seconds";
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const DIFF_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
+export const LIST_PULL_REQUEST_LIMIT = 100;
+
+export const PULL_REQUEST_LIST_QUERY = `query { viewer { pullRequests(first: ${LIST_PULL_REQUEST_LIMIT}, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft state updatedAt additions deletions headRefName baseRefName author { login } } } } }`;
 
 export const CURRENT_PULL_REQUEST_FIELDS = [
   "number",
@@ -40,6 +51,7 @@ export const CURRENT_PULL_REQUEST_FIELDS = [
   "reviewDecision",
   "autoMergeRequest",
   "updatedAt",
+  "body",
 ] as const;
 
 export const pullRequestViewUrl = (ref: PullRequestRef): string =>
@@ -55,6 +67,18 @@ export const currentPullRequestArgs = (pullRequest?: PullRequestRef): ReadonlyAr
         "--json",
         CURRENT_PULL_REQUEST_FIELDS.join(","),
       ];
+
+export const pullRequestListArgs = (): ReadonlyArray<string> => [
+  "api",
+  "graphql",
+  "-f",
+  `query=${PULL_REQUEST_LIST_QUERY}`,
+];
+
+export const pullRequestDiffArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
+  pullRequest === undefined
+    ? ["pr", "diff", "--color", "never"]
+    : ["pr", "diff", pullRequestViewUrl(pullRequest), "--color", "never"];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -126,15 +150,21 @@ const streamError =
 
 const executeGh = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-  cwd: string,
   args: ReadonlyArray<string>,
-): Effect.Effect<GitHubCliResult, GitHubCliExecutionError> =>
-  Effect.scoped(
+  options?: {
+    readonly cwd?: string;
+    readonly timeout?: typeof COMMAND_TIMEOUT | typeof DIFF_TIMEOUT;
+    readonly maxOutputBytes?: number;
+  },
+): Effect.Effect<GitHubCliResult, GitHubCliExecutionError> => {
+  const timeout = options?.timeout ?? COMMAND_TIMEOUT;
+  const maxOutputBytes = options?.maxOutputBytes ?? MAX_OUTPUT_BYTES;
+  return Effect.scoped(
     Effect.gen(function* () {
       const child = yield* spawner
         .spawn(
           ChildProcess.make("gh", args, {
-            cwd,
+            ...(options?.cwd === undefined ? undefined : { cwd: options.cwd }),
             env: { GH_PROMPT_DISABLED: "1" },
             extendEnv: true,
             stdin: "ignore",
@@ -156,9 +186,7 @@ const executeGh = (
           Effect.gen(function* () {
             const accepted = yield* Ref.modify(totalBytes, (current) => {
               const next = current + chunk.byteLength;
-              return next > MAX_OUTPUT_BYTES
-                ? ([false, current] as const)
-                : ([true, next] as const);
+              return next > maxOutputBytes ? ([false, current] as const) : ([true, next] as const);
             });
             if (!accepted) return yield* new GitHubCliOutputTooLarge();
             chunks.push(Uint8Array.from(chunk));
@@ -184,10 +212,11 @@ const executeGh = (
     }),
   ).pipe(
     Effect.timeoutOrElse({
-      duration: COMMAND_TIMEOUT,
+      duration: timeout,
       orElse: () => Effect.fail(new GitHubCliTimedOut()),
     }),
   );
+};
 
 const isUnauthenticated = (stderr: string): boolean =>
   /not logged into any github hosts|gh auth login|authentication required|bad credentials|http 401/i.test(
@@ -204,6 +233,11 @@ const isUnsupportedContext = (stderr: string): boolean =>
 
 const isNoPullRequest = (stderr: string): boolean =>
   /no pull requests found(?: for branch)?|could not find pull request/i.test(stderr);
+
+const isDiffTooLarge = (stderr: string): boolean =>
+  /http 406|too many files|exceeds.*(?:file|diff).*limit|diff(?:erence)? is too large/i.test(
+    stderr,
+  );
 
 const isUnsupportedHeadFlag = (stderr: string): boolean =>
   /unknown flag:\s*--match-head-commit|unknown shorthand flag.*match-head-commit/i.test(stderr);
@@ -241,8 +275,16 @@ export interface GitHubCliAdapter {
     cwd: string,
     pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
+  readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+  readonly diffFor: (
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+  readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
+  readonly detail: (
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly runAction: (input: {
-    readonly cwd: string;
+    readonly cwd?: string;
     readonly url: string;
     readonly action: PullRequestAction;
     readonly expectedHeadSha?: string;
@@ -261,32 +303,104 @@ const mapExecutionActionError = (error: GitHubCliExecutionError): PullRequestCli
 
 export const makeGitHubCliAdapter = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-): GitHubCliAdapter => ({
-  current: (cwd, pullRequest) =>
-    executeGh(spawner, cwd, currentPullRequestArgs(pullRequest)).pipe(
+): GitHubCliAdapter => {
+  const mapFailedRead = (result: GitHubCliResult): Effect.Effect<never, PullRequestReadFailure> => {
+    const output = `${result.stderr}\n${result.stdout}`;
+    if (isUnauthenticated(output)) return Effect.fail(new PullRequestUnauthenticated());
+    if (isRateLimited(output)) return Effect.fail(new PullRequestRateLimited());
+    if (isUnsupportedContext(output)) return Effect.fail(new PullRequestUnsupportedContext());
+    return Effect.fail(new PullRequestHostUnavailable());
+  };
+
+  const readStdout = (
+    result: GitHubCliResult,
+  ): Effect.Effect<string | null, PullRequestReadFailure> => {
+    if (result.exitCode !== 0) {
+      if (isNoPullRequest(result.stderr)) return Effect.succeed(null);
+      return mapFailedRead(result);
+    }
+    return Effect.succeed(result.stdout);
+  };
+
+  const current: GitHubCliAdapter["current"] = (cwd, pullRequest) =>
+    executeGh(spawner, currentPullRequestArgs(pullRequest), { cwd }).pipe(
       Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(readStdout),
       Effect.flatMap(
-        (result): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
-          if (result.exitCode !== 0) {
-            if (isNoPullRequest(result.stderr)) return Effect.succeed(null);
-            if (isUnauthenticated(result.stderr)) {
-              return Effect.fail(new PullRequestUnauthenticated());
-            }
-            if (isRateLimited(result.stderr)) return Effect.fail(new PullRequestRateLimited());
-            if (isUnsupportedContext(result.stderr)) {
-              return Effect.fail(new PullRequestUnsupportedContext());
-            }
-            return Effect.fail(new PullRequestHostUnavailable());
-          }
+        (stdout): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
+          if (stdout === null) return Effect.succeed(null);
           return Effect.try({
-            try: () => normalizeGitHubPullRequestJson(JSON.parse(result.stdout) as unknown),
+            try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
             catch: () => new PullRequestInvalidResponse(),
           });
         },
       ),
-    ),
-  runAction: ({ action, cwd, expectedHeadSha, url }) =>
-    executeGh(spawner, cwd, pullRequestActionArgs(url, action, expectedHeadSha)).pipe(
+    );
+
+  const runDiff = (args: ReadonlyArray<string>, cwd?: string) =>
+    Effect.gen(function* () {
+      const attempted = yield* executeGh(spawner, args, {
+        ...(cwd === undefined ? undefined : { cwd }),
+        timeout: DIFF_TIMEOUT,
+        maxOutputBytes: DIFF_MAX_OUTPUT_BYTES,
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempted)) {
+        if (attempted.failure._tag === "GitHubCliOutputTooLarge") {
+          return { patch: "", truncated: true };
+        }
+        return yield* Effect.fail(mapExecutionReadError(attempted.failure));
+      }
+      const result = attempted.success;
+      if (result.exitCode === 0) return { patch: result.stdout, truncated: false };
+      if (isNoPullRequest(result.stderr)) return { patch: "", truncated: false };
+      if (isUnauthenticated(result.stderr)) {
+        return yield* new PullRequestUnauthenticated();
+      }
+      if (isRateLimited(result.stderr)) return yield* new PullRequestRateLimited();
+      if (isUnsupportedContext(result.stderr)) {
+        return yield* new PullRequestUnsupportedContext();
+      }
+      if (isDiffTooLarge(result.stderr)) return { patch: "", truncated: true };
+      return yield* new PullRequestHostUnavailable();
+    });
+
+  const diff: GitHubCliAdapter["diff"] = (cwd) => runDiff(pullRequestDiffArgs(), cwd);
+  const diffFor: GitHubCliAdapter["diffFor"] = (pullRequest) =>
+    runDiff(pullRequestDiffArgs(pullRequest));
+
+  const list: GitHubCliAdapter["list"] = () =>
+    executeGh(spawner, pullRequestListArgs()).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(
+        (result): Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure> => {
+          if (result.exitCode !== 0) return mapFailedRead(result);
+          return Effect.try({
+            try: () => normalizeGitHubViewerPullRequestsJson(JSON.parse(result.stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
+    );
+
+  const detail: GitHubCliAdapter["detail"] = (pullRequest) =>
+    executeGh(spawner, currentPullRequestArgs(pullRequest)).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(readStdout),
+      Effect.flatMap(
+        (stdout): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
+          if (stdout === null) return Effect.succeed(null);
+          return Effect.try({
+            try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
+    );
+
+  const runAction: GitHubCliAdapter["runAction"] = ({ action, cwd, expectedHeadSha, url }) =>
+    executeGh(spawner, pullRequestActionArgs(url, action, expectedHeadSha), {
+      ...(cwd === undefined ? undefined : { cwd }),
+    }).pipe(
       Effect.mapError(mapExecutionActionError),
       Effect.flatMap((result): Effect.Effect<void, PullRequestCliActionFailure> => {
         if (result.exitCode === 0) return Effect.void;
@@ -306,5 +420,7 @@ export const makeGitHubCliAdapter = (
         }
         return Effect.fail(new PullRequestActionOutcomeUnknown());
       }),
-    ),
-});
+    );
+
+  return { current, diff, diffFor, list, detail, runAction };
+};

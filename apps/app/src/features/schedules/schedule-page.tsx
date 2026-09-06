@@ -8,20 +8,22 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
 import { useState } from "react";
+import { Group, Separator } from "react-resizable-panels";
 import { toast } from "sonner";
 
+import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
 
 import { formatSessionReuse } from "./cadence";
 import { ScheduleCard } from "./schedule-card";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
-import { ScheduleEditorDialog, type ScheduleEditorState } from "./schedule-editor-dialog";
+import { ScheduleDetailPanel } from "./schedule-detail-panel";
+import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
 import type { ScheduleFormSubmit } from "./schedule-form";
-import { ScheduleRunHistory } from "./schedule-run-history";
 
 export type ScheduleCreateDefaults = {
   readonly projectId?: string;
@@ -50,7 +52,7 @@ export function SchedulePage({
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [deleting, setDeleting] = useState<Schedule | null>(null);
-  const [history, setHistory] = useState<Schedule | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const schedules = useQuery({
     ...orpcQueryUtils.schedule.list.queryOptions(),
@@ -132,6 +134,8 @@ export function SchedulePage({
     mutationFn: (id: string) => orpcQueryUtils.schedule.delete.call({ id }),
     onSuccess: () => {
       setDeleting(null);
+      setSelectedId(null);
+      setEditing(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
     },
     onError: (error) => toast.error(`Failed to delete schedule: ${error.message}`),
@@ -163,19 +167,16 @@ export function SchedulePage({
   });
 
   const items = schedules.data ?? [];
-  const projectIds = [...new Set(items.map((item) => item.projectId))];
-  const sessionLists = useQueries({
-    queries: projectIds.map((projectId) =>
-      orpcQueryUtils.agent.session.list.queryOptions({
-        input: { projectId, archived: false },
-      }),
-    ),
+  const selected = selectedId === null ? undefined : items.find((item) => item.id === selectedId);
+  const sessions = useQuery({
+    ...orpcQueryUtils.agent.session.list.queryOptions({
+      input:
+        selected === undefined ? skipToken : { projectId: selected.projectId, archived: false },
+    }),
   });
   const sessionTitleById = new Map<string, string>();
-  for (const query of sessionLists) {
-    for (const session of query.data ?? []) {
-      sessionTitleById.set(session.sessionId, session.title ?? "New chat");
-    }
+  for (const session of sessions.data ?? []) {
+    sessionTitleById.set(session.sessionId, session.title ?? "New chat");
   }
   const editor: ScheduleEditorState | null =
     editing !== null
@@ -187,8 +188,6 @@ export function SchedulePage({
             sessionId: createDefaults?.sessionId,
           }
         : null;
-  const historySchedule =
-    history === null ? null : (items.find((item) => item.id === history.id) ?? history);
   const atLimit = items.length >= MAX_SCHEDULES;
   const canCreate = projectsReady && projects.length > 0 && !atLimit;
 
@@ -207,8 +206,8 @@ export function SchedulePage({
     );
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+  const list = (
+    <>
       <div className="flex items-start justify-between gap-3 px-6 py-4">
         <p className="text-muted-foreground text-sm">
           Create a session on a cadence. These live on the server, not inside a chat.
@@ -248,66 +247,98 @@ export function SchedulePage({
             <ScheduleCard
               schedule={schedule}
               key={schedule.id}
-              onDelete={() => setDeleting(schedule)}
-              onEdit={() => setEditing(schedule)}
-              onHistory={() => setHistory(schedule)}
-              onRunNow={() => runNow.mutate(schedule.id)}
+              onSelect={() => {
+                setEditing(null);
+                setSelectedId(schedule.id);
+                if (createOpen) onCloseCreate();
+              }}
               onToggle={(enabled) => update.mutate({ id: schedule.id, enabled })}
               projectName={
                 projects.find((item) => item.id === schedule.projectId)?.name ?? "Unknown project"
               }
-              sessionLine={formatSessionReuse(schedule.session, sessionTitleById)}
-              running={runNow.isPending}
+              selected={schedule.id === selectedId}
               updating={update.isPending}
             />
           ))}
         </ul>
       )}
+    </>
+  );
 
-      {editor !== null ? (
-        <ScheduleEditorDialog
-          editor={editor}
-          onClose={() => {
-            if (editor.mode === "create") {
-              onCloseCreate();
-              return;
-            }
-            setEditing(null);
-          }}
-          onSubmit={(value) => {
-            if (editor.mode === "create") {
-              create.mutate(value);
-              return;
-            }
-            update.mutate({ id: editor.schedule.id, ...value });
-          }}
-          projects={projects}
-          submitting={create.isPending || update.isPending}
-        />
-      ) : null}
-
-      {historySchedule !== null ? (
-        <ScheduleRunHistory
-          schedule={historySchedule}
-          nowMs={Date.now()}
-          onClose={() => setHistory(null)}
-          onOpenSession={(sessionId) => {
-            const projectId = historySchedule.projectId;
-            setHistory(null);
-            navigate({
-              to: "/session/$sessionId",
-              params: { sessionId },
-              search: { projectId },
-            }).catch((error: unknown) => {
-              console.error("Failed to open the schedule session", error);
-            });
-          }}
-          projectName={
-            projects.find((item) => item.id === historySchedule.projectId)?.name ??
-            "Unknown project"
+  const sidePanel =
+    editor !== null ? (
+      <ScheduleEditorPanel
+        editor={editor}
+        onClose={() => {
+          if (editor.mode === "create") {
+            onCloseCreate();
+            return;
           }
-        />
-      ) : null}
+          setEditing(null);
+        }}
+        onSubmit={(value) => {
+          if (editor.mode === "create") {
+            create.mutate(value);
+            return;
+          }
+          update.mutate({ id: editor.schedule.id, ...value });
+        }}
+        projects={projects}
+        submitting={create.isPending || update.isPending}
+      />
+    ) : selected === undefined ? null : (
+      <ScheduleDetailPanel
+        nowMs={Date.now()}
+        onClose={() => setSelectedId(null)}
+        onDelete={() => setDeleting(selected)}
+        onEdit={() => setEditing(selected)}
+        onOpenSession={(sessionId) => {
+          const projectId = selected.projectId;
+          navigate({
+            to: "/session/$sessionId",
+            params: { sessionId },
+            search: { projectId },
+          }).catch((error: unknown) => {
+            console.error("Failed to open the schedule session", error);
+          });
+        }}
+        onRunNow={() => runNow.mutate(selected.id)}
+        projectName={
+          projects.find((item) => item.id === selected.projectId)?.name ?? "Unknown project"
+        }
+        running={runNow.isPending}
+        schedule={selected}
+        sessionLine={formatSessionReuse(selected.session, sessionTitleById)}
+      />
+    );
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {sidePanel === null ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{list}</div>
+      ) : (
+        <Group
+          className="flex min-h-0 flex-1"
+          orientation="horizontal"
+          resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
+        >
+          <ResizablePanel className="flex min-w-0 flex-col" minSize="16rem">
+            {list}
+          </ResizablePanel>
+          <Separator
+            aria-label="Resize schedule panel"
+            className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
+          />
+          <ResizablePanel
+            className="flex min-w-0 flex-col"
+            defaultSize="28rem"
+            maxSize="50%"
+            minSize="18rem"
+          >
+            {sidePanel}
+          </ResizablePanel>
+        </Group>
+      )}
 
       {deleting !== null ? (
         <ScheduleDeleteDialog

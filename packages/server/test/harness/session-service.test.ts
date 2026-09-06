@@ -624,6 +624,20 @@ describe("PiAgentSessionService", () => {
     expect(event && isSessionScopedEvent(event) ? event.seq : 0).toBeGreaterThan(0);
   });
 
+  it("returns the runtime's prompt receipt", async () => {
+    const receipt = await run({ turn: "open" }, (fixture) =>
+      Effect.gen(function* () {
+        const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
+        return yield* fixture.service.prompt({
+          ref,
+          parts: [{ type: "text", text: "hello there" }],
+          messageId: "client-msg-1",
+        });
+      }),
+    );
+    expect(receipt).toEqual({ turnId: "turn-1", started: true });
+  });
+
   it("retains the accepted prompt in the runtime snapshot for mid-turn joiners", async () => {
     const snapshot = await run({ turn: "open" }, (fixture) =>
       Effect.gen(function* () {
@@ -648,11 +662,13 @@ describe("PiAgentSessionService", () => {
         return yield* Effect.scoped(
           Effect.gen(function* () {
             const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
-            yield* fixture.service.prompt({
-              ref,
-              parts: [{ type: "text", text: "loser prompt" }],
-              messageId: "loser-msg",
-            });
+            const prompt = yield* Effect.exit(
+              fixture.service.prompt({
+                ref,
+                parts: [{ type: "text", text: "loser prompt" }],
+                messageId: "loser-msg",
+              }),
+            );
             yield* Effect.sleep("50 millis");
             const items = yield* Stream.runCollect(
               Stream.take(
@@ -668,6 +684,7 @@ describe("PiAgentSessionService", () => {
             );
             const snapshot = yield* fixture.service.getSnapshot(ref);
             return {
+              prompt,
               broadcast: Array.from(items).map((item) =>
                 item.type === "event" ? item.event.type : item.type,
               ),
@@ -677,6 +694,7 @@ describe("PiAgentSessionService", () => {
         );
       }),
     );
+    expect(result.prompt._tag).toBe("Failure");
     expect(result.broadcast).toEqual(["session.prompt.submitted", "session.prompt.rejected"]);
     expect(result.activePrompt).toBeNull();
   });

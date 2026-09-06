@@ -17,6 +17,20 @@ export const isUnsafeRef = (ref: string): boolean =>
   ref.includes("@{") ||
   /\s/.test(ref);
 
+export const parseRefNames = (output: string) => {
+  const local: string[] = [];
+  const remotes: string[] = [];
+  for (const line of output.split("\n")) {
+    const ref = line.trim();
+    if (ref.startsWith("refs/heads/")) {
+      local.push(ref.slice("refs/heads/".length));
+    } else if (ref.startsWith("refs/remotes/")) {
+      remotes.push(ref.slice("refs/remotes/".length));
+    }
+  }
+  return { local, remotes, all: [...local, ...remotes] };
+};
+
 const isNotRepositoryMessage = (cause: unknown): boolean => {
   const message = cause instanceof Error ? cause.message : String(cause);
   return /not a git repository/i.test(message);
@@ -46,5 +60,10 @@ export const makeGitHelpers = (fs: FileSystem.FileSystem) => {
       ),
     );
 
-  return { readError, gitError, raw, resolveRoot, resolveRepoRoot };
+  const listRefs = (cwd: string) =>
+    raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
+      Effect.map(parseRefNames),
+    );
+
+  return { readError, gitError, raw, resolveRoot, resolveRepoRoot, listRefs };
 };

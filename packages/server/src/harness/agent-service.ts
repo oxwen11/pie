@@ -13,16 +13,7 @@ export class PiAgentService extends Context.Service<PiAgentService, PiAgentServi
 ) {}
 
 export const makePiAgentService = (): PiAgentServiceShape => ({
-  listModels: (cwd) =>
-    Effect.tryPromise({
-      try: () => listAvailablePiModels(cwd),
-      catch: (cause) =>
-        new AgentOperationError({
-          sessionId: "",
-          operation: "list-models",
-          cause,
-        }),
-    }),
+  listModels: (cwd) => listAvailablePiModels(cwd),
 });
 
 export const PiAgentServiceLayer = Layer.succeed(PiAgentService, makePiAgentService());

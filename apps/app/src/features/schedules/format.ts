@@ -59,7 +59,7 @@ export function formatNextRun(
     return "Paused";
   }
   if (nextRunAt === null) return "Run now only";
-  return new Date(nextRunAt).toLocaleString();
+  return `Next run ${new Date(nextRunAt).toLocaleString()}`;
 }
 
 export function formatFiredCap(firedCount: number, maxRuns: number): string {

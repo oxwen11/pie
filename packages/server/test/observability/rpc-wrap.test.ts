@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
+import { ORPCError } from "@orpc/server";
 import { Context, Effect, Layer, Logger } from "effect";
 
 import { makeRpcWrap } from "../../src/rpc/handlers";
@@ -72,6 +73,24 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
 
       assert.ok(exit._tag === "Failure");
       assert.deepEqual(records, []);
+    }),
+  );
+
+  it.effect("logs a declared ORPCError that oRPC turned into a success", () =>
+    Effect.gen(function* () {
+      const records: Array<LogRecord> = [];
+      const wrap = makeRpcWrap(yield* captureContext(records));
+      const error = new ORPCError("BINARY_FILE", { data: { path: "note.pdf" } });
+
+      const value = yield* wrap(Effect.succeed(error), { path: ["fs", "readFileString"] });
+
+      assert.equal(value, error);
+      const record = records.find((candidate) => candidate.annotations.event === "rpc.error");
+      assert.ok(record !== undefined);
+      assert.equal(record.level, "WARN");
+      assert.equal(record.annotations.procedure, "fs.readFileString");
+      assert.equal(record.annotations.code, "BINARY_FILE");
+      assert.deepEqual(record.annotations.data, { path: "note.pdf" });
     }),
   );
 

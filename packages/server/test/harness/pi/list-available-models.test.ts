@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 
+import { Effect } from "effect";
 import { describe, it } from "vitest";
 
 import { listAvailablePiModels } from "../../../src/harness/pi/list-available-models";
 
 describe("listAvailablePiModels", () => {
   it("returns AgentModel rows and a default from Pi ModelRuntime without an RPC child", async () => {
-    const listed = await listAvailablePiModels(process.cwd());
+    const listed = await Effect.runPromise(listAvailablePiModels(process.cwd()));
     assert.ok(Array.isArray(listed.models));
     for (const model of listed.models) {
       assert.equal(typeof model.provider, "string");

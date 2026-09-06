@@ -21,10 +21,31 @@ export type CreatePieClientOptions = {
   getTicket?: () => Promise<string>;
 };
 
+export type CloseablePieClient = {
+  readonly client: PieClient;
+  readonly close: () => void;
+};
+
 function defaultWsUrl(): URL {
   const url = new URL("/ws/rpc", globalThis.location.origin);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url;
+}
+
+/** Mint a single-use WebSocket ticket from a Pie HTTP endpoint. */
+export async function getWsTicket(httpBaseUrl: string | URL, token?: string): Promise<string> {
+  const response = await globalThis.fetch(new URL("/api/ws-ticket", httpBaseUrl), {
+    method: "POST",
+    ...(token === undefined ? undefined : { headers: { authorization: `Bearer ${token}` } }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
+  }
+  const body = (await response.json()) as { ticket: string };
+  if (typeof body.ticket !== "string" || body.ticket.length === 0) {
+    throw new Error("WebSocket ticket response was empty");
+  }
+  return body.ticket;
 }
 
 /**
@@ -41,21 +62,41 @@ export function createWsConnect(options: CreatePieClientOptions): () => Promise<
   };
 }
 
-/**
- * WebSocket client: every call multiplexed over one connection. The link takes
- * a lazy `connect` factory (oRPC 2.0.0-beta.16), so the socket is only opened
- * on first use — and re-opened, with a fresh ticket, on every reconnect.
- */
-export function createPieClient(options: CreatePieClientOptions = {}): PieClient {
+const createClient = (
+  options: CreatePieClientOptions,
+  reconnect: boolean,
+  onConnect?: (socket: WebSocket) => void,
+): PieClient => {
+  const connect = createWsConnect(options);
   const link = new WebSocketRPCLink({
-    connect: createWsConnect(options),
-    // Reconnect is opt-in in oRPC and OFF by default. Without it the link
-    // holds the dead socket after a drop and every later call hangs on a
-    // send into it — one network blip kills the client until a full page
-    // reload. Enabled, the next call after a drop re-invokes `connect` (and
-    // so mints a fresh ticket); in-flight calls still reject on the drop,
-    // which consumers (e.g. the chat transport's retry loop) recover from.
-    reconnect: { enabled: true },
+    connect: async () => {
+      const socket = await connect();
+      onConnect?.(socket);
+      return socket;
+    },
+    reconnect: { enabled: reconnect },
   });
   return createORPCClient(link);
+};
+
+/**
+ * WebSocket client: every call multiplexed over one connection. The link takes
+ * a lazy `connect` factory, so the socket is opened on first use and each
+ * reconnect fetches a fresh ticket.
+ */
+export function createPieClient(options: CreatePieClientOptions = {}): PieClient {
+  return createClient(options, true);
+}
+
+/** One-shot client for short-lived processes that must close their socket. */
+export function createCloseablePieClient(options: CreatePieClientOptions = {}): CloseablePieClient {
+  let socket: WebSocket | undefined;
+  return {
+    client: createClient(options, false, (connected) => {
+      socket = connected;
+    }),
+    close: () => {
+      socket?.close();
+    },
+  };
 }

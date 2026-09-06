@@ -225,7 +225,7 @@ function DraftRoute() {
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
-          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
+          <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
             <ProjectSelect
               onChange={(next) => {
                 navigate({
@@ -284,6 +284,7 @@ function DraftRoute() {
         <Card
           render={
             <PromptInput
+              className="divide-y-0"
               onSubmit={(e) => {
                 e.preventDefault();
                 void controller?.submit();

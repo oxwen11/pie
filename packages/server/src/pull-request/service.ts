@@ -1,7 +1,9 @@
 import type {
   PullRequestAction,
   PullRequestActionApplied,
+  PullRequestDiff,
   PullRequestExpected,
+  PullRequestListItem,
   PullRequestRef,
   PullRequestSessionStatus,
   PullRequestSnapshot,
@@ -24,6 +26,9 @@ const samePullRequest = (left: PullRequestRef, right: PullRequestRef): boolean =
   left.number === right.number;
 
 export type PullRequestActionFailure = PullRequestReadFailure | PullRequestCliActionFailure;
+export type PullRequestActionTarget =
+  | { readonly cwd: string }
+  | { readonly pullRequest: PullRequestRef };
 
 export class PullRequestService extends Context.Service<
   PullRequestService,
@@ -32,8 +37,16 @@ export class PullRequestService extends Context.Service<
       cwd: string,
       pullRequest?: PullRequestRef,
     ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
+    readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+    readonly diffFor: (
+      pullRequest: PullRequestRef,
+    ) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+    readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
+    readonly detail: (
+      pullRequest: PullRequestRef,
+    ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
     readonly runAction: (
-      cwd: string,
+      target: PullRequestActionTarget,
       expected: PullRequestExpected,
       action: PullRequestAction,
     ) => Effect.Effect<PullRequestActionApplied, PullRequestActionFailure>;
@@ -54,21 +67,25 @@ export const PullRequestServiceLayer: Layer.Layer<
     const cli = makeGitHubCliAdapter(spawner);
 
     const current = (cwd: string, pullRequest?: PullRequestRef) => cli.current(cwd, pullRequest);
+    const diff = (cwd: string) => cli.diff(cwd);
+    const diffFor = (pullRequest: PullRequestRef) => cli.diffFor(pullRequest);
+    const list = () => cli.list();
+    const detail = (pullRequest: PullRequestRef) => cli.detail(pullRequest);
 
     const runAction = (
-      cwd: string,
+      target: PullRequestActionTarget,
       expected: PullRequestExpected,
       action: PullRequestAction,
     ): Effect.Effect<PullRequestActionApplied, PullRequestActionFailure> =>
       Effect.gen(function* () {
-        const snapshot = yield* current(cwd);
+        const snapshot = yield* "cwd" in target ? current(target.cwd) : detail(target.pullRequest);
         if (snapshot === null || !samePullRequest(snapshot.ref, expected.pullRequest)) {
           return yield* new PullRequestStaleContext();
         }
         const expectedHeadSha = "headSha" in expected ? expected.headSha : undefined;
         yield* cli
           .runAction({
-            cwd,
+            ...("cwd" in target ? { cwd: target.cwd } : undefined),
             url: snapshot.url,
             action,
             ...(expectedHeadSha === undefined ? undefined : { expectedHeadSha }),
@@ -94,6 +111,6 @@ export const PullRequestServiceLayer: Layer.Layer<
     const sessionStatuses = (workspaces: ReadonlyArray<PullRequestSessionWorkspace>) =>
       foldSessionStatuses(workspaces, current);
 
-    return { current, runAction, sessionStatuses };
+    return { current, diff, diffFor, list, detail, runAction, sessionStatuses };
   }),
 );

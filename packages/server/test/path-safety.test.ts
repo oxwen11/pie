@@ -2,7 +2,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { contains, hasBinaryMagicPrefix, toPosixPath } from "../src/path-safety";
+import {
+  contains,
+  detectImageMimeType,
+  hasBinaryMagicPrefix,
+  toPosixPath,
+} from "../src/path-safety";
 
 describe("contains", () => {
   it("is true when parent equals child", () => {
@@ -57,5 +62,28 @@ describe("hasBinaryMagicPrefix", () => {
 
   it("is false for plain UTF-8 text", () => {
     expect(hasBinaryMagicPrefix(new TextEncoder().encode("hello world"))).toBe(false);
+  });
+});
+
+describe("detectImageMimeType", () => {
+  it("sniffs png, jpeg, gif, webp, and bmp", () => {
+    expect(detectImageMimeType(Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))).toBe(
+      "image/png",
+    );
+    expect(detectImageMimeType(Uint8Array.of(0xff, 0xd8, 0xff, 0xe0))).toBe("image/jpeg");
+    expect(detectImageMimeType(Uint8Array.of(0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00))).toBe(
+      "image/gif",
+    );
+    expect(
+      detectImageMimeType(
+        Uint8Array.of(0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50),
+      ),
+    ).toBe("image/webp");
+    expect(detectImageMimeType(Uint8Array.of(0x42, 0x4d, 0x00))).toBe("image/bmp");
+  });
+
+  it("is undefined for pdf and plain text", () => {
+    expect(detectImageMimeType(Uint8Array.of(0x25, 0x50, 0x44, 0x46, 0x2d))).toBeUndefined();
+    expect(detectImageMimeType(new TextEncoder().encode("hello"))).toBeUndefined();
   });
 });

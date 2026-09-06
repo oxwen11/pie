@@ -1,3 +1,4 @@
+import type { FilePreview } from "@getpie/contract/fs";
 import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
@@ -20,7 +21,7 @@ export function FilePreviewPane({
   refreshing,
   onRefresh,
 }: {
-  file: UseQueryResult<string>;
+  file: UseQueryResult<FilePreview>;
   path: string;
   line?: number;
   navigationRequest: number;
@@ -51,6 +52,14 @@ export function FilePreviewPane({
         <FileState title={fileErrorTitle(file.error)} onRetry={() => void file.refetch()}>
           {fileErrorMessage(file.error)}
         </FileState>
+      ) : file.data?.kind === "image" ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <img
+            alt={path.split(/[\\/]/).at(-1) || path}
+            className="max-h-full max-w-full object-contain"
+            src={`data:${file.data.mimeType};base64,${file.data.data}`}
+          />
+        </div>
       ) : (
         <div className="min-h-0 flex-1">
           <Suspense
@@ -61,7 +70,7 @@ export function FilePreviewPane({
             }
           >
             <FilePreviewAdapter
-              content={file.data ?? ""}
+              content={file.data?.content ?? ""}
               navigationRequest={navigationRequest}
               path={path}
               targetLine={line}

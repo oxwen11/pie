@@ -109,7 +109,7 @@ Stable handles (from source, not guesses):
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
-| Session send | button **Send message**; while streaming: **Steer message**, **Stop generating**, **Send message** |
+| Session send | button **Send message**; while streaming with an empty draft: **Steer message** (disabled) and **Stop generating**; typing lights **Send message** (queue follow-up) and keeps Stop as a ghost action |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
@@ -126,20 +126,27 @@ Proof directory (survives cleanup):
 .cursor/skills/verify-pie/evidence/<run-id>/
 ```
 
+Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+
 ```bash
 pnpm exec pie-verify web evidence init
+EVIDENCE="$(pnpm exec pie-verify web evidence path)"
+agent-browser open http://localhost:4190/            # settle the page first
 pnpm exec pie-verify web evidence snapshot before
 pnpm exec pie-verify web evidence screenshot before
+agent-browser record start "$EVIDENCE/<feature>.webm" # fresh context on the current URL
 # …drive…
+agent-browser record stop
 pnpm exec pie-verify web evidence snapshot after
 pnpm exec pie-verify web evidence screenshot after
 pnpm exec pie-verify web evidence url
 pnpm exec pie-verify web evidence side-effects
-pnpm exec pie-verify web evidence note "what you proved"
+pnpm exec pie-verify web evidence note "<feature>.webm: what the clip shows"
 ```
 
 Standards:
 
+- **Screenshots and video are both mandatory** (UI rule). Name them after the feature (`import-project-before.png`, `import-project.webm`). `record start` reopens the current URL in a fresh context, so open and settle the page before starting it; use `record restart <path>` to split long drives.
 - Exercise the real user path (sidebar / empty state / composer), not a test-only HTTP method and not a hand-edited `projects.json`.
 - Capture **the action and the resulting state**, not only the last screenshot.
 - Confirm side effects on disk:
@@ -169,6 +176,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
+| `agent-browser record start <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 
 ## Isolate

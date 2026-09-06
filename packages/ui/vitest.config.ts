@@ -10,7 +10,9 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+    name: "ui",
     environment: "jsdom",
+    fsModuleCache: true,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // First Streamdown/Shiki highlighter init exceeds vitest's 5s default on CI.
     hookTimeout: 20_000,

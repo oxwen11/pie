@@ -40,6 +40,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@getpie/typescript": "workspace:*",
-    "@types/ws": "catalog:"
+    "@types/ws": "catalog:",
+    "vitest": "catalog:"
   }
 }
