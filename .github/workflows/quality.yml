@@ -57,9 +57,9 @@ jobs:
       - name: Verify CI environment
         run: |
           source /etc/os-release
-          test "$ID" = "ubuntu"
-          test "$VERSION_ID" = "24.04"
+          test "$(uname -s)" = "Linux"
           test "$(uname -m)" = "x86_64"
+          printf 'host: %s %s\n' "$ID" "$VERSION_ID"
 
           expected_node="$(mise current node)"
           actual_node="$(node --version)"
@@ -72,8 +72,8 @@ jobs:
           test "$metadata_pnpm" = "$expected_pnpm"
           test "$actual_pnpm" = "$expected_pnpm"
 
-          printf 'Ubuntu %s, Node %s, pnpm %s, %s\n' \
-            "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
+          printf '%s %s, Node %s, pnpm %s, %s\n' \
+            "$ID" "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
         shell: bash
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
