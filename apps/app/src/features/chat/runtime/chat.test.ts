@@ -6,7 +6,9 @@ import {
   activeTurn,
   assistantText,
   chunkEvent,
+  FakeTransport,
   makeChat,
+  ref,
   settle,
   textChunks,
   toolRequest,
@@ -902,5 +904,37 @@ describe("Chat lifecycle", () => {
     await attach({});
     chat.dispose();
     expect(transport.disposed).toBe(1);
+    expect(chat.subscribed).toBe(false);
+  });
+
+  // Idle eviction keeps this Chat and its store; only the transport is
+  // swapped. The next attach hydrates against the retained cursor/floor.
+  it("reattach swaps the transport and keeps the store", async () => {
+    const { chat, transport, attach } = makeChat();
+    transport.history = [userMessage("user-1", "hello")];
+    await attach({});
+    expect(chat.store.getState().messages).toHaveLength(1);
+
+    const next = new FakeTransport();
+    chat.reattach(next);
+    expect(transport.disposed).toBe(1);
+    expect(chat.subscribed).toBe(true);
+    expect(chat.store.getState().messages).toHaveLength(1);
+
+    next.onEvent?.({
+      type: "attached",
+      snapshot: {
+        ref,
+        status: { phase: "idle" },
+        activeTurn: null,
+        activePrompt: null,
+        pendingRequests: [],
+        pendingPrompt: { steering: [], followUp: [] },
+        cursor: 0,
+      },
+    });
+    await settle();
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.subscribed).toBe(true);
   });
 });
