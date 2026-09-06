@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { layer as testLayer } from "@effect/vitest";
-import { Cause, ConfigProvider, Effect, Exit, Option } from "effect";
+import { Cause, ConfigProvider, Effect, Exit, Fiber, Option } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resolveServeConfig, runServe } from "../../src/http/serve";
@@ -16,7 +16,9 @@ import { NodePlatformLayer } from "../platform";
 const ENV_KEYS = [
   // `runServe` provides observability, which writes below `$PIE_HOME/logs`.
   // Pin it per test so the suite never touches the developer's real home.
+  // `PIE_AUTH_TOKEN` likewise: the scrub test owns it, no other test reads it.
   "PIE_HOME",
+  "PIE_AUTH_TOKEN",
 ] as const;
 
 let saved: Record<string, string | undefined>;
@@ -103,6 +105,65 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
 });
 
 describe("runServe", () => {
+  it("scrubs PIE_AUTH_TOKEN from the environment and still guards the server", async () => {
+    // Occupy then release a port so the server can own it for this test.
+    const blocker = net.createServer();
+    await new Promise<void>((resolve) => {
+      blocker.listen(0, "127.0.0.1", resolve);
+    });
+    const { port } = blocker.address() as AddressInfo;
+    await new Promise<void>((resolve) => {
+      blocker.close(() => resolve());
+    });
+
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-serve-"));
+    process.env.PIE_HOME = home;
+    const token = "scrub-test-token-0000";
+    process.env.PIE_AUTH_TOKEN = token;
+
+    const fiber = Effect.runFork(
+      Effect.scoped(runServe({ port: Option.some(port), corsOrigin: [], allowedHost: [] })).pipe(
+        Effect.provide(NodePlatformLayer),
+      ),
+    );
+
+    try {
+      // A responding health endpoint means startup completed: the Config read
+      // (and its scrub) happens before the server is even created.
+      const base = `http://127.0.0.1:${port}`;
+      let listening = false;
+      for (let attempt = 0; attempt < 100 && !listening; attempt++) {
+        const response = await fetch(`${base}/api/health`).catch(() => undefined);
+        if (response !== undefined && response.status === 200) listening = true;
+        else
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 50);
+          });
+      }
+      expect(listening).toBe(true);
+
+      // The Config-read token is the credential the server enforces.
+      const rejected = await fetch(`${base}/api/ws-ticket`, {
+        method: "POST",
+        headers: { authorization: "Bearer wrong-token-0000" },
+      });
+      expect(rejected.status).toBe(401);
+      const accepted = await fetch(`${base}/api/ws-ticket`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(accepted.status).toBe(200);
+
+      // Read once, then scrubbed: pi children and their tool shells inherit
+      // this process environment and must not see the credential.
+      assert.equal(process.env.PIE_AUTH_TOKEN, undefined);
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(fiber));
+      delete process.env.PIE_AUTH_TOKEN;
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("fails with a typed startup error when binding the port fails", async () => {
     // Occupy a port so runServe's listen stage fails after the server (and its
     // runtime) has been built; the scope then releases what was acquired.

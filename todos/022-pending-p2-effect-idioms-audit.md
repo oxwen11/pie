@@ -71,7 +71,7 @@ create: Effect.fn("PiAgentSessionService.create")(function* (input) { ... })
 
 **方案**：
 
-- `Config.redacted("PIE_AUTH_TOKEN")`（自动 redact，不需要 `delete process.env`）。
+- `Config.redacted("PIE_AUTH_TOKEN")`（redact 仅作用于日志渲染，不清理 `process.env`；`serve.ts` 读完仍 `delete process.env.PIE_AUTH_TOKEN`——agent 子进程继承环境变量，不能读到凭据，评审后已恢复该 scrub）。
 - `Config.integer("PIE_PORT").pipe(Config.withDefault(4180))`、`Config.logLevel("PIE_LOG_LEVEL")`。
 - 有默认值的开关用 `Context.Reference<boolean>("pie/PrintLogs", { defaultValue: () => false })`（`03_services/10_reference.ts`）。
 - 测试用 `ConfigProvider.fromMap` 注入。

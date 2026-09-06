@@ -107,6 +107,14 @@ export const runServe = (input: ServeInput) =>
 const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
     const token = yield* pieAuthToken;
+    // Read exactly once, then scrub. `Config.redacted` only masks log
+    // rendering — it does not touch the process environment. The agent spawns
+    // a shell for every tool call and children inherit this environment, so
+    // an agent-run command must not be able to read the credential that
+    // guards the agent.
+    yield* Effect.sync(() => {
+      delete process.env.PIE_AUTH_TOKEN;
+    });
     const authToken = Option.match(token, {
       onNone: () => undefined,
       onSome: Redacted.value,
