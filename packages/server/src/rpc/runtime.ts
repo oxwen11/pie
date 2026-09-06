@@ -32,7 +32,7 @@ const Infra = Layer.mergeAll(PlatformLayer, PathsLayer, EventBusLayer);
 export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
   PiProcessTag,
   Effect.gen(function* () {
-    const executable = yield* resolvePiExecutableEffect;
+    const executable = yield* resolvePiExecutableEffect.pipe(Effect.orDie);
     return yield* makePiProcess({ executable });
   }),
 ).pipe(Layer.provide(NodeProcessLayer));
@@ -41,7 +41,7 @@ const PiAgentProvided = Layer.effect(
   PiAgent,
   Effect.gen(function* () {
     const process = yield* PiProcessTag;
-    const executable = yield* resolvePiExecutableEffect;
+    const executable = yield* resolvePiExecutableEffect.pipe(Effect.orDie);
     return yield* cachePiAgentAvailability(makePiAgent(process, { executable }));
   }),
 ).pipe(Layer.provideMerge(PiProcessLayer), Layer.provideMerge(Infra));
