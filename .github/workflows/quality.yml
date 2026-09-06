@@ -14,7 +14,7 @@ env:
   CI: "true"
 
 # A newer commit makes older runs for the same PR or branch obsolete. Cancel it
-# before it consumes another slot on the single self-hosted runner.
+# before it consumes another slot on a pie self-hosted runner.
 concurrency:
   group: quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -27,7 +27,7 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
+    runs-on: [self-hosted, pie]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
