@@ -1,27 +1,53 @@
-import { Data } from "effect";
+import { Schema } from "effect";
 
-export class PullRequestMissingGh extends Data.TaggedError("PullRequestMissingGh") {}
+export class PullRequestMissingGh extends Schema.TaggedError<PullRequestMissingGh>()(
+  "PullRequestMissingGh",
+  {},
+) {}
 
-export class PullRequestUnauthenticated extends Data.TaggedError("PullRequestUnauthenticated") {}
+export class PullRequestUnauthenticated extends Schema.TaggedError<PullRequestUnauthenticated>()(
+  "PullRequestUnauthenticated",
+  {},
+) {}
 
-export class PullRequestRateLimited extends Data.TaggedError("PullRequestRateLimited") {}
+export class PullRequestRateLimited extends Schema.TaggedError<PullRequestRateLimited>()(
+  "PullRequestRateLimited",
+  {},
+) {}
 
-export class PullRequestUnsupportedContext extends Data.TaggedError(
+export class PullRequestUnsupportedContext extends Schema.TaggedError<PullRequestUnsupportedContext>()(
   "PullRequestUnsupportedContext",
+  {},
 ) {}
 
-export class PullRequestHostUnavailable extends Data.TaggedError("PullRequestHostUnavailable") {}
+export class PullRequestHostUnavailable extends Schema.TaggedError<PullRequestHostUnavailable>()(
+  "PullRequestHostUnavailable",
+  {},
+) {}
 
-export class PullRequestInvalidResponse extends Data.TaggedError("PullRequestInvalidResponse") {}
+export class PullRequestInvalidResponse extends Schema.TaggedError<PullRequestInvalidResponse>()(
+  "PullRequestInvalidResponse",
+  {
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {}
 
-export class PullRequestStaleContext extends Data.TaggedError("PullRequestStaleContext") {}
+export class PullRequestStaleContext extends Schema.TaggedError<PullRequestStaleContext>()(
+  "PullRequestStaleContext",
+  {},
+) {}
 
-export class PullRequestUnsupportedAction extends Data.TaggedError(
+export class PullRequestUnsupportedAction extends Schema.TaggedError<PullRequestUnsupportedAction>()(
   "PullRequestUnsupportedAction",
+  {},
 ) {}
 
-export class PullRequestActionOutcomeUnknown extends Data.TaggedError(
+export class PullRequestActionOutcomeUnknown extends Schema.TaggedError<PullRequestActionOutcomeUnknown>()(
   "PullRequestActionOutcomeUnknown",
+  {},
 ) {}
 
-export class PullRequestHostRejected extends Data.TaggedError("PullRequestHostRejected") {}
+export class PullRequestHostRejected extends Schema.TaggedError<PullRequestHostRejected>()(
+  "PullRequestHostRejected",
+  {},
+) {}
