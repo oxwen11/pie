@@ -85,7 +85,7 @@ export type PiAgentSessionRepositoryShape = {
 export class PiAgentSessionRepository extends Context.Service<
   PiAgentSessionRepository,
   PiAgentSessionRepositoryShape
->()("PiAgentSessionRepository") {}
+>()("pie/PiAgentSessionRepository") {}
 
 /**
  * Ids reach this repository from RPC input, so they must be sanitized before

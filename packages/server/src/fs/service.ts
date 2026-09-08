@@ -97,7 +97,7 @@ export class FileSystemService extends Context.Service<
     ) => Effect.Effect<WorkspaceFilePreview, ReadFileError>;
     readonly readTree: (cwd: string) => Effect.Effect<WorkspaceTreeResult, ReadTreeError>;
   }
->()("FileSystemService") {}
+>()("pie/FileSystemService") {}
 
 export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileSystem.FileSystem> =
   Layer.effect(

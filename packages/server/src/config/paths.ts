@@ -23,7 +23,7 @@ export class Paths extends Context.Service<
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
     readonly logsDir: string;
   }
->()("Paths") {}
+>()("pie/Paths") {}
 
 /** Owner-only, matching `daemon.pid`. Shared by the log layer and the launcher. */
 export const LOGS_DIRECTORY_MODE = 0o700;

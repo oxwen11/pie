@@ -54,7 +54,7 @@ export class PullRequestService extends Context.Service<
       workspaces: ReadonlyArray<PullRequestSessionWorkspace>,
     ) => Effect.Effect<ReadonlyArray<PullRequestSessionStatus>, PullRequestReadFailure>;
   }
->()("PullRequestService") {}
+>()("pie/PullRequestService") {}
 
 export const PullRequestServiceLayer: Layer.Layer<
   PullRequestService,

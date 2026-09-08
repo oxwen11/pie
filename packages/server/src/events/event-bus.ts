@@ -40,7 +40,7 @@ export type EventBusShape = {
   ) => Effect.Effect<Stream.Stream<SubscribeStreamEvent>, never, Scope.Scope>;
 };
 
-export class EventBus extends Context.Service<EventBus, EventBusShape>()("EventBus") {}
+export class EventBus extends Context.Service<EventBus, EventBusShape>()("pie/EventBus") {}
 
 export const makeEventBus = (
   capacity = DEFAULT_SUBSCRIBER_CAPACITY,

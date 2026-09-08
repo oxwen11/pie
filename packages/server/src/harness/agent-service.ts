@@ -9,7 +9,7 @@ export type PiAgentServiceShape = {
 };
 
 export class PiAgentService extends Context.Service<PiAgentService, PiAgentServiceShape>()(
-  "PiAgentService",
+  "pie/PiAgentService",
 ) {}
 
 export const makePiAgentService = (): PiAgentServiceShape => ({

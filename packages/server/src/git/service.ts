@@ -101,7 +101,7 @@ export class GitService extends Context.Service<
     readonly review: (query: GitReviewCwdQuery) => Effect.Effect<GitReview, GitReviewFailure>;
     readonly diff: (query: GitDiffCwdQuery) => Effect.Effect<GitFileDiff, GitDiffFailure>;
   }
->()("GitService") {}
+>()("pie/GitService") {}
 
 export const GitServiceLayer: Layer.Layer<
   GitService,

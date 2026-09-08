@@ -46,7 +46,7 @@ export type ScheduleServiceShape = {
 };
 
 export class ScheduleService extends Context.Service<ScheduleService, ScheduleServiceShape>()(
-  "ScheduleService",
+  "pie/ScheduleService",
 ) {}
 
 export const ScheduleServiceLayer: Layer.Layer<

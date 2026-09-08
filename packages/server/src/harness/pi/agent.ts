@@ -71,7 +71,7 @@ export const makePiAgent = (
   return pi;
 };
 
-export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent") {}
+export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("pie/PiAgent") {}
 
 export const cachePiAgentAvailability = (
   pi: PiAgentShape,
