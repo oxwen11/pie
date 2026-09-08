@@ -161,10 +161,8 @@ export const makePiAgentRuntime = (
                     }
                   }
                 }),
-                Effect.catch(() => Effect.void),
-                Effect.andThen(
-                  process.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
-                ),
+                Effect.ignore,
+                Effect.andThen(process.session.abort(sessionId).pipe(Effect.ignore)),
                 Effect.andThen(Queue.end(events)),
                 Effect.asVoid,
               ),

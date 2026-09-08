@@ -377,9 +377,7 @@ export const makePiProcessWithDependencies = <R>(
         declineUiResponse(request),
       ).pipe(
         Effect.flatMap((result) =>
-          session.transport
-            .respondUi(result as RpcExtensionUIResponse)
-            .pipe(Effect.catch(() => Effect.void)),
+          session.transport.respondUi(result as RpcExtensionUIResponse).pipe(Effect.ignore),
         ),
       );
 
@@ -472,7 +470,7 @@ export const makePiProcessWithDependencies = <R>(
           ).pipe(Effect.tap((isActive) => (isActive ? settlePending(session) : Effect.void))),
         );
         if (!active) return;
-        yield* session.transport.command({ type: "abort" }).pipe(Effect.catch(() => Effect.void));
+        yield* session.transport.command({ type: "abort" }).pipe(Effect.ignore);
         yield* session.requestGate.withPermit(settlePending(session));
       });
 
@@ -557,7 +555,7 @@ export const makePiProcessWithDependencies = <R>(
                         : ({ type: "steer", message: input.text } as const);
                     const queued = yield* restore(session.transport.command(command)).pipe(
                       Effect.as(true),
-                      Effect.catch(() => Effect.succeed(false)),
+                      Effect.orElseSucceed(() => false),
                     );
                     if (queued) {
                       return {
@@ -639,9 +637,7 @@ export const makePiProcessWithDependencies = <R>(
               );
 
             return yield* prepareTurn().pipe(
-              Effect.onInterrupt(() =>
-                interrupt(input.sessionId).pipe(Effect.catch(() => Effect.void)),
-              ),
+              Effect.onInterrupt(() => interrupt(input.sessionId).pipe(Effect.ignore)),
             );
           }),
         getEntries: (sessionId) =>
