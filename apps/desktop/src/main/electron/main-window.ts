@@ -110,12 +110,14 @@ export function makeMainWindow(
       }),
     );
 
-    // Detached so ensureOpen stays fire-and-forget; the load outcome is only
-    // observed for logging.
+    const scope = yield* Scope.Scope;
+
+    // Forked into the window Scope so ensureOpen stays fire-and-forget while
+    // shutdown still interrupts an in-flight loadURL.
     const loadRenderer = (window: BrowserWindow) =>
       Effect.tryPromise(() => window.loadURL(target)).pipe(
         Effect.catchCause((cause) => Effect.logError("Failed to load the desktop renderer", cause)),
-        Effect.forkDetach,
+        Effect.forkIn(scope),
       );
 
     return {
