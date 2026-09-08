@@ -5,7 +5,7 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { resolveDaemonDirectory, statusDaemon, stopDaemon } from "@getpie/server/daemon";
 import { resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
-import { Effect, Option } from "effect";
+import { Console, Effect, Option } from "effect";
 import { Command } from "effect/unstable/cli";
 
 import pkg from "../../package.json" with { type: "json" };
@@ -28,16 +28,16 @@ const startDaemon = (input: DaemonStartInput) =>
     // Same flag > env > default port precedence as `pie serve`. CORS is not
     // resolved here: the daemon's policy is static, and any extra origins are
     // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
-    const { port } = resolveServeConfig(input);
+    const { port } = yield* resolveServeConfig(input);
     const handle = yield* resolveCliDaemon(port);
-    console.log(
+    yield* Console.log(
       handle.reused
         ? `pie daemon already running at ${handle.address} (pid ${handle.pid})`
         : `pie daemon started at ${handle.address} (pid ${handle.pid})`,
     );
     const explicitPort = Option.getOrUndefined(input.port);
     if (handle.reused && explicitPort !== undefined && handle.port !== explicitPort) {
-      console.log(
+      yield* Console.log(
         `note: --port ${explicitPort} ignored — attached to the daemon already running on port ${handle.port}`,
       );
     }
@@ -46,18 +46,18 @@ const startDaemon = (input: DaemonStartInput) =>
 const stopHandler = () =>
   Effect.gen(function* () {
     const result = yield* stopDaemon(resolveDaemonDirectory());
-    console.log(result === "stopped" ? "pie daemon stopped" : "pie daemon is not running");
+    yield* Console.log(result === "stopped" ? "pie daemon stopped" : "pie daemon is not running");
   });
 
 const statusHandler = () =>
   Effect.gen(function* () {
     const status = yield* statusDaemon(resolveDaemonDirectory());
     if (!status.running) {
-      console.log("pie daemon is not running");
-      console.log("Start it with: pie daemon start");
+      yield* Console.log("pie daemon is not running");
+      yield* Console.log("Start it with: pie daemon start");
       return;
     }
-    console.log(`pie daemon running at ${status.record.address} (pid ${status.record.pid})`);
+    yield* Console.log(`pie daemon running at ${status.record.address} (pid ${status.record.pid})`);
   });
 
 const daemonStart = Command.make("start", serveFlags, startDaemon).pipe(
