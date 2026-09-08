@@ -101,8 +101,7 @@ export function piAvailabilityTarget(executable: PiExecutable): string {
   return executable.prefixArgs[0] ?? executable.command;
 }
 
-const BUN_MISSING_REASON =
-  "Bun was not found on PATH. Install Bun or unset PIE_PI_RUNTIME.";
+const BUN_MISSING_REASON = "Bun was not found on PATH. Install Bun or unset PIE_PI_RUNTIME.";
 const BUN_CLI_MISSING_REASON =
   "Pi cli.js was not found. PIE_PI_RUNTIME=bun needs the script entry, not the shebang binary.";
 
