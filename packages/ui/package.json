@@ -35,7 +35,6 @@
     "@getpie/typescript": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "ai": "catalog:",
     "class-variance-authority": "^0.7.1",
     "embla-carousel-react": "^8.6.0",
