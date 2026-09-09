@@ -10,7 +10,6 @@ import { Context, Effect, Layer } from "effect";
 
 import type { ProjectNotFound, SessionNotFound, StoreReadError, StoreWriteError } from "../errors";
 import { EventBus } from "../events/event-bus";
-import { WorktreeService, type GitWorktreeFailure } from "../git/worktree-service";
 import { ProjectService } from "../project/service";
 import type { Session } from "../types";
 import { inSession } from "./session-identity";
@@ -54,9 +53,6 @@ export type SessionMetadataShape = {
   readonly ensureCwd: (
     metadata: Session,
   ) => Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | StoreWriteError>;
-  readonly ensureWorktree: (
-    metadata: SessionWithCwd,
-  ) => Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | GitWorktreeFailure>;
   readonly workspaceFor: (
     ref: SessionRef,
   ) => Effect.Effect<SessionWorkspace, SessionNotFound | ProjectNotFound | StoreReadError>;
@@ -97,7 +93,6 @@ export const SessionMetadataLayer: Layer.Layer<
   | SessionMetadataLocks
   | ProjectService
   | PiAgentSessionManager
-  | WorktreeService
 > = Layer.effect(
   SessionMetadata,
   Effect.gen(function* () {
@@ -106,7 +101,6 @@ export const SessionMetadataLayer: Layer.Layer<
     const locks = yield* SessionMetadataLocks;
     const projects = yield* ProjectService;
     const manager = yield* PiAgentSessionManager;
-    const worktrees = yield* WorktreeService;
     const withMetadataMutation = locks.withLock;
     const projectPathFor = (projectId: string) =>
       projects.findById(projectId).pipe(Effect.map((project) => project.path));
@@ -123,22 +117,9 @@ export const SessionMetadataLayer: Layer.Layer<
             ),
           );
 
-    const ensureWorktree = (
-      metadata: SessionWithCwd,
-    ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | GitWorktreeFailure> => {
-      const worktree = metadata.worktree;
-      if (worktree === undefined) return Effect.succeed(metadata);
-      return projectPathFor(metadata.projectId).pipe(
-        Effect.flatMap((repoCwd) =>
-          worktrees.ensure(repoCwd, metadata.cwd, worktree.branch).pipe(Effect.as(metadata)),
-        ),
-      );
-    };
-
     return {
       readMetadata,
       ensureCwd,
-      ensureWorktree,
 
       workspaceFor: (ref) =>
         readMetadata(ref).pipe(

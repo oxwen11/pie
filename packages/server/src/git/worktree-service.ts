@@ -159,13 +159,26 @@ export const WorktreeServiceLayer: Layer.Layer<
             .exists(worktreePath)
             .pipe(Effect.mapError(readError(worktreePath)));
           if (exists) {
-            const info = yield* fs
-              .stat(worktreePath)
+            const realPath = yield* fs
+              .realPath(worktreePath)
               .pipe(Effect.mapError(readError(worktreePath)));
+            const realWorktreesDir = yield* fs
+              .realPath(paths.worktreesDir)
+              .pipe(Effect.mapError(readError(".")));
+            if (!contains(realWorktreesDir, realPath)) {
+              return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+            }
+            const info = yield* fs.stat(realPath).pipe(Effect.mapError(readError(worktreePath)));
             if (info.type !== "Directory") {
               return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
             }
-            return { path: worktreePath, branch };
+            const current = yield* raw(realPath, ["rev-parse", "--abbrev-ref", "HEAD"]).pipe(
+              Effect.map((value) => value.trim()),
+              Effect.catchTag("GitNotRepository", () => Effect.succeed("")),
+              Effect.catchTag("GitError", () => Effect.succeed("")),
+            );
+            if (current === branch) return { path: worktreePath, branch };
+            return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
           }
           if (!contains(paths.worktreesDir, worktreePath)) {
             return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });

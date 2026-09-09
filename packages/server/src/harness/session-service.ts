@@ -209,6 +209,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | PiAgentSessionRepository
   | EventBus
   | WorktreeService
+  | ProjectService
   | Crypto.Crypto
   | SessionMetadata
   | SessionMetadataLocks
@@ -220,17 +221,30 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const repo = yield* PiAgentSessionRepository;
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
+    const projects = yield* ProjectService;
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
-    const { readMetadata, ensureCwd, ensureWorktree, readAndStampTitleFromFirstPrompt } =
-      sessionMetadata;
+    const { readMetadata, ensureCwd, readAndStampTitleFromFirstPrompt } = sessionMetadata;
     const withMetadataMutation = locks.withLock;
     const newSessionId = crypto.randomUUIDv4.pipe(
       Effect.catchTag("PlatformError", (cause) =>
         Effect.die(new Error("invariant: platform RNG failed minting a session id", { cause })),
       ),
     );
+
+    const ensureWorktree = (
+      metadata: SessionWithCwd,
+    ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | GitWorktreeFailure> => {
+      const worktree = metadata.worktree;
+      if (worktree === undefined) return Effect.succeed(metadata);
+      return projects.findById(metadata.projectId).pipe(
+        Effect.map((project) => project.path),
+        Effect.flatMap((repoCwd) =>
+          worktrees.ensure(repoCwd, metadata.cwd, worktree.branch).pipe(Effect.as(metadata)),
+        ),
+      );
+    };
 
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
@@ -278,9 +292,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       | GitWorktreeFailure
     > =>
       Effect.gen(function* () {
-        const resolved = yield* readMetadata(ref).pipe(
-          Effect.flatMap(ensureCwd),
-          Effect.flatMap(ensureWorktree),
+        const resolved = yield* withMetadataMutation(
+          ref,
+          readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
         );
         const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
         return yield* runtime.prompt(userInput);
@@ -377,9 +391,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       prepare: (ref) =>
         withMetadataMutation(
           ref,
-          readMetadata(ref).pipe(Effect.flatMap((metadata) => ensureCwd(metadata))),
+          readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
         ).pipe(
-          Effect.flatMap(ensureWorktree),
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
               return Effect.succeed(toSessionWorkspace(metadata));

@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-04.
+Last audited: 2026-09-05.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -94,15 +94,15 @@ $PIE_HOME/
 
 ### Session metadata
 
-| Property      | Current contract                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Path          | `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json`                                                                            |
-| Owner         | `PiAgentSessionRepository`                                                                                                           |
-| Data          | One record per session, addressed by the same project/session ids carried in the body                                                |
-| Write points  | Create, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, and remembered pull-request refs |
-| Compatibility | No envelope migration chain or pre-envelope adoption is currently configured                                                         |
-| Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration  |
-| Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything         |
+| Property      | Current contract                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json`                                                                                                                         |
+| Owner         | `PiAgentSessionRepository`                                                                                                                                                        |
+| Data          | One record per session, addressed by the same project/session ids carried in the body                                                                                             |
+| Write points  | Create, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, remembered pull-request refs, and worktree restore (`prepare` / first prompt) |
+| Compatibility | No envelope migration chain. A legacy `gitBranch` string is lifted to `worktree: { branch }` on read and is never written back                                                    |
+| Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration                                               |
+| Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything                                                      |
 
 Current record fields:
 
@@ -113,7 +113,7 @@ Current record fields:
   agentSessionId?: string;
   createdAt: string;
   cwd?: string;
-  gitBranch?: string;
+  worktree?: { branch: string };
   pullRequestRefs?: Array<{ host; owner; repository; number }>;
   provider?: string;
   modelId?: string;
@@ -163,8 +163,17 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
-The session record persists the resulting `cwd` and `gitBranch`; there is no
-separate worktree manifest.
+The session record persists the resulting `cwd` and `worktree: { branch }`; there
+is no separate worktree manifest. Checkouts must stay under `$PIE_HOME/worktrees/`.
+
+If that checkout directory is later missing, `prepare` and the first prompt call
+`WorktreeService.ensure` under the per-session metadata lock. `ensure` is a no-op
+only when the path is already a directory under `$PIE_HOME/worktrees/` whose
+`HEAD` is the stored branch. Otherwise, if the path is gone and the branch still
+exists, it mkdir's the parent, runs `git worktree prune`, then
+`git worktree add <path> <branch>` (no `-b`). A leftover directory that is not
+that checkout, a path outside `$PIE_HOME/worktrees/`, or a missing branch fails
+without replacing the path.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and

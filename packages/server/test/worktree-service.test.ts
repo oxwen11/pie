@@ -124,6 +124,30 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
     }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
   );
 
+  it.effect("ensure rejects a leftover directory that is not the worktree", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      yield* worktrees.remove(created.path);
+      fs.mkdirSync(created.path);
+      const error = yield* Effect.flip(worktrees.ensure(dir, created.path, created.branch));
+      assert.equal(error._tag, "GitWorktreePathExists");
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
+
+  it.effect("ensure rejects an existing path outside $PIE_HOME/worktrees", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), "pie-wt-outside-"));
+      const error = yield* Effect.flip(worktrees.ensure(dir, outside, created.branch));
+      assert.equal(error._tag, "WorkspacePathEscape");
+      yield* worktrees.remove(created.path);
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
+
   it.effect("ensure fails when the stored branch is gone", () =>
     Effect.gen(function* () {
       const dir = yield* repo;

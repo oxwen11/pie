@@ -5,7 +5,7 @@ import path from "node:path";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { GitNotRepository } from "../../src/errors";
+import { GitNotRepository, GitRefNotFound } from "../../src/errors";
 import {
   type Fixture,
   run as runFixture,
@@ -108,6 +108,29 @@ describe("PiAgentSessionService worktree create", () => {
       { repoCwd: "/tmp/pie-app", path: "/tmp/pie-worktree", branch: "pie/abcd1234" },
     ]);
     expect(result.workspace).toEqual(result.created.workspace);
+  });
+
+  it("prepare fails when the stored worktree branch is gone", async () => {
+    const error = await run(
+      {
+        worktreeCreate: () =>
+          Effect.succeed({
+            path: "/tmp/pie-worktree",
+            branch: "pie/abcd1234",
+          }),
+        worktreeEnsure: () => Effect.fail(new GitRefNotFound({ ref: "pie/abcd1234" })),
+      },
+      (fixture) =>
+        Effect.gen(function* () {
+          const created = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+            worktree: {},
+          });
+          return yield* Effect.flip(fixture.service.prepare(created.ref));
+        }),
+    );
+    expect(error._tag).toBe("GitRefNotFound");
   });
 
   it("does not persist a session when worktree creation fails", async () => {
