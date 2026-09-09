@@ -47,6 +47,10 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.
 
+**PIE_PI_RUNTIME**:
+Optional host runtime for that child: unset / `node` (default) keeps today's Node path (`process.execPath` + bundled `cli.js`, or the shebang `pi` on PATH). `bun` looks up `bun` on the user's PATH — pie does not ship Bun — and spawns `bun <cli.js> --mode rpc …`. Missing Bun fails availability (`"Bun was not found on PATH…"`). Restart the daemon after flipping. To A/B memory, open the same kind of real session with the toggle on vs off and compare the child's RSS/PSS (`ps`, Activity Monitor); lab idle figures are not a production claim once MCP/tools attach.
+_Avoid_: bundling Bun in desktop/asar; spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim
+
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
 
