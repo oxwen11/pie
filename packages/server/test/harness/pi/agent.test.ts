@@ -45,6 +45,7 @@ if (providerFlag !== -1 && modelFlag !== -1) {
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
+  if (msg.type === "get_entries") { send({ id: msg.id, type: "response", command: "get_entries", success: true, data: { entries: [], leafId: null } }); return; }
   if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: availableModels } }); return; }
   if (msg.type === "set_model") {
     const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);

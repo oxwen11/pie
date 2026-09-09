@@ -1,6 +1,7 @@
 import type {
   AgentRequest,
   AgentResponse,
+  CompactionResult,
   AgentModelState,
   SessionPendingPrompt,
 } from "@getpie/contract";
@@ -16,7 +17,9 @@ import {
   HarnessSessionNotFound,
   TurnAlreadyRunning,
 } from "../errors";
+import { isSessionEvent, type SessionEnvelopeBody } from "../events/framework";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
+import { entriesToUIMessages } from "./history";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
@@ -48,14 +51,6 @@ type PiTurnState =
       readonly interrupted: boolean;
     };
 
-type PiTurnChunk = {
-  readonly chunk: PiStreamItem;
-  readonly runEnd: boolean;
-};
-type PiTurnOutput = PiTurnChunk | { readonly runEnd: true };
-
-const hasTurnChunk = (output: PiTurnOutput): output is PiTurnChunk => "chunk" in output;
-
 type RunEndTransition =
   | {
       readonly abandoned: true;
@@ -71,7 +66,8 @@ type SessionState = {
   readonly scope: Scope.Closeable;
   readonly transport: PiTransport;
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
-  readonly chunks: Queue.Queue<PiTurnOutput, Cause.Done | AgentOperationError>;
+  readonly chunks: Queue.Queue<SessionEnvelopeBody, Cause.Done | AgentOperationError>;
+  entryCursor: string | null;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
@@ -99,6 +95,10 @@ export interface PiProcessDependencies<R> {
 
 export interface PiProcess {
   readonly session: {
+    /** Single ordered stream, including compaction outside an agent turn. */
+    readonly events: (
+      sessionId: string,
+    ) => Stream.Stream<SessionEnvelopeBody, HarnessSessionNotFound | AgentOperationError>;
     readonly create: (config: {
       readonly cwd: string;
       readonly provider?: string;
@@ -246,10 +246,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(Queue.end(session.requests)),
             Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(
-              Queue.offer(session.chunks, {
-                chunk: { type: "error", errorText: failure.message },
-                runEnd: false,
-              }),
+              Queue.offer(session.chunks, { type: "error", errorText: failure.message }),
             ),
             Effect.flatMap((accepted) =>
               accepted
@@ -265,11 +262,62 @@ export const makePiProcessWithDependencies = <R>(
     const reportCrash = (session: SessionState, failure: PiSessionFailure) =>
       Effect.forkIn(crashSession(session, failure), ownerScope).pipe(Effect.asVoid);
 
+    const offerChunk = (session: SessionState, body: SessionEnvelopeBody) =>
+      Queue.offer(session.chunks, body).pipe(
+        Effect.flatMap((accepted) => (accepted ? Effect.void : evictOverflowedSession(session))),
+      );
+
     const routeEvent = (
       session: SessionState,
       event: Parameters<SessionState["transform"]>[0],
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
+        if (event.type === "compaction_start") {
+          yield* offerChunk(session, {
+            type: "session.compaction.started",
+            sessionId: session.sessionId,
+            reason: event.reason,
+          });
+          return;
+        }
+        if (event.type === "compaction_end") {
+          let result: CompactionResult;
+          if (event.aborted) result = { outcome: "canceled" };
+          else if (!event.result)
+            result = { outcome: "failed", error: event.errorMessage ?? "Compaction failed" };
+          else {
+            const history = yield* session.transport
+              .command<SessionEntries>({ type: "get_entries" })
+              .pipe(
+                Effect.timeout("10 seconds"),
+                Effect.catch(() => Effect.succeed(null)),
+              );
+            const cursor =
+              history?.entries.findIndex((entry) => entry.id === session.entryCursor) ?? -1;
+            const compacted = history?.entries
+              .slice(cursor + 1)
+              .find(
+                (entry) =>
+                  entry.type === "compaction" &&
+                  entry.firstKeptEntryId === event.result?.firstKeptEntryId &&
+                  entry.summary === event.result?.summary,
+              );
+            if (compacted && history) {
+              session.entryCursor = compacted.id;
+              result = {
+                outcome: "completed",
+                messages: entriesToUIMessages(history.entries, compacted.id, session.sessionId),
+              };
+            } else
+              result = { outcome: "failed", error: "Could not read the compacted conversation" };
+          }
+          yield* offerChunk(session, {
+            type: "session.compaction.ended",
+            sessionId: session.sessionId,
+            result,
+          });
+          return;
+        }
         if (event.type === "queue_update") {
           const accepted = yield* Queue.offer(session.queueUpdates, {
             steering: Array.from(event.steering),
@@ -309,25 +357,16 @@ export const makePiProcessWithDependencies = <R>(
               continue;
             }
             if (transition.interrupted) {
-              const accepted = yield* Queue.offer(session.chunks, {
-                chunk: { type: "abort" },
-                runEnd: false,
-              });
-              if (!accepted) {
-                yield* evictOverflowedSession(session);
-                return;
-              }
+              yield* offerChunk(session, { type: "abort" });
+            }
+            if (chunk === undefined) {
+              yield* completeTurn(session);
+              continue;
             }
           }
 
-          const accepted = yield* Queue.offer(
-            session.chunks,
-            chunk === undefined ? { runEnd: true } : { chunk, runEnd },
-          );
-          if (!accepted) {
-            yield* evictOverflowedSession(session);
-            return;
-          }
+          if (chunk === undefined) continue;
+          yield* offerChunk(session, chunk);
         }
       });
 
@@ -425,12 +464,14 @@ export const makePiProcessWithDependencies = <R>(
             }),
           );
 
+          const history = yield* transport.command<SessionEntries>({ type: "get_entries" });
           const session: SessionState = {
             sessionId,
             scope,
             transport,
             termination: yield* Deferred.make<never, PiSessionFailure>(),
-            chunks: yield* Queue.dropping<PiTurnOutput, Cause.Done | AgentOperationError>(
+            entryCursor: history.entries.at(-1)?.id ?? null,
+            chunks: yield* Queue.dropping<SessionEnvelopeBody, Cause.Done | AgentOperationError>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
@@ -502,8 +543,14 @@ export const makePiProcessWithDependencies = <R>(
         ),
       );
 
+    const sessionEvents = (session: SessionState) =>
+      streamFromQueueOne(session.chunks).pipe(
+        Stream.tap((body) => (body.type === "finish" ? completeTurn(session) : Effect.void)),
+      );
+
     return {
       session: {
+        events: (sessionId) => Stream.unwrap(getSession(sessionId).pipe(Effect.map(sessionEvents))),
         create: (config) => {
           const spawnArgs =
             config.provider && config.modelId
@@ -518,9 +565,6 @@ export const makePiProcessWithDependencies = <R>(
             return yield* session.requestGate.withPermit(
               Effect.uninterruptibleMask((restore) =>
                 Effect.gen(function* () {
-                  const before = yield* Ref.get(session.turnState);
-                  if (before._tag === "Idle") yield* drainQueue(session.chunks);
-
                   const admission = yield* restore(
                     session.transport.command<{ readonly started: boolean }>({
                       type: "prompt",
@@ -571,18 +615,11 @@ export const makePiProcessWithDependencies = <R>(
                     abandoned: false,
                     interrupted: false,
                   });
-
-                  const finishConsumed = Ref.modify(session.turnState, (current) =>
-                    current._tag === "Active" && current.turnId === turnId
-                      ? ([current.ended, { _tag: "Idle" } as const] as const)
-                      : ([undefined, current] as const),
-                  ).pipe(
-                    Effect.flatMap((pendingEnd) =>
-                      pendingEnd
-                        ? Deferred.succeed(pendingEnd, undefined).pipe(Effect.asVoid)
-                        : Effect.void,
-                    ),
-                  );
+                  yield* Queue.offer(session.chunks, {
+                    type: "session.turn.started",
+                    sessionId: input.sessionId,
+                    turnId,
+                  });
 
                   const abandonTurn = Ref.update(session.turnState, (current) =>
                     current._tag === "Active" && current.turnId === turnId
@@ -593,11 +630,12 @@ export const makePiProcessWithDependencies = <R>(
                   return {
                     turnId,
                     started: true,
-                    output: streamFromQueueOne(session.chunks).pipe(
-                      Stream.tap((output) => (output.runEnd ? finishConsumed : Effect.void)),
-                      Stream.takeUntil((output) => output.runEnd),
-                      Stream.filter(hasTurnChunk),
-                      Stream.map((output) => output.chunk),
+                    output: sessionEvents(session).pipe(
+                      Stream.filter(
+                        (body): body is PiStreamItem =>
+                          !isSessionEvent(body) || body.type === "session.prompt.submitted",
+                      ),
+                      Stream.takeUntil((chunk) => chunk.type === "finish"),
                       Stream.ensuring(abandonTurn),
                     ),
                   };
