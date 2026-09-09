@@ -215,6 +215,21 @@ describe("Chat compaction", () => {
     expect(chat.store.getState().messages).toEqual(projection);
   });
 
+  it("preserves the transcript and shows the reason if the compaction read crashes", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    transport.history = [retained];
+    await attach({});
+    live(1, { type: "session.compaction.started", reason: "overflow" });
+    live(2, {
+      type: "session.crashed",
+      reason: "Could not read the compacted conversation",
+      phase: "crashed",
+    });
+    expect(chat.store.getState().messages).toEqual([retained]);
+    expect(chat.store.getState().compaction).toBeNull();
+    expect(chat.store.getState().error?.message).toBe("Could not read the compacted conversation");
+  });
+
   it("restores the spinner and queues input while compacting without an active turn", async () => {
     const { chat, attach, transport } = makeChat();
     await attach({ compaction: { reason: "manual" } });
