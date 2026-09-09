@@ -162,6 +162,31 @@ describe("Chat hydration", () => {
     expect(assistantText(assistant)).toBe("once");
   });
 
+  it("replays multiple assistant message boundaries without repeating earlier parts", async () => {
+    const { chat, attach } = makeChat();
+    await attach({
+      status: { phase: "running" },
+      activeTurn: activeTurn({
+        turnId: "turn-1",
+        chunks: [
+          chunkEvent(1, "turn-1", { type: "start", messageId: "assistant-1" }),
+          chunkEvent(2, "turn-1", { type: "text-start", id: "before" }),
+          chunkEvent(3, "turn-1", { type: "text-delta", id: "before", delta: "before" }),
+          chunkEvent(4, "turn-1", { type: "text-end", id: "before" }),
+          chunkEvent(5, "turn-1", { type: "start", messageId: "assistant-2" }),
+          chunkEvent(6, "turn-1", { type: "text-start", id: "after" }),
+          chunkEvent(7, "turn-1", { type: "text-delta", id: "after", delta: "after" }),
+          chunkEvent(8, "turn-1", { type: "text-end", id: "after" }),
+        ],
+      }),
+      cursor: 8,
+    });
+
+    const messages = chat.store.getState().messages;
+    expect(messages.map((message) => message.id)).toEqual(["assistant-1", "assistant-2"]);
+    expect(messages.map(assistantText)).toEqual(["before", "after"]);
+  });
+
   it("skips a complete buffer at first attach — the floor already covers it", async () => {
     const { chat, transport, attach } = makeChat();
     transport.history = [userMessage("user-1", "hello"), userMessage("assistant-1", "done")];
@@ -413,7 +438,7 @@ describe("Chat prompting", () => {
       chunk: {
         type: "start",
         messageId: "assistant-1",
-        messageMetadata: { sessionId: "native-1", runId: "run-1", segment: 0 },
+        messageMetadata: { sessionId: "native-1" },
       },
     });
     for (const [index, chunk] of textChunks("before", "before steer").entries()) {
@@ -431,7 +456,7 @@ describe("Chat prompting", () => {
       chunk: {
         type: "start",
         messageId: "assistant-2",
-        messageMetadata: { sessionId: "native-1", runId: "run-1", segment: 1 },
+        messageMetadata: { sessionId: "native-1" },
       },
     });
     for (const [index, chunk] of textChunks("after", "after steer").entries()) {

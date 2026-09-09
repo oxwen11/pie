@@ -16,9 +16,9 @@ import type { PiUIMessageChunk } from "./ui-message";
 //     — the only per-message marker RPC mode actually emits; the
 //     assistantMessageEvent `start` delta never appears on this wire)
 //   • a `message_start role=user` after assistant output is a delivered steer
-//     (pi injects it as a real user entry — see ADR 0003): close the open
-//     UIMessage and start a fresh one, so live segmentation matches the
-//     persisted history fold. The echo of the *prompting* input arrives
+//     (pi injects it as a real user entry — see ADR 0003): start a fresh
+//     UIMessage, so live segmentation matches the persisted history fold.
+//     The echo of the *prompting* input arrives
 //     before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
 //     The AI-SDK tool chunks are generic, so args/results forward whole; the
@@ -62,12 +62,9 @@ export function createPiTransform(
   // Doubles as "has this run produced assistant output yet" (> 0), which is
   // what tells a delivered steer apart from the prompting input's echo.
   let messageOrdinal = 0;
-  let runId = "";
-  let segment = 0;
   // A steered user message landed mid-run: split before the next assistant
   // message rather than eagerly, so an interrupt right after delivery doesn't
-  // leave an empty trailing UIMessage. This split is not a turn boundary: the
-  // real run ends only at agent_settled.
+  // leave an empty trailing UIMessage.
   let pendingSplit = false;
   // Block ids that streamed at least one delta, so *_end can recover text that
   // only arrived whole (the no-delta fallback, mirroring codex).
@@ -127,14 +124,8 @@ export function createPiTransform(
         if (!turnOpen) {
           turnOpen = true;
           messageOrdinal = 0;
-          runId = uuid();
-          segment = 0;
           pendingSplit = false;
-          yield {
-            type: "start",
-            messageId: uuid(),
-            messageMetadata: { sessionId, runId, segment },
-          };
+          yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
         }
         break;
 
@@ -143,12 +134,7 @@ export function createPiTransform(
         if (event.message.role === "assistant") {
           if (pendingSplit) {
             pendingSplit = false;
-            segment += 1;
-            yield {
-              type: "start",
-              messageId: uuid(),
-              messageMetadata: { sessionId, runId, segment },
-            };
+            yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
           }
           messageOrdinal += 1;
         } else if (event.message.role === "user" && messageOrdinal > 0) {

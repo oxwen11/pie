@@ -88,13 +88,7 @@ describe("createPiTransform", () => {
     expect(run(userStart("steer"))).toEqual([]);
     const split = run(assistantStart());
     expect(types(split)).toEqual(["start"]);
-    expect(split[0]).toMatchObject({
-      messageMetadata: {
-        sessionId: "s1",
-        runId: (opened[0] as { messageMetadata: { runId: string } }).messageMetadata.runId,
-        segment: 1,
-      },
-    });
+    expect(split[0]).toMatchObject({ messageMetadata: { sessionId: "s1" } });
     expect((split[0] as { messageId: string }).messageId).not.toBe(firstMessageId);
 
     // Blocks of the continuation land under a fresh ordinal, in the new message.

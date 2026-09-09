@@ -70,9 +70,8 @@ const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
   return reason ? `${reason}. ${suffix}` : suffix;
 };
 
-// One turn's chunk sink: chunks are pushed in as they arrive and the AI-SDK's
-// own reducer (readUIMessageStream — the same machinery the server-side
-// history folds use) turns them into evolving UIMessage snapshots.
+// One assistant message's chunk sink. A later start in the same turn replaces
+// it, while the AI-SDK reducer turns its chunks into evolving UIMessage snapshots.
 type TurnFold = {
   readonly enqueue: (chunk: UIMessageChunk) => void;
   readonly close: () => void;
@@ -158,15 +157,11 @@ export class Chat {
     switch (event.type) {
       case "session.message.chunk":
         this.#observeChunk(event.chunk);
-        // A start chunk establishes transcript order synchronously. The async
-        // AI-SDK fold fills this placeholder later; without it, a steer's user
-        // event can append before the preceding assistant segment has folded.
-        if (event.chunk.type === "start") this.#pushAssistantStart(event.chunk);
         // Retry is UI status, not transcript — keep it out of the message fold.
         if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
-          this.#turnFold(event.turnId).enqueue(event.chunk);
+          this.#foldChunk(event.turnId, event.chunk);
         }
         break;
       // Another client's prompt — or this client's own echoed back, whose
@@ -466,7 +461,7 @@ export class Chat {
     for (const chunk of chunks) {
       if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
-      this.#turnFold(activeTurn.turnId).enqueue(chunk);
+      this.#foldChunk(activeTurn.turnId, chunk);
     }
     if (activeTurn.complete) {
       this.#turnFolds.get(activeTurn.turnId)?.close();
@@ -482,6 +477,32 @@ export class Chat {
   // ---------------------------------------------------------------------
   // Shared handlers
   // ---------------------------------------------------------------------
+
+  #foldChunk(turnId: string, chunk: UIMessageChunk): void {
+    // A later start closes the previous UIMessage without ending the turn.
+    // The placeholder fixes transcript order while the AI-SDK fold catches up.
+    if (chunk.type === "start") {
+      this.#turnFolds.get(turnId)?.close();
+      this.#turnFolds.delete(turnId);
+      if (
+        typeof chunk.messageId === "string" &&
+        !this.#state.messages.some((message) => message.id === chunk.messageId)
+      ) {
+        this.#state.pushMessage({
+          id: chunk.messageId,
+          role: "assistant",
+          parts: [],
+          metadata: chunk.messageMetadata,
+        } as UIMessage);
+      }
+    }
+    const fold = this.#turnFold(turnId);
+    fold.enqueue(chunk);
+    if (chunk.type === "finish") {
+      fold.close();
+      this.#turnFolds.delete(turnId);
+    }
+  }
 
   #observeChunk(chunk: UIMessageChunk): void {
     const retryNotice = retryNoticeFrom(chunk);
@@ -502,17 +523,6 @@ export class Chat {
     if (this.#state.messages.some((message) => message.id === messageId)) return false;
     this.#state.pushMessage(toUserMessage(messageId, parts));
     return true;
-  }
-
-  #pushAssistantStart(chunk: Extract<UIMessageChunk, { type: "start" }>): void {
-    if (typeof chunk.messageId !== "string") return;
-    if (this.#state.messages.some((message) => message.id === chunk.messageId)) return;
-    this.#state.pushMessage({
-      id: chunk.messageId,
-      role: "assistant",
-      parts: [],
-      metadata: chunk.messageMetadata,
-    } as UIMessage);
   }
 
   // Policy, not transport: an empty plan carries nothing to review, so it is

@@ -13,8 +13,8 @@ import type { PiMetadata, PiUIMessage } from "./ui-message";
 //     rebuilt by walking `parentId` from `leafId` and reversing.
 //   • Segmentation is by user entry: a `user` message entry opens a new
 //     message, and the following run of `assistant` / `toolResult` entries
-//     folds into ONE assistant message (steer/follow-up injections open new
-//     segments — see ADR 0003 for the resulting live/history asymmetry).
+//     folds into ONE assistant message (delivered steer/follow-up injections
+//     open the same new segments in the live transform; see ADR 0003).
 //   • messageId: the user entry's id, or the segment's first assistant entry
 //     id — pi entry ids are stable across reads, so refreshes reconcile.
 //   • Trimming the active turn is the caller's job (the facade folds the
