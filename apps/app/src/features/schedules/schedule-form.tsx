@@ -247,31 +247,29 @@ export function ScheduleForm({
           </SelectContent>
         </Select>
       </Field>
-      <Field>
-        <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
-        <PromptInputBox>
-          <PromptInputTextarea
-            id="schedule-prompt"
-            maxLength={MAX_SCHEDULE_PROMPT_CHARS}
-            onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-            placeholder=""
-            required
-            value={form.prompt}
-          />
-          <PromptInputToolbar>
-            <PromptInputTools>
-              <ScheduleModelSelect
-                modelId={model?.modelId}
-                models={modelOptions}
-                onChange={(provider, modelId) =>
-                  setForm((current) => ({ ...current, model: { provider, modelId } }))
-                }
-                providerId={model?.provider}
-              />
-            </PromptInputTools>
-          </PromptInputToolbar>
-        </PromptInputBox>
-      </Field>
+      <PromptInputBox>
+        <PromptInputTextarea
+          aria-label="Prompt"
+          id="schedule-prompt"
+          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
+          onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+          placeholder="Ask Pi anything..."
+          required
+          value={form.prompt}
+        />
+        <PromptInputToolbar>
+          <PromptInputTools>
+            <ScheduleModelSelect
+              modelId={model?.modelId}
+              models={modelOptions}
+              onChange={(provider, modelId) =>
+                setForm((current) => ({ ...current, model: { provider, modelId } }))
+              }
+              providerId={model?.provider}
+            />
+          </PromptInputTools>
+        </PromptInputToolbar>
+      </PromptInputBox>
       <ScheduleFormCadenceFields form={form} setForm={setForm} />
       <ScheduleFormLimitsFields form={form} setForm={setForm} />
       <ScheduleFormSessionFields

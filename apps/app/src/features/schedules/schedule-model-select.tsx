@@ -89,7 +89,7 @@ export function ScheduleModelSelect({
       <ModelSelectorTrigger
         aria-label="Model"
         className="data-placeholder:text-muted-foreground min-w-0"
-        render={<Button size="sm" variant="ghost" />}
+        render={<Button aria-label="Model" size="sm" variant="ghost" />}
       >
         <ModelSelectorValue placeholder="Default">
           {(option: ModelOption | null) => (
