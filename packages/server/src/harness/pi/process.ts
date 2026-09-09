@@ -61,12 +61,21 @@ type RunEndTransition =
 
 export type PiSessionFailure = PiTransportFailure | AgentOperationError;
 
+// Resolve a compaction at the consumer's ordered boundary, not in the native
+// event router: it must keep draining stdout so the RPC response can arrive.
+type PiOutputFrame =
+  | SessionEnvelopeBody
+  | {
+      readonly type: "compaction.reset";
+      readonly read: Effect.Effect<SessionEnvelopeBody, AgentOperationError>;
+    };
+
 type SessionState = {
   readonly sessionId: string;
   readonly scope: Scope.Closeable;
   readonly transport: PiTransport;
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
-  readonly chunks: Queue.Queue<SessionEnvelopeBody, Cause.Done | AgentOperationError>;
+  readonly chunks: Queue.Queue<PiOutputFrame, Cause.Done | AgentOperationError>;
   entryCursor: string | null;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
@@ -277,6 +286,7 @@ export const makePiProcessWithDependencies = <R>(
           return;
         }
         if (event.type === "compaction_end") {
+          if (event.result && !event.aborted) Array.from(session.transform(event));
           let result: CompactionResult;
           if (event.aborted) result = { outcome: "canceled" };
           else if (!event.result)
@@ -300,9 +310,6 @@ export const makePiProcessWithDependencies = <R>(
               );
             if (compacted && history) {
               session.entryCursor = compacted.id;
-              // Apply the same boundary to the live transform before routing
-              // any later native event (the generator has no output here).
-              Array.from(session.transform(event));
               result = {
                 outcome: "completed",
                 messages: entriesToUIMessages(history.entries, compacted.id, session.sessionId),
@@ -465,7 +472,7 @@ export const makePiProcessWithDependencies = <R>(
             transport,
             termination: yield* Deferred.make<never, PiSessionFailure>(),
             entryCursor: history.entries.at(-1)?.id ?? null,
-            chunks: yield* Queue.dropping<SessionEnvelopeBody, Cause.Done | AgentOperationError>(
+            chunks: yield* Queue.dropping<PiOutputFrame, Cause.Done | AgentOperationError>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
@@ -539,6 +546,9 @@ export const makePiProcessWithDependencies = <R>(
 
     const sessionEvents = (session: SessionState) =>
       streamFromQueueOne(session.chunks).pipe(
+        Stream.mapEffect((frame) =>
+          frame.type === "compaction.reset" ? frame.read : Effect.succeed(frame),
+        ),
         Stream.tap((body) => (body.type === "finish" ? completeTurn(session) : Effect.void)),
       );
 

@@ -10,7 +10,9 @@ import type { PiMetadata, PiUIMessage } from "./ui-message";
 //
 // Fold rules:
 //   • `get_entries` returns the whole session tree; the current branch is
-//     rebuilt by walking `parentId` from `leafId` and reversing.
+//     rebuilt by walking `parentId` from `leafId` and reversing. The latest
+//     compaction selects its kept tail; the marker stays at its chronological
+//     position, after that tail and before subsequent messages.
 //   • Segmentation is by user entry: a `user` message entry opens a new
 //     message, and the following run of `assistant` / `toolResult` entries
 //     folds into ONE assistant message (steer/follow-up injections open new
@@ -18,7 +20,7 @@ import type { PiMetadata, PiUIMessage } from "./ui-message";
 //   • messageId: the user entry's id, or the segment's first assistant entry
 //     id — pi entry ids are stable across reads, so refreshes reconcile.
 //   • Trimming the active turn is the caller's job (the facade folds the
-//     runtime snapshot in); this function maps everything it is given.
+//     runtime snapshot in); a compaction boundary is itself a settled floor.
 
 type PiMessage = SessionMessageEntry["message"];
 type PiUserMessage = Extract<PiMessage, { role: "user" }>;

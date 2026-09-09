@@ -32,7 +32,9 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
 //     Successful read output drops file content because the UI only renders
 //     its input path; other tool results forward whole.
-//   • message_end / compaction / auto_retry_end → skipped
+//   • compaction lifecycle → routed by PiProcess; successful end starts the
+//     continuation as a new UI message without ending the agent run
+//   • message_end / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
 //   • queue_update → skipped here; the process offers it on `queueUpdates`
