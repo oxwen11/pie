@@ -6,6 +6,7 @@ import {
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
+import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 import {
   PromptInputBox,
   PromptInputTextarea,
@@ -41,7 +42,6 @@ import {
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
-import { ScheduleModelSelect } from "./schedule-model-select";
 
 export type ScheduleFormSubmit = {
   readonly name: string;
@@ -259,7 +259,8 @@ export function ScheduleForm({
         />
         <PromptInputToolbar>
           <PromptInputTools>
-            <ScheduleModelSelect
+            <ModelSelectorPicker
+              aria-label="Model"
               modelId={model?.modelId}
               models={modelOptions}
               onChange={(provider, modelId) =>
