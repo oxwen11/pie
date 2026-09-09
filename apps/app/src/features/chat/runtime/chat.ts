@@ -251,7 +251,7 @@ export class Chat {
         }
         break;
       case "session.crashed":
-        this.store.setState({ compaction: null });
+        this.store.setState({ compaction: null, error: new Error(event.reason) });
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
         // The server projection drops its pending requests on crash; a card

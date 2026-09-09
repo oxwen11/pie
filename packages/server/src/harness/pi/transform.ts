@@ -37,7 +37,10 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //   • the first assistant message_start of a segment stamps `messageStartTimestamp`
 //     on message-metadata (message.timestamp). A steered segment's `start` stays
 //     `{ sessionId }`. Each later assistant / toolResult message_end stamps
-//     `messageEndTimestamp` at receipt. Compaction / auto_retry_end are skipped
+//     `messageEndTimestamp` at receipt.
+//   • compaction lifecycle → routed by PiProcess; successful end starts the
+//     continuation as a new UI message without ending the agent run.
+//   • auto_retry_end → skipped.
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
 //   • queue_update → skipped here; the process offers it on `queueUpdates`
