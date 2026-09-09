@@ -7,7 +7,7 @@ import {
 } from "@getpie/ui/components/collapsible";
 import { useControllableState } from "@getpie/ui/hooks/use-controllable-state";
 import { cn } from "@getpie/ui/lib/utils";
-import { ChevronDownIcon } from "lucide-react";
+import { SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";
 
@@ -100,7 +100,7 @@ export const Reasoning = memo(
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
 export const ReasoningTrigger = memo(({ className, children, ...props }: ReasoningTriggerProps) => {
-  const { isStreaming, isOpen, duration } = useReasoning();
+  const { isStreaming, duration } = useReasoning();
   let label = "Thought";
   if (duration !== undefined && duration >= 1) {
     label = `Thought for ${duration} ${duration === 1 ? "second" : "seconds"}`;
@@ -108,25 +108,32 @@ export const ReasoningTrigger = memo(({ className, children, ...props }: Reasoni
 
   return (
     <CollapsibleTrigger
-      className={cn("text-muted-foreground flex items-center gap-2 text-sm", className)}
+      className={cn(
+        "group text-muted-foreground flex min-h-5 items-center gap-2.5 text-sm leading-5",
+        className,
+      )}
       {...props}
     >
       {children ?? (
         <>
-          <PieLoader aria-hidden animated={isStreaming} />
+          <span className="relative flex size-(--dot-grid-size,1em) shrink-0 items-center justify-center">
+            <PieLoader
+              aria-hidden
+              animated={isStreaming}
+              className="size-full group-hover:opacity-0 group-data-[panel-open]:opacity-0"
+            />
+            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+              <SquarePlusIcon className="size-full group-data-[panel-open]:hidden" />
+              <SquareMinusIcon className="hidden size-full group-data-[panel-open]:block" />
+            </span>
+          </span>
           {isStreaming ? (
             <Shimmer duration={2} as="span">
               Thinking…
             </Shimmer>
           ) : (
-            <p>{label}</p>
+            <span>{label}</span>
           )}
-          <ChevronDownIcon
-            className={cn(
-              "text-muted-foreground size-4 transition-transform",
-              isOpen ? "rotate-180" : "rotate-0",
-            )}
-          />
         </>
       )}
     </CollapsibleTrigger>
