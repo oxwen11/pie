@@ -132,7 +132,7 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
       yield* worktrees.remove(created.path);
       fs.mkdirSync(created.path);
       const error = yield* Effect.flip(worktrees.ensure(dir, created.path, created.branch));
-      assert.equal(error._tag, "GitWorktreePathExists");
+      assert.equal(error._tag, "GitNotRepository");
     }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
   );
 

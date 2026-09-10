@@ -135,6 +135,27 @@ async function setup() {
   return { client, workspace, dispose: () => runtime.dispose() };
 }
 
+async function initGitRepo(workspace: string) {
+  const { simpleGit } = await import("simple-git");
+  const git = simpleGit(workspace);
+  await git.init(["-b", "main"]);
+  await git.addConfig("user.email", "test@example.com");
+  await git.addConfig("user.name", "Test");
+  await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+  await git.add(".");
+  await git.commit("init");
+  return git;
+}
+
+async function createWorktreeSession(
+  client: Awaited<ReturnType<typeof setup>>["client"],
+  workspace: string,
+) {
+  await initGitRepo(workspace);
+  const project = await client.project.create({ path: workspace });
+  return client.agent.session.create({ projectId: project.id, worktree: {} });
+}
+
 describe("agent.session router", () => {
   it("creates a session from a project and streams its scoped events", async () => {
     const { client, workspace, dispose } = await setup();
@@ -266,20 +287,7 @@ describe("agent.session router", () => {
   it("creates a git worktree on session.create when requested", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
+      const created = await createWorktreeSession(client, workspace);
 
       expect(created.workspace.worktree?.branch).toMatch(/^pie\/[a-f0-9]{8}$/);
       expect(created.workspace.cwd).not.toBe(workspace);
@@ -312,20 +320,7 @@ describe("agent.session router", () => {
   it("restores a deleted worktree on prepare from the stored worktree branch", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
+      const created = await createWorktreeSession(client, workspace);
       expect(created.workspace.worktree?.branch).toBeDefined();
       await client.agent.session.archive({ ref: created.ref, archived: true });
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
@@ -349,20 +344,7 @@ describe("agent.session router", () => {
   it("restores a deleted worktree on the first prompt from the stored worktree branch", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
+      const created = await createWorktreeSession(client, workspace);
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
@@ -386,15 +368,7 @@ describe("agent.session router", () => {
   it("prepare fails when the stored worktree branch is gone", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
+      const git = await initGitRepo(workspace);
       const project = await client.project.create({ path: workspace });
       const created = await client.agent.session.create({
         projectId: project.id,
@@ -418,20 +392,7 @@ describe("agent.session router", () => {
   it("defaults worktree layout and branch like Cursor (pie/<hex> under worktrees/<repo>/<key>)", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
+      const created = await createWorktreeSession(client, workspace);
 
       const repoName = path.basename(workspace);
       expect(created.workspace.worktree?.branch).toMatch(/^pie\/[a-f0-9]{8}$/);

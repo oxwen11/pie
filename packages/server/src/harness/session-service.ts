@@ -246,6 +246,12 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       );
     };
 
+    const resolveWorkspace = (ref: SessionRef) =>
+      withMetadataMutation(
+        ref,
+        readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
+      );
+
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
       metadata: SessionWithCwd,
@@ -292,10 +298,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       | GitWorktreeFailure
     > =>
       Effect.gen(function* () {
-        const resolved = yield* withMetadataMutation(
-          ref,
-          readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
-        );
+        const resolved = yield* resolveWorkspace(ref);
         const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
         return yield* runtime.prompt(userInput);
       });
@@ -389,10 +392,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         ),
 
       prepare: (ref) =>
-        withMetadataMutation(
-          ref,
-          readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
-        ).pipe(
+        resolveWorkspace(ref).pipe(
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
               return Effect.succeed(toSessionWorkspace(metadata));
