@@ -14,6 +14,8 @@
 @source ".";
 
 :root {
+  color-scheme: light;
+
   --sidebar: hsl(0 0% 98%);
 
   --sidebar-foreground: hsl(240 5.3% 26.1%);
@@ -40,6 +42,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --sidebar: hsl(240 5.9% 10%);
 
   --sidebar-foreground: hsl(240 4.8% 95.9%);

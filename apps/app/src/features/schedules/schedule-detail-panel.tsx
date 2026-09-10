@@ -10,6 +10,12 @@ import {
   summarizeRuns,
 } from "./cadence";
 import {
+  ScheduleDetailActions,
+  ScheduleDetailDescription,
+  ScheduleDetailHistory,
+  ScheduleDetailLine,
+} from "./schedule-detail";
+import {
   SchedulePanel,
   SchedulePanelBody,
   SchedulePanelClose,
@@ -52,30 +58,28 @@ export function ScheduleDetailPanel({
         <SchedulePanelClose onClick={onClose} />
       </SchedulePanelHeader>
       <SchedulePanelBody className="gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="text-muted-foreground text-sm">
+        <ScheduleDetailDescription>
+          <ScheduleDetailLine>
             {projectName} · {formatSpec(schedule.spec)}
-          </div>
-          <div className="text-muted-foreground text-sm">
+          </ScheduleDetailLine>
+          <ScheduleDetailLine>
             {formatNextRun(
               schedule.nextRunAt,
               schedule.enabled,
               schedule.pauseReason,
               schedule.maxRuns,
             )}
-          </div>
-          {sessionLine !== null ? (
-            <div className="text-muted-foreground text-sm">{sessionLine}</div>
-          ) : null}
+          </ScheduleDetailLine>
+          {sessionLine !== null ? <ScheduleDetailLine>{sessionLine}</ScheduleDetailLine> : null}
           {schedule.maxRuns !== undefined ? (
-            <div className="text-muted-foreground text-sm">
+            <ScheduleDetailLine>
               {formatFiredCap(firedRunCount(schedule), schedule.maxRuns)}
-            </div>
+            </ScheduleDetailLine>
           ) : null}
-          {lastRun !== null ? <div className="text-muted-foreground text-sm">{lastRun}</div> : null}
-          {summary !== null ? <div className="text-muted-foreground text-sm">{summary}</div> : null}
-        </div>
-        <div className="flex flex-wrap gap-1">
+          {lastRun !== null ? <ScheduleDetailLine>{lastRun}</ScheduleDetailLine> : null}
+          {summary !== null ? <ScheduleDetailLine>{summary}</ScheduleDetailLine> : null}
+        </ScheduleDetailDescription>
+        <ScheduleDetailActions>
           <Button disabled={running} onClick={onRunNow} size="sm" variant="ghost">
             Run now
           </Button>
@@ -85,11 +89,11 @@ export function ScheduleDetailPanel({
           <Button onClick={onDelete} size="sm" variant="ghost">
             Delete
           </Button>
-        </div>
-        <div className="flex min-h-0 flex-col gap-2">
+        </ScheduleDetailActions>
+        <ScheduleDetailHistory>
           <h3 className="text-sm font-medium">Recent runs</h3>
           <ScheduleRunHistory nowMs={nowMs} onOpenSession={onOpenSession} schedule={schedule} />
-        </div>
+        </ScheduleDetailHistory>
       </SchedulePanelBody>
     </SchedulePanel>
   );

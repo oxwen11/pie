@@ -21,8 +21,10 @@ import { skipToken, useMutation, useQuery, type UseQueryResult } from "@tanstack
 import { useRouteContext } from "@tanstack/react-router";
 import { GitPullRequestIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
+import { Group, Separator } from "react-resizable-panels";
 import { toast } from "sonner";
 
+import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -115,8 +117,17 @@ export function PullRequestPage() {
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="border-border flex w-[22rem] shrink-0 flex-col border-e">
+      <Group
+        className="flex min-h-0 flex-1"
+        orientation="horizontal"
+        resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
+      >
+        <ResizablePanel
+          className="flex min-w-0 flex-col"
+          defaultSize="22rem"
+          maxSize="50%"
+          minSize="16rem"
+        >
           <div className="px-3 py-3">
             <InputGroup>
               <InputGroupAddon>
@@ -144,23 +155,29 @@ export function PullRequestPage() {
               ))}
             </ul>
           )}
-        </div>
-        <PullRequestPageDetail
-          actionPending={action.isPending}
-          diff={diff}
-          error={detail.error}
-          onAction={(next) => {
-            if (detail.data !== null && detail.data !== undefined) {
-              setIntent(pullRequestActionInput(detail.data.ref, detail.data, next));
-            }
-          }}
-          onRefresh={refresh}
-          pending={detail.isPending && detail.data === undefined}
-          postActionRefreshFailed={postActionRefreshFailed}
-          refreshing={detail.isFetching || diff.isFetching}
-          snapshot={detail.data ?? undefined}
+        </ResizablePanel>
+        <Separator
+          aria-label="Resize pull request list"
+          className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
         />
-      </div>
+        <ResizablePanel className="flex min-w-0 flex-col" minSize="18rem">
+          <PullRequestPageDetail
+            actionPending={action.isPending}
+            diff={diff}
+            error={detail.error}
+            onAction={(next) => {
+              if (detail.data !== null && detail.data !== undefined) {
+                setIntent(pullRequestActionInput(detail.data.ref, detail.data, next));
+              }
+            }}
+            onRefresh={refresh}
+            pending={detail.isPending && detail.data === undefined}
+            postActionRefreshFailed={postActionRefreshFailed}
+            refreshing={detail.isFetching || diff.isFetching}
+            snapshot={detail.data ?? undefined}
+          />
+        </ResizablePanel>
+      </Group>
       {intent !== null ? (
         <ConfirmPullRequestAction
           input={intent}

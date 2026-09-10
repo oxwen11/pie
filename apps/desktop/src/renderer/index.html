@@ -2,13 +2,14 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Pie</title>
     <!-- The renderer talks to Electron Main through pie: and to the spawned
          server over loopback HTTP/WebSocket. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self' pie: http://127.0.0.1:* ws://127.0.0.1:*"
+      content="default-src 'self'; script-src 'self' blob: __PIE_THEME_BOOTSTRAP_CSP__; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:; connect-src 'self' pie: http://127.0.0.1:* ws://127.0.0.1:*"
     />
+    <!-- pie-theme-bootstrap -->
+    <title>Pie</title>
   </head>
 
   <body>

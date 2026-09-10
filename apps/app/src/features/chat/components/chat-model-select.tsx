@@ -1,8 +1,7 @@
 import type { SessionRef } from "@getpie/contract";
+import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 
 import { useSessionModels } from "@/features/chat/hooks/use-session-models";
-
-import { ModelSelect } from "./model-select";
 
 export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
   const { models, providerId, modelId, isLoading, setModel, isSettingModel } =
@@ -11,6 +10,11 @@ export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
   if (isLoading || isSettingModel) return null;
 
   return (
-    <ModelSelect models={models} providerId={providerId} modelId={modelId} onChange={setModel} />
+    <ModelSelectorPicker
+      modelId={modelId}
+      models={models}
+      onChange={setModel}
+      providerId={providerId}
+    />
   );
 }
