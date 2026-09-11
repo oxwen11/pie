@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-04.
+Last audited: 2026-09-11.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -29,9 +29,11 @@ roots:
   `~/.pie-dev`.
 - `$PIE_DAEMON_DIR` overrides daemon lifecycle storage; otherwise it is
   `$PIE_HOME/daemon`.
-- Development front doors may scope lifecycle state to
-  `$PIE_HOME/daemons/<checkout-scope>` while retaining one shared development
-  data home.
+- Unpackaged development front doors always scope lifecycle state to
+  `$PIE_HOME/daemons/<checkout-scope>` (ignoring inherited `$PIE_DAEMON_DIR`)
+  unless `$PIE_DEV_DAEMON_DIR` is set. Nested `pnpm dev` must not attach a
+  production daemon directory. Project and Session storage stay on the shared
+  development home.
 
 The Desktop Electron `userData` directory is separate from `$PIE_HOME`.
 Changing one does not relocate the other.
