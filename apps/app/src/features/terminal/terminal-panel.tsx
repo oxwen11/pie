@@ -1,4 +1,5 @@
 import type { PieClient } from "@getpie/client";
+import { useRouteContext } from "@tanstack/react-router";
 import { TerminalIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -11,12 +12,6 @@ import "@xterm/xterm/css/xterm.css";
 
 interface TerminalPayload {
   readonly terminalId: string;
-  /**
-   * Shown on the tab. In the payload rather than the instance because the tab
-   * strip labels a panel it has never activated — and a reload has to redraw
-   * that strip before any instance exists.
-   */
-  readonly title: string;
 }
 
 type TerminalInstance = PanelHandle<TerminalPayload>;
@@ -25,16 +20,13 @@ export function createTerminalPanel(client: PieClient) {
   return definePanelFamily({
     type: "terminal",
     key: (payload: TerminalPayload) => payload.terminalId,
-    label: (payload) => payload.title,
+    label: () => "zsh",
     title: "Terminal",
-    newPayload: () => ({
-      terminalId: crypto.randomUUID(),
-      title: "zsh",
-    }),
+    newPayload: () => ({ terminalId: crypto.randomUUID() }),
     parse: (raw) => {
-      const { terminalId, title } = asRecord(raw) ?? {};
+      const { terminalId } = asRecord(raw) ?? {};
       if (typeof terminalId !== "string") return null;
-      return { terminalId, title: typeof title === "string" ? title : "Terminal" };
+      return { terminalId };
     },
     onClose: (sessionRef, payload) => {
       void client.terminal.close({
@@ -44,33 +36,27 @@ export function createTerminalPanel(client: PieClient) {
     },
     view: {
       icon: TerminalIcon,
-      render: (instance) => <TerminalPanelView instance={instance} client={client} />,
+      render: (instance) => <TerminalPanelView instance={instance} />,
     },
   });
 }
 
-function TerminalPanelView({
-  instance,
-  client,
-}: {
-  instance: TerminalInstance;
-  client: PieClient;
-}) {
+function TerminalPanelView({ instance }: { instance: TerminalInstance }) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const { orpcClient } = useRouteContext({ from: "__root__" });
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
     const surface = attachTerminalSurface(mount, {
-      client,
+      client: orpcClient,
       ref: instance.sessionRef,
       terminalId: instance.payload.terminalId,
-      title: instance.payload.title,
     });
     return () => {
       surface.detach();
     };
-  }, [client, instance]);
+  }, [instance, orpcClient]);
 
   return (
     <div

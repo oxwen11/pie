@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -56,10 +56,7 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
   const { theme } = useTheme();
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
-  // Terminal close RPC needs the pie client; other panels register in __root__.
-  useState(() => {
-    contentPanel.register(createTerminalPanel(orpcClient));
-  });
+  useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),

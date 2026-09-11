@@ -12,17 +12,15 @@ export interface TerminalSurface {
   readonly detach: () => void;
 }
 
-const RESUBSCRIBE_MS = 1_000;
-
 export function attachTerminalSurface(
   mount: HTMLElement,
   options: {
     readonly client: PieClient;
     readonly ref: SessionRef;
     readonly terminalId: string;
-    readonly title: string;
   },
 ): TerminalSurface {
+  const resubscribeMs = 1_000;
   const term = new Terminal({
     convertEol: true,
     cursorBlink: true,
@@ -33,7 +31,7 @@ export function attachTerminalSurface(
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(mount);
-  term.textarea?.setAttribute("aria-label", `${options.title} input`);
+  term.textarea?.setAttribute("aria-label", "zsh input");
   fit.fit();
 
   const abort = new AbortController();
@@ -128,7 +126,7 @@ export function attachTerminalSurface(
         );
       }
       if (abort.signal.aborted) return;
-      await sleep(RESUBSCRIBE_MS, abort.signal);
+      await sleep(resubscribeMs, abort.signal);
     }
   };
   void run();
