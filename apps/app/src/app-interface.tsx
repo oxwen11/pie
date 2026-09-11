@@ -5,9 +5,11 @@ import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
@@ -54,6 +56,10 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
   const { theme } = useTheme();
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+  // Terminal close RPC needs the pie client; other panels register in __root__.
+  useState(() => {
+    contentPanel.register(createTerminalPanel(orpcClient));
+  });
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),

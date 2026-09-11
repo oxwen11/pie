@@ -20,6 +20,7 @@ import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
+import { TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -102,6 +103,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   GitProvided,
   WorktreeProvided,
   PullRequestServiceProvided,
+  TerminalManagerLayer,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

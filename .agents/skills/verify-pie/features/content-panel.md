@@ -9,7 +9,8 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 - **Tab strip** — one strip for all open panels. **Open a panel** (`+`) adds another. **Close \<label\>**. **Maximize panel** / **Restore panel size**.
 - **Files** — workspace tree, `aria-label="Project files"`. Clicking a file **replaces** the Files tab with a **File** family tab (label = basename, `title: "File"`) — one tab, not two. Empty-tree chrome may be Chinese (`打开文件`).
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
-- **Terminal** / **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). Terminal greeting is fake `pnpm dev` lines. Browser has **Address** and **Reload**. Do not treat their output as a real shell or network.
+- **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh N input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
+- **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). **Address** and **Reload**. Do not treat its output as a real network.
 
 ## How to get to it (user POV)
 
@@ -30,7 +31,7 @@ agent-browser wait --text "Choose what to show alongside the chat."
 3. Click `README.md` if shown — the **Files** tab **becomes** **README.md** (File family). Preview is the file text.
 4. **Toggle content panel** again unmounts the column; chat and URL remain.
 
-Proof: snapshots before / open / Files / File / hidden, plus the session URL unchanged. Files is the real feature; Terminal/Browser only prove the host (tab appears, close works).
+Proof: snapshots before / open / Files / File / hidden, plus the session URL unchanged. Files is the real feature. Terminal is a real shell in the session workspace. Browser only proves the host (tab appears, close works).
 
 Review: on a **non-git** sample, the Review tab shows **Not a Git repository** / **Open a Git project to review uncommitted work, commits, or another branch.** Git diff tree / Compare mode / Reload need an imported git project — do not import the repo root as a convenience.
 
@@ -40,4 +41,4 @@ Review: on a **non-git** sample, the Review tab shows **Not a Git repository** /
 - **File** in the empty-state grid may be missing: it is a family that needs a path. Open files from the Files tree.
 - Panel instance state (terminal scrollback, browser loading) dies on **Close \<label\>**, not on hide. Hide then show should restore tabs; close should not.
 - Persistence is per session ref. A different session starts empty.
-- Placeholder Terminal does **not** run commands in the project. A "proof" that types into **zsh N input** and expects repo side effects is wrong.
+- Terminal commands run in the session workspace. A proof that types into **zsh N input** should observe that command's real output.
