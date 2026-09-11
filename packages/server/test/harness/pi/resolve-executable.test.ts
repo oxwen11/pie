@@ -8,10 +8,33 @@ import {
   checkPiAvailability,
   parsePiRuntime,
   piAvailabilityTarget,
+  resolveAsarUnpackedPath,
   resolveBundledPiCli,
   resolvePiExecutable,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
+
+describe("resolveAsarUnpackedPath", () => {
+  it("rewrites the asar directory to the unpacked sibling", () => {
+    expect(
+      resolveAsarUnpackedPath(
+        "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+      ),
+    ).toBe(
+      "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+    );
+  });
+
+  it("leaves an already-unpacked path unchanged", () => {
+    const unpacked =
+      "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@earendil-works/pi-coding-agent/dist/cli.js";
+    expect(resolveAsarUnpackedPath(unpacked)).toBe(unpacked);
+  });
+
+  it("leaves a non-asar path unchanged", () => {
+    expect(resolveAsarUnpackedPath("/opt/pi/dist/cli.js")).toBe("/opt/pi/dist/cli.js");
+  });
+});
 
 describe("parsePiRuntime", () => {
   it("defaults to node when unset or empty", () => {
@@ -84,6 +107,47 @@ describe("resolvePiExecutable", () => {
         PIE_PI_EXECUTABLE: "/opt/custom/cli.js",
       }),
     ).toEqual({ command: "bun", prefixArgs: ["/opt/custom/cli.js"] });
+  });
+
+  it("rewrites a bundled asar cli.js so bun opens the unpacked file", () => {
+    expect(
+      resolvePiExecutable(
+        { PIE_PI_RUNTIME: "bun" },
+        {
+          resolveBundledCli: () =>
+            "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+        },
+      ),
+    ).toEqual({
+      command: "bun",
+      prefixArgs: [
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+      ],
+    });
+  });
+
+  it("rewrites an asar PIE_PI_EXECUTABLE under bun", () => {
+    expect(
+      resolvePiExecutable({
+        PIE_PI_RUNTIME: "bun",
+        PIE_PI_EXECUTABLE:
+          "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+      }),
+    ).toEqual({
+      command: "bun",
+      prefixArgs: [
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+      ],
+    });
+  });
+
+  it("does not rewrite asar paths on the Electron Node spawn path", () => {
+    const asarCli =
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@earendil-works/pi-coding-agent/dist/cli.js";
+    expect(resolvePiExecutable({}, { resolveBundledCli: () => asarCli })).toEqual({
+      command: process.execPath,
+      prefixArgs: [asarCli],
+    });
   });
 
   it("does not run a shebang PIE_PI_EXECUTABLE under bun", () => {

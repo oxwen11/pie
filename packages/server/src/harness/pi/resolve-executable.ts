@@ -21,6 +21,24 @@ export type ResolvePiExecutableOptions = {
 
 const JS_CLI_ENTRY = /\.[cm]?js$/i;
 
+const ASAR_DIR = `${path.sep}app.asar${path.sep}`;
+const ASAR_UNPACKED_DIR = `${path.sep}app.asar.unpacked${path.sep}`;
+
+/**
+ * Map an Electron asar module path to the real file electron-builder unpacked.
+ *
+ * `import.meta.resolve` (and Electron's patched fs) keep reporting
+ * `…/app.asar/node_modules/…` even after `asarUnpack`. Electron can open that
+ * virtual path; Bun and system Node cannot — they see `app.asar` as a file,
+ * so `bun <asar>/…/cli.js` exits 1 with `Module not found`.
+ */
+export function resolveAsarUnpackedPath(filePath: string): string {
+  if (filePath.includes(ASAR_UNPACKED_DIR)) return filePath;
+  const index = filePath.indexOf(ASAR_DIR);
+  if (index === -1) return filePath;
+  return `${filePath.slice(0, index)}${ASAR_UNPACKED_DIR}${filePath.slice(index + ASAR_DIR.length)}`;
+}
+
 /**
  * Resolve the npm-shipped Pi CLI when `@earendil-works/pi-coding-agent` is on
  * disk next to the running server (desktop asar or global `pie` install).
@@ -52,15 +70,17 @@ function resolvePiCliScript(
   resolveBundled: () => string | undefined,
 ): string | undefined {
   const explicit = env.PIE_PI_EXECUTABLE?.trim();
-  if (explicit && JS_CLI_ENTRY.test(explicit)) return explicit;
-  return resolveBundled();
+  if (explicit && JS_CLI_ENTRY.test(explicit)) return resolveAsarUnpackedPath(explicit);
+  const bundled = resolveBundled();
+  return bundled === undefined ? undefined : resolveAsarUnpackedPath(bundled);
 }
 
 /**
  * Pick the Pi binary for this process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1` (ignores `PIE_PI_RUNTIME`)
  * 2. `PIE_PI_RUNTIME=bun` → `bun <cli.js>` (bundled or a `.js` / `.mjs` /
- *    `.cjs` `PIE_PI_EXECUTABLE`; never the shebang `pi` binary)
+ *    `.cjs` `PIE_PI_EXECUTABLE`; never the shebang `pi` binary). Asar
+ *    module paths are rewritten to `app.asar.unpacked` so Bun can open them.
  * 3. `PIE_PI_EXECUTABLE`
  * 4. bundled `@earendil-works/pi-coding-agent` via Node (`process.execPath`)
  * 5. bare `pi` on PATH
