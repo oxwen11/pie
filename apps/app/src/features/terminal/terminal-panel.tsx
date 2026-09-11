@@ -81,7 +81,7 @@ function TerminalPanelView({
   return (
     <div
       ref={mountRef}
-      className="bg-background h-full min-h-0 flex-1 overflow-hidden [&_.xterm]:h-full [&_.xterm-screen]:h-full"
+      className="bg-card h-full min-h-0 flex-1 overflow-hidden [&_.xterm]:h-full [&_.xterm-screen]:h-full"
     />
   );
 }

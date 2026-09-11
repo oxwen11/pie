@@ -6,6 +6,8 @@ import { Terminal } from "@xterm/xterm";
 
 import { isAbortError, sleep } from "@/lib/utils";
 
+import { subscribeToAppTheme, xtermThemeFromElement } from "./theme";
+
 export interface TerminalSurface {
   readonly detach: () => void;
 }
@@ -21,17 +23,12 @@ export function attachTerminalSurface(
     readonly title: string;
   },
 ): TerminalSurface {
-  const colors = getComputedStyle(mount);
   const term = new Terminal({
     convertEol: true,
     cursorBlink: true,
     fontSize: 12,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    theme: {
-      background: colors.backgroundColor,
-      foreground: colors.color,
-      cursor: colors.color,
-    },
+    theme: xtermThemeFromElement(mount),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
@@ -71,6 +68,9 @@ export function attachTerminalSurface(
     }
   });
   observer.observe(mount);
+  const unwatchTheme = subscribeToAppTheme(() => {
+    term.options.theme = xtermThemeFromElement(mount);
+  });
 
   const stopAsExited = (exitCode: number | null): void => {
     attachedWriter = false;
@@ -134,6 +134,7 @@ export function attachTerminalSurface(
   return {
     detach: () => {
       abort.abort();
+      unwatchTheme();
       observer.disconnect();
       dataDisposable.dispose();
       resizeDisposable.dispose();

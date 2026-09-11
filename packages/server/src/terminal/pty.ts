@@ -23,7 +23,7 @@ export const spawnPty = (input: {
 }): Effect.Effect<PtyProcess, TerminalSpawnFailed> =>
   Effect.tryPromise({
     try: async () => {
-      const nodePty = await import("node-pty");
+      const nodePty = await import("@homebridge/node-pty-prebuilt-multiarch");
       const env: NodeJS.ProcessEnv = { ...process.env, TERM: "xterm-256color" };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.ELECTRON_RENDERER_PORT;
