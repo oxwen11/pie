@@ -33,6 +33,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const repo = findRepoRoot();
   if (
     identity.needsDisplay &&
+    process.platform !== "darwin" &&
     process.env.DISPLAY === undefined &&
     commandOnPath("xvfb-run") === undefined
   ) {

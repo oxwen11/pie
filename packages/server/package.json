@@ -33,6 +33,7 @@
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "node-pty": "1.1.0",
     "simple-git": "catalog:",
     "uuid": "catalog:",
     "ws": "catalog:",

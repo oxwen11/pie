@@ -10,7 +10,6 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
-import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
@@ -28,14 +27,7 @@ export interface RouterAppContext {
   queryClient: QueryClient;
 }
 
-contentPanel.registerAll([
-  filesPanel,
-  filePanel,
-  reviewPanel,
-  pullRequestPanel,
-  terminalPanel,
-  browserPanel,
-]);
+contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,

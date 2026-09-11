@@ -37,7 +37,7 @@ async function startDesktop(ctx: LaunchCtx): Promise<void> {
   const logPath = path.join(desktop.runDir, "logs/electron-vite.log");
   const viteArgs = ["exec", "electron-vite", "dev"];
   const child =
-    process.env.DISPLAY === undefined
+    process.platform !== "darwin" && process.env.DISPLAY === undefined
       ? spawnLogged("xvfb-run", ["-a", "pnpm", ...viteArgs], logPath, {
           cwd: path.join(desktop.repo, "apps/desktop"),
           env: desktop.env,
