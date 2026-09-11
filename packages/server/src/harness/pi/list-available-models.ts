@@ -16,7 +16,7 @@ const listModelsError = (cause: unknown) =>
 /**
  * Available models plus Pi's startup default, from one
  * `createAgentSessionServices` load — same source as `pi --list-models` and
- * RPC `get_available_models`, without spawning `pi --mode rpc`.
+ * RPC `get_available_models`, without spawning the Pi RPC child.
  */
 export function listAvailablePiModels(
   cwd: string,

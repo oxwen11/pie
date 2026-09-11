@@ -291,8 +291,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches the external Pi executable with `--mode rpc`, the session cwd, and
-optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches a pie-owned Pi RPC child (`dist/pi-rpc.mjs`) with the session cwd
+and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie

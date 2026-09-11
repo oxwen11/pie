@@ -45,11 +45,11 @@ The sole owner of live session state: the table of sessions keyed by ref (each `
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
-`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned Pi RPC child (`dist/pi-rpc.mjs`, JSONL over stdio). The child still hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **PIE_PI_RUNTIME**:
-Optional host runtime for that child: unset / `node` (default) keeps today's Node path (`process.execPath` + bundled `cli.js`, or the shebang `pi` on PATH). `bun` looks up `bun` on the user's PATH — pie does not ship Bun — and spawns `bun <cli.js> --mode rpc …`. Missing Bun fails availability (`"Bun was not found on PATH…"`). Restart the daemon after flipping. To A/B memory, open the same kind of real session with the toggle on vs off and compare the child's RSS/PSS (`ps`, Activity Monitor); lab idle figures are not a production claim once MCP/tools attach.
-_Avoid_: bundling Bun in desktop/asar; spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim
+Optional host runtime for that child: unset / `node` (default) keeps today's Node path (`process.execPath` + `dist/pi-rpc.mjs`). `bun` looks up `bun` on the user's PATH — pie does not ship Bun — and spawns `bun <entry> --mode rpc …`. Missing Bun fails availability (`"Bun was not found on PATH…"`). Restart the daemon after flipping. To A/B memory, open the same kind of real session with the toggle on vs off and compare the child's RSS/PSS (`ps`, Activity Monitor); lab idle figures are not a production claim once MCP/tools attach.
+_Avoid_: bundling Bun in desktop/asar; spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim; using a user-installed `pi` as the RPC child
 
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.

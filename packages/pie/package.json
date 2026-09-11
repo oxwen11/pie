@@ -14,6 +14,9 @@
     "dist"
   ],
   "type": "module",
+  "exports": {
+    "./pi-rpc": "./dist/pi-rpc.mjs"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -28,7 +31,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
