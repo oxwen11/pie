@@ -42,6 +42,16 @@ export type {
   RpcSessionState,
 } from "./rpc-types";
 
+/** Thrown after stdin is paused so the child can set `process.exitCode` and drain. */
+export class RpcChildExitError extends Error {
+  readonly exitCode: number;
+  constructor(exitCode: number) {
+    super(`rpc child exit ${String(exitCode)}`);
+    this.name = "RpcChildExitError";
+    this.exitCode = exitCode;
+  }
+}
+
 /**
  * Run in RPC mode.
  * Listens for JSON commands on stdin, outputs events and responses on stdout.
@@ -56,14 +66,14 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   let unsubscribe: (() => void) | undefined;
   let unsubscribeBackpressure: (() => void) | undefined;
 
-  const output = (obj: RpcResponse | RpcExtensionUIRequest | object) => {
-    writeRawStdout(serializeJsonLine(obj));
+  const output = (frame: unknown) => {
+    writeRawStdout(serializeJsonLine(frame));
   };
 
   const success = <T extends RpcCommand["type"]>(
     id: string | undefined,
     command: T,
-    data?: object | null,
+    data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
       return { id, type: "response", command, success: true } as RpcResponse;
@@ -426,9 +436,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
               }
             },
           })
-          .catch((e) => {
+          .catch((cause: unknown) => {
             if (!preflightSucceeded) {
-              output(error(id, "prompt", e.message));
+              const message = cause instanceof Error ? cause.message : String(cause);
+              output(error(id, "prompt", message));
             }
           });
         return undefined;
@@ -708,12 +719,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       case "get_commands": {
         const commands: RpcSlashCommand[] = [];
 
-        for (const command of session.extensionRunner.getRegisteredCommands()) {
+        for (const registered of session.extensionRunner.getRegisteredCommands()) {
           commands.push({
-            name: command.invocationName,
-            description: command.description,
+            name: registered.invocationName,
+            description: registered.description,
             source: "extension",
-            sourceInfo: command.sourceInfo,
+            sourceInfo: registered.sourceInfo,
           });
         }
 
@@ -753,7 +764,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
   async function shutdown(exitCode = 0, signal?: NodeJS.Signals): Promise<never> {
     if (shuttingDown) {
-      process.exit(exitCode);
+      throw new RpcChildExitError(exitCode);
     }
     shuttingDown = true;
     for (const cleanup of signalCleanupHandlers) {
@@ -767,7 +778,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     if (signal !== "SIGTERM") {
       await flushRawStdout();
     }
-    process.exit(exitCode);
+    throw new RpcChildExitError(exitCode);
   }
 
   async function checkShutdownRequested(): Promise<void> {

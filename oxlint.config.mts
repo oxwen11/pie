@@ -10,13 +10,6 @@ const pieIgnorePatterns = [
   ".conductor",
   "**/dist/**",
   "**/node_modules/**",
-  // Vendored Pi RPC loop (command table + JSONL helpers). Lint the pie-owned
-  // entry (`entry.ts`, `pi-dist.ts`) only.
-  "packages/server/src/harness/pi/rpc/rpc-mode.ts",
-  "packages/server/src/harness/pi/rpc/rpc-types.ts",
-  "packages/server/src/harness/pi/rpc/json-event.ts",
-  "packages/server/src/harness/pi/rpc/jsonl.ts",
-  "packages/server/src/harness/pi/rpc/output-guard.ts",
   ".agent/**",
   ".agents/**",
   ".claude/**",

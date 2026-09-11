@@ -15,9 +15,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { importPiDist } from "./pi-dist";
-import { runRpcMode } from "./rpc-mode";
+import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
-process.title = "pie-pi-rpc";
+process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
 process.emitWarning = (() => {}) as typeof process.emitWarning;
@@ -82,10 +82,18 @@ const start = async (): Promise<void> => {
     for (const diagnostic of runtime.diagnostics) {
       console.error(`${diagnostic.type}: ${diagnostic.message}`);
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   await runRpcMode(runtime);
 };
 
-void start();
+void start().catch((cause: unknown) => {
+  if (cause instanceof RpcChildExitError) {
+    process.exitCode = cause.exitCode;
+    return;
+  }
+  console.error(cause);
+  process.exitCode = 1;
+});

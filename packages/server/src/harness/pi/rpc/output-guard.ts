@@ -43,7 +43,9 @@ async function writeRawStdoutChunk(text: string): Promise<void> {
       if (code !== "ENOBUFS" && code !== "EAGAIN" && code !== "EWOULDBLOCK") {
         throw writeError;
       }
-      await new Promise<void>((resolve) => setTimeout(resolve, RAW_STDOUT_RETRY_DELAY_MS));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, RAW_STDOUT_RETRY_DELAY_MS);
+      });
     }
   }
 }
@@ -59,7 +61,7 @@ export function takeOverStdout(): void {
   const rawStderrWrite = process.stderr.write.bind(
     process.stderr,
   ) as StdoutTakeoverState["rawStderrWrite"];
-  const originalStdoutWrite = process.stdout.write;
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 
   process.stdout.write = ((
     chunk: string | Uint8Array,
@@ -98,7 +100,7 @@ export function writeRawStdout(text: string): void {
   }
   rawStdoutWriteTail = rawStdoutWriteTail.then(() => writeRawStdoutChunk(text));
   void rawStdoutWriteTail.catch(() => {
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
