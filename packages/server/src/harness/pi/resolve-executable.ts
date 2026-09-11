@@ -22,6 +22,22 @@ export type ResolvePiExecutableOptions = {
 
 const JS_CLI_ENTRY = /\.[cm]?js$/i;
 
+const ASAR_SEGMENT = `${path.sep}app.asar${path.sep}`;
+const ASAR_UNPACKED_SEGMENT = `${path.sep}app.asar.unpacked${path.sep}`;
+
+/**
+ * Electron's `import.meta.resolve` reports paths inside `app.asar` even when
+ * electron-builder unpacked the file. Electron can read that virtual path;
+ * Bun cannot. Map to the real `app.asar.unpacked` sibling.
+ */
+function asarUnpackedPath(filePath: string): string {
+  const index = filePath.indexOf(ASAR_SEGMENT);
+  if (index === -1) return filePath;
+  return (
+    filePath.slice(0, index) + ASAR_UNPACKED_SEGMENT + filePath.slice(index + ASAR_SEGMENT.length)
+  );
+}
+
 const existingFile = (pathname: string | undefined): string | undefined => {
   if (pathname === undefined) return undefined;
   try {
@@ -73,7 +89,9 @@ function resolvePiCliScript(
  * Pick the Pi binary for this process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1` (ignores `PIE_PI_RUNTIME`)
  * 2. `PIE_PI_RUNTIME=bun` → `bun <entry>` (owned `pi-rpc.mjs`, or a `.js` /
- *    `.mjs` / `.cjs` `PIE_PI_EXECUTABLE`; never a shebang binary)
+ *    `.mjs` / `.cjs` `PIE_PI_EXECUTABLE`; never a shebang binary). Packaged
+ *    desktop rewrites `app.asar` → `app.asar.unpacked` because Bun cannot
+ *    read an asar.
  * 3. `PIE_PI_EXECUTABLE`
  * 4. pie-owned `dist/pi-rpc.mjs` via Node (`process.execPath`)
  *
@@ -93,7 +111,10 @@ export function resolvePiExecutable(
 
   if (parsePiRuntime(env.PIE_PI_RUNTIME) === "bun") {
     const script = resolvePiCliScript(env, resolveBundled);
-    return { command: "bun", prefixArgs: script === undefined ? [] : [script] };
+    return {
+      command: "bun",
+      prefixArgs: script === undefined ? [] : [asarUnpackedPath(script)],
+    };
   }
 
   const explicit = env.PIE_PI_EXECUTABLE?.trim();

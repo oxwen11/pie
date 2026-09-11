@@ -23,19 +23,18 @@
   "dependencies": {
     "@effect/platform-node": "catalog:effect",
     "@electron-toolkit/utils": "^4.0.0",
-    "@getpie/app": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/experimental-effect": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
-    "effect": "catalog:effect",
-    "react-error-boundary": "catalog:"
+    "effect": "catalog:effect"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@getpie/app": "workspace:*",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",
@@ -46,8 +45,10 @@
     "electron": "^44.1.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0-beta.1",
+    "nf3": "^0.3.24",
     "react": "catalog:react",
     "react-dom": "catalog:react",
+    "react-error-boundary": "catalog:",
     "tailwindcss": "catalog:tailwind",
     "vitest": "catalog:"
   }

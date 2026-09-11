@@ -98,6 +98,19 @@ describe("resolvePiExecutable", () => {
       resolvePiExecutable({ PIE_PI_RUNTIME: "bun" }, { resolveBundledCli: () => undefined }),
     ).toEqual({ command: "bun", prefixArgs: [] });
   });
+
+  it("rewrites a packaged asar RPC entry to asar.unpacked for bun", () => {
+    const asarEntry =
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pi-rpc.mjs";
+    expect(
+      resolvePiExecutable({ PIE_PI_RUNTIME: "bun" }, { resolveBundledCli: () => asarEntry }),
+    ).toEqual({
+      command: "bun",
+      prefixArgs: [
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-rpc.mjs",
+      ],
+    });
+  });
 });
 
 describe("piAvailabilityTarget", () => {
