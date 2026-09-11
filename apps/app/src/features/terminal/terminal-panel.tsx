@@ -21,22 +21,16 @@ interface TerminalPayload {
 
 type TerminalInstance = PanelHandle<TerminalPayload>;
 
-let nextTerminal = 0;
-
 export function createTerminalPanel(client: PieClient) {
   return definePanelFamily({
     type: "terminal",
     key: (payload: TerminalPayload) => payload.terminalId,
     label: (payload) => payload.title,
     title: "Terminal",
-    newPayload: () => {
-      const n = ++nextTerminal;
-      const payload: TerminalPayload = {
-        terminalId: crypto.randomUUID(),
-        title: `zsh ${n}`,
-      };
-      return payload;
-    },
+    newPayload: () => ({
+      terminalId: crypto.randomUUID(),
+      title: "zsh",
+    }),
     parse: (raw) => {
       const { terminalId, title } = asRecord(raw) ?? {};
       if (typeof terminalId !== "string") return null;

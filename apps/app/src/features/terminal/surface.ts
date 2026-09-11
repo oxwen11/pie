@@ -109,12 +109,14 @@ export function attachTerminalSurface(
           { signal: abort.signal },
         );
         for await (const event of stream) {
-          if (abort.signal.aborted) return;
+          const aborted = abort.signal.aborted;
+          if (aborted) return;
           applyEvent(event);
           if (event.type === "exited") return;
         }
       } catch (error) {
-        if (abort.signal.aborted || isAbortError(error)) return;
+        const aborted = abort.signal.aborted;
+        if (aborted || isAbortError(error)) return;
         // Closed/tombstoned ids stay dead — retrying SESSION_NOT_ACTIVE is the
         // spam the tombstone table exists to suppress.
         if (error instanceof ORPCError && error.code === "SESSION_NOT_ACTIVE") {
