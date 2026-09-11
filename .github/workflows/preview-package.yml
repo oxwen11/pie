@@ -80,6 +80,11 @@ jobs:
           mise install --locked
         shell: bash
 
+      - name: Native toolchain (node-pty)
+        if: steps.pr-gate.outputs.skip != 'true'
+        run: bash .github/scripts/ensure-native-toolchain.sh
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
         if: steps.pr-gate.outputs.skip != 'true'
 

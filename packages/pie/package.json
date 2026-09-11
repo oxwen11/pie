@@ -33,12 +33,12 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
-    "@homebridge/node-pty-prebuilt-multiarch": "0.14.1",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "node-pty": "1.1.0",
     "uuid": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"

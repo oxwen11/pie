@@ -21,7 +21,7 @@ export default defineConfig([
       // `vite` stays external: nothing in this package imports it. The UI is a
       // prebuilt static bundle (`http/ui.ts`); `apps/app` runs its own `vite dev`.
       alwaysBundle: [/.*/],
-      neverBundle: ["vite", "@homebridge/node-pty-prebuilt-multiarch"],
+      neverBundle: ["vite", "node-pty"],
       onlyBundle: false,
     },
     env: {

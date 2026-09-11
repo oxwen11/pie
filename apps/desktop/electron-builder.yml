@@ -20,7 +20,7 @@ asarUnpack:
   # Pi is spawned as `node <pi-rpc.mjs>`; AgentSession assets must be real files.
   - "**/node_modules/@earendil-works/pi-coding-agent/dist/**"
   - "**/node_modules/@getpie/server/dist/pi-rpc.mjs"
-  - "**/node_modules/@homebridge/node-pty-prebuilt-multiarch/**"
+  - "**/node_modules/node-pty/**"
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns
@@ -36,8 +36,6 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
-# PTY runs in the forked Node server (Node ABI prebuilds), not the Electron
-# renderer. Do not rebuild native addons for Electron's ABI.
 npmRebuild: false
 publish:
   provider: generic

@@ -17,7 +17,7 @@
     "e2e": "playwright test -c e2e/playwright.config.ts",
     "e2e:headed": "playwright test -c e2e/playwright.config.ts --headed",
     "e2e:report": "playwright show-report e2e/report",
-    "postinstall": "node -e \"process.exit(0)\"",
+    "postinstall": "electron-builder install-app-deps",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
