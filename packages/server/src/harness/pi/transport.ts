@@ -72,7 +72,7 @@ export const makePiTransport = (
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
-    const executable = options.executable ?? { command: "pi", prefixArgs: [] };
+    const executable = options.executable ?? { command: process.execPath, prefixArgs: [] };
     const child = yield* spawner
       .spawn(
         ChildProcess.make(

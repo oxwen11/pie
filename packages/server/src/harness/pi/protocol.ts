@@ -8,10 +8,10 @@ import type {
   SessionMessageEntry,
 } from "@earendil-works/pi-coding-agent";
 
-// Pi's RPC wire protocol (`pi --mode rpc`, JSON lines over stdio). Unlike
-// previous agents, the types come straight from the published package — pi is
-// TypeScript-native, so there is no vendored ts-rs output. All imports here
-// are type-only. The RPC child process is the only path for sessions; model
+// Pi's RPC wire protocol (JSON lines over stdio). The child is pie-owned
+// (`harness/pi/rpc`); types still come from the published package because they
+// match the vendored command table at the current pin. All imports here are
+// type-only. The RPC child process is the only path for sessions; model
 // catalog lookup (`list-available-models.ts`) uses the library in-process.
 //
 // stdout frames:

@@ -10,6 +10,7 @@ import {
   piAvailabilityTarget,
   resolveBundledPiCli,
   resolvePiExecutable,
+  resolvePiRpcEntry,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
@@ -51,8 +52,8 @@ describe("resolvePiExecutable", () => {
     });
   });
 
-  it("falls back to bundled pi-coding-agent via Node", () => {
-    const bundled = resolveBundledPiCli();
+  it("falls back to the pie-owned RPC entry via Node", () => {
+    const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
     expect(resolvePiExecutable({})).toEqual({
       command: process.execPath,
@@ -61,15 +62,15 @@ describe("resolvePiExecutable", () => {
   });
 
   it("keeps the Node spawn path when PIE_PI_RUNTIME is node", () => {
-    const bundled = resolveBundledPiCli();
+    const bundled = resolvePiRpcEntry();
     expect(resolvePiExecutable({ PIE_PI_RUNTIME: "node" })).toEqual({
       command: process.execPath,
       prefixArgs: [bundled!],
     });
   });
 
-  it("spawns bun plus bundled cli.js when PIE_PI_RUNTIME=bun", () => {
-    const bundled = resolveBundledPiCli();
+  it("spawns bun plus the RPC entry when PIE_PI_RUNTIME=bun", () => {
+    const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
     expect(resolvePiExecutable({ PIE_PI_RUNTIME: "bun" })).toEqual({
       command: "bun",
@@ -87,7 +88,7 @@ describe("resolvePiExecutable", () => {
   });
 
   it("does not run a shebang PIE_PI_EXECUTABLE under bun", () => {
-    const bundled = resolveBundledPiCli();
+    const bundled = resolvePiRpcEntry();
     expect(
       resolvePiExecutable({
         PIE_PI_RUNTIME: "bun",
@@ -102,10 +103,18 @@ describe("resolvePiExecutable", () => {
     ).toEqual({ command: "bun", prefixArgs: [] });
   });
 
-  it("resolves the bundled cli from the workspace dependency graph", () => {
+  it("resolves the npm cli from the workspace dependency graph", () => {
     const bundled = resolveBundledPiCli();
     const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
     expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
+  });
+
+  it("prefers an existing pie-owned RPC entry over the npm cli", () => {
+    const owned = resolvePiRpcEntry();
+    const npmCli = resolveBundledPiCli();
+    expect(owned).toBeTruthy();
+    expect(npmCli).toBeTruthy();
+    expect(owned === npmCli || owned!.endsWith("pi-rpc.mjs")).toBe(true);
   });
 });
 
@@ -129,7 +138,7 @@ describe("piAvailabilityTarget", () => {
 
 describe("checkPiAvailability", () => {
   it("reports bundled Pi available when the script file exists", () => {
-    const bundled = resolveBundledPiCli();
+    const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
 
     const result = Effect.runSync(
@@ -140,23 +149,23 @@ describe("checkPiAvailability", () => {
     expect(result).toEqual({ available: true });
   });
 
-  it("reports bundled Pi missing when the script file is absent", () => {
+  it("reports the RPC entry missing when the script file is absent", () => {
     const result = Effect.runSync(
       checkPiAvailability({
         command: process.execPath,
-        prefixArgs: ["/does/not/exist/cli.js"],
+        prefixArgs: ["/does/not/exist/pi-rpc.mjs"],
       }).pipe(Effect.provide(fakeStats({}))),
     );
-    expect(result).toEqual({ available: false, reason: "Bundled Pi is missing." });
+    expect(result).toEqual({ available: false, reason: "Pie's Pi RPC entry is missing." });
   });
 
-  it("reports PATH Pi missing when the command is not installed", () => {
+  it("reports the RPC entry missing when Node has no script to run", () => {
     const result = Effect.runSync(
-      checkPiAvailability({ command: "pi", prefixArgs: [] }).pipe(
+      checkPiAvailability({ command: process.execPath, prefixArgs: [] }).pipe(
         Effect.provide(fakeExecutables()),
       ),
     );
-    expect(result).toEqual({ available: false, reason: "Pi was not found on PATH." });
+    expect(result).toEqual({ available: false, reason: "Pie's Pi RPC entry is missing." });
   });
 
   it("reports bun missing on PATH when PIE_PI_RUNTIME selected bun", () => {
@@ -182,7 +191,7 @@ describe("checkPiAvailability", () => {
     expect(result).toEqual({
       available: false,
       reason:
-        "Pi cli.js was not found. PIE_PI_RUNTIME=bun needs the script entry, not the shebang binary.",
+        "Pi RPC entry was not found. PIE_PI_RUNTIME=bun needs the script entry, not a shebang binary.",
     });
   });
 

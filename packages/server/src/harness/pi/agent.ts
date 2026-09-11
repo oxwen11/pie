@@ -63,7 +63,9 @@ export const makePiAgent = (
   options: { readonly executable?: PiExecutable } = {},
 ): PiAgentShape => {
   const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
+    availability: checkPiAvailability(
+      options.executable ?? { command: process.execPath, prefixArgs: [] },
+    ),
     create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(process, input)),
     resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(process, input)),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
