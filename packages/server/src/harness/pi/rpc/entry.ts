@@ -23,7 +23,7 @@ import {
   type CreateAgentSessionRuntimeFactory,
 } from "@earendil-works/pi-coding-agent";
 
-import { createPiShellEnvExtension } from "../shell-env";
+import { createPiBashExtension } from "../bash";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -64,7 +64,7 @@ const start = async (): Promise<void> => {
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       resourceLoaderOptions: {
-        extensionFactories: [createPiShellEnvExtension(options.cwd)],
+        extensionFactories: [createPiBashExtension(options.cwd)],
       },
     });
     const resolved = resolveCliModel({

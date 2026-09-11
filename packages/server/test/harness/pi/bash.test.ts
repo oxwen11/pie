@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterPiUserCommandEnv } from "../../../src/harness/pi/shell-env";
+import { filterPiBashEnv } from "../../../src/harness/pi/bash";
 
 const HOST_ENV: NodeJS.ProcessEnv = {
   PIE_DAEMON_DIR: "daemon-beta",
@@ -18,9 +18,9 @@ const HOST_ENV: NodeJS.ProcessEnv = {
   PI_SESSION_ID: "sess-1",
 };
 
-describe("filterPiUserCommandEnv", () => {
+describe("filterPiBashEnv", () => {
   it("strips host identity and keeps OS, proxy, and PI session keys", () => {
-    expect(filterPiUserCommandEnv(HOST_ENV)).toEqual({
+    expect(filterPiBashEnv(HOST_ENV)).toEqual({
       PATH: "/usr/bin:/bin",
       HOME: "/users/test",
       DISPLAY: ":0",
