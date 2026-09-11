@@ -1,6 +1,5 @@
 import {
   createBashTool,
-  createPowerShellTool,
   type BashSpawnContext,
   type ExtensionAPI,
   type InlineExtension,
@@ -34,7 +33,6 @@ export function createPiShellEnvExtension(cwd: string): InlineExtension {
     name: "@getpie/shell-env",
     factory: (pi: ExtensionAPI) => {
       pi.registerTool(createBashTool(cwd, { spawnHook: piUserCommandSpawnHook }));
-      pi.registerTool(createPowerShellTool(cwd, { spawnHook: piUserCommandSpawnHook }));
     },
   };
 }
