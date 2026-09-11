@@ -9,7 +9,7 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 - **Tab strip** — one strip for all open panels. **Open a panel** (`+`) adds another. **Close \<label\>**. **Maximize panel** / **Restore panel size**.
 - **Files** — workspace tree, `aria-label="Project files"`. Clicking a file **replaces** the Files tab with a **File** family tab (label = basename, `title: "File"`) — one tab, not two. Empty-tree chrome may be Chinese (`打开文件`).
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
-- **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh N input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
+- **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
 - **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). **Address** and **Reload**. Do not treat its output as a real network.
 
 ## How to get to it (user POV)
@@ -41,4 +41,4 @@ Review: on a **non-git** sample, the Review tab shows **Not a Git repository** /
 - **File** in the empty-state grid may be missing: it is a family that needs a path. Open files from the Files tree.
 - Panel instance state (terminal scrollback, browser loading) dies on **Close \<label\>**, not on hide. Hide then show should restore tabs; close should not.
 - Persistence is per session ref. A different session starts empty.
-- Terminal commands run in the session workspace. A proof that types into **zsh N input** should observe that command's real output.
+- Terminal commands run in the session workspace. A proof that types into **zsh input** should observe that command's real output.
