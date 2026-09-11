@@ -1,7 +1,10 @@
 /**
  * Vendored from @earendil-works/pi-coding-agent v0.85.1
  * (`packages/coding-agent/src/modes/rpc/rpc-mode.ts`).
- * Pie owns this command loop; AgentSession still comes from the npm package.
+ *
+ * Pie owns this loop so extension bind (`session.bindExtensions`), the RPC
+ * UI context, and JSONL stay customizable. AgentSession still comes from the
+ * npm package. Loading (which factories/paths) is `entry.ts`, not here.
  */
 
 import crypto from "node:crypto";
