@@ -23,7 +23,6 @@ import {
   waitForRawStdoutBackpressure,
   writeRawStdout,
 } from "./output-guard";
-import { importPiDist } from "./pi-dist";
 import type {
   RpcCommand,
   RpcExtensionUIRequest,
@@ -57,10 +56,6 @@ export class RpcChildExitError extends Error {
  * Listens for JSON commands on stdin, outputs events and responses on stdout.
  */
 export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<never> {
-  const [{ killTrackedDetachedChildren }, { theme }] = await Promise.all([
-    importPiDist<{ killTrackedDetachedChildren: () => void }>("utils/shell.js"),
-    importPiDist<{ theme: Theme }>("modes/interactive/theme/theme.js"),
-  ]);
   takeOverStdout();
   let session = runtimeHost.session;
   let unsubscribe: (() => void) | undefined;
@@ -307,8 +302,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return undefined;
     },
 
-    get theme() {
-      return theme;
+    get theme(): Theme {
+      throw new Error("Theme is not available in RPC mode");
     },
 
     getAllThemes() {
@@ -400,7 +395,6 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     for (const signal of signals) {
       const handler = () => {
-        killTrackedDetachedChildren();
         void shutdown(signal === "SIGHUP" ? 129 : 143, signal);
       };
       process.on(signal, handler);

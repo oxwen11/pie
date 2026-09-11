@@ -14,7 +14,6 @@ import {
   type CreateAgentSessionRuntimeFactory,
 } from "@earendil-works/pi-coding-agent";
 
-import { importPiDist } from "./pi-dist";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -33,11 +32,6 @@ const openSessionManager = async (sessionId: string | undefined, cwd: string) =>
 };
 
 const start = async (): Promise<void> => {
-  const { configureHttpDispatcher } = await importPiDist<{
-    configureHttpDispatcher: (idleTimeoutMs?: number) => void;
-  }>("core/http-dispatcher.js");
-  configureHttpDispatcher();
-
   const parsed = parseArgs(process.argv.slice(2));
   const cwd = process.cwd();
   const agentDir = getAgentDir();
