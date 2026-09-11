@@ -9,13 +9,14 @@
 
 import crypto from "node:crypto";
 
-import type {
-  AgentSessionRuntime,
-  ExtensionUIContext,
-  ExtensionUIDialogOptions,
-  ExtensionWidgetOptions,
+import {
+  initTheme,
   Theme,
-  WorkingIndicatorOptions,
+  type AgentSessionRuntime,
+  type ExtensionUIContext,
+  type ExtensionUIDialogOptions,
+  type ExtensionWidgetOptions,
+  type WorkingIndicatorOptions,
 } from "@earendil-works/pi-coding-agent";
 
 import { toJsonEvent } from "./json-event";
@@ -306,7 +307,16 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     },
 
     get theme(): Theme {
-      throw new Error("Theme is not available in RPC mode");
+      const key = Symbol.for("@earendil-works/pi-coding-agent:theme");
+      const store = globalThis as Record<symbol, Theme | undefined>;
+      if (!(store[key] instanceof Theme)) {
+        initTheme();
+      }
+      const current = store[key];
+      if (!(current instanceof Theme)) {
+        throw new Error("Theme not initialized. Call initTheme() first.");
+      }
+      return current;
     },
 
     getAllThemes() {

@@ -40,27 +40,11 @@ const resolvedPackageFile = (specifier: string): string | undefined => {
 };
 
 /**
- * Pie-owned RPC child (`dist/pi-rpc.mjs`), then the npm `cli.js` of the same
- * pin when the server artifact has not been built yet.
+ * Pie-owned RPC child via package exports only: workspace/desktop
+ * `@getpie/server/pi-rpc`, published CLI `@getpie/cli/pi-rpc`.
  */
 export function resolvePiRpcEntry(): string | undefined {
-  const here = import.meta.dirname;
-  return (
-    resolvedPackageFile("@getpie/server/pi-rpc") ??
-    existingFile(path.join(here, "pi-rpc.mjs")) ??
-    existingFile(path.join(here, "../../../dist/pi-rpc.mjs")) ??
-    resolveBundledPiCli()
-  );
-}
-
-/**
- * Resolve the npm-shipped Pi CLI when `@earendil-works/pi-coding-agent` is on
- * disk next to the running server (desktop asar or global `pie` install).
- */
-export function resolveBundledPiCli(): string | undefined {
-  const indexPath = resolvedPackageFile("@earendil-works/pi-coding-agent");
-  if (indexPath === undefined) return undefined;
-  return existingFile(path.join(path.dirname(indexPath), "cli.js"));
+  return resolvedPackageFile("@getpie/server/pi-rpc") ?? resolvedPackageFile("@getpie/cli/pi-rpc");
 }
 
 /**
@@ -88,16 +72,14 @@ function resolvePiCliScript(
 /**
  * Pick the Pi binary for this process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1` (ignores `PIE_PI_RUNTIME`)
- * 2. `PIE_PI_RUNTIME=bun` → `bun <entry>` (owned `pi-rpc.mjs`, npm `cli.js`,
- *    or a `.js` / `.mjs` / `.cjs` `PIE_PI_EXECUTABLE`; never a shebang binary)
+ * 2. `PIE_PI_RUNTIME=bun` → `bun <entry>` (owned `pi-rpc.mjs`, or a `.js` /
+ *    `.mjs` / `.cjs` `PIE_PI_EXECUTABLE`; never a shebang binary)
  * 3. `PIE_PI_EXECUTABLE`
  * 4. pie-owned `dist/pi-rpc.mjs` via Node (`process.execPath`)
- * 5. npm `@earendil-works/pi-coding-agent` `cli.js` when the server artifact
- *    has not been built yet
  *
  * Bun is resolved from the user's PATH at spawn / availability time — pie
- * does not ship it. There is no PATH `pi` fallback: the child protocol is
- * pie-owned and a user CLI would drift.
+ * does not ship it. There is no PATH `pi` or npm `cli.js` fallback: the child
+ * protocol is pie-owned and a user CLI would drift.
  */
 export function resolvePiExecutable(
   env: NodeJS.ProcessEnv = process.env,

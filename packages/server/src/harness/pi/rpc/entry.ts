@@ -15,6 +15,7 @@ import {
   createAgentSessionRuntime,
   createAgentSessionServices,
   getAgentDir,
+  initTheme,
   parseArgs,
   resolveCliModel,
   SessionManager,
@@ -102,6 +103,7 @@ const start = async (): Promise<void> => {
   const { settingsManager } = runtime.services;
   applyHttpProxySettings(settingsManager.getGlobalSettings().httpProxy);
   configureHttpDispatcher(settingsManager.getHttpIdleTimeoutMs());
+  initTheme(settingsManager.getTheme(), false);
 
   await runRpcMode(runtime);
 };

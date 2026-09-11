@@ -1,6 +1,3 @@
-import path from "node:path";
-import url from "node:url";
-
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +5,6 @@ import {
   checkPiAvailability,
   parsePiRuntime,
   piAvailabilityTarget,
-  resolveBundledPiCli,
   resolvePiExecutable,
   resolvePiRpcEntry,
 } from "../../../src/harness/pi/resolve-executable";
@@ -97,16 +93,10 @@ describe("resolvePiExecutable", () => {
     ).toEqual({ command: "bun", prefixArgs: [bundled!] });
   });
 
-  it("returns bun with no script when cli.js cannot be resolved", () => {
+  it("returns bun with no script when the RPC entry cannot be resolved", () => {
     expect(
       resolvePiExecutable({ PIE_PI_RUNTIME: "bun" }, { resolveBundledCli: () => undefined }),
     ).toEqual({ command: "bun", prefixArgs: [] });
-  });
-
-  it("resolves the npm cli from the workspace dependency graph", () => {
-    const bundled = resolveBundledPiCli();
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
   });
 });
 
