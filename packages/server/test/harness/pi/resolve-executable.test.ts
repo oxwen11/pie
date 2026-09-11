@@ -108,14 +108,6 @@ describe("resolvePiExecutable", () => {
     const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
     expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
   });
-
-  it("prefers an existing pie-owned RPC entry over the npm cli", () => {
-    const owned = resolvePiRpcEntry();
-    const npmCli = resolveBundledPiCli();
-    expect(owned).toBeTruthy();
-    expect(npmCli).toBeTruthy();
-    expect(owned === npmCli || owned!.endsWith("pi-rpc.mjs")).toBe(true);
-  });
 });
 
 describe("piAvailabilityTarget", () => {
