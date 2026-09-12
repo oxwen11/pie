@@ -1,4 +1,5 @@
 import type {
+  AgentToolResult,
   JsonAgentSessionEvent,
   RpcCommand,
   RpcExtensionUIRequest,
@@ -20,7 +21,11 @@ import type {
 //   • everything else                                 — a JsonAgentSessionEvent
 // The JSON shape intentionally omits cumulative message snapshots from
 // message_update; using the in-process AgentSessionEvent type hides that gap.
-export type AgentSessionEvent = JsonAgentSessionEvent;
+type ToolExecutionEndEvent = Extract<JsonAgentSessionEvent, { type: "tool_execution_end" }>;
+
+export type AgentSessionEvent =
+  | Exclude<JsonAgentSessionEvent, ToolExecutionEndEvent>
+  | (Omit<ToolExecutionEndEvent, "result"> & { readonly result: AgentToolResult<unknown> });
 
 export type {
   RpcCommand,
