@@ -28,7 +28,7 @@ export type AnySchema = Schema.Codec<unknown, unknown>;
  */
 export interface MigrationStep<S extends AnySchema> {
   readonly schema: S;
-  readonly migrate: (data: S["Type"]) => unknown;
+  migrate(data: S["Type"]): unknown;
 }
 
 /**

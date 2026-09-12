@@ -30,7 +30,6 @@ import {
 import type {
   RpcCommand,
   RpcExtensionUIResponse,
-  RpcResponse,
   RpcSessionState,
   RpcSlashCommand,
 } from "./rpc-types";
@@ -43,6 +42,18 @@ export type {
   RpcResponse,
   RpcSessionState,
 } from "./rpc-types";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isExtensionUiResponse(value: unknown): value is RpcExtensionUIResponse {
+  return isRecord(value) && value.type === "extension_ui_response" && typeof value.id === "string";
+}
+
+function isRpcCommand(value: unknown): value is RpcCommand {
+  return isRecord(value) && typeof value.type === "string";
+}
 
 /** Thrown after stdin is paused so the child can set `process.exitCode` and drain. */
 export class RpcChildExitError extends Error {
@@ -212,13 +223,16 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     setWidget(key: string, content: unknown, options?: ExtensionWidgetOptions): void {
       // Only support string arrays in RPC mode - factory functions are ignored
-      if (content === undefined || Array.isArray(content)) {
+      if (
+        content === undefined ||
+        (Array.isArray(content) && content.every((line) => typeof line === "string"))
+      ) {
         output({
           type: "extension_ui_request",
           id: crypto.randomUUID(),
           method: "setWidget",
           widgetKey: key,
-          widgetLines: content as string[] | undefined,
+          widgetLines: content,
           widgetPlacement: options?.placement,
         });
       }
@@ -244,8 +258,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     },
 
     async custom() {
-      // Custom UI not supported in RPC mode
-      return undefined as never;
+      throw new Error("Custom UI not supported in RPC mode");
     },
 
     pasteToEditor(text: string): void {
@@ -420,7 +433,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   registerSignalHandlers();
 
   // Handle a single command
-  const handleCommand = async (command: RpcCommand): Promise<RpcResponse | undefined> => {
+  const handleCommand = async (command: RpcCommand): Promise<RpcFrame | undefined> => {
     const id = command.id;
 
     switch (command.type) {
@@ -813,22 +826,21 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     }
 
     // Handle extension UI responses
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "type" in parsed &&
-      parsed.type === "extension_ui_response"
-    ) {
-      const response = parsed as RpcExtensionUIResponse;
-      const pending = pendingExtensionRequests.get(response.id);
+    if (isExtensionUiResponse(parsed)) {
+      const pending = pendingExtensionRequests.get(parsed.id);
       if (pending) {
-        pendingExtensionRequests.delete(response.id);
-        pending.resolve(response);
+        pendingExtensionRequests.delete(parsed.id);
+        pending.resolve(parsed);
       }
       return;
     }
 
-    const command = parsed as RpcCommand;
+    if (!isRpcCommand(parsed)) {
+      output(error(undefined, "parse", "Invalid command"));
+      await waitForRawStdoutBackpressure();
+      return;
+    }
+    const command = parsed;
     try {
       const response = await handleCommand(command);
       if (response) {

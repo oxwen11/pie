@@ -144,12 +144,16 @@ export function definePanelFamily<
   return definition;
 }
 
+function isRecord(raw: unknown): raw is Record<string, unknown> {
+  return typeof raw === "object" && raw !== null;
+}
+
 /**
  * The half of every `parse` that is the same everywhere: narrow a value read
  * back from storage to something whose fields can be checked.
  */
 export const asRecord = (raw: unknown): Record<string, unknown> | null =>
-  typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : null;
+  isRecord(raw) ? raw : null;
 
 /** Singleton and family collapse to this one line. */
 export function panelId<Payload>(

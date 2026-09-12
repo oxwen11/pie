@@ -21,24 +21,49 @@ export type DaemonRecord = {
   compatibilityKey?: string;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isCompatModule(value: unknown): value is {
+  resolveDaemonCompatibilityKey: (options: { cwd: string }) => string;
+} {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "resolveDaemonCompatibilityKey" in value &&
+    typeof value.resolveDaemonCompatibilityKey === "function"
+  );
+}
+
 export function readDaemonRecord(filePath: string): DaemonRecord {
-  const data = readJson(filePath) as Record<string, unknown>;
+  const data = readJson(filePath);
   if (
+    !isRecord(data) ||
     typeof data.pid !== "number" ||
     typeof data.address !== "string" ||
     typeof data.token !== "string"
   ) {
     throw new TypeError(`invalid daemon.pid at ${filePath}`);
   }
-  return data as DaemonRecord;
+  return {
+    pid: data.pid,
+    address: data.address,
+    token: data.token,
+    ...(typeof data.startedAt === "string" ? { startedAt: data.startedAt } : undefined),
+    ...(typeof data.compatibilityKey === "string"
+      ? { compatibilityKey: data.compatibilityKey }
+      : undefined),
+  };
 }
 
 export function redactDaemonRecord(src: string, dest: string): void {
-  const data = readJson(src) as Record<string, unknown>;
-  if (Object.hasOwn(data, "token")) {
-    data.token = "[redacted]";
+  const data = readJson(src);
+  if (!isRecord(data)) {
+    writeJson(dest, data);
+    return;
   }
-  writeJson(dest, data);
+  writeJson(dest, Object.hasOwn(data, "token") ? { ...data, token: "[redacted]" } : data);
 }
 
 export function ensureCoreBuilt(repo: string): void {
@@ -71,9 +96,10 @@ export function ensureServerBuilt(repo: string): void {
 
 export async function resolveCompatKey(repo: string): Promise<string> {
   const href = url.pathToFileURL(path.join(repo, "packages/core/dist/compatibility.mjs")).href;
-  const mod = (await import(href)) as {
-    resolveDaemonCompatibilityKey: (options: { cwd: string }) => string;
-  };
+  const mod: unknown = await import(href);
+  if (!isCompatModule(mod)) {
+    throw new TypeError(`invalid compatibility module at ${href}`);
+  }
   return mod.resolveDaemonCompatibilityKey({ cwd: repo });
 }
 

@@ -82,6 +82,25 @@ export interface ContentPanelOptions {
   readonly storage?: Storage;
 }
 
+function asTypedInstance<Payload, Extra extends object>(
+  handle: PanelHandle<unknown>,
+): PanelInstance<Payload, Extra> {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- registry erasure: the instance was created from this definition
+  return handle as PanelInstance<Payload, Extra>;
+}
+
+function isPayloadUpdater(value: unknown): value is (current: unknown) => unknown {
+  return typeof value === "function";
+}
+
+function objectFromPrototype(handle: PanelHandle<unknown>): object {
+  const proto: unknown = Object.create(handle);
+  if (typeof proto !== "object" || proto === null) {
+    throw new TypeError("Object.create returned a non-object");
+  }
+  return proto;
+}
+
 const STORAGE_NAME = "pie:content-panel";
 
 const EMPTY_SESSION: SessionPanels = { presentation: "hidden", activeId: null, panels: [] };
@@ -160,7 +179,7 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    return this.#openWith(sessionRef, definition, payloadArgs[0]) as PanelInstance<Payload, Extra>;
+    return asTypedInstance<Payload, Extra>(this.#openWith(sessionRef, definition, payloadArgs[0]));
   }
 
   /**
@@ -175,7 +194,8 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    const payload = payloadArgs[0] as Payload;
+    const [payload] = payloadArgs;
+    if (payload === undefined) return this.open(sessionRef, definition, ...payloadArgs);
     const nextId = panelId(definition, payload);
     const session = this.#sessionOf(sessionRef);
     const currentIndex = session.panels.findIndex((panel) => panel.id === currentId);
@@ -188,10 +208,9 @@ export class ContentPanel<View = unknown> {
           panel.id === currentId ? { id: nextId, type: definition.type, payload } : panel,
         ),
       });
-      const instance = this.#ensureInstance(sessionRef, nextId, definition) as PanelInstance<
-        Payload,
-        Extra
-      >;
+      const instance = asTypedInstance<Payload, Extra>(
+        this.#ensureInstance(sessionRef, nextId, definition),
+      );
       instance.reopen(payload);
       return instance;
     }
@@ -212,10 +231,9 @@ export class ContentPanel<View = unknown> {
           ),
     });
 
-    const instance = this.#ensureInstance(sessionRef, nextId, definition) as PanelInstance<
-      Payload,
-      Extra
-    >;
+    const instance = asTypedInstance<Payload, Extra>(
+      this.#ensureInstance(sessionRef, nextId, definition),
+    );
     if (targetIsOpen) instance.reopen(payload);
     return instance;
   }
@@ -334,6 +352,7 @@ export class ContentPanel<View = unknown> {
     for (const record of records) {
       const definition = this.#definitions.get(record.type);
       if (!definition) continue;
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.parse is the any-erasure slot
       const payload = definition.parse ? definition.parse(record.payload) : record.payload;
       if (payload === null) continue;
       // Arrow, so `this` is the host without aliasing it into the literal.
@@ -439,10 +458,7 @@ export class ContentPanel<View = unknown> {
               ...panel,
               // A payload that is itself callable can't be set functionally;
               // no panel has one, and the updater form is worth more.
-              payload:
-                typeof next === "function"
-                  ? (next as (p: unknown) => unknown)(panel.payload)
-                  : next,
+              payload: isPayloadUpdater(next) ? next(panel.payload) : next,
             }
           : panel,
       ),
@@ -458,6 +474,7 @@ export class ContentPanel<View = unknown> {
     const record = session.panels.find((panel) => panel.id === id);
     const definition = record ? this.#definitions.get(record.type) : undefined;
     if (record && definition?.onClose) {
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.parse is the any-erasure slot
       const payload = definition.parse ? definition.parse(record.payload) : record.payload;
       if (payload !== null) definition.onClose(sessionRef, payload);
     }
@@ -481,8 +498,9 @@ export class ContentPanel<View = unknown> {
     const handle = this.#createHandle(sessionRef, id);
     // Prototype-linked, not spread: `payload` is an accessor on the handle, and
     // copying it would freeze the value it had the moment the panel opened.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.create is the any-erasure slot
     const instance: PanelHandle<unknown> = definition.create
-      ? Object.assign(Object.create(handle) as PanelHandle<unknown>, definition.create(handle))
+      ? Object.assign(objectFromPrototype(handle), definition.create(handle))
       : handle;
     this.#instances.set(key, instance);
     return instance;

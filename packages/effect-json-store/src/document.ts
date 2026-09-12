@@ -4,6 +4,14 @@ import { type AnySchema, makeFileCodec, type MigrationStep } from "./codec";
 import type { JsonStoreEncodeError, JsonStoreLoadError, JsonStoreWriteError } from "./errors";
 import { getAtPath, type KeyPath, type KeyPathValue, setAtPath } from "./path";
 
+function isKeyPathValue<A, P extends string>(_value: unknown): _value is KeyPathValue<A, P> {
+  return true;
+}
+
+function isDocumentValue<A>(_value: unknown): _value is A {
+  return true;
+}
+
 export interface JsonDocument<A> {
   /** Current value from the in-memory cache; never fails. */
   readonly get: Effect.Effect<A>;
@@ -86,14 +94,9 @@ export const makeJsonDocument = <
   Effect.gen(function* () {
     type A = Latest["Type"];
     const { defaults, path: file, schema } = options;
-    const migrations = (options.migrations ?? []) as ReadonlyArray<MigrationStep<AnySchema>>;
+    const migrations = options.migrations ?? [];
     const fs = yield* FileSystem.FileSystem;
-    const codec = makeFileCodec(
-      fs,
-      schema,
-      migrations,
-      options.legacy as MigrationStep<AnySchema> | undefined,
-    );
+    const codec = makeFileCodec(fs, schema, migrations, options.legacy);
 
     const loadFromDisk: Effect.Effect<A, JsonStoreLoadError> = codec
       .load(file)
@@ -101,7 +104,9 @@ export const makeJsonDocument = <
         Effect.flatMap((value) =>
           value === undefined
             ? codec.save(file, defaults).pipe(Effect.as(defaults))
-            : Effect.succeed(value as A),
+            : isDocumentValue<A>(value)
+              ? Effect.succeed(value)
+              : Effect.die(new TypeError("json document codec returned an invalid value")),
         ),
       );
 
@@ -127,10 +132,24 @@ export const makeJsonDocument = <
       update,
       getKey: (key) =>
         Ref.get(ref).pipe(
-          Effect.map((value) => getAtPath(value, key) as KeyPathValue<A, typeof key>),
+          Effect.map((value) => {
+            const result = getAtPath(value, key);
+            if (!isKeyPathValue<A, typeof key>(result)) {
+              throw new TypeError(`invalid key path ${key}`);
+            }
+            return result;
+          }),
         ),
       setKey: (key, leaf) =>
-        Effect.asVoid(update((current) => setAtPath(current, key.split("."), leaf) as A)),
+        Effect.asVoid(
+          update((current) => {
+            const next = setAtPath(current, key.split("."), leaf);
+            if (!isDocumentValue<A>(next)) {
+              throw new TypeError(`invalid document after setKey ${key}`);
+            }
+            return next;
+          }),
+        ),
       load: semaphore.withPermit(loadFromDisk.pipe(Effect.tap((value) => Ref.set(ref, value)))),
     };
   });

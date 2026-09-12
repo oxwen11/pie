@@ -45,14 +45,21 @@ export type Surface = {
   stop: (runDir: string, meta: RunMeta | undefined) => Promise<void>;
 };
 
+function isSurfaceLaunch<S extends SurfaceId>(
+  ctx: LaunchCtx,
+  surface: S,
+): ctx is Extract<LaunchCtx, { surface: S }> {
+  return ctx.surface === surface;
+}
+
 export function expectLaunch<S extends SurfaceId>(
   ctx: LaunchCtx,
   surface: S,
 ): Extract<LaunchCtx, { surface: S }> {
-  if (ctx.surface !== surface) {
+  if (!isSurfaceLaunch(ctx, surface)) {
     throw new TypeError(`expected ${surface} launch ctx, got ${ctx.surface}`);
   }
-  return ctx as Extract<LaunchCtx, { surface: S }>;
+  return ctx;
 }
 
 export function parseLaunchArgs(

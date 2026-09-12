@@ -49,6 +49,9 @@ export type PiUiRequest = Extract<
 
 const BLOCKING_UI_METHODS = new Set(["confirm", "select", "input", "editor"]);
 
-export function isBlockingUiRequest(request: RpcExtensionUIRequest): request is PiUiRequest {
+export function isBlockingUiRequest(request: unknown): request is PiUiRequest {
+  if (typeof request !== "object" || request === null) return false;
+  if (!("type" in request) || request.type !== "extension_ui_request") return false;
+  if (!("method" in request) || typeof request.method !== "string") return false;
   return BLOCKING_UI_METHODS.has(request.method);
 }

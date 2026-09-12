@@ -125,10 +125,8 @@ export function partsInTimeZone(ms: number, timeZone: string): WallClock {
   const value = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((part) => part.type === type)?.value ?? "";
   const weekdayName = value("weekday");
-  const weekday =
-    weekdayName in WEEKDAY_INDEX
-      ? WEEKDAY_INDEX[weekdayName as keyof typeof WEEKDAY_INDEX]
-      : undefined;
+  const isWeekday = (name: string): name is keyof typeof WEEKDAY_INDEX => name in WEEKDAY_INDEX;
+  const weekday = isWeekday(weekdayName) ? WEEKDAY_INDEX[weekdayName] : undefined;
   if (weekday === undefined) {
     throw new CronError("INVALID_TIMEZONE", `could not read weekday in ${timeZone}`);
   }

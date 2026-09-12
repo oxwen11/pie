@@ -39,6 +39,17 @@ type PendingRequest = {
   readonly settle: (response: AgentResponse) => unknown;
 };
 
+function isRpcExtensionUIResponse(value: unknown): value is RpcExtensionUIResponse {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "extension_ui_response" &&
+    "id" in value &&
+    typeof value.id === "string"
+  );
+}
+
 type PiTurnState =
   | { readonly _tag: "Idle" }
   | {
@@ -377,9 +388,9 @@ export const makePiProcessWithDependencies = <R>(
         declineUiResponse(request),
       ).pipe(
         Effect.flatMap((result) =>
-          session.transport
-            .respondUi(result as RpcExtensionUIResponse)
-            .pipe(Effect.catch(() => Effect.void)),
+          isRpcExtensionUIResponse(result)
+            ? session.transport.respondUi(result).pipe(Effect.catch(() => Effect.void))
+            : Effect.void,
         ),
       );
 

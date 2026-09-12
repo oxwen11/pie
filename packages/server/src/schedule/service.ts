@@ -70,8 +70,14 @@ export const ScheduleServiceLayer: Layer.Layer<
       Context.add(ScheduleRuntime, runtime),
     );
     // Shape stays R-free. Modules yield* services; this seam provides them.
-    const provide = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
-      effect.pipe(Effect.provide(env)) as Effect.Effect<A, E>;
+    type ScheduleEnv =
+      | ScheduleRepository
+      | ProjectService
+      | PiAgentSessionService
+      | Crypto.Crypto
+      | ScheduleRuntime;
+    const provide = <A, E>(effect: Effect.Effect<A, E, ScheduleEnv>): Effect.Effect<A, E> =>
+      effect.pipe(Effect.provide(env));
     return {
       list: () => provide(mutations.list()),
       get: (id) => provide(mutations.get(id)),

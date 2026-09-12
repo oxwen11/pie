@@ -1,5 +1,4 @@
 import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
 
 export function listenServer(server: Server, port: number): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -9,7 +8,12 @@ export function listenServer(server: Server, port: number): Promise<number> {
     };
     const onListening = () => {
       server.off("error", onError);
-      resolve((server.address() as AddressInfo).port);
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        reject(new Error("Server is not listening on a TCP port"));
+        return;
+      }
+      resolve(address.port);
     };
 
     server.once("error", onError);
