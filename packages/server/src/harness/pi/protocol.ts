@@ -12,7 +12,7 @@ import type {
 // Pi's RPC wire protocol (JSON lines over stdio). The child is pie-owned
 // (`harness/pi/rpc`); types still come from the published package because they
 // match the vendored command table at the current pin. All imports here are
-// type-only. The RPC child process is the only path for sessions; model
+// type-only. pie-pi-process is the only path for sessions; model
 // catalog lookup (`list-available-models.ts`) uses the library in-process.
 //
 // stdout frames:

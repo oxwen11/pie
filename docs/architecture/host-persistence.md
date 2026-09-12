@@ -312,8 +312,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches a pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, Bun) with the session cwd
-and optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)
+with the session cwd and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie

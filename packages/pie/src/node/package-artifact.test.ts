@@ -8,6 +8,13 @@ import { Effect, FileSystem } from "effect";
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
 layer(NodeFileSystem.layer)("published CLI bundle", (it) => {
+  it.effect("ships pie-pi-process beside the CLI entry", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.access(fromModuleUrl("../../dist/pi-process/pi-process.js"));
+    }),
+  );
+
   it.effect("ships the complete web UI beside the CLI entry", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
