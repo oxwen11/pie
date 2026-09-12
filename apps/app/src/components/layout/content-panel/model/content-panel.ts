@@ -508,7 +508,9 @@ export class ContentPanel<View = unknown> {
       activate: () => this.activate(sessionRef, id),
       close: () => this.close(sessionRef, id),
       setPayload: (next) => this.#setPayload(sessionRef, id, next),
-      reopen: () => {},
+      reopen: () => {
+        /* default handle: a second open is a no-op unless the family overrides */
+      },
     };
   }
 }

@@ -28,7 +28,11 @@ export function startThemeSync(preference: ThemePreference): () => void {
 
   applyTheme();
 
-  if (preference !== "system") return () => {};
+  if (preference !== "system") {
+    return () => {
+      /* non-system preference has no media-query subscription to drop */
+    };
+  }
 
   systemTheme.addEventListener("change", applyTheme);
   return () => systemTheme.removeEventListener("change", applyTheme);

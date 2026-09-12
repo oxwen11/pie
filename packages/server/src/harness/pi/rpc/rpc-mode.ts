@@ -179,7 +179,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     onTerminalInput(): () => void {
       // Raw terminal input not supported in RPC mode
-      return () => {};
+      return () => {
+        /* RPC mode has no raw terminal input stream to detach */
+      };
     },
 
     setStatus(key: string, text: string | undefined): void {
@@ -767,7 +769,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
    * Check if shutdown was requested and perform shutdown if so.
    * Called after handling each command when waiting for the next command.
    */
-  let detachInput = () => {};
+  let detachInput = () => {
+    /* assigned once stdin listeners are attached */
+  };
 
   async function shutdown(exitCode = 0, signal?: NodeJS.Signals): Promise<never> {
     if (shuttingDown) {
@@ -861,5 +865,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   })();
 
   // Keep process alive forever
-  return new Promise(() => {});
+  return new Promise(() => {
+    /* the child stays alive until shutdown() exits the process */
+  });
 }

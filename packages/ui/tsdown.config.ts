@@ -7,5 +7,7 @@ export default defineConfig({
   platform: "browser",
   unbundle: true,
   tsconfig: true,
-  external: [/react/, /react\/.*/],
+  deps: {
+    neverBundle: [/react/, /react\/.*/],
+  },
 });

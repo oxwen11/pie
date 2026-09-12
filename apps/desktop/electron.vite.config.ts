@@ -72,7 +72,7 @@ export default defineConfig({
   preload: {
     build: {
       outDir: "dist/preload",
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: "src/preload/index.ts" },
         // A sandboxed renderer receives the MessagePort through a CommonJS preload.
         output: {
@@ -114,7 +114,7 @@ export default defineConfig({
     ],
     build: {
       outDir: "dist/renderer",
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: url.fileURLToPath(new URL("./src/renderer/index.html", import.meta.url)),
         },
