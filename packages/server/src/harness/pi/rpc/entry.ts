@@ -10,6 +10,9 @@
 import path from "node:path";
 import url from "node:url";
 
+import type { CreateAgentSessionRuntimeFactory } from "@earendil-works/pi-coding-agent";
+
+import { piBashExtension } from "../bash";
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -20,10 +23,7 @@ import {
   resolveCliModel,
   SessionManager,
   SettingsManager,
-  type CreateAgentSessionRuntimeFactory,
-} from "@earendil-works/pi-coding-agent";
-
-import { piBashExtension } from "../bash";
+} from "../pi-sdk";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
 type HttpDispatcher = {
