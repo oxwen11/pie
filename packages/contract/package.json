@@ -11,6 +11,7 @@
     "./git": "./src/git.ts",
     "./project": "./src/project.ts",
     "./pull-request": "./src/pull-request.ts",
+    "./resource-monitoring": "./src/resource-monitoring.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts",
