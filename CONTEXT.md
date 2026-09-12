@@ -45,11 +45,14 @@ The sole owner of live session state: the table of sessions keyed by ref (each `
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
-`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned Pi RPC child (`dist/pi-rpc.mjs`, JSONL over stdio). The child still hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, JSONL over stdio, bun-build). The child still hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
-**PIE_PI_RUNTIME**:
-Optional host runtime for that child: unset / `node` (default) keeps today's Node path (`process.execPath` + `dist/pi-rpc.mjs`). `bun` looks up `bun` on the user's PATH — pie does not ship Bun — and spawns `bun <entry> --mode rpc …`. Missing Bun fails availability (`"Bun was not found on PATH…"`). Restart the daemon after flipping. To A/B memory, open the same kind of real session with the toggle on vs off and compare the child's RSS/PSS (`ps`, Activity Monitor); lab idle figures are not a production claim once MCP/tools attach.
-_Avoid_: bundling Bun in desktop/asar; spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim; using a user-installed `pi` as the RPC child
+**Pi RPC child**:
+Always Bun: `bun <pi-rpc.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
+
+**PIE_DAEMON_RUNTIME**:
+Desktop-only switch for the _daemon_ (not the Pi child). Unset / `node` (default) keeps Electron-as-Node (`Pie Helper` + `server.mjs`). `bun` spawns `PIE_BUN` or PATH `bun` + `server.mjs` and does not set `ELECTRON_RUN_AS_NODE`. Restart the app and stop any existing daemon (`pie daemon stop`) after flipping — attach would otherwise reuse the previous runtime. Use this to A/B daemon RSS.
+_Avoid_: spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim; using a user-installed `pi` as the RPC child; a Node spawn path for this child; leaving a Node daemon running when measuring the bun switch
 
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.

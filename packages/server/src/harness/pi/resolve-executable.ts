@@ -12,15 +12,28 @@ export type PiExecutable = {
   readonly prefixArgs: ReadonlyArray<string>;
 };
 
-/** Host runtime for the Pi RPC child. Default is Node (shebang / `process.execPath`). */
-export type PiRuntime = "node" | "bun";
-
 export type ResolvePiExecutableOptions = {
   /** Test seam — production uses {@link resolvePiRpcEntry}. */
   readonly resolveBundledCli?: () => string | undefined;
 };
 
 const JS_CLI_ENTRY = /\.[cm]?js$/i;
+
+const ASAR_SEGMENT = `${path.sep}app.asar${path.sep}`;
+const ASAR_UNPACKED_SEGMENT = `${path.sep}app.asar.unpacked${path.sep}`;
+
+/**
+ * Electron's `import.meta.resolve` reports paths inside `app.asar` even when
+ * electron-builder unpacked the file. Electron can read that virtual path;
+ * Bun cannot. Map to the real `app.asar.unpacked` sibling.
+ */
+function asarUnpackedPath(filePath: string): string {
+  const index = filePath.indexOf(ASAR_SEGMENT);
+  if (index === -1) return filePath;
+  return (
+    filePath.slice(0, index) + ASAR_UNPACKED_SEGMENT + filePath.slice(index + ASAR_SEGMENT.length)
+  );
+}
 
 const existingFile = (pathname: string | undefined): string | undefined => {
   if (pathname === undefined) return undefined;
@@ -47,14 +60,6 @@ export function resolvePiRpcEntry(): string | undefined {
   return resolvedPackageFile("@getpie/server/pi-rpc") ?? resolvedPackageFile("@getpie/cli/pi-rpc");
 }
 
-/**
- * `PIE_PI_RUNTIME=bun` selects Bun; unset, `node`, and any other value keep
- * the default Node spawn path. Case-insensitive.
- */
-export function parsePiRuntime(value: string | undefined): PiRuntime {
-  return value?.trim().toLowerCase() === "bun" ? "bun" : "node";
-}
-
 export function isBunCommand(command: string): boolean {
   const base = path.basename(command).toLowerCase();
   return base === "bun" || base === "bun.exe";
@@ -70,16 +75,14 @@ function resolvePiCliScript(
 }
 
 /**
- * Pick the Pi binary for this process. Priority:
- * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1` (ignores `PIE_PI_RUNTIME`)
- * 2. `PIE_PI_RUNTIME=bun` → `bun <entry>` (owned `pi-rpc.mjs`, or a `.js` /
- *    `.mjs` / `.cjs` `PIE_PI_EXECUTABLE`; never a shebang binary)
- * 3. `PIE_PI_EXECUTABLE`
- * 4. pie-owned `dist/pi-rpc.mjs` via Node (`process.execPath`)
+ * Pick the Pi RPC child. Priority:
+ * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1`
+ * 2. `bun <entry>` — `PIE_BUN` if that path exists, else PATH `bun`. Entry is
+ *    a `.js` / `.mjs` / `.cjs` `PIE_PI_EXECUTABLE` or the pie-owned bun-build.
+ *    Packaged desktop rewrites `app.asar` → `app.asar.unpacked` because Bun
+ *    cannot read an asar; extraResources copies sit outside asar.
  *
- * Bun is resolved from the user's PATH at spawn / availability time — pie
- * does not ship it. There is no PATH `pi` or npm `cli.js` fallback: the child
- * protocol is pie-owned and a user CLI would drift.
+ * There is no Node spawn path and no PATH `pi` fallback.
  */
 export function resolvePiExecutable(
   env: NodeJS.ProcessEnv = process.env,
@@ -89,24 +92,11 @@ export function resolvePiExecutable(
     return { command: env.PIE_E2E_PI_EXECUTABLE, prefixArgs: [] };
   }
 
-  const resolveBundled = options.resolveBundledCli ?? resolvePiRpcEntry;
-
-  if (parsePiRuntime(env.PIE_PI_RUNTIME) === "bun") {
-    const script = resolvePiCliScript(env, resolveBundled);
-    return { command: "bun", prefixArgs: script === undefined ? [] : [script] };
-  }
-
-  const explicit = env.PIE_PI_EXECUTABLE?.trim();
-  if (explicit) {
-    return { command: explicit, prefixArgs: [] };
-  }
-
-  const bundled = resolveBundled();
-  if (bundled) {
-    return { command: process.execPath, prefixArgs: [bundled] };
-  }
-
-  return { command: process.execPath, prefixArgs: [] };
+  const script = resolvePiCliScript(env, options.resolveBundledCli ?? resolvePiRpcEntry);
+  return {
+    command: existingFile(env.PIE_BUN?.trim()) ?? "bun",
+    prefixArgs: script === undefined ? [] : [asarUnpackedPath(script)],
+  };
 }
 
 /** What `availability` should stat or PATH-search. */
@@ -114,10 +104,8 @@ export function piAvailabilityTarget(executable: PiExecutable): string {
   return executable.prefixArgs[0] ?? executable.command;
 }
 
-const BUN_MISSING_REASON = "Bun was not found on PATH. Install Bun or unset PIE_PI_RUNTIME.";
-const BUN_CLI_MISSING_REASON =
-  "Pi RPC entry was not found. PIE_PI_RUNTIME=bun needs the script entry, not a shebang binary.";
-const RPC_ENTRY_MISSING_REASON = "Pie's Pi RPC entry is missing.";
+const BUN_MISSING_REASON = "Bun was not found. Install Bun.";
+const BUN_CLI_MISSING_REASON = "Pi RPC entry was not found.";
 
 export const checkPiAvailability = (
   executable: PiExecutable,
@@ -145,22 +133,6 @@ export const checkPiAvailability = (
       return { available: false, reason: BUN_CLI_MISSING_REASON };
     }
 
-    // Owned / npm Pi is a JS entry run under Node — npm does not mark it +x.
-    if (executable.prefixArgs.length > 0) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- prefixArgs.length > 0 was checked
-      const script = executable.prefixArgs[0] as string;
-      const fileSystem = yield* FileSystem.FileSystem;
-      const info = yield* fileSystem.stat(script).pipe(Effect.option);
-      if (info._tag === "Some" && info.value.type === "File") {
-        return { available: true };
-      }
-      return { available: false, reason: RPC_ENTRY_MISSING_REASON };
-    }
-
-    if (executable.command === process.execPath) {
-      return { available: false, reason: RPC_ENTRY_MISSING_REASON };
-    }
-
     const found = yield* findExecutable(executable.command, deps);
-    return found ? { available: true } : { available: false, reason: RPC_ENTRY_MISSING_REASON };
+    return found ? { available: true } : { available: false, reason: BUN_MISSING_REASON };
   });

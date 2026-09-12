@@ -300,7 +300,7 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches a pie-owned Pi RPC child (`dist/pi-rpc.mjs`) with the session cwd
+Pie launches a pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, Bun) with the session cwd
 and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
