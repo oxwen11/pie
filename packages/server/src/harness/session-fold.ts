@@ -43,9 +43,9 @@ const EVICT_TO_BYTES = Math.floor(MAX_BUFFERED_BYTES * 0.75);
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */
 const chunkBytes = (chunk: WireChunk): number => {
-  const delta = (chunk as { delta?: unknown }).delta;
+  const delta = "delta" in chunk ? chunk.delta : undefined;
   if (typeof delta === "string") return delta.length + 32;
-  const text = (chunk as { text?: unknown }).text;
+  const text = "text" in chunk ? chunk.text : undefined;
   if (typeof text === "string") return text.length + 32;
   try {
     return JSON.stringify(chunk).length;
@@ -137,8 +137,8 @@ export const toWireBody = (
 };
 
 const startChunkMessageId = (chunk: WireChunk): string | null =>
-  chunk.type === "start" && typeof (chunk as { messageId?: unknown }).messageId === "string"
-    ? (chunk as { messageId: string }).messageId
+  chunk.type === "start" && "messageId" in chunk && typeof chunk.messageId === "string"
+    ? chunk.messageId
     : null;
 
 // In-place append under the caps (see the ActiveTurn comment); overflow evicts

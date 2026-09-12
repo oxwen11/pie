@@ -27,6 +27,9 @@ describe("redactDaemonRecord", () => {
       token: "[redacted]",
       compatibilityKey: "githash:d1fb9004",
     });
-    expect((readJson(src) as Record<string, unknown>).token).toBe("secret-token");
+    const srcRecord = readJson(src);
+    expect(
+      srcRecord && typeof srcRecord === "object" && "token" in srcRecord && srcRecord.token,
+    ).toBe("secret-token");
   });
 });

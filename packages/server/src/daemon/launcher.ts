@@ -338,11 +338,12 @@ const spawnDaemon = (
     // nothing can ever attach to it or stop it, and the next launch spawns a
     // second daemon beside it. A successor that recovers the launch lock polls
     // a live, same-key record for the remainder of this readiness window.
+    const startedAt = yield* Clock.currentTimeMillis;
     const record: DaemonRecord = {
       pid,
       address,
       token,
-      startedAt: yield* Clock.currentTimeMillis,
+      startedAt,
       compatibilityKey: options.requiredCompatibilityKey,
     };
     yield* writeRecord(daemonDir, record).pipe(

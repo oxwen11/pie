@@ -37,12 +37,19 @@ export type DesktopRunMeta = RunMetaBase & {
 
 export type RunMeta = WebRunMeta | CliRunMeta | DesktopRunMeta;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function writeRunMeta(filePath: string, meta: RunMeta): void {
   writeJson(filePath, meta);
 }
 
 export function readRunMeta(filePath: string): RunMeta {
-  const data = readJson(filePath) as Record<string, unknown>;
+  const data = readJson(filePath);
+  if (!isRecord(data)) {
+    throw new TypeError(`invalid run meta in ${filePath}`);
+  }
   const surface = data.surface;
   switch (surface) {
     case "web":
@@ -64,14 +71,21 @@ export function tryReadRunMeta(filePath: string): RunMeta | undefined {
   }
 }
 
+function isSurfaceMeta<S extends SurfaceId>(
+  meta: RunMeta,
+  surface: S,
+): meta is Extract<RunMeta, { surface: S }> {
+  return meta.surface === surface;
+}
+
 export function expectMeta<S extends SurfaceId>(
   meta: RunMeta,
   surface: S,
 ): Extract<RunMeta, { surface: S }> {
-  if (meta.surface !== surface) {
+  if (!isSurfaceMeta(meta, surface)) {
     throw new TypeError(`expected ${surface} meta, got ${meta.surface}`);
   }
-  return meta as Extract<RunMeta, { surface: S }>;
+  return meta;
 }
 
 export function patchRunMeta<S extends SurfaceId>(

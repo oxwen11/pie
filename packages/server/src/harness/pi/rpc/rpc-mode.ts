@@ -74,8 +74,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
       return { id, type: "response", command, success: true } as RpcResponse;
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
     return { id, type: "response", command, success: true, data } as RpcResponse;
   };
 
@@ -245,6 +247,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     async custom() {
       // Custom UI not supported in RPC mode
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ExtensionUIContext.custom is typed Promise<T>
       return undefined as never;
     },
 
@@ -819,6 +822,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       "type" in parsed &&
       parsed.type === "extension_ui_response"
     ) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already === "extension_ui_response"
       const response = parsed as RpcExtensionUIResponse;
       const pending = pendingExtensionRequests.get(response.id);
       if (pending) {
@@ -828,6 +832,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return;
     }
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL command; handleCommand switches on type
     const command = parsed as RpcCommand;
     try {
       const response = await handleCommand(command);

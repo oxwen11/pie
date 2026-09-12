@@ -15,9 +15,14 @@ export function describeModelError(rawMessage: string): ModelErrorDetails {
 
   try {
     const payload: unknown = JSON.parse(body);
-    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-      const record = payload as Record<string, unknown>;
-      if (typeof record.message === "string") message = record.message;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      !Array.isArray(payload) &&
+      "message" in payload &&
+      typeof payload.message === "string"
+    ) {
+      message = payload.message;
     }
   } catch {
     // Some providers return plain text after the HTTP status.

@@ -108,6 +108,7 @@ export function FileTreeAdapter({
       return;
     }
     event.preventDefault();
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- isOpenableTreeEntry already proved focusedPath is a tree file path
     onOpenFile(focusedPath as string);
   };
 
