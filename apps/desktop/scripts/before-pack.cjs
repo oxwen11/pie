@@ -4,7 +4,6 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-/** Pin the current latest Bun. Bump when shipping a newer runtime. */
 const BUN_VERSION = "bun-v1.4.2";
 
 const VENDOR_DIR = path.join(__dirname, "..", "vendor");
@@ -19,11 +18,10 @@ function bunDownloadName(platform, arch) {
   throw new Error(`Unsupported Bun target: ${platform}-${arch}`);
 }
 
-function curl(...args) {
-  return execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
+const curl = (...args) =>
+  execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
     encoding: "utf8",
   });
-}
 
 function downloadBun(platform, arch) {
   const name = bunDownloadName(platform, arch);
@@ -34,23 +32,19 @@ function downloadBun(platform, arch) {
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bun-"));
   try {
-    const zipUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/${name}.zip`;
-    const sumUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/SHASUMS256.txt`;
+    const releaseUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}`;
     const zipPath = path.join(tmp, `${name}.zip`);
 
     console.log(`Downloading ${BUN_VERSION} ${name}…`);
-    curl("-o", zipPath, zipUrl);
+    curl("-o", zipPath, `${releaseUrl}/${name}.zip`);
 
-    const expected = curl(sumUrl)
+    const expected = curl(`${releaseUrl}/SHASUMS256.txt`)
       .split("\n")
       .find((line) => line.includes(`${name}.zip`))
       ?.split(/\s+/)[0];
-    if (!expected) {
-      throw new Error(`No checksum for ${name}.zip`);
-    }
     const actual = crypto.createHash("sha256").update(fs.readFileSync(zipPath)).digest("hex");
-    if (actual !== expected) {
-      throw new Error(`Checksum mismatch for ${name}.zip`);
+    if (!expected || actual !== expected) {
+      throw new Error(`Checksum verification failed for ${name}.zip`);
     }
 
     execFileSync("unzip", ["-o", zipPath, "-d", tmp], { stdio: "pipe" });
@@ -64,7 +58,6 @@ function downloadBun(platform, arch) {
   }
 }
 
-/** electron-builder hook: vendor the target Bun binary. */
 exports.default = function beforePack(context) {
   const arch = ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch];
   downloadBun(context.electronPlatformName, arch);
