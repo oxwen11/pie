@@ -8,6 +8,21 @@ import { Effect, FileSystem } from "effect";
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
 layer(NodeFileSystem.layer)("published CLI bundle", (it) => {
+  it.effect("ships the complete Pi runtime at the exported entry path", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const sourceDir = fromModuleUrl("../../../server/dist/pi-rpc");
+      const runtimeDir = fromModuleUrl("../../dist/pi-rpc");
+      const [sourceEntries, runtimeEntries] = yield* Effect.all([
+        fs.readDirectory(sourceDir, { recursive: true }),
+        fs.readDirectory(runtimeDir, { recursive: true }),
+      ]);
+
+      assert.deepEqual(Array.from(runtimeEntries).sort(), Array.from(sourceEntries).sort());
+      yield* fs.access(url.fileURLToPath(import.meta.resolve("@getpie/cli/pi-rpc")));
+    }),
+  );
+
   it.effect("ships the complete web UI beside the CLI entry", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

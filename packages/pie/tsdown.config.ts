@@ -14,7 +14,8 @@ export default defineConfig({
     },
     {
       from: "../server/dist/pi-rpc",
-      to: "dist/pi-rpc",
+      to: "dist",
+      rename: "pi-rpc",
     },
   ],
   deps: {
