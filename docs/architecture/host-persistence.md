@@ -212,6 +212,54 @@ The daemon directory itself uses normal mkdir/umask behavior.
 Stopping Desktop does not stop or delete the detached daemon, its state, or its
 logs.
 
+## Proposed resource diagnostics (not implemented)
+
+[Resource monitoring design](../design/resource-monitoring.md) proposes independent
+sidecar OS sampling and separate runtime writers. This is a **pending host-write
+review**, not a change to the current log inventory above. The user has confirmed
+**default-on at process startup**: an unset `PIE_RESOURCE_LOGGING` or `1` enables
+monitoring; `0` disables it. Module imports and unit-test construction do not
+implicitly start writers. The [code architecture proposal](../design/resource-monitoring-code-architecture.md)
+locates the process composition and shared writer modules.
+
+| Proposed path                                                     | Owner / scope                                                                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `$PIE_HOME/logs/resources/os/<UTC-created-at>.jsonl`              | Sidecar; relevant local process OS samples                                                                                                                               |
+| `$PIE_HOME/logs/resources/daemon/<UTC-created-at>.jsonl`          | Daemon or foreground server; its runtime memory and event-loop samples                                                                                                   |
+| `$PIE_HOME/logs/resources/electron/<UTC-created-at>.jsonl`        | Electron main; runtime memory and Electron process metrics                                                                                                               |
+| `$PIE_HOME/logs/resources/{os,daemon,electron}/.writer.lock`      | Proposed per-source exclusive writer/cleanup ownership: Rust platform file lock for os, SQLite BEGIN IMMEDIATE in each TS file worker for daemon/electron; not telemetry |
+| `$PIE_HOME/logs/resources/{daemon,electron}/.writer.lock-journal` | Possible bounded SQLite rollback-journal metadata; same owner-only permissions as the lock; no WAL or metric database                                                    |
+
+Roots would be derived only from `config/paths.ts` / `Paths.logsDir`, retaining
+existing `PIE_HOME` override rules. The proposal uses date-named JSONL, no runId
+subdirectories, exclusive file creation, owner-only directory/file permissions,
+versioned numeric/process-identity records, per-file retention headers and
+sample-completeness markers, and no commands, content, paths, or credentials.
+The optimized proposal admits at most one sample round in flight (1 MiB encoded),
+keeps the whole round in one JSONL file, and skips new rounds while busy instead
+of queuing history. Explicit partial coverage and end markers remain necessary:
+one submission is not an atomic disk transaction. Business logs remain unchanged.
+
+The user has confirmed seven-day maximum retention with expiry deletion and
+rolling logs: 16 MiB per file, 64 MiB per source (192 MiB total JSONL). Writers
+evict the oldest closed files and continue writing; normal budget exhaustion
+must not disable logging. File headers track the earliest permitted sample time,
+not mtime, so appends/touch cannot extend retention. Known-name files with invalid
+retention headers are conservatively evicted. Writer errors retry automatically;
+external files, lock metadata and filesystem overhead are not a disk-wide quota.
+Whole-round rotation can leave less than 1 MiB unused at the end of a file;
+this trades packing efficiency for simpler retention and reading.
+
+Cleanup runs only while the source is enabled and owns its lock, with startup
+cleanup before new writes; it cannot delete on schedule during shutdown, sleep,
+logging disablement or I/O failure. The proposed timing defaults, per-source lock
+backends/metadata, non-owner behavior, permissions, compatibility, corrupt/newer-data
+handling, shutdown behavior and uninstall policy are specified in design sections
+3–9 and require confirmation under section 12 before implementation. Older
+releases ignore this new subtree; no business-data or Pi-transcript migration is
+proposed. Inventory status changes to shipped only in the slice that actually
+enables the corresponding verified host writes, not in the contracts-only slice.
+
 ## Browser-owned state
 
 Browser storage is scoped by origin. The web development/served origins and the
