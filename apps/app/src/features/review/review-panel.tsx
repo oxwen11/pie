@@ -94,7 +94,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   });
   const branchData = branch.data;
   const repositoryBranch = isGitRepositoryBranch(branchData) ? branchData : undefined;
-  const defaultBranch = repositoryBranch?.defaultBranch;
+  const defaultBranch = repositoryBranch?.defaultBranch ?? undefined;
   const other = reviewCompareOther(mode, instance.payload.other, defaultBranch);
   const review = useQuery(
     orpcQueryUtils.git.review.queryOptions({

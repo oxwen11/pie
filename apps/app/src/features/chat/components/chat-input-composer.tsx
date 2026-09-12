@@ -42,7 +42,8 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
-  const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
+  const currentBranch =
+    branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
