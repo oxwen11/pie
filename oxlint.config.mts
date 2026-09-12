@@ -90,6 +90,7 @@ export default defineConfig({
       },
     ],
     "pie/node-import-style": "error",
+    "pie/no-node-modules-import": "error",
     "pie/no-restricted-disable": "error",
     "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
     "import/no-mutable-exports": "error",
