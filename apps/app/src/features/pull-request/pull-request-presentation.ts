@@ -9,7 +9,7 @@ import type {
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 
-export type PullRequestSessionState = "open" | "draft" | "closed" | "merged";
+type PullRequestSessionState = "open" | "draft" | "closed" | "merged";
 
 export function samePullRequestRef(left: PullRequestRef, right: PullRequestRef): boolean {
   return (

@@ -91,7 +91,7 @@ export function formatRunReason(reason: ScheduleRunReason): string {
   return "Scheduled";
 }
 
-export type ScheduleRunSummary = {
+type ScheduleRunSummary = {
   readonly running: number;
   readonly succeeded: number;
   readonly failed: number;
