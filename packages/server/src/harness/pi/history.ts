@@ -89,31 +89,9 @@ function userParts(message: PiUserMessage): PiUIMessagePart[] {
   return parts;
 }
 
-function isPiToolPart(part: { type: string }): part is PiToolPart {
-  return part.type.startsWith("tool-") && part.type !== "dynamic-tool";
-}
-
-type NamedToolPartExtra =
-  | { readonly state: "input-available"; readonly input: unknown }
-  | { readonly state: "output-error"; readonly input: unknown; readonly errorText: string }
-  | { readonly state: "output-available"; readonly input: unknown; readonly output: unknown };
-
-function namedToolPart(call: PendingCall, extra: NamedToolPartExtra): PiToolPart {
-  const part = {
-    type: `tool-${call.toolName}`,
-    toolCallId: call.toolCallId,
-    providerExecuted: true as const,
-    ...extra,
-  };
-  if (!isPiToolPart(part)) {
-    throw new TypeError(`invalid pi tool part type: ${part.type}`);
-  }
-  return part;
-}
-
 // The tool name arrives as a runtime string, so the correlated `tool-<name>` ×
 // input union can't be constructed literally; disk data can't prove the
-// correlation anyway (inputs are untyped JSON).
+// correlation anyway (inputs are untyped JSON), hence the single cast.
 function callPart(call: PendingCall): PiUIMessagePart {
   if (isDynamicPiTool(call.toolName)) {
     return {
@@ -125,7 +103,14 @@ function callPart(call: PendingCall): PiUIMessagePart {
       providerExecuted: true,
     } satisfies PiDynamicToolPart;
   }
-  return namedToolPart(call, { state: "input-available", input: call.input });
+  return {
+    type: `tool-${call.toolName}`,
+    toolCallId: call.toolCallId,
+    state: "input-available",
+    input: call.input,
+    providerExecuted: true,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
+  } as PiToolPart;
 }
 
 function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessagePart {
@@ -133,40 +118,30 @@ function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessage
   // sibling of `tool_execution_end.result` — the output stays result-shaped.
   // oxlint-disable-next-line typescript/no-unsafe-assignment -- Pi toolResult content/details are untyped JSON
   const output = { content: result.content, details: result.details };
-  if (isDynamicPiTool(call.toolName)) {
-    if (result.isError) {
-      return {
-        type: "dynamic-tool",
-        toolName: call.toolName,
-        toolCallId: call.toolCallId,
-        providerExecuted: true,
-        state: "output-error",
+  const settled = result.isError
+    ? {
+        state: "output-error" as const,
         input: call.input,
         errorText: toolResultText(output) || "Tool execution failed",
-      } satisfies PiDynamicToolPart;
-    }
+      }
+    : { state: "output-available" as const, input: call.input, output };
+  if (isDynamicPiTool(call.toolName)) {
     return {
       type: "dynamic-tool",
       toolName: call.toolName,
       toolCallId: call.toolCallId,
       providerExecuted: true,
-      state: "output-available",
-      input: call.input,
-      output,
-    } satisfies PiDynamicToolPart;
+      ...settled,
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- settled output is untyped JSON; live path uses the same PiDynamicToolPart cast
+    } as PiDynamicToolPart;
   }
-  if (result.isError) {
-    return namedToolPart(call, {
-      state: "output-error" as const,
-      input: call.input,
-      errorText: toolResultText(output) || "Tool execution failed",
-    });
-  }
-  return namedToolPart(call, {
-    state: "output-available" as const,
-    input: call.input,
-    output,
-  });
+  return {
+    type: `tool-${call.toolName}`,
+    toolCallId: call.toolCallId,
+    providerExecuted: true,
+    ...settled,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
+  } as PiToolPart;
 }
 
 /**
