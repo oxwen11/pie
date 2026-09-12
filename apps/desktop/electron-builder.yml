@@ -22,8 +22,8 @@ asarUnpack:
 # pi-rpc.js comes from @getpie/server#build (bun-build, outside asar).
 beforePack: scripts/before-pack.cjs
 extraResources:
-  - from: vendor/bun
-    to: vendor/bun
+  - from: vendor
+    to: vendor
   - from: ../../packages/server/dist/pi-rpc
     to: pi-rpc
 icon: resources/icon.png

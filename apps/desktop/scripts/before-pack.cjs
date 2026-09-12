@@ -8,7 +8,7 @@ const path = require("node:path");
 const BUN_VERSION = "bun-v1.4.2";
 
 const DESKTOP_DIR = path.join(__dirname, "..");
-const VENDOR_BUN = path.join(DESKTOP_DIR, "vendor", "bun");
+const VENDOR_DIR = path.join(DESKTOP_DIR, "vendor");
 
 function bunDownloadName(platform, arch) {
   if (platform === "darwin" && arch === "arm64") return "bun-darwin-aarch64";
@@ -83,5 +83,9 @@ function downloadBun(platform, arch, destDir) {
 
 /** electron-builder hook: vendor the target Bun binary. */
 exports.default = async function beforePack(context) {
-  downloadBun(context.electronPlatformName, context.arch ?? process.arch, VENDOR_BUN);
+  const arch =
+    typeof context.arch === "number"
+      ? ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch]
+      : context.arch;
+  downloadBun(context.electronPlatformName, arch ?? process.arch, VENDOR_DIR);
 };
