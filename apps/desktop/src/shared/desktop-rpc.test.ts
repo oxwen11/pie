@@ -46,7 +46,7 @@ describe("desktop RPC schemas", () => {
         tailscaleClient: { available: true },
         environments: {
           revision: 0,
-          connectingLabel: null,
+          connecting: [],
           remotes: [],
         },
       }),
@@ -58,7 +58,7 @@ describe("desktop RPC schemas", () => {
       tailscaleClient: { available: true },
       environments: {
         revision: 0,
-        connectingLabel: null,
+        connecting: [],
         remotes: [],
       },
     });

@@ -253,10 +253,9 @@ const buildServer = (
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
     const tickets = createTicketStore();
+    const resolvedEnvironmentId = environmentId ?? crypto.randomUUID();
     const pairing: PairingStore | undefined =
-      authToken === undefined
-        ? undefined
-        : createPairingStore({ environmentId: environmentId ?? crypto.randomUUID() });
+      authToken === undefined ? undefined : createPairingStore();
 
     const ui = yield* Effect.promise(() => stages.createUI(rpcRuntime));
 
@@ -275,6 +274,7 @@ const buildServer = (
           allowedHosts,
           tickets,
           pairing,
+          environmentId: resolvedEnvironmentId,
           shutdown,
           registerElectron:
             authToken === undefined || Option.isNone(resources)

@@ -53,7 +53,9 @@ export const serveFlags = {
     Flag.optional,
   ),
   host: Flag.String("host").pipe(
-    Flag.withDescription("Address to bind (default 127.0.0.1; 0.0.0.0 for LAN)"),
+    Flag.withDescription(
+      "bind this address (default 127.0.0.1; a LAN IP is auto-allowlisted as Host/Origin; 0.0.0.0 still needs --allowed-host)",
+    ),
     Flag.optional,
   ),
   corsOrigin: Flag.String("cors-origin").pipe(
@@ -157,7 +159,9 @@ const serveWith = (input: ServeInput) =>
     const { port: requestedPort, host, corsOrigins, allowedHosts } =
       yield* resolveServeConfig(input);
     const paths = yield* Paths;
-    const environmentId = yield* loadOrCreateEnvironmentId(paths.home);
+    const environmentId = yield* loadOrCreateEnvironmentId(paths.home).pipe(
+      Effect.mapError((cause) => new ServerStartupError({ phase: "create", cause })),
+    );
     const compatibilityKey = optionString(yield* pieDaemonCompatibilityKey);
     const version = optionString(yield* npmPackageVersion);
 

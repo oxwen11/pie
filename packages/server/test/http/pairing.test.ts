@@ -25,10 +25,9 @@ describe("parsePairingExchange", () => {
 
 describe("createPairingStore", () => {
   it("exchanges a minted code once for a session that is not the daemon token", () => {
-    const store = createPairingStore({ environmentId: ENVIRONMENT_ID });
+    const store = createPairingStore();
     const { code } = store.mint();
     const session = store.exchange(code);
-    expect(session?.environmentId).toBe(ENVIRONMENT_ID);
     expect(session?.token).toEqual(expect.any(String));
     expect(session?.token).not.toBe(TOKEN);
     expect(store.accepts(session?.token ?? null)).toBe(true);
@@ -37,7 +36,7 @@ describe("createPairingStore", () => {
 
   it("rejects an expired code", () => {
     let now = 1_000;
-    const store = createPairingStore({ environmentId: ENVIRONMENT_ID, now: () => now });
+    const store = createPairingStore({ now: () => now });
     const { code } = store.mint();
     now += PAIRING_CODE_TTL_MS + 1;
     expect(store.exchange(code)).toBeNull();
@@ -102,6 +101,9 @@ describe("createServer pairing", () => {
     });
     await expect(environment.json()).resolves.toEqual({ id: ENVIRONMENT_ID });
 
+    const anonymousEnvironment = await fetch(`${base}/api/environment`);
+    expect(anonymousEnvironment.status).toBe(401);
+
     const shutdown = await fetch(`${base}/api/shutdown`, {
       method: "POST",
       headers: { authorization: `Bearer ${session.token}` },
@@ -154,5 +156,19 @@ describe("createServer pairing absent", () => {
       body: JSON.stringify({ code: "probe" }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it("returns GET /api/environment without pairing when auth is off", async () => {
+    server = await createServer({
+      environmentId: ENVIRONMENT_ID,
+      effectContext: await discardContext(),
+    });
+    await new Promise<void>((resolve) => {
+      server?.listen(0, "127.0.0.1", resolve);
+    });
+    const { port } = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${String(port)}/api/environment`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: ENVIRONMENT_ID });
   });
 });

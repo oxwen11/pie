@@ -44,7 +44,6 @@ export const runRelayListen = (input: { readonly port: number; readonly publicHo
     const handle = yield* Effect.tryPromise(() =>
       listenRelay({
         port: input.port,
-        controlPort: input.port + 1,
         token,
         publicHost: input.publicHost,
       }),

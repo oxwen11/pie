@@ -1,6 +1,6 @@
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { use, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
@@ -10,7 +10,8 @@ import { AppErrorPage } from "./components/app-error-page";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
-import { createAppClients, type AppClients } from "./lib/orpc";
+import { parseEnvironmentId } from "./lib/environment-id";
+import { createAppClients, disposeAppClients, type AppClients } from "./lib/orpc";
 import { toSessionRef } from "./lib/session-ref";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
@@ -50,16 +51,16 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
-async function loadLocalEnvironmentId(server?: ServerConnection): Promise<string> {
-  if (server === undefined) return "local";
+async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
+  const url = server === undefined ? "/api/environment" : `${server.httpBaseUrl}/api/environment`;
+  const headers = server === undefined ? undefined : { authorization: `Bearer ${server.token}` };
   try {
-    const response = await globalThis.fetch(`${server.httpBaseUrl}/api/environment`, {
-      headers: { authorization: `Bearer ${server.token}` },
+    const response = await globalThis.fetch(url, {
+      headers,
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) return "local";
-    const body = (await response.json()) as { id?: unknown };
-    return typeof body.id === "string" && body.id.length > 0 ? body.id : "local";
+    return parseEnvironmentId(await response.json()) ?? "local";
   } catch {
     return "local";
   }
@@ -89,7 +90,16 @@ function AppHost({
 }): ReactElement {
   usePlatform();
   const identity = server ? `${server.httpBaseUrl}\0${server.token}` : "default";
-  return <AppRuntime key={identity} server={server} environmentId={environmentId} />;
+  if (environmentId !== undefined) {
+    return <AppRuntime key={identity} server={server} environmentId={environmentId} />;
+  }
+  return <ResolveLocalEnvironment key={identity} server={server} />;
+}
+
+function ResolveLocalEnvironment({ server }: { server?: ServerConnection }): ReactElement {
+  const [promise] = useState(() => loadEnvironmentId(server));
+  const environmentId = use(promise);
+  return <AppRuntime server={server} environmentId={environmentId} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
@@ -98,7 +108,7 @@ function AppRuntime({
   environmentId,
 }: {
   server?: ServerConnection;
-  environmentId?: string;
+  environmentId: string;
 }): ReactElement {
   const platform = usePlatform();
   const localClients = useState(() => createAppClients(server))[0];
@@ -107,30 +117,28 @@ function AppRuntime({
   useEffect(() => {
     const feed = platform.ssh?.environments;
     if (feed === undefined) return undefined;
-    const sync = () => {
-      for (const remote of feed.getSnapshot().remotes) {
-        if (!remoteClients.has(remote.environmentId)) {
-          remoteClients.set(remote.environmentId, createAppClients(remote.connection));
-        }
+    const prune = () => {
+      const live = new Set(feed.getSnapshot().remotes.map((remote) => remote.environmentId));
+      for (const [id, clients] of remoteClients) {
+        if (live.has(id)) continue;
+        remoteClients.delete(id);
+        disposeAppClients(clients);
       }
     };
-    sync();
-    return feed.subscribe(sync);
+    prune();
+    return feed.subscribe(prune);
   }, [platform.ssh, remoteClients]);
 
-  const clientsFor = async (id: string): Promise<AppClients> => {
-    const resolved = id === "pending" ? await loadLocalEnvironmentId(server) : id;
-    if (resolved === (environmentId ?? "local") || resolved === "local" || resolved === "pending") {
-      return localClients;
-    }
-    const cached = remoteClients.get(resolved);
+  const clientsFor = (id: string): AppClients => {
+    if (id === environmentId) return localClients;
+    const cached = remoteClients.get(id);
     if (cached) return cached;
     const remote = platform.ssh?.environments
       .getSnapshot()
-      .remotes.find((entry) => entry.environmentId === resolved);
+      .remotes.find((entry) => entry.environmentId === id);
     if (remote === undefined) return localClients;
     const created = createAppClients(remote.connection);
-    remoteClients.set(resolved, created);
+    remoteClients.set(id, created);
     return created;
   };
 
@@ -140,17 +148,14 @@ function AppRuntime({
       orpcClient,
       queryClient,
       orpcQueryUtils,
-      localEnvironmentId: environmentId ?? "local",
-      clientsFor,
+      localEnvironmentId: environmentId,
+      clientsFor: async (id) => clientsFor(id),
     }),
   );
   const [chatManager] = useState(
     () =>
       new ChatManager((ref) => {
-        const clients =
-          ref.environmentId === (environmentId ?? "local")
-            ? localClients
-            : (remoteClients.get(ref.environmentId) ?? localClients);
+        const clients = clientsFor(ref.environmentId);
         return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
       }),
   );

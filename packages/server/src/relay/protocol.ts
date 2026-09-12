@@ -1,3 +1,5 @@
+import net from "node:net";
+
 /** First line of the daemon's long-lived control connection. */
 export const RELAY_CONTROL_PREFIX = "PIE-RELAY-CONTROL ";
 
@@ -46,4 +48,19 @@ export function relayPublicBaseUrl(input: {
     );
   }
   return `http://${host}:${String(input.port)}`;
+}
+
+/** Bidirectional byte pipe used by both listen and attach. Honors backpressure. */
+export function pipeSockets(left: net.Socket, right: net.Socket): void {
+  let dropped = false;
+  const drop = () => {
+    if (dropped) return;
+    dropped = true;
+    left.destroy();
+    right.destroy();
+  };
+  left.on("error", drop);
+  right.on("error", drop);
+  left.pipe(right);
+  right.pipe(left);
 }
