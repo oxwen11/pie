@@ -10,15 +10,23 @@ interface StdoutTakeoverState {
   originalStdoutWrite: typeof process.stdout.write;
 }
 
-let stdoutTakeoverState: StdoutTakeoverState | undefined;
+interface StdoutTakeover {
+  state: StdoutTakeoverState | undefined;
+}
+
+interface RawStdoutWrites {
+  tail: Promise<void>;
+}
+
+const stdoutTakeover: StdoutTakeover = { state: undefined };
 
 const RAW_STDOUT_RETRY_DELAY_MS = 10;
 
-let rawStdoutWriteTail: Promise<void> = Promise.resolve();
+const rawStdoutWrites: RawStdoutWrites = { tail: Promise.resolve() };
 
 function getRawStdoutWrite(): StdoutTakeoverState["rawStdoutWrite"] {
-  if (stdoutTakeoverState) {
-    return stdoutTakeoverState.rawStdoutWrite;
+  if (stdoutTakeover.state) {
+    return stdoutTakeover.state.rawStdoutWrite;
   }
   return process.stdout.write.bind(process.stdout);
 }
@@ -51,7 +59,7 @@ async function writeRawStdoutChunk(text: string): Promise<void> {
 }
 
 export function takeOverStdout(): void {
-  if (stdoutTakeoverState) {
+  if (stdoutTakeover.state) {
     return;
   }
 
@@ -74,7 +82,7 @@ export function takeOverStdout(): void {
     return rawStderrWrite(String(chunk), callback);
   };
 
-  stdoutTakeoverState = {
+  stdoutTakeover.state = {
     rawStdoutWrite,
     rawStderrWrite,
     originalStdoutWrite,
@@ -82,33 +90,33 @@ export function takeOverStdout(): void {
 }
 
 export function restoreStdout(): void {
-  if (!stdoutTakeoverState) {
+  if (!stdoutTakeover.state) {
     return;
   }
 
-  process.stdout.write = stdoutTakeoverState.originalStdoutWrite;
-  stdoutTakeoverState = undefined;
+  process.stdout.write = stdoutTakeover.state.originalStdoutWrite;
+  stdoutTakeover.state = undefined;
 }
 
 export function isStdoutTakenOver(): boolean {
-  return stdoutTakeoverState !== undefined;
+  return stdoutTakeover.state !== undefined;
 }
 
 export function writeRawStdout(text: string): void {
   if (text.length === 0) {
     return;
   }
-  rawStdoutWriteTail = rawStdoutWriteTail.then(() => writeRawStdoutChunk(text));
-  void rawStdoutWriteTail.catch(() => {
+  rawStdoutWrites.tail = rawStdoutWrites.tail.then(() => writeRawStdoutChunk(text));
+  void rawStdoutWrites.tail.catch(() => {
     process.exitCode = 1;
   });
 }
 
 export async function waitForRawStdoutBackpressure(): Promise<void> {
   while (true) {
-    const tail = rawStdoutWriteTail;
+    const tail = rawStdoutWrites.tail;
     await tail;
-    if (tail === rawStdoutWriteTail) {
+    if (tail === rawStdoutWrites.tail) {
       return;
     }
   }

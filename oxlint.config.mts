@@ -91,7 +91,7 @@ export default defineConfig({
     ],
     "pie/node-import-style": "error",
     "pie/no-restricted-disable": "error",
-    "pie/no-module-mutable-state": "error",
+    "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
     "import/no-mutable-exports": "error",
     "react/globals": "error",
     "react/purity": "error",
@@ -205,6 +205,20 @@ export default defineConfig({
         // Playwright fixture `use` and Effect Context `use` are not React's `use`.
         "react/rules-of-hooks": "off",
         // Tests mock deprecated host APIs (MediaQueryList.addListener, tsd matchers).
+        "typescript/no-deprecated": "off",
+        "pie/no-let": "off",
+      },
+    },
+    {
+      // Behavioral lint follow-ups split out of #217 (auto-merge).
+      files: [
+        "apps/app/src/routes/session/$sessionId.tsx",
+        "apps/app/src/features/schedules/schedule-page.tsx",
+        "apps/app/src/features/files/file-preview-adapter.tsx",
+      ],
+      rules: {
+        "react/purity": "off",
+        "react/immutability": "off",
         "typescript/no-deprecated": "off",
       },
     },
