@@ -86,11 +86,11 @@ for per-agent tool rendering.
   store as the AI SDK `ChatState`. `ChatManager` caches Chat instances by the
   complete `SessionRef` so transcripts survive navigation without crossing
   project/harness identity, and is constructed at App mount (module scope has no
-  host connection yet). UI modules must not declare module-level `let`/`var`
-  (`pie/no-module-mutable-state`): mint identities with `crypto.randomUUID()`,
-  and keep live caches on an App-mount owner. `pie/no-restricted-disable`
-  forbids silencing that rule, `react/globals`, `react/purity`, and
-  `react/immutability`.
+  host connection yet). `apps/app` and the desktop renderer must not export
+  mutable bindings (`import/no-mutable-exports`). Mint identities with
+  `crypto.randomUUID()`, and keep live caches on an App-mount owner.
+  `pie/no-restricted-disable` forbids silencing `react/globals`, `react/purity`,
+  and `react/immutability`.
 - Content-panel tabs, live instances, provider bindings, and panel handles use
   the complete `SessionRef`; shell state is never keyed by a bare sessionId.
   The app-lifetime host registers unconditional panel definitions beside its

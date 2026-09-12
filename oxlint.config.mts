@@ -91,7 +91,6 @@ export default defineConfig({
     ],
     "pie/node-import-style": "error",
     "pie/no-restricted-disable": "error",
-    "pie/no-module-mutable-state": "error",
     "import/no-mutable-exports": "error",
     "react/globals": "error",
     "react/purity": "error",

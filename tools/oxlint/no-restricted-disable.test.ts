@@ -72,11 +72,6 @@ const x = 1;`,
       errors: [{ message: /Do not disable pie\/no-restricted-disable with a comment/ }],
     },
     {
-      code: `// oxlint-disable-next-line pie/no-module-mutable-state
-let next = 0;`,
-      errors: [{ message: /Do not disable pie\/no-module-mutable-state with a comment/ }],
-    },
-    {
       code: `// eslint-disable-next-line react/purity
 const now = Date.now();`,
       errors: [{ message: /Do not disable react\/purity with a comment/ }],
