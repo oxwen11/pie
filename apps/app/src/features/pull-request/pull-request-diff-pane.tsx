@@ -1,19 +1,12 @@
 import type { PullRequestDiff } from "@getpie/contract/pull-request";
 import { Alert, AlertDescription, AlertTitle } from "@getpie/ui/components/alert";
-import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { GitPullRequestIcon, type LucideIcon } from "lucide-react";
-import { lazy, Suspense, type ReactNode } from "react";
+import { GitPullRequestIcon } from "lucide-react";
+import { lazy, Suspense } from "react";
+
+import { WorkspaceState } from "@/components/workspace-state";
 
 import { countDiffFiles } from "./pull-request-presentation";
 
@@ -40,9 +33,13 @@ export function PullRequestDiffPane({
 
   if (diff.isError && diff.data === undefined) {
     return (
-      <DiffState title={diffErrorTitle(diff.error)} onRetry={() => void diff.refetch()}>
+      <WorkspaceState
+        icon={GitPullRequestIcon}
+        title={diffErrorTitle(diff.error)}
+        onRetry={() => void diff.refetch()}
+      >
         {diffErrorMessage(diff.error)}
-      </DiffState>
+      </WorkspaceState>
     );
   }
 
@@ -50,11 +47,15 @@ export function PullRequestDiffPane({
   const truncated = diff.data?.truncated ?? false;
   if (countDiffFiles(patch) === 0) {
     return (
-      <DiffState prominentIcon title={truncated ? "Diff preview unavailable" : "No file changes"}>
+      <WorkspaceState
+        icon={GitPullRequestIcon}
+        title={truncated ? "Diff preview unavailable" : "No file changes"}
+        variant="prominent"
+      >
         {truncated
           ? "Changed files are binary or too large to preview."
           : `This pull request has no file changes against ${baseBranch}.`}
-      </DiffState>
+      </WorkspaceState>
     );
   }
 
@@ -80,39 +81,6 @@ export function PullRequestDiffPane({
         </Suspense>
       </div>
     </div>
-  );
-}
-
-function DiffState({
-  title,
-  children,
-  onRetry,
-  icon: Icon = GitPullRequestIcon,
-  prominentIcon = false,
-}: {
-  title: string;
-  children: ReactNode;
-  onRetry?: () => void;
-  icon?: LucideIcon;
-  prominentIcon?: boolean;
-}) {
-  return (
-    <Empty className="py-8 md:py-8">
-      <EmptyHeader>
-        <EmptyMedia className={prominentIcon ? "size-12" : undefined} variant="icon">
-          <Icon className={prominentIcon ? "size-6" : undefined} />
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{children}</EmptyDescription>
-      </EmptyHeader>
-      {onRetry ? (
-        <EmptyContent>
-          <Button onClick={onRetry} size="sm" variant="outline">
-            Try again
-          </Button>
-        </EmptyContent>
-      ) : null}
-    </Empty>
   );
 }
 
