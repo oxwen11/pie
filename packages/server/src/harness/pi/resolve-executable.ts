@@ -147,10 +147,7 @@ export const checkPiAvailability = (
 
     // Owned / npm Pi is a JS entry run under Node — npm does not mark it +x.
     if (executable.prefixArgs.length > 0) {
-      const script = executable.prefixArgs[0];
-      if (script === undefined) {
-        return { available: false, reason: RPC_ENTRY_MISSING_REASON };
-      }
+      const script = executable.prefixArgs[0] as string;
       const fileSystem = yield* FileSystem.FileSystem;
       const info = yield* fileSystem.stat(script).pipe(Effect.option);
       if (info._tag === "Some" && info.value.type === "File") {

@@ -39,19 +39,7 @@ export function parseCron(cron: string): CronExpr {
   if (/[a-zA-Z?#LW]/.test(cron)) {
     throw new CronError("INVALID_CRON", "names and extensions (L, W, ?, #) are not supported");
   }
-  const [minute, hour, dom, month, dow] = parts;
-  if (
-    minute === undefined ||
-    hour === undefined ||
-    dom === undefined ||
-    month === undefined ||
-    dow === undefined
-  ) {
-    throw new CronError(
-      "INVALID_CRON",
-      "expected 5-field cron: minute hour day-of-month month day-of-week",
-    );
-  }
+  const [minute, hour, dom, month, dow] = parts as [string, string, string, string, string];
   return {
     minute: parseField(minute, 0, 59),
     hour: parseField(hour, 0, 23),
@@ -71,10 +59,7 @@ function parseField(raw: string, min: number, max: number): Field {
     if (!stepMatch) {
       throw new CronError("INVALID_CRON", `invalid field: ${item}`);
     }
-    const range = stepMatch[1];
-    if (range === undefined) {
-      throw new CronError("INVALID_CRON", `invalid field: ${item}`);
-    }
+    const range = stepMatch[1] as string;
     const step = stepMatch[2] ? Number(stepMatch[2]) : 1;
     if (!Number.isInteger(step) || step <= 0) {
       throw new CronError("INVALID_CRON", `invalid step: ${item}`);
@@ -83,16 +68,8 @@ function parseField(raw: string, min: number, max: number): Field {
     let end = max;
     if (range !== "*") {
       const bounds = range.split("-").map(Number);
-      const startBound = bounds[0];
-      if (startBound === undefined) {
-        throw new CronError("INVALID_CRON", `field out of range: ${item}`);
-      }
-      const endBound = bounds.length === 2 ? bounds[1] : startBound;
-      if (endBound === undefined) {
-        throw new CronError("INVALID_CRON", `field out of range: ${item}`);
-      }
-      start = startBound;
-      end = endBound;
+      start = bounds[0] as number;
+      end = bounds.length === 2 ? (bounds[1] as number) : start;
     }
     if (start < min || end > max || start > end) {
       throw new CronError("INVALID_CRON", `field out of range: ${item}`);

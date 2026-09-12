@@ -101,27 +101,22 @@ export default function piLoopExtension(pi: ExtensionAPI): void {
       "Create a fixed recurring or one-shot scheduled prompt in the current Session. Provide exactly one of cron (5-field) or run_at (timezone-aware ISO-8601). Do not use this to create a self-paced loop; use /loop <prompt> instead.",
     parameters: CronCreateParams,
     async execute(_id, params) {
-      const cron = params.cron;
-      const runAt = params.run_at;
-      const hasCron = typeof cron === "string" && cron.length > 0;
-      const hasRunAt = typeof runAt === "string" && runAt.length > 0;
+      const hasCron = typeof params.cron === "string" && params.cron.length > 0;
+      const hasRunAt = typeof params.run_at === "string" && params.run_at.length > 0;
       if (hasCron === hasRunAt) {
         throw new LoopError("INVALID_CRON", "provide exactly one of cron or run_at");
       }
       if (hasRunAt && params.recurring === true) {
         throw new LoopError("INVALID_RUN_AT", "run_at cannot be recurring");
       }
-      if (hasCron) {
-        return textResult(
-          JSON.stringify(
-            scheduler.createRecurring(params.prompt, cron, params.recurring !== false),
-          ),
-        );
-      }
-      if (runAt === undefined || runAt.length === 0) {
-        throw new LoopError("INVALID_CRON", "provide exactly one of cron or run_at");
-      }
-      return textResult(JSON.stringify(scheduler.createOneShot(params.prompt, runAt)));
+      const result = hasCron
+        ? scheduler.createRecurring(
+            params.prompt,
+            params.cron as string,
+            params.recurring !== false,
+          )
+        : scheduler.createOneShot(params.prompt, params.run_at as string);
+      return textResult(JSON.stringify(result));
     },
   });
 
