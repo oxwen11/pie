@@ -49,8 +49,11 @@ const asText = (value: unknown): string | undefined =>
 const optional = <K extends keyof DraftSearch>(
   key: K,
   value: DraftSearch[K],
-): Pick<DraftSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
+): Partial<Pick<DraftSearch, K>> => {
+  const result: Partial<Pick<DraftSearch, K>> = {};
+  if (value !== undefined) result[key] = value;
+  return result;
+};
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({

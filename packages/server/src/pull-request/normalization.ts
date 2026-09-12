@@ -18,11 +18,15 @@ export class InvalidPullRequestJsonError extends Error {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 const asRecord = (value: unknown, field: string): Record<string, unknown> => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new InvalidPullRequestJsonError(`${field} must be an object`);
   }
-  return value as Record<string, unknown>;
+  return value;
 };
 
 const requiredString = (record: Record<string, unknown>, field: string): string => {

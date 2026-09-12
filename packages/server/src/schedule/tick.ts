@@ -17,6 +17,7 @@ const decideTick = (schedule: Schedule, tickedAt: number): TickDecision => {
   if (schedule.expiresAt !== undefined && Date.parse(schedule.expiresAt) <= tickedAt) {
     return { kind: "expire" };
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- nextRunAt is a persisted ISO string
   const nextRunMs = Date.parse(schedule.nextRunAt as string);
   if (isStale(nextRunMs, tickedAt)) {
     return { kind: "stale", missedCount: countMissedSlots(schedule.spec, nextRunMs, tickedAt) };

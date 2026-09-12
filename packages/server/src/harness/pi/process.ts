@@ -378,6 +378,7 @@ export const makePiProcessWithDependencies = <R>(
       ).pipe(
         Effect.flatMap((result) =>
           session.transport
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mapUiResponse/declineUiResponse return RpcExtensionUIResponse
             .respondUi(result as RpcExtensionUIResponse)
             .pipe(Effect.catch(() => Effect.void)),
         ),

@@ -53,7 +53,7 @@ export function PlanRequestView({
   const isRevise = selected === REVISE_VALUE;
 
   const handleSubmit = () => {
-    if (isRevise) {
+    if (selected === REVISE_VALUE) {
       onRespond(request.id, { type: "plan", behavior: "deny", message: feedback });
       return;
     }
@@ -78,7 +78,19 @@ export function PlanRequestView({
       <div className="border-border/50 space-y-3 border-t px-3 py-3">
         <p className="text-foreground text-sm font-medium">Ready to implement?</p>
 
-        <RadioGroup value={selected} onValueChange={(v) => setSelected(v as SelectedValue)}>
+        <RadioGroup
+          value={selected}
+          onValueChange={(value: string) => {
+            if (
+              value === "revise" ||
+              value === "manual" ||
+              value === "autoEdit" ||
+              value === "bypass"
+            ) {
+              setSelected(value);
+            }
+          }}
+        >
           {APPROVAL_VALUES.map((value) => (
             <Label
               key={value}

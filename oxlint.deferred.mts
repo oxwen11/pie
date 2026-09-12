@@ -26,15 +26,9 @@ export const deferredUltraciteRules = {
   "no-await-in-loop": "off",
 
   // --- slice 4 — any / unsafe / strict boolean ---
-  // Will be noisy. Enable one package at a time if needed.
-  // no-explicit-any is on (this slice). no-non-null-assertion is on (#218).
-  // strict-boolean-expressions: measured ~133 hits, 81 of them `if (str)` /
-  // nullable-string rewrites. Not surgical — leave off.
-  "typescript/no-unsafe-argument": "off",
-  "typescript/no-unsafe-assignment": "off",
-  "typescript/no-unsafe-call": "off",
-  "typescript/no-unsafe-member-access": "off",
-  "typescript/no-unsafe-return": "off",
+  // no-unsafe-* is on (this slice). Remaining: strict boolean, void-return.
+  // no-explicit-any is on (#219). no-non-null-assertion is on (#218).
+  // consistent-return and no-unnecessary-type-assertion are on (#220).
   "typescript/strict-boolean-expressions": "off",
   "typescript/strict-void-return": "off",
 

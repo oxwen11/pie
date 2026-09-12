@@ -15,8 +15,11 @@ const asText = (value: unknown): string | undefined =>
 const optional = <K extends keyof SchedulesSearch>(
   key: K,
   value: SchedulesSearch[K],
-): Pick<SchedulesSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<SchedulesSearch, K>);
+): Partial<Pick<SchedulesSearch, K>> => {
+  const result: Partial<Pick<SchedulesSearch, K>> = {};
+  if (value !== undefined) result[key] = value;
+  return result;
+};
 
 export const Route = createFileRoute("/schedules")({
   staticData: { cardHeading: false, cardHeader: false },

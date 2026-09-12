@@ -22,7 +22,7 @@ function serialize(value: unknown): string {
 // `name` is injected by the caller; provider-specific display-name derivation
 // stays in each provider dir.
 export function DynamicToolPart({ part, name }: { part: AnyToolPart; name: string }) {
-  const input = part.input as Record<string, unknown> | undefined;
+  const input = typeof part.input === "object" && part.input !== null ? part.input : undefined;
   return (
     <Tool>
       <ToolHeader icon={WrenchIcon}>{name}</ToolHeader>

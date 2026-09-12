@@ -151,7 +151,6 @@ export default defineConfig({
     "unicorn/no-array-sort": "off",
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
-    "typescript/no-unsafe-type-assertion": "off",
     // Ultracite leaves this off; pie turns it on in this slice.
     "promise/always-return": "error",
     "no-unused-vars": [
@@ -207,6 +206,24 @@ export default defineConfig({
         // Tests mock deprecated host APIs (MediaQueryList.addListener, tsd matchers).
         "typescript/no-deprecated": "off",
         "pie/no-let": "off",
+        // Fixtures and tests use `as` / JSON.parse any at the mock boundary.
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+      },
+    },
+    {
+      files: ["**/*.mjs", "tools/testing/**"],
+      rules: {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
       },
     },
     {
@@ -275,6 +292,12 @@ export default defineConfig({
         "promise/always-return": "off",
         "typescript/consistent-return": "off",
         "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
       },
     },
     {
@@ -320,6 +343,12 @@ export default defineConfig({
         "import/no-commonjs": "off",
         "typescript/no-require-imports": "off",
         "typescript/no-var-requires": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
       },
     },
   ],

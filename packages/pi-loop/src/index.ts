@@ -112,10 +112,12 @@ export default function piLoopExtension(pi: ExtensionAPI): void {
       const result = hasCron
         ? scheduler.createRecurring(
             params.prompt,
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- hasCron already proved cron is present
             params.cron as string,
             params.recurring !== false,
           )
-        : scheduler.createOneShot(params.prompt, params.run_at as string);
+        : // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one-shot path requires run_at
+          scheduler.createOneShot(params.prompt, params.run_at as string);
       return textResult(JSON.stringify(result));
     },
   });

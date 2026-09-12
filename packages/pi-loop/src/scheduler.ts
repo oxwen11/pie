@@ -324,6 +324,7 @@ export class SessionLoopScheduler {
       task.decision = "stopped";
       return "stopped";
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- delay_seconds is present on the scheduled wakeup path
     const delay = input.delay_seconds as number;
     if (!Number.isInteger(delay) || delay < 60 || delay > 3600) {
       throw new LoopError("INVALID_WAKEUP_DELAY", "delay_seconds must be 60-3600");
