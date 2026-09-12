@@ -35,7 +35,8 @@ export function promoteQueuedFollowUp(
 ): SessionPendingPrompt {
   const items = pending.followUp;
   if (index < 0 || index >= items.length) return pending;
-  const text = items[index]!;
+  const text = items[index];
+  if (text === undefined) return pending;
   return {
     steering: [...pending.steering, text],
     followUp: items.filter((_, itemIndex) => itemIndex !== index),

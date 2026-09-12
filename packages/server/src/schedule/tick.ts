@@ -17,7 +17,11 @@ const decideTick = (schedule: Schedule, tickedAt: number): TickDecision => {
   if (schedule.expiresAt !== undefined && Date.parse(schedule.expiresAt) <= tickedAt) {
     return { kind: "expire" };
   }
-  const nextRunMs = Date.parse(schedule.nextRunAt!);
+  const nextRunAt = schedule.nextRunAt;
+  if (nextRunAt === null) {
+    throw new Error(`schedule ${schedule.id} is due without nextRunAt`);
+  }
+  const nextRunMs = Date.parse(nextRunAt);
   if (isStale(nextRunMs, tickedAt)) {
     return { kind: "stale", missedCount: countMissedSlots(schedule.spec, nextRunMs, tickedAt) };
   }

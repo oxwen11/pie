@@ -25,10 +25,9 @@ export const deferredUltraciteRules = {
   "oxc/no-barrel-file": "off",
   "no-await-in-loop": "off",
 
-  // --- slice 4 — any / non-null / unsafe / strict boolean ---
+  // --- slice 4 — any / unsafe / strict boolean ---
   // Will be noisy. Enable one package at a time if needed.
   "typescript/no-explicit-any": "off",
-  "typescript/no-non-null-assertion": "off",
   "typescript/no-unsafe-argument": "off",
   "typescript/no-unsafe-assignment": "off",
   "typescript/no-unsafe-call": "off",

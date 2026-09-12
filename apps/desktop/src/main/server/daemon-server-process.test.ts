@@ -149,7 +149,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
               const spawn = yield* makeDaemonServerProcess({ requiredCompatibilityKey });
               const running = yield* spawn(config, 0);
               yield* running.ready;
-              return (yield* readRecord(daemonDir))!;
+              const record = yield* readRecord(daemonDir);
+              assert.ok(record);
+              return record;
             }),
           );
 

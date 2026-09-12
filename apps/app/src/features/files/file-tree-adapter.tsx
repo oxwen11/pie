@@ -102,13 +102,10 @@ export function FileTreeAdapter({
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.key !== "Enter" || event.defaultPrevented) return;
     const focusedPath = state.model.getFocusedPath();
-    if (
-      !isOpenableTreeEntry(focusedPath === null ? undefined : state.entryByPath.get(focusedPath))
-    ) {
-      return;
-    }
+    if (focusedPath === null) return;
+    if (!isOpenableTreeEntry(state.entryByPath.get(focusedPath))) return;
     event.preventDefault();
-    onOpenFile(focusedPath!);
+    onOpenFile(focusedPath);
   };
 
   return (

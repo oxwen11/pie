@@ -144,7 +144,6 @@ export default defineConfig({
     "jsx-a11y/role-supports-aria-props": "warn",
     "jsx-a11y/no-autofocus": "off",
     "jsx-a11y/prefer-tag-over-role": "off",
-    "@typescript-eslint/no-non-null-assertion": "off",
     "react/react-in-jsx-scope": "off",
     "unicorn/no-empty-file": "off",
     "unicorn/consistent-function-scoping": "off",
