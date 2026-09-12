@@ -5,11 +5,11 @@ import { Group, Separator } from "react-resizable-panels";
 import { ResizablePanel } from "@/components/layout/resizable-panel";
 
 import { formatSessionReuse } from "./cadence";
+import { projectNameOf } from "./format";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
 import { ScheduleDetailPanel } from "./schedule-detail-panel";
 import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
 import type { ScheduleFormSubmit } from "./schedule-form-model";
-import { projectNameOf } from "./schedule-page-list";
 
 export function SchedulePageFrame({
   list,

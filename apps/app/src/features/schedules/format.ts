@@ -1,4 +1,5 @@
 import type {
+  Project,
   SchedulePauseReason,
   ScheduleRunReason,
   ScheduleRunStatus,
@@ -17,6 +18,13 @@ function splitEveryMs(everyMs: number) {
 }
 
 const pad = (n: number): string => String(n).padStart(2, "0");
+
+export function projectNameOf(
+  projects: ReadonlyArray<Pick<Project, "id" | "name">>,
+  projectId: string,
+): string {
+  return projects.find((item) => item.id === projectId)?.name ?? "Unknown project";
+}
 
 /** One-way pretty-print of known cron presets. Does not reverse-parse into the form. */
 function formatCronExpr(expr: string, timeZone?: string): string {

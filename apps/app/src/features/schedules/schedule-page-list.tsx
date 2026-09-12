@@ -10,14 +10,8 @@ import {
 } from "@getpie/ui/components/empty";
 import { Clock } from "lucide-react";
 
+import { projectNameOf } from "./format";
 import { ScheduleCard } from "./schedule-card";
-
-export function projectNameOf(
-  projects: ReadonlyArray<Pick<Project, "id" | "name">>,
-  projectId: string,
-): string {
-  return projects.find((item) => item.id === projectId)?.name ?? "Unknown project";
-}
 
 export function SchedulePageList({
   items,
