@@ -104,26 +104,25 @@ export const makeEventBus = (
       }).pipe(Effect.catch(() => Effect.void));
     };
 
-    const publish = (event: ServerEvent) =>
-      Ref.get(subscribers).pipe(
-        Effect.flatMap((active) =>
-          Effect.forEach(active.values(), (subscriber) => deliver(subscriber, event), {
-            concurrency: "unbounded",
-            discard: true,
-          }),
-        ),
-      );
+    const publish = Effect.fn("EventBus.publish")(function* (event: ServerEvent) {
+      const active = yield* Ref.get(subscribers);
+      yield* Effect.forEach(active.values(), (subscriber) => deliver(subscriber, event), {
+        concurrency: "unbounded",
+        discard: true,
+      });
+    });
 
-    const closeSession = (ref: SessionRef, reason: SubscriptionClosedReason) =>
-      Ref.get(subscribers).pipe(
-        Effect.flatMap((active) =>
-          Effect.forEach(
-            [...active.values()].filter((subscriber) => scopeTargets(subscriber.scope, ref)),
-            (subscriber) => emitClosed(subscriber, reason),
-            { concurrency: "unbounded", discard: true },
-          ),
-        ),
+    const closeSession = Effect.fn("EventBus.closeSession")(function* (
+      ref: SessionRef,
+      reason: SubscriptionClosedReason,
+    ) {
+      const active = yield* Ref.get(subscribers);
+      yield* Effect.forEach(
+        [...active.values()].filter((subscriber) => scopeTargets(subscriber.scope, ref)),
+        (subscriber) => emitClosed(subscriber, reason),
+        { concurrency: "unbounded", discard: true },
       );
+    });
 
     const subscribe = (scope: SubscriptionScope) =>
       Effect.acquireRelease(

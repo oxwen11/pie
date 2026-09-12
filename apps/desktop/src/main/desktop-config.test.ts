@@ -31,7 +31,7 @@ describe("buildDesktopConfig", () => {
 describe("applyPackagedPiRuntime", () => {
   const bundled = {
     isPackaged: true,
-    bundledBun: "/Resources/vendor/bun/bun",
+    bundledBun: "/Resources/vendor/bun",
     bundledRpc: "/Resources/pi-rpc/pi-rpc.js",
   } as const;
 
@@ -43,7 +43,7 @@ describe("applyPackagedPiRuntime", () => {
   it("points packaged desktop at the shipped bun and pi-rpc", () => {
     expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
       PATH: "/usr/bin",
-      PIE_BUN: "/Resources/vendor/bun/bun",
+      PIE_BUN: "/Resources/vendor/bun",
       PIE_PI_EXECUTABLE: "/Resources/pi-rpc/pi-rpc.js",
     });
   });

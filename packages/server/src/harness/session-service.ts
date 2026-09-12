@@ -449,7 +449,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         ),
 
       prompt: (input: PromptInput) =>
-        Effect.gen(function* () {
+        Effect.fn("PiAgentSessionService.prompt")(function* () {
           const queued = input.delivery !== undefined;
           const userInput = yield* toUserInput(input.parts, input.delivery);
           yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
@@ -484,7 +484,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           const receipt = yield* deliverPrompt(input.ref, userInput);
           if (receipt.started) yield* submitted();
           return receipt;
-        }).pipe(inSession(input.ref)),
+        })().pipe(inSession(input.ref)),
 
       interrupt: (ref: SessionRef) =>
         readMetadata(ref).pipe(
