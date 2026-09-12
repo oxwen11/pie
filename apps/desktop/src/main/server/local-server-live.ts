@@ -29,7 +29,6 @@ export const LocalServerLive = Layer.effect(
             path.join(
               config.resourcesPath,
               "vendor",
-              "bun",
               process.platform === "win32" ? "bun.exe" : "bun",
             ),
           ),
