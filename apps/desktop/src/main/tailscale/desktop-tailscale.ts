@@ -4,6 +4,7 @@ import {
   ensureTailscaleServe,
   listOnlineTailscaleSshHosts,
   probeTailscaleClient,
+  readTailscaleServeOwnership,
   readTailscaleStatus,
   TailscaleClientMissingError,
   tailscaleCommandForPlatform,
@@ -109,7 +110,7 @@ export function makeDesktopTailscale(
     >();
     const cli = { env: input.env };
     const client = yield* probeTailscaleClient(cli);
-    const serveEnabledRef = yield* Ref.make(false);
+    const servePortRef = yield* Ref.make<number | null>(null);
 
     const snapshotFromStatus = (serveEnabled: boolean) =>
       readTailscaleStatus(cli).pipe(
@@ -134,7 +135,13 @@ export function makeDesktopTailscale(
         : Effect.succeed([]),
       snapshot: Effect.gen(function* () {
         if (!client.available) return emptySnapshot(client);
-        const serveEnabled = yield* Ref.get(serveEnabledRef);
+        const localPort = yield* Ref.get(servePortRef);
+        const serveEnabled =
+          localPort === null
+            ? false
+            : (yield* readTailscaleServeOwnership({ localPort, env: input.env }).pipe(
+                Effect.orElseSucceed(() => "empty" as const),
+              )) === "ours";
         return yield* snapshotFromStatus(serveEnabled);
       }).pipe(Effect.provide(platform)),
       enableServe: (localPort) =>
@@ -146,12 +153,16 @@ export function makeDesktopTailscale(
             });
           }
           yield* ensureTailscaleServe({ localPort, env: input.env });
-          yield* Ref.set(serveEnabledRef, true);
+          yield* Ref.set(servePortRef, localPort);
         }).pipe(Effect.provide(platform)),
       disableServe: Effect.gen(function* () {
         if (!client.available) return;
-        yield* disableTailscaleServe({ env: input.env });
-        yield* Ref.set(serveEnabledRef, false);
+        const localPort = yield* Ref.get(servePortRef);
+        yield* disableTailscaleServe({
+          env: input.env,
+          ...(localPort === null ? undefined : { localPort }),
+        });
+        yield* Ref.set(servePortRef, null);
       }).pipe(Effect.provide(platform)),
     });
   });

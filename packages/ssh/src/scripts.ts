@@ -178,11 +178,11 @@ require_installed_pie_cli() {
 }
 if command -v npx >/dev/null 2>&1; then
   require_installed_pie_cli npx --yes --package @@PIE_PACKAGE_SPEC@@ || exit 1
-  exec npx --yes @@PIE_PACKAGE_SPEC@@ "$@"
+  exec npx --yes --package @@PIE_PACKAGE_SPEC@@ -- pie "$@"
 fi
 if command -v npm >/dev/null 2>&1; then
   require_installed_pie_cli npm exec --yes --package @@PIE_PACKAGE_SPEC@@ || exit 1
-  exec npm exec --yes @@PIE_PACKAGE_SPEC@@ -- "$@"
+  exec npm exec --yes --package @@PIE_PACKAGE_SPEC@@ -- pie "$@"
 fi
 printf 'Remote host is missing the pie CLI and could not install @@PIE_PACKAGE_SPEC@@ because node/npm/npx are unavailable on PATH. Install Node 24 and pie, or configure a supported version manager for non-interactive shells.\\n' >&2
 exit 1

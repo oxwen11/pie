@@ -8,13 +8,13 @@ import {
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
-import { GitBranchIcon, SquareIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { GitBranchIcon, NavigationIcon, SquareIcon } from "lucide-react";
+import { useRef, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
 import { useLatestRef } from "@/hooks/use-latest-ref";
+import { useAppClients } from "@/lib/app-clients";
 
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
@@ -39,7 +39,7 @@ export function ChatInputComposer({
   sessionRef: SessionRef;
   toolbar?: ReactNode;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useAppClients();
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
   const currentBranch =
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
