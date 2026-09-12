@@ -21,12 +21,12 @@ describe("redactDaemonRecord", () => {
 
     redactDaemonRecord(src, dest);
 
-    expect(readJson<Record<string, unknown>>(dest)).toEqual({
+    expect(readJson(dest)).toEqual({
       pid: 12,
       address: "http://127.0.0.1:4182",
       token: "[redacted]",
       compatibilityKey: "githash:d1fb9004",
     });
-    expect(readJson<Record<string, unknown>>(src).token).toBe("secret-token");
+    expect((readJson(src) as Record<string, unknown>).token).toBe("secret-token");
   });
 });

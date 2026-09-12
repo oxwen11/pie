@@ -27,7 +27,7 @@ export const deferredUltraciteRules = {
 
   // --- slice 4 — any / unsafe / strict boolean ---
   // Will be noisy. Enable one package at a time if needed.
-  "typescript/no-explicit-any": "off",
+  // no-explicit-any is on (this slice). no-non-null-assertion is on (#218).
   "typescript/no-unsafe-argument": "off",
   "typescript/no-unsafe-assignment": "off",
   "typescript/no-unsafe-call": "off",
@@ -35,7 +35,6 @@ export const deferredUltraciteRules = {
   "typescript/no-unsafe-return": "off",
   "typescript/strict-boolean-expressions": "off",
   "typescript/strict-void-return": "off",
-  "typescript/prefer-nullish-coalescing": "off",
 
   // --- later — perf ---
   "no-useless-call": "off",
@@ -55,9 +54,7 @@ export const deferredUltraciteRules = {
   "no-inner-declarations": "off",
   "no-lonely-if": "off",
   "no-negated-condition": "off",
-  "no-redeclare": "off",
   "no-warning-comments": "off",
-  "oxc/branches-sharing-code": "off",
   "react/no-unescaped-entities": "off",
   "require-await": "off",
   "require-unicode-regexp": "off",
@@ -66,7 +63,6 @@ export const deferredUltraciteRules = {
   "typescript/ban-ts-comment": "off",
   "typescript/ban-types": "off",
   "typescript/prefer-enum-initializers": "off",
-  "typescript/prefer-includes": "off",
   "typescript/prefer-ts-expect-error": "off",
   "unicorn/escape-case": "off",
   "unicorn/no-negated-condition": "off",
@@ -190,11 +186,8 @@ export const deferredUltraciteRules = {
   "typescript/method-signature-style": "off",
   "typescript/no-inferrable-types": "off",
   "typescript/parameter-properties": "off",
-  "typescript/prefer-find": "off",
-  "typescript/prefer-for-of": "off",
   "typescript/prefer-readonly": "off",
   "typescript/prefer-regexp-exec": "off",
-  "typescript/prefer-string-starts-ends-with": "off",
   "typescript/unified-signatures": "off",
   "unicorn/catch-error-name": "off",
   "unicorn/empty-brace-spaces": "off",

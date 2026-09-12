@@ -69,9 +69,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     writeRawStdout(serializeJsonLine(frame));
   };
 
-  const success = <T extends RpcCommand["type"]>(
+  const success = (
     id: string | undefined,
-    command: T,
+    command: RpcCommand["type"],
     data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
@@ -87,7 +87,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   // Pending extension UI requests waiting for response
   const pendingExtensionRequests = new Map<
     string,
-    { resolve: (value: any) => void; reject: (error: Error) => void }
+    { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
   >();
 
   // Shutdown request flag
