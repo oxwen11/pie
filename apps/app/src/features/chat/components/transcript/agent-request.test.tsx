@@ -18,8 +18,9 @@ const respondToRequest = vi.fn<ChatSessionValue["respondToRequest"]>();
 const session: ChatSessionValue = {
   sessionId: "session-1",
   store: new ChatState().store,
-  prompt: vi.fn<(text: string) => void>(),
+  prompt: vi.fn<ChatSessionValue["prompt"]>(),
   interrupt: vi.fn<() => Promise<void>>(async () => undefined),
+  replaceQueue: vi.fn<ChatSessionValue["replaceQueue"]>(),
   respondToRequest,
   turnInProgress: false,
 };
