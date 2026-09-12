@@ -42,7 +42,6 @@ function desktopMeta(): DesktopRunMeta {
     pieHome: "/tmp/pie-verify-desktop/runs/run-2/pie-home",
     piePort: 4000,
     startedAt: "2026-09-01T00:00:00Z",
-    daemonDir: "/tmp/pie-verify-desktop/runs/run-2/pie-home/daemon",
     cdpPort: 9223,
     userData: "/tmp/pie-desktop-remote-debugging-9223",
     sampleProject: "/home/me/verify-pie-desktop-sample",

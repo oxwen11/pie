@@ -87,24 +87,24 @@ V1 does not include:
 - GitHub App installation tokens (daemon uses local `gh`);
 - cloning a repository the daemon has not registered as a Project;
 - exposing `/api/*` oRPC, tickets, or the SPA on the Hub process;
-- changing the single-daemon-per-`PIE_DAEMON_DIR` invariant;
+- changing the single-daemon-per-`$PIE_HOME` invariant;
 - a second agent or harness registry;
 - Hub-owned session history or a second event stream;
 - automatic PR open (the agent may `gh pr create` if the prompt asks).
 
 ## Why this shape fits pie
 
-| Existing piece                  | Hub uses it as                                                                                                    |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `Project.path`                  | The only directory mapping. Hub sends `owner/repo`; the daemon resolves a registered Project whose remotes match. |
-| `SessionRef`                    | The durable identity after dispatch. Hub's `executionId` is _not_ a session id.                                   |
-| `session.create` + `worktree`   | Isolation from the user's main checkout. Git failure fails the execution with no session record.                  |
-| `session.prompt`                | The only way Pi starts. Observing still costs no process until the prompt.                                        |
-| `PiAgentSessionManager`         | Sole owner of live state. Hub is another caller of the session service, not a second runtime table.               |
-| `GitHubCliAdapter`              | Issue/PR comments and later `gh pr create`. No new GitHub HTTP client in V1.                                      |
-| `ScheduleService`               | The only fire path. Hub sends `scheduleId` (+ optional GitHub context). Daemon tick skips non-`local` triggers.   |
-| Daemon bearer + tickets         | Stay on loopback/UI. Hub traffic never reuses them.                                                               |
-| `$PIE_HOME` / `$PIE_DAEMON_DIR` | Session metadata and the single-instance lock stay where they are. Hub state lives on the Hub host.               |
+| Existing piece                | Hub uses it as                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `Project.path`                | The only directory mapping. Hub sends `owner/repo`; the daemon resolves a registered Project whose remotes match. |
+| `SessionRef`                  | The durable identity after dispatch. Hub's `executionId` is _not_ a session id.                                   |
+| `session.create` + `worktree` | Isolation from the user's main checkout. Git failure fails the execution with no session record.                  |
+| `session.prompt`              | The only way Pi starts. Observing still costs no process until the prompt.                                        |
+| `PiAgentSessionManager`       | Sole owner of live state. Hub is another caller of the session service, not a second runtime table.               |
+| `GitHubCliAdapter`            | Issue/PR comments and later `gh pr create`. No new GitHub HTTP client in V1.                                      |
+| `ScheduleService`             | The only fire path. Hub sends `scheduleId` (+ optional GitHub context). Daemon tick skips non-`local` triggers.   |
+| Daemon bearer + tickets       | Stay on loopback/UI. Hub traffic never reuses them.                                                               |
+| `$PIE_HOME`                   | Session metadata and the single-instance lock stay where they are. Hub state lives on the Hub host.               |
 
 The current pull-request design (`docs/design/github-pull-request-integration.md`)
 explicitly deferred webhooks. Hub is that missing inbound path. It must

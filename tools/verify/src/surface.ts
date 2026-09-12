@@ -25,10 +25,9 @@ type LaunchBase = {
 
 export type LaunchCtx =
   | (LaunchBase & { surface: "web"; vitePort: number; sample: SampleProject })
-  | (LaunchBase & { surface: "cli"; daemonDir: string })
+  | (LaunchBase & { surface: "cli" })
   | (LaunchBase & {
       surface: "desktop";
-      daemonDir: string;
       cdpPort: number;
       sample: SampleProject;
     });

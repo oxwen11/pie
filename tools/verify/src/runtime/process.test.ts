@@ -40,6 +40,8 @@ describe("isSharedPieHome", () => {
   it("flags the default user homes", () => {
     const home = process.env.HOME ?? "";
     expect(isSharedPieHome(path.join(home, ".pie"))).toBe(true);
+    expect(isSharedPieHome(path.join(home, ".pie_dev"))).toBe(true);
+    expect(isSharedPieHome(path.join(home, ".pie_feat-foo"))).toBe(true);
     expect(isSharedPieHome(path.join(home, ".pie-dev"))).toBe(true);
     expect(isSharedPieHome("/tmp/pie-verify-cli/runs/x/pie-home")).toBe(false);
     expect(isSharedPieHome("/tmp/pie-verify-web/runs/x/pie-home")).toBe(false);

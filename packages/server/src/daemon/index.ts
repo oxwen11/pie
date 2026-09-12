@@ -1,10 +1,4 @@
-export {
-  type DaemonLocation,
-  developmentDaemonEnvironment,
-  resolveDaemonDirectory,
-  resolveDaemonLocation,
-  resolvePieHome,
-} from "../config/paths";
+export { daemonDirectory, resolveDaemonDirectory, resolvePieHome } from "../config/paths";
 export { DaemonLaunchError, DaemonStoppedError } from "./errors";
 export {
   type DaemonHandle,

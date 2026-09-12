@@ -21,14 +21,12 @@ export type WebRunMeta = RunMetaBase & {
 export type CliRunMeta = RunMetaBase & {
   surface: "cli";
   mode: "daemon" | "serve";
-  daemonDir: string;
   address?: string;
   daemonPid?: number;
 };
 
 export type DesktopRunMeta = RunMetaBase & {
   surface: "desktop";
-  daemonDir: string;
   cdpPort: number;
   userData: string;
   sampleProject: string;
@@ -124,13 +122,11 @@ export function initialMeta(ctx: LaunchCtx): RunMeta {
         ...base,
         surface: "cli",
         mode: ctx.request.mode ?? "daemon",
-        daemonDir: ctx.daemonDir,
       };
     case "desktop":
       return {
         ...base,
         surface: "desktop",
-        daemonDir: ctx.daemonDir,
         cdpPort: ctx.cdpPort,
         userData: userDataDir(ctx.cdpPort),
         sampleProject: ctx.sample.path,
@@ -164,7 +160,6 @@ function parseCli(data: Record<string, unknown>, file: string): CliRunMeta {
     ...parseBase(data, file),
     surface: "cli",
     mode,
-    daemonDir: str(data, "daemonDir", file),
     address: optStr(data, "address", file),
     daemonPid: optInt(data, "daemonPid", file),
   };
@@ -174,7 +169,6 @@ function parseDesktop(data: Record<string, unknown>, file: string): DesktopRunMe
   return {
     ...parseBase(data, file),
     surface: "desktop",
-    daemonDir: str(data, "daemonDir", file),
     cdpPort: num(data, "cdpPort", file),
     userData: str(data, "userData", file),
     sampleProject: str(data, "sampleProject", file),

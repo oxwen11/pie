@@ -1,6 +1,6 @@
 # Daemon attach
 
-Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` + `$PIE_DAEMON_DIR` must converge on one backend.
+Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` must converge on one backend.
 
 ## How to get to it
 
@@ -9,7 +9,6 @@ Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` + `$PIE_DAEMO
 ```bash
 # after verify-pie-desktop launch
 export PIE_HOME="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/pie-verify-desktop/current/meta.json","utf8")).pieHome)')"
-export PIE_DAEMON_DIR="$PIE_HOME/daemon"
 cd packages/pie && pnpm exec tsx src/node/cli.ts daemon status
 ```
 
