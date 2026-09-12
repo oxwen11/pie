@@ -146,8 +146,12 @@ export const TerminalManagerLayer: Layer.Layer<TerminalManager> = Layer.effect(
           cols,
           rows,
           history: "",
-          unsubscribeData: () => {},
-          unsubscribeExit: () => {},
+          unsubscribeData: () => {
+            /* replaced immediately with process.onData */
+          },
+          unsubscribeExit: () => {
+            /* replaced immediately with process.onExit */
+          },
           queues: new Set(),
         };
         records.set(key, record);

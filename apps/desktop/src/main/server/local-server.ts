@@ -159,23 +159,26 @@ export function makeLocalServer(
         entry: config.entry,
         environment: yield* config.environment,
       };
-      let first = true;
-      let pinnedPort = 0;
-      let fastFailures = 0;
+      const loop = {
+        first: true,
+        pinnedPort: 0,
+        fastFailures: 0,
+        readyAt: undefined as number | undefined,
+      };
 
       while (true) {
-        let readyAt: number | undefined;
+        loop.readyAt = undefined;
 
         const attempt = yield* Effect.scoped(
           Effect.gen(function* () {
-            const running = yield* spawnServer(processConfig, first ? 0 : pinnedPort);
+            const running = yield* spawnServer(processConfig, loop.first ? 0 : loop.pinnedPort);
             const endpoint = yield* running.ready;
-            readyAt = yield* Clock.currentTimeMillis;
+            loop.readyAt = yield* Clock.currentTimeMillis;
 
-            const wasFirst = first;
+            const wasFirst = loop.first;
             if (wasFirst) {
-              pinnedPort = endpoint.port;
-              first = false;
+              loop.pinnedPort = endpoint.port;
+              loop.first = false;
             }
 
             const connection: ServerConnection = {
@@ -201,7 +204,7 @@ export function makeLocalServer(
           );
         }
 
-        if (first) {
+        if (loop.first) {
           yield* Effect.logWarning("Server supervision paused after initial failure").pipe(
             Effect.annotateLogs({ event: "server.supervisor.failed" }),
           );
@@ -215,15 +218,15 @@ export function makeLocalServer(
         }
 
         const now = yield* Clock.currentTimeMillis;
-        const uptime = readyAt === undefined ? 0 : now - readyAt;
-        if (uptime >= stableAfter) fastFailures = 0;
-        fastFailures += 1;
+        const uptime = loop.readyAt === undefined ? 0 : now - loop.readyAt;
+        if (uptime >= stableAfter) loop.fastFailures = 0;
+        loop.fastFailures += 1;
 
-        if (fastFailures > maxFailures) {
+        if (loop.fastFailures > maxFailures) {
           yield* Effect.logWarning("Server supervision paused after repeated failures").pipe(
             Effect.annotateLogs({
               event: "server.supervisor.restart_paused",
-              fastFailures,
+              fastFailures: loop.fastFailures,
               uptimeMs: uptime,
             }),
           );
@@ -232,17 +235,17 @@ export function makeLocalServer(
           yield* Effect.logInfo("Server restart requested").pipe(
             Effect.annotateLogs({ event: "server.supervisor.retry_requested" }),
           );
-          fastFailures = 0;
+          loop.fastFailures = 0;
           yield* setStatus(statusRef, "reconnecting");
           continue;
         }
 
-        const backoffMs = restartBackoff(fastFailures, initialDelay, maxDelay);
+        const backoffMs = restartBackoff(loop.fastFailures, initialDelay, maxDelay);
         yield* Effect.logWarning("Server restart scheduled").pipe(
           Effect.annotateLogs({
             event: "server.supervisor.restart_scheduled",
             backoffMs,
-            fastFailures,
+            fastFailures: loop.fastFailures,
             uptimeMs: uptime,
           }),
         );

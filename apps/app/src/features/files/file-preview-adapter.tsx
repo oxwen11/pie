@@ -5,13 +5,7 @@ import {
   type SelectedLineRange,
   useVirtualizer,
 } from "@pierre/diffs/react";
-import {
-  type MutableRefObject,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 const PREVIEW_UNSAFE_CSS = `
   :host {
@@ -49,11 +43,13 @@ const subscribeToAppTheme = (listener: () => void): (() => void) => {
 };
 
 function TargetLineScroller({
-  lastScrolledTarget,
+  hasScrolled,
+  onResetScroll,
   targetKey,
   targetLine,
 }: {
-  lastScrolledTarget: MutableRefObject<string | null>;
+  hasScrolled: (key: string) => boolean;
+  onResetScroll: () => void;
   targetKey: string | null;
   targetLine: number | undefined;
 }) {
@@ -61,10 +57,10 @@ function TargetLineScroller({
 
   useLayoutEffect(() => {
     if (targetKey === null || targetLine === undefined) {
-      lastScrolledTarget.current = null;
+      onResetScroll();
       return;
     }
-    if (virtualizer === undefined || lastScrolledTarget.current === targetKey) return;
+    if (virtualizer === undefined || hasScrolled(targetKey)) return;
 
     let scrollFrame = 0;
     const renderFrame = requestAnimationFrame(() => {
@@ -82,7 +78,7 @@ function TargetLineScroller({
       cancelAnimationFrame(renderFrame);
       cancelAnimationFrame(scrollFrame);
     };
-  }, [lastScrolledTarget, targetKey, targetLine, virtualizer]);
+  }, [hasScrolled, onResetScroll, targetKey, targetLine, virtualizer]);
 
   return null;
 }
@@ -99,6 +95,10 @@ export function FilePreviewAdapter({
   targetLine?: number;
 }) {
   const lastScrolledTarget = useRef<string | null>(null);
+  const onResetScroll = useCallback(() => {
+    lastScrolledTarget.current = null;
+  }, []);
+  const hasScrolled = useCallback((key: string) => lastScrolledTarget.current === key, []);
   const themeType = useSyncExternalStore(
     subscribeToAppTheme,
     getAppThemeType,
@@ -167,7 +167,8 @@ export function FilePreviewAdapter({
         contentStyle={{ display: "flex", minHeight: "100%", width: "100%" }}
       >
         <TargetLineScroller
-          lastScrolledTarget={lastScrolledTarget}
+          hasScrolled={hasScrolled}
+          onResetScroll={onResetScroll}
           targetKey={scrollTargetKey}
           targetLine={validTargetLine}
         />
