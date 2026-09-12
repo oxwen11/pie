@@ -37,6 +37,23 @@ function useWorkspaceLayout(): WorkspaceLayoutContextValue {
   return value;
 }
 
+function WorkspaceLayoutProvider({
+  children,
+  useDrawer,
+}: {
+  readonly children: ReactNode;
+  readonly useDrawer: boolean;
+}): ReactNode {
+  const [treeOpen, setTreeOpen] = useState(false);
+  const drawerId = useId();
+  const value = useMemo(
+    () => ({ drawerId, setTreeOpen, treeOpen, useDrawer }),
+    [drawerId, treeOpen, useDrawer],
+  );
+
+  return <WorkspaceLayoutContext value={value}>{children}</WorkspaceLayoutContext>;
+}
+
 export type WorkspaceLayoutProps = {
   children: ReactNode;
 };
@@ -44,9 +61,7 @@ export type WorkspaceLayoutProps = {
 export function WorkspaceLayout({ children }: WorkspaceLayoutProps): ReactNode {
   const isMobile = useIsMobile();
   const [isNarrow, setIsNarrow] = useState(false);
-  const [treeOpen, setTreeOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const drawerId = useId();
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -65,21 +80,13 @@ export function WorkspaceLayout({ children }: WorkspaceLayoutProps): ReactNode {
   }, []);
 
   const useDrawer = isMobile || isNarrow;
-  useLayoutEffect(() => {
-    if (!useDrawer) setTreeOpen(false);
-  }, [useDrawer]);
-
-  const value = useMemo(
-    () => ({ drawerId, setTreeOpen, treeOpen, useDrawer }),
-    [drawerId, treeOpen, useDrawer],
-  );
 
   return (
-    <WorkspaceLayoutContext value={value}>
-      <div ref={containerRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={containerRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <WorkspaceLayoutProvider key={useDrawer ? "drawer" : "split"} useDrawer={useDrawer}>
         {children}
-      </div>
-    </WorkspaceLayoutContext>
+      </WorkspaceLayoutProvider>
+    </div>
   );
 }
 
