@@ -114,6 +114,7 @@ function ChatInputQueueItem({
         >
           <Input
             aria-label="Edit queued message"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus the editor after the user starts editing
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

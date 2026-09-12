@@ -345,7 +345,7 @@ export class SessionLoopScheduler {
       } else {
         task.nextFireAt = null;
       }
-      if (task.pendingSince == null) task.pendingSince = now;
+      task.pendingSince ??= now;
     }
     for (const task of this.tasks.values()) {
       if (task.kind === "one_shot") continue;

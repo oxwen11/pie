@@ -142,7 +142,8 @@ export default defineConfig({
       },
     ],
     "jsx-a11y/role-supports-aria-props": "warn",
-    "jsx-a11y/no-autofocus": "off",
+    // Ultracite leaves these off; pie turns them on in this slice.
+    "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/prefer-tag-over-role": "off",
     "react/react-in-jsx-scope": "off",
     "unicorn/no-empty-file": "off",
@@ -151,10 +152,8 @@ export default defineConfig({
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
-    "typescript/consistent-return": "off",
-    "typescript/no-unnecessary-type-parameters": "off",
-    "promise/always-return": "off",
+    // Ultracite leaves this off; pie turns it on in this slice.
+    "promise/always-return": "error",
     "no-unused-vars": [
       "error",
       {
@@ -269,6 +268,50 @@ export default defineConfig({
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/prefer-reduce-type-parameter": "off",
         "no-promise-executor-return": "off",
+        "typescript/prefer-nullish-coalescing": "off",
+        "jsx-a11y/no-autofocus": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unnecessary-type-parameters": "off",
+        "promise/always-return": "off",
+        "typescript/consistent-return": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+      },
+    },
+    {
+      // `undefined` keeps the current value; `null` clears it. `??` collapses that.
+      files: ["packages/server/src/schedule/mutations.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Empty `SHELL` is missing, not a command. `??` would spawn `""`.
+      files: ["packages/server/src/terminal/pty.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Empty last segment (`foo/`) should fall back to the full path. `??` keeps `""`.
+      files: [
+        "apps/app/src/features/files/file-panel.tsx",
+        "apps/app/src/features/files/file-preview-pane.tsx",
+      ],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Once-used `E` keeps oRPC error factories precise through Effect.catchTags.
+      files: [
+        "packages/server/src/rpc/git.ts",
+        "packages/server/src/rpc/pull-request.ts",
+        "packages/server/src/rpc/resolve-workspace.ts",
+        "packages/server/src/rpc/session.ts",
+        "packages/server/src/rpc/terminal.ts",
+      ],
+      rules: {
+        "typescript/no-unnecessary-type-parameters": "off",
       },
     },
     {

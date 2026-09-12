@@ -14,8 +14,8 @@ export function writeText(filePath: string, contents: string): void {
   fs.writeFileSync(filePath, contents);
 }
 
-export function readJson<T>(filePath: string): T {
-  return JSON.parse(readText(filePath)) as T;
+export function readJson(filePath: string): unknown {
+  return JSON.parse(readText(filePath));
 }
 
 export function writeJson(filePath: string, value: unknown): void {
@@ -23,22 +23,22 @@ export function writeJson(filePath: string, value: unknown): void {
 }
 
 export function patchJson(filePath: string, patch: Record<string, unknown>): void {
-  const current = readJson<Record<string, unknown>>(filePath);
+  const current = readJson(filePath) as Record<string, unknown>;
   writeJson(filePath, { ...current, ...patch });
 }
 
-export function readJsonField<T>(filePath: string, key: string): T {
-  const data = readJson<Record<string, unknown>>(filePath);
+export function readJsonField(filePath: string, key: string): unknown {
+  const data = readJson(filePath) as Record<string, unknown>;
   const value = data[key];
   if (value === undefined || value === null) {
     throw new Error(`missing ${key} in ${filePath}`);
   }
-  return value as T;
+  return value;
 }
 
-export function tryReadJsonField<T>(filePath: string, key: string): T | undefined {
+export function tryReadJsonField(filePath: string, key: string): unknown {
   try {
-    return readJsonField<T>(filePath, key);
+    return readJsonField(filePath, key);
   } catch {
     return undefined;
   }

@@ -118,7 +118,7 @@ const applyTick = (schedule: Schedule, tickedAt: number, decision: TickDecision)
         return;
       default: {
         const exhaustive: never = decision;
-        return exhaustive;
+        void exhaustive;
       }
     }
   });

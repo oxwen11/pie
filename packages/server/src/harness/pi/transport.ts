@@ -134,6 +134,7 @@ export const makePiTransport = (
         if (!accepted) {
           return yield* transportError("write-closed", new Error("Pi transport is closed"));
         }
+        return undefined;
       });
 
     const removePending = (id: string) =>

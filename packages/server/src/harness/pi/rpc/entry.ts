@@ -29,9 +29,9 @@ import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
-process.emitWarning = (() => {
+process.emitWarning = () => {
   /* Pi RPC child must not leak Node experimental warnings onto the JSONL pipe */
-}) as typeof process.emitWarning;
+};
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {
   if (sessionId !== undefined) {
