@@ -19,10 +19,6 @@ function bunDownloadName(platform, arch) {
   throw new Error(`Unsupported Bun target: ${platform}-${arch}`);
 }
 
-function bunBinaryName(platform) {
-  return platform === "win32" ? "bun.exe" : "bun";
-}
-
 function curl(...args) {
   return execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
     encoding: "utf8",
@@ -31,7 +27,7 @@ function curl(...args) {
 
 function downloadBun(platform, arch) {
   const name = bunDownloadName(platform, arch);
-  const binary = bunBinaryName(platform);
+  const binary = platform === "win32" ? "bun.exe" : "bun";
   const dest = path.join(VENDOR_DIR, binary);
   fs.mkdirSync(VENDOR_DIR, { recursive: true });
   if (fs.statSync(dest, { throwIfNoEntry: false })?.isFile()) return;
@@ -69,10 +65,7 @@ function downloadBun(platform, arch) {
 }
 
 /** electron-builder hook: vendor the target Bun binary. */
-exports.default = async function beforePack(context) {
-  const arch =
-    typeof context.arch === "number"
-      ? ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch]
-      : context.arch;
-  downloadBun(context.electronPlatformName, arch ?? process.arch);
+exports.default = function beforePack(context) {
+  const arch = ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch];
+  downloadBun(context.electronPlatformName, arch);
 };
