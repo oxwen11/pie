@@ -35,7 +35,7 @@ export const desktopSurface: Surface = {
 async function startDesktop(ctx: LaunchCtx): Promise<void> {
   const desktop = expectLaunch(ctx, "desktop");
   const logPath = path.join(desktop.runDir, "logs/electron-vite.log");
-  const viteArgs = ["exec", "electron-vite", "dev"];
+  const viteArgs = ["run", "dev"];
   const child =
     process.platform !== "darwin" && process.env.DISPLAY === undefined
       ? spawnLogged("xvfb-run", ["-a", "pnpm", ...viteArgs], logPath, {
