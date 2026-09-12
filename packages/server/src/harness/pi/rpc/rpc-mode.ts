@@ -9,15 +9,16 @@
 
 import crypto from "node:crypto";
 
-import type {
-  AgentSessionRuntime,
-  ExtensionUIContext,
-  ExtensionUIDialogOptions,
-  ExtensionWidgetOptions,
-  WorkingIndicatorOptions,
+import {
+  initTheme,
+  Theme,
+  type AgentSessionRuntime,
+  type ExtensionUIContext,
+  type ExtensionUIDialogOptions,
+  type ExtensionWidgetOptions,
+  type WorkingIndicatorOptions,
 } from "@earendil-works/pi-coding-agent";
 
-import { initTheme, Theme } from "../pi-sdk";
 import { toJsonEvent } from "./json-event";
 import { attachJsonlLineReader, serializeJsonLine } from "./jsonl";
 import {

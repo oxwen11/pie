@@ -1,6 +1,4 @@
-import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
-
-import { createBashTool } from "./pi-sdk";
+import { createBashTool, type ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 const BLOCKED_EXACT = new Set(["PORT", "ELECTRON_RENDERER_PORT", "ELECTRON_RUN_AS_NODE"]);
 
