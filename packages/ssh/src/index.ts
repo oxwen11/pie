@@ -1,8 +1,7 @@
-export { SshPasswordPrompt, isSshAuthFailure } from "./auth";
-export type { SshPasswordPromptShape, SshPasswordRequest } from "./auth";
 export {
   baseSshArgs,
   findSshCommand,
+  isSshAuthFailure,
   isSshSpawnNotFound,
   probeSshClient,
   redactSshErrorOutput,
@@ -28,7 +27,6 @@ export {
   SshHostDiscoveryError,
   SshInvalidTargetError,
   SshLaunchError,
-  SshPasswordPromptError,
   SshReadinessError,
 } from "./errors";
 export type { SshEnvironmentError } from "./errors";
@@ -37,7 +35,6 @@ export {
   buildRemotePieRunnerScript,
   DEFAULT_NODE_ENGINE_RANGE,
   DEFAULT_PIE_PACKAGE_SPEC,
-  DEFAULT_REMOTE_PORT,
   PIE_SSH_CLI_PACKAGE_ENV,
   resolveRemotePiePackageSpec,
   REMOTE_LAUNCH_TIMEOUT_MS,
@@ -58,7 +55,6 @@ export {
 export type {
   DiscoveredSshHost,
   RemoteLaunchResult,
-  RemoteServerKind,
   SshEnvironmentBootstrap,
   SshTarget,
 } from "./target";

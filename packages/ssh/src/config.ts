@@ -10,13 +10,13 @@ const NO_HOSTS: ReadonlyArray<string> = [];
 
 function stripInlineComment(line: string): string {
   const hashIndex = line.indexOf("#");
-  return (hashIndex >= 0 ? line.slice(0, hashIndex) : line).trim();
+  return (hashIndex !== -1 ? line.slice(0, hashIndex) : line).trim();
 }
 
 function splitDirectiveArgs(value: string): ReadonlyArray<string> {
   const args: string[] = [];
   for (const rawEntry of value
-    .replace(/=(?!=)/gu, " ")
+    .replaceAll(/=(?!=)/gu, " ")
     .trim()
     .split(/\s+/u)) {
     const entry = rawEntry.trim();
@@ -41,12 +41,14 @@ function hasSshPattern(value: string): boolean {
 }
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 }
 
 function globToRegExp(pattern: string): RegExp {
   return new RegExp(
-    `^${escapeRegex(pattern).replace(/\\\*/gu, ".*").replace(/\\\?/gu, ".")}$`,
+    `^${escapeRegex(pattern)
+      .replaceAll(String.raw`\*`, ".*")
+      .replaceAll(String.raw`\?`, ".")}$`,
     "u",
   );
 }
@@ -77,8 +79,8 @@ const expandGlob = (
 
 export const collectSshConfigAliasesFromFile = (
   filePath: string,
-  visited = new Set<string>(),
   homeDir: string,
+  visited = new Set<string>(),
 ): Effect.Effect<ReadonlyArray<string>, PlatformError.PlatformError, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -102,8 +104,8 @@ export const collectSshConfigAliasesFromFile = (
           for (const includedPath of includedPaths) {
             const includedAliases = yield* collectSshConfigAliasesFromFile(
               includedPath,
-              visited,
               homeDir,
+              visited,
             );
             for (const alias of includedAliases) aliases.add(alias);
           }
@@ -122,49 +124,6 @@ export const collectSshConfigAliasesFromFile = (
     return Array.from(aliases).sort((left, right) => left.localeCompare(right));
   });
 
-function normalizeKnownHostsHostname(rawHost: string): string {
-  const bracketMatch = /^\[([^\]]+)\]:(\d+)$/u.exec(rawHost);
-  if (bracketMatch?.[1]) return bracketMatch[1];
-
-  if (!rawHost.includes(":")) return rawHost;
-
-  const firstColonIndex = rawHost.indexOf(":");
-  const lastColonIndex = rawHost.lastIndexOf(":");
-  return firstColonIndex === lastColonIndex ? rawHost.slice(0, lastColonIndex) : rawHost;
-}
-
-export function parseKnownHostsHostnames(raw: string): ReadonlyArray<string> {
-  const hostnames = new Set<string>();
-
-  for (const line of raw.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0 || trimmed.startsWith("#")) continue;
-
-    const withoutMarker = trimmed.startsWith("@")
-      ? trimmed.split(/\s+/u).slice(1).join(" ")
-      : trimmed;
-    const [hostField = ""] = withoutMarker.split(/\s+/u);
-    if (hostField.length === 0 || hostField.startsWith("|")) continue;
-
-    for (const rawHost of hostField.split(",")) {
-      const host = normalizeKnownHostsHostname(rawHost).trim();
-      if (host.length === 0 || hasSshPattern(host)) continue;
-      hostnames.add(host);
-    }
-  }
-
-  return Array.from(hostnames).sort((left, right) => left.localeCompare(right));
-}
-
-const readKnownHostsHostnames = (
-  filePath: string,
-): Effect.Effect<ReadonlyArray<string>, PlatformError.PlatformError, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    if (!(yield* fs.exists(filePath))) return NO_HOSTS;
-    return parseKnownHostsHostnames(yield* fs.readFileString(filePath));
-  });
-
 export const discoverSshHosts = (
   input: { readonly homeDir?: string } = {},
 ): Effect.Effect<ReadonlyArray<DiscoveredSshHost>, SshHostDiscoveryError, FileSystem.FileSystem> =>
@@ -172,39 +131,17 @@ export const discoverSshHosts = (
     const homeDir = input.homeDir ?? os.homedir();
     if (homeDir.trim().length === 0) return [];
 
-    const sshDirectory = path.join(homeDir, ".ssh");
-    const configAliases = yield* collectSshConfigAliasesFromFile(
-      path.join(sshDirectory, "config"),
-      new Set(),
+    const aliases = yield* collectSshConfigAliasesFromFile(
+      path.join(homeDir, ".ssh", "config"),
       homeDir,
     );
-    const knownHosts = yield* readKnownHostsHostnames(path.join(sshDirectory, "known_hosts"));
-    const discovered = new Map<string, DiscoveredSshHost>();
-
-    for (const alias of configAliases) {
-      discovered.set(alias, {
-        alias,
-        hostname: alias,
-        username: null,
-        port: null,
-        source: "ssh-config",
-      });
-    }
-
-    for (const hostname of knownHosts) {
-      if (discovered.has(hostname)) continue;
-      discovered.set(hostname, {
-        alias: hostname,
-        hostname,
-        username: null,
-        port: null,
-        source: "known-hosts",
-      });
-    }
-
-    return Array.from(discovered.values()).sort((left, right) =>
-      left.alias.localeCompare(right.alias),
-    );
+    return aliases.map((alias) => ({
+      alias,
+      hostname: alias,
+      username: null,
+      port: null,
+      source: "ssh-config" as const,
+    }));
   }).pipe(
     Effect.mapError(
       (cause) =>

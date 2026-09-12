@@ -1,23 +1,7 @@
-import {
-  AppInterface,
-  LOCAL_ENVIRONMENT_ID,
-  type EnvironmentFeed,
-  type ServerConnection,
-  type ServerStatusFeed,
-} from "@getpie/app";
-import { use, useEffect, useState, useSyncExternalStore, type ReactElement } from "react";
+import { AppInterface, type ServerConnection, type ServerStatusFeed } from "@getpie/app";
+import { use, useEffect, useState, type ReactElement } from "react";
 
 import { startupAnimation } from "./startup-animation";
-
-const localEnvironmentSnapshot = {
-  revision: 0,
-  activeId: LOCAL_ENVIRONMENT_ID,
-  connectingLabel: null,
-  remotes: [],
-} as const;
-
-const subscribeNoop = (): (() => void) => () => {};
-const getLocalEnvironmentSnapshot = () => localEnvironmentSnapshot;
 
 function sameConnection(a: ServerConnection, b: ServerConnection): boolean {
   return a.httpBaseUrl === b.httpBaseUrl && a.wsBaseUrl === b.wsBaseUrl && a.token === b.token;
@@ -27,22 +11,15 @@ export function ReadyApp({
   server,
   refresh,
   status,
-  environments,
   onReady,
 }: {
   server: Promise<ServerConnection>;
   refresh: () => Promise<ServerConnection>;
   status: ServerStatusFeed;
-  environments?: EnvironmentFeed;
   onReady: () => void;
 }): ReactElement {
   use(server);
-  const snapshot = useSyncExternalStore(
-    environments?.subscribe ?? subscribeNoop,
-    environments?.getSnapshot ?? getLocalEnvironmentSnapshot,
-  );
-
-  return <KeyedApp key={snapshot.activeId} load={refresh} status={status} onReady={onReady} />;
+  return <KeyedApp load={refresh} status={status} onReady={onReady} />;
 }
 
 function KeyedApp({
@@ -54,8 +31,7 @@ function KeyedApp({
   status: ServerStatusFeed;
   onReady: () => void;
 }): ReactElement {
-  // Once per environment mount (`key={activeId}`). A new promise every render
-  // would re-suspend `use`.
+  // One promise per mount. A new promise every render would re-suspend `use`.
   const [promise] = useState(() => load());
   const initial = use(promise);
   const [connection, setConnection] = useState(initial);

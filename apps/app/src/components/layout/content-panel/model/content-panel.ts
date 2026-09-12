@@ -1,7 +1,7 @@
-import type { SessionRef } from "@getpie/contract";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 import { sessionRefKey } from "@/lib/session-ref";
 
 import {
@@ -89,7 +89,8 @@ const EMPTY_SESSION: SessionPanels = { presentation: "hidden", activeId: null, p
 const NO_PANELS: readonly never[] = [];
 
 // NUL cannot occur in the JSON key, so `forget` can match a session by prefix.
-const instanceKey = (ref: SessionRef, id: string): string => `${sessionRefKey(ref)}\0${id}`;
+const instanceKey = (ref: EnvironmentSessionRef, id: string): string =>
+  `${sessionRefKey(ref)}\0${id}`;
 
 /**
  * The global instance: it owns the registry, the live panel instances, and a
@@ -156,7 +157,7 @@ export class ContentPanel<View = unknown> {
    * (then told via `reopen`) rather than duplicated. Returns the live instance.
    */
   open<Type extends string, Payload, Extra extends object>(
-    sessionRef: SessionRef,
+    sessionRef: EnvironmentSessionRef,
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
@@ -174,7 +175,7 @@ export class ContentPanel<View = unknown> {
    * source is removed and the existing target is reused instead of duplicated.
    */
   replace<Type extends string, Payload, Extra extends object>(
-    sessionRef: SessionRef,
+    sessionRef: EnvironmentSessionRef,
     currentId: string,
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
@@ -231,13 +232,13 @@ export class ContentPanel<View = unknown> {
    * type rather than by definition so `openable` stays plain data, shareable
    * across sessions instead of one bound closure per session per definition.
    */
-  openNew(sessionRef: SessionRef, type: string): void {
+  openNew(sessionRef: EnvironmentSessionRef, type: string): void {
     const definition = this.#definitions.get(type);
     if (!definition) return;
     this.#openWith(sessionRef, definition, definition.newPayload?.());
   }
 
-  activate(sessionRef: SessionRef, id: string): void {
+  activate(sessionRef: EnvironmentSessionRef, id: string): void {
     const session = this.#sessionOf(sessionRef);
     if (!session.panels.some((panel) => panel.id === id)) return;
     this.#writeSession(sessionRef, {
@@ -251,7 +252,7 @@ export class ContentPanel<View = unknown> {
    * The low-level door. `instance.close()` comes through here, and it is also
    * how an unresolved record left over from a retired panel type gets purged.
    */
-  close(sessionRef: SessionRef, id: string): void {
+  close(sessionRef: EnvironmentSessionRef, id: string): void {
     const session = this.#sessionOf(sessionRef);
     const index = session.panels.findIndex((panel) => panel.id === id);
     if (index === -1) return;
@@ -266,14 +267,14 @@ export class ContentPanel<View = unknown> {
     });
   }
 
-  setPresentation(sessionRef: SessionRef, presentation: PanelPresentation): void {
+  setPresentation(sessionRef: EnvironmentSessionRef, presentation: PanelPresentation): void {
     const session = this.#sessionOf(sessionRef);
     if (session.presentation === presentation) return;
     this.#writeSession(sessionRef, { ...session, presentation });
   }
 
   /** Hidden → docked, anything else → hidden. */
-  toggleVisibility(sessionRef: SessionRef): void {
+  toggleVisibility(sessionRef: EnvironmentSessionRef): void {
     const { presentation } = this.#sessionOf(sessionRef);
     this.setPresentation(sessionRef, presentation === "hidden" ? "docked" : "hidden");
   }
@@ -283,7 +284,7 @@ export class ContentPanel<View = unknown> {
    * session. No caller yet: nothing in the app hard-deletes a session, and
    * archiving is reversible, so forgetting there would lose a user's tabs.
    */
-  forget(sessionRef: SessionRef): void {
+  forget(sessionRef: EnvironmentSessionRef): void {
     const sessionKey = sessionRefKey(sessionRef);
     const prefix = `${sessionKey}\0`;
     for (const [key, instance] of this.#instances) {
@@ -300,7 +301,7 @@ export class ContentPanel<View = unknown> {
   }
 
   /** The test seam: asserts on instance lifetime without going through a render. */
-  instanceFor(sessionRef: SessionRef, id: string): PanelHandle<unknown> | undefined {
+  instanceFor(sessionRef: EnvironmentSessionRef, id: string): PanelHandle<unknown> | undefined {
     return this.#instances.get(instanceKey(sessionRef, id));
   }
 
@@ -310,7 +311,10 @@ export class ContentPanel<View = unknown> {
    * identical array — which is what lets `useStore` decide, by `Object.is`, not
    * to re-render. Select fields off this; the wrapper itself is cheap and fresh.
    */
-  snapshot(state: ContentPanelState, sessionRef: SessionRef | null): PanelSnapshot<View> {
+  snapshot(
+    state: ContentPanelState,
+    sessionRef: EnvironmentSessionRef | null,
+  ): PanelSnapshot<View> {
     const openable = this.#openableFor(state.registryVersion);
     if (sessionRef === null) {
       return { presentation: "hidden", panels: NO_PANELS, active: null, openable };
@@ -327,7 +331,7 @@ export class ContentPanel<View = unknown> {
   }
 
   #tabsFor(
-    sessionRef: SessionRef,
+    sessionRef: EnvironmentSessionRef,
     records: readonly PanelRecord[],
     registryVersion: number,
   ): readonly OpenPanel<View>[] {
@@ -384,7 +388,7 @@ export class ContentPanel<View = unknown> {
    * conditional collapses to a union and the spread stops type-checking.
    */
   #openWith(
-    sessionRef: SessionRef,
+    sessionRef: EnvironmentSessionRef,
     definition: AnyPanelDefinition<View>,
     payload: unknown,
   ): PanelHandle<unknown> {
@@ -426,19 +430,19 @@ export class ContentPanel<View = unknown> {
     this.store.setState((state) => ({ registryVersion: state.registryVersion + 1 }));
   }
 
-  #sessionOf(sessionRef: SessionRef): SessionPanels {
+  #sessionOf(sessionRef: EnvironmentSessionRef): SessionPanels {
     const state = this.store.getState();
     return state.bySessionKey[sessionRefKey(sessionRef)] ?? EMPTY_SESSION;
   }
 
-  #writeSession(sessionRef: SessionRef, session: SessionPanels): void {
+  #writeSession(sessionRef: EnvironmentSessionRef, session: SessionPanels): void {
     const sessionKey = sessionRefKey(sessionRef);
     this.store.setState((state) => ({
       bySessionKey: { ...state.bySessionKey, [sessionKey]: session },
     }));
   }
 
-  #setPayload(sessionRef: SessionRef, id: string, next: unknown): void {
+  #setPayload(sessionRef: EnvironmentSessionRef, id: string, next: unknown): void {
     const session = this.#sessionOf(sessionRef);
     this.#writeSession(sessionRef, {
       ...session,
@@ -458,7 +462,7 @@ export class ContentPanel<View = unknown> {
     });
   }
 
-  #disposeInstance(sessionRef: SessionRef, id: string): void {
+  #disposeInstance(sessionRef: EnvironmentSessionRef, id: string): void {
     const key = instanceKey(sessionRef, id);
     this.#instances.get(key)?.dispose?.();
     this.#instances.delete(key);
@@ -470,7 +474,7 @@ export class ContentPanel<View = unknown> {
    * moment it is rendered — and not before.
    */
   #ensureInstance(
-    sessionRef: SessionRef,
+    sessionRef: EnvironmentSessionRef,
     id: string,
     definition: AnyPanelDefinition<View>,
   ): PanelHandle<unknown> {
@@ -487,7 +491,7 @@ export class ContentPanel<View = unknown> {
     return instance;
   }
 
-  #createHandle(sessionRef: SessionRef, id: string): PanelHandle<unknown> {
+  #createHandle(sessionRef: EnvironmentSessionRef, id: string): PanelHandle<unknown> {
     // Arrows throughout: they close over `this` lexically, so the getter below
     // can reach the host without aliasing it.
     const payloadOf = (): unknown =>

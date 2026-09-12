@@ -2,13 +2,12 @@ import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { type ReactElement, useSyncExternalStore } from "react";
 
-import { LOCAL_ENVIRONMENT_ID, type EnvironmentSnapshot } from "./platform";
+import type { EnvironmentSnapshot } from "./platform";
 import { usePlatform } from "./platform-context";
 import type { ServerStatusFeed } from "./server-status";
 
 const LOCAL_ENVIRONMENT_SNAPSHOT: EnvironmentSnapshot = {
   revision: 0,
-  activeId: LOCAL_ENVIRONMENT_ID,
   connectingLabel: null,
   remotes: [],
 };
@@ -30,7 +29,6 @@ export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): React
     platform.ssh?.environments.subscribe ?? subscribeNoop,
     platform.ssh?.environments.getSnapshot ?? getLocalEnvironmentSnapshot,
   );
-  const remoteActive = environments.activeId !== LOCAL_ENVIRONMENT_ID;
   const connectingLabel = environments.connectingLabel;
 
   if (connectingLabel) {
@@ -50,9 +48,8 @@ export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): React
   }
 
   // Initial startup is owned by the host's branded sequence. This overlay
-  // only handles reconnecting or terminal failure. An SSH session talks to a
-  // tunneled remote daemon, so local restart noise stays off-screen.
-  if (status === "starting" || remoteActive) return null;
+  // only handles reconnecting or terminal failure.
+  if (status === "starting") return null;
 
   if (status === "reconnecting") {
     return (

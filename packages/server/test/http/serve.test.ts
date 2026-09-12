@@ -13,7 +13,9 @@ import { NodePlatformLayer } from "../platform";
 
 const ENV_KEYS = [
   "PIE_PORT",
+  "PIE_HOST",
   "PIE_CORS_ORIGINS",
+  "PIE_ALLOWED_HOSTS",
   "NODE_ENV",
   // `runServe` provides observability, which writes below `$PIE_HOME/logs`.
   // Pin it per test so the suite never touches the developer's real home.
@@ -39,25 +41,45 @@ describe("resolveServeConfig", () => {
   it("prefers the flag over env and default for the port", () => {
     process.env.PIE_PORT = "5000";
     expect(
-      resolveServeConfig({ port: Option.some(3000), corsOrigin: [], allowedHost: [] }).port,
+      resolveServeConfig({
+        port: Option.some(3000),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).port,
     ).toBe(3000);
   });
 
   it("falls back to PIE_PORT when no flag is given", () => {
     process.env.PIE_PORT = "5000";
-    expect(resolveServeConfig({ port: Option.none(), corsOrigin: [], allowedHost: [] }).port).toBe(
-      5000,
-    );
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).port,
+    ).toBe(5000);
   });
 
   it("defaults to 4000 in production and 0 in development", () => {
-    expect(resolveServeConfig({ port: Option.none(), corsOrigin: [], allowedHost: [] }).port).toBe(
-      4000,
-    );
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).port,
+    ).toBe(4000);
     process.env.NODE_ENV = "development";
-    expect(resolveServeConfig({ port: Option.none(), corsOrigin: [], allowedHost: [] }).port).toBe(
-      0,
-    );
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).port,
+    ).toBe(0);
   });
 
   it("prefers repeated --cors-origin flags over PIE_CORS_ORIGINS", () => {
@@ -65,6 +87,7 @@ describe("resolveServeConfig", () => {
     expect(
       resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: ["https://a.test", "https://b.test"],
         allowedHost: [],
       }).corsOrigins,
@@ -74,8 +97,60 @@ describe("resolveServeConfig", () => {
   it("falls back to the comma-separated env list when no flag is given", () => {
     process.env.PIE_CORS_ORIGINS = " https://a.test , https://b.test ,";
     expect(
-      resolveServeConfig({ port: Option.none(), corsOrigin: [], allowedHost: [] }).corsOrigins,
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).corsOrigins,
     ).toEqual(["https://a.test", "https://b.test"]);
+  });
+
+  it("defaults the bind host to loopback and takes PIE_HOST", () => {
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).host,
+    ).toBe("127.0.0.1");
+    process.env.PIE_HOST = "0.0.0.0";
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.none(),
+        corsOrigin: [],
+        allowedHost: [],
+      }).host,
+    ).toBe("0.0.0.0");
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.some("192.168.31.135"),
+        corsOrigin: [],
+        allowedHost: [],
+      }).host,
+    ).toBe("192.168.31.135");
+  });
+
+  it("adds a specific LAN bind address to allowed hosts, not 0.0.0.0", () => {
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.some("192.168.31.135"),
+        corsOrigin: [],
+        allowedHost: [],
+      }).allowedHosts,
+    ).toEqual(["192.168.31.135"]);
+    expect(
+      resolveServeConfig({
+        port: Option.none(),
+        host: Option.some("0.0.0.0"),
+        corsOrigin: [],
+        allowedHost: ["192.168.31.135"],
+      }).allowedHosts,
+    ).toEqual(["192.168.31.135"]);
   });
 });
 
@@ -94,9 +169,14 @@ describe("runServe", () => {
 
     try {
       const exit = await Effect.runPromiseExit(
-        Effect.scoped(runServe({ port: Option.some(port), corsOrigin: [], allowedHost: [] })).pipe(
-          Effect.provide(NodePlatformLayer),
-        ),
+        Effect.scoped(
+          runServe({
+            port: Option.some(port),
+            host: Option.none(),
+            corsOrigin: [],
+            allowedHost: [],
+          }),
+        ).pipe(Effect.provide(NodePlatformLayer)),
       );
       const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
       expect(error).toBeInstanceOf(ServerStartupError);

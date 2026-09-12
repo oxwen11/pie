@@ -120,26 +120,16 @@ describe("connection identity", () => {
 describe("parseRemoteLaunchOutput", () => {
   it("reads the last JSON object from mixed stdout", () => {
     expect(
-      parseRemoteLaunchOutput(
-        'starting\n{"remotePort":41234,"token":"secret-token","serverKind":"daemon"}\n',
-      ),
+      parseRemoteLaunchOutput('starting\n{"remotePort":41234,"token":"secret-token"}\n'),
     ).toEqual({
       remotePort: 41234,
       token: "secret-token",
-      serverKind: "daemon",
     });
   });
 
   it("rejects a payload without a daemon token or port", () => {
-    expect(
-      parseRemoteLaunchOutput('{"remotePort":0,"token":"x","serverKind":"daemon"}'),
-    ).toBeUndefined();
-    expect(
-      parseRemoteLaunchOutput('{"remotePort":4000,"token":"","serverKind":"daemon"}'),
-    ).toBeUndefined();
-    expect(
-      parseRemoteLaunchOutput('{"remotePort":4000,"token":"secret","serverKind":"serve"}'),
-    ).toBeUndefined();
+    expect(parseRemoteLaunchOutput('{"remotePort":0,"token":"x"}')).toBeUndefined();
+    expect(parseRemoteLaunchOutput('{"remotePort":4000,"token":""}')).toBeUndefined();
   });
 
   it("extracts the last brace-delimited object", () => {

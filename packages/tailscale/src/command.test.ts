@@ -75,11 +75,13 @@ describe("findTailscaleCommand", () => {
         yield* fs.chmod(hidden, 0o755);
         return {
           found: yield* findTailscaleCommand({ env: { PATH: onPath }, platform: "linux" }),
+          required: yield* requireTailscaleCommand({ env: { PATH: onPath }, platform: "linux" }),
           expected: visible,
         };
       }),
     );
     expect(result.found).toBe(result.expected);
+    expect(result.required).toBe(result.expected);
   });
 
   it("reports missing when PATH has no tailscale binary", async () => {

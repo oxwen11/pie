@@ -43,7 +43,7 @@ command -v pie
 command -v node
 node -v
 `;
-  return await new Promise((resolve) => {
+  return new Promise((resolve) => {
     childProcess.execFile(
       "/bin/sh",
       ["-c", script],
@@ -63,7 +63,9 @@ describe("remote launch scripts", () => {
     expect(script).toContain("daemon start");
     expect(script).toContain("$HOME/.pie/daemon/daemon.pid");
     expect(script).toContain("$HOME/.pie/ssh-launch/");
-    expect(script).toContain('serverKind: "daemon"');
+    expect(script).toContain("remotePort: port");
+    expect(script).toContain("token: token");
+    expect(script).not.toContain("serverKind");
     expect(script).not.toContain("@@PIE_");
   });
 
@@ -83,11 +85,13 @@ describe("remote launch scripts", () => {
   });
 
   it("embeds the Node 24 engine check", () => {
-    const script = buildRemoteLaunchScript({ nodeEngineRange: DEFAULT_NODE_ENGINE_RANGE });
+    const script = buildRemoteLaunchScript();
     expect(script).toContain("v24.*");
     expect(script).toContain("VOLTA_HOME");
-    expect(script).toContain("nvm.sh");
-    expect(script).toContain("NVM_NO_USE");
+    expect(script).not.toContain("nvm.sh");
+    expect(script).not.toContain("NVM_NO_USE");
+    expect(script).not.toContain("fnm env");
+    expect(script).not.toContain("mise activate");
     expect(script).toContain("node-versions");
     expect(script).toContain("pie needs Node 24");
   });
@@ -143,6 +147,44 @@ nvm() { :; }
       expect(result.stdout).toContain("v24.18.0");
       expect(result.stdout).toContain(`${path.dirname(fnmNode)}/node`);
       expect(result.stdout.split("\n")[0]).toContain("/.local/bin");
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the first Node 24 match from a version-manager glob", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-node-first-"));
+    try {
+      const first = path.join(
+        home,
+        ".local",
+        "share",
+        "fnm",
+        "node-versions",
+        "v24.0.0",
+        "installation",
+        "bin",
+        "node",
+      );
+      const last = path.join(
+        home,
+        ".local",
+        "share",
+        "fnm",
+        "node-versions",
+        "v24.18.0",
+        "installation",
+        "bin",
+        "node",
+      );
+      await writeExecutable(first, nodeShim("v24.0.0"));
+      await writeExecutable(last, nodeShim("v24.18.0"));
+      await writeExecutable(path.join(home, ".local", "bin", "pie"), "#!/bin/sh\necho pie-ok\n");
+
+      const result = await runEnsure(home, "/usr/bin:/bin");
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("v24.0.0");
+      expect(result.stdout).not.toContain("v24.18.0");
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

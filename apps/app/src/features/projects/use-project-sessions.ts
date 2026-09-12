@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { sameSessionRef } from "@/lib/session-ref";
-
 export const selectProjectSessionTitle = (
   sessions: ReadonlyArray<SessionSummary>,
   ref: SessionRef,
 ): string | null | undefined => {
-  const session = sessions.find((candidate) => sameSessionRef(candidate, ref));
+  const session = sessions.find(
+    (candidate) => candidate.projectId === ref.projectId && candidate.sessionId === ref.sessionId,
+  );
   return session === undefined ? undefined : (session.title ?? null);
 };
 

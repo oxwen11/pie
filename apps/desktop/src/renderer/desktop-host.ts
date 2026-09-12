@@ -1,4 +1,4 @@
-import type { ServerStatusFeed, Platform, EnvironmentSnapshot } from "@getpie/app";
+import type { ServerStatusFeed, Platform } from "@getpie/app";
 import { consumeEventIterator } from "@orpc/client";
 
 import type { ServerConnection, DesktopBootstrap } from "../shared/desktop-rpc";
@@ -34,8 +34,6 @@ export function createDesktopHost(
   let statusRevision = bootstrap.statusRevision;
   let environments = bootstrap.environments;
 
-  const environmentListeners = new Set<(snapshot: EnvironmentSnapshot) => void>();
-
   return {
     platform: {
       quit: () => {
@@ -49,9 +47,8 @@ export function createDesktopHost(
         environments: {
           getSnapshot: () => environments,
           subscribe: (listener) => {
-            environmentListeners.add(listener);
             const controller = new AbortController();
-            let revision = bootstrap.environments.revision;
+            let revision = environments.revision;
             const unsubscribe = consumeEventIterator(
               client.environments.subscribe({ after: revision }, { signal: controller.signal }),
               {
@@ -59,7 +56,7 @@ export function createDesktopHost(
                   if (snapshot.revision <= revision) return;
                   revision = snapshot.revision;
                   environments = snapshot;
-                  for (const current of environmentListeners) current(snapshot);
+                  listener(snapshot);
                 },
                 onError: (error) => {
                   if (!controller.signal.aborted && !isAbortError(error)) {
@@ -71,7 +68,6 @@ export function createDesktopHost(
             );
 
             return () => {
-              environmentListeners.delete(listener);
               controller.abort();
               void unsubscribe().catch((error: unknown) => {
                 if (!isAbortError(error)) {
@@ -83,7 +79,6 @@ export function createDesktopHost(
         },
         discoverHosts: () => client.environments.discoverSshHosts(),
         connect: (target) => client.environments.connectSsh({ target }),
-        disconnect: () => client.environments.disconnectSsh(),
         remove: (id) => client.environments.removeSsh({ id }),
       },
       tailscale: {

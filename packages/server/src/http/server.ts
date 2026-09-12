@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { RequestListener, Server } from "node:http";
 import http from "node:http";
 
@@ -10,6 +11,7 @@ import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
 import { makeRequestApp } from "./app";
 import { createTicketStore, type TicketStore } from "./auth";
 import { isAllowedOrigin, isLoopbackHost } from "./cors";
+import { createPairingStore, type PairingStore } from "./pairing";
 import { createUIHandler, type UIApp } from "./ui";
 
 export type ManagedServer = Server & {
@@ -39,6 +41,12 @@ export type CreateServerOptions = {
   effectContext?: Context.Context<never> | undefined;
   /** Authenticated daemon-only shutdown callback. */
   shutdown?: (() => void) | undefined;
+  /**
+   * Stable Environment id this daemon authors. Pairing exchange returns it so
+   * SSH and a paired browser name the same daemon. Unset mints a process-local
+   * UUID (tests); `runServe` persists one under `$PIE_HOME`.
+   */
+  environmentId?: string | undefined;
 };
 
 /** Startup failed for an operational reason: building the server or binding. */
@@ -232,6 +240,7 @@ const buildServer = (
       allowedHosts = [],
       effectContext = Context.empty(),
       shutdown,
+      environmentId,
     } = options;
     const runInContext = Effect.runForkWith(effectContext);
 
@@ -241,6 +250,10 @@ const buildServer = (
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
     const tickets = createTicketStore();
+    const pairing: PairingStore | undefined =
+      authToken === undefined
+        ? undefined
+        : createPairingStore({ environmentId: environmentId ?? crypto.randomUUID() });
 
     const ui = yield* Effect.promise(() => stages.createUI(rpcRuntime));
 
@@ -253,7 +266,7 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, shutdown, ui }),
+        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, pairing, shutdown, ui }),
         requestScope,
       ),
     );

@@ -22,6 +22,8 @@ export class Paths extends Context.Service<
     readonly worktreesDir: string;
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
     readonly logsDir: string;
+    /** `storage/ssh-environments.json` — Desktop and CLI saved SSH hosts. */
+    readonly sshEnvironmentsFile: string;
   }
 >()("Paths") {}
 
@@ -39,6 +41,7 @@ const resolve = (home: string) => ({
   schedulesDir: path.join(home, "storage", "schedules"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
+  sshEnvironmentsFile: sshEnvironmentsFile(home),
 });
 
 /**
@@ -120,6 +123,11 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
+
+/** Saved SSH hosts for Desktop and CLI. Not Electron userData. */
+export function sshEnvironmentsFile(home: string): string {
+  return path.join(home, "storage", "ssh-environments.json");
+}
 
 export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 

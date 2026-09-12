@@ -26,23 +26,17 @@ export type ServerConnection = typeof ServerConnectionSchema.Type;
 export const DesktopOsSchema = Schema.Literals(["macos", "windows", "linux"]);
 export type DesktopOs = typeof DesktopOsSchema.Type;
 
-export const LOCAL_ENVIRONMENT_ID = "local";
-
-export const SshRemoteStatusSchema = Schema.Literals(["idle", "connecting", "ready", "error"]);
-export type SshRemoteStatus = typeof SshRemoteStatusSchema.Type;
-
 export const SshRemoteEnvironmentSchema = Schema.Struct({
   id: Schema.NonEmptyString,
+  environmentId: Schema.NonEmptyString,
   label: Schema.NonEmptyString,
   alias: Schema.NonEmptyString,
-  status: SshRemoteStatusSchema,
-  error: Schema.optionalKey(Schema.String),
+  connection: ServerConnectionSchema,
 });
 export type SshRemoteEnvironment = typeof SshRemoteEnvironmentSchema.Type;
 
 export const EnvironmentSnapshotSchema = Schema.Struct({
   revision: Schema.Natural,
-  activeId: Schema.NonEmptyString,
   connectingLabel: Schema.NullOr(Schema.String),
   remotes: Schema.Array(SshRemoteEnvironmentSchema),
 });
@@ -53,16 +47,9 @@ export const DiscoveredSshHostSchema = Schema.Struct({
   hostname: Schema.NonEmptyString,
   username: Schema.NullOr(Schema.String),
   port: Schema.NullOr(Schema.Int),
-  source: Schema.Literals(["ssh-config", "known-hosts", "tailscale"]),
+  source: Schema.Literals(["ssh-config", "tailscale"]),
 });
 export type DiscoveredSshHost = typeof DiscoveredSshHostSchema.Type;
-
-export const emptyEnvironmentSnapshot = (): EnvironmentSnapshot => ({
-  revision: 0,
-  activeId: LOCAL_ENVIRONMENT_ID,
-  connectingLabel: null,
-  remotes: [],
-});
 
 export const SshClientAvailabilitySchema = Schema.Union([
   Schema.Struct({ available: Schema.Literal(true) }),
@@ -114,7 +101,6 @@ export const desktopContract = {
       .output(asyncIteratorObject(toStandardSchema(EnvironmentSnapshotSchema))),
     discoverSshHosts: oc.output(Schema.Array(DiscoveredSshHostSchema)),
     connectSsh: oc.input(Schema.Struct({ target: Schema.NonEmptyString })).output(Schema.Void),
-    disconnectSsh: oc.output(Schema.Void),
     removeSsh: oc.input(Schema.Struct({ id: Schema.NonEmptyString })).output(Schema.Void),
   },
   tailscale: {

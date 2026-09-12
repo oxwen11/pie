@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -8,7 +8,8 @@ import "./index.css";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
-import { createAppClients } from "./lib/orpc";
+import { createAppClients, type AppClients } from "./lib/orpc";
+import { toSessionRef } from "./lib/session-ref";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
@@ -29,18 +30,7 @@ declare global {
 // renderer's CSP blocks with a console error.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-grab/core").then(({ init }) => {
-    // Banner is a CSS-styled console.log with an inline SVG. Chromium's
-    // ELECTRON_ENABLE_LOGGING dumps that as a multi-kilobyte TTY blob.
-    const log = console.log.bind(console);
-    console.log = (...args: unknown[]) => {
-      if (typeof args[0] === "string" && args[0].includes("%cReact Grab")) return;
-      log(...args);
-    };
-    try {
-      init({ telemetry: false });
-    } finally {
-      console.log = log;
-    }
+    init({ telemetry: false });
   });
 }
 
@@ -57,22 +47,95 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
+async function loadLocalEnvironmentId(server?: ServerConnection): Promise<string> {
+  if (server === undefined) return "local";
+  try {
+    const response = await globalThis.fetch(`${server.httpBaseUrl}/api/environment`, {
+      headers: { authorization: `Bearer ${server.token}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return "local";
+    const body = (await response.json()) as { id?: unknown };
+    return typeof body.id === "string" && body.id.length > 0 ? body.id : "local";
+  } catch {
+    return "local";
+  }
+}
+
 /** Shared application entry. PlatformProvider is the host seam above it. */
-export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
+export function AppInterface({
+  server,
+  environmentId,
+}: {
+  server?: ServerConnection;
+  environmentId?: string;
+}): ReactElement {
   usePlatform();
-  // Daemon respawn mints a new ticket token. Keep clients tied to that identity
-  // so getTicket cannot keep posting the previous Bearer.
   const identity = server ? `${server.httpBaseUrl}\0${server.token}` : "default";
-  return <AppRuntime key={identity} server={server} />;
+  return <AppRuntime key={identity} server={server} environmentId={environmentId} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
-function AppRuntime({ server }: { server?: ServerConnection }): ReactElement {
-  const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => createAppClients(server));
-  const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
-  // Composition root: the only place that knows Chat's wire transport is oRPC.
+function AppRuntime({
+  server,
+  environmentId,
+}: {
+  server?: ServerConnection;
+  environmentId?: string;
+}): ReactElement {
+  const platform = usePlatform();
+  const localClients = useState(() => createAppClients(server))[0];
+  const remoteClients = useState(() => new Map<string, AppClients>())[0];
+
+  useEffect(() => {
+    const feed = platform.ssh?.environments;
+    if (feed === undefined) return undefined;
+    const sync = () => {
+      for (const remote of feed.getSnapshot().remotes) {
+        if (!remoteClients.has(remote.environmentId)) {
+          remoteClients.set(remote.environmentId, createAppClients(remote.connection));
+        }
+      }
+    };
+    sync();
+    return feed.subscribe(sync);
+  }, [platform.ssh, remoteClients]);
+
+  const clientsFor = async (id: string): Promise<AppClients> => {
+    const resolved = id === "pending" ? await loadLocalEnvironmentId(server) : id;
+    if (resolved === (environmentId ?? "local") || resolved === "local" || resolved === "pending") {
+      return localClients;
+    }
+    const cached = remoteClients.get(resolved);
+    if (cached) return cached;
+    const remote = platform.ssh?.environments
+      .getSnapshot()
+      .remotes.find((entry) => entry.environmentId === resolved);
+    if (remote === undefined) return localClients;
+    const created = createAppClients(remote.connection);
+    remoteClients.set(resolved, created);
+    return created;
+  };
+
+  const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => localClients);
+  const [router] = useState(() =>
+    createRouter({
+      orpcClient,
+      queryClient,
+      orpcQueryUtils,
+      localEnvironmentId: environmentId ?? "local",
+      clientsFor,
+    }),
+  );
   const [chatManager] = useState(
-    () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),
+    () =>
+      new ChatManager((ref) => {
+        const clients =
+          ref.environmentId === (environmentId ?? "local")
+            ? localClients
+            : (remoteClients.get(ref.environmentId) ?? localClients);
+        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
+      }),
   );
 
   return (

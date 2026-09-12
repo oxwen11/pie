@@ -22,7 +22,8 @@ export type CreatePieClientOptions = {
 };
 
 function defaultWsUrl(): URL {
-  const url = new URL("/ws/rpc", globalThis.location.origin);
+  const location = (globalThis as { location?: { origin?: string } }).location;
+  const url = new URL("/ws/rpc", location?.origin ?? "http://127.0.0.1");
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url;
 }

@@ -1,14 +1,15 @@
 {
   "name": "@getpie/cli",
   "version": "0.0.2",
-  "description": "Pie CLI — daemon and serve for the Pi coding agent",
+  "description": "Pie CLI — daemon, serve, and a standalone relay hop for the Pi coding agent",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oxwen11/pie.git",
     "directory": "packages/pie"
   },
   "bin": {
-    "pie": "./dist/cli.mjs"
+    "pie": "./dist/cli.mjs",
+    "pie-relay": "./dist/relay.mjs"
   },
   "files": [
     "dist"
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@effect/platform-node": "catalog:effect",
     "@effect/vitest": "catalog:effect",
+    "@getpie/client": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",

@@ -14,6 +14,8 @@ import {
 import { Context, Effect, FileSystem, Layer, Ref } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
+import { LoginShellEnvironment } from "../server/login-shell-environment";
+
 export type {
   TailscaleClientAvailability,
   TailscaleEnvironmentError,
@@ -92,7 +94,11 @@ const emptySnapshot = (
   serveEnabled,
 });
 
-export function makeDesktopTailscale(): Effect.Effect<
+export function makeDesktopTailscale(
+  input: {
+    readonly env?: NodeJS.ProcessEnv;
+  } = {},
+): Effect.Effect<
   DesktopTailscale["Service"],
   never,
   FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
@@ -101,11 +107,12 @@ export function makeDesktopTailscale(): Effect.Effect<
     const platform = yield* Effect.context<
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
-    const client = yield* probeTailscaleClient();
+    const cli = { env: input.env };
+    const client = yield* probeTailscaleClient(cli);
     const serveEnabledRef = yield* Ref.make(false);
 
     const snapshotFromStatus = (serveEnabled: boolean) =>
-      readTailscaleStatus.pipe(
+      readTailscaleStatus(cli).pipe(
         Effect.map((status) => {
           const magicDnsName = status.magicDnsName;
           return {
@@ -123,7 +130,7 @@ export function makeDesktopTailscale(): Effect.Effect<
     return DesktopTailscale.of({
       client,
       listSshHosts: client.available
-        ? listOnlineTailscaleSshHosts.pipe(Effect.provide(platform))
+        ? listOnlineTailscaleSshHosts(cli).pipe(Effect.provide(platform))
         : Effect.succeed([]),
       snapshot: Effect.gen(function* () {
         if (!client.available) return emptySnapshot(client);
@@ -138,16 +145,22 @@ export function makeDesktopTailscale(): Effect.Effect<
               message: client.message,
             });
           }
-          yield* ensureTailscaleServe({ localPort });
+          yield* ensureTailscaleServe({ localPort, env: input.env });
           yield* Ref.set(serveEnabledRef, true);
         }).pipe(Effect.provide(platform)),
       disableServe: Effect.gen(function* () {
         if (!client.available) return;
-        yield* disableTailscaleServe();
+        yield* disableTailscaleServe({ env: input.env });
         yield* Ref.set(serveEnabledRef, false);
       }).pipe(Effect.provide(platform)),
     });
   });
 }
 
-export const DesktopTailscaleLive = Layer.effect(DesktopTailscale, makeDesktopTailscale());
+export const DesktopTailscaleLive = Layer.effect(
+  DesktopTailscale,
+  Effect.gen(function* () {
+    const loginShell = yield* LoginShellEnvironment;
+    return yield* makeDesktopTailscale({ env: loginShell.env });
+  }),
+);

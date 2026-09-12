@@ -12,6 +12,7 @@
     "./git": "./src/git/index.ts",
     "./rpc": "./src/rpc/index.ts",
     "./http": "./src/http/index.ts",
+    "./relay": "./src/relay/index.ts",
     "./daemon": "./src/daemon/index.ts",
     "./observability": "./src/observability/index.ts"
   },
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
+    "@getpie/client": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@types/ws": "catalog:"
   }

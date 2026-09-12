@@ -46,7 +46,7 @@ describe("mergeDiscoveredHosts", () => {
     ]);
   });
 
-  it("skips a Tailscale host whose hostname is already in known_hosts", () => {
+  it("skips a Tailscale host whose hostname is already in ssh-config", () => {
     const merged = mergeDiscoveredHosts(
       [
         {
@@ -54,7 +54,7 @@ describe("mergeDiscoveredHosts", () => {
           hostname: "box.tailnet.ts.net",
           username: null,
           port: null,
-          source: "known-hosts",
+          source: "ssh-config",
         },
       ],
       [
@@ -71,7 +71,7 @@ describe("mergeDiscoveredHosts", () => {
         hostname: "box.tailnet.ts.net",
         username: null,
         port: null,
-        source: "known-hosts",
+        source: "ssh-config",
       },
     ]);
   });

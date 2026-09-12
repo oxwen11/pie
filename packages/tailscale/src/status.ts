@@ -1,6 +1,10 @@
 import { Effect } from "effect";
 
-import { runTailscaleCommand, TAILSCALE_STATUS_TIMEOUT_MS } from "./command";
+import {
+  runTailscaleCommand,
+  TAILSCALE_STATUS_TIMEOUT_MS,
+  type FindTailscaleCommandOptions,
+} from "./command";
 import { TailscaleStatusParseError } from "./errors";
 
 /** CGNAT range Tailscale assigns: 100.64.0.0/10. */
@@ -32,7 +36,6 @@ export type TailscalePeerHost = {
 export type TailscaleStatus = {
   readonly backendState: string | null;
   readonly magicDnsName: string | null;
-  readonly tailnetIpv4Addresses: readonly string[];
   readonly peers: readonly TailscalePeerHost[];
 };
 
@@ -89,7 +92,6 @@ export function decodeTailscaleStatus(raw: string): TailscaleStatus {
   const backendState = stringField(root, "BackendState");
   const self = asRecord(root["Self"]);
   const magicDnsName = self === null ? null : (peerHostFromStatusNode(self)?.hostname ?? null);
-  const tailnetIpv4Addresses = self === null ? [] : ipv4AddressesOf(self["TailscaleIPs"]);
 
   const peers: TailscalePeerHost[] = [];
   const seen = new Set<string>();
@@ -110,7 +112,6 @@ export function decodeTailscaleStatus(raw: string): TailscaleStatus {
   return {
     backendState,
     magicDnsName,
-    tailnetIpv4Addresses,
     peers: Array.from(peers).sort((left, right) => left.alias.localeCompare(right.alias)),
   };
 }
@@ -129,13 +130,14 @@ export const parseTailscaleStatus = (
           }),
   });
 
-export const readTailscaleStatus = runTailscaleCommand(
-  ["status", "--json"],
-  TAILSCALE_STATUS_TIMEOUT_MS,
-).pipe(Effect.flatMap((result) => parseTailscaleStatus(result.stdout)));
+export const readTailscaleStatus = (input: FindTailscaleCommandOptions = {}) =>
+  runTailscaleCommand(["status", "--json"], TAILSCALE_STATUS_TIMEOUT_MS, input).pipe(
+    Effect.flatMap((result) => parseTailscaleStatus(result.stdout)),
+  );
 
 /** Online tailnet peers as SSH hosts. Missing CLI or status errors become `[]`. */
-export const listOnlineTailscaleSshHosts = readTailscaleStatus.pipe(
-  Effect.map((status) => status.peers.filter((peer) => peer.online)),
-  Effect.orElseSucceed((): readonly TailscalePeerHost[] => []),
-);
+export const listOnlineTailscaleSshHosts = (input: FindTailscaleCommandOptions = {}) =>
+  readTailscaleStatus(input).pipe(
+    Effect.map((status) => status.peers.filter((peer) => peer.online)),
+    Effect.orElseSucceed((): readonly TailscalePeerHost[] => []),
+  );

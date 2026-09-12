@@ -1,21 +1,20 @@
 /** The OS a native host runs on. `undefined` means the browser. */
 export type PlatformOs = "macos" | "windows" | "linux";
 
-export const LOCAL_ENVIRONMENT_ID = "local";
-
-export type SshRemoteStatus = "idle" | "connecting" | "ready" | "error";
-
 export type SshRemoteEnvironment = {
   readonly id: string;
+  readonly environmentId: string;
   readonly label: string;
   readonly alias: string;
-  readonly status: SshRemoteStatus;
-  readonly error?: string;
+  readonly connection: {
+    readonly httpBaseUrl: string;
+    readonly wsBaseUrl: string;
+    readonly token: string;
+  };
 };
 
 export type EnvironmentSnapshot = {
   readonly revision: number;
-  readonly activeId: string;
   readonly connectingLabel: string | null;
   readonly remotes: readonly SshRemoteEnvironment[];
 };
@@ -25,7 +24,7 @@ export type DiscoveredSshHost = {
   readonly hostname: string;
   readonly username: string | null;
   readonly port: number | null;
-  readonly source: "ssh-config" | "known-hosts" | "tailscale";
+  readonly source: "ssh-config" | "tailscale";
 };
 
 /** How the UI observes which server the desktop host is talking to. */
@@ -43,7 +42,6 @@ export type PlatformSsh = {
   readonly environments: EnvironmentFeed;
   readonly discoverHosts: () => Promise<readonly DiscoveredSshHost[]>;
   readonly connect: (target: string) => Promise<void>;
-  readonly disconnect: () => Promise<void>;
   readonly remove: (id: string) => Promise<void>;
 };
 
@@ -77,9 +75,9 @@ export type Platform = {
    */
   os?: PlatformOs;
   /**
-   * Desktop-only: switch between this computer's daemon and an SSH-forwarded
-   * remote pie daemon. Absent in the browser. On desktop, `client.available`
-   * is false when OpenSSH is not on PATH — local stays the only environment.
+   * Desktop-only: SSH-forwarded remote pie daemons, all connected in parallel.
+   * Absent in the browser. On desktop, `client.available` is false when OpenSSH
+   * is not on PATH.
    */
   ssh?: PlatformSsh;
   /**

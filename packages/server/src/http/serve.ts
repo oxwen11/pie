@@ -1,10 +1,11 @@
 import { Cause, Context, Effect, Option, Scope } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-import { PathsLayer } from "../config/paths";
+import { Paths, PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
+import { loadOrCreateEnvironmentId } from "./environment-id";
 import { formatReadyLine } from "./handshake";
-import { listenServer } from "./listen";
+import { DEFAULT_LISTEN_HOST, extraAllowedHostsForListen, listenServer } from "./listen";
 import { createServer, ServerStartupError } from "./server";
 
 const DEFAULT_PORT = 4000;
@@ -35,9 +36,48 @@ function portFromEnv(): number {
   return Number.isInteger(port) && port >= 0 ? port : DEFAULT_PORT;
 }
 
+function hostFromEnv(): string {
+  const raw = process.env.PIE_HOST?.trim();
+  return raw === undefined || raw.length === 0 ? DEFAULT_LISTEN_HOST : raw;
+}
+
+function uniqueHosts(hosts: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const host of hosts) {
+    const key = host.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(host);
+  }
+  return out;
+}
+
+/** Env the daemon child should inherit so `pie daemon start --host` actually binds. */
+export function daemonServeEnvironment(
+  env: NodeJS.ProcessEnv,
+  config: ServeConfig,
+): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = {
+    ...env,
+    PIE_HOST: config.host,
+  };
+  if (config.corsOrigins.length > 0) {
+    next.PIE_CORS_ORIGINS = config.corsOrigins.join(",");
+  }
+  if (config.allowedHosts.length > 0) {
+    next.PIE_ALLOWED_HOSTS = config.allowedHosts.join(",");
+  }
+  return next;
+}
+
 export const serveFlags = {
   port: Flag.integer("port").pipe(
     Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
+    Flag.optional,
+  ),
+  host: Flag.string("host").pipe(
+    Flag.withDescription("Address to bind (default 127.0.0.1; 0.0.0.0 for LAN)"),
     Flag.optional,
   ),
   corsOrigin: Flag.string("cors-origin").pipe(
@@ -54,12 +94,14 @@ export const serveFlags = {
 
 type ServeInput = {
   readonly port: Option.Option<number>;
+  readonly host: Option.Option<string>;
   readonly corsOrigin: ReadonlyArray<string>;
   readonly allowedHost: ReadonlyArray<string>;
 };
 
-type ServeConfig = {
+export type ServeConfig = {
   readonly port: number;
+  readonly host: string;
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
 };
@@ -70,11 +112,14 @@ type ServeConfig = {
  * Pure so the precedence can be tested without booting a server.
  */
 export function resolveServeConfig(input: ServeInput): ServeConfig {
+  const host = Option.getOrElse(input.host, hostFromEnv);
+  const allowedHosts =
+    input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("PIE_ALLOWED_HOSTS");
   return {
     port: Option.getOrElse(input.port, portFromEnv),
+    host,
     corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),
-    allowedHosts:
-      input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("PIE_ALLOWED_HOSTS"),
+    allowedHosts: uniqueHosts([...allowedHosts, ...extraAllowedHostsForListen(host)]),
   };
 }
 
@@ -119,7 +164,9 @@ export const runServe = (input: ServeInput) =>
 const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
     const authToken = takeAuthToken();
-    const { port: requestedPort, corsOrigins, allowedHosts } = resolveServeConfig(input);
+    const { port: requestedPort, host, corsOrigins, allowedHosts } = resolveServeConfig(input);
+    const paths = yield* Paths;
+    const environmentId = yield* loadOrCreateEnvironmentId(paths.home);
 
     // The first line of every run, and the one that dates the file. It also
     // records the shape of the run — auth on or off, which origins are allowed
@@ -129,6 +176,7 @@ const serveWith = (input: ServeInput) =>
       Effect.annotateLogs({
         event: "server.starting",
         requestedPort,
+        host,
         authenticated: authToken !== undefined,
         compatibilityKey: process.env.PIE_DAEMON_COMPATIBILITY_KEY,
         corsOrigins,
@@ -147,6 +195,7 @@ const serveWith = (input: ServeInput) =>
             authToken,
             corsOrigins,
             allowedHosts,
+            environmentId,
             effectContext,
             shutdown:
               authToken === undefined
@@ -177,7 +226,7 @@ const serveWith = (input: ServeInput) =>
     );
 
     const port = yield* Effect.tryPromise({
-      try: () => listenServer(server, requestedPort),
+      try: () => listenServer(server, requestedPort, host),
       catch: (cause) => new ServerStartupError({ phase: "listen", cause }),
     });
 
@@ -185,7 +234,7 @@ const serveWith = (input: ServeInput) =>
     // second. Both go to stdout; observability writes to the local log file and
     // only mirrors to stderr when `PIE_PRINT_LOGS=1`.
     console.log(formatReadyLine({ port }));
-    console.log(`pie listening on http://127.0.0.1:${port}`);
+    console.log(`pie listening on http://${host}:${port}`);
 
     yield* Effect.logInfo("server listening").pipe(
       Effect.annotateLogs({ event: "server.listening", pid: process.pid, port }),

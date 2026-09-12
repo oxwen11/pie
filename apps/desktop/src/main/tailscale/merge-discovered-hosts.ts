@@ -7,7 +7,7 @@ type ConfigHost = {
   readonly hostname: string;
   readonly username: string | null;
   readonly port: number | null;
-  readonly source: "ssh-config" | "known-hosts";
+  readonly source: "ssh-config";
 };
 
 export function mergeDiscoveredHosts(

@@ -2,11 +2,8 @@
 
 export type RemotePieRunnerOptions = {
   readonly packageSpec?: string;
-  readonly nodeScriptPath?: string | null;
-  readonly nodeEngineRange?: string | null;
 };
 
-export const DEFAULT_REMOTE_PORT = 4000;
 export const REMOTE_LAUNCH_TIMEOUT_MS = 90_000;
 export const SSH_READY_TIMEOUT_MS = 20_000;
 export const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
@@ -33,7 +30,7 @@ function stripTrailingNewlines(value: string): string {
 }
 
 function shellSingleQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
+  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 function applyScriptPlaceholders(
@@ -47,9 +44,7 @@ function applyScriptPlaceholders(
   return result;
 }
 
-export const REMOTE_NODE_ENV_SCRIPT = `PIE_NODE_ENGINE_RANGE=@@PIE_NODE_ENGINE_RANGE@@
-
-prepend_path_if_dir() {
+export const REMOTE_NODE_ENV_SCRIPT = `prepend_path_if_dir() {
   if [ -d "$1" ]; then
     case ":$PATH:" in
       *":$1:"*) ;;
@@ -68,24 +63,18 @@ remote_node_major_is_24() {
 }
 
 prefer_node_from_dirs() {
-  PIE_MATCH=
   for PIE_NODE_BIN in "$@"; do
     if [ -x "$PIE_NODE_BIN/node" ]; then
       PIE_SAVED=$PATH
       PATH="$PIE_NODE_BIN:$PATH"
       export PATH
       if remote_node_major_is_24; then
-        PIE_MATCH=$PIE_NODE_BIN
+        return 0
       fi
       PATH=$PIE_SAVED
       export PATH
     fi
   done
-  if [ -n "$PIE_MATCH" ]; then
-    PATH="$PIE_MATCH:$PATH"
-    export PATH
-    return 0
-  fi
   return 1
 }
 
@@ -99,8 +88,8 @@ ensure_remote_node_path() {
     return 0
   fi
 
-  # Scan $HOME installs before PATH/nvm.sh. Login sh -l skips .zshrc, so
-  # Homebrew Node 25 or nvm's default 20 must not shadow fnm/mise Node 24.
+  # Scan $HOME installs before PATH. Login sh -l skips .zshrc, so Homebrew
+  # Node 25 or nvm's default 20 must not shadow fnm/mise Node 24.
   if [ -z "\${FNM_DIR:-}" ]; then
     FNM_DIR="$HOME/.local/share/fnm"
   fi
@@ -123,19 +112,12 @@ ensure_remote_node_path() {
 
   prepend_path_if_dir "$FNM_DIR"
   prepend_path_if_dir "$HOME/.fnm"
-  if command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env --shell bash 2>/dev/null)" || true
-    fnm use 24 >/dev/null 2>&1 || fnm use default >/dev/null 2>&1 || fnm use --silent-if-unchanged >/dev/null 2>&1 || true
-  fi
   if remote_node_major_is_24; then
     return 0
   fi
 
   prepend_path_if_dir "$HOME/.local/share/mise/shims"
   prepend_path_if_dir "$HOME/.mise/shims"
-  if command -v mise >/dev/null 2>&1; then
-    eval "$(mise activate sh 2>/dev/null)" || true
-  fi
   if remote_node_major_is_24; then
     return 0
   fi
@@ -151,32 +133,12 @@ ensure_remote_node_path() {
 
   prepend_path_if_dir "$HOME/.asdf/shims"
   prepend_path_if_dir "$HOME/.asdf/bin"
-  if [ -s "$HOME/.asdf/asdf.sh" ]; then
-    # shellcheck disable=SC1090
-    . "$HOME/.asdf/asdf.sh"
-  fi
   if remote_node_major_is_24; then
     return 0
   fi
 
   prepend_path_if_dir "$HOME/.nodenv/bin"
   prepend_path_if_dir "$HOME/.nodenv/shims"
-  if command -v nodenv >/dev/null 2>&1; then
-    eval "$(nodenv init - 2>/dev/null)" || true
-  fi
-  if remote_node_major_is_24; then
-    return 0
-  fi
-
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    NVM_NO_USE=1
-    export NVM_NO_USE
-    # shellcheck disable=SC1090
-    . "$NVM_DIR/nvm.sh"
-    if command -v nvm >/dev/null 2>&1; then
-      nvm use --silent 24 >/dev/null 2>&1 || nvm use --silent default >/dev/null 2>&1 || nvm use --silent node >/dev/null 2>&1 || nvm use --silent --lts >/dev/null 2>&1 || true
-    fi
-  fi
   if remote_node_major_is_24; then
     return 0
   fi
@@ -189,7 +151,7 @@ ensure_remote_node_path() {
 
   if command -v node >/dev/null 2>&1; then
     PIE_NODE_RAW=$(node -v 2>/dev/null) || PIE_NODE_RAW=unknown
-    printf 'Remote Node %s does not satisfy required range %s. pie needs Node 24.\\n' "$PIE_NODE_RAW" "$PIE_NODE_ENGINE_RANGE" >&2
+    printf 'Remote Node %s does not satisfy required range %s. pie needs Node 24.\\n' "$PIE_NODE_RAW" @@PIE_NODE_ENGINE_RANGE@@ >&2
   else
     printf 'Remote host is missing node on PATH. Install Node 24 or configure a supported version manager for non-interactive shells.\\n' >&2
   fi
@@ -202,10 +164,6 @@ set -eu
 @@PIE_NODE_ENV_SCRIPT@@
 if ! ensure_remote_node_path; then
   exit 1
-fi
-PIE_NODE_SCRIPT_PATH=@@PIE_NODE_SCRIPT_PATH@@
-if [ -n "$PIE_NODE_SCRIPT_PATH" ]; then
-  exec node "$PIE_NODE_SCRIPT_PATH" "$@"
 fi
 if command -v pie >/dev/null 2>&1; then
   exec pie "$@"
@@ -273,7 +231,7 @@ try {
     process.stderr.write("Remote pie daemon is not bound to loopback.\\n");
     process.exit(1);
   }
-  process.stdout.write(JSON.stringify({ remotePort: port, token: token, serverKind: "daemon" }) + "\\n");
+  process.stdout.write(JSON.stringify({ remotePort: port, token: token }) + "\\n");
 } catch (cause) {
   process.stderr.write("Remote pie daemon did not write a valid discovery record at " + recordPath + ".\\n");
   process.exit(1);
@@ -281,31 +239,27 @@ try {
 NODE
 `;
 
-export function buildRemoteNodeEnvScript(input?: RemotePieRunnerOptions): string {
+export function buildRemoteNodeEnvScript(): string {
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_NODE_ENV_SCRIPT, {
-      PIE_NODE_ENGINE_RANGE: shellSingleQuote(
-        input?.nodeEngineRange?.trim() || DEFAULT_NODE_ENGINE_RANGE,
-      ),
+      PIE_NODE_ENGINE_RANGE: shellSingleQuote(DEFAULT_NODE_ENGINE_RANGE),
     }),
   );
 }
 
 export function buildRemotePieRunnerScript(input?: RemotePieRunnerOptions): string {
   const packageSpec = shellSingleQuote(resolveRemotePiePackageSpec(input?.packageSpec));
-  const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
       PIE_PACKAGE_SPEC: packageSpec,
-      PIE_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
-      PIE_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
+      PIE_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(),
     }),
   );
 }
 
 export function buildRemoteLaunchScript(input?: RemotePieRunnerOptions): string {
   return applyScriptPlaceholders(REMOTE_LAUNCH_SCRIPT, {
-    PIE_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
+    PIE_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(),
     PIE_RUNNER_SCRIPT: stripTrailingNewlines(buildRemotePieRunnerScript(input)),
   });
 }

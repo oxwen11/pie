@@ -26,6 +26,8 @@ export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
   orpcQueryUtils: AppClients["orpcQueryUtils"];
   queryClient: QueryClient;
+  localEnvironmentId: string;
+  clientsFor: (environmentId: string) => Promise<AppClients>;
 }
 
 contentPanel.registerAll([
@@ -61,7 +63,14 @@ function RootLayout() {
       from: "/session/$sessionId",
       shouldThrow: false,
     }) ?? null;
-  const sessionRef = sessionRoute?.loaderData?.ref ?? null;
+  const sessionRef =
+    sessionRoute?.loaderData === undefined
+      ? null
+      : {
+          environmentId: sessionRoute.loaderData.environmentId,
+          projectId: sessionRoute.loaderData.ref.projectId,
+          sessionId: sessionRoute.loaderData.ref.sessionId,
+        };
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,

@@ -58,7 +58,7 @@ export function writeFakePiExecutable(): PiExecutable {
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE_PI);
   fs.chmodSync(file, 0o755);
-  return { command: file, prefixArgs: [] };
+  return { command: file };
 }
 
 export interface RpcTestHarnessOptions {
@@ -117,7 +117,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
     scheduleServiceLayer,

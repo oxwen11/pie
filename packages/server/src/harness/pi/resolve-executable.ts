@@ -5,7 +5,6 @@ import { findExecutable } from "../executable";
 /** How the server spawns `pi --mode rpc`. */
 export type PiExecutable = {
   readonly command: string;
-  readonly prefixArgs: ReadonlyArray<string>;
 };
 
 /**
@@ -16,20 +15,15 @@ export type PiExecutable = {
  */
 export function resolvePiExecutable(env: NodeJS.ProcessEnv = process.env): PiExecutable {
   if (env.PIE_E2E === "1" && env.PIE_E2E_PI_EXECUTABLE) {
-    return { command: env.PIE_E2E_PI_EXECUTABLE, prefixArgs: [] };
+    return { command: env.PIE_E2E_PI_EXECUTABLE };
   }
 
   const explicit = env.PIE_PI_EXECUTABLE?.trim();
   if (explicit) {
-    return { command: explicit, prefixArgs: [] };
+    return { command: explicit };
   }
 
-  return { command: "pi", prefixArgs: [] };
-}
-
-/** What `availability` should stat or PATH-search. */
-export function piAvailabilityTarget(executable: PiExecutable): string {
-  return executable.prefixArgs[0] ?? executable.command;
+  return { command: "pi" };
 }
 
 export const checkPiAvailability = (
@@ -39,18 +33,6 @@ export const checkPiAvailability = (
   never,
   FileSystem.FileSystem
 > =>
-  Effect.gen(function* () {
-    // Bundled Pi is a .js entry run under Node — npm does not mark it +x.
-    if (executable.prefixArgs.length > 0) {
-      const script = executable.prefixArgs[0]!;
-      const fs = yield* FileSystem.FileSystem;
-      const info = yield* fs.stat(script).pipe(Effect.option);
-      if (info._tag === "Some" && info.value.type === "File") {
-        return { available: true };
-      }
-      return { available: false, reason: "Bundled Pi is missing." };
-    }
-
-    const found = yield* findExecutable(executable.command);
-    return found ? { available: true } : { available: false, reason: "Pi was not found on PATH." };
-  });
+  Effect.map(findExecutable(executable.command), (found) =>
+    found ? { available: true } : { available: false, reason: "Pi was not found on PATH." },
+  );

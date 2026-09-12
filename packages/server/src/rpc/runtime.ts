@@ -27,19 +27,18 @@ const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeC
 
 const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(PlatformLayer));
 
-const piExecutable = resolvePiExecutable();
-const piProcessOptions = { executable: piExecutable };
-
 export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
   PiProcessTag,
-  makePiProcess(piProcessOptions),
+  Effect.suspend(() => makePiProcess({ executable: resolvePiExecutable() })),
 ).pipe(Layer.provide(NodeProcessLayer));
 
 const PiAgentProvided = Layer.effect(
   PiAgent,
   Effect.gen(function* () {
     const process = yield* PiProcessTag;
-    const pi = yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
+    const pi = yield* cachePiAgentAvailability(
+      makePiAgent(process, { executable: resolvePiExecutable() }),
+    );
     return pi;
   }),
 ).pipe(Layer.provide(PiProcessLayer), Layer.provide(PlatformLayer));
@@ -74,7 +73,10 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
-const PiAgentServiceProvided = PiAgentServiceLayer;
+const PiAgentServiceProvided = PiAgentServiceLayer.pipe(
+  Layer.provide(NodeProcessLayer),
+  Layer.provide(PlatformLayer),
+);
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
 const ScheduleServiceProvided = ScheduleServiceLayer.pipe(

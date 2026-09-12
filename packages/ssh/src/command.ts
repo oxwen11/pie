@@ -1,18 +1,12 @@
 import os from "node:os";
-import path from "node:path";
 
+import { findExecutable } from "@getpie/core/executable";
 import { Duration, Effect, FileSystem, Option, Scope, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import {
-  buildSshChildEnvironment,
-  type SshAuthOptions,
-  type SshChildEnvironmentOptions,
-} from "./auth";
 import { SshClientMissingError, SshCommandError, SshInvalidTargetError } from "./errors";
 import {
   buildSshHostSpecEffect,
-  getLastNonEmptyOutputLine,
   overlaySshTarget,
   parseSshInput,
   parseSshResolveOutput,
@@ -54,11 +48,12 @@ export type SshCommandResult = {
   readonly stderr: string;
 };
 
-export type RunSshCommandOptions = SshAuthOptions & {
+export type RunSshCommandOptions = {
   readonly preHostArgs?: ReadonlyArray<string>;
   readonly remoteCommandArgs?: ReadonlyArray<string>;
   readonly stdin?: string;
   readonly timeoutMs?: number;
+  readonly env?: NodeJS.ProcessEnv;
 };
 
 export function sshCommandForPlatform(platform: NodeJS.Platform = os.platform()): string {
@@ -74,40 +69,13 @@ export type FindSshCommandOptions = {
   readonly platform?: NodeJS.Platform;
 };
 
-function pathDelimiter(platform: NodeJS.Platform): string {
-  return platform === "win32" ? ";" : ":";
-}
-
-const isRunnableSsh = (
-  fs: FileSystem.FileSystem,
-  candidate: string,
-  platform: NodeJS.Platform,
-): Effect.Effect<boolean> =>
-  fs.stat(candidate).pipe(
-    Effect.map(
-      (info) => info.type === "File" && (platform === "win32" || (info.mode & 0o111) !== 0),
-    ),
-    Effect.catch(() => Effect.succeed(false)),
-  );
-
 /** PATH lookup only — spawn uses the same search, so extra dirs would lie. */
 export const findSshCommand = (
   input: FindSshCommandOptions = {},
 ): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const platform = input.platform ?? os.platform();
-    const env = input.env ?? process.env;
-    const command = sshCommandForPlatform(platform);
-    const fs = yield* FileSystem.FileSystem;
-    if (path.isAbsolute(command)) {
-      return (yield* isRunnableSsh(fs, command, platform)) ? command : undefined;
-    }
-    for (const dir of (env["PATH"] ?? "").split(pathDelimiter(platform))) {
-      if (!dir) continue;
-      const candidate = path.join(dir, command);
-      if (yield* isRunnableSsh(fs, candidate, platform)) return candidate;
-    }
-    return undefined;
+  findExecutable(sshCommandForPlatform(input.platform ?? os.platform()), {
+    env: input.env,
+    platform: input.platform,
   });
 
 export function sshClientMissingMessage(
@@ -133,7 +101,7 @@ export const requireSshCommand = (
         message: sshClientMissingMessage(command, platform),
       });
     }
-    return command;
+    return found;
   });
 
 export const probeSshClient = (
@@ -164,17 +132,26 @@ function missingSshClientError(
   });
 }
 
-export function baseSshArgs(
-  target: SshTarget,
-  input?: { readonly batchMode?: "yes" | "no" },
-): string[] {
+export function baseSshArgs(target: SshTarget): string[] {
   return [
     "-o",
-    `BatchMode=${input?.batchMode ?? "no"}`,
+    "BatchMode=yes",
     "-o",
     "ConnectTimeout=10",
     ...(target.port !== null ? ["-p", String(target.port)] : []),
   ];
+}
+
+export function isSshAuthFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    /permission denied \((?:publickey|password|keyboard-interactive|hostbased|gssapi-with-mic)[^)]*\)/u.test(
+      normalized,
+    ) ||
+    /authentication failed/u.test(normalized) ||
+    /too many authentication failures/u.test(normalized)
+  );
 }
 
 function sshTargetLogFields(target: SshTarget) {
@@ -187,7 +164,7 @@ function sshTargetLogFields(target: SshTarget) {
 }
 
 export function redactSshErrorOutput(output: string): string {
-  const redacted = output.replace(
+  const redacted = output.replaceAll(
     /("(?:access_token|bearerToken|credential|pairingToken|token)"\s*:\s*")[^"]+(")/giu,
     "$1[redacted]$2",
   );
@@ -207,7 +184,9 @@ export function normalizeSshErrorMessage(input: {
   return cleanedStdout.length > 0 ? cleanedStdout : input.fallbackMessage;
 }
 
-const collectProcessOutput = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.Effect<string, E> =>
+export const collectProcessOutput = <E>(
+  stream: Stream.Stream<Uint8Array, E>,
+): Effect.Effect<string, E> =>
   stream.pipe(
     Stream.decodeText(),
     Stream.runFold(
@@ -231,30 +210,11 @@ const runSshCommandInScope = (
 > =>
   Effect.gen(function* () {
     const hostSpec = yield* buildSshHostSpecEffect(target);
-    const sshCommand = yield* requireSshCommand();
-    let childEnvironment: SshChildEnvironmentOptions = { baseEnv: sshSpawnEnv() };
-    if (input.interactiveAuth !== undefined) {
-      childEnvironment = { ...childEnvironment, interactiveAuth: input.interactiveAuth };
-    }
-    if (input.authSecret !== undefined) {
-      childEnvironment = { ...childEnvironment, authSecret: input.authSecret };
-    }
-    const environment = yield* buildSshChildEnvironment(childEnvironment).pipe(
-      Effect.mapError(
-        (cause) =>
-          new SshCommandError({
-            command: ["ssh"],
-            exitCode: null,
-            stderr: "",
-            message: "Failed to prepare SSH authentication helpers.",
-            cause,
-          }),
-      ),
-    );
+    const cli = { env: input.env };
+    const sshCommand = yield* requireSshCommand(cli);
+    const environment = sshSpawnEnv(input.env);
     const args = [
-      ...baseSshArgs(target, {
-        batchMode: input.batchMode ?? (input.interactiveAuth ? "no" : "yes"),
-      }),
+      ...baseSshArgs(target),
       ...(input.preHostArgs ?? []),
       hostSpec,
       ...(input.remoteCommandArgs ?? []),
@@ -308,7 +268,7 @@ const runSshCommandInScope = (
       Effect.mapError(
         (cause) =>
           new SshCommandError({
-            command: ["ssh", ...args],
+            command: [sshCommand, ...args],
             exitCode: null,
             stderr: "",
             message:
@@ -323,14 +283,14 @@ const runSshCommandInScope = (
       yield* Effect.logWarning("ssh.command.failed").pipe(
         Effect.annotateLogs({
           ...sshTargetLogFields(target),
-          command: ["ssh", ...args],
+          command: [sshCommand, ...args],
           exitCode,
           stdout: diagnosticStdout,
           stderr,
         }),
       );
       return yield* new SshCommandError({
-        command: ["ssh", ...args],
+        command: [sshCommand, ...args],
         exitCode,
         stdout: diagnosticStdout,
         stderr,
@@ -345,7 +305,7 @@ const runSshCommandInScope = (
     yield* Effect.logDebug("ssh.command.succeeded").pipe(
       Effect.annotateLogs({
         ...sshTargetLogFields(target),
-        command: ["ssh", ...args],
+        command: [sshCommand, ...args],
       }),
     );
     return { stdout, stderr };
@@ -385,6 +345,7 @@ export const runSshCommand = (
 
 export const resolveSshTarget = (
   alias: string,
+  input: FindSshCommandOptions = {},
 ): Effect.Effect<
   SshTarget,
   SshCommandError | SshClientMissingError | SshInvalidTargetError,
@@ -406,7 +367,7 @@ export const resolveSshTarget = (
         username: null,
         port: null,
       },
-      { preHostArgs: ["-G"] },
+      { preHostArgs: ["-G"], env: input.env },
     ).pipe(
       Effect.map((result) => parseSshResolveOutput(trimmedAlias, result.stdout)),
       Effect.tap((target) =>
@@ -433,6 +394,7 @@ export const resolveSshTarget = (
 
 export const resolveSshInput = (
   raw: string,
+  input: FindSshCommandOptions = {},
 ): Effect.Effect<
   SshTarget,
   SshCommandError | SshClientMissingError | SshInvalidTargetError,
@@ -443,8 +405,6 @@ export const resolveSshInput = (
     if (parsed.alias.length === 0) {
       return yield* new SshInvalidTargetError({ message: "SSH host is required." });
     }
-    const resolved = yield* resolveSshTarget(parsed.alias);
+    const resolved = yield* resolveSshTarget(parsed.alias, input);
     return overlaySshTarget(resolved, parsed);
   });
-
-export { getLastNonEmptyOutputLine };

@@ -66,7 +66,7 @@ async function setup() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
+  const piExecutable = { command: makeFake() };
   const piProcessLayer = Layer.effect(
     PiProcessTag,
     makePiProcess({ executable: piExecutable }),
@@ -115,7 +115,7 @@ async function setup() {
   );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
     scheduleServiceLayer,
