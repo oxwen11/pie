@@ -11,8 +11,8 @@ export class LoopError extends Error {
 const COMPACT = /^(\d+)(s|m|h|d)$/;
 const LEADING_INTERVAL =
   /^(?:每隔\s*|每\s*)?(?:(\d+)\s*(分钟|小时|秒|天|分|时)|(\d+)([smhd])(?=[,\s，:：]|$))/;
-const MINUTE_STEPS = [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60];
-const HOUR_STEPS = [1, 2, 3, 4, 6, 8, 12, 24];
+const MINUTE_STEPS: readonly [number, ...number[]] = [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60];
+const HOUR_STEPS: readonly [number, ...number[]] = [1, 2, 3, 4, 6, 8, 12, 24];
 const THIRTY_MIN_MS = 30 * 60 * 1000;
 
 export interface CronExpr {
@@ -134,8 +134,8 @@ export function intervalToCron(token: string): IntervalConversion {
   };
 }
 
-function pickStep(steps: number[], target: number): number {
-  let best = steps[0]!;
+function pickStep(steps: readonly [number, ...number[]], target: number): number {
+  let best = steps[0];
   let bestDist = Math.abs(best - target);
   for (const step of steps) {
     const dist = Math.abs(step - target);
@@ -158,12 +158,13 @@ export function parseCron(cron: string): CronExpr {
   if (/[a-zA-Z?#LW]/.test(cron)) {
     throw new LoopError("INVALID_CRON", "names and extensions (L, W, ?, #) are not supported");
   }
+  const [minute, hour, dom, month, dow] = parts as [string, string, string, string, string];
   return {
-    minute: parseField(parts[0]!, 0, 59),
-    hour: parseField(parts[1]!, 0, 23),
-    dom: parseField(parts[2]!, 1, 31),
-    month: parseField(parts[3]!, 1, 12),
-    dow: parseField(parts[4]!, 0, 6),
+    minute: parseField(minute, 0, 59),
+    hour: parseField(hour, 0, 23),
+    dom: parseField(dom, 1, 31),
+    month: parseField(month, 1, 12),
+    dow: parseField(dow, 0, 6),
   };
 }
 
@@ -177,7 +178,7 @@ function parseField(raw: string, min: number, max: number): Field {
     if (!stepMatch) {
       throw new LoopError("INVALID_CRON", `invalid field: ${item}`);
     }
-    const range = stepMatch[1]!;
+    const range = stepMatch[1] as string;
     const step = stepMatch[2] ? Number(stepMatch[2]) : 1;
     if (!Number.isInteger(step) || step <= 0) {
       throw new LoopError("INVALID_CRON", `invalid step: ${item}`);
@@ -186,8 +187,8 @@ function parseField(raw: string, min: number, max: number): Field {
     let end = max;
     if (range !== "*") {
       const bounds = range.split("-").map(Number);
-      start = bounds[0]!;
-      end = bounds.length === 2 ? bounds[1]! : start;
+      start = bounds[0] as number;
+      end = bounds.length === 2 ? (bounds[1] as number) : start;
     }
     if (start < min || end > max || start > end) {
       throw new LoopError("INVALID_CRON", `field out of range: ${item}`);

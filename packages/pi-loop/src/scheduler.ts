@@ -324,7 +324,7 @@ export class SessionLoopScheduler {
       task.decision = "stopped";
       return "stopped";
     }
-    const delay = input.delay_seconds!;
+    const delay = input.delay_seconds as number;
     if (!Number.isInteger(delay) || delay < 60 || delay > 3600) {
       throw new LoopError("INVALID_WAKEUP_DELAY", "delay_seconds must be 60-3600");
     }

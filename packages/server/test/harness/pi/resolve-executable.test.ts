@@ -51,26 +51,36 @@ describe("resolvePiExecutable", () => {
   it("falls back to the pie-owned RPC entry via Node", () => {
     const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
+    if (bundled === undefined) {
+      throw new Error("expected bundled RPC entry");
+    }
     expect(resolvePiExecutable({})).toEqual({
       command: process.execPath,
-      prefixArgs: [bundled!],
+      prefixArgs: [bundled],
     });
   });
 
   it("keeps the Node spawn path when PIE_PI_RUNTIME is node", () => {
     const bundled = resolvePiRpcEntry();
+    expect(bundled).toBeTruthy();
+    if (bundled === undefined) {
+      throw new Error("expected bundled RPC entry");
+    }
     expect(resolvePiExecutable({ PIE_PI_RUNTIME: "node" })).toEqual({
       command: process.execPath,
-      prefixArgs: [bundled!],
+      prefixArgs: [bundled],
     });
   });
 
   it("spawns bun plus the RPC entry when PIE_PI_RUNTIME=bun", () => {
     const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
+    if (bundled === undefined) {
+      throw new Error("expected bundled RPC entry");
+    }
     expect(resolvePiExecutable({ PIE_PI_RUNTIME: "bun" })).toEqual({
       command: "bun",
-      prefixArgs: [bundled!],
+      prefixArgs: [bundled],
     });
   });
 
@@ -85,12 +95,16 @@ describe("resolvePiExecutable", () => {
 
   it("does not run a shebang PIE_PI_EXECUTABLE under bun", () => {
     const bundled = resolvePiRpcEntry();
+    expect(bundled).toBeTruthy();
+    if (bundled === undefined) {
+      throw new Error("expected bundled RPC entry");
+    }
     expect(
       resolvePiExecutable({
         PIE_PI_RUNTIME: "bun",
         PIE_PI_EXECUTABLE: "/usr/bin/pi",
       }),
-    ).toEqual({ command: "bun", prefixArgs: [bundled!] });
+    ).toEqual({ command: "bun", prefixArgs: [bundled] });
   });
 
   it("returns bun with no script when the RPC entry cannot be resolved", () => {
@@ -122,10 +136,13 @@ describe("checkPiAvailability", () => {
   it("reports bundled Pi available when the script file exists", () => {
     const bundled = resolvePiRpcEntry();
     expect(bundled).toBeTruthy();
+    if (bundled === undefined) {
+      throw new Error("expected bundled RPC entry");
+    }
 
     const result = Effect.runSync(
-      checkPiAvailability({ command: process.execPath, prefixArgs: [bundled!] }).pipe(
-        Effect.provide(fakeStats({ [bundled!]: fileInfo("File", 0o644) })),
+      checkPiAvailability({ command: process.execPath, prefixArgs: [bundled] }).pipe(
+        Effect.provide(fakeStats({ [bundled]: fileInfo("File", 0o644) })),
       ),
     );
     expect(result).toEqual({ available: true });

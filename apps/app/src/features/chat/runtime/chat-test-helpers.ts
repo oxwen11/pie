@@ -132,7 +132,17 @@ export const activeTurn = (
   ...init,
 });
 
-export const textChunks = (id: string, text: string): UIMessageChunk[] => [
+export function defined<T>(value: T | undefined | null): T {
+  if (value == null) {
+    throw new Error("expected a defined value");
+  }
+  return value;
+}
+
+export const textChunks = (
+  id: string,
+  text: string,
+): [UIMessageChunk, UIMessageChunk, UIMessageChunk] => [
   { type: "text-start", id },
   { type: "text-delta", id, delta: text },
   { type: "text-end", id },

@@ -331,7 +331,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
         const wedged = childProcess.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-        const wedgedPid = wedged.pid!;
+        const wedgedPid = wedged.pid;
+        if (wedgedPid === undefined) {
+          throw new Error("expected spawned pid");
+        }
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             if (pidAlive(wedgedPid)) process.kill(wedgedPid, "SIGKILL");
@@ -358,7 +361,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const fs = yield* FileSystem.FileSystem;
         const { daemonDir } = yield* tempHome;
         const wedged = childProcess.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-        const wedgedPid = wedged.pid!;
+        const wedgedPid = wedged.pid;
+        if (wedgedPid === undefined) {
+          throw new Error("expected spawned pid");
+        }
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             if (pidAlive(wedgedPid)) process.kill(wedgedPid, "SIGKILL");

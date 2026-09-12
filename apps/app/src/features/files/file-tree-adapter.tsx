@@ -108,7 +108,7 @@ export function FileTreeAdapter({
       return;
     }
     event.preventDefault();
-    onOpenFile(focusedPath!);
+    onOpenFile(focusedPath as string);
   };
 
   return (
