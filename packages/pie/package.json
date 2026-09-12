@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "exports": {
-    "./pie-pi-process": "./dist/pie-pi-process/pie-pi-process.js"
+    "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "publishConfig": {
     "access": "public"

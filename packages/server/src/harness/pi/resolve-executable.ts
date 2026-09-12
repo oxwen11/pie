@@ -54,12 +54,12 @@ const resolvedPackageFile = (specifier: string): string | undefined => {
 
 /**
  * Resolve pie-pi-process via package exports only: workspace/desktop
- * `@getpie/server/pie-pi-process`, published CLI `@getpie/cli/pie-pi-process`.
+ * `@getpie/server/pi-process`, published CLI `@getpie/cli/pi-process`.
  */
 export function resolvePiePiProcessEntry(): string | undefined {
   return (
-    resolvedPackageFile("@getpie/server/pie-pi-process") ??
-    resolvedPackageFile("@getpie/cli/pie-pi-process")
+    resolvedPackageFile("@getpie/server/pi-process") ??
+    resolvedPackageFile("@getpie/cli/pi-process")
   );
 }
 

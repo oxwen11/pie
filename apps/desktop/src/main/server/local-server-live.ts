@@ -34,7 +34,7 @@ export const LocalServerLive = Layer.effect(
             ),
           ),
           bundledPiProcess: existingFile(
-            path.join(config.resourcesPath, "pie-pi-process", "pie-pi-process.js"),
+            path.join(config.resourcesPath, "pi-process", "pi-process.js"),
           ),
         }),
       ),

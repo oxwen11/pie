@@ -32,7 +32,7 @@ describe("applyPackagedPiRuntime", () => {
   const bundled = {
     isPackaged: true,
     bundledBun: "/Resources/vendor/bun/bun",
-    bundledPiProcess: "/Resources/pie-pi-process/pie-pi-process.js",
+    bundledPiProcess: "/Resources/pi-process/pi-process.js",
   } as const;
 
   it("leaves unpackaged env unchanged", () => {
@@ -44,7 +44,7 @@ describe("applyPackagedPiRuntime", () => {
     expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
       PATH: "/usr/bin",
       PIE_BUN: "/Resources/vendor/bun/bun",
-      PIE_PI_EXECUTABLE: "/Resources/pie-pi-process/pie-pi-process.js",
+      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 
@@ -54,7 +54,7 @@ describe("applyPackagedPiRuntime", () => {
     ).toEqual({
       PIE_BUN: "/custom/bun",
       PIE_HOME: "/tmp/pie",
-      PIE_PI_EXECUTABLE: "/Resources/pie-pi-process/pie-pi-process.js",
+      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 

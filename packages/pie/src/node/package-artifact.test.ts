@@ -11,7 +11,7 @@ layer(NodeFileSystem.layer)("published CLI bundle", (it) => {
   it.effect("ships pie-pi-process beside the CLI entry", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      yield* fs.access(fromModuleUrl("../../dist/pie-pi-process/pie-pi-process.js"));
+      yield* fs.access(fromModuleUrl("../../dist/pi-process/pi-process.js"));
     }),
   );
 

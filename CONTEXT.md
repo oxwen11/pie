@@ -45,10 +45,10 @@ The sole owner of live session state: the table of sessions keyed by ref (each `
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
-`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pie-pi-process/pie-pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **pie-pi-process**:
-Always Bun: `bun <pie-pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
+Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
 
 **PIE_DAEMON_RUNTIME**:
 Desktop-only switch for the _daemon_ (not the Pi child). Unset / `node` (default) keeps Electron-as-Node (`Pie Helper` + `server.mjs`). `bun` spawns `PIE_BUN` or PATH `bun` + `server.mjs` and does not set `ELECTRON_RUN_AS_NODE`. Restart the app and stop any existing daemon (`pie daemon stop`) after flipping — attach would otherwise reuse the previous runtime. Use this to A/B daemon RSS.
