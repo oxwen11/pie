@@ -1,7 +1,8 @@
 import { defineRule } from "@oxlint/plugins";
 
 // Forbids eslint/oxlint disable comments on the frontend-state rules that
-// must be rewritten, not silenced: React effects and compiler purity.
+// must be rewritten, not silenced: React effects, compiler purity, and
+// module-level let/var.
 
 const DISABLE_DIRECTIVE =
   /^\s*(?<kind>oxlint|eslint)-disable(?<scope>-next-line|-line)?(?:\s+(?<body>[\s\S]*))?$/u;
@@ -16,6 +17,7 @@ const PROTECTED_RULES = new Set([
   "react/set-state-in-render",
   "react/rules-of-hooks",
   "pie/no-restricted-disable",
+  "pie/no-module-mutable-state",
 ]);
 
 const PROTECTED_PREFIXES = ["react-you-might-not-need-an-effect/"] as const;
@@ -46,7 +48,7 @@ export const noRestrictedDisable = defineRule({
             context.report({
               node: comment,
               message:
-                "A blanket eslint/oxlint-disable also turns off React compiler purity rules, react-you-might-not-need-an-effect, and react/exhaustive-deps. Name the other rules instead of silencing them.",
+                "A blanket eslint/oxlint-disable also turns off pie/no-module-mutable-state, React compiler purity rules, react-you-might-not-need-an-effect, and react/exhaustive-deps. Name the other rules instead of silencing them.",
             });
             continue;
           }
