@@ -1,9 +1,4 @@
-import {
-  createBashTool,
-  type BashSpawnContext,
-  type ExtensionAPI,
-  type InlineExtension,
-} from "@earendil-works/pi-coding-agent";
+import { createBashTool, type ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 const BLOCKED_EXACT = new Set(["PORT", "ELECTRON_RENDERER_PORT", "ELECTRON_RUN_AS_NODE"]);
 
@@ -26,15 +21,12 @@ export function filterPiBashEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return next;
 }
 
-export function createPiBashExtension(cwd: string): InlineExtension {
-  const spawnHook = (context: BashSpawnContext): BashSpawnContext => ({
-    ...context,
-    env: filterPiBashEnv(context.env),
-  });
-  return {
-    name: "@getpie/bash",
-    factory: (pi: ExtensionAPI) => {
-      pi.registerTool(createBashTool(cwd, { spawnHook }));
-    },
+export function piBashExtension(cwd: string): ExtensionFactory {
+  return (pi) => {
+    pi.registerTool(
+      createBashTool(cwd, {
+        spawnHook: (context) => ({ ...context, env: filterPiBashEnv(context.env) }),
+      }),
+    );
   };
 }
