@@ -375,7 +375,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
   const awaitOpen = (fixture: Fixture): Effect.Effect<void> =>
     Effect.gen(function* () {
       for (let attempt = 0; attempt < 1000; attempt += 1) {
-        if (fixture.spy.open.length > 0) return;
+        if (fixture.spy.open.length > 0) return undefined;
         yield* Effect.yieldNow;
       }
       return yield* Effect.die(new Error("timed out waiting for Pi open"));
@@ -391,7 +391,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
         const turn = yield* fixture.service
           .getSnapshot(ref)
           .pipe(Effect.map((snapshot) => snapshot.activeTurn));
-        if (done(turn)) return;
+        if (done(turn)) return undefined;
         yield* Effect.yieldNow;
       }
       return yield* Effect.die(new Error("timed out waiting for turn"));
@@ -1047,7 +1047,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           // the adapter log lands so the identity wrap is still on the fiber.
           yield* Effect.gen(function* () {
             for (let attempt = 0; attempt < 200; attempt += 1) {
-              if (records.some((record) => record.message === "pi creating")) return;
+              if (records.some((record) => record.message === "pi creating")) return undefined;
               yield* Effect.yieldNow;
             }
             return yield* Effect.die(new Error("timed out waiting for pi creating"));

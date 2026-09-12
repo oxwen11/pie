@@ -959,6 +959,7 @@ describe("ScheduleService", () => {
             if (ticks === 1) {
               return yield* Effect.die("tick boom");
             }
+            return undefined;
           }),
         nextWakeDelay: () => Effect.succeed(60_000),
       });
