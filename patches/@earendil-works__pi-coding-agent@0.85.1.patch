@@ -1,8 +1,26 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index e2b640b661a7712fa3f86ed5ecb494b98a6f9e4d..bb75a52bb6f9bb306d73f04eb36e39dd62835551 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,3 +1,5 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
++export { builtInExtensions } from "./extensions/index.ts";
+ export { type Args, parseArgs } from "./cli/args.ts";
+ export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
+ export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
 diff --git a/dist/index.js b/dist/index.js
-index 01017cd..fe2674d 100644
+index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..15072caa1da977d62f9841d1d906263e9d702332 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -29,10 +29,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+@@ -1,3 +1,7 @@
++// Preserve upstream Bun sandbox recovery before config reads process.env.
++import "./bun/sandbox-env-setup.js";
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
++export { builtInExtensions } from "./extensions/index.js";
+ // Core session management
+ export { parseArgs } from "./cli/args.js";
+ // Config paths
+@@ -29,10 +33,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
  // Tools
  export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
  export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
@@ -15,7 +33,7 @@ index 01017cd..fe2674d 100644
  export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
 diff --git a/dist/modes/index.js b/dist/modes/index.js
-index 10528c3..0102883 100644
+index 10528c34b4941a060fbf8228fcec61beeb6902d8..0102883cbc0b8f00791377c63628c4068b9c37e9 100644
 --- a/dist/modes/index.js
 +++ b/dist/modes/index.js
 @@ -1,7 +1,6 @@
@@ -27,7 +45,7 @@ index 10528c3..0102883 100644
  export { RpcClient } from "./rpc/rpc-client.js";
  export { runRpcMode } from "./rpc/rpc-mode.js";
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
-index 5418167..d9de2a1 100644
+index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..d9de2a14ed33ed6afd2c12f2ae3d959b143f4363 100644
 --- a/dist/modes/interactive/theme/theme.js
 +++ b/dist/modes/interactive/theme/theme.js
 @@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
@@ -54,8 +72,39 @@ index 5418167..d9de2a1 100644
      }
      return BUILTIN_THEMES;
  }
+diff --git a/dist/utils/image-resize.js b/dist/utils/image-resize.js
+index 686c9f32ea6ae5858ab560014bdfe102edd78804..b07fabb23ea2ffa4db1d5896a609f357302e1586 100644
+--- a/dist/utils/image-resize.js
++++ b/dist/utils/image-resize.js
+@@ -1,4 +1,5 @@
+ import { Worker } from "node:worker_threads";
++import { isBunBinary } from "../config.js";
+ import { resizeImageInProcess } from "./image-resize-core.js";
+ function toTransferableBytes(input) {
+     // Transfer detaches the buffer, so transfer a worker-owned copy and leave the
+@@ -70,7 +71,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
+     // Bun compiled executables resolve worker entrypoints by string path, not via
+     // new URL(..., import.meta.url). Try the string path first under Bun so the
+     // release binary uses the embedded worker instead of falling back in-process.
+-    if (typeof process.versions.bun === "string") {
++    if (isBunBinary) {
+         try {
+             return await resizeImageInWorker("./src/utils/image-resize-worker.ts", inputBytes, mimeType, options);
+         }
+diff --git a/dist/utils/photon.js b/dist/utils/photon.js
+index 3078895bedba898ce26c439b6123425834ca2586..586fab202f3bae969c0d44fd67a7db84bfee9bd3 100644
+--- a/dist/utils/photon.js
++++ b/dist/utils/photon.js
+@@ -33,6 +33,7 @@ function pathOrNull(file) {
+ function getFallbackWasmPaths() {
+     const execDir = path.dirname(process.execPath);
+     return [
++        path.join(path.dirname(fileURLToPath(import.meta.url)), WASM_FILENAME),
+         path.join(execDir, WASM_FILENAME),
+         path.join(execDir, "photon", WASM_FILENAME),
+         path.join(process.cwd(), WASM_FILENAME),
 diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
-index 711fb57..738f550 100644
+index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c283092335f2e66ce 100644
 --- a/dist/utils/syntax-highlight.js
 +++ b/dist/utils/syntax-highlight.js
 @@ -1,177 +1,4 @@

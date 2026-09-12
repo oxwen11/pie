@@ -7,13 +7,13 @@
  * extension bind/UI/protocol here, and extension loading via
  * `createAgentSessionServices` (`resourceLoaderOptions.extensionFactories`).
  */
-import path from "node:path";
-import url from "node:url";
-
 import { bedrockProviderModule } from "@earendil-works/pi-ai/bedrock-provider";
 import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { setBedrockProviderModule } from "@earendil-works/pi-ai/compat";
 import {
+  applyHttpProxySettings,
+  builtInExtensions,
+  configureHttpDispatcher,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
@@ -28,22 +28,6 @@ import {
 
 import { piBashExtension } from "../bash";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
-
-type HttpDispatcher = {
-  applyHttpProxySettings: (proxy: unknown) => void;
-  configureHttpDispatcher: (idleTimeoutMs?: number) => void;
-};
-
-function isHttpDispatcher(value: unknown): value is HttpDispatcher {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "applyHttpProxySettings" in value &&
-    "configureHttpDispatcher" in value &&
-    typeof value.applyHttpProxySettings === "function" &&
-    typeof value.configureHttpDispatcher === "function"
-  );
-}
 
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
@@ -66,17 +50,6 @@ const start = async (): Promise<void> => {
   // Match Pi's Bun bootstrap: these loaders use bundler-opaque imports otherwise.
   registerBunOAuthFlows();
   setBedrockProviderModule(bedrockProviderModule);
-  const dispatcherUrl = url.pathToFileURL(
-    path.join(
-      path.dirname(url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),
-      "core/http-dispatcher.js",
-    ),
-  ).href;
-  const dispatcherModule: unknown = await import(dispatcherUrl);
-  if (!isHttpDispatcher(dispatcherModule)) {
-    throw new Error("Pi http-dispatcher export mismatch");
-  }
-  const { applyHttpProxySettings, configureHttpDispatcher } = dispatcherModule;
   const parsed = parseArgs(process.argv.slice(2));
   const cwd = process.cwd();
   const agentDir = getAgentDir();
@@ -91,7 +64,7 @@ const start = async (): Promise<void> => {
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       resourceLoaderOptions: {
-        extensionFactories: [piBashExtension(options.cwd)],
+        extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
       },
     });
     const resolved = resolveCliModel({

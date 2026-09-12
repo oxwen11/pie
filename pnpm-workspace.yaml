@@ -130,6 +130,8 @@ patchedDependencies:
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
   # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
   # InteractiveMode and highlight.js; inline builtin theme JSON.
-  # On bump: index.js, modes/index.js, theme.js, syntax-highlight.js.
+  # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
+  # relocatable image worker/WASM paths. On bump, re-check every patched file
+  # and run the isolated server RPC bundle tests after rebuilding.
   "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch
