@@ -22,8 +22,7 @@ asarUnpack:
 # pi-process.js comes from @getpie/server#build (bun-build, outside asar).
 beforePack: scripts/before-pack.cjs
 extraResources:
-  - from: vendor/bun
-    to: vendor/bun
+  - vendor
   - from: ../../packages/server/dist/pi-process
     to: pi-process
 icon: resources/icon.png
