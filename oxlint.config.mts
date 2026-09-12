@@ -278,6 +278,33 @@ export default defineConfig({
       },
     },
     {
+      // `undefined` keeps the current value; `null` clears it. `??` collapses that.
+      files: ["packages/server/src/schedule/mutations.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Empty `SHELL` is missing, not a command. `??` would spawn `""`.
+      files: ["packages/server/src/terminal/pty.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Once-used `E` keeps oRPC error factories precise through Effect.catchTags.
+      files: [
+        "packages/server/src/rpc/git.ts",
+        "packages/server/src/rpc/pull-request.ts",
+        "packages/server/src/rpc/resolve-workspace.ts",
+        "packages/server/src/rpc/session.ts",
+        "packages/server/src/rpc/terminal.ts",
+      ],
+      rules: {
+        "typescript/no-unnecessary-type-parameters": "off",
+      },
+    },
+    {
       files: ["**/*.cjs"],
       rules: {
         "import/no-commonjs": "off",

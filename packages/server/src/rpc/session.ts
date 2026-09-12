@@ -24,13 +24,17 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 
-const mapGitWorktreeErrors = (errors: {
-  NOT_FOUND: (input: { message: string }) => unknown;
-  CONFLICT: (input: { message: string }) => unknown;
-  INVALID_ARGUMENT: (input: { message: string }) => unknown;
-  FORBIDDEN: (input: { message: string }) => unknown;
-  INTERNAL: (input: { message: string }) => unknown;
-}) =>
+const mapGitWorktreeErrors = <
+  E extends {
+    NOT_FOUND: (input: { message: string }) => unknown;
+    CONFLICT: (input: { message: string }) => unknown;
+    INVALID_ARGUMENT: (input: { message: string }) => unknown;
+    FORBIDDEN: (input: { message: string }) => unknown;
+    INTERNAL: (input: { message: string }) => unknown;
+  },
+>(
+  errors: E,
+) =>
   Effect.catchTags({
     GitRefNotFound: (e: GitRefNotFound) =>
       Effect.fail(errors.NOT_FOUND({ message: `git ref ${e.ref} not found` })),

@@ -27,14 +27,10 @@ export const spawnPty = (input: {
       const env: NodeJS.ProcessEnv = { ...process.env, TERM: "xterm-256color" };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.ELECTRON_RENDERER_PORT;
-      const envShell = process.env.SHELL?.trim();
       const shell =
         os.platform() === "win32"
           ? { command: "pwsh.exe", args: ["-NoLogo"] }
-          : {
-              command: envShell === undefined || envShell.length === 0 ? "/bin/bash" : envShell,
-              args: [],
-            };
+          : { command: process.env.SHELL?.trim() || "/bin/bash", args: [] };
       const spawned = nodePty.spawn(shell.command, shell.args, {
         cwd: input.cwd,
         cols: input.cols,

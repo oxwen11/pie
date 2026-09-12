@@ -19,7 +19,7 @@ type PullRequestReadErrors = {
   INVALID_RESPONSE: (input: { message: string }) => unknown;
 };
 
-const pullRequestReadErrorHandlers = (errors: PullRequestReadErrors) => ({
+const pullRequestReadErrorHandlers = <E extends PullRequestReadErrors>(errors: E) => ({
   PullRequestMissingGh: () =>
     Effect.fail(errors.MISSING_GH({ message: "GitHub CLI is not installed" })),
   PullRequestUnauthenticated: () =>
@@ -36,7 +36,7 @@ const pullRequestReadErrorHandlers = (errors: PullRequestReadErrors) => ({
     Effect.fail(errors.INVALID_RESPONSE({ message: "GitHub returned an invalid response" })),
 });
 
-const catchCurrentRead = (errors: PullRequestReadErrors) =>
+const catchCurrentRead = <E extends PullRequestReadErrors>(errors: E) =>
   Effect.catchTags(pullRequestReadErrorHandlers(errors));
 
 export const pullRequestRouter = orpc.router({

@@ -10,11 +10,15 @@ import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(terminalContract).$context<RpcContext>();
 
-const mapTerminalErrors = (errors: {
-  NOT_FOUND: (input: { message: string }) => unknown;
-  SESSION_NOT_ACTIVE: (input: { message: string }) => unknown;
-  INTERNAL: (input: { message: string }) => unknown;
-}) =>
+const mapTerminalErrors = <
+  E extends {
+    NOT_FOUND: (input: { message: string }) => unknown;
+    SESSION_NOT_ACTIVE: (input: { message: string }) => unknown;
+    INTERNAL: (input: { message: string }) => unknown;
+  },
+>(
+  errors: E,
+) =>
   Effect.catchTags({
     TerminalNotRunning: (error: TerminalNotRunning) =>
       Effect.fail(

@@ -21,14 +21,16 @@ import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
 
 const orpc = implement(gitContract).$context<RpcContext>();
 
-const mapGitCwdErrors = (
-  cwd: string,
-  errors: {
+const mapGitCwdErrors = <
+  E extends {
     PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
     NOT_DIRECTORY: (input: { data: { path: string } }) => unknown;
     GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
     NOT_REPOSITORY: (input: { data: { cwd: string } }) => unknown;
   },
+>(
+  cwd: string,
+  errors: E,
 ) =>
   Effect.catchTags({
     WorkspacePathEscape: (error: WorkspacePathEscape) =>
@@ -42,10 +44,14 @@ const mapGitCwdErrors = (
     GitError: (error: GitError) => Effect.fail(errors.GIT_FAILED({ data: { cwd: error.cwd } })),
   });
 
-const mapGitBranchErrors = (errors: {
-  PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
-  GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
-}) =>
+const mapGitBranchErrors = <
+  E extends {
+    PATH_ESCAPE: (input: { data: { cwd: string; path: string } }) => unknown;
+    GIT_FAILED: (input: { data: { cwd: string } }) => unknown;
+  },
+>(
+  errors: E,
+) =>
   Effect.catchTags({
     WorkspacePathEscape: (error: WorkspacePathEscape) =>
       Effect.fail(errors.PATH_ESCAPE({ data: { cwd: error.cwd, path: error.path } })),
