@@ -1,7 +1,13 @@
 import type { Project, Schedule } from "@getpie/contract";
 import { MAX_SCHEDULES } from "@getpie/contract";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -109,7 +115,7 @@ export function SchedulePage({
     onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
   });
 
-  const items = scheduleItems(schedules.data);
+  const items = schedules.data ?? [];
   const selected = selectedSchedule(items, selectedId);
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
@@ -117,12 +123,7 @@ export function SchedulePage({
     }),
   });
   const editor = scheduleEditorState(editing, createOpen, createDefaults);
-  const placeholder = schedulePagePlaceholder({
-    projectsReady,
-    schedulesPending: schedules.isPending,
-    schedulesError: schedules.isError,
-    errorMessage: schedules.error?.message,
-  });
+  const placeholder = schedulePagePlaceholder(projectsReady, schedules);
   if (placeholder !== null) return placeholder;
 
   return (
@@ -132,7 +133,7 @@ export function SchedulePage({
       list={
         <SchedulePageList
           atLimit={items.length >= MAX_SCHEDULES}
-          canCreate={canCreateSchedule(projectsReady, projects.length, items.length)}
+          canCreate={projectsReady && projects.length > 0 && items.length < MAX_SCHEDULES}
           items={items}
           onOpenCreate={onOpenCreate}
           onSelect={(scheduleId) => {
@@ -148,54 +149,49 @@ export function SchedulePage({
       }
       onCancelDelete={() => setDeleting(null)}
       onConfirmDelete={(id) => remove.mutate(id)}
-      sidePanel={schedulePageSide({
-        editor,
-        nowMs: Date.now(),
-        onCloseEditor: (mode) => {
-          if (mode === "create") {
-            onCloseCreate();
-            return;
-          }
-          setEditing(null);
-        },
-        onCloseSelected: () => setSelectedId(null),
-        onDelete: () => {
-          if (selected !== undefined) setDeleting(selected);
-        },
-        onEdit: () => {
-          if (selected !== undefined) setEditing(selected);
-        },
-        onOpenSession: (sessionId) => {
-          if (selected === undefined) return;
-          openScheduleSession(navigate, sessionId, selected.projectId);
-        },
-        onRunNow: () => {
-          if (selected !== undefined) runNow.mutate(selected.id);
-        },
-        onSubmit: (value, current) => {
-          if (current.mode === "create") {
-            create.mutate(value);
-            return;
-          }
-          update.mutate({ id: current.schedule.id, ...value });
-        },
-        projects,
-        running: runNow.isPending,
-        selected,
-        sessionTitleById: sessionTitleMap(sessions.data),
-        submitting: eitherPending(create.isPending, update.isPending),
-      })}
+      sidePanel={
+        editor === null && selected === undefined ? null : (
+          <SchedulePageSide
+            editor={editor}
+            nowMs={Date.now()}
+            onCloseEditor={(mode) => {
+              if (mode === "create") {
+                onCloseCreate();
+                return;
+              }
+              setEditing(null);
+            }}
+            onCloseSelected={() => setSelectedId(null)}
+            onDelete={() => {
+              if (selected !== undefined) setDeleting(selected);
+            }}
+            onEdit={() => {
+              if (selected !== undefined) setEditing(selected);
+            }}
+            onOpenSession={(sessionId) => {
+              if (selected === undefined) return;
+              openScheduleSession(navigate, sessionId, selected.projectId);
+            }}
+            onRunNow={() => {
+              if (selected !== undefined) runNow.mutate(selected.id);
+            }}
+            onSubmit={(value, current) => {
+              if (current.mode === "create") {
+                create.mutate(value);
+                return;
+              }
+              update.mutate({ id: current.schedule.id, ...value });
+            }}
+            projects={projects}
+            running={runNow.isPending}
+            selected={selected}
+            sessionTitleById={sessionTitleMap(sessions.data)}
+            submitting={create.isPending || update.isPending}
+          />
+        )
+      }
     />
   );
-}
-
-function schedulePageSide(props: Parameters<typeof SchedulePageSide>[0]): ReactNode {
-  if (props.editor === null && props.selected === undefined) return null;
-  return <SchedulePageSide {...props} />;
-}
-
-function scheduleItems(data: ReadonlyArray<Schedule> | undefined): ReadonlyArray<Schedule> {
-  return data ?? [];
 }
 
 function selectedSchedule(
@@ -209,18 +205,6 @@ function selectedSchedule(
 function selectedSessionListInput(selected: Schedule | undefined) {
   if (selected === undefined) return skipToken;
   return { projectId: selected.projectId, archived: false };
-}
-
-function canCreateSchedule(
-  projectsReady: boolean,
-  projectCount: number,
-  itemCount: number,
-): boolean {
-  return projectsReady && projectCount > 0 && itemCount < MAX_SCHEDULES;
-}
-
-function eitherPending(left: boolean, right: boolean): boolean {
-  return left || right;
 }
 
 function scheduleListInterval(items: ReadonlyArray<Schedule> | undefined): number | false {
@@ -252,24 +236,17 @@ function sessionTitleMap(
   );
 }
 
-function schedulePagePlaceholder({
-  projectsReady,
-  schedulesPending,
-  schedulesError,
-  errorMessage,
-}: {
-  projectsReady: boolean;
-  schedulesPending: boolean;
-  schedulesError: boolean;
-  errorMessage: string | undefined;
-}): ReactNode {
-  if (!projectsReady || schedulesPending) return <Loader />;
-  if (!schedulesError) return null;
+function schedulePagePlaceholder(
+  projectsReady: boolean,
+  schedules: UseQueryResult<ReadonlyArray<Schedule>>,
+): ReactNode {
+  if (!projectsReady || schedules.isPending) return <Loader />;
+  if (!schedules.isError) return null;
   return (
     <Empty>
       <EmptyHeader>
         <EmptyTitle>Could not load schedules</EmptyTitle>
-        <EmptyDescription>{errorMessage}</EmptyDescription>
+        <EmptyDescription>{schedules.error.message}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );

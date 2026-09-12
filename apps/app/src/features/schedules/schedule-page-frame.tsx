@@ -9,7 +9,7 @@ import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
 import { ScheduleDetailPanel } from "./schedule-detail-panel";
 import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
 import type { ScheduleFormSubmit } from "./schedule-form-model";
-import { projectNameOf } from "./schedule-page-model";
+import { projectNameOf } from "./schedule-page-list";
 
 export function SchedulePageFrame({
   list,

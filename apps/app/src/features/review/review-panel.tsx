@@ -1,7 +1,6 @@
 import type { Project, WorkspaceQuery } from "@getpie/contract";
-import type { WorkspaceTreeResult } from "@getpie/contract/fs";
 import {
-  type GitFileDiff,
+  type GitBranch,
   type GitRepositoryBranch,
   type GitReview,
   type GitReviewFile,
@@ -87,7 +86,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   });
   const gitWorkspace = { ref: instance.sessionRef };
   const panel = useContentPanel();
-  const mode = reviewModeOf(instance.payload.mode);
+  const mode = instance.payload.mode ?? "uncommitted";
   const branch = useQuery({
     ...orpcQueryUtils.git.branch.queryOptions({ input: gitWorkspace }),
     meta: { errorMode: "inline" },
@@ -107,7 +106,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     }),
   );
   const diffs = useQueries({
-    queries: reviewFiles(review.data).map((file) =>
+    queries: (review.data?.files ?? []).map((file) =>
       orpcQueryUtils.git.diff.queryOptions({
         input: diffInput(gitWorkspace, file, mode, other),
       }),
@@ -115,6 +114,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   });
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
+  const workspaceName = projectName ?? "Workspace";
 
   const selectFile = useCallback(
     (path: string) => {
@@ -149,57 +149,60 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [instance],
   );
 
-  const placeholder = reviewPanelPlaceholder({
-    panel,
-    branchIsPending: branch.isPending,
-    branchHasData: branch.data !== undefined,
-    branchIsError: branch.isError,
-    branchErrorMessage: branch.error?.message,
-    onRetryBranch: () => void branch.refetch(),
-    branchKind: branchData?.kind,
-    mode,
-    other,
-    reviewIsPending: review.isPending,
-    reviewHasData: review.data !== undefined,
-    reviewIsError: review.isError,
-    reviewError: review.error,
-    onRetryReview: () => void review.refetch(),
-  });
+  if (panel === null) {
+    return (
+      <ReviewState title="Workspace unavailable">
+        This session no longer resolves to an imported project.
+      </ReviewState>
+    );
+  }
+
+  const placeholder = reviewPanelPlaceholder(branch, review, mode, other);
   if (placeholder !== null) return placeholder;
-  if (panel === null) return null;
 
   return (
-    <ReviewPanelReady
-      diffs={diffs}
-      heading={reviewHeadingText(review.data)}
-      locateRequest={locateRequest}
-      mode={mode}
-      other={other}
-      panel={panel}
-      refreshing={reviewRefreshing(review.isFetching, branch.isFetching, tree.isFetching)}
-      repositoryBranch={repositoryBranch}
-      review={review}
-      selectedPath={selectedPath}
-      selectFile={selectFile}
-      setMode={setMode}
-      setOther={setOther}
-      tree={tree}
-      workspaceName={workspaceLabel(projectName)}
-      workspacePath={workspacePathOf(tree.data?.cwd)}
-      onRefresh={() => {
-        void Promise.all([
-          review.refetch(),
-          branch.refetch(),
-          tree.refetch(),
-          ...diffs.map((diff) => diff.refetch()),
-        ]);
-      }}
+    <ReviewWorkspaceLayout
+      files={
+        <ReviewTreePane
+          files={review.data?.files ?? []}
+          onSelectFile={selectFile}
+          sessionId={panel.sessionKey}
+          tree={tree}
+          workspaceName={workspaceName}
+          workspacePath={tree.data?.cwd ?? ""}
+        />
+      }
+      filesLabel={workspaceName}
+      preview={
+        <ReviewDiffPane
+          diffs={diffs}
+          key={`${mode}:${other ?? ""}`}
+          locateRequest={locateRequest}
+          path={selectedPath}
+          review={review}
+        />
+      }
+      toolbar={
+        <ReviewToolbar
+          branch={repositoryBranch}
+          heading={review.data === undefined ? "" : reviewHeading(review.data)}
+          mode={mode}
+          onModeChange={setMode}
+          onOtherChange={setOther}
+          onRefresh={() => {
+            void Promise.all([
+              review.refetch(),
+              branch.refetch(),
+              tree.refetch(),
+              ...diffs.map((diff) => diff.refetch()),
+            ]);
+          }}
+          other={other}
+          refreshing={review.isFetching || branch.isFetching || tree.isFetching}
+        />
+      }
     />
   );
-}
-
-function reviewModeOf(mode: GitReviewMode | undefined): GitReviewMode {
-  return mode ?? "uncommitted";
 }
 
 function reviewCompareOther(
@@ -219,110 +222,6 @@ function skipUnlessBranch<T>(
   return value;
 }
 
-function reviewFiles(review: GitReview | undefined): ReadonlyArray<GitReviewFile> {
-  return review?.files ?? [];
-}
-
-function reviewHeadingText(review: GitReview | undefined): string {
-  if (review === undefined) return "";
-  return reviewHeading(review);
-}
-
-function workspaceLabel(projectName: string | undefined): string {
-  return projectName ?? "Workspace";
-}
-
-function workspacePathOf(cwd: string | undefined): string {
-  return cwd ?? "";
-}
-
-function reviewRefreshing(
-  reviewFetching: boolean,
-  branchFetching: boolean,
-  treeFetching: boolean,
-): boolean {
-  return reviewFetching || branchFetching || treeFetching;
-}
-
-function reviewDiffKey(mode: GitReviewMode, other: string | undefined): string {
-  return `${mode}:${other ?? ""}`;
-}
-
-function ReviewPanelReady({
-  diffs,
-  heading,
-  locateRequest,
-  mode,
-  other,
-  panel,
-  refreshing,
-  repositoryBranch,
-  review,
-  selectedPath,
-  selectFile,
-  setMode,
-  setOther,
-  tree,
-  workspaceName,
-  workspacePath,
-  onRefresh,
-}: {
-  diffs: ReadonlyArray<UseQueryResult<GitFileDiff>>;
-  heading: string;
-  locateRequest: number;
-  mode: GitReviewMode;
-  other: string | undefined;
-  panel: { sessionKey: string };
-  refreshing: boolean;
-  repositoryBranch: GitRepositoryBranch | undefined;
-  review: UseQueryResult<GitReview>;
-  selectedPath: string | undefined;
-  selectFile: (path: string) => void;
-  setMode: (mode: GitReviewMode) => void;
-  setOther: (other: string) => void;
-  tree: UseQueryResult<WorkspaceTreeResult>;
-  workspaceName: string;
-  workspacePath: string;
-  onRefresh: () => void;
-}) {
-  return (
-    <ReviewWorkspaceLayout
-      files={
-        <ReviewTreePane
-          files={reviewFiles(review.data)}
-          onSelectFile={selectFile}
-          sessionId={panel.sessionKey}
-          tree={tree}
-          workspaceName={workspaceName}
-          workspacePath={workspacePath}
-        />
-      }
-      filesLabel={workspaceName}
-      preview={
-        <ReviewDiffPane
-          diffs={diffs}
-          key={reviewDiffKey(mode, other)}
-          locateRequest={locateRequest}
-          path={selectedPath}
-          review={review}
-        />
-      }
-      toolbar={
-        <ReviewToolbar
-          branch={repositoryBranch}
-          heading={heading}
-          mode={mode}
-          onModeChange={setMode}
-          onOtherChange={setOther}
-          onRefresh={onRefresh}
-          other={other}
-          refreshing={refreshing}
-        />
-      }
-    />
-  );
-}
-
 function ReviewSpinner() {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -331,80 +230,51 @@ function ReviewSpinner() {
   );
 }
 
-function reviewPanelPlaceholder({
-  panel,
-  branchIsPending,
-  branchHasData,
-  branchIsError,
-  branchErrorMessage,
-  onRetryBranch,
-  branchKind,
-  mode,
-  other,
-  reviewIsPending,
-  reviewHasData,
-  reviewIsError,
-  reviewError,
-  onRetryReview,
-}: {
-  panel: { sessionKey: string } | null;
-  branchIsPending: boolean;
-  branchHasData: boolean;
-  branchIsError: boolean;
-  branchErrorMessage: string | undefined;
-  onRetryBranch: () => void;
-  branchKind: "repository" | "not-repository" | "workspace-unavailable" | undefined;
-  mode: GitReviewMode;
-  other: string | undefined;
-  reviewIsPending: boolean;
-  reviewHasData: boolean;
-  reviewIsError: boolean;
-  reviewError: Error | null;
-  onRetryReview: () => void;
-}): ReactNode {
-  if (panel === null) {
+function reviewPanelPlaceholder(
+  branch: UseQueryResult<GitBranch>,
+  review: UseQueryResult<GitReview>,
+  mode: GitReviewMode,
+  other: string | undefined,
+): ReactNode {
+  if (branch.isPending && branch.data === undefined) return <ReviewSpinner />;
+  if (branch.isError && branch.data === undefined) {
     return (
-      <ReviewState title="Workspace unavailable">
-        This session no longer resolves to an imported project.
+      <ReviewState onRetry={() => void branch.refetch()} title="Unable to inspect repository">
+        {branch.error.message}
       </ReviewState>
     );
   }
-  if (branchIsPending && !branchHasData) return <ReviewSpinner />;
-  if (branchIsError && !branchHasData) {
-    return (
-      <ReviewState onRetry={onRetryBranch} title="Unable to inspect repository">
-        {branchErrorMessage}
-      </ReviewState>
-    );
-  }
-  if (branchKind === "not-repository") {
+  if (branch.data?.kind === "not-repository") {
     return (
       <ReviewState title="Not a Git repository">
         Open a Git project to review uncommitted work, commits, or another branch.
       </ReviewState>
     );
   }
-  if (branchKind === "workspace-unavailable") {
+  if (branch.data?.kind === "workspace-unavailable") {
     return (
       <ReviewState title="Workspace unavailable">
         This session&apos;s workspace folder no longer exists or cannot be read.
       </ReviewState>
     );
   }
-  if (mode === "branch" && other === undefined && !branchIsPending) {
+  if (mode === "branch" && other === undefined && !branch.isPending) {
     return (
       <ReviewState title="Compare branch not found">
         This repository has no local default branch or remote-tracking ref to compare against.
       </ReviewState>
     );
   }
-  if ((reviewIsPending && !reviewHasData) || (mode === "branch" && other === undefined)) {
+  if (
+    (review.isPending && review.data === undefined) ||
+    (mode === "branch" && other === undefined)
+  ) {
     return <ReviewSpinner />;
   }
-  if (reviewIsError && !reviewHasData && reviewError !== null) {
+  if (review.isError && review.data === undefined && review.error !== null) {
     return (
-      <ReviewState onRetry={onRetryReview} title={reviewErrorTitle(reviewError)}>
-        {reviewErrorMessage(reviewError)}
+      <ReviewState onRetry={() => void review.refetch()} title={reviewErrorTitle(review.error)}>
+        {reviewErrorMessage(review.error)}
       </ReviewState>
     );
   }

@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -45,11 +45,16 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
-/** Lazily create a value that stays stable for the component lifetime. */
+/** Create once per mount — composition-root singletons, not updatable state. */
 function useStable<T>(create: () => T): T {
-  const [value, setValue] = useState(create);
-  // `hook-use-state` requires the setter in the tuple; this value is created once.
-  void setValue;
+  const ref = useRef<T | undefined>(undefined);
+  // Lazy init during render is the documented create-once pattern
+  // (https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents).
+  // `react/refs` forbids any `.current` read in render; this ref is the store, not a subscription.
+  /* oxlint-disable react/refs */
+  ref.current ??= create();
+  const value = ref.current;
+  /* oxlint-enable react/refs */
   return value;
 }
 

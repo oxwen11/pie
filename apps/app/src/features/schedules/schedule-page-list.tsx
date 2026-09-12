@@ -11,7 +11,13 @@ import {
 import { Clock } from "lucide-react";
 
 import { ScheduleCard } from "./schedule-card";
-import { projectNameOf } from "./schedule-page-model";
+
+export function projectNameOf(
+  projects: ReadonlyArray<Pick<Project, "id" | "name">>,
+  projectId: string,
+): string {
+  return projects.find((item) => item.id === projectId)?.name ?? "Unknown project";
+}
 
 export function SchedulePageList({
   items,
