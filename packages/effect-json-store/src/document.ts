@@ -4,10 +4,12 @@ import { type AnySchema, makeFileCodec, type MigrationStep } from "./codec";
 import type { JsonStoreEncodeError, JsonStoreLoadError, JsonStoreWriteError } from "./errors";
 import { getAtPath, type KeyPath, type KeyPathValue, setAtPath } from "./path";
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- type predicate target
 function isKeyPathValue<A, P extends string>(_value: unknown): _value is KeyPathValue<A, P> {
   return true;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- type predicate target
 function isDocumentValue<A>(_value: unknown): _value is A {
   return true;
 }

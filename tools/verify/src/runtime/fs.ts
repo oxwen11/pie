@@ -36,10 +36,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- type predicate target
 function isFieldValue<T>(value: unknown): value is T {
   return value !== undefined && value !== null;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- caller-chosen JSON field type
 export function readJsonField<T>(filePath: string, key: string): T {
   const data = readJson(filePath);
   if (!isRecord(data)) {
@@ -52,6 +54,7 @@ export function readJsonField<T>(filePath: string, key: string): T {
   return value;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- caller-chosen JSON field type
 export function tryReadJsonField<T>(filePath: string, key: string): T | undefined {
   try {
     return readJsonField<T>(filePath, key);
