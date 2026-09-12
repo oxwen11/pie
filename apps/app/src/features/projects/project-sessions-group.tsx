@@ -23,7 +23,6 @@ import {
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
 
-
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
 
