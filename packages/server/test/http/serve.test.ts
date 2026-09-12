@@ -24,13 +24,13 @@ let saved: Record<string, string | undefined>;
 
 beforeEach(() => {
   saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
-  for (const key of ENV_KEYS) delete process.env[key];
+  for (const key of ENV_KEYS) Reflect.deleteProperty(process.env, key);
 });
 
 afterEach(() => {
   for (const key of ENV_KEYS) {
     const value = saved[key];
-    if (value === undefined) delete process.env[key];
+    if (value === undefined) Reflect.deleteProperty(process.env, key);
     else process.env[key] = value;
   }
 });

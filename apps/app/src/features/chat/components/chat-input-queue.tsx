@@ -35,7 +35,8 @@ export function promoteQueuedFollowUp(
 ): SessionPendingPrompt {
   const items = pending.followUp;
   if (index < 0 || index >= items.length) return pending;
-  const text = items[index]!;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- index is in bounds of followUp
+  const text = items[index] as string;
   return {
     steering: [...pending.steering, text],
     followUp: items.filter((_, itemIndex) => itemIndex !== index),
@@ -114,6 +115,7 @@ function ChatInputQueueItem({
         >
           <Input
             aria-label="Edit queued message"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus the editor after the user starts editing
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

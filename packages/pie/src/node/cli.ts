@@ -20,9 +20,9 @@ type DaemonStartInput = {
 
 // Default startup is the daemon: a short-lived `pie` command must operate a
 // backend that outlives it, so it attaches to the running daemon or spawns one.
-// Both directories come from the ambient environment through the shared
-// resolver, which is also what `stop`/`status` and a desktop app inheriting the
-// same `PIE_DAEMON_DIR` use — that is what makes them address one daemon.
+// `$PIE_HOME` comes from the ambient environment through the shared resolver,
+// which is also what `stop`/`status` and a desktop app inheriting the same
+// home use — that is what makes them address one daemon.
 const startDaemon = (input: DaemonStartInput) =>
   Effect.gen(function* () {
     // Same flag > env > default port precedence as `pie serve`. CORS is not

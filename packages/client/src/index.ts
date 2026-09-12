@@ -41,8 +41,14 @@ export async function getWsTicket(httpBaseUrl: string | URL, token?: string): Pr
   if (!response.ok) {
     throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
   }
-  const body = (await response.json()) as { ticket: string };
-  if (typeof body.ticket !== "string" || body.ticket.length === 0) {
+  const body: unknown = await response.json();
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("ticket" in body) ||
+    typeof body.ticket !== "string" ||
+    body.ticket.length === 0
+  ) {
     throw new Error("WebSocket ticket response was empty");
   }
   return body.ticket;

@@ -239,6 +239,7 @@ export const WorktreeServiceLayer: Layer.Layer<
             try: () => simpleGit(repoRoot).raw(["worktree", "remove", "--force", realPath]),
             catch: gitError(realPath),
           });
+          return undefined;
         }),
     };
   }),

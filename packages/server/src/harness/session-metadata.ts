@@ -110,7 +110,7 @@ export const SessionMetadataLayer: Layer.Layer<
       metadata: Session,
     ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | StoreWriteError> =>
       metadata.cwd !== undefined
-        ? Effect.succeed(metadata as SessionWithCwd)
+        ? Effect.succeed({ ...metadata, cwd: metadata.cwd })
         : projectPathFor(metadata.projectId).pipe(
             Effect.flatMap((cwd) =>
               repo.write({ ...metadata, cwd }).pipe(Effect.map(() => ({ ...metadata, cwd }))),
@@ -125,7 +125,7 @@ export const SessionMetadataLayer: Layer.Layer<
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) =>
             metadata.cwd !== undefined
-              ? Effect.succeed(toSessionWorkspace(metadata as SessionWithCwd))
+              ? Effect.succeed(toSessionWorkspace({ ...metadata, cwd: metadata.cwd }))
               : projectPathFor(metadata.projectId).pipe(
                   Effect.map((cwd) => toSessionWorkspace({ ...metadata, cwd })),
                 ),

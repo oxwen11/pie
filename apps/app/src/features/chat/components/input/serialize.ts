@@ -4,16 +4,22 @@ export type ChatNodeTextSerializer = (node: JSONContent) => string;
 
 // Serialization travels with the extension: a chip extension declares
 // serializeText in addStorage(), collected here by extension name.
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isChatNodeTextSerializer(value: unknown): value is ChatNodeTextSerializer {
+  return typeof value === "function";
+}
+
 export function getChatText(editor: Editor): string {
   const serializers: Record<string, ChatNodeTextSerializer> = {};
+  const storageBag: unknown = editor.storage;
   for (const extension of editor.extensionManager.extensions) {
-    const storage =
-      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- TipTap Storage has no string index
-      (editor.storage as unknown as Record<string, { serializeText?: unknown } | undefined>)[
-        extension.name
-      ];
-    if (typeof storage?.serializeText === "function") {
-      serializers[extension.name] = storage.serializeText as ChatNodeTextSerializer;
+    if (!isRecord(storageBag)) break;
+    const storage = storageBag[extension.name];
+    if (isRecord(storage) && isChatNodeTextSerializer(storage.serializeText)) {
+      serializers[extension.name] = storage.serializeText;
     }
   }
   return serializeDoc(editor.getJSON(), serializers).trim();
@@ -38,8 +44,12 @@ export function serializeDoc(
       return;
     }
     if (node.type === "text") {
-      const linkHref = node.marks?.find((mark) => mark.type === "link")?.attrs?.href;
-      parts.push(linkHref ? String(linkHref) : (node.text ?? "").replaceAll("\u00A0", " "));
+      const linkMark = node.marks?.find((mark) => mark.type === "link");
+      const linkAttrs = linkMark?.attrs;
+      const linkHref = isRecord(linkAttrs) ? linkAttrs.href : undefined;
+      parts.push(
+        typeof linkHref === "string" ? linkHref : (node.text ?? "").replaceAll("\u00A0", " "),
+      );
       return;
     }
     if (node.type === "hardBreak") {

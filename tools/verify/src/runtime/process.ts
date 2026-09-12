@@ -249,5 +249,7 @@ export function spawnLogged(
 
 export function isSharedPieHome(pieHome: string): boolean {
   const home = process.env.HOME ?? "";
-  return pieHome === path.join(home, ".pie") || pieHome === path.join(home, ".pie-dev");
+  if (home === "") return false;
+  const base = path.join(home, ".pie");
+  return pieHome === base || pieHome.startsWith(`${base}_`) || pieHome.startsWith(`${base}-`);
 }

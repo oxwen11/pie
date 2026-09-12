@@ -41,4 +41,11 @@ export function layerForHome(home: string) {
  * write `$PIE_HOME/logs` still must not leak `Effect.log*` to stdout.
  * `layer()` uses `mergeWithExisting: false`, so providing it replaces this.
  */
-export const discard = Logger.layer([Logger.make(() => {})], { mergeWithExisting: false });
+export const discard = Logger.layer(
+  [
+    Logger.make(() => {
+      /* tests that do not write a log file must not leak Effect.log* to stdout */
+    }),
+  ],
+  { mergeWithExisting: false },
+);

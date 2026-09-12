@@ -60,7 +60,7 @@ export function FileTreeAdapter({
   useEffect(() => {
     const host = containerRef.current?.querySelector("file-tree-container");
     const shadowRoot = host?.shadowRoot;
-    if (shadowRoot === undefined || shadowRoot === null) return;
+    if (shadowRoot === undefined || shadowRoot === null) return undefined;
 
     const annotateRows = (): void => {
       for (const row of shadowRoot.querySelectorAll<HTMLElement>("[data-item-path]")) {
@@ -108,7 +108,8 @@ export function FileTreeAdapter({
       return;
     }
     event.preventDefault();
-    onOpenFile(focusedPath!);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- isOpenableTreeEntry already proved focusedPath is a tree file path
+    onOpenFile(focusedPath as string);
   };
 
   return (

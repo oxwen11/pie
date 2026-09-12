@@ -71,7 +71,6 @@ function pieEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv 
   return {
     ...process.env,
     PIE_HOME: home,
-    PIE_DAEMON_DIR: path.join(home, "daemon"),
     PIE_PORT: "0",
     PIE_E2E: "1",
     PIE_E2E_PI_EXECUTABLE: fakePi,

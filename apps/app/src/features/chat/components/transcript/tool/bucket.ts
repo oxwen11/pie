@@ -51,8 +51,16 @@ export function isStandalone(type: string): boolean {
 
 // The file identity a `files`/`edits` tool dedupes on. Reads the provider's
 // typed `input` field; a single trust-boundary cast to the shape we read.
+function isInputRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null;
+}
+
+function toolInputRecord(input: unknown): Record<string, unknown> | undefined {
+  return isInputRecord(input) ? input : undefined;
+}
+
 export function filePathOf(part: ToolUIPart): string | undefined {
-  const input = part.input as { file_path?: unknown; notebook_path?: unknown } | undefined;
+  const input = toolInputRecord(part.input);
   switch (part.type) {
     case "tool-Read":
     case "tool-Edit":

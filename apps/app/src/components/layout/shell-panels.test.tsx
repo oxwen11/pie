@@ -13,21 +13,35 @@ import { notifyUserLayoutListeners, resolveSidebarUserLayout } from "./shell-use
 Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
   ResizeObserver: class {
-    disconnect(): void {}
-    observe(): void {}
-    unobserve(): void {}
+    disconnect(): void {
+      /* jsdom has no layout */
+    }
+    observe(): void {
+      /* jsdom has no layout */
+    }
+    unobserve(): void {
+      /* jsdom has no layout */
+    }
   },
 });
 
 window.matchMedia = (query) => ({
-  addEventListener() {},
-  addListener() {},
+  addEventListener() {
+    /* tests drive layout through notifyUserLayoutListeners */
+  },
+  addListener() {
+    /* MediaQueryList still types this deprecated alias */
+  },
   dispatchEvent: () => false,
   matches: false,
   media: query,
   onchange: null,
-  removeEventListener() {},
-  removeListener() {},
+  removeEventListener() {
+    /* tests drive layout through notifyUserLayoutListeners */
+  },
+  removeListener() {
+    /* MediaQueryList still types this deprecated alias */
+  },
 });
 
 let root: Root | undefined;

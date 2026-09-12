@@ -90,7 +90,43 @@ export default defineConfig({
       },
     ],
     "pie/node-import-style": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: ["**/node_modules", "**/node_modules/**"],
+            message:
+              'Do not import through node_modules. Import the package by name instead of a relative path like "../../../../node_modules/<pkg>".',
+          },
+        ],
+      },
+    ],
     "pie/no-restricted-disable": "error",
+    "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
+    "import/no-mutable-exports": "error",
+    "react/globals": "error",
+    "react/purity": "error",
+    "react/immutability": "error",
+    "react/set-state-in-effect": "error",
+    "react/set-state-in-render": "error",
+    // Compiler extra-deps fights react/exhaustive-deps on ref objects passed
+    // as props (shell-panels). Keep the hooks rule; leave this off.
+    "react/exhaustive-effect-dependencies": "off",
+    "react/rules-of-hooks": "error",
+    "react/no-deriving-state-in-effects": "error",
+    "react/display-name": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-dynamic-delete": "error",
+    "no-empty": "error",
+    "no-empty-function": "error",
+    "no-loop-func": "error",
+    "no-param-reassign": "error",
+    "no-implicit-globals": "error",
+    "no-case-declarations": "error",
+    "no-fallthrough": "error",
+    "no-prototype-builtins": "error",
+    "prefer-promise-reject-errors": "error",
     "pie-boundaries/feature-no-route-match": "error",
     "pie-boundaries/feature-no-cross-import": "error",
     "pie-boundaries/app-no-server-import": "error",
@@ -118,24 +154,17 @@ export default defineConfig({
       },
     ],
     "jsx-a11y/role-supports-aria-props": "warn",
-    "jsx-a11y/no-autofocus": "off",
+    // Ultracite leaves these off; pie turns them on in this slice.
+    "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/prefer-tag-over-role": "off",
-    "@typescript-eslint/no-non-null-assertion": "off",
     "react/react-in-jsx-scope": "off",
     "unicorn/no-empty-file": "off",
     "unicorn/consistent-function-scoping": "off",
     "unicorn/no-array-sort": "off",
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
-    "react/purity": "off",
-    "react/set-state-in-effect": "off",
-    "react/exhaustive-effect-dependencies": "off",
-    "react/immutability": "off",
-    "typescript/no-unsafe-type-assertion": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
-    "typescript/consistent-return": "off",
-    "typescript/no-unnecessary-type-parameters": "off",
-    "promise/always-return": "off",
+    // Ultracite leaves this off; pie turns it on in this slice.
+    "promise/always-return": "error",
     "no-unused-vars": [
       "error",
       {
@@ -180,8 +209,47 @@ export default defineConfig({
       files: [
         "**/*.{test,spec,test-d,spec-d}.{ts,tsx,js,jsx}",
         "**/__tests__/**/*.{ts,tsx,js,jsx}",
+        "**/e2e/**",
       ],
-      rules: deferredVitestUltraciteRules,
+      rules: {
+        ...deferredVitestUltraciteRules,
+        // Playwright fixture `use` and Effect Context `use` are not React's `use`.
+        "react/rules-of-hooks": "off",
+        // Tests mock deprecated host APIs (MediaQueryList.addListener, tsd matchers).
+        "typescript/no-deprecated": "off",
+        "pie/no-let": "off",
+        // Fixtures and tests use `as` / JSON.parse any at the mock boundary.
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+      },
+    },
+    {
+      files: ["**/*.mjs", "tools/testing/**"],
+      rules: {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+      },
+    },
+    {
+      // Behavioral lint follow-ups split out of #217 (auto-merge).
+      files: [
+        "apps/app/src/routes/session/$sessionId.tsx",
+        "apps/app/src/features/schedules/schedule-page.tsx",
+        "apps/app/src/features/files/file-preview-adapter.tsx",
+      ],
+      rules: {
+        "react/purity": "off",
+        "react/immutability": "off",
+        "typescript/no-deprecated": "off",
+      },
     },
     {
       files: [
@@ -215,9 +283,70 @@ export default defineConfig({
         "typescript/no-misused-promises": "off",
         "react/jsx-no-constructed-context-values": "off",
         "react/no-object-type-as-default-prop": "off",
+        "react/purity": "off",
+        "react/immutability": "off",
+        "react/globals": "off",
+        "react/set-state-in-effect": "off",
+        "react/set-state-in-render": "off",
+        "react/no-deriving-state-in-effects": "off",
+        "react/display-name": "off",
+        "react/rules-of-hooks": "off",
+        "typescript/no-deprecated": "off",
+        "no-param-reassign": "off",
+        "no-empty-function": "off",
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/prefer-reduce-type-parameter": "off",
         "no-promise-executor-return": "off",
+        "typescript/prefer-nullish-coalescing": "off",
+        "jsx-a11y/no-autofocus": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unnecessary-type-parameters": "off",
+        "promise/always-return": "off",
+        "typescript/consistent-return": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+      },
+    },
+    {
+      // `undefined` keeps the current value; `null` clears it. `??` collapses that.
+      files: ["packages/server/src/schedule/mutations.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Empty `SHELL` is missing, not a command. `??` would spawn `""`.
+      files: ["packages/server/src/terminal/pty.ts"],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Empty last segment (`foo/`) should fall back to the full path. `??` keeps `""`.
+      files: [
+        "apps/app/src/features/files/file-panel.tsx",
+        "apps/app/src/features/files/file-preview-pane.tsx",
+      ],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
+      // Once-used `E` keeps oRPC error factories precise through Effect.catchTags.
+      files: [
+        "packages/server/src/rpc/git.ts",
+        "packages/server/src/rpc/pull-request.ts",
+        "packages/server/src/rpc/resolve-workspace.ts",
+        "packages/server/src/rpc/session.ts",
+        "packages/server/src/rpc/terminal.ts",
+      ],
+      rules: {
+        "typescript/no-unnecessary-type-parameters": "off",
       },
     },
     {
@@ -226,6 +355,12 @@ export default defineConfig({
         "import/no-commonjs": "off",
         "typescript/no-require-imports": "off",
         "typescript/no-var-requires": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
       },
     },
   ],

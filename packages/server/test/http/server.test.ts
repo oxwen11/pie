@@ -143,7 +143,10 @@ describe("createServer CORS", () => {
 describe("createServer anti DNS-rebinding", () => {
   it("refuses a request whose Host is not loopback, even /api/health", async () => {
     await start({});
-    const { port } = server!.address() as AddressInfo;
+    if (server === undefined) {
+      throw new Error("expected server");
+    }
+    const { port } = server.address() as AddressInfo;
     const status = await new Promise<number>((resolve) => {
       const req = http.request(
         { host: "127.0.0.1", port, path: "/api/health", headers: { host: "evil.example" } },

@@ -1,36 +1,14 @@
-import path from "node:path";
-import url from "node:url";
-
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
   checkPiAvailability,
-  parsePiRuntime,
   piAvailabilityTarget,
-  resolveBundledPiCli,
   resolvePiExecutable,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
-describe("parsePiRuntime", () => {
-  it("defaults to node when unset or empty", () => {
-    expect(parsePiRuntime(undefined)).toBe("node");
-    expect(parsePiRuntime("")).toBe("node");
-    expect(parsePiRuntime("node")).toBe("node");
-    expect(parsePiRuntime(" NODE ")).toBe("node");
-  });
-
-  it("selects bun case-insensitively", () => {
-    expect(parsePiRuntime("bun")).toBe("bun");
-    expect(parsePiRuntime("BUN")).toBe("bun");
-    expect(parsePiRuntime(" bun ")).toBe("bun");
-  });
-
-  it("treats unknown values as node so the default spawn path stays unchanged", () => {
-    expect(parsePiRuntime("deno")).toBe("node");
-  });
-});
+const rpc = "/opt/pie/dist/pi-rpc/pi-rpc.js";
 
 describe("resolvePiExecutable", () => {
   it("prefers the E2E override when PIE_E2E=1", () => {
@@ -39,140 +17,93 @@ describe("resolvePiExecutable", () => {
         PIE_E2E: "1",
         PIE_E2E_PI_EXECUTABLE: "/tmp/fake-pi",
         PIE_PI_EXECUTABLE: "/ignored",
-        PIE_PI_RUNTIME: "bun",
       }),
     ).toEqual({ command: "/tmp/fake-pi", prefixArgs: [] });
   });
 
-  it("uses PIE_PI_EXECUTABLE in production", () => {
-    expect(resolvePiExecutable({ PIE_PI_EXECUTABLE: "/opt/pi" })).toEqual({
-      command: "/opt/pi",
-      prefixArgs: [],
-    });
-  });
-
-  it("falls back to bundled pi-coding-agent via Node", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
-    expect(resolvePiExecutable({})).toEqual({
-      command: process.execPath,
-      prefixArgs: [bundled!],
-    });
-  });
-
-  it("keeps the Node spawn path when PIE_PI_RUNTIME is node", () => {
-    const bundled = resolveBundledPiCli();
-    expect(resolvePiExecutable({ PIE_PI_RUNTIME: "node" })).toEqual({
-      command: process.execPath,
-      prefixArgs: [bundled!],
-    });
-  });
-
-  it("spawns bun plus bundled cli.js when PIE_PI_RUNTIME=bun", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
-    expect(resolvePiExecutable({ PIE_PI_RUNTIME: "bun" })).toEqual({
+  it("spawns bun plus the pie-owned RPC entry", () => {
+    expect(resolvePiExecutable({}, { resolveBundledCli: () => rpc })).toEqual({
       command: "bun",
-      prefixArgs: [bundled!],
+      prefixArgs: [rpc],
     });
   });
 
-  it("lets a .js PIE_PI_EXECUTABLE override the bundled cli under bun", () => {
+  it("uses PIE_BUN as the command when that path exists", () => {
     expect(
-      resolvePiExecutable({
-        PIE_PI_RUNTIME: "bun",
-        PIE_PI_EXECUTABLE: "/opt/custom/cli.js",
-      }),
+      resolvePiExecutable({ PIE_BUN: process.execPath }, { resolveBundledCli: () => rpc }),
+    ).toEqual({
+      command: process.execPath,
+      prefixArgs: [rpc],
+    });
+  });
+
+  it("falls back to PATH bun when PIE_BUN is missing on disk", () => {
+    expect(
+      resolvePiExecutable({ PIE_BUN: "/does/not/exist/bun" }, { resolveBundledCli: () => rpc }),
+    ).toEqual({
+      command: "bun",
+      prefixArgs: [rpc],
+    });
+  });
+
+  it("lets a .js PIE_PI_EXECUTABLE override the bundled entry", () => {
+    expect(
+      resolvePiExecutable(
+        { PIE_PI_EXECUTABLE: "/opt/custom/cli.js" },
+        { resolveBundledCli: () => rpc },
+      ),
     ).toEqual({ command: "bun", prefixArgs: ["/opt/custom/cli.js"] });
   });
 
   it("does not run a shebang PIE_PI_EXECUTABLE under bun", () => {
-    const bundled = resolveBundledPiCli();
     expect(
-      resolvePiExecutable({
-        PIE_PI_RUNTIME: "bun",
-        PIE_PI_EXECUTABLE: "/usr/bin/pi",
-      }),
-    ).toEqual({ command: "bun", prefixArgs: [bundled!] });
+      resolvePiExecutable({ PIE_PI_EXECUTABLE: "/usr/bin/pi" }, { resolveBundledCli: () => rpc }),
+    ).toEqual({ command: "bun", prefixArgs: [rpc] });
   });
 
-  it("returns bun with no script when cli.js cannot be resolved", () => {
-    expect(
-      resolvePiExecutable({ PIE_PI_RUNTIME: "bun" }, { resolveBundledCli: () => undefined }),
-    ).toEqual({ command: "bun", prefixArgs: [] });
+  it("returns bun with no script when the RPC entry cannot be resolved", () => {
+    expect(resolvePiExecutable({}, { resolveBundledCli: () => undefined })).toEqual({
+      command: "bun",
+      prefixArgs: [],
+    });
   });
-
-  it("resolves the bundled cli from the workspace dependency graph", () => {
-    const bundled = resolveBundledPiCli();
-    const indexPath = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-    expect(bundled).toBe(path.join(path.dirname(indexPath), "cli.js"));
+  it("rewrites a packaged asar RPC entry to asar.unpacked for bun", () => {
+    const asarEntry =
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pi-rpc/pi-rpc.js";
+    expect(resolvePiExecutable({}, { resolveBundledCli: () => asarEntry })).toEqual({
+      command: "bun",
+      prefixArgs: [
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-rpc/pi-rpc.js",
+      ],
+    });
   });
 });
 
 describe("piAvailabilityTarget", () => {
-  it("checks the script path when Pi is run under Node", () => {
-    expect(
-      piAvailabilityTarget({ command: process.execPath, prefixArgs: ["/opt/pi/dist/cli.js"] }),
-    ).toBe("/opt/pi/dist/cli.js");
-  });
-
   it("checks the script path when Pi is run under bun", () => {
-    expect(piAvailabilityTarget({ command: "bun", prefixArgs: ["/opt/pi/dist/cli.js"] })).toBe(
-      "/opt/pi/dist/cli.js",
-    );
+    expect(piAvailabilityTarget({ command: "bun", prefixArgs: [rpc] })).toBe(rpc);
   });
 
   it("checks the command name for PATH lookup", () => {
-    expect(piAvailabilityTarget({ command: "pi", prefixArgs: [] })).toBe("pi");
+    expect(piAvailabilityTarget({ command: "bun", prefixArgs: [] })).toBe("bun");
   });
 });
 
 describe("checkPiAvailability", () => {
-  it("reports bundled Pi available when the script file exists", () => {
-    const bundled = resolveBundledPiCli();
-    expect(bundled).toBeTruthy();
-
-    const result = Effect.runSync(
-      checkPiAvailability({ command: process.execPath, prefixArgs: [bundled!] }).pipe(
-        Effect.provide(fakeStats({ [bundled!]: fileInfo("File", 0o644) })),
-      ),
-    );
-    expect(result).toEqual({ available: true });
-  });
-
-  it("reports bundled Pi missing when the script file is absent", () => {
-    const result = Effect.runSync(
-      checkPiAvailability({
-        command: process.execPath,
-        prefixArgs: ["/does/not/exist/cli.js"],
-      }).pipe(Effect.provide(fakeStats({}))),
-    );
-    expect(result).toEqual({ available: false, reason: "Bundled Pi is missing." });
-  });
-
-  it("reports PATH Pi missing when the command is not installed", () => {
-    const result = Effect.runSync(
-      checkPiAvailability({ command: "pi", prefixArgs: [] }).pipe(
-        Effect.provide(fakeExecutables()),
-      ),
-    );
-    expect(result).toEqual({ available: false, reason: "Pi was not found on PATH." });
-  });
-
-  it("reports bun missing on PATH when PIE_PI_RUNTIME selected bun", () => {
+  it("reports bun missing when bun is not on PATH", () => {
     const result = Effect.runSync(
       checkPiAvailability(
-        { command: "bun", prefixArgs: ["/opt/pi/dist/cli.js"] },
+        { command: "bun", prefixArgs: [rpc] },
         { env: { PATH: "/usr/local/bin" }, platform: "linux" },
-      ).pipe(Effect.provide(fakeStats({ "/opt/pi/dist/cli.js": fileInfo("File", 0o644) }))),
+      ).pipe(Effect.provide(fakeStats({ [rpc]: fileInfo("File", 0o644) }))),
     );
     expect(result).toEqual({
       available: false,
-      reason: "Bun was not found on PATH. Install Bun or unset PIE_PI_RUNTIME.",
+      reason: "Bun was not found. Install Bun.",
     });
   });
 
-  it("reports cli.js missing when bun is present but the script is not", () => {
+  it("reports the RPC entry missing when bun is present but the script is not", () => {
     const result = Effect.runSync(
       checkPiAvailability(
         { command: "bun", prefixArgs: [] },
@@ -181,21 +112,20 @@ describe("checkPiAvailability", () => {
     );
     expect(result).toEqual({
       available: false,
-      reason:
-        "Pi cli.js was not found. PIE_PI_RUNTIME=bun needs the script entry, not the shebang binary.",
+      reason: "Pi RPC entry was not found.",
     });
   });
 
-  it("reports bun available when bun and cli.js both exist", () => {
+  it("reports bun available when bun and the RPC entry both exist", () => {
     const result = Effect.runSync(
       checkPiAvailability(
-        { command: "bun", prefixArgs: ["/opt/pi/dist/cli.js"] },
+        { command: "bun", prefixArgs: [rpc] },
         { env: { PATH: "/usr/local/bin" }, platform: "linux" },
       ).pipe(
         Effect.provide(
           fakeStats({
             "/usr/local/bin/bun": fileInfo("File", 0o755),
-            "/opt/pi/dist/cli.js": fileInfo("File", 0o644),
+            [rpc]: fileInfo("File", 0o644),
           }),
         ),
       ),

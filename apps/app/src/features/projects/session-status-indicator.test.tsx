@@ -123,7 +123,8 @@ describe("SessionPullRequestIndicator", () => {
       expect(indicator?.getAttribute("role")).toBe("img");
       expect(indicator?.classList.contains(colorClass)).toBe(true);
       expect(indicator?.querySelector("svg")?.classList.contains(iconClass)).toBe(true);
-      act(() => root?.unmount());
+      const mounted = root;
+      act(() => mounted?.unmount());
       node.remove();
       root = undefined;
       container = undefined;

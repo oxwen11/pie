@@ -61,8 +61,11 @@ async function getBrowserWsTicket(): Promise<string> {
   if (!response.ok) {
     throw new Error(`Failed to bootstrap the local server: ${response.status}`);
   }
-  const body = (await response.json()) as { token: string | null };
-  const token = typeof body.token === "string" ? body.token : undefined;
+  const body: unknown = await response.json();
+  const token =
+    typeof body === "object" && body !== null && "token" in body && typeof body.token === "string"
+      ? body.token
+      : undefined;
   return getWsTicket(globalThis.location.origin, token);
 }
 

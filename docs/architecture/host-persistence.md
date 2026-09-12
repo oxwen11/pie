@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-05.
+Last audited: 2026-09-12.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -16,7 +16,7 @@ in `.agents/rules/architecture.md` under **Host-write design gate**.
 There are four persistence owners. Their data must not be merged casually:
 
 1. **Pie server data** under `$PIE_HOME`.
-2. **Daemon lifecycle state** under `$PIE_DAEMON_DIR`.
+2. **Daemon lifecycle state** under `$PIE_HOME/daemon`.
 3. **Browser/Electron profile state** owned by the renderer origin or Chromium.
 4. **Pi and the agent's tools**, which write outside Pie-owned storage under
    Pi's own data root and the selected workspace.
@@ -25,13 +25,18 @@ There are four persistence owners. Their data must not be merged casually:
 roots:
 
 - `$PIE_HOME` overrides the home.
-- Otherwise production uses `~/.pie` and `NODE_ENV=development` uses
-  `~/.pie-dev`.
-- `$PIE_DAEMON_DIR` overrides daemon lifecycle storage; otherwise it is
-  `$PIE_HOME/daemon`.
-- Development front doors may scope lifecycle state to
-  `$PIE_HOME/daemons/<checkout-scope>` while retaining one shared development
-  data home.
+- Otherwise the default is chosen from the running code's on-disk location
+  (not `process.cwd()`):
+  - installed binary, not inside a Git checkout → `~/.pie`;
+  - Git checkout (dev, or a build launched from the repo) →
+    `~/.pie_<sanitized-branch>` (`main` → `~/.pie_main`, `feat/foo` →
+    `~/.pie_feat--foo`; `/` becomes `--` so it does not collide with `-`;
+    detached HEAD uses the short SHA);
+  - checkout whose branch cannot be read → `~/.pie_dev`.
+- `NODE_ENV` does not choose the home. Isolation is a different `$PIE_HOME`;
+  tests and verify runs must set their own and must not use `~/.pie`,
+  `~/.pie_dev`, or `~/.pie_<branch>`.
+- Daemon lifecycle storage is always `$PIE_HOME/daemon`.
 
 The Desktop Electron `userData` directory is separate from `$PIE_HOME`.
 Changing one does not relocate the other.
@@ -45,9 +50,13 @@ $PIE_HOME/
 │   ├── sessions/<projectId>/<sessionId>.json
 │   └── schedules/<scheduleId>.json
 ├── worktrees/<repository-basename>/<four-character-key>/
-└── logs/
-    ├── pie.log
-    └── daemon-stdio.log
+├── logs/
+│   ├── pie.log
+│   └── daemon-stdio.log
+└── daemon/
+    ├── daemon.pid
+    ├── daemon.lock
+    └── daemon.stopped
 ```
 
 ### Common JSON storage contract
@@ -187,7 +196,7 @@ explicit future cleanup path or manual Git cleanup.
 The default lifecycle tree is:
 
 ```text
-$PIE_DAEMON_DIR/               # defaults to $PIE_HOME/daemon
+$PIE_HOME/daemon/
 ├── daemon.pid
 ├── daemon.lock
 └── daemon.stopped
@@ -300,8 +309,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches the external Pi executable with `--mode rpc`, the session cwd, and
-optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches a pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, Bun) with the session cwd
+and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie
@@ -342,4 +351,4 @@ new designs:
   is outside that envelope system.
 - Server data JSON permissions and the daemon SQLite lock mode rely on umask.
 - JSON coordination is not cross-process, so one `$PIE_HOME` assumes one active
-  server writer even when lifecycle directories are split.
+  server writer.

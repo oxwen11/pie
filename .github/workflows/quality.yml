@@ -76,6 +76,10 @@ jobs:
             "$ID" "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
         shell: bash
 
+      - name: Native toolchain (node-pty)
+        run: bash .github/scripts/ensure-native-toolchain.sh
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       # `build` / `typecheck` / `lint:check` go through turbo.

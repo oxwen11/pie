@@ -236,7 +236,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(created.name, "Morning review");
       assert.strictEqual(created.enabled, true);
       assert.isTrue(created.nextRunAt !== null);
-      assert.isTrue(Date.parse(created.nextRunAt!) > ORIGIN);
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      assert.isTrue(Date.parse(created.nextRunAt) > ORIGIN);
     }),
   );
 
@@ -362,7 +365,10 @@ describe("ScheduleService", () => {
       const created = yield* h.service.create(
         cronInput({ spec: { kind: "cron", expr: "* * * * *" } }),
       );
-      const firstNext = created.nextRunAt!;
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      const firstNext = created.nextRunAt;
       yield* TestClock.setTime(Date.parse(firstNext));
       yield* h.service.tick();
       yield* Effect.yieldNow;
@@ -371,7 +377,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(after?.lastRunStatus, "succeeded");
       assert.strictEqual(after?.runs[0]?.reason, "scheduled");
       assert.notStrictEqual(after?.nextRunAt, firstNext);
-      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse(firstNext));
+      if (after?.nextRunAt == null) {
+        throw new Error("expected nextRunAt after tick");
+      }
+      assert.isTrue(Date.parse(after.nextRunAt) > Date.parse(firstNext));
     }),
   );
 
@@ -388,7 +397,10 @@ describe("ScheduleService", () => {
           session: { policy: "existing", sessionId: "picked" },
         }),
       );
-      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(created.nextRunAt));
       yield* h.service.tick();
       const after = h.store.get(created.id);
       assert.strictEqual(h.created.length, 0);
@@ -452,7 +464,10 @@ describe("ScheduleService", () => {
       yield* Effect.yieldNow;
       assert.strictEqual(first.schedule.lastSessionId, "sess-1");
       live.add("sess-1");
-      yield* TestClock.setTime(Date.parse(first.schedule.nextRunAt!));
+      if (first.schedule.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(first.schedule.nextRunAt));
       yield* h.service.tick();
       yield* Effect.yieldNow;
       const after = h.store.get(created.id);
@@ -582,8 +597,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(after?.lastRunStatus, "missed");
       assert.strictEqual(after?.runs[0]?.skipReason, "stale");
       assert.isTrue((after?.runs[0]?.missedCount ?? 0) > 0);
-      assert.isTrue(after?.nextRunAt !== null && after?.nextRunAt !== undefined);
-      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse("2026-09-10T09:00:00.000Z"));
+      if (after?.nextRunAt == null) {
+        throw new Error("expected nextRunAt after stale miss");
+      }
+      assert.isTrue(Date.parse(after.nextRunAt) > Date.parse("2026-09-10T09:00:00.000Z"));
     }),
   );
 
@@ -625,8 +642,10 @@ describe("ScheduleService", () => {
         sessionId: "sess-1",
       });
       const bound = h.catalog.find((session) => session.sessionId === "sess-1");
-      assert.isDefined(bound);
-      bound!.archived = true;
+      if (bound === undefined) {
+        throw new Error("expected bound session");
+      }
+      bound.archived = true;
       yield* h.service.runNow(created.id);
       yield* Effect.yieldNow;
       assert.strictEqual(h.created.length, 2);
@@ -862,7 +881,10 @@ describe("ScheduleService", () => {
           maxRuns: 1,
         }),
       );
-      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(created.nextRunAt));
       yield* h.service.tick();
       yield* Effect.yieldNow;
       const afterFire = h.store.get(created.id);

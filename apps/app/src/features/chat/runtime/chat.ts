@@ -48,11 +48,12 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIM
   role: "user",
   parts: parts.map((part) =>
     part.type === "data-inspector" ? { type: "data-inspector", data: part.data } : part,
-  ) as UIMessage["parts"],
+  ),
 });
 
 const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- data-retry payload is untyped JSON
   const data = chunk.data as {
     readonly errorMessage?: unknown;
     readonly attempt?: unknown;
@@ -564,7 +565,7 @@ export class Chat {
         // overrides this seed.
         const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as UIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
-          this.#state.upsertMessage(message as UIMessage);
+          this.#state.upsertMessage(message);
         }
       } catch (foldError) {
         console.error("Failed to fold turn", foldError);
