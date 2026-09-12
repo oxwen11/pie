@@ -65,6 +65,15 @@ rl.on("line", (line) => {
   if (msg.type === "steer") {
     steering.push(msg.message);
     send({ id: msg.id, type: "response", command: "steer", success: true });
+    if (holding && msg.message === "split") {
+      send({ type: "message_start", message: { role: "user", content: [{ type: "text", text: msg.message }], timestamp: 0 } });
+      send({ type: "message_start", message: assistant() });
+      upd({ type: "text_start", contentIndex: 0 });
+      upd({ type: "text_delta", contentIndex: 0, delta: "after split" });
+      upd({ type: "text_end", contentIndex: 0, content: "after split" });
+      send({ type: "queue_update", steering, followUp });
+      return;
+    }
     send({ type: "queue_update", steering, followUp });
     if (holding) { holding = false; settle(); }
     return;
@@ -90,9 +99,21 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   const text = msg.message;
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
+  if (holding && !msg.streamingBehavior) {
+    send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
+    return;
+  }
   send({ id: msg.id, type: "response", command: "prompt", success: true });
+  if (holding) { holding = false; settle(); return; }
   send({ type: "agent_start" });
-  if (text === "hold") { holding = true; return; }
+  if (text === "hold") {
+    holding = true;
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "before split" });
+    upd({ type: "text_end", contentIndex: 0, content: "before split" });
+    return;
+  }
   if (text === "confirm") { holding = true; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
   if (text === "tool") {
     send({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls" } });
@@ -269,6 +290,37 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
       const chunks = yield* Stream.runCollect(first.output);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("keeps a steered turn active across a model switch", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold" });
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
+      const queueUpdated = yield* Effect.forkChild(
+        Stream.runHead(agent.session.queueUpdates(sessionId)),
+      );
+
+      const split = yield* agent.session.prompt({ sessionId, text: "split", delivery: "steer" });
+      assert.equal(split.started, false);
+      yield* Fiber.join(queueUpdated);
+      yield* Effect.yieldNow;
+      yield* agent.session.setModel(sessionId, { provider: "p", modelId: "m2" });
+
+      const steered = yield* agent.session.prompt({
+        sessionId,
+        text: "replace this",
+        delivery: "steer",
+      });
+      assert.equal(steered.started, false);
+      assert.equal(steered.turnId, first.turnId);
+
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.equal(chunks.filter((chunk) => chunk.type === "start").length, 2);
+      assert.equal(chunks.filter((chunk) => chunk.type === "finish").length, 2);
       yield* agent.session.abort(sessionId);
     }),
   );

@@ -60,6 +60,11 @@ type FinishTransition = {
   readonly interrupted: boolean;
 };
 
+type PiTurnOutput = {
+  readonly chunk: PiUIMessageChunk;
+  readonly runEnd: boolean;
+};
+
 type TurnDecision =
   | { readonly _tag: "Start"; readonly turnId: string; readonly ended: Deferred.Deferred<void> }
   | { readonly _tag: "Steer"; readonly turn: Extract<PiTurnState, { _tag: "Active" }> }
@@ -72,7 +77,7 @@ type SessionState = {
   readonly scope: Scope.Closeable;
   readonly transport: PiTransport;
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
-  readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
+  readonly chunks: Queue.Queue<PiTurnOutput, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
@@ -243,7 +248,10 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(Queue.end(session.requests)),
             Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(
-              Queue.offer(session.chunks, { type: "error", errorText: failure.message }),
+              Queue.offer(session.chunks, {
+                chunk: { type: "error", errorText: failure.message },
+                runEnd: false,
+              }),
             ),
             Effect.flatMap((accepted) =>
               accepted
@@ -274,7 +282,8 @@ export const makePiProcessWithDependencies = <R>(
         }
 
         for (const chunk of session.transform(event)) {
-          if (chunk.type === "finish") {
+          const runEnd = event.type === "agent_settled" && chunk.type === "finish";
+          if (runEnd) {
             const transition = yield* Ref.modify<PiTurnState, FinishTransition>(
               session.turnState,
               (current) => {
@@ -310,7 +319,10 @@ export const makePiProcessWithDependencies = <R>(
             if (transition.ended) yield* Deferred.succeed(transition.ended, undefined);
             if (!transition.deliver) continue;
             if (transition.interrupted) {
-              const accepted = yield* Queue.offer(session.chunks, { type: "abort" });
+              const accepted = yield* Queue.offer(session.chunks, {
+                chunk: { type: "abort" },
+                runEnd: false,
+              });
               if (!accepted) {
                 yield* evictOverflowedSession(session);
                 return;
@@ -318,7 +330,7 @@ export const makePiProcessWithDependencies = <R>(
             }
           }
 
-          const accepted = yield* Queue.offer(session.chunks, chunk);
+          const accepted = yield* Queue.offer(session.chunks, { chunk, runEnd });
           if (!accepted) {
             yield* evictOverflowedSession(session);
             return;
@@ -420,7 +432,7 @@ export const makePiProcessWithDependencies = <R>(
             scope,
             transport,
             termination: yield* Deferred.make<never, PiSessionFailure>(),
-            chunks: yield* Queue.dropping<PiUIMessageChunk, Cause.Done | AgentOperationError>(
+            chunks: yield* Queue.dropping<PiTurnOutput, Cause.Done | AgentOperationError>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
@@ -589,7 +601,11 @@ export const makePiProcessWithDependencies = <R>(
 
                   yield* drainQueue(session.chunks);
                   yield* session.transport
-                    .command({ type: "prompt", message: input.text })
+                    .command({
+                      type: "prompt",
+                      message: input.text,
+                      streamingBehavior: input.delivery,
+                    })
                     .pipe(
                       Effect.tapError(() =>
                         Ref.update(session.turnState, (current) =>
@@ -633,10 +649,9 @@ export const makePiProcessWithDependencies = <R>(
                     turnId,
                     started: true,
                     output: streamFromQueueOne(session.chunks).pipe(
-                      Stream.tap((chunk) =>
-                        chunk.type === "finish" ? finishConsumed : Effect.void,
-                      ),
-                      Stream.takeUntil((chunk) => chunk.type === "finish"),
+                      Stream.tap((output) => (output.runEnd ? finishConsumed : Effect.void)),
+                      Stream.takeUntil((output) => output.runEnd),
+                      Stream.map((output) => output.chunk),
                       Stream.ensuring(abandonTurn),
                     ),
                   };
