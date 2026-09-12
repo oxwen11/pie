@@ -43,16 +43,12 @@ function downloadBun(platform, arch) {
       .find((line) => line.includes(`${name}.zip`))
       ?.split(/\s+/)[0];
     const actual = crypto.createHash("sha256").update(fs.readFileSync(zipPath)).digest("hex");
-    if (!expected || actual !== expected) {
+    if (!expected || actual !== expected)
       throw new Error(`Checksum verification failed for ${name}.zip`);
-    }
 
     execFileSync("unzip", ["-o", zipPath, "-d", tmp], { stdio: "pipe" });
-    const source = path.join(tmp, name, binary);
-    fs.copyFileSync(source, dest);
-    if (platform !== "win32") {
-      fs.chmodSync(dest, 0o755);
-    }
+    fs.copyFileSync(path.join(tmp, name, binary), dest);
+    if (platform !== "win32") fs.chmodSync(dest, 0o755);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
