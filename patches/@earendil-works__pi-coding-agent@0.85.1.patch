@@ -1,0 +1,976 @@
+diff --git a/dist/cli/config-selector.js b/dist/cli/config-selector.js
+index 879d410a832776ff4d5e6ed39a9439882df5311c..a5e1dfd90219002f625b2e4350fafc5bf878cf6c 100644
+--- a/dist/cli/config-selector.js
++++ b/dist/cli/config-selector.js
+@@ -1,7 +1,7 @@
+ /**
+  * TUI config selector for `pi config` command
+  */
+-import { ProcessTerminal, TuiMainScreen } from "@earendil-works/pi-tui";
++import { ProcessTerminal, TuiMainScreen } from "../tui-stub.js";
+ import { ConfigSelectorComponent } from "../modes/interactive/components/config-selector.js";
+ import { initTheme, stopThemeWatcher } from "../modes/interactive/theme/theme.js";
+ /** Show TUI config selector and return when closed */
+diff --git a/dist/cli/list-models.js b/dist/cli/list-models.js
+index 0a60a397fe11c1e20eaca5bc7dbe1062074280e6..fd5a581ee27a8b8ff8e9c408c16f6ff315ce8786 100644
+--- a/dist/cli/list-models.js
++++ b/dist/cli/list-models.js
+@@ -1,7 +1,7 @@
+ /**
+  * List available models with optional fuzzy search
+  */
+-import { fuzzyFilter } from "@earendil-works/pi-tui";
++import { fuzzyFilter } from "../tui-stub.js";
+ import chalk from "chalk";
+ import { formatNoModelsAvailableMessage } from "../core/auth-guidance.js";
+ /**
+diff --git a/dist/cli/session-picker.js b/dist/cli/session-picker.js
+index 1341a1fb00c92e99c977757f9d31d56c75ad7506..a62b2f2c3861e410762680bd14c4084db9969d9c 100644
+--- a/dist/cli/session-picker.js
++++ b/dist/cli/session-picker.js
+@@ -1,7 +1,7 @@
+ /**
+  * TUI session selector for --resume flag
+  */
+-import { setKeybindings } from "@earendil-works/pi-tui";
++import { setKeybindings } from "../tui-stub.js";
+ import { KeybindingsManager } from "../core/keybindings.js";
+ import { SessionSelectorComponent } from "../modes/interactive/components/session-selector.js";
+ import { createStartupTui, startStartupTui } from "./startup-ui.js";
+diff --git a/dist/cli/startup-ui.js b/dist/cli/startup-ui.js
+index b08537a519ba199451396538a04cf5ea8654b959..b41a3974abc3213b3c9c6e1bb352c465e1601042 100644
+--- a/dist/cli/startup-ui.js
++++ b/dist/cli/startup-ui.js
+@@ -1,4 +1,4 @@
+-import { ProcessTerminal, setCapabilityOverrides, setKeybindings, TuiMainScreen, } from "@earendil-works/pi-tui";
++import { ProcessTerminal, setCapabilityOverrides, setKeybindings, TuiMainScreen, } from "../tui-stub.js";
+ import { existsSync } from "fs";
+ import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, getAgentDir, getSettingsPath, PACKAGE_NAME } from "../config.js";
+ import { areExperimentalFeaturesEnabled } from "../core/experimental.js";
+diff --git a/dist/core/extensions/loader.js b/dist/core/extensions/loader.js
+index e8e8859ae1e64ef0cdc50b0d31e2927d1fa0082f..842642beacd009c29fc3b056780262adac1e0a05 100644
+--- a/dist/core/extensions/loader.js
++++ b/dist/core/extensions/loader.js
+@@ -10,7 +10,7 @@ import * as _bundledPiAgentCore from "@earendil-works/pi-agent-core";
+ import * as _bundledPiAiCompat from "@earendil-works/pi-ai/compat";
+ import * as _bundledPiAiOauth from "@earendil-works/pi-ai/oauth";
+ import * as _bundledPiAiProviders from "@earendil-works/pi-ai/providers/all";
+-import * as _bundledPiTui from "@earendil-works/pi-tui";
++import * as _bundledPiTui from "../../tui-stub.js";
+ import { createJiti } from "jiti/static";
+ // Static imports of packages that extensions may use.
+ // These MUST be static so Bun bundles them into the compiled binary.
+diff --git a/dist/core/keybindings.js b/dist/core/keybindings.js
+index 2513d09bf0c52f07eb50965ccd67f1a1e0f0efbe..97996a6a3286270e3a99f05362743dd1730995ab 100644
+--- a/dist/core/keybindings.js
++++ b/dist/core/keybindings.js
+@@ -1,4 +1,4 @@
+-import { TUI_KEYBINDINGS, KeybindingsManager as TuiKeybindingsManager, } from "@earendil-works/pi-tui";
++import { TUI_KEYBINDINGS, KeybindingsManager as TuiKeybindingsManager, } from "../tui-stub.js";
+ import { existsSync, readFileSync } from "fs";
+ import { join } from "path";
+ import { getAgentDir } from "../config.js";
+diff --git a/dist/core/tools/render-utils.js b/dist/core/tools/render-utils.js
+index 479a0b48bf68f8e717b0b0068f19e3244d0058ef..0cb97572f1764c1d7a7e0d241b6b976f6c44ce5e 100644
+--- a/dist/core/tools/render-utils.js
++++ b/dist/core/tools/render-utils.js
+@@ -1,6 +1,6 @@
+ import * as os from "node:os";
+ import { pathToFileURL } from "node:url";
+-import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "@earendil-works/pi-tui";
++import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "../../tui-stub.js";
+ import { stripAnsi } from "../../utils/ansi.js";
+ import { resolvePath } from "../../utils/paths.js";
+ import { sanitizeBinaryOutput } from "../../utils/shell.js";
+diff --git a/dist/core/tools/renderers/bash.js b/dist/core/tools/renderers/bash.js
+index f749aa958d2b834d0f5b67b448e995495bcb96e0..193bb93359d6f7bc80457617987877ae02141c93 100644
+--- a/dist/core/tools/renderers/bash.js
++++ b/dist/core/tools/renderers/bash.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `bash.ts` spreads these into the shell
+  * tool definition, so the tool's public shape is unchanged.
+  */
+-import { Container, Text, truncateToWidth } from "@earendil-works/pi-tui";
++import { Container, Text, truncateToWidth } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { truncateToVisualLines } from "../../../modes/interactive/components/visual-truncate.js";
+ import { theme } from "../../../modes/interactive/theme/theme.js";
+diff --git a/dist/core/tools/renderers/edit.js b/dist/core/tools/renderers/edit.js
+index 4def3e242133187867d60178e3364e26f0dfca4d..66d53fc289c5bd01f1452a1354a70a8129339a78 100644
+--- a/dist/core/tools/renderers/edit.js
++++ b/dist/core/tools/renderers/edit.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `edit.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Container, Spacer, Text } from "../../../tui-stub.js";
+ import { renderDiff } from "../../../modes/interactive/components/diff.js";
+ import { computeEditsDiff } from "../edit-diff.js";
+ import { renderToolPath, str } from "../render-utils.js";
+diff --git a/dist/core/tools/renderers/find.js b/dist/core/tools/renderers/find.js
+index 61b9896c75fdd37a9e73c4880fc86976dc234387..7641ab0eced185eb6edea69fd1a7818efeea306e 100644
+--- a/dist/core/tools/renderers/find.js
++++ b/dist/core/tools/renderers/find.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `find.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/grep.js b/dist/core/tools/renderers/grep.js
+index c8d832e054c180de51f3d72ac586bc4cfc8c3191..ff391256d606c92fa14a5f9e0a8ef0b932450a14 100644
+--- a/dist/core/tools/renderers/grep.js
++++ b/dist/core/tools/renderers/grep.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `grep.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/ls.js b/dist/core/tools/renderers/ls.js
+index ff331314497c2f08ddc47e9ac45886684f1532a0..87ba9bdf3bd9d1758d20ab981225c1964ab0148d 100644
+--- a/dist/core/tools/renderers/ls.js
++++ b/dist/core/tools/renderers/ls.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `ls.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, renderToolPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/read.js b/dist/core/tools/renderers/read.js
+index c331317a77fbf05dbdd9889f0a91d9710fe908ab..e660a58c7032948955ac41b483db13a5d3b8eb99 100644
+--- a/dist/core/tools/renderers/read.js
++++ b/dist/core/tools/renderers/read.js
+@@ -6,7 +6,7 @@
+  * definition, so the tool's public shape is unchanged.
+  */
+ import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from "node:path";
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { getReadmePath } from "../../../config.js";
+ import { keyHint, keyText } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getLanguageFromPath, highlightCode } from "../../../modes/interactive/theme/theme.js";
+diff --git a/dist/core/tools/renderers/write.js b/dist/core/tools/renderers/write.js
+index dcf5bf9b84394f2d151e6862733b239d8d6fbe84..be2bb4a38d088673e41129ea379bcfc61510d6e0 100644
+--- a/dist/core/tools/renderers/write.js
++++ b/dist/core/tools/renderers/write.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `write.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Container, Text } from "@earendil-works/pi-tui";
++import { Container, Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getLanguageFromPath, highlightCode } from "../../../modes/interactive/theme/theme.js";
+ import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.js";
+diff --git a/dist/extensions/llama/ui.js b/dist/extensions/llama/ui.js
+index 4e748afdc2956709093c3879e3108a4a68488bab..126ef72c8394cf2ffd55765b70c700d6e2fc0563 100644
+--- a/dist/extensions/llama/ui.js
++++ b/dist/extensions/llama/ui.js
+@@ -1,4 +1,4 @@
+-import { Container, fuzzyFilter, Input, SelectList, Spacer, Text, truncateToWidth, visibleWidth, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, Input, SelectList, Spacer, Text, truncateToWidth, visibleWidth, } from "../../tui-stub.js";
+ import { DynamicBorder } from "../../modes/interactive/components/dynamic-border.js";
+ import { keyHint } from "../../modes/interactive/components/keybinding-hints.js";
+ const DOWNLOAD_VALUE = "\0download";
+diff --git a/dist/index.js b/dist/index.js
+index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..6f0cc53b12df942586afe5a1d0c0198786c3cc7b 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -29,12 +29,9 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+ // Tools
+ export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
+ export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
+-// Main entry point
+-export { main } from "./main.js";
+ // Run modes for programmatic SDK usage
+-export { InteractiveMode, RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
++export { RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
+ // UI components for extensions
+-export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
+ // Theme utilities for custom tools and extensions
+ export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, } from "./modes/interactive/theme/theme.js";
+ // Clipboard utilities
+diff --git a/dist/main.js b/dist/main.js
+index bb7c8c3aeebd58b0baa3f12b95276982c1ce0a87..e21d93c763c0f0e4797b3ce5cc0fa58b741a2e26 100644
+--- a/dist/main.js
++++ b/dist/main.js
+@@ -6,7 +6,7 @@
+  */
+ import { createInterface } from "node:readline";
+ import { modelsAreEqual } from "@earendil-works/pi-ai";
+-import { setCapabilityOverrides } from "@earendil-works/pi-tui";
++import { setCapabilityOverrides } from "./tui-stub.js";
+ import chalk from "chalk";
+ import { normalizeSessionName, parseArgs, printHelp } from "./cli/args.js";
+ import { checkProviderAuth, createAuthCheckModelRuntime, getProviderCredential, } from "./cli/auth-check.js";
+diff --git a/dist/modes/index.js b/dist/modes/index.js
+index 10528c34b4941a060fbf8228fcec61beeb6902d8..0102883cbc0b8f00791377c63628c4068b9c37e9 100644
+--- a/dist/modes/index.js
++++ b/dist/modes/index.js
+@@ -1,7 +1,6 @@
+ /**
+  * Run modes for the coding agent.
+  */
+-export { InteractiveMode } from "./interactive/interactive-mode.js";
+ export { runPrintMode } from "./print-mode.js";
+ export { RpcClient } from "./rpc/rpc-client.js";
+ export { runRpcMode } from "./rpc/rpc-mode.js";
+diff --git a/dist/modes/interactive/chat-viewport.js b/dist/modes/interactive/chat-viewport.js
+index 7bb7f2990a61705c756dfc232e133e5a6458b74b..666e2bb5f1cfb6897405f1116825aa60308779d1 100644
+--- a/dist/modes/interactive/chat-viewport.js
++++ b/dist/modes/interactive/chat-viewport.js
+@@ -1,4 +1,4 @@
+-import { ScrollView, VStack } from "@earendil-works/pi-tui";
++import { ScrollView, VStack } from "../../tui-stub.js";
+ /** Shared fullscreen transcript and fixed input-dock layout. */
+ export function createChatViewport(options) {
+     const transcript = new ScrollView(options.document, {
+diff --git a/dist/modes/interactive/components/assistant-message.js b/dist/modes/interactive/components/assistant-message.js
+index 62800843f775dc32b0008178d2941aab04a34989..e1e57891c16fd7892a5d11618759b09d7bc45905 100644
+--- a/dist/modes/interactive/components/assistant-message.js
++++ b/dist/modes/interactive/components/assistant-message.js
+@@ -1,4 +1,4 @@
+-import { Container, Markdown, MouseRegion, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, Markdown, MouseRegion, Spacer, Text } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ import { createMarkdownTransform } from "./markdown-transform.js";
+ const OSC133_ZONE_START = "\x1b]133;A\x07";
+diff --git a/dist/modes/interactive/components/bash-execution.js b/dist/modes/interactive/components/bash-execution.js
+index d8e5ddb397177550ff2be2d26ee4ab48213bb09b..2439cc4c9aa6cd4b621474bf5b00445c13d443b3 100644
+--- a/dist/modes/interactive/components/bash-execution.js
++++ b/dist/modes/interactive/components/bash-execution.js
+@@ -1,7 +1,7 @@
+ /**
+  * Component for displaying bash command execution with streaming output.
+  */
+-import { Container, Loader, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, Loader, Spacer, Text } from "../../../tui-stub.js";
+ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateTail, } from "../../../core/tools/truncate.js";
+ import { stripAnsi } from "../../../utils/ansi.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/bordered-loader.js b/dist/modes/interactive/components/bordered-loader.js
+index bc1c2fe42797e83a4c3dcac7cb35ea765403689b..ae96ccf5a78d414973366a10b783c3810b9155cf 100644
+--- a/dist/modes/interactive/components/bordered-loader.js
++++ b/dist/modes/interactive/components/bordered-loader.js
+@@ -1,4 +1,4 @@
+-import { CancellableLoader, Container, Loader, Spacer, Text } from "@earendil-works/pi-tui";
++import { CancellableLoader, Container, Loader, Spacer, Text } from "../../../tui-stub.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ import { keyHint } from "./keybinding-hints.js";
+ /** Loader wrapped with borders for extension UI */
+diff --git a/dist/modes/interactive/components/branch-summary-message.js b/dist/modes/interactive/components/branch-summary-message.js
+index e23ca6db02a29814112dd4945bd868604eb6676f..eec5dbf4947787ea0c3c24f4c772345d07878d7b 100644
+--- a/dist/modes/interactive/components/branch-summary-message.js
++++ b/dist/modes/interactive/components/branch-summary-message.js
+@@ -1,4 +1,4 @@
+-import { Box, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Markdown, Spacer, Text } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ import { keyText } from "./keybinding-hints.js";
+ /**
+diff --git a/dist/modes/interactive/components/compaction-summary-message.js b/dist/modes/interactive/components/compaction-summary-message.js
+index 48c22718e1dff7cf4faa4cc09b8a917301b0d892..a84e55c6c725258998411c748925022c32fb8cab 100644
+--- a/dist/modes/interactive/components/compaction-summary-message.js
++++ b/dist/modes/interactive/components/compaction-summary-message.js
+@@ -1,4 +1,4 @@
+-import { Box, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Markdown, Spacer, Text } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ import { keyText } from "./keybinding-hints.js";
+ /**
+diff --git a/dist/modes/interactive/components/config-selector.js b/dist/modes/interactive/components/config-selector.js
+index 6f7ed6ae227d37b751d0a044eae17074622430d2..6dac830efde368ff0a9d307a441028bd1e612c39 100644
+--- a/dist/modes/interactive/components/config-selector.js
++++ b/dist/modes/interactive/components/config-selector.js
+@@ -3,7 +3,7 @@
+  */
+ import { homedir } from "node:os";
+ import { basename, dirname, join, relative } from "node:path";
+-import { Container, getKeybindings, Input, matchesKey, Spacer, truncateToWidth, visibleWidth, } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, matchesKey, Spacer, truncateToWidth, visibleWidth, } from "../../../tui-stub.js";
+ import { CONFIG_DIR_NAME } from "../../../config.js";
+ import { canonicalizePath, isLocalPath, resolvePath } from "../../../utils/paths.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/custom-editor.js b/dist/modes/interactive/components/custom-editor.js
+index 8af62ee66e21fcfd0549026c7b80446a81da694c..efe8af86041b5e90070706729e6d3a3b53240324 100644
+--- a/dist/modes/interactive/components/custom-editor.js
++++ b/dist/modes/interactive/components/custom-editor.js
+@@ -1,4 +1,4 @@
+-import { Editor, visibleWidth } from "@earendil-works/pi-tui";
++import { Editor, visibleWidth } from "../../../tui-stub.js";
+ /**
+  * Custom editor that handles app-level keybindings for coding-agent.
+  */
+diff --git a/dist/modes/interactive/components/custom-entry.js b/dist/modes/interactive/components/custom-entry.js
+index fa38f12d17a7754daaaf8f444e50c3e9401728a0..1f04a2a7fe41f27622b970904946e3c55b89fa13 100644
+--- a/dist/modes/interactive/components/custom-entry.js
++++ b/dist/modes/interactive/components/custom-entry.js
+@@ -1,4 +1,4 @@
+-import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Container, Spacer, Text } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ /**
+  * Component that renders a custom session entry from extensions.
+diff --git a/dist/modes/interactive/components/custom-message.js b/dist/modes/interactive/components/custom-message.js
+index 7c6fb37daea606e59d1616d24fb18d689fed6023..6f2e8cc5241fa21ed43036b306e198c91660393c 100644
+--- a/dist/modes/interactive/components/custom-message.js
++++ b/dist/modes/interactive/components/custom-message.js
+@@ -1,4 +1,4 @@
+-import { Box, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Container, Markdown, Spacer, Text } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ /**
+  * Component that renders a custom message entry from extensions.
+diff --git a/dist/modes/interactive/components/earendil-announcement.js b/dist/modes/interactive/components/earendil-announcement.js
+index 6c022b366296b25d2a4eb978a1b30af1cdc749c6..5d1229f5bfc7294d939a5b4591081d1831669ba1 100644
+--- a/dist/modes/interactive/components/earendil-announcement.js
++++ b/dist/modes/interactive/components/earendil-announcement.js
+@@ -1,5 +1,5 @@
+ import * as fs from "node:fs";
+-import { Container, Image, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, Image, Spacer, Text } from "../../../tui-stub.js";
+ import { getBundledInteractiveAssetPath } from "../../../config.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/extension-editor.js b/dist/modes/interactive/components/extension-editor.js
+index e583bb807d4e5dc17f533a79d0edc1285a366ddb..203ec892f58dfb899c85ab4dd323cebf1600dea6 100644
+--- a/dist/modes/interactive/components/extension-editor.js
++++ b/dist/modes/interactive/components/extension-editor.js
+@@ -2,7 +2,7 @@
+  * Multi-line editor component for extensions.
+  * Supports Ctrl+G for external editor.
+  */
+-import { Container, Editor, getKeybindings, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, Editor, getKeybindings, Spacer, Text, } from "../../../tui-stub.js";
+ import { editInExternalEditor } from "../external-editor.js";
+ import { getEditorTheme, theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/extension-input.js b/dist/modes/interactive/components/extension-input.js
+index 333722f9e72773b5708630f73ee85c55e3cb5b88..f7b5d798a7c61404941d6777bf54785a73b695fa 100644
+--- a/dist/modes/interactive/components/extension-input.js
++++ b/dist/modes/interactive/components/extension-input.js
+@@ -1,7 +1,7 @@
+ /**
+  * Simple text input component for extensions.
+  */
+-import { Container, getKeybindings, Input, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, Spacer, Text } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { CountdownTimer } from "./countdown-timer.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/extension-selector.js b/dist/modes/interactive/components/extension-selector.js
+index 8220e06bc1e2b136c4b84c4af3cd29fd21b98a9f..3417f7849f986223d6496d6ffec2330d0261cbc1 100644
+--- a/dist/modes/interactive/components/extension-selector.js
++++ b/dist/modes/interactive/components/extension-selector.js
+@@ -2,7 +2,7 @@
+  * Generic selector component for extensions.
+  * Displays a list of string options with keyboard navigation.
+  */
+-import { Container, getKeybindings, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Spacer, Text } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { CountdownTimer } from "./countdown-timer.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/first-time-setup.js b/dist/modes/interactive/components/first-time-setup.js
+index 57f12d0fcad3f6d22d833867e82acb048bb0a6bb..7bf3a651f973af50ee6289b02402ec28cc7bfac0 100644
+--- a/dist/modes/interactive/components/first-time-setup.js
++++ b/dist/modes/interactive/components/first-time-setup.js
+@@ -1,4 +1,4 @@
+-import { Container, getKeybindings, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Spacer, Text } from "../../../tui-stub.js";
+ import { APP_NAME } from "../../../config.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/footer.js b/dist/modes/interactive/components/footer.js
+index 1d9f046a453350b98bfaed62fac3bca084cb7399..0408e2b53197ad3d08ec2285f3cc21576eb3f986 100644
+--- a/dist/modes/interactive/components/footer.js
++++ b/dist/modes/interactive/components/footer.js
+@@ -1,5 +1,5 @@
+ import { isAbsolute, relative, resolve, sep } from "node:path";
+-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
++import { truncateToWidth, visibleWidth } from "../../../tui-stub.js";
+ import { areExperimentalFeaturesEnabled } from "../../../core/experimental.js";
+ import { addUsageToTotals, createUsageTotals } from "../../../core/usage-totals.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/keybinding-hints.js b/dist/modes/interactive/components/keybinding-hints.js
+index 03a6c6691f6c8aefffa01f6ee92233bfeab44c85..2884b4cb8cf18a52eced33520334588a0712540d 100644
+--- a/dist/modes/interactive/components/keybinding-hints.js
++++ b/dist/modes/interactive/components/keybinding-hints.js
+@@ -1,7 +1,7 @@
+ /**
+  * Utilities for formatting keybinding hints in the UI.
+  */
+-import { getKeybindings } from "@earendil-works/pi-tui";
++import { getKeybindings } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ function formatKeyPart(part, options) {
+     const displayPart = process.platform === "darwin" && part.toLowerCase() === "alt" ? "option" : part;
+diff --git a/dist/modes/interactive/components/login-dialog.js b/dist/modes/interactive/components/login-dialog.js
+index 5a07de26e32de37d96512aaedf48553c4589f81f..0ed68a2ee2d7e477bd75af631668cd95d740b699 100644
+--- a/dist/modes/interactive/components/login-dialog.js
++++ b/dist/modes/interactive/components/login-dialog.js
+@@ -1,4 +1,4 @@
+-import { Container, getKeybindings, Input, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, Spacer, Text } from "../../../tui-stub.js";
+ import { openBrowser } from "../../../utils/open-browser.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/mermaid.js b/dist/modes/interactive/components/mermaid.js
+index 6015ae42db8b0a3571ac4c7748caa2f715b2ff44..05b36e448b86ecd27dcd8110c93243e73d5e5f31 100644
+--- a/dist/modes/interactive/components/mermaid.js
++++ b/dist/modes/interactive/components/mermaid.js
+@@ -1,4 +1,4 @@
+-import { Marked } from "@earendil-works/pi-tui";
++import { Marked } from "../../../tui-stub.js";
+ import { render } from "grok-mermaid";
+ const markdownParser = new Marked();
+ function isMermaid(token) {
+diff --git a/dist/modes/interactive/components/model-selector.js b/dist/modes/interactive/components/model-selector.js
+index bd8894046f77385541fd9bd7b88268866a34a526..a6ed8b05b2059064fe224f2e526f01662532d82d 100644
+--- a/dist/modes/interactive/components/model-selector.js
++++ b/dist/modes/interactive/components/model-selector.js
+@@ -1,5 +1,5 @@
+ import { modelsAreEqual } from "@earendil-works/pi-ai";
+-import { Container, fuzzyFilter, getKeybindings, Input, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, getKeybindings, Input, Spacer, Text, } from "../../../tui-stub.js";
+ import { refreshModelCatalogs } from "../model-catalog-refresh.js";
+ import { getModelSelectorSearchText } from "../model-search.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/oauth-selector.js b/dist/modes/interactive/components/oauth-selector.js
+index a65a8cdb6434925b2f55808eafbe3ad4d87bcd48..249a7d6af4d0b3308359164069aca1d83d453b18 100644
+--- a/dist/modes/interactive/components/oauth-selector.js
++++ b/dist/modes/interactive/components/oauth-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, fuzzyFilter, getKeybindings, Input, Spacer, TruncatedText, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, getKeybindings, Input, Spacer, TruncatedText, } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ export function formatAuthSelectorProviderType(authType) {
+diff --git a/dist/modes/interactive/components/scoped-models-selector.js b/dist/modes/interactive/components/scoped-models-selector.js
+index 00b406ab758a6643ba435a15c1e44b3d1a681fa0..fc2a1c3cd8df5a771911dbc218b1e930874b8309 100644
+--- a/dist/modes/interactive/components/scoped-models-selector.js
++++ b/dist/modes/interactive/components/scoped-models-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, fuzzyFilter, getKeybindings, Input, Key, matchesKey, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, getKeybindings, Input, Key, matchesKey, Spacer, Text, } from "../../../tui-stub.js";
+ import { getModelSearchText } from "../model-search.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/session-selector-search.js b/dist/modes/interactive/components/session-selector-search.js
+index 4f9c404ac913e691268288a10ec1eb722eb1f5e5..df7847604c7b596445498bf60171940b1ada154e 100644
+--- a/dist/modes/interactive/components/session-selector-search.js
++++ b/dist/modes/interactive/components/session-selector-search.js
+@@ -1,4 +1,4 @@
+-import { fuzzyMatch } from "@earendil-works/pi-tui";
++import { fuzzyMatch } from "../../../tui-stub.js";
+ function normalizeWhitespaceLower(text) {
+     return text.toLowerCase().replace(/\s+/g, " ").trim();
+ }
+diff --git a/dist/modes/interactive/components/session-selector.js b/dist/modes/interactive/components/session-selector.js
+index 59886ee01690146d6f3950fa8f72d6769b1c0c2e..00fd8674d01da12867e21914e53d31b8a208e01d 100644
+--- a/dist/modes/interactive/components/session-selector.js
++++ b/dist/modes/interactive/components/session-selector.js
+@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
+ import { existsSync } from "node:fs";
+ import { unlink } from "node:fs/promises";
+ import * as os from "node:os";
+-import { Container, getKeybindings, Input, Spacer, Text, truncateToWidth, visibleWidth, } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, Spacer, Text, truncateToWidth, visibleWidth, } from "../../../tui-stub.js";
+ import { KeybindingsManager } from "../../../core/keybindings.js";
+ import { canonicalizePath as _canonicalizePath } from "../../../utils/paths.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/settings-selector.js b/dist/modes/interactive/components/settings-selector.js
+index db2b1a1b49f2ad7e7b29a466bd3689c123bda65b..afd70e1682ca2016664571c601814016adc1dcb5 100644
+--- a/dist/modes/interactive/components/settings-selector.js
++++ b/dist/modes/interactive/components/settings-selector.js
+@@ -1,5 +1,5 @@
+ import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+-import { Container, getCapabilities, SettingsList, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, getCapabilities, SettingsList, Spacer, Text, } from "../../../tui-stub.js";
+ import { formatHttpIdleTimeoutMs, HTTP_IDLE_TIMEOUT_CHOICES } from "../../../core/http-dispatcher.js";
+ import { getSettingsListTheme, parseAutoThemeSetting, theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/settings-submenu.js b/dist/modes/interactive/components/settings-submenu.js
+index 51df8db5fc5672dfb3041b1bd67f106774997459..c7cc1fbf266a0c38cd7ec5e96263e158d08d9da5 100644
+--- a/dist/modes/interactive/components/settings-submenu.js
++++ b/dist/modes/interactive/components/settings-submenu.js
+@@ -1,4 +1,4 @@
+-import { Container, fuzzyFilter, getKeybindings, Input, SelectList, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, getKeybindings, Input, SelectList, Spacer, Text, } from "../../../tui-stub.js";
+ import { getSelectListTheme, theme } from "../theme/theme.js";
+ const SUBMENU_SELECT_LIST_LAYOUT = {
+     minPrimaryColumnWidth: 12,
+diff --git a/dist/modes/interactive/components/show-images-selector.js b/dist/modes/interactive/components/show-images-selector.js
+index 5da465b9a4085e4c907afd1861f93a8f57e1d1c9..baf43c1732f6d8fdbb239001696381b0cca9b779 100644
+--- a/dist/modes/interactive/components/show-images-selector.js
++++ b/dist/modes/interactive/components/show-images-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, SelectList } from "@earendil-works/pi-tui";
++import { Container, SelectList } from "../../../tui-stub.js";
+ import { getSelectListTheme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ const SHOW_IMAGES_SELECT_LIST_LAYOUT = {
+diff --git a/dist/modes/interactive/components/skill-invocation-message.js b/dist/modes/interactive/components/skill-invocation-message.js
+index 561f3d2540db0a8d934bc2bbecb097aaa7c88458..535245dabb183310d80a97a76c06f59c1d26dc8d 100644
+--- a/dist/modes/interactive/components/skill-invocation-message.js
++++ b/dist/modes/interactive/components/skill-invocation-message.js
+@@ -1,4 +1,4 @@
+-import { Box, Markdown, Text } from "@earendil-works/pi-tui";
++import { Box, Markdown, Text } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ import { keyText } from "./keybinding-hints.js";
+ /**
+diff --git a/dist/modes/interactive/components/status-indicator.js b/dist/modes/interactive/components/status-indicator.js
+index 94a4ad6dc8ba31317fc46076cac8814908bbeca0..57509cb953cd7987664ac95aa883575da71ba06f 100644
+--- a/dist/modes/interactive/components/status-indicator.js
++++ b/dist/modes/interactive/components/status-indicator.js
+@@ -1,4 +1,4 @@
+-import { Loader, truncateToWidth } from "@earendil-works/pi-tui";
++import { Loader, truncateToWidth } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { CountdownTimer } from "./countdown-timer.js";
+ import { keyText } from "./keybinding-hints.js";
+diff --git a/dist/modes/interactive/components/theme-selector.js b/dist/modes/interactive/components/theme-selector.js
+index c23156a15d0f8b8387aff50726b9a33c8c1617fb..f435d138b210e8cfcd61ef4823839558805665b8 100644
+--- a/dist/modes/interactive/components/theme-selector.js
++++ b/dist/modes/interactive/components/theme-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, SelectList } from "@earendil-works/pi-tui";
++import { Container, SelectList } from "../../../tui-stub.js";
+ import { getAvailableThemes, getSelectListTheme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ const THEME_SELECT_LIST_LAYOUT = {
+diff --git a/dist/modes/interactive/components/thinking-selector.js b/dist/modes/interactive/components/thinking-selector.js
+index d0b11ac65857fce038d0bdff43dccf623df5897d..32eb446f0db6edef51b03bbc252715fe90af394d 100644
+--- a/dist/modes/interactive/components/thinking-selector.js
++++ b/dist/modes/interactive/components/thinking-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, fuzzyFilter, getKeybindings, Input, SelectList, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Container, fuzzyFilter, getKeybindings, Input, SelectList, Spacer, Text, } from "../../../tui-stub.js";
+ import { getSelectListTheme, theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ import { keyDisplayText } from "./keybinding-hints.js";
+diff --git a/dist/modes/interactive/components/tool-execution.js b/dist/modes/interactive/components/tool-execution.js
+index 811f0f024e769551b9bc96d26089887554751712..47d88df514a16a6d1c6148a1c41fa032a80a2d08 100644
+--- a/dist/modes/interactive/components/tool-execution.js
++++ b/dist/modes/interactive/components/tool-execution.js
+@@ -1,4 +1,4 @@
+-import { Box, Container, getCapabilities, Image, MouseRegion, Spacer, Text, } from "@earendil-works/pi-tui";
++import { Box, Container, getCapabilities, Image, MouseRegion, Spacer, Text, } from "../../../tui-stub.js";
+ import { getTextOutput as getRenderedTextOutput } from "../../../core/tools/render-utils.js";
+ import { convertToPng } from "../../../utils/image-convert.js";
+ import { theme } from "../theme/theme.js";
+diff --git a/dist/modes/interactive/components/tree-selector.js b/dist/modes/interactive/components/tree-selector.js
+index 96ec6673f6ad97ce1aa1aeccde93599d7e0e1f8b..534b6a319bbc94bd7060a7b8dc0a115467a59bfe 100644
+--- a/dist/modes/interactive/components/tree-selector.js
++++ b/dist/modes/interactive/components/tree-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, getKeybindings, Input, Spacer, sliceByColumn, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Input, Spacer, sliceByColumn, Text, truncateToWidth, visibleWidth, wrapTextWithAnsi, } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ import { formatKeyText, keyHint } from "./keybinding-hints.js";
+diff --git a/dist/modes/interactive/components/trust-selector.js b/dist/modes/interactive/components/trust-selector.js
+index 9af0fc406788dd8eb5ca9b8747258a063c9cf2f0..d332109e3131aaf06f03b86ab1f153f7f29a75a6 100644
+--- a/dist/modes/interactive/components/trust-selector.js
++++ b/dist/modes/interactive/components/trust-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, getKeybindings, Spacer, Text } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Spacer, Text } from "../../../tui-stub.js";
+ import { getProjectTrustOptions, } from "../../../core/trust-manager.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+diff --git a/dist/modes/interactive/components/user-message-selector.js b/dist/modes/interactive/components/user-message-selector.js
+index 7f26882858cec1a45327abb3fa85d6f77bf6beac..14db9162a4dd9f4b44296cf5fd4e0802794f2cf0 100644
+--- a/dist/modes/interactive/components/user-message-selector.js
++++ b/dist/modes/interactive/components/user-message-selector.js
+@@ -1,4 +1,4 @@
+-import { Container, getKeybindings, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
++import { Container, getKeybindings, Spacer, Text, truncateToWidth } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ import { DynamicBorder } from "./dynamic-border.js";
+ /**
+diff --git a/dist/modes/interactive/components/user-message.js b/dist/modes/interactive/components/user-message.js
+index 2e0490362d3396995b587f502ff3e69a7cad9a43..012d02da0a495a4e6dc8880dee8c7ac6e46afc30 100644
+--- a/dist/modes/interactive/components/user-message.js
++++ b/dist/modes/interactive/components/user-message.js
+@@ -1,4 +1,4 @@
+-import { Box, Container, Markdown } from "@earendil-works/pi-tui";
++import { Box, Container, Markdown } from "../../../tui-stub.js";
+ import { getMarkdownTheme, theme } from "../theme/theme.js";
+ import { createMarkdownTransform } from "./markdown-transform.js";
+ const OSC133_ZONE_START = "\x1b]133;A\x07";
+diff --git a/dist/modes/interactive/components/visual-truncate.js b/dist/modes/interactive/components/visual-truncate.js
+index 492636bc64f7a34dd5461fec8d4ce125d4943afa..fd4be33996068f84b6ceb480540cf7d6b3bb5880 100644
+--- a/dist/modes/interactive/components/visual-truncate.js
++++ b/dist/modes/interactive/components/visual-truncate.js
+@@ -2,7 +2,7 @@
+  * Shared utility for truncating text to visual lines (accounting for line wrapping).
+  * Used by both tool-execution.ts and bash-execution.ts for consistent behavior.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ /**
+  * Truncate text to a maximum number of visual lines (from the end).
+  * This accounts for line wrapping based on terminal width.
+diff --git a/dist/modes/interactive/interactive-mode.js b/dist/modes/interactive/interactive-mode.js
+index a1e7d98551b085a62359f1b5dc2953d0878b073b..7cdb039c66eb16cc4c647f11282ab87675a33133 100644
+--- a/dist/modes/interactive/interactive-mode.js
++++ b/dist/modes/interactive/interactive-mode.js
+@@ -6,8 +6,8 @@ import * as crypto from "node:crypto";
+ import * as fs from "node:fs";
+ import * as os from "node:os";
+ import * as path from "node:path";
+-import * as TuiLayouts from "@earendil-works/pi-tui";
+-import { CombinedAutocompleteProvider, Container, fuzzyFilter, getCapabilities, hyperlink, Markdown, matchesKey, Spacer, setCapabilityOverrides, setKeybindings, Text, TruncatedText, TuiAltScreen, TuiMainScreen, visibleWidth, } from "@earendil-works/pi-tui";
++import * as TuiLayouts from "../../tui-stub.js";
++import { CombinedAutocompleteProvider, Container, fuzzyFilter, getCapabilities, hyperlink, Markdown, matchesKey, Spacer, setCapabilityOverrides, setKeybindings, Text, TruncatedText, TuiAltScreen, TuiMainScreen, visibleWidth, } from "../../tui-stub.js";
+ import chalk from "chalk";
+ import { spawn } from "child_process";
+ import { APP_NAME, APP_TITLE, CONFIG_DIR_NAME, getAgentDir, getAuthPath, getDebugLogPath, getDocsPath, VERSION, } from "../../config.js";
+diff --git a/dist/modes/interactive/session-share.js b/dist/modes/interactive/session-share.js
+index ee9694d1299d0be667839a6d95957a757f69ea7a..f234774fce801333a1bef0b08d264f5da9693eba 100644
+--- a/dist/modes/interactive/session-share.js
++++ b/dist/modes/interactive/session-share.js
+@@ -4,7 +4,7 @@ import * as fs from "node:fs";
+ import * as os from "node:os";
+ import * as path from "node:path";
+ import { DEFAULT_RADIUS_GATEWAY } from "@earendil-works/pi-ai/providers/radius-config";
+-import { hyperlink } from "@earendil-works/pi-tui";
++import { hyperlink } from "../../tui-stub.js";
+ import { getAuthCredential } from "../../cli/auth-command.js";
+ import { getShareViewerUrl } from "../../config.js";
+ import { exportSessionToJsonl } from "../../core/session-export.js";
+diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
+index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..6e2c8a4ed716140c480a6fdc2b38ddf12100d74b 100644
+--- a/dist/modes/interactive/theme/theme.js
++++ b/dist/modes/interactive/theme/theme.js
+@@ -1,11 +1,13 @@
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+-import { getCapabilities, } from "@earendil-works/pi-tui";
++import { getCapabilities, } from "../../../tui-stub.js";
+ import chalk from "chalk";
+ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
+ import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
+ import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
+ import { stripBom } from "../../../utils/text.js";
++import darkThemeJson from "./dark.json" with { type: "json" };
++import lightThemeJson from "./light.json" with { type: "json" };
+ let themeJsonValidator;
+ /**
+  * Install full theme validation. Without it, documents are accepted as-is, which is what built-in
+@@ -270,13 +272,7 @@ export class Theme {
+ let BUILTIN_THEMES;
+ function getBuiltinThemes() {
+     if (!BUILTIN_THEMES) {
+-        const themesDir = getThemesDir();
+-        const darkPath = path.join(themesDir, "dark.json");
+-        const lightPath = path.join(themesDir, "light.json");
+-        BUILTIN_THEMES = {
+-            dark: JSON.parse(stripBom(fs.readFileSync(darkPath, "utf-8"))),
+-            light: JSON.parse(stripBom(fs.readFileSync(lightPath, "utf-8"))),
+-        };
++        BUILTIN_THEMES = { dark: darkThemeJson, light: lightThemeJson };
+     }
+     return BUILTIN_THEMES;
+ }
+diff --git a/dist/modes/interactive/tui-renderer.js b/dist/modes/interactive/tui-renderer.js
+index b367073ce5bdecef197a0542bf33a255492d68e6..ce287e591e6bdb4d8882f07cb1bca8f537ef6dc7 100644
+--- a/dist/modes/interactive/tui-renderer.js
++++ b/dist/modes/interactive/tui-renderer.js
+@@ -1,4 +1,4 @@
+-import { ProcessTerminal, TuiAltScreen, TuiMainScreen } from "@earendil-works/pi-tui";
++import { ProcessTerminal, TuiAltScreen, TuiMainScreen } from "../../tui-stub.js";
+ import { copyToClipboard } from "../../utils/clipboard.js";
+ import { openBrowser } from "../../utils/open-browser.js";
+ import { keyDisplayText } from "./components/keybinding-hints.js";
+diff --git a/dist/package-manager-cli.js b/dist/package-manager-cli.js
+index 3f101e6769a7921df4d3b9994a44e829b855c508..d83d43ad645813eabe5b9bcf09d64a46348ad8a0 100644
+--- a/dist/package-manager-cli.js
++++ b/dist/package-manager-cli.js
+@@ -1,6 +1,6 @@
+ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, } from "node:fs";
+ import { join, resolve } from "node:path";
+-import { Markdown } from "@earendil-works/pi-tui";
++import { Markdown } from "./tui-stub.js";
+ import chalk from "chalk";
+ import lockfile from "proper-lockfile";
+ import { selectConfig } from "./cli/config-selector.js";
+diff --git a/dist/tui-stub.js b/dist/tui-stub.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..20896f593cbdd3175bf72058f110c6429f9d43f4
+--- /dev/null
++++ b/dist/tui-stub.js
+@@ -0,0 +1,73 @@
++const empty = () => "";
++class Widget { render() { return empty(); } }
++export const TUI_KEYBINDINGS = new Proxy({}, { get: () => ({ defaultKeys: "", description: "" }) });
++export const CURSOR_MARKER = "";
++export const Key = class {};
++export const KeybindingsManager = class {};
++export function getCapabilities() { return { trueColor: false }; }
++export const Box = Widget;
++export const CancellableLoader = Widget;
++export const CombinedAutocompleteProvider = Widget;
++export const Container = Widget;
++export const Editor = Widget;
++export const HStack = Widget;
++export const Image = Widget;
++export const Input = Widget;
++export const Loader = Widget;
++export const Markdown = Widget;
++export const Marked = Widget;
++export const MouseRegion = Widget;
++export const ProcessTerminal = Widget;
++export const ScrollView = Widget;
++export const SelectList = Widget;
++export const SettingsList = Widget;
++export const Spacer = Widget;
++export const StdinBuffer = Widget;
++export const Text = Widget;
++export const TruncatedText = Widget;
++export const TuiAltScreen = Widget;
++export const TuiMainScreen = Widget;
++export const VStack = Widget;
++export function allocateImageId() { return empty(); }
++export function calculateImageRows() { return empty(); }
++export function compositeTuiLine() { return empty(); }
++export function decodeKittyPrintable() { return empty(); }
++export function deleteAllKittyImages() { return empty(); }
++export function deleteKittyImage() { return empty(); }
++export function detectCapabilities() { return empty(); }
++export function encodeITerm2() { return empty(); }
++export function encodeKitty() { return empty(); }
++export function fuzzyFilter() { return empty(); }
++export function fuzzyMatch() { return empty(); }
++export function getCellDimensions() { return empty(); }
++export function getGifDimensions() { return empty(); }
++export function getImageDimensions() { return empty(); }
++export function getJpegDimensions() { return empty(); }
++export function getKeybindings() { return empty(); }
++export function getOsc8LinkAtColumn() { return empty(); }
++export function getPngDimensions() { return empty(); }
++export function getWebpDimensions() { return empty(); }
++export function hyperlink() { return empty(); }
++export function imageFallback() { return empty(); }
++export function isFocusable() { return empty(); }
++export function isKeyRelease() { return empty(); }
++export function isKeyRepeat() { return empty(); }
++export function isKittyProtocolActive() { return empty(); }
++export function isViewportTUI() { return empty(); }
++export function matchesKey() { return empty(); }
++export function parseKey() { return empty(); }
++export function parseOsc11BackgroundColor() { return empty(); }
++export function parseTerminalColorSchemeReport() { return empty(); }
++export function renderImage() { return empty(); }
++export function renderLatex() { return empty(); }
++export function resetCapabilitiesCache() { return empty(); }
++export function setCapabilities() { return empty(); }
++export function setCapabilityOverrides() { return empty(); }
++export function setCellDimensions() { return empty(); }
++export function setKeybindings() { return empty(); }
++export function setKittyProtocolActive() { return empty(); }
++export function sliceByColumn() { return empty(); }
++export function stripTerminalSequences() { return empty(); }
++export function truncateToWidth() { return empty(); }
++export function visibleWidth() { return empty(); }
++export function wrapTextWithAnsi() { return empty(); }
+diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
+index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c283092335f2e66ce 100644
+--- a/dist/utils/syntax-highlight.js
++++ b/dist/utils/syntax-highlight.js
+@@ -1,177 +1,4 @@
+-import hljs from "highlight.js/lib/core.js";
+-import bash from "highlight.js/lib/languages/bash.js";
+-import c from "highlight.js/lib/languages/c.js";
+-import cpp from "highlight.js/lib/languages/cpp.js";
+-import csharp from "highlight.js/lib/languages/csharp.js";
+-import dart from "highlight.js/lib/languages/dart.js";
+-import go from "highlight.js/lib/languages/go.js";
+-import groovy from "highlight.js/lib/languages/groovy.js";
+-import java from "highlight.js/lib/languages/java.js";
+-import javascript from "highlight.js/lib/languages/javascript.js";
+-import kotlin from "highlight.js/lib/languages/kotlin.js";
+-import lua from "highlight.js/lib/languages/lua.js";
+-import nix from "highlight.js/lib/languages/nix.js";
+-import perl from "highlight.js/lib/languages/perl.js";
+-import php from "highlight.js/lib/languages/php.js";
+-import python from "highlight.js/lib/languages/python.js";
+-import ruby from "highlight.js/lib/languages/ruby.js";
+-import rust from "highlight.js/lib/languages/rust.js";
+-import scala from "highlight.js/lib/languages/scala.js";
+-import swift from "highlight.js/lib/languages/swift.js";
+-import typescript from "highlight.js/lib/languages/typescript.js";
+-import { decodeHtmlEntityAt } from "./html.js";
+-const eagerLanguages = {
+-    python,
+-    java,
+-    go,
+-    javascript,
+-    cpp,
+-    typescript,
+-    php,
+-    ruby,
+-    c,
+-    csharp,
+-    nix,
+-    bash,
+-    rust,
+-    scala,
+-    kotlin,
+-    swift,
+-    dart,
+-    groovy,
+-    perl,
+-    lua,
+-};
+-for (const [name, language] of Object.entries(eagerLanguages)) {
+-    hljs.registerLanguage(name, language);
+-}
+-let allLanguagesPromise;
+-export function loadAllHighlightLanguages() {
+-    if (!allLanguagesPromise) {
+-        allLanguagesPromise = new Promise((resolve) => {
+-            setImmediate(() => {
+-                void import("highlight.js/lib/index.js").then(() => resolve(), () => {
+-                    // Eager languages and plaintext fallback remain available.
+-                    resolve();
+-                });
+-            });
+-        });
+-    }
+-    return allLanguagesPromise;
+-}
+-const SPAN_CLOSE = "</span>";
+-const HIGHLIGHT_CLASS_PREFIX = "hljs-";
+-function getScopeFromSpanTag(tag) {
+-    const match = /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag);
+-    const classValue = match?.[1] ?? match?.[2];
+-    if (!classValue) {
+-        return undefined;
+-    }
+-    for (const className of classValue.split(/\s+/)) {
+-        if (className.startsWith(HIGHLIGHT_CLASS_PREFIX)) {
+-            return className.slice(HIGHLIGHT_CLASS_PREFIX.length);
+-        }
+-    }
+-    return undefined;
+-}
+-function getScopeFormatter(scope, theme) {
+-    const exact = theme[scope];
+-    if (exact) {
+-        return exact;
+-    }
+-    const dotIndex = scope.indexOf(".");
+-    if (dotIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dotIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    const dashIndex = scope.indexOf("-");
+-    if (dashIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dashIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    return undefined;
+-}
+-function getActiveFormatter(scopes, theme) {
+-    for (let i = scopes.length - 1; i >= 0; i--) {
+-        const scope = scopes[i];
+-        if (!scope) {
+-            continue;
+-        }
+-        const formatter = getScopeFormatter(scope, theme);
+-        if (formatter) {
+-            return formatter;
+-        }
+-    }
+-    return theme.default;
+-}
+-function isSpanOpenTagStart(html, index) {
+-    if (!html.startsWith("<span", index)) {
+-        return false;
+-    }
+-    const nextChar = html[index + "<span".length];
+-    return nextChar === ">" || nextChar === " " || nextChar === "\t" || nextChar === "\n" || nextChar === "\r";
+-}
+-export function renderHighlightedHtml(html, theme = {}) {
+-    let output = "";
+-    let textBuffer = "";
+-    const scopes = [];
+-    const flushText = () => {
+-        if (!textBuffer) {
+-            return;
+-        }
+-        const formatter = getActiveFormatter(scopes, theme);
+-        output += formatter ? formatter(textBuffer) : textBuffer;
+-        textBuffer = "";
+-    };
+-    let index = 0;
+-    while (index < html.length) {
+-        if (isSpanOpenTagStart(html, index)) {
+-            const tagEndIndex = html.indexOf(">", index + 5);
+-            if (tagEndIndex !== -1) {
+-                flushText();
+-                const tag = html.slice(index, tagEndIndex + 1);
+-                const scope = getScopeFromSpanTag(tag);
+-                scopes.push(scope);
+-                index = tagEndIndex + 1;
+-                continue;
+-            }
+-        }
+-        if (html.startsWith(SPAN_CLOSE, index)) {
+-            flushText();
+-            if (scopes.length > 0) {
+-                scopes.pop();
+-            }
+-            index += SPAN_CLOSE.length;
+-            continue;
+-        }
+-        if (html[index] === "&") {
+-            const decoded = decodeHtmlEntityAt(html, index);
+-            if (decoded) {
+-                textBuffer += decoded.text;
+-                index += decoded.length;
+-                continue;
+-            }
+-        }
+-        textBuffer += html[index];
+-        index++;
+-    }
+-    flushText();
+-    return output;
+-}
+-export function highlight(code, options = {}) {
+-    const html = options.language
+-        ? hljs.highlight(code, {
+-            language: options.language,
+-            ignoreIllegals: options.ignoreIllegals,
+-        }).value
+-        : hljs.highlightAuto(code, options.languageSubset).value;
+-    return renderHighlightedHtml(html, options.theme);
+-}
+-export function supportsLanguage(name) {
+-    return hljs.getLanguage(name) !== undefined;
+-}
+-//# sourceMappingURL=syntax-highlight.js.map
+\ No newline at end of file
++export function loadAllHighlightLanguages() { return Promise.resolve(); }
++export function renderHighlightedHtml(html, _theme = {}) { return html; }
++export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
++export function supportsLanguage(_name) { return false; }

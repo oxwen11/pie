@@ -13,8 +13,8 @@ export default defineConfig({
       rename: "client",
     },
     {
-      from: "../server/dist/pi-rpc.mjs",
-      to: "dist/pi-rpc.mjs",
+      from: "../server/dist/pi-rpc",
+      to: "dist/pi-rpc",
     },
   ],
   deps: {

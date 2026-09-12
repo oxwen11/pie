@@ -128,4 +128,9 @@ patchedDependencies:
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
+  # Headless Pi RPC: drop InteractiveMode, stub pi-tui, skip highlight.js,
+  # inline builtin theme JSON so bun build does not need a plugin script.
+  # On bump, re-apply against dist/index.js, dist/modes/index.js, theme.js,
+  # syntax-highlight.js, and @earendil-works/pi-tui imports.
+  "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch
