@@ -91,7 +91,7 @@ export default defineConfig({
     ],
     "pie/node-import-style": "error",
     "pie/no-restricted-disable": "error",
-    "pie/no-module-mutable-state": "error",
+    "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
     "import/no-mutable-exports": "error",
     "react/globals": "error",
     "react/purity": "error",
@@ -208,6 +208,7 @@ export default defineConfig({
         "react/rules-of-hooks": "off",
         // Tests mock deprecated host APIs (MediaQueryList.addListener, tsd matchers).
         "typescript/no-deprecated": "off",
+        "pie/no-let": "off",
       },
     },
     {

@@ -3,7 +3,7 @@ import module from "node:module";
 import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-import { noModuleMutableState } from "./no-module-mutable-state";
+import { noLet } from "./no-let";
 import { noRestrictedDisable } from "./no-restricted-disable";
 
 const { isBuiltin } = module;
@@ -105,6 +105,6 @@ export default definePlugin({
   rules: {
     "node-import-style": nodeImportStyleRule,
     "no-restricted-disable": noRestrictedDisable,
-    "no-module-mutable-state": noModuleMutableState,
+    "no-let": noLet,
   },
 });
