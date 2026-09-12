@@ -55,7 +55,7 @@ export function FilePreviewPane({
       ) : file.data?.kind === "image" ? (
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
           <img
-            alt={path.split(/[\\/]/).at(-1) ?? path}
+            alt={path.split(/[\\/]/).at(-1) || path}
             className="max-h-full max-w-full object-contain"
             src={`data:${file.data.mimeType};base64,${file.data.data}`}
           />

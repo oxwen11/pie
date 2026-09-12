@@ -292,6 +292,16 @@ export default defineConfig({
       },
     },
     {
+      // Empty last segment (`foo/`) should fall back to the full path. `??` keeps `""`.
+      files: [
+        "apps/app/src/features/files/file-panel.tsx",
+        "apps/app/src/features/files/file-preview-pane.tsx",
+      ],
+      rules: {
+        "typescript/prefer-nullish-coalescing": "off",
+      },
+    },
+    {
       // Once-used `E` keeps oRPC error factories precise through Effect.catchTags.
       files: [
         "packages/server/src/rpc/git.ts",
