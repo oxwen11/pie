@@ -5,7 +5,12 @@ import { Paths, PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { loadOrCreateEnvironmentId } from "./environment-id";
 import { formatReadyLine } from "./handshake";
-import { DEFAULT_LISTEN_HOST, extraAllowedHostsForListen, listenServer } from "./listen";
+import {
+  DEFAULT_LISTEN_HOST,
+  extraAllowedHostsForListen,
+  isLoopbackBind,
+  listenServer,
+} from "./listen";
 import { createServer, ServerStartupError } from "./server";
 
 const DEFAULT_PORT = 4000;
@@ -167,6 +172,12 @@ const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
     const authToken = takeAuthToken();
     const { port: requestedPort, host, corsOrigins, allowedHosts } = resolveServeConfig(input);
+    if (!isLoopbackBind(host) && authToken === undefined) {
+      return yield* new ServerStartupError({
+        phase: "create",
+        cause: new Error("non-loopback bind requires PIE_AUTH_TOKEN"),
+      });
+    }
     const paths = yield* Paths;
     const environmentId = yield* loadOrCreateEnvironmentId(paths.home).pipe(
       Effect.mapError((cause) => new ServerStartupError({ phase: "create", cause })),

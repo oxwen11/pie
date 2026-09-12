@@ -56,16 +56,17 @@ function createQueryClient(): QueryClient {
   return queryClient;
 }
 
-function createOrpcClient(server?: ServerConnection): PieClient {
+function createOrpcClient(server?: ServerConnection, tokenRef?: { current: string }): PieClient {
   if (!server) return createPieClient();
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
+  const presented = tokenRef ?? { current: token };
   return createPieClient({
     url: `${wsBaseUrl}/ws/rpc`,
     getTicket: async () => {
       const response = await globalThis.fetch(`${httpBaseUrl}/api/ws-ticket`, {
         method: "POST",
-        headers: { authorization: `Bearer ${token}` },
+        headers: { authorization: `Bearer ${presented.current}` },
       });
       if (!response.ok) {
         throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
@@ -77,9 +78,12 @@ function createOrpcClient(server?: ServerConnection): PieClient {
 }
 
 /** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
-export function createAppClients(server?: ServerConnection): AppClients {
+export function createAppClients(
+  server?: ServerConnection,
+  tokenRef?: { current: string },
+): AppClients {
   const queryClient = createQueryClient();
-  const orpcClient = createOrpcClient(server);
+  const orpcClient = createOrpcClient(server, tokenRef);
   const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
 
   // Draft seeds optimistic rows; `useSessionListSync` patches titles. Hold briefly.

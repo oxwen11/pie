@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { probePairingMode, resolvePairingAccess } from "./pairing-mode";
+import {
+  probePairingMode,
+  resolvePairingAccess,
+  validateStoredPairingSession,
+} from "./pairing-mode";
 
 describe("resolvePairingAccess", () => {
   const stored = { token: "session-token", environmentId: "env-1" };
@@ -37,5 +41,22 @@ describe("probePairingMode", () => {
   it("treats GET /api/environment 401 as pairing required", async () => {
     const required: typeof fetch = async () => new Response("Unauthorized", { status: 401 });
     await expect(probePairingMode(required)).resolves.toBe("required");
+  });
+});
+
+describe("validateStoredPairingSession", () => {
+  const stored = { token: "session-token", environmentId: "env-1" };
+
+  it("keeps a token the daemon still accepts", async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expect(init?.headers).toEqual({ authorization: "Bearer session-token" });
+      return Response.json({ id: "env-1" });
+    };
+    await expect(validateStoredPairingSession(stored, fetchImpl)).resolves.toEqual(stored);
+  });
+
+  it("drops a rejected token", async () => {
+    const fetchImpl: typeof fetch = async () => new Response("Unauthorized", { status: 401 });
+    await expect(validateStoredPairingSession(stored, fetchImpl)).resolves.toBeNull();
   });
 });

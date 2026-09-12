@@ -24,9 +24,11 @@ export {
 export type { TailscaleEnvironmentError, TailscaleStderrDiagnostic } from "./errors";
 export {
   buildTailscaleHttpsBaseUrl,
+  decodeTailscaleServeOwnership,
   DEFAULT_TAILSCALE_SERVE_PORT,
   disableTailscaleServe,
   ensureTailscaleServe,
+  readTailscaleServeOwnership,
   tailscaleServeDisableArgs,
   tailscaleServeEnableArgs,
 } from "./serve";

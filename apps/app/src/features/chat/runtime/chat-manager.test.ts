@@ -81,6 +81,18 @@ describe("ChatManager", () => {
     expect(reopened.store.getState().error).toBeUndefined();
   });
 
+  it("forgets every Chat on an Environment so reconnect gets a new transport", () => {
+    const { manager, transports } = makeManager();
+    const first = manager.chatFor(refFor("session-1"));
+    manager.chatFor(refFor("session-2"));
+    manager.chatFor(refFor("session-1", { environmentId: "env-2" }));
+    manager.forgetEnvironment("env-1");
+    const reopened = manager.chatFor(refFor("session-1"));
+    expect(reopened).not.toBe(first);
+    expect(manager.chatFor(refFor("session-1", { environmentId: "env-2" }))).toBeDefined();
+    expect(transports).toHaveLength(4);
+  });
+
   it("evicts once even if the stream closes twice", () => {
     const { manager, transports } = makeManager();
     manager.chatFor(refFor("session-1"));

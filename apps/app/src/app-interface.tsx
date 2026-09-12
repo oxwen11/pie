@@ -48,6 +48,15 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
+type CachedRemote = {
+  readonly connectionKey: string;
+  readonly clients: AppClients;
+};
+
+function connectionKey(connection: ServerConnection): string {
+  return `${connection.httpBaseUrl}\0${connection.token}`;
+}
+
 async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
   const url = server === undefined ? "/api/environment" : `${server.httpBaseUrl}/api/environment`;
   const headers = server === undefined ? undefined : { authorization: `Bearer ${server.token}` };
@@ -63,6 +72,13 @@ async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
   }
 }
 
+export class UnknownEnvironmentError extends Error {
+  constructor(readonly environmentId: string) {
+    super(`Environment ${environmentId} is not connected`);
+    this.name = "UnknownEnvironmentError";
+  }
+}
+
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({
   server,
@@ -72,7 +88,7 @@ export function AppInterface({
   environmentId?: string;
 }): ReactElement {
   usePlatform();
-  const identity = server ? `${server.httpBaseUrl}\0${server.token}` : "default";
+  const identity = server?.httpBaseUrl ?? "default";
   if (environmentId !== undefined) {
     return <AppRuntime key={identity} server={server} environmentId={environmentId} />;
   }
@@ -94,38 +110,67 @@ function AppRuntime({
   environmentId: string;
 }): ReactElement {
   const platform = usePlatform();
-  const localClients = useState(() => createAppClients(server))[0];
-  const remoteClients = useState(() => new Map<string, AppClients>())[0];
+  const tokenHolder = useState(() => ({ current: server?.token ?? "" }))[0];
+  if (server?.token !== undefined) tokenHolder.current = server.token;
+  const localClients = useState(() => createAppClients(server, tokenHolder))[0];
+  const remoteClients = useState(() => new Map<string, CachedRemote>())[0];
+  const chatManagerHolder = useState(() => ({ current: null as ChatManager | null }))[0];
 
   useEffect(() => {
     const feed = platform.ssh?.environments;
     if (feed === undefined) return undefined;
+    const dropRemote = (id: string, clients: AppClients) => {
+      remoteClients.delete(id);
+      disposeAppClients(clients);
+      chatManagerHolder.current?.forgetEnvironment(id);
+    };
     const prune = () => {
-      const live = new Set(feed.getSnapshot().remotes.map((remote) => remote.environmentId));
-      for (const [id, clients] of remoteClients) {
-        if (live.has(id)) continue;
-        remoteClients.delete(id);
-        disposeAppClients(clients);
+      const live = new Map(
+        feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote] as const),
+      );
+      for (const [id, cached] of remoteClients) {
+        const remote = live.get(id);
+        if (remote === undefined) {
+          dropRemote(id, cached.clients);
+          continue;
+        }
+        if (cached.connectionKey !== connectionKey(remote.connection)) {
+          dropRemote(id, cached.clients);
+        }
       }
     };
     prune();
     return feed.subscribe(prune);
-  }, [platform.ssh, remoteClients]);
+  }, [platform.ssh, remoteClients, chatManagerHolder]);
 
   const clientsFor = (id: string): AppClients => {
     if (id === environmentId) return localClients;
-    const cached = remoteClients.get(id);
-    if (cached) return cached;
     const remote = platform.ssh?.environments
       .getSnapshot()
       .remotes.find((entry) => entry.environmentId === id);
-    if (remote === undefined) return localClients;
+    if (remote === undefined) throw new UnknownEnvironmentError(id);
+    const key = connectionKey(remote.connection);
+    const cached = remoteClients.get(id);
+    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
+    if (cached !== undefined) {
+      remoteClients.delete(id);
+      disposeAppClients(cached.clients);
+      chatManagerHolder.current?.forgetEnvironment(id);
+    }
     const created = createAppClients(remote.connection);
-    remoteClients.set(id, created);
+    remoteClients.set(id, { connectionKey: key, clients: created });
     return created;
   };
 
   const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => localClients);
+  const [chatManager] = useState(
+    () =>
+      new ChatManager((ref) => {
+        const clients = clientsFor(ref.environmentId);
+        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
+      }),
+  );
+  chatManagerHolder.current = chatManager;
   const [router] = useState(() =>
     createRouter({
       orpcClient,
@@ -134,13 +179,6 @@ function AppRuntime({
       localEnvironmentId: environmentId,
       clientsFor: async (id) => clientsFor(id),
     }),
-  );
-  const [chatManager] = useState(
-    () =>
-      new ChatManager((ref) => {
-        const clients = clientsFor(ref.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
-      }),
   );
 
   return (

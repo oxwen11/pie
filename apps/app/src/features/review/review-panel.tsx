@@ -7,13 +7,13 @@ import {
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useQueries, useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { useAppClients } from "@/lib/app-clients";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -70,7 +70,7 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useAppClients();
   const projectId = instance.sessionRef.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),

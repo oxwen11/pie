@@ -32,8 +32,7 @@ cliproxyapi    gpt-5.6-sol   272K
       listed.models.map((model) => `${model.provider}/${model.modelId}`),
       ["xai/grok-4.3", "cliproxyapi/gpt-5.6-sol"],
     );
-    assert.equal(listed.defaultModel?.provider, "xai");
-    assert.equal(listed.defaultModel?.modelId, "grok-4.3");
+    assert.equal(listed.defaultModel, undefined);
   });
 
   it("lists models from the host pi CLI", async () => {
@@ -46,7 +45,6 @@ cliproxyapi    gpt-5.6-sol   272K
       listed.models.map((model) => `${model.provider}/${model.modelId}`),
       ["xai/grok-4.3", "cliproxyapi/gpt-5.6-sol"],
     );
-    assert.equal(listed.defaultModel?.provider, "xai");
-    assert.equal(listed.defaultModel?.modelId, "grok-4.3");
+    assert.equal(listed.defaultModel, undefined);
   });
 });

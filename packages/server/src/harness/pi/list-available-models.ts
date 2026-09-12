@@ -30,8 +30,7 @@ export function parsePiListModelsTable(stdout: string): ListAgentModelsOutput {
     if (provider === undefined || modelId === undefined) continue;
     models.push({ provider, modelId, name: modelId });
   }
-  const defaultModel = models[0];
-  return defaultModel === undefined ? { models } : { models, defaultModel };
+  return { models };
 }
 
 const listModelsFromPiCli = (

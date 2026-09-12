@@ -101,8 +101,7 @@ const mintPairing = () =>
   Effect.gen(function* () {
     const status = yield* statusDaemon(resolveDaemonDirectory());
     if (!status.running) {
-      console.error("pie daemon is not running");
-      return;
+      return yield* Effect.fail(new Error("pie daemon is not running"));
     }
     const response = yield* Effect.tryPromise({
       try: () =>
@@ -113,16 +112,14 @@ const mintPairing = () =>
       catch: (cause) => new Error(`pairing mint failed: ${String(cause)}`),
     });
     if (!response.ok) {
-      console.error(`pairing mint failed (${String(response.status)})`);
-      return;
+      return yield* Effect.fail(new Error(`pairing mint failed (${String(response.status)})`));
     }
     const body = (yield* Effect.tryPromise(() => response.json())) as {
       code?: unknown;
       expiresAt?: unknown;
     };
     if (typeof body.code !== "string") {
-      console.error("pairing mint returned no code");
-      return;
+      return yield* Effect.fail(new Error("pairing mint returned no code"));
     }
     console.log(body.code);
     if (typeof body.expiresAt === "number") {
@@ -171,12 +168,22 @@ const relayAttach = Command.make("attach", relayAttachFlags, (input) =>
     } else {
       const status = yield* statusDaemon(resolveDaemonDirectory());
       if (!status.running) {
-        console.error("pie daemon is not running");
-        return;
+        return yield* Effect.fail(new Error("pie daemon is not running"));
       }
       const local = new URL(status.record.address);
       localHost = local.hostname;
       localPort = Number(local.port);
+    }
+    const allowed = (process.env.PIE_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0);
+    if (!allowed.includes(hop.host.toLowerCase())) {
+      return yield* Effect.fail(
+        new Error(
+          `relay public Host ${hop.host} is not in PIE_ALLOWED_HOSTS. Restart the daemon with --allowed-host ${hop.host}`,
+        ),
+      );
     }
     const handle = yield* Effect.tryPromise(() =>
       attachRelay({

@@ -85,10 +85,10 @@ function ShareTailscaleStatus({
   );
 }
 
-export function ShareTailscaleDialog({ onClose }: { onClose: () => void }): ReactElement {
+export function ShareTailscaleDialog({ onClose }: { onClose: () => void }): ReactElement | null {
   const tailscale = usePlatform().tailscale;
 
-  if (!tailscale || !tailscale.client.available) return <></>;
+  if (!tailscale || !tailscale.client.available) return null;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

@@ -1,4 +1,4 @@
-import type { StoredPairingSession } from "./pairing-session";
+import { clearPairingSession, type StoredPairingSession } from "./pairing-session";
 
 export type PairingMode = "open" | "required";
 
@@ -27,4 +27,22 @@ export async function probePairingMode(fetchImpl: typeof fetch = fetch): Promise
   } catch {
     return "open";
   }
+}
+
+/** Drop a stored pairing token the daemon no longer accepts. */
+export async function validateStoredPairingSession(
+  stored: StoredPairingSession | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<StoredPairingSession | null> {
+  if (stored === null) return null;
+  try {
+    const response = await fetchImpl("/api/environment", {
+      headers: { authorization: `Bearer ${stored.token}` },
+    });
+    if (response.ok) return stored;
+  } catch {
+    return stored;
+  }
+  clearPairingSession();
+  return null;
 }

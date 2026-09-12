@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch } from "@tanstack/react-router";
+import { createRootRouteWithContext, useMatch, useRouteContext } from "@tanstack/react-router";
+import { use, useMemo, type ReactNode } from "react";
 
 import {
   AppShell,
@@ -20,7 +21,9 @@ import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
+import { AppClientsProvider } from "@/lib/app-clients";
 import type { AppClients } from "@/lib/orpc";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
@@ -92,19 +95,44 @@ function RootLayout() {
             <AppSidebar />
           </AppShellSidebar>
           <AppShellMain>
-            <CardPanel
-              heading={
-                schedulesRoute !== null
-                  ? "Schedule"
-                  : sessionRef === null
-                    ? "New chat"
-                    : (sessionTitle ?? "New chat")
-              }
-              supportingText={schedulesRoute !== null ? undefined : project?.name}
-            />
+            <SessionBoundMain sessionRef={sessionRef}>
+              <CardPanel
+                heading={
+                  schedulesRoute !== null
+                    ? "Schedule"
+                    : sessionRef === null
+                      ? "New chat"
+                      : (sessionTitle ?? "New chat")
+                }
+                supportingText={schedulesRoute !== null ? undefined : project?.name}
+              />
+            </SessionBoundMain>
           </AppShellMain>
         </AppShellBody>
       </ContentPanelSessionProvider>
     </AppShell>
   );
+}
+
+function SessionBoundMain({
+  sessionRef,
+  children,
+}: {
+  sessionRef: EnvironmentSessionRef | null;
+  children: ReactNode;
+}) {
+  const { clientsFor, localEnvironmentId, orpcClient, queryClient, orpcQueryUtils } =
+    useRouteContext({ from: "__root__" });
+  const targetId =
+    sessionRef === null || sessionRef.environmentId === localEnvironmentId
+      ? null
+      : sessionRef.environmentId;
+  const remote = use(
+    useMemo(
+      () => (targetId === null ? Promise.resolve(undefined) : clientsFor(targetId)),
+      [clientsFor, targetId],
+    ),
+  );
+  const clients: AppClients = remote ?? { orpcClient, queryClient, orpcQueryUtils };
+  return <AppClientsProvider clients={clients}>{children}</AppClientsProvider>;
 }

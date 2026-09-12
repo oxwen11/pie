@@ -8,13 +8,13 @@ import {
   EmptyTitle,
 } from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { useAppClients } from "@/lib/app-clients";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -31,7 +31,7 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useAppClients();
   const projectId = instance.sessionRef.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),

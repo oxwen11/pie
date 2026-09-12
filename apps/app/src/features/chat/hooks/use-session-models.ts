@@ -1,10 +1,10 @@
 import type { SessionRef } from "@getpie/contract";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { useAppClients } from "@/lib/app-clients";
 
 export function useSessionModels(ref: SessionRef) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const queryClient = useQueryClient();
+  const { orpcQueryUtils, queryClient } = useAppClients();
 
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: ref.projectId } }),

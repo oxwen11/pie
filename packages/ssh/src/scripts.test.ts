@@ -73,6 +73,8 @@ describe("remote launch scripts", () => {
     const runner = buildRemotePieRunnerScript({ packageSpec: DEFAULT_PIE_PACKAGE_SPEC });
     expect(runner).toContain("command -v pie");
     expect(runner).toContain("@getpie/cli@latest");
+    expect(runner).toContain("npx --yes --package");
+    expect(runner).toContain("-- pie");
     expect(runner).toContain("ensure_remote_node_path");
     expect(runner).toContain(DEFAULT_NODE_ENGINE_RANGE);
   });

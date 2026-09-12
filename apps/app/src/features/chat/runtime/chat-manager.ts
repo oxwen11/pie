@@ -25,6 +25,16 @@ export class ChatManager implements ChatManagerApi {
 
   // chatFor is get-or-create per SessionRef; later calls return the existing
   // Chat for that ref.
+  forgetEnvironment(environmentId: string): void {
+    for (const [key, chat] of this.#chats) {
+      const parsed: unknown = JSON.parse(key);
+      const id = Array.isArray(parsed) ? parsed[0] : undefined;
+      if (id !== environmentId) continue;
+      this.#chats.delete(key);
+      chat.dispose();
+    }
+  }
+
   chatFor(sessionRef: EnvironmentSessionRef): Chat {
     const key = sessionRefKey(sessionRef);
     const existing = this.#chats.get(key);

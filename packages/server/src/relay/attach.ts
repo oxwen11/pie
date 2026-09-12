@@ -22,11 +22,17 @@ function connectTcp(host: string, port: number): Promise<net.Socket> {
   });
 }
 
+const READY_TIMEOUT_MS = 8_000;
+
 function waitForReady(socket: net.Socket): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error) => {
       cleanup();
       reject(error);
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error("relay closed the connection"));
     };
     const onData = (data: Buffer) => {
       chunks.push(data);
@@ -43,13 +49,20 @@ function waitForReady(socket: net.Socket): Promise<Buffer> {
       resolve(rest);
     };
     const chunks: Buffer[] = [];
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("relay handshake timed out"));
+    }, READY_TIMEOUT_MS);
     const cleanup = () => {
+      clearTimeout(timer);
       socket.pause();
       socket.off("data", onData);
       socket.off("error", onError);
+      socket.off("close", onClose);
     };
     socket.on("data", onData);
     socket.once("error", onError);
+    socket.once("close", onClose);
   });
 }
 

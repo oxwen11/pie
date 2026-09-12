@@ -3,6 +3,16 @@ import type { AddressInfo } from "node:net";
 
 export const DEFAULT_LISTEN_HOST = "127.0.0.1";
 
+export function isLoopbackBind(host: string): boolean {
+  const trimmed = host.trim().toLowerCase();
+  return (
+    trimmed === DEFAULT_LISTEN_HOST ||
+    trimmed === "localhost" ||
+    trimmed === "::1" ||
+    trimmed === "[::1]"
+  );
+}
+
 /**
  * Hostnames to add to `PIE_ALLOWED_HOSTS` when the daemon binds a specific
  * non-loopback address (LAN). `0.0.0.0` / `::` do not name a Host header.
