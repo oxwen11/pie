@@ -160,7 +160,7 @@ importers:
         version: 0.1.7
       eslint-plugin-react-you-might-not-need-an-effect:
         specifier: ^1.0.2
-        version: 1.0.2
+        version: 1.0.2(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0(supports-color@10.2.2)
@@ -6259,8 +6259,8 @@ packages:
   lodash.startcase@4.4.0:
     resolution: {integrity: sha512-+WKqsK294HMSc2jEbNgpHpd0JfIBhp7rEV4aqXWqFr6AlXov+SlcgB1Fv01y2kGe3Gc8nMW7VA0SrGuSkRfIEg==}
 
-  lodash@4.18.1:
-    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+  lodash@4.17.23:
+    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
 
   log-symbols@7.0.1:
     resolution: {integrity: sha512-ja1E3yCr9i/0hmBVaM0bfwDjnGy8I/s6PP4DFp+yP+a+mrHO4Rm7DtmnqROTUkHIkqffC84YY7AeqX6oFk0WFg==}
@@ -9565,7 +9565,7 @@ snapshots:
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
       fs-extra: 9.1.0
-      lodash: 4.18.1
+      lodash: 4.17.23
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
@@ -12797,7 +12797,7 @@ snapshots:
       '@electron/asar': 3.4.1
       debug: 4.4.3(supports-color@10.2.2)
       fs-extra: 7.0.1
-      lodash: 4.18.1
+      lodash: 4.17.23
       temp: 0.9.4
     optionalDependencies:
       '@electron/windows-sign': 1.2.2(supports-color@10.2.2)
@@ -12957,8 +12957,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-react-you-might-not-need-an-effect@1.0.2:
+  eslint-plugin-react-you-might-not-need-an-effect@1.0.2(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2)):
     dependencies:
+      eslint: 10.7.0(jiti@2.7.0)(supports-color@10.2.2)
       globals: 16.5.0
 
   eslint-scope@9.1.2:
@@ -13921,7 +13922,7 @@ snapshots:
 
   lodash.startcase@4.4.0: {}
 
-  lodash@4.18.1: {}
+  lodash@4.17.23: {}
 
   log-symbols@7.0.1:
     dependencies:

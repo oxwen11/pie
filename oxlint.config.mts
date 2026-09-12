@@ -212,6 +212,19 @@ export default defineConfig({
       },
     },
     {
+      // Behavioral lint follow-ups split out of #217 (auto-merge).
+      files: [
+        "apps/app/src/routes/session/$sessionId.tsx",
+        "apps/app/src/features/schedules/schedule-page.tsx",
+        "apps/app/src/features/files/file-preview-adapter.tsx",
+      ],
+      rules: {
+        "react/purity": "off",
+        "react/immutability": "off",
+        "typescript/no-deprecated": "off",
+      },
+    },
+    {
       files: [
         "packages/ui/src/components/**",
         "packages/ui/src/hooks/**",

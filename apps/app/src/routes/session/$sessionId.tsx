@@ -20,11 +20,9 @@ export const Route = createFileRoute("/session/$sessionId")({
   loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
     const { session } = context.orpcQueryUtils.agent;
     const prepareWithBranch = (ref: SessionRef) => {
-      void context.queryClient
-        .query(context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }))
-        .catch(() => {
-          /* branch lookup is best-effort before the session view mounts */
-        });
+      void context.queryClient.prefetchQuery(
+        context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
+      );
       return session.prepare.call({ ref });
     };
 

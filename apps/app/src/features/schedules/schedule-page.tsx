@@ -293,7 +293,7 @@ export function SchedulePage({
       />
     ) : selected === undefined ? null : (
       <ScheduleDetailPanel
-        nowMs={schedules.dataUpdatedAt}
+        nowMs={Date.now()}
         onClose={() => setSelectedId(null)}
         onDelete={() => setDeleting(selected)}
         onEdit={() => setEditing(selected)}
