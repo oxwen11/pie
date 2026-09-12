@@ -393,18 +393,20 @@ function DraftWorkspaceControls({
   disabled: boolean;
   draftWorktree: ReturnType<typeof useDraftWorktree>;
 }) {
+  const handleModeChange = draftWorktree.setMode;
+  const handleValueChange = draftWorktree.setWorktreeBaseOverride;
   return (
     <>
       <DraftWorkspaceSelect
         disabled={disabled}
         mode={draftWorktree.mode}
-        onModeChange={draftWorktree.setMode}
+        onModeChange={handleModeChange}
       />
       {draftWorktree.mode === "worktree" ? (
         <DraftWorktreeBaseSelect
           branch={draftWorktree.repositoryBranch}
           disabled={disabled}
-          onValueChange={draftWorktree.setWorktreeBaseOverride}
+          onValueChange={handleValueChange}
           value={draftWorktree.worktreeBase}
         />
       ) : null}

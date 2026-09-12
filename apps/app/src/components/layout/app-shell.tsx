@@ -57,12 +57,13 @@ export interface AppShellMainProps {
 export function AppShellMain({ children }: AppShellMainProps) {
   const { isMobile } = useSidebar();
   const { contentPanel } = useAppShell();
+  const handleCollapsedChange = contentPanel.setMaximized;
   return (
     <ShellMainPanel
       hasContentPanel={contentPanel.visible}
       collapsed={contentPanel.maximized}
       collapsible={contentPanel.maximized || (contentPanel.visible && !isMobile)}
-      onCollapsedChange={contentPanel.setMaximized}
+      onCollapsedChange={handleCollapsedChange}
     >
       {children}
     </ShellMainPanel>

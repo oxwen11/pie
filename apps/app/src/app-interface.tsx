@@ -45,20 +45,28 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
+/** Lazily create a value that stays stable for the component lifetime. */
+function useStable<T>(create: () => T): T {
+  const [value, setValue] = useState(create);
+  // `hook-use-state` requires the setter in the tuple; this value is created once.
+  void setValue;
+  return value;
+}
+
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
-  const [clients] = useState(() => createAppClients(server));
+  const clients = useStable(() => createAppClients(server));
   return <AppRuntime {...clients} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
   const { theme } = useTheme();
-  const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+  const router = useStable(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
-  const [chatManager] = useState(
+  const chatManager = useStable(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),
   );
 

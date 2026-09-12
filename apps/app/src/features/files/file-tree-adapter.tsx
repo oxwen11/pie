@@ -95,7 +95,7 @@ export function FileTreeAdapter({
     if (isOpenableTreeEntry(entry)) onOpenFile(path);
   };
 
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+  const handleOpenFile = (event: MouseEvent<HTMLElement>): void => {
     openPath(pathFromComposedEvent(event));
   };
 
@@ -116,7 +116,7 @@ export function FileTreeAdapter({
       <PierreFileTree
         aria-label="Project files"
         model={state.model}
-        onClick={handleClick}
+        onClick={handleOpenFile}
         onKeyDown={handleKeyDown}
         style={TREE_STYLE}
       />

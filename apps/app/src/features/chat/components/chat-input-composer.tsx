@@ -203,7 +203,9 @@ function gitStatusLabel({
   workspaceUnavailable: boolean;
 }): ReactNode {
   if (isPending) {
-    return <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />;
+    return (
+      <span aria-hidden="true" className="bg-muted h-2 w-24 rounded-sm motion-safe:animate-pulse" />
+    );
   }
   if (currentBranch) {
     return (
