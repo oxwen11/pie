@@ -103,6 +103,10 @@ layer(NodeServices.layer)("Pi RPC bundle", (it) => {
             } from "@earendil-works/pi-coding-agent";
 
             export default async function (pi) {
+              assert.equal(process.title, "pie-pi-process");
+              assert.equal(process.env.PI_CODING_AGENT, "true");
+              assert.equal(process.env.AI_AGENT, "pi");
+              process.emitWarning("BUN_BOOTSTRAP_WARNING_MUST_BE_SUPPRESSED");
               assert.equal(typeof Agent, "function");
               assert.ok(Value.Check(Type.String(), "bundled typebox"));
               assert.equal(getModel("xai", "grok-4.6").provider, "xai");
@@ -213,7 +217,10 @@ layer(NodeServices.layer)("Pi RPC bundle", (it) => {
           Stream.runCollect,
         );
         const output = lines.join("\n");
-        assert.doesNotMatch(output, /Cannot find module|OAuth refresh failed|extension_error/);
+        assert.doesNotMatch(
+          output,
+          /Cannot find module|OAuth refresh failed|extension_error|BUN_BOOTSTRAP_WARNING/,
+        );
         assert.match(output, /test model response/);
         assert.match(output, /"command":"export_html","success":true/);
         const html = yield* fs.readFileString(path.join(cwd, "conversation.html"));

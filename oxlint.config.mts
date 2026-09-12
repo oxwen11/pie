@@ -76,6 +76,8 @@ export default defineConfig({
       {
         allow: [
           "**/*.css",
+          "@earendil-works/pi-coding-agent/bun/sandbox-env-setup",
+          "@earendil-works/pi-coding-agent/bun/runtime-setup",
           "@orpc/experimental-effect/extensions/effect",
           "@orpc/experimental-effect/extensions/input-output",
           "zod/compile",
