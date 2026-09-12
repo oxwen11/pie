@@ -107,6 +107,11 @@ export const runServe = (input: ServeInput) =>
 const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
     const token = yield* pieAuthToken;
+    // Config.redacted masks logs but does not stop child processes from
+    // inheriting the credential that guards the agent.
+    yield* Effect.sync(() => {
+      delete process.env.PIE_AUTH_TOKEN;
+    });
     const authToken = Option.match(token, {
       onNone: () => undefined,
       onSome: Redacted.value,

@@ -1,6 +1,6 @@
 import { Crypto, Effect, Layer, Logger, References } from "effect";
 
-import { pieLogLevel, piePrintLogs, PrintLogs } from "../config/env";
+import { pieLogLevel, piePrintLogs } from "../config/env";
 import { layerPaths, Paths } from "../config/paths";
 import * as Logging from "./logging";
 
@@ -28,11 +28,7 @@ export function layer() {
       const logLevel = yield* pieLogLevel;
       return Logger.layer(Logging.loggers(logsDir, runId, printLogs), {
         mergeWithExisting: false,
-      }).pipe(
-        Layer.orDie,
-        Layer.merge(Layer.succeed(References.MinimumLogLevel, logLevel)),
-        Layer.merge(Layer.succeed(PrintLogs, printLogs)),
-      );
+      }).pipe(Layer.orDie, Layer.merge(Layer.succeed(References.MinimumLogLevel, logLevel)));
     }),
   );
 }

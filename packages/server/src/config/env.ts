@@ -1,4 +1,4 @@
-import { Config, Context, Option, type LogLevel } from "effect";
+import { Config, Option, type LogLevel } from "effect";
 
 const LOG_LEVELS = {
   DEBUG: "Debug",
@@ -41,17 +41,6 @@ export const pieLogLevel = Config.string("PIE_LOG_LEVEL").pipe(
 );
 
 export const piePrintLogs = Config.boolean("PIE_PRINT_LOGS").pipe(Config.withDefault(false));
-
-export const pieE2e = Config.string("PIE_E2E").pipe(Config.withDefault(""));
-
-export const piePiExecutable = Config.string("PIE_PI_EXECUTABLE").pipe(Config.option);
-
-export const pieE2ePiExecutable = Config.string("PIE_E2E_PI_EXECUTABLE").pipe(Config.option);
-
-/** Default-off stderr log mirror. Bound at the observability composition root. */
-export const PrintLogs = Context.Reference<boolean>("pie/PrintLogs", {
-  defaultValue: () => false,
-});
 
 export const optionString = (value: Option.Option<string>): string | undefined =>
   Option.getOrUndefined(value);
