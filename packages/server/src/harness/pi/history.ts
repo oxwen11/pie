@@ -126,14 +126,13 @@ function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessage
       }
     : { state: "output-available" as const, input: call.input, output };
   if (isDynamicPiTool(call.toolName)) {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- settled output is untyped JSON; live path uses the same PiDynamicToolPart cast
     return {
       type: "dynamic-tool",
       toolName: call.toolName,
       toolCallId: call.toolCallId,
       providerExecuted: true,
       ...settled,
-    } as PiDynamicToolPart;
+    };
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   return {

@@ -160,12 +160,7 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    const instance = this.#openWith(
-      sessionRef,
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- registry stores the erased definition
-      definition as AnyPanelDefinition<View>,
-      payloadArgs[0],
-    );
+    const instance = this.#openWith(sessionRef, definition, payloadArgs[0]);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
     return instance as PanelInstance<Payload, Extra>;
   }
@@ -196,12 +191,7 @@ export class ContentPanel<View = unknown> {
           panel.id === currentId ? { id: nextId, type: definition.type, payload } : panel,
         ),
       });
-      const instance = this.#ensureInstance(
-        sessionRef,
-        nextId,
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- registry stores the erased definition
-        definition as AnyPanelDefinition<View>,
-      );
+      const instance = this.#ensureInstance(sessionRef, nextId, definition);
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
       const typed = instance as PanelInstance<Payload, Extra>;
       typed.reopen(payload);
@@ -224,12 +214,7 @@ export class ContentPanel<View = unknown> {
           ),
     });
 
-    const instance = this.#ensureInstance(
-      sessionRef,
-      nextId,
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- registry stores the erased definition
-      definition as AnyPanelDefinition<View>,
-    );
+    const instance = this.#ensureInstance(sessionRef, nextId, definition);
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
     const typed = instance as PanelInstance<Payload, Extra>;
     if (targetIsOpen) typed.reopen(payload);

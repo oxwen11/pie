@@ -48,7 +48,7 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIM
   role: "user",
   parts: parts.map((part) =>
     part.type === "data-inspector" ? { type: "data-inspector", data: part.data } : part,
-  ) as UIMessage["parts"],
+  ),
 });
 
 const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
