@@ -36,7 +36,7 @@ What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
-- Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie-dev`.
+- Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
 - Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
@@ -60,7 +60,7 @@ It checks, in order:
 2. Server and Vite pids from that run are alive.
 3. Those pids (or their children) own 4180 and 4190.
 4. Both `/api/health` endpoints return `ok`.
-5. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie-dev`.
+5. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie_*`.
 6. `POST /api/ws-ticket` through the Vite proxy returns 200. **401** means the proxy is aimed at the desktop daemon.
 
 If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -sTCP:LISTEN` and compare to the doctor pids.
@@ -189,7 +189,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 
-If the user already has `pnpm dev` on 4180/4190 against `~/.pie-dev`, **stop and tell them**. Do not point this skill at that pair.
+If the user already has `pnpm dev` on 4180/4190 against `~/.pie` / `~/.pie_*`, **stop and tell them**. Do not point this skill at that pair.
 
 ## Feature map
 

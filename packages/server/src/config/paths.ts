@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
+import { type GitCheckout, resolveGitCheckout } from "@getpie/core/development-scope";
 import { Context, Layer } from "effect";
 
 /**
@@ -42,83 +43,33 @@ const resolve = (home: string) => ({
 });
 
 /**
- * An unset variable and one set to the empty string mean the same thing here.
- * Without this, `PIE_DAEMON_DIR=""` resolves every lifecycle file to a bare
- * relative path under whatever cwd the process happens to have — `stop` and
- * `status` would silently read the wrong daemon instead of failing.
+ * Directory name under the user home for a Git checkout of the running code.
+ * `/` becomes `--` so `feat/xx` and `feat-xx` stay distinct.
  */
-const explicitPath = (value: string | undefined): string | undefined =>
-  value === undefined || value.trim() === "" ? undefined : value;
+export function defaultPieHomeDir(git: GitCheckout): string {
+  if (!git.inGit) return ".pie";
+  if (!git.branch) return ".pie_dev";
+  const segment = git.branch.replaceAll("/", "--").replaceAll(/[^a-zA-Z0-9._-]/g, "-");
+  return `.pie_${segment}`;
+}
 
 /**
- * `$PIE_HOME`, falling back to `~/.pie-dev` under
- * `NODE_ENV=development` and `~/.pie` otherwise — the single home every
- * client (server Paths, CLI, desktop, daemon launcher) resolves through, so
- * Project and Session storage can never drift on a second definition.
- * The dev split keeps `pnpm dev` / `electron-vite dev` sessions from sharing
- * storage (and, by default, a daemon) with the production install.
- *
- * A plain function, not an Effect: an env lookup and a string join perform no
- * effectful work (`.agents/rules/stack.md`, "Where the boundary is"). Not
- * because callers lack a runtime — every one of them is inside an `Effect.gen`
- * today — but because there is nothing here to suspend.
+ * `$PIE_HOME`, else installed `~/.pie`, a git checkout `~/.pie_<branch>`
+ * (`/` → `--`), or `~/.pie_dev` when the branch is unreadable. Probes git from
+ * this file's on-disk location, not cwd.
  */
 export function resolvePieHome(env: NodeJS.ProcessEnv = process.env): string {
-  return (
-    explicitPath(env.PIE_HOME) ??
-    path.join(os.homedir(), env.NODE_ENV === "development" ? ".pie-dev" : ".pie")
-  );
+  const raw = env.PIE_HOME;
+  if (raw !== undefined && raw.trim() !== "") return raw;
+  return path.join(os.homedir(), defaultPieHomeDir(resolveGitCheckout(import.meta.dirname)));
 }
 
-/** The two directories a daemon front door needs, resolved together. */
-export type DaemonLocation = {
-  /** `$PIE_HOME` — Projects and Sessions. Handed to the daemon process. */
-  readonly home: string;
-  /** `$PIE_DAEMON_DIR` — `daemon.pid`, `.lock`, `.stopped`. Lifecycle state
-   * only; the daemon's logs live under `$PIE_HOME/logs`. */
-  readonly daemonDir: string;
-};
+/** `$PIE_HOME/daemon` — pid, lock, and stop tombstone. */
+export const daemonDirectory = (home: string): string => path.join(home, "daemon");
 
-/**
- * Where a daemon keeps its data and its lifecycle files. Every front door (CLI,
- * desktop, and any future one) resolves the pair here rather than pairing them
- * itself: `stop` must find what `start` wrote, and the desktop must find what
- * the CLI started, which only holds while there is one pairing rule.
- *
- * An explicit `$PIE_DAEMON_DIR` lets multiple daemon processes use separate
- * lifecycle state while keeping their server data under the same
- * `$PIE_HOME`; unset, it is `$PIE_HOME/daemon` (`~/.pie/daemon` in
- * production). This is the one place that default is spelled — the
- * single-instance invariant is keyed on the daemon directory, so a second
- * definition would be a second daemon. `daemon/paths.ts` names files inside a
- * directory it is handed and never re-derives the directory itself.
- */
-export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): DaemonLocation {
-  const home = resolvePieHome(env);
-  return { home, daemonDir: explicitPath(env.PIE_DAEMON_DIR) ?? path.join(home, "daemon") };
-}
-
-/**
- * Scope unpackaged development lifecycle state under the canonical development
- * home. Inherited `$PIE_DAEMON_DIR` is ignored so a nested `pnpm dev` cannot
- * attach a production daemon; `$PIE_DEV_DAEMON_DIR` is the explicit override.
- * Desktop computes the checkout identity, while this module remains the sole
- * owner of home/daemon path policy.
- */
-export function developmentDaemonEnvironment(
-  env: NodeJS.ProcessEnv,
-  scope: string | undefined,
-): NodeJS.ProcessEnv {
-  const explicitDev = explicitPath(env.PIE_DEV_DAEMON_DIR);
-  if (explicitDev !== undefined) return { ...env, PIE_DAEMON_DIR: explicitDev };
-  if (scope === undefined) return env;
-  const home = resolvePieHome({ ...env, NODE_ENV: "development" });
-  return { ...env, PIE_DAEMON_DIR: path.join(home, "daemons", scope) };
-}
-
-/** `resolveDaemonLocation().daemonDir`, for callers that need only the directory. */
+/** `$PIE_HOME/daemon` from the same home `resolvePieHome` would pick. */
 export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): string {
-  return resolveDaemonLocation(env).daemonDir;
+  return daemonDirectory(resolvePieHome(env));
 }
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
@@ -132,7 +83,7 @@ export const daemonStdioLogPath = (logsDir: string): string =>
 /** Point the runtime at an explicit home directory (used in tests). */
 export const layerPaths = (home: string): Layer.Layer<Paths> => Layer.succeed(Paths, resolve(home));
 
-/** Default: `$PIE_HOME`, falling back to `~/.pie-dev` (dev) / `~/.pie`. */
+/** Default: `$PIE_HOME`, else installed `~/.pie` or checkout `~/.pie_<branch>`. */
 export const PathsLayer: Layer.Layer<Paths> = Layer.sync(
   Paths,
   // Resolved when the layer is built, not when this module is imported — the

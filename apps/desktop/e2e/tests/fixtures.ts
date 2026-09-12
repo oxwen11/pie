@@ -139,7 +139,6 @@ export const test = base.extend<{
         PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
         PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
         PIE_HOME: e2ePaths.pieHome,
-        PIE_DAEMON_DIR: path.join(e2ePaths.pieHome, "daemon"),
       },
     });
 

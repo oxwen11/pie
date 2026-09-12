@@ -84,8 +84,8 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
   persistent roots: `resolvePieHome` for server data, `resolveDaemonDirectory`
-  for lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`. The daemon
-  directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
+  for `$PIE_HOME/daemon` lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`.
+  The daemon directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
   `Paths` includes `logsDir`; directory `0700` and files `0600` are
   part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
   The process-owned observability Layer appends to `logsDir/pie.log` and
@@ -95,7 +95,9 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   the process context captured after that provide; `mergeAll` leaves fibers forked
   during `AgentRuntimeLayer` construction on Effect's default logger. Tests that
   do not write a log file provide `Observability.discard` so `Effect.log*` does
-  not leak to stdout. The single-daemon invariant is keyed on the daemon
-  directory, so every front door resolves it there and passes it down —
+  not leak to stdout. The single-daemon invariant is keyed on `$PIE_HOME/daemon`,
+  so every front door resolves the home and derives the directory —
   `packages/server/src/daemon/paths.ts` names files inside a directory it is
-  handed and deliberately has no default of its own.
+  handed and deliberately has no default of its own. Tests and verify runs set
+  their own `$PIE_HOME`; they must not use `~/.pie`, `~/.pie_dev`, or
+  `~/.pie_<branch>`.

@@ -109,10 +109,13 @@ export function spawnPie(
   });
 }
 
+export function daemonPidPath(pieHome: string): string {
+  return path.join(pieHome, "daemon", "daemon.pid");
+}
+
 export async function stopRecordedDaemon(input: {
   repo: string;
   pieHome: string;
-  daemonDir: string;
   piePort: number;
   runDir: string;
   logPrefix: string;
@@ -120,11 +123,10 @@ export async function stopRecordedDaemon(input: {
   const env = {
     ...process.env,
     PIE_HOME: input.pieHome,
-    PIE_DAEMON_DIR: input.daemonDir,
     PIE_PORT: String(input.piePort),
     NODE_ENV: "development",
   };
-  const recordPath = path.join(input.daemonDir, "daemon.pid");
+  const recordPath = daemonPidPath(input.pieHome);
   const daemonPid = fs.existsSync(recordPath) ? readDaemonRecord(recordPath).pid : undefined;
   console.log(`${input.logPrefix}: pie daemon stop (recorded pid=${daemonPid ?? "none"})`);
   invokePie(input.repo, ["daemon", "stop"], env, {

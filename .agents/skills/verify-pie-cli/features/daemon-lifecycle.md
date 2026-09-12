@@ -1,6 +1,6 @@
 # Daemon lifecycle
 
-Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a detached daemon. The CLI process exits. The daemon writes `$PIE_DAEMON_DIR/daemon.pid` and keeps serving until an explicit stop.
+Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a detached daemon. The CLI process exits. The daemon writes `$PIE_HOME/daemon/daemon.pid` and keeps serving until an explicit stop.
 
 ## Sub-features
 

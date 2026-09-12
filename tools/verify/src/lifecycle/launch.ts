@@ -182,26 +182,20 @@ function toLaunchCtx(
         sample: scaffold(identity),
       };
     case "cli": {
-      const daemonDir = path.join(base.pieHome, "daemon");
       return {
         ...base,
         surface: "cli",
-        daemonDir,
-        env: { ...base.env, PIE_DAEMON_DIR: daemonDir },
       };
     }
     case "desktop": {
-      const daemonDir = path.join(base.pieHome, "daemon");
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
       return {
         ...base,
         surface: "desktop",
-        daemonDir,
         cdpPort,
         sample: scaffold(identity),
         env: {
           ...base.env,
-          PIE_DAEMON_DIR: daemonDir,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };
