@@ -7,9 +7,6 @@
  * extension bind/UI/protocol here, and extension loading via
  * `createAgentSessionServices` (`resourceLoaderOptions.extensionFactories`).
  */
-import path from "node:path";
-import url from "node:url";
-
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -23,6 +20,12 @@ import {
   type CreateAgentSessionRuntimeFactory,
 } from "@earendil-works/pi-coding-agent";
 
+// Static specifier so bun --compile inlines this (import.meta.resolve of the
+// package name fails inside $bunfs). The subpath is not on the package exports.
+import {
+  applyHttpProxySettings,
+  configureHttpDispatcher,
+} from "../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/http-dispatcher.js";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -41,14 +44,6 @@ const openSessionManager = async (sessionId: string | undefined, cwd: string) =>
 };
 
 const start = async (): Promise<void> => {
-  const { applyHttpProxySettings, configureHttpDispatcher } = await import(
-    url.pathToFileURL(
-      path.join(
-        path.dirname(url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),
-        "core/http-dispatcher.js",
-      ),
-    ).href
-  );
   const parsed = parseArgs(process.argv.slice(2));
   const cwd = process.cwd();
   const agentDir = getAgentDir();
