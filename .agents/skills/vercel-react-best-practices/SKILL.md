@@ -117,6 +117,12 @@ Reference these guidelines when:
 - `advanced-init-once` - Initialize app once per app load
 - `advanced-use-latest` - useLatest for stable callback refs
 
+## In this repository (pie)
+
+This is a Vite + TanStack Query SPA, not Next.js. Follow bundle, rerender, rendering, and `js-*` rules. Skip RSC / Server Action / `next/dynamic` / SWR rules (`server-*`, `bundle-dynamic-imports` as Next-only, `client-swr-dedup`). Server state stays in TanStack Query (`.agents/rules/frontend-state.md`).
+
+React Doctor enforces the high-value subset of these practices as errors. When a Doctor finding overlaps a rule below, fix it using that rule's recipe — see `.agents/skills/react-doctor/references/strict-value.md`.
+
 ## How to Use
 
 Read individual rule files for detailed explanations and code examples:

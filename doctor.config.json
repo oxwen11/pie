@@ -1,0 +1,42 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  // 0.9.14 made cleanup / migration / unmeasured-perf / security-review
+  // checks opt-in so the default scan only reports proven defects. This
+  // config turns back on the strictest subset that still pays rent in a
+  // Vite + TanStack + React 19 SPA — not Next.js RSC, not React Native,
+  // not retired style rules (those stay silent even if listed).
+  // Pair each enabled rule with the practice in
+  // .agents/skills/react-doctor/references/strict-value.md; do not "fix"
+  // a finding by disabling the rule.
+  "buckets": {
+    "compiler-cleanup": "error"
+  },
+  "rules": {
+    "react-doctor/circular-dependency": "error",
+    "react-doctor/js-combine-iterations": "error",
+    "react-doctor/js-flatmap-filter": "error",
+    "react-doctor/js-length-check-first": "error",
+    "react-doctor/jsx-max-depth": "error",
+    "react-doctor/no-barrel-import": "error",
+    "react-doctor/no-impure-call-at-module-scope": "error",
+    "react-doctor/no-usememo-simple-expression": "error",
+    "react-doctor/prefer-module-scope-pure-function": "error",
+    "react-doctor/prefer-module-scope-static-value": "error",
+    "react-doctor/prefer-useReducer": "error",
+    "react-doctor/rendering-hoist-jsx": "error",
+    "react-doctor/rendering-svg-precision": "error",
+    "react-doctor/unused-dependency": "error",
+    "react-doctor/unused-dev-dependency": "error",
+    "react-doctor/unused-export": "error",
+    "react-doctor/unused-file": "error",
+    // Warn: exported `*Props` / options / return types are the component API
+    // (ui-components.md) even when nothing imports them yet.
+    "react-doctor/unused-type": "warn",
+    "react-doctor/zod-v4-prefer-top-level-string-formats": "error",
+    // Inventory, not a defect: keep visible locally and on the PR comment,
+    // but do not fail CI. Enable an explicit security review when the
+    // surface changes.
+    "react-doctor/agent-tool-capability-risk": "warn",
+    "react-doctor/mcp-tool-capability-risk": "warn"
+  }
+}
