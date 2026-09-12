@@ -1,7 +1,6 @@
-import type { SessionRef } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
-import { sessionRefKey } from "@/lib/session-ref";
+import { type EnvironmentSessionRef, sessionRefKey } from "@/lib/session-ref";
 
 import { ContentPanel } from "./content-panel";
 import { definePanel, definePanelFamily, type PanelHandle } from "./panel";
@@ -19,14 +18,15 @@ const file = definePanelFamily({
   view: null,
 });
 
-const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
+const ref = (overrides: Partial<EnvironmentSessionRef> = {}): EnvironmentSessionRef => ({
+  environmentId: "env-1",
   projectId: "11111111-1111-4111-8111-111111111111",
   sessionId: "session-1",
   ...overrides,
 });
 const S = ref();
 
-const snapshotOf = (host: ContentPanel<null>, sessionRef: SessionRef | null = S) =>
+const snapshotOf = (host: ContentPanel<null>, sessionRef: EnvironmentSessionRef | null = S) =>
   host.snapshot(host.store.getState(), sessionRef);
 
 const withPanels = (...definitions: Parameters<ContentPanel<null>["register"]>[0][]) => {
@@ -395,18 +395,16 @@ describe("ContentPanel", () => {
     expect(snapshotOf(host).panels.map((panel) => panel.id)).toEqual(["counted:1"]);
   });
 
-  it("scopes panels by the complete SessionRef", () => {
+  it("scopes panels by Environment and session", () => {
     const host = withPanels(diff);
-    const sameIdOtherProject = ref({
-      projectId: "22222222-2222-4222-8222-222222222222",
-    });
+    const otherEnvironment = ref({ environmentId: "env-2" });
     const handle = host.open(S, diff);
-    host.open(sameIdOtherProject, diff);
-    host.close(sameIdOtherProject, "diff");
+    host.open(otherEnvironment, diff);
+    host.close(otherEnvironment, "diff");
 
     expect(handle.sessionRef).toEqual(S);
     expect(snapshotOf(host).panels).toHaveLength(1);
-    expect(snapshotOf(host, sameIdOtherProject).panels).toHaveLength(0);
+    expect(snapshotOf(host, otherEnvironment).panels).toHaveLength(0);
   });
 
   it("forget drops a session and disposes its instances", () => {

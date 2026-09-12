@@ -34,16 +34,10 @@ export class SshReadinessError extends Data.TaggedError("SshReadinessError")<{
   readonly cause?: unknown;
 }> {}
 
-export class SshPasswordPromptError extends Data.TaggedError("SshPasswordPromptError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
 export type SshEnvironmentError =
   | SshCommandError
   | SshClientMissingError
   | SshInvalidTargetError
   | SshLaunchError
   | SshReadinessError
-  | SshPasswordPromptError
   | SshHostDiscoveryError;

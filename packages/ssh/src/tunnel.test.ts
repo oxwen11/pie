@@ -1,6 +1,7 @@
 import http from "node:http";
 
-import { Effect } from "effect";
+import { Effect, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 import { describe, expect, it } from "vitest";
 
 import { forwardedConnection, reserveLoopbackPort, waitForHttpReady } from "./tunnel";
@@ -60,11 +61,17 @@ describe("waitForHttpReady", () => {
   it("fails when the health endpoint never answers ok", async () => {
     await expect(
       Effect.runPromise(
-        waitForHttpReady({
-          address: "http://127.0.0.1:1",
-          timeoutMs: 400,
-          probeTimeoutMs: 50,
-        }),
+        Effect.gen(function* () {
+          const fiber = yield* Effect.forkChild(
+            waitForHttpReady({
+              address: "http://127.0.0.1:1",
+              timeoutMs: 400,
+              probeTimeoutMs: 50,
+            }),
+          );
+          yield* TestClock.adjust("1 second");
+          return yield* Fiber.join(fiber);
+        }).pipe(Effect.provide(TestClock.layer())),
       ),
     ).rejects.toMatchObject({ _tag: "SshReadinessError" });
   });

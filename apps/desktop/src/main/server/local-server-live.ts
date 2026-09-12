@@ -10,7 +10,7 @@ import { applyDesktopRuntime, DesktopConfig } from "../desktop-config";
 import { withTailscaleAllowedHosts } from "../tailscale/allowed-hosts";
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import { LocalServer, makeLocalServer } from "./local-server";
-import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
+import { LoginShellEnvironment } from "./login-shell-environment";
 
 const existingFile = (pathname: string): string | undefined =>
   fs.existsSync(pathname) ? pathname : undefined;
@@ -19,15 +19,15 @@ export const LocalServerLive = Layer.effect(
   LocalServer,
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
+    const loginShell = yield* LoginShellEnvironment;
     const platform = yield* Effect.context<
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const environment = (
       config.isPackaged
-        ? resolveLoginShellEnvironmentWith(spawner)
+        ? Effect.succeed(loginShell.env)
         : Effect.sync(() =>
-            developmentDaemonEnvironment({ ...process.env }, resolveDevelopmentScope()),
+            developmentDaemonEnvironment({ ...loginShell.env }, resolveDevelopmentScope()),
           )
     ).pipe(
       Effect.map((env) =>

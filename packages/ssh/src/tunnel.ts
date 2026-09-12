@@ -1,11 +1,12 @@
 import net from "node:net";
 
-import { Duration, Effect, Exit, FileSystem, Scope, Stream } from "effect";
+import { Deferred, Duration, Effect, Exit, FileSystem, Schedule, Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import { buildSshChildEnvironment, isSshAuthFailure } from "./auth";
 import {
   baseSshArgs,
+  collectProcessOutput,
+  isSshAuthFailure,
   isSshSpawnNotFound,
   redactSshErrorOutput,
   requireSshCommand,
@@ -41,8 +42,9 @@ import {
 export const LOCAL_FORWARD_HOST = "127.0.0.1";
 export const REMOTE_FORWARD_HOST = "127.0.0.1";
 
-const TUNNEL_START_GRACE_MS = 500;
 const READY_POLL_INTERVAL_MS = 200;
+const SSH_AUTH_FAILURE_MESSAGE =
+  "SSH authentication failed. Use ssh-agent or an IdentityFile in ~/.ssh/config (password prompts are not wired in pie v1).";
 
 export type SshForwardedConnection = {
   readonly httpBaseUrl: string;
@@ -54,10 +56,21 @@ export type SshTunnel = {
   readonly localPort: number;
   readonly remotePort: number;
   readonly close: Effect.Effect<void>;
+  /** Completes when the `ssh -N` child exits, including after `close`. */
+  readonly closed: Effect.Effect<void>;
+  readonly alive: Effect.Effect<boolean>;
+  /** Drained `ssh -N` stderr; completes when the child closes the stream. */
+  readonly stderr: Effect.Effect<string>;
 };
 
 export type SshConnectedEnvironment = SshEnvironmentBootstrap & {
   readonly close: Effect.Effect<void>;
+  readonly closed: Effect.Effect<void>;
+  readonly alive: Effect.Effect<boolean>;
+};
+
+export type SshCliEnv = {
+  readonly env?: NodeJS.ProcessEnv;
 };
 
 export function forwardedConnection(localPort: number, token: string): SshForwardedConnection {
@@ -67,15 +80,6 @@ export function forwardedConnection(localPort: number, token: string): SshForwar
     token,
   };
 }
-
-const collectProcessOutput = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.Effect<string, E> =>
-  stream.pipe(
-    Stream.decodeText(),
-    Stream.runFold(
-      () => "",
-      (acc, chunk) => acc + chunk,
-    ),
-  );
 
 export const reserveLoopbackPort = (): Effect.Effect<number, SshLaunchError> =>
   Effect.tryPromise({
@@ -119,30 +123,52 @@ export const waitForHttpReady = (input: {
   Effect.gen(function* () {
     const timeoutMs = input.timeoutMs ?? SSH_READY_TIMEOUT_MS;
     const probeTimeoutMs = input.probeTimeoutMs ?? SSH_READY_PROBE_TIMEOUT_MS;
-    const deadline = Date.now() + timeoutMs;
     let lastError: unknown;
 
-    while (Date.now() < deadline) {
-      const healthy = yield* Effect.promise(async () => {
-        try {
-          const response = await fetch(new URL("/api/health", input.address), {
-            signal: AbortSignal.timeout(probeTimeoutMs),
-          });
-          return response.ok && (await response.text()) === "ok";
-        } catch (cause) {
-          lastError = cause;
-          return false;
-        }
-      });
-      if (healthy) return;
-      yield* Effect.sleep(READY_POLL_INTERVAL_MS);
-    }
+    const probe = Effect.promise(async () => {
+      try {
+        const response = await fetch(new URL("/api/health", input.address), {
+          signal: AbortSignal.timeout(probeTimeoutMs),
+        });
+        return response.ok && (await response.text()) === "ok";
+      } catch (cause) {
+        lastError = cause;
+        return false;
+      }
+    });
+
+    const healthy = yield* probe.pipe(
+      Effect.repeat({
+        until: (ready) => ready,
+        schedule: Schedule.spaced(Duration.millis(READY_POLL_INTERVAL_MS)).pipe(
+          Schedule.upTo({ duration: Duration.millis(timeoutMs) }),
+        ),
+      }),
+    );
+
+    if (healthy) return;
 
     return yield* new SshReadinessError({
       message: `Remote pie daemon did not become ready at ${input.address} within ${String(timeoutMs)}ms.`,
       cause: lastError,
     });
   });
+
+function launchErrorFromDiagnostic(
+  diagnostic: string,
+  fallback: string,
+  cause?: unknown,
+): SshLaunchError {
+  const message = isSshAuthFailure(diagnostic)
+    ? SSH_AUTH_FAILURE_MESSAGE
+    : diagnostic.length > 0
+      ? diagnostic
+      : fallback;
+  if (cause === undefined) {
+    return new SshLaunchError({ message, stdout: diagnostic });
+  }
+  return new SshLaunchError({ message, stdout: diagnostic, cause });
+}
 
 function toLaunchError(
   error: SshCommandError | SshClientMissingError | SshInvalidTargetError,
@@ -156,9 +182,8 @@ function toLaunchError(
   const diagnostic = stderr || stdout;
   if (isSshAuthFailure(error) || isSshAuthFailure(diagnostic)) {
     return new SshLaunchError({
-      message:
-        "SSH authentication failed. Use ssh-agent or an IdentityFile in ~/.ssh/config (password prompts are not wired in pie v1).",
-      stdout,
+      message: SSH_AUTH_FAILURE_MESSAGE,
+      stdout: diagnostic,
       cause: error,
     });
   }
@@ -171,7 +196,7 @@ function toLaunchError(
 
 export const launchOrReuseRemoteServer = (
   target: SshTarget,
-  options?: RemotePieRunnerOptions,
+  options?: RemotePieRunnerOptions & SshCliEnv,
 ): Effect.Effect<
   RemoteLaunchResult,
   SshLaunchError | SshClientMissingError | SshInvalidTargetError,
@@ -192,6 +217,7 @@ export const launchOrReuseRemoteServer = (
       }),
       remoteCommandArgs: ["sh", "-l", "-s", remoteStateKey(target)],
       timeoutMs: REMOTE_LAUNCH_TIMEOUT_MS,
+      env: options?.env,
     }).pipe(Effect.mapError(toLaunchError));
 
     const parsed = parseRemoteLaunchOutput(result.stdout);
@@ -207,6 +233,7 @@ export const launchOrReuseRemoteServer = (
 export const startSshTunnel = (
   target: SshTarget,
   remotePort: number,
+  options?: SshCliEnv,
 ): Effect.Effect<
   SshTunnel,
   SshLaunchError | SshClientMissingError | SshInvalidTargetError,
@@ -214,24 +241,13 @@ export const startSshTunnel = (
 > =>
   Effect.gen(function* () {
     const hostSpec = yield* buildSshHostSpecEffect(target);
-    const sshCommand = yield* requireSshCommand();
+    const sshCommand = yield* requireSshCommand({ env: options?.env });
     const localPort = yield* reserveLoopbackPort();
     const tunnelScope = yield* Scope.make();
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const environment = yield* buildSshChildEnvironment({
-      baseEnv: sshSpawnEnv(),
-    }).pipe(
-      Effect.mapError(
-        (cause) =>
-          new SshLaunchError({
-            message: "Failed to prepare SSH authentication helpers.",
-            stdout: "",
-            cause,
-          }),
-      ),
-    );
+    const environment = sshSpawnEnv(options?.env);
     const args = [
-      ...baseSshArgs(target, { batchMode: "yes" }),
+      ...baseSshArgs(target),
       "-N",
       "-L",
       `${String(localPort)}:${REMOTE_FORWARD_HOST}:${String(remotePort)}`,
@@ -280,30 +296,25 @@ export const startSshTunnel = (
         ),
       );
 
-    yield* Effect.sleep(TUNNEL_START_GRACE_MS);
-    const running = yield* child.isRunning.pipe(Effect.orElseSucceed(() => false));
-    if (!running) {
-      const output = yield* collectProcessOutput(child.stderr).pipe(Effect.orElseSucceed(() => ""));
-      yield* Effect.ignore(Scope.close(tunnelScope, Exit.void));
-      const diagnostic = redactSshErrorOutput(output);
-      if (isSshAuthFailure(diagnostic)) {
-        return yield* new SshLaunchError({
-          message:
-            "SSH authentication failed. Use ssh-agent or an IdentityFile in ~/.ssh/config (password prompts are not wired in pie v1).",
-          stdout: diagnostic,
-        });
-      }
-      return yield* new SshLaunchError({
-        message:
-          diagnostic.length > 0
-            ? diagnostic
-            : `SSH tunnel to ${hostSpec} exited before the local forward was ready.`,
-        stdout: diagnostic,
-      });
-    }
+    const stderrDone = yield* Deferred.make<string>();
+    yield* collectProcessOutput(child.stderr).pipe(
+      Effect.orElseSucceed(() => ""),
+      Effect.flatMap((output) => Deferred.succeed(stderrDone, output)),
+      Effect.ensuring(Deferred.succeed(stderrDone, "")),
+      Effect.forkIn(tunnelScope),
+    );
 
     const close = Effect.ignore(Scope.close(tunnelScope, Exit.void)).pipe(Effect.asVoid);
-    return { localPort, remotePort, close };
+    const closed = child.exitCode.pipe(Effect.asVoid, Effect.ignore);
+    const alive = child.isRunning.pipe(Effect.orElseSucceed(() => false));
+    return {
+      localPort,
+      remotePort,
+      close,
+      closed,
+      alive,
+      stderr: Deferred.await(stderrDone),
+    };
   });
 
 export const waitForForwardedDaemon = (localPort: number): Effect.Effect<void, SshReadinessError> =>
@@ -313,7 +324,7 @@ export const waitForForwardedDaemon = (localPort: number): Effect.Effect<void, S
 
 export const connectSshEnvironment = (
   target: SshTarget,
-  options?: RemotePieRunnerOptions,
+  options?: RemotePieRunnerOptions & SshCliEnv,
 ): Effect.Effect<
   SshConnectedEnvironment,
   SshLaunchError | SshClientMissingError | SshInvalidTargetError | SshReadinessError,
@@ -321,15 +332,29 @@ export const connectSshEnvironment = (
 > =>
   Effect.gen(function* () {
     const launch = yield* launchOrReuseRemoteServer(target, options);
-    const tunnel = yield* startSshTunnel(target, launch.remotePort);
-    yield* waitForForwardedDaemon(tunnel.localPort).pipe(Effect.tapError(() => tunnel.close));
+    const tunnel = yield* startSshTunnel(target, launch.remotePort, { env: options?.env });
+    const tunnelExited = tunnel.closed.pipe(
+      Effect.andThen(tunnel.stderr),
+      Effect.flatMap((output) =>
+        Effect.fail(
+          launchErrorFromDiagnostic(
+            redactSshErrorOutput(output),
+            `SSH tunnel to ${target.hostname} exited before the local forward was ready.`,
+          ),
+        ),
+      ),
+    );
+    yield* Effect.raceFirst(waitForForwardedDaemon(tunnel.localPort), tunnelExited).pipe(
+      Effect.tapError(() => tunnel.close),
+    );
     return {
       target,
       httpBaseUrl: forwardedConnection(tunnel.localPort, launch.token).httpBaseUrl,
       wsBaseUrl: forwardedConnection(tunnel.localPort, launch.token).wsBaseUrl,
       token: launch.token,
       remotePort: launch.remotePort,
-      remoteServerKind: launch.serverKind,
       close: tunnel.close,
+      closed: tunnel.closed,
+      alive: tunnel.alive,
     };
   });

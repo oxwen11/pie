@@ -1,7 +1,11 @@
 import { Effect, FileSystem } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
-import { runTailscaleCommand, TAILSCALE_SERVE_TIMEOUT_MS } from "./command";
+import {
+  runTailscaleCommand,
+  TAILSCALE_SERVE_TIMEOUT_MS,
+  type FindTailscaleCommandOptions,
+} from "./command";
 import type { TailscaleClientMissingError, TailscaleCommandError } from "./errors";
 
 export const DEFAULT_TAILSCALE_SERVE_PORT = 443;
@@ -40,17 +44,21 @@ export const ensureTailscaleServe = (input: {
   readonly localPort: number;
   readonly servePort?: number;
   readonly localHost?: string;
+  readonly env?: NodeJS.ProcessEnv;
 }): Effect.Effect<void, TailscaleCommandError | TailscaleClientMissingError, TailscaleCli> =>
-  runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS).pipe(
-    Effect.asVoid,
-  );
+  runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
+    env: input.env,
+  }).pipe(Effect.asVoid);
 
 export const disableTailscaleServe = (
   input: {
     readonly servePort?: number;
+    readonly env?: NodeJS.ProcessEnv;
   } = {},
 ): Effect.Effect<void, TailscaleCommandError | TailscaleClientMissingError, TailscaleCli> =>
-  runTailscaleCommand(tailscaleServeDisableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS).pipe(
+  runTailscaleCommand(tailscaleServeDisableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
+    env: input.env,
+  } satisfies FindTailscaleCommandOptions).pipe(
     Effect.asVoid,
     Effect.catchTag("TailscaleCommandError", (error) =>
       error.stderrDiagnostic === "no-existing-handler" ? Effect.void : Effect.fail(error),

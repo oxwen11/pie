@@ -20,7 +20,6 @@ function discoveredHostOptionLabel(host: DiscoveredSshHost): string {
     case "tailscale":
       return `${host.alias} (Tailscale)`;
     case "ssh-config":
-    case "known-hosts":
       return host.alias;
     default: {
       const exhaustive: never = host.source;
@@ -50,13 +49,13 @@ function DiscoveredSshHostOptions({ ssh }: { ssh: PlatformSsh }): ReactElement {
   );
 }
 
-export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactElement {
+export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactElement | null {
   const ssh = usePlatform().ssh;
   const [target, setTarget] = useState("");
   const [pending, setPending] = useState(false);
   const trimmed = target.trim();
 
-  if (!ssh || !ssh.client.available) return <></>;
+  if (!ssh || !ssh.client.available) return null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

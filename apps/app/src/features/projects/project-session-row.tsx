@@ -17,12 +17,14 @@ export type SessionPullRequest = {
 export function ProjectSessionRow({
   active,
   createdBySchedule = false,
+  environmentId,
   isActive,
   pullRequest,
   session,
 }: {
   readonly active: boolean;
   readonly createdBySchedule?: boolean;
+  readonly environmentId: string;
   readonly isActive: () => boolean;
   readonly pullRequest: SessionPullRequest | undefined;
   readonly session: SessionSummary;
@@ -48,7 +50,7 @@ export function ProjectSessionRow({
               navigate({
                 to: "/session/$sessionId",
                 params: { sessionId: session.sessionId },
-                search: { projectId: session.projectId },
+                search: { projectId: session.projectId, environmentId },
               }).catch((error: unknown) => {
                 console.error("Failed to open session", error);
               });

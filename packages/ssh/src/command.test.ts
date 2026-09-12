@@ -4,10 +4,10 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { Effect, FileSystem } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { ASKPASS_POSIX_SCRIPT, isSshAuthFailure } from "./auth";
 import {
   baseSshArgs,
   findSshCommand,
+  isSshAuthFailure,
   isSshSpawnNotFound,
   normalizeSshErrorMessage,
   probeSshClient,
@@ -38,7 +38,7 @@ describe("ssh command helpers", () => {
   });
 
   it("adds BatchMode and an explicit port", () => {
-    expect(baseSshArgs(parseSshInput("alice@example.com:2222"), { batchMode: "yes" })).toEqual([
+    expect(baseSshArgs(parseSshInput("alice@example.com:2222"))).toEqual([
       "-o",
       "BatchMode=yes",
       "-o",
@@ -93,13 +93,6 @@ describe("isSshAuthFailure", () => {
   });
 });
 
-describe("askpass helper", () => {
-  it("prints PIE_SSH_AUTH_SECRET when the posix helper is invoked", () => {
-    expect(ASKPASS_POSIX_SCRIPT).toContain("PIE_SSH_AUTH_SECRET");
-    expect(ASKPASS_POSIX_SCRIPT.startsWith("#!/bin/sh")).toBe(true);
-  });
-});
-
 const withTmp = <A>(
   f: (dir: string) => Effect.Effect<A, unknown, FileSystem.FileSystem>,
 ): Promise<A> =>
@@ -128,11 +121,13 @@ describe("findSshCommand", () => {
         yield* fs.chmod(hidden, 0o755);
         return {
           found: yield* findSshCommand({ env: { PATH: onPath }, platform: "linux" }),
+          required: yield* requireSshCommand({ env: { PATH: onPath }, platform: "linux" }),
           expected: visible,
         };
       }),
     );
     expect(result.found).toBe(result.expected);
+    expect(result.required).toBe(result.expected);
   });
 
   it("reports missing when PATH has no ssh binary", async () => {

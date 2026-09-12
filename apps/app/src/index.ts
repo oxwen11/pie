@@ -14,7 +14,6 @@ export type {
   TailscaleClientAvailability,
   TailscaleSnapshot,
 } from "./platform";
-export { LOCAL_ENVIRONMENT_ID } from "./platform";
 export { PlatformProvider } from "./platform-provider";
 export type { ServerConnection } from "./server-connection";
 export type { ThemePreference } from "./theme";

@@ -55,9 +55,6 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
       connectSsh: orpc.environments.connectSsh.effect(function* ({ input }) {
         yield* application.connectSsh(input.target).pipe(Effect.mapError(rpcUserError));
       }),
-      disconnectSsh: orpc.environments.disconnectSsh.effect(function* () {
-        yield* application.disconnectSsh;
-      }),
       removeSsh: orpc.environments.removeSsh.effect(function* ({ input }) {
         yield* application.removeSsh(input.id);
       }),
