@@ -84,6 +84,7 @@ export function RenameSessionDialog({
           <div className="flex flex-col items-start gap-2 px-6 pb-4">
             <Label htmlFor="session-title">Title</Label>
             <Input
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus the title field when the dialog opens
               autoFocus
               disabled={rename.isPending}
               id="session-title"

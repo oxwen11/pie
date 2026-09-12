@@ -12,6 +12,7 @@ describe("waitForStartupAnimation", () => {
     let completed = false;
     const animation = waitForStartupAnimation(false).then(() => {
       completed = true;
+      return undefined;
     });
 
     await vi.advanceTimersByTimeAsync(STARTUP_ANIMATION_MS - 1);

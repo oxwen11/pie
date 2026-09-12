@@ -20,7 +20,7 @@ export interface FilePayload {
   readonly line?: number;
 }
 
-const fileName = (path: string): string => path.split(/[\\/]/).at(-1) || path;
+const fileName = (path: string): string => path.split(/[\\/]/).at(-1) ?? path;
 
 export const filePanel = definePanelFamily({
   type: "file",

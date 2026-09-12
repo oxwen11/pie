@@ -44,7 +44,7 @@ export function writeRunMeta(filePath: string, meta: RunMeta): void {
 }
 
 export function readRunMeta(filePath: string): RunMeta {
-  const data = readJson<Record<string, unknown>>(filePath);
+  const data = readJson(filePath) as Record<string, unknown>;
   const surface = data.surface;
   switch (surface) {
     case "web":

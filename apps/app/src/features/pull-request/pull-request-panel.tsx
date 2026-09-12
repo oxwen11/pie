@@ -44,6 +44,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
   const refresh = (): void => {
     void pullRequest.refetch().then((result) => {
       if (!result.isError) setPostActionRefreshFailed(false);
+      return undefined;
     });
     void diff.refetch();
   };

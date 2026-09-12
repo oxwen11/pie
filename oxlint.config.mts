@@ -142,7 +142,8 @@ export default defineConfig({
       },
     ],
     "jsx-a11y/role-supports-aria-props": "warn",
-    "jsx-a11y/no-autofocus": "off",
+    // Ultracite leaves these off; pie turns them on in this slice.
+    "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/prefer-tag-over-role": "off",
     "react/react-in-jsx-scope": "off",
     "unicorn/no-empty-file": "off",
@@ -153,8 +154,8 @@ export default defineConfig({
     "typescript/no-unsafe-type-assertion": "off",
     "typescript/no-unnecessary-type-assertion": "off",
     "typescript/consistent-return": "off",
-    "typescript/no-unnecessary-type-parameters": "off",
-    "promise/always-return": "off",
+    // Ultracite leaves this off; pie turns it on in this slice.
+    "promise/always-return": "error",
     "no-unused-vars": [
       "error",
       {
@@ -269,6 +270,11 @@ export default defineConfig({
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/prefer-reduce-type-parameter": "off",
         "no-promise-executor-return": "off",
+        "typescript/prefer-nullish-coalescing": "off",
+        "jsx-a11y/no-autofocus": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unnecessary-type-parameters": "off",
+        "promise/always-return": "off",
       },
     },
     {

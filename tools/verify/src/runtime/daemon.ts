@@ -22,7 +22,7 @@ export type DaemonRecord = {
 };
 
 export function readDaemonRecord(filePath: string): DaemonRecord {
-  const data = readJson<Record<string, unknown>>(filePath);
+  const data = readJson(filePath) as Record<string, unknown>;
   if (
     typeof data.pid !== "number" ||
     typeof data.address !== "string" ||
@@ -34,7 +34,7 @@ export function readDaemonRecord(filePath: string): DaemonRecord {
 }
 
 export function redactDaemonRecord(src: string, dest: string): void {
-  const data = readJson<Record<string, unknown>>(src);
+  const data = readJson(src) as Record<string, unknown>;
   if (Object.hasOwn(data, "token")) {
     data.token = "[redacted]";
   }

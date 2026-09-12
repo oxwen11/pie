@@ -20,11 +20,9 @@ export const resolveWorkspaceCwd = (
     return input.cwd;
   });
 
-export const catchWorkspaceResolveErrors = <
-  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
->(
-  errors: E,
-) =>
+export const catchWorkspaceResolveErrors = (errors: {
+  SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown;
+}) =>
   Effect.catchTags({
     SessionNotFound: (error: SessionNotFound) =>
       Effect.fail(
@@ -46,9 +44,7 @@ export const catchWorkspaceResolveErrors = <
       ),
   });
 
-export const resolveWorkspaceCwdOrFail = <
-  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
->(
+export const resolveWorkspaceCwdOrFail = (
   input: WorkspaceQuery,
-  errors: E,
+  errors: { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
 ) => resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));

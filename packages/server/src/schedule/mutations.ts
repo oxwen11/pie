@@ -100,17 +100,8 @@ export const update = (input: UpdateScheduleInput) =>
     const updatedAt = yield* Clock.currentTimeMillis;
     const spec = input.spec ?? current.spec;
     const expiresAt =
-      input.expiresAt === undefined
-        ? current.expiresAt
-        : input.expiresAt === null
-          ? undefined
-          : input.expiresAt;
-    const maxRuns =
-      input.maxRuns === undefined
-        ? current.maxRuns
-        : input.maxRuns === null
-          ? undefined
-          : input.maxRuns;
+      input.expiresAt === undefined ? current.expiresAt : (input.expiresAt ?? undefined);
+    const maxRuns = input.maxRuns === undefined ? current.maxRuns : (input.maxRuns ?? undefined);
     if (input.session !== undefined) {
       yield* trySession(current.projectId, input.session);
     }

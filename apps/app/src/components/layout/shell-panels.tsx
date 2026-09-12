@@ -130,7 +130,7 @@ export function ShellSeparator({
         locked && "pointer-events-none",
         className,
       )}
-      disabled={disabled || locked}
+      disabled={disabled === true || locked}
       {...props}
     />
   );
