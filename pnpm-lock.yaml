@@ -406,9 +406,6 @@ importers:
       electron-vite:
         specifier: ^6.0.0-beta.1
         version: 6.0.0-beta.1(@swc/core@1.15.11(@swc/helpers@0.5.18))(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
-      nf3:
-        specifier: ^0.3.24
-        version: 0.3.24
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -6588,9 +6585,6 @@ packages:
   negotiator@1.0.0:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
-
-  nf3@0.3.24:
-    resolution: {integrity: sha512-HxLK4bo+5jNsEETZp4w3tJblHOA9MCBY14IN9nZJJV8JDxt9yNIYxuBuLMjTAR5GFa3HL61+8VQDUrXv3/C8fw==}
 
   node-abi@4.33.0:
     resolution: {integrity: sha512-vLBWCKb+7LWsX+TbfzWOkw0W81m377tyx3hOweBTjO43CXZnRGS1/JPWs20fr0PgZyDXk6ROYrylsEycK8raDA==}
@@ -14435,8 +14429,6 @@ snapshots:
 
   negotiator@1.0.0:
     optional: true
-
-  nf3@0.3.24: {}
 
   node-abi@4.33.0:
     dependencies:
