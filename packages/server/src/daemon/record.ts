@@ -12,7 +12,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The discovery record the launcher writes to `$PIE_DAEMON_DIR/daemon.pid` —
+ * The discovery record the launcher writes to `$PIE_HOME/daemon/daemon.pid` —
  * the local mirror of the SSH remote's `ssh-launch/<stateKey>/{pid,port,token}`.
  * It is the single-instance marker: staleness is decided by "is the pid alive",
  * never a lock the server holds. The server itself never reads or writes it.
