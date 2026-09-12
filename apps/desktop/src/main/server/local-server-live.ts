@@ -33,7 +33,9 @@ export const LocalServerLive = Layer.effect(
               process.platform === "win32" ? "bun.exe" : "bun",
             ),
           ),
-          bundledRpc: existingFile(path.join(config.resourcesPath, "pi-rpc", "pi-rpc.js")),
+          bundledPiProcess: existingFile(
+            path.join(config.resourcesPath, "pie-pi-process", "pie-pi-process.js"),
+          ),
         }),
       ),
     );

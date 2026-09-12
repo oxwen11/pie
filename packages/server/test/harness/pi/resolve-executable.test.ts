@@ -8,7 +8,7 @@ import {
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
-const rpc = "/opt/pie/dist/pi-rpc/pi-rpc.js";
+const rpc = "/opt/pie/dist/pie-pi-process/pie-pi-process.js";
 
 describe("resolvePiExecutable", () => {
   it("prefers the E2E override when PIE_E2E=1", () => {
@@ -61,19 +61,19 @@ describe("resolvePiExecutable", () => {
     ).toEqual({ command: "bun", prefixArgs: [rpc] });
   });
 
-  it("returns bun with no script when the RPC entry cannot be resolved", () => {
+  it("returns bun with no script when pie-pi-process cannot be resolved", () => {
     expect(resolvePiExecutable({}, { resolveBundledCli: () => undefined })).toEqual({
       command: "bun",
       prefixArgs: [],
     });
   });
-  it("rewrites a packaged asar RPC entry to asar.unpacked for bun", () => {
+  it("rewrites a packaged asar pie-pi-process entry to asar.unpacked for bun", () => {
     const asarEntry =
-      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pi-rpc/pi-rpc.js";
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pie-pi-process/pie-pi-process.js";
     expect(resolvePiExecutable({}, { resolveBundledCli: () => asarEntry })).toEqual({
       command: "bun",
       prefixArgs: [
-        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-rpc/pi-rpc.js",
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pie-pi-process/pie-pi-process.js",
       ],
     });
   });
@@ -103,7 +103,7 @@ describe("checkPiAvailability", () => {
     });
   });
 
-  it("reports the RPC entry missing when bun is present but the script is not", () => {
+  it("reports pie-pi-process missing when bun is present but the script is not", () => {
     const result = Effect.runSync(
       checkPiAvailability(
         { command: "bun", prefixArgs: [] },
@@ -112,11 +112,11 @@ describe("checkPiAvailability", () => {
     );
     expect(result).toEqual({
       available: false,
-      reason: "Pi RPC entry was not found.",
+      reason: "pie-pi-process entry was not found.",
     });
   });
 
-  it("reports bun available when bun and the RPC entry both exist", () => {
+  it("reports bun available when bun and pie-pi-process both exist", () => {
     const result = Effect.runSync(
       checkPiAvailability(
         { command: "bun", prefixArgs: [rpc] },

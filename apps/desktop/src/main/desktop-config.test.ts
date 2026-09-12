@@ -32,7 +32,7 @@ describe("applyPackagedPiRuntime", () => {
   const bundled = {
     isPackaged: true,
     bundledBun: "/Resources/vendor/bun/bun",
-    bundledRpc: "/Resources/pi-rpc/pi-rpc.js",
+    bundledPiProcess: "/Resources/pie-pi-process/pie-pi-process.js",
   } as const;
 
   it("leaves unpackaged env unchanged", () => {
@@ -40,11 +40,11 @@ describe("applyPackagedPiRuntime", () => {
     expect(applyPackagedPiRuntime(env, { ...bundled, isPackaged: false })).toEqual(env);
   });
 
-  it("points packaged desktop at the shipped bun and pi-rpc", () => {
+  it("points packaged desktop at the shipped bun and pie-pi-process", () => {
     expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
       PATH: "/usr/bin",
       PIE_BUN: "/Resources/vendor/bun/bun",
-      PIE_PI_EXECUTABLE: "/Resources/pi-rpc/pi-rpc.js",
+      PIE_PI_EXECUTABLE: "/Resources/pie-pi-process/pie-pi-process.js",
     });
   });
 
@@ -54,7 +54,7 @@ describe("applyPackagedPiRuntime", () => {
     ).toEqual({
       PIE_BUN: "/custom/bun",
       PIE_HOME: "/tmp/pie",
-      PIE_PI_EXECUTABLE: "/Resources/pi-rpc/pi-rpc.js",
+      PIE_PI_EXECUTABLE: "/Resources/pie-pi-process/pie-pi-process.js",
     });
   });
 
@@ -64,7 +64,7 @@ describe("applyPackagedPiRuntime", () => {
       applyPackagedPiRuntime(env, {
         isPackaged: true,
         bundledBun: undefined,
-        bundledRpc: undefined,
+        bundledPiProcess: undefined,
       }),
     ).toEqual(env);
   });
