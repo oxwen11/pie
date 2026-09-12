@@ -39,9 +39,14 @@ const isInForLoopInitializer = (node: ESTree.Node): boolean => {
   return false;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 const readOptions = (raw: unknown): Required<Options> => {
-  const option = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof option !== "object" || option === null || Array.isArray(option)) {
+  // oxlint-disable-next-line typescript/no-unsafe-assignment -- Array.isArray(unknown) is any[]
+  const option: unknown = Array.isArray(raw) ? raw[0] : raw;
+  if (!isRecord(option)) {
     return { allowInForLoopInit: false, allowInFunctions: false };
   }
   return {
