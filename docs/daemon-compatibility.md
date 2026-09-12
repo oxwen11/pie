@@ -26,12 +26,11 @@ transaction at `daemon.lock`. Process exit releases the transaction through the
 SQLite connection lifecycle, so lock recovery never deletes a pathname that a
 successor may already own.
 
-Development Desktop runs isolate only lifecycle state. Unless
-`PIE_DAEMON_DIR` is explicitly set, Main derives a stable scope from the
-canonical Git checkout path and uses `$PIE_HOME/daemons/<scope>` (or
-`~/.pie-dev/daemons/<scope>` with the normal development default). Project and
-Session storage, application ports, and root development commands are
-unchanged. Packaged builds continue sharing `~/.pie/daemon/`.
+Development and packaged builds share one daemon per `$PIE_HOME` at
+`$PIE_HOME/daemon`. An installed binary uses `~/.pie`; a binary running from
+a Git checkout uses `~/.pie_<branch>`. Isolation is a different home, not a
+second lifecycle directory. Tests and verify runs must set their own
+`$PIE_HOME`.
 
 A future cross-build compatibility protocol can add a separate versioned key
 format. Current decoding deliberately accepts only `githash:<8-hex>`.

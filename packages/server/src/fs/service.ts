@@ -164,7 +164,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
 
           while (pendingDirectories.length > 0) {
             const currentDirectories = pendingDirectories;
-            pendingDirectories = [];
+            const nextPending: string[] = [];
 
             const directoryCandidates = yield* Effect.forEach(
               currentDirectories,
@@ -216,7 +216,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
                       if (shouldExcludeDirectory(candidate.relativePath, candidate.name)) {
                         return undefined;
                       }
-                      pendingDirectories.push(candidate.relativePath);
+                      nextPending.push(candidate.relativePath);
                       return { path: candidate.relativePath, type: "directory" };
                     }
                     if (info.type === "File") {
@@ -248,6 +248,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
             entries.push(
               ...classified.filter((entry): entry is WorkspaceTreeEntry => entry !== undefined),
             );
+            pendingDirectories = nextPending;
           }
 
           entries.sort((left, right) =>
@@ -325,8 +326,8 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
         });
 
       return {
-        readFileString,
-        readTree,
+        readFileString: Effect.fn("FileSystemService.readFileString")(readFileString),
+        readTree: Effect.fn("FileSystemService.readTree")(readTree),
       };
     }),
   );

@@ -6,11 +6,17 @@ export default defineConfig({
   platform: "node",
   // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
   // artifact beside the final CLI so runtime lookup never depends on a repo.
-  copy: {
-    from: "../../apps/app/dist",
-    to: "dist",
-    rename: "client",
-  },
+  copy: [
+    {
+      from: "../../apps/app/dist",
+      to: "dist",
+      rename: "client",
+    },
+    {
+      from: "../server/dist/pi-rpc",
+      to: "dist/pi-rpc",
+    },
+  ],
   deps: {
     // The private server/harness/contract packages are compiled into the CLI.
     // Whitelist their bundled runtime dependencies so additions fail closed.

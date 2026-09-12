@@ -25,6 +25,7 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -124,6 +125,7 @@ async function setup() {
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );

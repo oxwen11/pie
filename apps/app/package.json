@@ -33,6 +33,8 @@
     "@tiptap/extensions": "catalog:tiptap",
     "@tiptap/pm": "catalog:tiptap",
     "@tiptap/react": "catalog:tiptap",
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/xterm": "5.5.0",
     "ai": "catalog:",
     "lucide-react": "catalog:",
     "motion": "^13.2.0",
@@ -57,6 +59,7 @@
     "code-inspector-plugin": "latest",
     "react-doctor": "^0.9.13",
     "react-grab": "^0.1.50",
-    "react-scan": "catalog:"
+    "react-scan": "catalog:",
+    "vitest": "catalog:"
   }
 }

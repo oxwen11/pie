@@ -43,6 +43,16 @@ describe("PieLoader", () => {
     expect(dots).toHaveLength(16);
   });
 
+  it("renders a frozen pie mark without dot animations when animated={false}", async () => {
+    const el = await render(<PieLoader animated={false} />);
+    const dots = el.querySelectorAll("[data-slot=pie-dot]");
+
+    expect(dots).toHaveLength(16);
+    for (const dot of dots) {
+      expect(dot.className).not.toContain("animate-pie-dot-grid");
+    }
+  });
+
   it("merges a caller className last", async () => {
     const el = await render(<PieLoader className="text-muted-foreground" />);
     const mark = el.querySelector("[data-slot=pie-loader]");

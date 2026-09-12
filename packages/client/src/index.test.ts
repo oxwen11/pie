@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createWsConnect } from "./index";
+import { createWsConnect, getWsTicket } from "./index";
 
 describe("createWsConnect", () => {
   it("does not fetch a ticket until a connection is attempted", () => {
@@ -64,6 +64,25 @@ describe("createWsConnect", () => {
     await connect();
 
     expect(opened).toEqual(["ws://127.0.0.1:4100/ws/rpc"]);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("getWsTicket", () => {
+  it("uses the bearer token and validates the response", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ ticket: "ticket-1" }));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(getWsTicket("http://127.0.0.1:4100", "daemon-token")).resolves.toBe("ticket-1");
+    expect(fetch).toHaveBeenCalledOnce();
+    const [url, request] = fetch.mock.calls[0] ?? [];
+    expect(url).toBeInstanceOf(URL);
+    if (!(url instanceof URL)) throw new Error("expected ticket URL");
+    expect(url.href).toBe("http://127.0.0.1:4100/api/ws-ticket");
+    expect(request).toEqual({
+      method: "POST",
+      headers: { authorization: "Bearer daemon-token" },
+    });
     vi.unstubAllGlobals();
   });
 });

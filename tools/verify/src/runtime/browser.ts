@@ -285,12 +285,12 @@ export function ensureBrowserEnvDirs(vars: BrowserEnvVars): void {
 
 export function applyBrowserEnv(vars: BrowserEnvVars, env: NodeJS.ProcessEnv): void {
   for (const key of BROWSER_ENV_UNSET) {
-    delete env[key];
+    Reflect.deleteProperty(env, key);
   }
   for (const key of BROWSER_ENV_KEYS) {
     const value = vars[key];
     if (value === undefined || value === "") {
-      delete env[key];
+      Reflect.deleteProperty(env, key);
     } else {
       env[key] = value;
     }

@@ -6,6 +6,13 @@ import {
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
+import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
+import {
+  PromptInputBox,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -17,7 +24,6 @@ import {
   SelectValue,
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
-import { Textarea } from "@getpie/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
@@ -47,6 +53,8 @@ export type ScheduleFormSubmit = {
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;
+  readonly provider?: string;
+  readonly modelId?: string;
 };
 
 export type ScheduleFormDefaults = {
@@ -113,6 +121,10 @@ function formFromSource(
     expiresAt: schedule.expiresAt !== undefined ? isoToLocalDateTime(schedule.expiresAt) : "",
     maxRuns: schedule.maxRuns !== undefined ? String(schedule.maxRuns) : "",
     runNow: false,
+    model:
+      schedule.provider !== undefined && schedule.modelId !== undefined
+        ? { provider: schedule.provider, modelId: schedule.modelId }
+        : undefined,
     ...formFromSpec(schedule.spec, base),
   };
 }
@@ -135,6 +147,17 @@ function ScheduleFormFields({
     }),
     enabled: form.reuseSession && form.projectId.length > 0,
   });
+  const models = useQuery({
+    ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
+    enabled: form.projectId.length > 0,
+  });
+  const listedModels = models.data?.models ?? [];
+  const model = form.model ?? models.data?.defaultModel;
+  const modelOptions =
+    model !== undefined &&
+    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
+      ? [...listedModels, model]
+      : listedModels;
   const listed = sessions.data ?? [];
   const listedIds = sessions.isSuccess
     ? new Set(listed.map((session) => session.sessionId))
@@ -167,7 +190,8 @@ function ScheduleFormFields({
     form.prompt.trim().length > 0 &&
     (form.cadence !== "once" || form.runAt.length > 0) &&
     (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1));
+    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
+    (listedModels.length === 0 || model !== undefined);
 
   return (
     <form
@@ -193,6 +217,9 @@ function ScheduleFormFields({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
+            ...(model !== undefined
+              ? { provider: model.provider, modelId: model.modelId }
+              : undefined),
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -221,6 +248,7 @@ function ScheduleFormFields({
                 projectId: next,
                 sessionPick: "create",
                 sessionId: "",
+                model: undefined,
               }));
             }
           }}
@@ -238,17 +266,30 @@ function ScheduleFormFields({
           </SelectContent>
         </Select>
       </Field>
-      <Field>
-        <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
-        <Textarea
+      <PromptInputBox>
+        <PromptInputTextarea
+          aria-label="Prompt"
           id="schedule-prompt"
           maxLength={MAX_SCHEDULE_PROMPT_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+          placeholder="Ask Pi anything..."
           required
-          rows={5}
           value={form.prompt}
         />
-      </Field>
+        <PromptInputToolbar>
+          <PromptInputTools>
+            <ModelSelectorPicker
+              aria-label="Model"
+              modelId={model?.modelId}
+              models={modelOptions}
+              onChange={(provider, modelId) =>
+                setForm((current) => ({ ...current, model: { provider, modelId } }))
+              }
+              providerId={model?.provider}
+            />
+          </PromptInputTools>
+        </PromptInputToolbar>
+      </PromptInputBox>
       <ScheduleFormCadenceFields form={form} setForm={setForm} />
       <ScheduleFormLimitsFields form={form} setForm={setForm} />
       <ScheduleFormSessionFields

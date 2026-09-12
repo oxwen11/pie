@@ -44,6 +44,12 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
       pullRequestDefaults,
     );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.list.key())).toMatchObject(
+      pullRequestDefaults,
+    );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.detail.key())).toMatchObject(
+      pullRequestDefaults,
+    );
 
     queryClient.clear();
   });

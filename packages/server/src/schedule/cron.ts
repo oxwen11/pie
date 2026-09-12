@@ -39,12 +39,14 @@ export function parseCron(cron: string): CronExpr {
   if (/[a-zA-Z?#LW]/.test(cron)) {
     throw new CronError("INVALID_CRON", "names and extensions (L, W, ?, #) are not supported");
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- length === 5 was checked above
+  const [minute, hour, dom, month, dow] = parts as [string, string, string, string, string];
   return {
-    minute: parseField(parts[0]!, 0, 59),
-    hour: parseField(parts[1]!, 0, 23),
-    dom: parseField(parts[2]!, 1, 31),
-    month: parseField(parts[3]!, 1, 12),
-    dow: parseField(parts[4]!, 0, 6),
+    minute: parseField(minute, 0, 59),
+    hour: parseField(hour, 0, 23),
+    dom: parseField(dom, 1, 31),
+    month: parseField(month, 1, 12),
+    dow: parseField(dow, 0, 6),
   };
 }
 
@@ -58,7 +60,8 @@ function parseField(raw: string, min: number, max: number): Field {
     if (!stepMatch) {
       throw new CronError("INVALID_CRON", `invalid field: ${item}`);
     }
-    const range = stepMatch[1]!;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- group 1 is required by the field regex
+    const range = stepMatch[1] as string;
     const step = stepMatch[2] ? Number(stepMatch[2]) : 1;
     if (!Number.isInteger(step) || step <= 0) {
       throw new CronError("INVALID_CRON", `invalid step: ${item}`);
@@ -67,8 +70,10 @@ function parseField(raw: string, min: number, max: number): Field {
     let end = max;
     if (range !== "*") {
       const bounds = range.split("-").map(Number);
-      start = bounds[0]!;
-      end = bounds.length === 2 ? bounds[1]! : start;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- range is non-empty after split
+      start = bounds[0] as number;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- length === 2 was checked
+      end = bounds.length === 2 ? (bounds[1] as number) : start;
     }
     if (start < min || end > max || start > end) {
       throw new CronError("INVALID_CRON", `field out of range: ${item}`);
@@ -124,10 +129,8 @@ export function partsInTimeZone(ms: number, timeZone: string): WallClock {
   const value = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((part) => part.type === type)?.value ?? "";
   const weekdayName = value("weekday");
-  const weekday =
-    weekdayName in WEEKDAY_INDEX
-      ? WEEKDAY_INDEX[weekdayName as keyof typeof WEEKDAY_INDEX]
-      : undefined;
+  const isWeekday = (name: string): name is keyof typeof WEEKDAY_INDEX => name in WEEKDAY_INDEX;
+  const weekday = isWeekday(weekdayName) ? WEEKDAY_INDEX[weekdayName] : undefined;
   if (weekday === undefined) {
     throw new CronError("INVALID_TIMEZONE", `could not read weekday in ${timeZone}`);
   }

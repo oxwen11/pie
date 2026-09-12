@@ -24,7 +24,7 @@ test("PiAgent create is scoped and effect native", () => {
 });
 
 test("session operations expose Effect and Stream only", () => {
-  expectTypeOf<PiAgentRuntime["events"]>().toMatchTypeOf<Stream.Stream<unknown, unknown>>();
+  expectTypeOf<PiAgentRuntime["events"]>().toExtend<Stream.Stream<unknown, unknown>>();
   expectTypeOf<ReturnType<PiAgentRuntime["prompt"]>>().toEqualTypeOf<
     Effect.Effect<RuntimePromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>
   >();

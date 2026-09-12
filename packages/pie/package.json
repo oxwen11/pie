@@ -1,7 +1,7 @@
 {
   "name": "@getpie/cli",
   "version": "0.0.1",
-  "description": "Pie CLI — daemon and serve for the Pi coding agent",
+  "description": "Pie CLI — daemon, serve, and pie run for the Pi coding agent",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oxwen11/pie.git",
@@ -14,6 +14,9 @@
     "dist"
   ],
   "type": "module",
+  "exports": {
+    "./pi-rpc": "./dist/pi-rpc/pi-rpc.js"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -28,22 +31,27 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
+    "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "node-pty": "1.1.0",
     "uuid": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
+    "@getpie/client": "workspace:*",
+    "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",
-    "@types/ws": "catalog:"
+    "@types/ws": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24.0.0 <25"

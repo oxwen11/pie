@@ -9,6 +9,7 @@ export function listenServer(server: Server, port: number): Promise<number> {
     };
     const onListening = () => {
       server.off("error", onError);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- listen() on 127.0.0.1 yields AddressInfo
       resolve((server.address() as AddressInfo).port);
     };
 

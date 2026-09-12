@@ -1,165 +1,166 @@
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import assert from "node:assert/strict";
 
+import { layer } from "@effect/vitest";
 import { Effect } from "effect";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { GitNotRepository } from "../../src/errors";
-import {
-  type Fixture,
-  run as runFixture,
-  type SessionServiceRunOpts,
-} from "./session-service-fixture";
+import { NodePlatformLayer } from "../platform";
+import { run } from "./session-service-fixture";
 
-describe("PiAgentSessionService worktree create", () => {
-  let home: string;
-  beforeEach(async () => {
-    home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-svc-wt-"));
-  });
-  afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
-  });
-
-  const run = <A, E>(
-    opts: SessionServiceRunOpts,
-    program: (fixture: Fixture) => Effect.Effect<A, E>,
-  ) => runFixture(home, opts, program);
-
-  it("creates a worktree at create and does not recreate it on prompt", async () => {
-    let creates = 0;
-    const bases: Array<string | undefined> = [];
-    const result = await run(
-      {
-        worktreeCreate: (_cwd, input) => {
-          creates += 1;
-          bases.push(input?.base);
-          return Effect.succeed({
-            path: "/tmp/pie-worktree",
-            branch: "pie/abcd1234",
-          });
+layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
+  it.effect("creates a worktree at create and does not recreate it on prompt", () =>
+    Effect.gen(function* () {
+      let creates = 0;
+      const bases: Array<string | undefined> = [];
+      const result = yield* run(
+        {
+          worktreeCreate: (_cwd, input) => {
+            creates += 1;
+            bases.push(input?.base);
+            return Effect.succeed({
+              path: "/tmp/pie-worktree",
+              branch: "pie/abcd1234",
+            });
+          },
         },
-      },
-      (fixture) =>
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: { base: "main" },
+            });
+            const afterCreate = yield* fixture.repo.read(
+              created.ref.projectId,
+              created.ref.sessionId,
+            );
+            yield* fixture.service.prompt({
+              ref: created.ref,
+              parts: [{ type: "text", text: "one" }],
+            });
+            for (let attempt = 0; attempt < 1000; attempt += 1) {
+              if (fixture.spy.open.length > 0) break;
+              yield* Effect.yieldNow;
+            }
+            return { created, afterCreate, open: fixture.spy.open.slice() };
+          }),
+      );
+      assert.equal(creates, 1);
+      assert.deepEqual(bases, ["main"]);
+      assert.deepEqual(result.created.workspace, {
+        cwd: "/tmp/pie-worktree",
+        gitBranch: "pie/abcd1234",
+      });
+      assert.equal(result.afterCreate.cwd, "/tmp/pie-worktree");
+      assert.equal(result.afterCreate.gitBranch, "pie/abcd1234");
+      assert.deepEqual(result.open, [{ cwd: "/tmp/pie-worktree" }]);
+    }),
+  );
+
+  it.effect("does not persist a session when worktree creation fails", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          worktreeCreate: () => Effect.fail(new GitNotRepository({ cwd: "/tmp/pie-app" })),
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const error = yield* Effect.flip(
+              fixture.service.create({
+                projectId: "proj-a",
+                cwd: "/tmp/pie-app",
+                worktree: {},
+              }),
+            );
+            const listed = yield* fixture.repo.list("proj-a");
+            return { error, listed, open: fixture.spy.open };
+          }),
+      );
+      assert.equal(result.error._tag, "GitNotRepository");
+      assert.equal(result.listed.length, 0);
+      assert.deepEqual(result.open, []);
+    }),
+  );
+
+  it.effect("does not create a worktree when create omits worktree", () =>
+    Effect.gen(function* () {
+      const stored = yield* run({}, (fixture) =>
         Effect.gen(function* () {
           const created = yield* fixture.service.create({
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
-            worktree: { base: "main" },
           });
-          const afterCreate = yield* fixture.repo.read(
-            created.ref.projectId,
-            created.ref.sessionId,
-          );
           yield* fixture.service.prompt({
             ref: created.ref,
             parts: [{ type: "text", text: "one" }],
           });
-          yield* Effect.sleep("80 millis");
-          return { created, afterCreate, open: fixture.spy.open };
-        }),
-    );
-    expect(creates).toBe(1);
-    expect(bases).toEqual(["main"]);
-    expect(result.created.workspace).toEqual({
-      cwd: "/tmp/pie-worktree",
-      gitBranch: "pie/abcd1234",
-    });
-    expect(result.afterCreate.cwd).toBe("/tmp/pie-worktree");
-    expect(result.afterCreate.gitBranch).toBe("pie/abcd1234");
-    expect(result.open).toEqual([{ cwd: "/tmp/pie-worktree" }]);
-  });
-
-  it("does not persist a session when worktree creation fails", async () => {
-    const result = await run(
-      {
-        worktreeCreate: () => Effect.fail(new GitNotRepository({ cwd: "/tmp/pie-app" })),
-      },
-      (fixture) =>
-        Effect.gen(function* () {
-          const error = yield* Effect.flip(
-            fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-              worktree: {},
-            }),
+          yield* Effect.yieldNow;
+          const afterPrompt = yield* fixture.repo.read(
+            created.ref.projectId,
+            created.ref.sessionId,
           );
-          const listed = yield* fixture.repo.list("proj-a");
-          return { error, listed, open: fixture.spy.open };
+          return { created, afterPrompt };
         }),
-    );
-    expect(result.error._tag).toBe("GitNotRepository");
-    expect(result.listed).toHaveLength(0);
-    expect(result.open).toEqual([]);
-  });
+      );
+      assert.deepEqual(stored.created.workspace, { cwd: "/tmp/pie-app" });
+      assert.equal(stored.afterPrompt.cwd, "/tmp/pie-app");
+      assert.equal(stored.afterPrompt.gitBranch, undefined);
+    }),
+  );
 
-  it("does not create a worktree when create omits worktree", async () => {
-    const stored = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const created = yield* fixture.service.create({
-          projectId: "proj-a",
-          cwd: "/tmp/pie-app",
-        });
-        yield* fixture.service.prompt({ ref: created.ref, parts: [{ type: "text", text: "one" }] });
-        yield* Effect.sleep("80 millis");
-        const afterPrompt = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
-        return { created, afterPrompt };
-      }),
-    );
-    expect(stored.created.workspace).toEqual({ cwd: "/tmp/pie-app" });
-    expect(stored.afterPrompt.cwd).toBe("/tmp/pie-app");
-    expect(stored.afterPrompt.gitBranch).toBeUndefined();
-  });
-
-  it("removes the worktree when persist fails after create", async () => {
-    const removed: string[] = [];
-    const result = await run(
-      {
-        failWrite: true,
-        worktreeCreate: () =>
-          Effect.succeed({
-            path: "/tmp/pie-worktree",
-            branch: "pie/abcd1234",
-          }),
-        worktreeRemove: (worktreePath) => {
-          removed.push(worktreePath);
-          return Effect.void;
+  it.effect("removes the worktree when persist fails after create", () =>
+    Effect.gen(function* () {
+      const removed: string[] = [];
+      const result = yield* run(
+        {
+          failWrite: true,
+          worktreeCreate: () =>
+            Effect.succeed({
+              path: "/tmp/pie-worktree",
+              branch: "pie/abcd1234",
+            }),
+          worktreeRemove: (worktreePath) => {
+            removed.push(worktreePath);
+            return Effect.void;
+          },
         },
-      },
-      (fixture) =>
-        Effect.gen(function* () {
-          const error = yield* Effect.flip(
-            fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-              worktree: {},
-            }),
-          );
-          const listed = yield* fixture.repo.list("proj-a");
-          return { error, listed };
-        }),
-    );
-    expect(result.error._tag).toBe("StoreWriteError");
-    expect(result.listed).toHaveLength(0);
-    expect(removed).toEqual(["/tmp/pie-worktree"]);
-  });
+        (fixture) =>
+          Effect.gen(function* () {
+            const error = yield* Effect.flip(
+              fixture.service.create({
+                projectId: "proj-a",
+                cwd: "/tmp/pie-app",
+                worktree: {},
+              }),
+            );
+            const listed = yield* fixture.repo.list("proj-a");
+            return { error, listed };
+          }),
+      );
+      assert.equal(result.error._tag, "StoreWriteError");
+      assert.equal(result.listed.length, 0);
+      assert.deepEqual(removed, ["/tmp/pie-worktree"]);
+    }),
+  );
 
-  it("workspaceFor backfills cwd without writing metadata", async () => {
-    const result = await run({}, (fixture) =>
-      Effect.gen(function* () {
-        const { ref } = yield* fixture.service.create({
-          projectId: "proj-a",
-          cwd: "/tmp/pie-app",
-        });
-        const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-        const { cwd: _dropped, ...withoutCwd } = stored;
-        yield* fixture.repo.write(withoutCwd);
-        const workspace = yield* fixture.service.workspaceFor(ref);
-        const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-        return { workspace, cwd: after.cwd };
-      }),
-    );
-    expect(result.workspace).toEqual({ cwd: "/tmp/pie-app" });
-    expect(result.cwd).toBeUndefined();
-  });
+  it.effect("workspaceFor backfills cwd without writing metadata", () =>
+    Effect.gen(function* () {
+      const result = yield* run({}, (fixture) =>
+        Effect.gen(function* () {
+          const { ref } = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+          });
+          const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+          const { cwd: _dropped, ...withoutCwd } = stored;
+          yield* fixture.repo.write(withoutCwd);
+          const workspace = yield* fixture.service.workspaceFor(ref);
+          const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+          return { workspace, cwd: after.cwd };
+        }),
+      );
+      assert.deepEqual(result.workspace, { cwd: "/tmp/pie-app" });
+      assert.equal(result.cwd, undefined);
+    }),
+  );
 });

@@ -1,17 +1,20 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
+import { useTheme } from "./theme-provider";
 
 declare global {
   interface ImportMetaEnv {
@@ -51,7 +54,9 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
+  const { theme } = useTheme();
   const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+  useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const [chatManager] = useState(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),
@@ -66,7 +71,7 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
          */}
-        <Toaster theme="system" />
+        <Toaster theme={theme} />
       </ChatManagerProvider>
     </QueryClientProvider>
   );
