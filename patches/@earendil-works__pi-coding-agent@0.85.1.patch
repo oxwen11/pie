@@ -1,21 +1,8 @@
-diff --git a/dist/core/extensions/loader.js b/dist/core/extensions/loader.js
-index e8e8859..105be3e 100644
---- a/dist/core/extensions/loader.js
-+++ b/dist/core/extensions/loader.js
-@@ -21,7 +21,7 @@ import * as _bundledTypeboxValue from "typebox/value";
- import { CONFIG_DIR_NAME, getAgentDir, isBunBinary, isBundledNode } from "../../config.js";
- // NOTE: This import works because loader.ts exports are NOT re-exported from index.ts,
- // avoiding a circular dependency. Extensions can import from @earendil-works/pi-coding-agent.
--import * as _bundledPiCodingAgent from "../../index.js";
-+import * as _bundledPiCodingAgent from "../sdk.js";
- import { resolvePath } from "../../utils/paths.js";
- import { createEventBus } from "../event-bus.js";
- import { execCommand } from "../exec.js";
 diff --git a/dist/index.js b/dist/index.js
-index 01017cd..aab94e5 100644
+index 01017cd..fe2674d 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -29,12 +29,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+@@ -29,10 +29,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
  // Tools
  export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
  export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
@@ -23,12 +10,10 @@ index 01017cd..aab94e5 100644
 -export { main } from "./main.js";
  // Run modes for programmatic SDK usage
 -export { InteractiveMode, RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
--// UI components for extensions
--export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
 +export { RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
+ // UI components for extensions
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
- export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, } from "./modes/interactive/theme/theme.js";
- // Clipboard utilities
 diff --git a/dist/modes/index.js b/dist/modes/index.js
 index 10528c3..0102883 100644
 --- a/dist/modes/index.js
