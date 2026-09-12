@@ -14,14 +14,12 @@ export type PairingMint = {
 
 export type PairingSession = {
   readonly token: string;
-  readonly environmentId: string;
 };
 
 export type PairingStore = {
   mint(): PairingMint;
   exchange(code: string): PairingSession | null;
   accepts(token: string | null): boolean;
-  readonly environmentId: string;
 };
 
 function randomCode(): string {
@@ -53,20 +51,19 @@ export function parsePairingExchange(raw: string): { code: string } | null {
 }
 
 /**
- * One-time pairing codes that mint a reload-stable session token. The daemon
- * token never leaves the operator machine; browsers keep only this session.
+ * One-time pairing codes that mint a session token. The daemon token never
+ * leaves the operator machine; browsers keep only this session.
+ *
+ * Tokens are process-lifetime: a browser reload still works while this process
+ * is up. A daemon restart drops every pairing session — they are not written
+ * next to `environment-id`.
  */
-export function createPairingStore(input: {
-  readonly environmentId: string;
-  readonly now?: () => number;
-}): PairingStore {
+export function createPairingStore(input: { readonly now?: () => number } = {}): PairingStore {
   const now = input.now ?? Date.now;
   const pending = new Map<string, number>();
   const sessions = new Set<string>();
-  const { environmentId } = input;
 
   return {
-    environmentId,
     mint() {
       const code = randomCode();
       const expiresAt = now() + PAIRING_CODE_TTL_MS;
@@ -81,7 +78,7 @@ export function createPairingStore(input: {
       if (expiresAt <= now()) return null;
       const token = crypto.randomBytes(SESSION_TOKEN_BYTES).toString("hex");
       sessions.add(token);
-      return { token, environmentId };
+      return { token };
     },
     accepts(token) {
       return token !== null && sessions.has(token);

@@ -107,3 +107,9 @@ export function createAppClients(server?: ServerConnection): AppClients {
 
   return { orpcClient, queryClient, orpcQueryUtils };
 }
+
+/** Drop cached queries for an environment that left the snapshot. */
+export function disposeAppClients(clients: AppClients): void {
+  void clients.queryClient.cancelQueries();
+  clients.queryClient.clear();
+}

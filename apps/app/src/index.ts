@@ -2,6 +2,7 @@ export { AppInterface } from "./app-interface";
 export type { ServerStatusFeed } from "./server-status";
 export { ServerStatusOverlay } from "./server-status-overlay";
 export type {
+  ConnectingSshHost,
   DiscoveredSshHost,
   EnvironmentFeed,
   EnvironmentSnapshot,

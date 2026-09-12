@@ -11,6 +11,7 @@ import {
   SshClientMissingError,
   sshCommandForPlatform,
   SshInvalidTargetError,
+  SshReadinessError,
   type DiscoveredSshHost,
   type SshClientAvailability,
   type SshConnectedEnvironment,
@@ -18,12 +19,26 @@ import {
   type SshHostDiscoveryError,
   type SshTarget,
 } from "@getpie/ssh";
-import { Context, Effect, FileSystem, Layer, Ref, Semaphore, type PlatformError } from "effect";
+import {
+  Context,
+  Data,
+  Effect,
+  FileSystem,
+  Layer,
+  Ref,
+  Semaphore,
+  type PlatformError,
+} from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { LoginShellEnvironment } from "../server/login-shell-environment";
 
-export { environmentLabel, formatSshInput, SshHostDiscoveryError } from "@getpie/ssh";
+export {
+  environmentLabel,
+  formatSshInput,
+  SshHostDiscoveryError,
+  SshReadinessError,
+} from "@getpie/ssh";
 export type {
   DiscoveredSshHost,
   SshClientAvailability,
@@ -32,6 +47,12 @@ export type {
 } from "@getpie/ssh";
 
 const SAVED_FILE_MODE = 0o600;
+const ENVIRONMENT_ID_TIMEOUT_MS = 8_000;
+
+export class SshPersistError extends Data.TaggedError("SshPersistError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 export type SavedSshEnvironment = {
   readonly id: string;
@@ -41,6 +62,7 @@ export type SavedSshEnvironment = {
 export type DesktopSshConnectResult = {
   readonly id: string;
   readonly target: SshTarget;
+  readonly environmentId: string;
   readonly connection: {
     readonly httpBaseUrl: string;
     readonly wsBaseUrl: string;
@@ -53,6 +75,7 @@ export type DesktopSshConnectResult = {
 type LiveSshSession = {
   readonly id: string;
   readonly target: SshTarget;
+  readonly environmentId: string;
   readonly connected: SshConnectedEnvironment;
 };
 
@@ -75,12 +98,16 @@ type SavedState = {
   readonly environments: readonly SavedSshEnvironment[];
 };
 
+type SshConnection = DesktopSshConnectResult["connection"];
+
 export type DesktopSshShape = {
   readonly client: SshClientAvailability;
   readonly listSaved: Effect.Effect<readonly SavedSshEnvironment[]>;
-  readonly connect: (raw: string) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError>;
+  readonly connect: (
+    raw: string,
+  ) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError | SshPersistError>;
   readonly disconnect: Effect.Effect<void>;
-  readonly remove: (id: string) => Effect.Effect<void>;
+  readonly remove: (id: string) => Effect.Effect<void, SshPersistError>;
   readonly discoverHosts: Effect.Effect<readonly DiscoveredSshHost[], SshHostDiscoveryError>;
 };
 
@@ -100,6 +127,35 @@ export function disabledDesktopSsh(overrides?: Partial<DesktopSshShape>): Deskto
     ...overrides,
   });
 }
+
+function parseEnvironmentId(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const id = (body as { id?: unknown }).id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
+const fetchEnvironmentId = (connection: SshConnection): Effect.Effect<string, SshReadinessError> =>
+  Effect.gen(function* () {
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const response = await fetch(`${connection.httpBaseUrl}/api/environment`, {
+          headers: { authorization: `Bearer ${connection.token}` },
+          signal: AbortSignal.timeout(ENVIRONMENT_ID_TIMEOUT_MS),
+        });
+        if (!response.ok) return undefined;
+        return parseEnvironmentId(await response.json());
+      },
+      catch: (cause) =>
+        new SshReadinessError({
+          message: `Remote pie daemon did not advertise an environment id at ${connection.httpBaseUrl}/api/environment.`,
+          cause,
+        }),
+    });
+    if (result !== undefined) return result;
+    return yield* new SshReadinessError({
+      message: `Remote pie daemon did not advertise an environment id at ${connection.httpBaseUrl}/api/environment.`,
+    });
+  });
 
 function parseEnvironments(value: unknown): SavedSshEnvironment[] {
   if (!Array.isArray(value)) return [];
@@ -195,6 +251,13 @@ const writeSaved = (
 export function makeDesktopSsh(input: {
   readonly persistPath: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly resolveInput?: (raw: string) => Effect.Effect<SshTarget, SshEnvironmentError>;
+  readonly connectEnvironment?: (
+    target: SshTarget,
+  ) => Effect.Effect<SshConnectedEnvironment, SshEnvironmentError>;
+  readonly loadEnvironmentId?: (
+    connection: SshConnection,
+  ) => Effect.Effect<string, SshReadinessError>;
 }): Effect.Effect<
   DesktopSsh["Service"],
   never,
@@ -209,15 +272,35 @@ export function makeDesktopSsh(input: {
     const persistGate = yield* Semaphore.make(1);
     const cli = { env: input.env };
     const client = yield* probeSshClient(cli);
+    const loadEnvironmentId = input.loadEnvironmentId ?? fetchEnvironmentId;
 
-    const persistEnvironments = (environments: readonly SavedSshEnvironment[]) =>
+    const modifySaved = (
+      mutate: (environments: readonly SavedSshEnvironment[]) => readonly SavedSshEnvironment[],
+    ) =>
       persistGate.withPermit(
-        writeSaved(filePath, { environments }).pipe(Effect.provide(platform), Effect.ignore),
+        Effect.gen(function* () {
+          const saved = yield* readSaved(filePath);
+          yield* writeSaved(filePath, { environments: mutate(saved.environments) }).pipe(
+            Effect.tapError(() =>
+              Effect.logError("ssh.environments.persist.failed").pipe(
+                Effect.annotateLogs({ path: filePath }),
+              ),
+            ),
+            Effect.mapError(
+              (error) =>
+                new SshPersistError({
+                  message: `Failed to persist SSH environments to ${filePath}.`,
+                  cause: error,
+                }),
+            ),
+          );
+        }).pipe(Effect.provide(platform)),
       );
 
     const resultFromLive = (live: LiveSshSession): DesktopSshConnectResult => ({
       id: live.id,
       target: live.target,
+      environmentId: live.environmentId,
       connection: {
         httpBaseUrl: live.connected.httpBaseUrl,
         wsBaseUrl: live.connected.wsBaseUrl,
@@ -259,25 +342,37 @@ export function makeDesktopSsh(input: {
       ),
       connect: (raw) =>
         Effect.gen(function* () {
-          if (!client.available) {
+          const missingMessage = client.available ? undefined : client.message;
+          if (missingMessage !== undefined && input.connectEnvironment === undefined) {
             return yield* new SshClientMissingError({
               command: sshCommandForPlatform(),
-              message: client.message,
+              message: missingMessage,
             });
           }
-          const target = yield* resolveSshInput(raw, cli);
+          const target = yield* input.resolveInput?.(raw) ?? resolveSshInput(raw, cli);
           const id = remoteStateKey(target);
           const existing = yield* Ref.get(liveRef).pipe(Effect.map((lives) => lives.get(id)));
           if (existing !== undefined) {
             return resultFromLive(existing);
           }
 
-          const connected = yield* connectSshEnvironment(target, cli);
-          yield* adoptLive({ id, target, connected });
+          const connected = yield* (
+            input.connectEnvironment?.(target) ?? connectSshEnvironment(target, cli)
+          );
+          const connection = {
+            httpBaseUrl: connected.httpBaseUrl,
+            wsBaseUrl: connected.wsBaseUrl,
+            token: connected.token,
+          };
+          const environmentId = yield* loadEnvironmentId(connection).pipe(
+            Effect.tapError(() => connected.close),
+          );
+          yield* modifySaved((environments) => [
+            ...environments.filter((entry) => entry.id !== id),
+            { id, target },
+          ]).pipe(Effect.tapError(() => connected.close));
 
-          const saved = yield* readSaved(filePath).pipe(Effect.provide(platform));
-          const next = [...saved.environments.filter((entry) => entry.id !== id), { id, target }];
-          yield* persistEnvironments(next);
+          yield* adoptLive({ id, target, environmentId, connected });
 
           yield* Effect.log("ssh.environment.connected").pipe(
             Effect.annotateLogs({
@@ -288,11 +383,12 @@ export function makeDesktopSsh(input: {
             }),
           );
 
-          return resultFromLive({ id, target, connected });
+          return resultFromLive({ id, target, environmentId, connected });
         }).pipe(Effect.provide(platform)),
       disconnect: disconnectAll,
       remove: (id) =>
         Effect.gen(function* () {
+          yield* modifySaved((environments) => environments.filter((entry) => entry.id !== id));
           const current = yield* Ref.modify(liveRef, (lives) => {
             const live = lives.get(id);
             if (live === undefined) return [undefined, lives];
@@ -303,8 +399,6 @@ export function makeDesktopSsh(input: {
           if (current !== undefined) {
             yield* closeSession(current);
           }
-          const saved = yield* readSaved(filePath).pipe(Effect.provide(platform));
-          yield* persistEnvironments(saved.environments.filter((entry) => entry.id !== id));
         }).pipe(Effect.provide(platform)),
       discoverHosts: discoverSshHosts().pipe(Effect.provide(platform)),
     });

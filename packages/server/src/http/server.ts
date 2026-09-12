@@ -250,10 +250,9 @@ const buildServer = (
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
     const tickets = createTicketStore();
+    const resolvedEnvironmentId = environmentId ?? crypto.randomUUID();
     const pairing: PairingStore | undefined =
-      authToken === undefined
-        ? undefined
-        : createPairingStore({ environmentId: environmentId ?? crypto.randomUUID() });
+      authToken === undefined ? undefined : createPairingStore();
 
     const ui = yield* Effect.promise(() => stages.createUI(rpcRuntime));
 
@@ -266,7 +265,16 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, pairing, shutdown, ui }),
+        makeRequestApp({
+          authToken,
+          corsOrigins,
+          allowedHosts,
+          tickets,
+          pairing,
+          environmentId: resolvedEnvironmentId,
+          shutdown,
+          ui,
+        }),
         requestScope,
       ),
     );

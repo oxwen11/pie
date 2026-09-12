@@ -66,7 +66,6 @@ function makeHarness(
     server,
     ssh: disabledDesktopSsh(),
     tailscale: disabledDesktopTailscale(),
-    initialRemotes: [],
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -124,7 +123,7 @@ describe("Desktop MessagePort RPC", () => {
         tailscaleClient: { available: true },
         environments: {
           revision: 0,
-          connectingLabel: null,
+          connecting: [],
           remotes: [],
         },
       });

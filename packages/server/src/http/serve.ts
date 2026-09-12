@@ -77,7 +77,9 @@ export const serveFlags = {
     Flag.optional,
   ),
   host: Flag.string("host").pipe(
-    Flag.withDescription("Address to bind (default 127.0.0.1; 0.0.0.0 for LAN)"),
+    Flag.withDescription(
+      "bind this address (default 127.0.0.1; a LAN IP is auto-allowlisted as Host/Origin; 0.0.0.0 still needs --allowed-host)",
+    ),
     Flag.optional,
   ),
   corsOrigin: Flag.string("cors-origin").pipe(
@@ -166,7 +168,9 @@ const serveWith = (input: ServeInput) =>
     const authToken = takeAuthToken();
     const { port: requestedPort, host, corsOrigins, allowedHosts } = resolveServeConfig(input);
     const paths = yield* Paths;
-    const environmentId = yield* loadOrCreateEnvironmentId(paths.home);
+    const environmentId = yield* loadOrCreateEnvironmentId(paths.home).pipe(
+      Effect.mapError((cause) => new ServerStartupError({ phase: "create", cause })),
+    );
 
     // The first line of every run, and the one that dates the file. It also
     // records the shape of the run — auth on or off, which origins are allowed

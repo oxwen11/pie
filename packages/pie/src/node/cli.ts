@@ -146,6 +146,9 @@ const relayAttachFlags = {
   to: Flag.string("to").pipe(
     Flag.withDescription("Public relay host:port (e.g. 96.44.165.19:8443)"),
   ),
+  control: Flag.string("control").pipe(
+    Flag.withDescription("Control host:port printed by pie relay listen"),
+  ),
   local: Flag.string("local").pipe(
     Flag.withDescription("Foreground pie serve host:port instead of the running daemon"),
     Flag.optional,
@@ -157,6 +160,7 @@ const relayAttach = Command.make("attach", relayAttachFlags, (input) =>
     const token = takeRelayToken();
     const hop = parseHostPort(input.to);
     relayPublicBaseUrl({ host: hop.host, port: hop.port });
+    const control = parseHostPort(input.control);
     const localFlag = Option.getOrUndefined(input.local);
     let localHost: string;
     let localPort: number;
@@ -176,14 +180,14 @@ const relayAttach = Command.make("attach", relayAttachFlags, (input) =>
     }
     const handle = yield* Effect.tryPromise(() =>
       attachRelay({
-        relayHost: hop.host,
-        relayPort: hop.port + 1,
+        relayHost: control.host,
+        relayPort: control.port,
         token,
         localHost,
         localPort,
       }),
     );
-    console.log(`pie relay attached to ${input.to}`);
+    console.log(`pie relay attached to ${input.to} via ${input.control}`);
     yield* Effect.addFinalizer(() => Effect.promise(() => handle.close()));
     return yield* Effect.never;
   }),
@@ -191,7 +195,9 @@ const relayAttach = Command.make("attach", relayAttachFlags, (input) =>
 
 const relay = Command.make("relay", {}, () =>
   Effect.sync(() => {
-    console.error("usage: pie relay listen | pie relay attach [--local host:port]");
+    console.error(
+      "usage: pie relay listen | pie relay attach --to host:port --control host:port [--local host:port]",
+    );
   }),
 ).pipe(
   Command.withDescription("Public reverse-tunnel hop for daemons without inbound ports"),

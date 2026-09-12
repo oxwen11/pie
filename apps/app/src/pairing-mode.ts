@@ -7,14 +7,6 @@ export type PairingAccess =
   | { readonly kind: "session"; readonly session: StoredPairingSession }
   | { readonly kind: "pair" };
 
-/**
- * Pairing routes exist only when the daemon has an auth token. A 404 means
- * unauthenticated `pie serve` (Vite :4190) — the SPA must load without a gate.
- */
-export function pairingModeFromStatus(status: number): PairingMode {
-  return status === 404 ? "open" : "required";
-}
-
 export function resolvePairingAccess(
   mode: PairingMode,
   stored: StoredPairingSession | null,
@@ -24,14 +16,14 @@ export function resolvePairingAccess(
   return { kind: "pair" };
 }
 
+/**
+ * GET /api/environment answers without a pairing side effect: 200 is
+ * unauthenticated `pie serve`, 401 means the daemon has a token.
+ */
 export async function probePairingMode(fetchImpl: typeof fetch = fetch): Promise<PairingMode> {
   try {
-    const response = await fetchImpl("/api/pairing/exchange", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: "probe" }),
-    });
-    return pairingModeFromStatus(response.status);
+    const response = await fetchImpl("/api/environment");
+    return response.status === 200 ? "open" : "required";
   } catch {
     return "open";
   }

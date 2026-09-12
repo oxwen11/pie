@@ -35,9 +35,15 @@ export const SshRemoteEnvironmentSchema = Schema.Struct({
 });
 export type SshRemoteEnvironment = typeof SshRemoteEnvironmentSchema.Type;
 
+export const ConnectingSshHostSchema = Schema.Struct({
+  target: Schema.NonEmptyString,
+  blocking: Schema.Boolean,
+});
+export type ConnectingSshHost = typeof ConnectingSshHostSchema.Type;
+
 export const EnvironmentSnapshotSchema = Schema.Struct({
   revision: Schema.Natural,
-  connectingLabel: Schema.NullOr(Schema.String),
+  connecting: Schema.Array(ConnectingSshHostSchema),
   remotes: Schema.Array(SshRemoteEnvironmentSchema),
 });
 export type EnvironmentSnapshot = typeof EnvironmentSnapshotSchema.Type;

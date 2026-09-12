@@ -1,6 +1,7 @@
 import net from "node:net";
 
 import {
+  pipeSockets,
   RELAY_CONTROL_PREFIX,
   RELAY_DATA_PREFIX,
   RELAY_OPEN_PREFIX,
@@ -10,22 +11,6 @@ import {
 export type RelayAttachHandle = {
   readonly close: () => Promise<void>;
 };
-
-function pipeSockets(left: net.Socket, right: net.Socket): void {
-  const forward = (from: net.Socket, to: net.Socket) => {
-    from.on("data", (chunk: Buffer) => {
-      if (!to.destroyed) to.write(chunk);
-    });
-    from.on("end", () => {
-      if (!to.destroyed) to.end();
-    });
-    from.on("error", () => to.destroy());
-    from.on("close", () => to.destroy());
-    from.resume();
-  };
-  forward(left, right);
-  forward(right, left);
-}
 
 function connectTcp(host: string, port: number): Promise<net.Socket> {
   return new Promise((resolve, reject) => {

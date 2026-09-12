@@ -1,4 +1,4 @@
-import { Effect, Option, Stream, SubscriptionRef } from "effect";
+import { Deferred, Effect, Option, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
@@ -69,7 +69,7 @@ describe("DesktopApplication", () => {
       tailscaleClient: { available: true },
       environments: {
         revision: 0,
-        connectingLabel: null,
+        connecting: [],
         remotes: [],
       },
     });
@@ -139,6 +139,7 @@ describe("DesktopApplication", () => {
               username: "alice",
               port: null,
             },
+            environmentId: "env-ssh-1",
             connection: sshConnection,
             closed: Effect.never,
           }),
@@ -150,7 +151,7 @@ describe("DesktopApplication", () => {
       localConnection,
     );
     await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
-      connectingLabel: null,
+      connecting: [],
       remotes: [
         {
           id: "remote-1",
@@ -277,6 +278,7 @@ describe("DesktopApplication", () => {
                 username: "alice",
                 port: null,
               },
+              environmentId: "env-ssh-restored",
               connection: restored,
               closed: Effect.never,
             };
@@ -315,6 +317,7 @@ describe("DesktopApplication", () => {
                     username: "bob",
                     port: null,
                   },
+                  environmentId: "env-ssh-2",
                   connection: other,
                   closed: Effect.never,
                 }
@@ -326,6 +329,7 @@ describe("DesktopApplication", () => {
                     username: "alice",
                     port: null,
                   },
+                  environmentId: "env-ssh-1",
                   connection: sshConnection,
                   closed: Effect.never,
                 },
@@ -343,8 +347,180 @@ describe("DesktopApplication", () => {
     });
     const snapshot = await Effect.runPromise(h.application.environmentSnapshot);
     expect(snapshot.remotes.map((remote) => remote.environmentId)).toEqual([
-      "remote-1",
-      "remote-2",
+      "env-ssh-1",
+      "env-ssh-2",
     ]);
+  });
+
+  it("tracks parallel SSH connects independently", async () => {
+    const first = Effect.runSync(Deferred.make<void>());
+    const second = Effect.runSync(Deferred.make<void>());
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: (raw) =>
+          Effect.gen(function* () {
+            yield* Deferred.await(raw.includes("bob") ? second : first);
+            return raw.includes("bob")
+              ? {
+                  id: "remote-2",
+                  target: {
+                    alias: "other.example",
+                    hostname: "other.example",
+                    username: "bob",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-2",
+                  connection: {
+                    httpBaseUrl: "http://127.0.0.1:61234",
+                    wsBaseUrl: "ws://127.0.0.1:61234",
+                    token: "ssh-token-2",
+                  },
+                  closed: Effect.never,
+                }
+              : {
+                  id: "remote-1",
+                  target: {
+                    alias: "example.com",
+                    hostname: "example.com",
+                    username: "alice",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-1",
+                  connection: sshConnection,
+                  closed: Effect.never,
+                };
+          }),
+      }),
+    );
+
+    const pendingFirst = Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    const pendingSecond = Effect.runPromise(
+      h.application.connectSsh("bob@other.example", { background: true }),
+    );
+    const bothConnecting = await Effect.runPromise(
+      h.application.watchEnvironments(0).pipe(
+        Stream.filter((snapshot) => snapshot.connecting.length === 2),
+        Stream.runHead,
+      ),
+    );
+    expect(Option.getOrUndefined(bothConnecting)?.connecting).toEqual([
+      { target: "alice@example.com", blocking: true },
+      { target: "bob@other.example", blocking: false },
+    ]);
+
+    await Effect.runPromise(Deferred.succeed(first, undefined));
+    await pendingFirst;
+    const afterFirst = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(afterFirst.connecting).toEqual([{ target: "bob@other.example", blocking: false }]);
+    expect(afterFirst.remotes.map((remote) => remote.id)).toEqual(["remote-1"]);
+
+    await Effect.runPromise(Deferred.succeed(second, undefined));
+    await pendingSecond;
+    const afterSecond = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(afterSecond.connecting).toEqual([]);
+    expect(afterSecond.remotes.map((remote) => remote.id)).toEqual(["remote-1", "remote-2"]);
+  });
+
+  it("drops a remote when its local forward closes", async () => {
+    const closed = Effect.runSync(Deferred.make<void>());
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: () =>
+          Effect.succeed({
+            id: "remote-1",
+            target: {
+              alias: "example.com",
+              hostname: "example.com",
+              username: "alice",
+              port: null,
+            },
+            environmentId: "env-ssh-1",
+            connection: sshConnection,
+            closed: Deferred.await(closed),
+          }),
+      }),
+    );
+
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    const connected = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(connected.remotes.map((remote) => remote.id)).toEqual(["remote-1"]);
+
+    const pending = Effect.runPromise(
+      h.application.watchEnvironments(connected.revision).pipe(Stream.runHead),
+    );
+    await Effect.runPromise(Deferred.succeed(closed, undefined));
+    const afterClose = Option.getOrUndefined(await pending);
+    expect(afterClose?.remotes).toEqual([]);
+  });
+
+  it("keeps a replacement remote when an older forward for the same id closes", async () => {
+    const firstClosed = Effect.runSync(Deferred.make<void>());
+    const firstConnection: ServerConnection = {
+      httpBaseUrl: "http://127.0.0.1:51234",
+      wsBaseUrl: "ws://127.0.0.1:51234",
+      token: "ssh-token-old",
+    };
+    const secondConnection: ServerConnection = {
+      httpBaseUrl: "http://127.0.0.1:51235",
+      wsBaseUrl: "ws://127.0.0.1:51235",
+      token: "ssh-token-new",
+    };
+    let connects = 0;
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: () =>
+          Effect.sync(() => {
+            connects += 1;
+            return connects === 1
+              ? {
+                  id: "remote-1",
+                  target: {
+                    alias: "example.com",
+                    hostname: "example.com",
+                    username: "alice",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-1",
+                  connection: firstConnection,
+                  closed: Deferred.await(firstClosed),
+                }
+              : {
+                  id: "remote-1",
+                  target: {
+                    alias: "example.com",
+                    hostname: "example.com",
+                    username: "alice",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-1",
+                  connection: secondConnection,
+                  closed: Effect.never,
+                };
+          }),
+      }),
+    );
+
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    const replaced = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(replaced.remotes).toHaveLength(1);
+    expect(replaced.remotes[0]?.connection).toEqual(secondConnection);
+
+    const pending = Effect.runPromise(
+      h.application.watchEnvironments(replaced.revision).pipe(Stream.runHead),
+    );
+    await Effect.runPromise(Deferred.succeed(firstClosed, undefined));
+    await expect(
+      Promise.race([
+        pending.then(() => "emitted"),
+        Effect.runPromise(Effect.sleep("50 millis")).then(() => "quiet"),
+      ]),
+    ).resolves.toBe("quiet");
+    const stillLive = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(stillLive.remotes).toHaveLength(1);
+    expect(stillLive.remotes[0]?.connection).toEqual(secondConnection);
   });
 });

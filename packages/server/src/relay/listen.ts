@@ -2,6 +2,7 @@ import net from "node:net";
 import type { AddressInfo } from "node:net";
 
 import {
+  pipeSockets,
   RELAY_CONTROL_PREFIX,
   RELAY_DATA_PREFIX,
   RELAY_OPEN_PREFIX,
@@ -17,13 +18,18 @@ export type RelayListenHandle = {
 };
 
 const FIRST_LINE_LIMIT = 1024;
+const DEFAULT_WAITING_TIMEOUT_MS = 10_000;
 
 function listenTcp(port: number, host: string): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once("error", reject);
+    const onError = (error: Error) => {
+      server.close();
+      reject(error);
+    };
+    server.once("error", onError);
     server.listen(port, host, () => {
-      server.off("error", reject);
+      server.off("error", onError);
       resolve(server);
     });
   });
@@ -70,27 +76,16 @@ function readFirstLine(socket: net.Socket): Promise<string> {
   });
 }
 
-function pipeSockets(left: net.Socket, right: net.Socket): void {
-  const forward = (from: net.Socket, to: net.Socket) => {
-    from.on("data", (chunk: Buffer) => {
-      if (!to.destroyed) to.write(chunk);
-    });
-    from.on("end", () => {
-      if (!to.destroyed) to.end();
-    });
-    from.on("error", () => to.destroy());
-    from.on("close", () => to.destroy());
-    from.resume();
-  };
-  forward(left, right);
-  forward(right, left);
-}
-
 function closeServer(server: net.Server): Promise<void> {
   return new Promise((resolve) => {
     server.close(() => resolve());
   });
 }
+
+type WaitingClient = {
+  readonly socket: net.Socket;
+  readonly timer: ReturnType<typeof setTimeout>;
+};
 
 export async function listenRelay(input: {
   readonly port: number;
@@ -98,14 +93,20 @@ export async function listenRelay(input: {
   readonly publicHost: string;
   readonly host?: string;
   readonly controlPort?: number;
+  readonly waitingTimeoutMs?: number;
 }): Promise<RelayListenHandle> {
   const bindHost = input.host ?? "0.0.0.0";
-  const waiting = new Map<string, net.Socket>();
+  const waitingTimeoutMs = input.waitingTimeoutMs ?? DEFAULT_WAITING_TIMEOUT_MS;
+  const waiting = new Map<string, WaitingClient>();
   let control: net.Socket | undefined;
   let nextStream = 1;
 
   const dropClient = (streamId: string, socket: net.Socket) => {
-    if (waiting.get(streamId) === socket) waiting.delete(streamId);
+    const pending = waiting.get(streamId);
+    if (pending !== undefined && pending.socket === socket) {
+      clearTimeout(pending.timer);
+      waiting.delete(streamId);
+    }
     socket.destroy();
   };
 
@@ -114,12 +115,21 @@ export async function listenRelay(input: {
       control.destroy();
       control = undefined;
     }
-    for (const socket of waiting.values()) socket.destroy();
+    for (const pending of waiting.values()) {
+      clearTimeout(pending.timer);
+      pending.socket.destroy();
+    }
     waiting.clear();
   };
 
   const publicServer = await listenTcp(input.port, bindHost);
-  const controlServer = await listenTcp(input.controlPort ?? 0, bindHost);
+  let controlServer: net.Server;
+  try {
+    controlServer = await listenTcp(input.controlPort ?? 0, bindHost);
+  } catch (error) {
+    await closeServer(publicServer);
+    throw error;
+  }
 
   publicServer.on("connection", (socket) => {
     socket.pause();
@@ -130,7 +140,8 @@ export async function listenRelay(input: {
     }
     const streamId = String(nextStream);
     nextStream += 1;
-    waiting.set(streamId, socket);
+    const timer = setTimeout(() => dropClient(streamId, socket), waitingTimeoutMs);
+    waiting.set(streamId, { socket, timer });
     socket.on("close", () => dropClient(streamId, socket));
     socket.on("error", () => dropClient(streamId, socket));
     control.setNoDelay(true);
@@ -170,14 +181,15 @@ export async function listenRelay(input: {
           socket.destroy();
           return;
         }
-        const client = waiting.get(streamId);
-        if (client === undefined) {
+        const pending = waiting.get(streamId);
+        if (pending === undefined) {
           socket.destroy();
           return;
         }
         waiting.delete(streamId);
+        clearTimeout(pending.timer);
         socket.write(`${RELAY_READY}\n`);
-        setImmediate(() => pipeSockets(client, socket));
+        setImmediate(() => pipeSockets(pending.socket, socket));
       })
       .catch(() => {
         socket.destroy();
