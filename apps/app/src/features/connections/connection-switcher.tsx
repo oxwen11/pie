@@ -1,5 +1,6 @@
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
+import { Spinner } from "@getpie/ui/components/spinner";
 import { Laptop, Plus, Server, Share2 } from "lucide-react";
 import { useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ import { usePlatform } from "@/platform-context";
 
 const MISSING_SNAPSHOT: EnvironmentSnapshot = {
   revision: 0,
-  connectingLabel: null,
+  connecting: [],
   remotes: [],
 };
 
@@ -22,6 +23,18 @@ type PendingDialog = "add" | "share";
 
 function sshErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function connectionsLabel(snapshot: EnvironmentSnapshot): string {
+  const [only] = snapshot.connecting;
+  if (only !== undefined && snapshot.connecting.length === 1) {
+    return `Connecting ${only.target}…`;
+  }
+  if (snapshot.connecting.length > 1) {
+    return `Connecting ${String(snapshot.connecting.length)} hosts…`;
+  }
+  if (snapshot.remotes.length === 0) return "Connections";
+  return `${String(snapshot.remotes.length)} connected`;
 }
 
 export function ConnectionSwitcher(): ReactElement | null {
@@ -37,11 +50,7 @@ export function ConnectionSwitcher(): ReactElement | null {
   if (!ssh) return null;
 
   const launch = ssh.client;
-  const connecting = environments.connectingLabel !== null;
-  const label =
-    environments.remotes.length === 0
-      ? "Connections"
-      : `${String(environments.remotes.length)} connected`;
+  const blocking = environments.connecting.some((entry) => entry.blocking);
 
   return (
     <>
@@ -72,21 +81,29 @@ export function ConnectionSwitcher(): ReactElement | null {
               }, 0);
             }}
           >
-            <MenuTrigger disabled={connecting} render={<SidebarMenuButton />}>
+            <MenuTrigger render={<SidebarMenuButton />}>
               <Laptop />
-              <span>{environments.connectingLabel ?? label}</span>
+              <span>{connectionsLabel(environments)}</span>
             </MenuTrigger>
             <MenuPopup align="start" className="min-w-56">
+              {environments.connecting.map((entry, index) => (
+                <MenuItem disabled key={`connecting-${entry.target}-${String(index)}`}>
+                  <Spinner />
+                  <span>Connecting {entry.target}…</span>
+                </MenuItem>
+              ))}
               {environments.remotes.map((remote) => (
                 <MenuItem disabled key={remote.id}>
                   <Server />
                   <span>{remote.label}</span>
                 </MenuItem>
               ))}
-              {environments.remotes.length > 0 ? <MenuSeparator /> : null}
+              {environments.remotes.length > 0 || environments.connecting.length > 0 ? (
+                <MenuSeparator />
+              ) : null}
               {launch.available ? (
                 <MenuItem
-                  disabled={connecting}
+                  disabled={blocking}
                   onClick={() => {
                     pendingDialog.current = "add";
                   }}
@@ -101,7 +118,7 @@ export function ConnectionSwitcher(): ReactElement | null {
               )}
               {tailscale === undefined ? null : tailscale.client.available ? (
                 <MenuItem
-                  disabled={connecting}
+                  disabled={blocking}
                   onClick={() => {
                     pendingDialog.current = "share";
                   }}
@@ -116,7 +133,7 @@ export function ConnectionSwitcher(): ReactElement | null {
               )}
               {environments.remotes.map((remote) => (
                 <MenuItem
-                  disabled={connecting}
+                  disabled={blocking}
                   key={`remove-${remote.id}`}
                   variant="destructive"
                   onClick={() => {

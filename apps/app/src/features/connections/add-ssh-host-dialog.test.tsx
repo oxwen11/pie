@@ -14,7 +14,7 @@ let container: HTMLDivElement | undefined;
 
 const hangingSnapshot = {
   revision: 0,
-  connectingLabel: null,
+  connecting: [],
   remotes: [],
 } as const;
 

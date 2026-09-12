@@ -3,7 +3,6 @@ import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
-import url from "node:url";
 
 import { attachRelay } from "@getpie/server/relay";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,7 +32,7 @@ async function waitForListening(child: childProcess.ChildProcess): Promise<strin
     const onData = (data: Buffer) => {
       chunks.push(data);
       const text = Buffer.concat(chunks).toString("utf8");
-      if (text.includes("pie relay listening on ")) {
+      if (text.includes("pie relay listening on ") && text.includes("pie relay control on ")) {
         clearTimeout(timer);
         child.stdout?.off("data", onData);
         child.off("exit", onExit);
@@ -107,10 +106,13 @@ describe("pie-relay binary", () => {
     const started = await waitForListening(child);
     expect(started).toContain(`http://96.44.165.19:${String(port)}`);
     expect(started).not.toMatch(/100\.|ts\.net|192\.168\.31/);
+    const controlMatch = started.match(/pie relay control on \S+:(\d+)/);
+    expect(controlMatch?.[1]).toEqual(expect.any(String));
+    const controlPort = Number(controlMatch?.[1]);
 
     const attach = await attachRelay({
       relayHost: "127.0.0.1",
-      relayPort: port + 1,
+      relayPort: controlPort,
       token,
       localHost: "127.0.0.1",
       localPort: backendPort,

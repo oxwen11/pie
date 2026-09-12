@@ -1,6 +1,7 @@
 import { Context, Effect, Stream, SubscriptionRef } from "effect";
 
 import type {
+  ConnectingSshHost,
   DesktopBootstrap,
   DesktopOs,
   DiscoveredSshHost,
@@ -16,6 +17,7 @@ import {
   formatSshInput,
   type DesktopSsh,
   type SshEnvironmentError,
+  type SshPersistError,
 } from "../ssh/desktop-ssh";
 import {
   portFromHttpBaseUrl,
@@ -41,8 +43,11 @@ export class DesktopApplication extends Context.Service<
     readonly retryServer: Effect.Effect<void>;
     readonly environmentSnapshot: Effect.Effect<EnvironmentSnapshot>;
     readonly watchEnvironments: (after: number) => Stream.Stream<EnvironmentSnapshot>;
-    readonly connectSsh: (target: string) => Effect.Effect<void, SshEnvironmentError>;
-    readonly removeSsh: (id: string) => Effect.Effect<void>;
+    readonly connectSsh: (
+      target: string,
+      options?: { readonly background?: boolean },
+    ) => Effect.Effect<void, SshEnvironmentError | SshPersistError>;
+    readonly removeSsh: (id: string) => Effect.Effect<void, SshPersistError>;
     readonly discoverSshHosts: Effect.Effect<readonly DiscoveredSshHost[]>;
     readonly tailscaleSnapshot: Effect.Effect<TailscaleSnapshot>;
     readonly enableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
@@ -58,34 +63,12 @@ export type DesktopApplicationDependencies = {
   readonly quit: Effect.Effect<void>;
 };
 
-async function fetchEnvironmentId(connection: ServerConnection): Promise<string | undefined> {
-  try {
-    const response = await fetch(`${connection.httpBaseUrl}/api/environment`, {
-      headers: { authorization: `Bearer ${connection.token}` },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) return undefined;
-    const body = (await response.json()) as { id?: unknown };
-    return typeof body.id === "string" && body.id.length > 0 ? body.id : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function emptySnapshot(): EnvironmentSnapshot {
   return {
     revision: 0,
-    connectingLabel: null,
+    connecting: [],
     remotes: [],
   };
-}
-
-function upsertRemote(
-  remotes: readonly SshRemoteEnvironment[],
-  next: SshRemoteEnvironment,
-): SshRemoteEnvironment[] {
-  const without = remotes.filter((remote) => remote.id !== next.id);
-  return [...without, next];
 }
 
 export function makeDesktopApplication({
@@ -106,34 +89,50 @@ export function makeDesktopApplication({
       revision: current.revision + 1,
     }));
 
-  const connectSsh = (target: string) =>
+  const dropRemoteIfCurrent = (remote: SshRemoteEnvironment) =>
+    SubscriptionRef.updateAndGet(environmentsRef, (current) => {
+      const existing = current.remotes.find((entry) => entry.id === remote.id);
+      if (existing === undefined || existing.connection !== remote.connection) {
+        return current;
+      }
+      return {
+        connecting: current.connecting,
+        remotes: current.remotes.filter((entry) => entry.id !== remote.id),
+        revision: current.revision + 1,
+      };
+    });
+
+  const connectSsh = (target: string, options?: { readonly background?: boolean }) =>
     Effect.gen(function* () {
       const trimmed = target.trim();
-      yield* updateEnvironments((current) => ({
-        connectingLabel: trimmed,
+      const entry: ConnectingSshHost = {
+        target: trimmed,
+        blocking: options?.background !== true,
+      };
+      const clearConnecting = updateEnvironments((current) => ({
+        connecting: current.connecting.filter((item) => item !== entry),
         remotes: current.remotes,
       }));
-      const result = yield* ssh.connect(trimmed).pipe(
-        Effect.tapError(() =>
-          updateEnvironments((current) => ({
-            connectingLabel: null,
-            remotes: current.remotes,
-          })),
-        ),
-      );
-      const environmentId = yield* Effect.promise(() =>
-        fetchEnvironmentId(result.connection).then((id) => id ?? result.id),
-      );
       yield* updateEnvironments((current) => ({
-        connectingLabel: null,
-        remotes: upsertRemote(current.remotes, {
-          id: result.id,
-          environmentId,
-          label: environmentLabel(result.target),
-          alias: formatSshInput(result.target),
-          connection: result.connection,
-        }),
+        connecting: [...current.connecting, entry],
+        remotes: current.remotes,
       }));
+      const result = yield* ssh.connect(trimmed).pipe(Effect.tapError(() => clearConnecting));
+      const remote: SshRemoteEnvironment = {
+        id: result.id,
+        environmentId: result.environmentId,
+        label: environmentLabel(result.target),
+        alias: formatSshInput(result.target),
+        connection: result.connection,
+      };
+      yield* updateEnvironments((current) => ({
+        connecting: current.connecting.filter((item) => item !== entry),
+        remotes: [...current.remotes.filter((item) => item.id !== remote.id), remote],
+      }));
+      yield* result.closed.pipe(
+        Effect.andThen(() => dropRemoteIfCurrent(remote)),
+        Effect.forkDetach,
+      );
     });
 
   return {
@@ -163,7 +162,7 @@ export function makeDesktopApplication({
       Effect.gen(function* () {
         yield* ssh.remove(id);
         yield* updateEnvironments((current) => ({
-          connectingLabel: null,
+          connecting: current.connecting,
           remotes: current.remotes.filter((remote) => remote.id !== id),
         }));
       }),

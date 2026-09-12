@@ -30,7 +30,7 @@ export const DesktopApplicationLive = Layer.effect(
       }),
     });
     for (const remote of savedRemotes) {
-      yield* application.connectSsh(formatSshInput(remote.target)).pipe(
+      yield* application.connectSsh(formatSshInput(remote.target), { background: true }).pipe(
         Effect.catch(() => Effect.void),
         Effect.forkScoped,
       );

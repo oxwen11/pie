@@ -22,8 +22,10 @@ export type RequestAppOptions = {
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
   readonly tickets: TicketStore;
-  /** Pairing codes → reload-stable session tokens. Unset when auth is off. */
+  /** Pairing codes → process-lifetime session tokens. Unset when auth is off. */
   readonly pairing: PairingStore | undefined;
+  /** Stable daemon Environment id. Returned by GET /api/environment. */
+  readonly environmentId: string;
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
   readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
@@ -163,7 +165,12 @@ const route = (
       if (body === null) return withCors(badRequest);
       const session = options.pairing.exchange(body.code);
       if (session === null) return withCors(unauthorized);
-      return withCors(HttpServerResponse.jsonUnsafe(session));
+      return withCors(
+        HttpServerResponse.jsonUnsafe({
+          token: session.token,
+          environmentId: options.environmentId,
+        }),
+      );
     }
 
     if (
@@ -222,12 +229,8 @@ const route = (
       return withCors(HttpServerResponse.jsonUnsafe({ ticket: options.tickets.issue() }));
     }
 
-    if (
-      options.pairing !== undefined &&
-      request.method === "GET" &&
-      pathname === "/api/environment"
-    ) {
-      return withCors(HttpServerResponse.jsonUnsafe({ id: options.pairing.environmentId }));
+    if (request.method === "GET" && pathname === "/api/environment") {
+      return withCors(HttpServerResponse.jsonUnsafe({ id: options.environmentId }));
     }
 
     if (pathname.startsWith("/api/")) {

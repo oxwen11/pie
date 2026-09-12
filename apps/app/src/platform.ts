@@ -13,9 +13,14 @@ export type SshRemoteEnvironment = {
   };
 };
 
+export type ConnectingSshHost = {
+  readonly target: string;
+  readonly blocking: boolean;
+};
+
 export type EnvironmentSnapshot = {
   readonly revision: number;
-  readonly connectingLabel: string | null;
+  readonly connecting: readonly ConnectingSshHost[];
   readonly remotes: readonly SshRemoteEnvironment[];
 };
 

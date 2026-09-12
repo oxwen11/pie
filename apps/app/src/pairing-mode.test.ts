@@ -1,17 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pairingModeFromStatus, probePairingMode, resolvePairingAccess } from "./pairing-mode";
-
-describe("pairingModeFromStatus", () => {
-  it("treats 404 as unauthenticated serve — no pairing routes", () => {
-    expect(pairingModeFromStatus(404)).toBe("open");
-  });
-
-  it("requires pairing when mint/exchange exist", () => {
-    expect(pairingModeFromStatus(400)).toBe("required");
-    expect(pairingModeFromStatus(401)).toBe("required");
-  });
-});
+import { probePairingMode, resolvePairingAccess } from "./pairing-mode";
 
 describe("resolvePairingAccess", () => {
   const stored = { token: "session-token", environmentId: "env-1" };
@@ -31,27 +20,21 @@ describe("resolvePairingAccess", () => {
 });
 
 describe("probePairingMode", () => {
-  it("POSTs /api/pairing/exchange and follows the shipped 404-vs-pairing statuses", async () => {
-    const calls: Array<{ url: string; method: string; body: string }> = [];
+  it("treats GET /api/environment 200 as unauthenticated serve", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      const body = typeof init?.body === "string" ? init.body : "";
       calls.push({
         url,
         method: init?.method ?? "GET",
-        body,
       });
-      return new Response("Not Found", { status: 404 });
+      return Response.json({ id: "env-1" });
     };
     await expect(probePairingMode(fetchImpl)).resolves.toBe("open");
-    expect(calls).toEqual([
-      {
-        url: "/api/pairing/exchange",
-        method: "POST",
-        body: JSON.stringify({ code: "probe" }),
-      },
-    ]);
+    expect(calls).toEqual([{ url: "/api/environment", method: "GET" }]);
+  });
 
+  it("treats GET /api/environment 401 as pairing required", async () => {
     const required: typeof fetch = async () => new Response("Unauthorized", { status: 401 });
     await expect(probePairingMode(required)).resolves.toBe("required");
   });
