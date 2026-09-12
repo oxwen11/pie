@@ -178,7 +178,9 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
 
         const worktreePath = worktreeDirectory(paths.worktreesDir, repoRoot, worktreeKey);
-        yield* rejectEscape(realRoot, worktreePath);
+        if (!contains(paths.worktreesDir, worktreePath)) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+        }
         const exists = yield* fs
           .exists(worktreePath)
           .pipe(Effect.mapError(readError(worktreePath)));
