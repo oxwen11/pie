@@ -57,9 +57,18 @@ capabilities. They are not proof of a hole. When they fire on a tool you
 touched, read the finding, confirm the policy, and leave the warn in place
 unless the code is wrong.
 
+## Sibling commands (not CI)
+
+`design` and `scan` ship with 0.9.14. They are not CI gates.
+
+- UI composition / typography / motion: `pnpm exec react-doctor design --verbose` from `apps/app`, then `.agents/skills/web-design-guidelines`. Design-tagged rules stay off in the health scan on purpose.
+- A slow interaction: `/performance` → `pnpm exec react-doctor scan http://localhost:4190/ --format json`.
+- A roadmap rather than a fix-it-now pass: `/improve-react` (read-only; writes `plans/`).
+- Why this line fired: `pnpm exec react-doctor why <file:line>`.
+
 ## How to fix a diagnostic
 
-1. `npx react-doctor@latest rules explain <rule>`
+1. `pnpm exec react-doctor rules explain <rule>` from `apps/app` (or `why <file:line>`)
 2. Fetch `https://www.react.doctor/prompts/rules/react-doctor/<id>.md`
 3. Apply the practice in the table, then re-run
    `pnpm exec react-doctor --yes --verbose --scope changed` from `apps/app`

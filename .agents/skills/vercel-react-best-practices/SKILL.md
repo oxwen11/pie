@@ -121,7 +121,7 @@ Reference these guidelines when:
 
 This is a Vite + TanStack Query SPA, not Next.js. Follow bundle, rerender, rendering, and `js-*` rules. Skip RSC / Server Action / `next/dynamic` / SWR rules (`server-*`, `bundle-dynamic-imports` as Next-only, `client-swr-dedup`). Server state stays in TanStack Query (`.agents/rules/frontend-state.md`).
 
-React Doctor enforces the high-value subset of these practices as errors. When a Doctor finding overlaps a rule below, fix it using that rule's recipe — see `.agents/skills/react-doctor/references/strict-value.md`.
+React Doctor enforces the high-value subset of these practices as errors. When a Doctor finding overlaps a rule below, fix it using that rule's recipe — see `.agents/skills/react-doctor/references/strict-value.md`. For a measured slow interaction, use the `performance` skill (`react-doctor scan` on `http://localhost:4190/`), not a static lint pass.
 
 ## How to Use
 
