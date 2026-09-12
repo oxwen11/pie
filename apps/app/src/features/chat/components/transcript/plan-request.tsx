@@ -60,7 +60,7 @@ export function PlanRequestView({
     onRespond(request.id, {
       type: "plan",
       behavior: "allow",
-      mode: APPROVAL_OPTIONS[selected as ApprovalValue].mode,
+      mode: APPROVAL_OPTIONS[selected].mode,
     });
   };
 

@@ -878,7 +878,7 @@ describe("PiAgentSessionService", () => {
             if (records.some((record) => record.message === "pi creating")) return;
             yield* Effect.sleep("10 millis");
           }
-          return yield* Effect.die(new Error("timed out waiting for pi creating"));
+          yield* Effect.die(new Error("timed out waiting for pi creating"));
         });
       }).pipe(
         Effect.provide(

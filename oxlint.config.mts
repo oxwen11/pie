@@ -152,8 +152,6 @@ export default defineConfig({
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
-    "typescript/consistent-return": "off",
     // Ultracite leaves this off; pie turns it on in this slice.
     "promise/always-return": "error",
     "no-unused-vars": [
@@ -275,6 +273,8 @@ export default defineConfig({
         "typescript/no-explicit-any": "off",
         "typescript/no-unnecessary-type-parameters": "off",
         "promise/always-return": "off",
+        "typescript/consistent-return": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
       },
     },
     {

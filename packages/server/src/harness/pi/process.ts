@@ -454,7 +454,7 @@ export const makePiProcessWithDependencies = <R>(
             error instanceof PiTransportError ||
             error instanceof AgentOperationError ||
             (typeof error === "object" && error !== null && "_tag" in error)
-              ? (error as PiTransportFailure)
+              ? error
               : new PiTransportError({ operation: "open-session", cause: error }),
           ),
           Effect.onError(() => Scope.close(scope, Exit.void)),
@@ -530,6 +530,10 @@ export const makePiProcessWithDependencies = <R>(
                           return [{ _tag: "Steer", turn: current }, current];
                         case "Finishing":
                           return [{ _tag: "Wait", ended: current.ended }, current];
+                        default: {
+                          const exhaustive: never = current;
+                          return exhaustive;
+                        }
                       }
                     },
                   );

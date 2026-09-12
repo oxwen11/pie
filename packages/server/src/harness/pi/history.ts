@@ -130,7 +130,7 @@ function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessage
       toolCallId: call.toolCallId,
       providerExecuted: true,
       ...settled,
-    } as PiDynamicToolPart;
+    };
   }
   return {
     type: `tool-${call.toolName}`,

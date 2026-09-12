@@ -115,6 +115,10 @@ function startErrorAnnotations(error: ServerStartError) {
         ...(causeType === undefined ? undefined : { causeType }),
       };
     }
+    default: {
+      const exhaustive: never = error;
+      return exhaustive;
+    }
   }
 }
 

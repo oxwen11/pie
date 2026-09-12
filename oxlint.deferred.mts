@@ -28,6 +28,8 @@ export const deferredUltraciteRules = {
   // --- slice 4 — any / unsafe / strict boolean ---
   // Will be noisy. Enable one package at a time if needed.
   // no-explicit-any is on (this slice). no-non-null-assertion is on (#218).
+  // strict-boolean-expressions: measured ~133 hits, 81 of them `if (str)` /
+  // nullable-string rewrites. Not surgical — leave off.
   "typescript/no-unsafe-argument": "off",
   "typescript/no-unsafe-assignment": "off",
   "typescript/no-unsafe-call": "off",

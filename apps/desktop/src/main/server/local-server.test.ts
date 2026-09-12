@@ -40,7 +40,7 @@ function makeHarness(
         }),
       ]),
     ),
-  ) as Context.Context<never>;
+  );
 
   const spawnServer: SpawnServer = (config, port) => {
     if (initialSpawnFailure && processes.length === 0) return Effect.fail(initialSpawnFailure);
