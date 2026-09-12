@@ -62,16 +62,15 @@ jobs:
         shell: bash
 
       - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2.2.9
-        # doctor.config.json enables every 0.9.14 rule at recommended severity
-        # (SPA graph/cleanup promoted to error; three stack mismatches off).
-        # New error-severity findings fail the check. Warnings stay advisory.
+        # doctor.config.json enables every 0.9.14 rule at error (three stack
+        # mismatches off). Warning-severity findings fail the check too.
         # Full reference: https://www.react.doctor/ci
         with:
           node-version: ${{ steps.project-node.outputs.version }}
           # Pin the scanner to the same CLI we ship in apps/app. `latest`
           # would silently pick up new opt-in defaults and fail PRs.
           version: 0.9.14
-          blocking: error
+          blocking: warning
           scope: full
           # Everything except @getpie/ui. Its base components are vendored
           # wholesale from the coss registry via `shadcn add @coss/ui --overwrite`

@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "doctor": "react-doctor --yes",
+    "doctor": "react-doctor --yes --blocking warning",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {

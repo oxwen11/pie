@@ -13,11 +13,13 @@ Run every command below from `apps/app` with the workspace CLI (0.9.14), not
 ## In this repository
 
 Root `doctor.config.json` is the shared severity map for `@getpie/app` and
-`@getpie/desktop`. Every 0.9.14 rule is on except the three stack mismatches
-in [strict-value.md](strict-value.md). Do not set `projects` in the root config
-(that breaks per-package `pnpm doctor`). Do not add a fourth `off` to land a
-PR — inline `react-doctor-disable-next-line` is last resort and needs a comment
-naming the invariant the rule cannot see.
+`@getpie/desktop`. Every 0.9.14 rule is **error** except the three stack mismatches
+in [strict-value.md](strict-value.md). Categories are also error so a default-on
+rule we did not list still gates. CI and `pnpm doctor` use `--blocking warning`.
+Do not set `projects` in the root config (that breaks per-package `pnpm doctor`).
+Do not add a fourth `off` or demote a rule to `warn` to land a PR — inline
+`react-doctor-disable-next-line` is last resort and needs a comment naming the
+invariant the rule cannot see.
 
 Next.js / React Native IDs are enabled and inert on this Vite SPA. Leave them
 on. Design-tagged rules are included in the health scan via
@@ -38,7 +40,7 @@ pnpm exec react-doctor why src/features/chat/components/chat-input-queue.tsx:63
 5. Validate the change did what they wanted:
 
 ```bash
-pnpm exec react-doctor --yes --verbose --scope changed
+pnpm exec react-doctor --yes --verbose --scope changed --blocking warning
 ```
 
 ## Commands
@@ -65,7 +67,7 @@ Rule references accept the full key (`react-doctor/no-danger`), the bare id (`no
 Match the control to the intent — prefer the narrowest one:
 
 - **User disagrees with one rule / it's a false positive for them** → fix the code first. `rules disable <rule>` (sets `rules.<key> = "off"`) is only for a documented stack mismatch, the three in [strict-value.md](strict-value.md). A new off needs a comment in `doctor.config.json`.
-- **Rule is fine but wrong severity** → `rules set <rule> warn` or `rules set <rule> error`.
+- **Rule is fine but wrong severity** → do not demote to `warn` in this repo. `rules set <rule> error` is the only severity this repo accepts besides the three `off`s.
 - **A disabled-by-default rule they want on** → already the repo default; `rules enable <rule>` restores recommended severity if someone turned it off.
 - **A whole area is unwanted** (e.g. all React Native rules) → do not category-off React Native here; those IDs are inert. The CLI only accepts Security / Bugs / Performance / Accessibility / Maintainability.
 - **A behavioral family is noisy** (`design`, `test-noise`, `migration-hint`) → do not `ignore-tag design` in this repo. Prefer `react-doctor design` for a focused UI audit; the health scan already includes design tags.
