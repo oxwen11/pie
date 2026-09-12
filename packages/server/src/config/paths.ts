@@ -99,16 +99,19 @@ export function resolveDaemonLocation(env: NodeJS.ProcessEnv = process.env): Dae
 }
 
 /**
- * Preserve an explicit daemon directory; otherwise scope only development
- * lifecycle state under the canonical development home. Desktop computes the
- * checkout identity, while this module remains the sole owner of home/daemon
- * path policy.
+ * Scope unpackaged development lifecycle state under the canonical development
+ * home. Inherited `$PIE_DAEMON_DIR` is ignored so a nested `pnpm dev` cannot
+ * attach a production daemon; `$PIE_DEV_DAEMON_DIR` is the explicit override.
+ * Desktop computes the checkout identity, while this module remains the sole
+ * owner of home/daemon path policy.
  */
 export function developmentDaemonEnvironment(
   env: NodeJS.ProcessEnv,
   scope: string | undefined,
 ): NodeJS.ProcessEnv {
-  if (explicitPath(env.PIE_DAEMON_DIR) !== undefined || scope === undefined) return env;
+  const explicitDev = explicitPath(env.PIE_DEV_DAEMON_DIR);
+  if (explicitDev !== undefined) return { ...env, PIE_DAEMON_DIR: explicitDev };
+  if (scope === undefined) return env;
   const home = resolvePieHome({ ...env, NODE_ENV: "development" });
   return { ...env, PIE_DAEMON_DIR: path.join(home, "daemons", scope) };
 }

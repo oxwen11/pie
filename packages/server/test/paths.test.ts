@@ -45,9 +45,35 @@ describe("developmentDaemonEnvironment", () => {
     expect(environment.PIE_DAEMON_DIR).toBe(path.join("/tmp/pie-home", "daemons", "pie-a1b2c3d4"));
   });
 
-  it("preserves an explicitly selected daemon directory", () => {
-    const environment = { PIE_DAEMON_DIR: "/tmp/explicit-daemon" };
-    expect(developmentDaemonEnvironment(environment, "scope")).toBe(environment);
+  it("ignores an inherited PIE_DAEMON_DIR and scopes under daemons/<scope>", () => {
+    const environment = developmentDaemonEnvironment(
+      {
+        PIE_HOME: "/tmp/pie-home",
+        PIE_DAEMON_DIR: "/tmp/prod-daemon",
+        NODE_ENV: "development",
+      },
+      "pie-a1b2c3d4",
+    );
+
+    expect(environment.PIE_HOME).toBe("/tmp/pie-home");
+    expect(environment.PIE_DAEMON_DIR).toBe(path.join("/tmp/pie-home", "daemons", "pie-a1b2c3d4"));
+  });
+
+  it("honors PIE_DEV_DAEMON_DIR over the scoped default and inherited PIE_DAEMON_DIR", () => {
+    const environment = developmentDaemonEnvironment(
+      {
+        PIE_HOME: "/tmp/pie-home",
+        PIE_DAEMON_DIR: "/tmp/prod-daemon",
+        PIE_DEV_DAEMON_DIR: "/tmp/dev-daemon",
+      },
+      "scope",
+    );
+    expect(environment.PIE_DAEMON_DIR).toBe("/tmp/dev-daemon");
+  });
+
+  it("leaves the environment unchanged when no development scope is available", () => {
+    const environment = { PIE_DAEMON_DIR: "/tmp/prod-daemon" };
+    expect(developmentDaemonEnvironment(environment, undefined)).toBe(environment);
   });
 });
 
