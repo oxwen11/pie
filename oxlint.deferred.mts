@@ -25,18 +25,12 @@ export const deferredUltraciteRules = {
   "oxc/no-barrel-file": "off",
   "no-await-in-loop": "off",
 
-  // --- slice 4 — any / non-null / unsafe / strict boolean ---
-  // Will be noisy. Enable one package at a time if needed.
-  "typescript/no-explicit-any": "off",
-  "typescript/no-non-null-assertion": "off",
-  "typescript/no-unsafe-argument": "off",
-  "typescript/no-unsafe-assignment": "off",
-  "typescript/no-unsafe-call": "off",
-  "typescript/no-unsafe-member-access": "off",
-  "typescript/no-unsafe-return": "off",
+  // --- slice 4 — any / unsafe / strict boolean ---
+  // no-unsafe-* is on (this slice). Remaining: strict boolean, void-return.
+  // no-explicit-any is on (#219). no-non-null-assertion is on (#218).
+  // consistent-return and no-unnecessary-type-assertion are on (#220).
   "typescript/strict-boolean-expressions": "off",
   "typescript/strict-void-return": "off",
-  "typescript/prefer-nullish-coalescing": "off",
 
   // --- later — perf ---
   "no-useless-call": "off",
@@ -56,9 +50,7 @@ export const deferredUltraciteRules = {
   "no-inner-declarations": "off",
   "no-lonely-if": "off",
   "no-negated-condition": "off",
-  "no-redeclare": "off",
   "no-warning-comments": "off",
-  "oxc/branches-sharing-code": "off",
   "react/no-unescaped-entities": "off",
   "require-await": "off",
   "require-unicode-regexp": "off",
@@ -67,7 +59,6 @@ export const deferredUltraciteRules = {
   "typescript/ban-ts-comment": "off",
   "typescript/ban-types": "off",
   "typescript/prefer-enum-initializers": "off",
-  "typescript/prefer-includes": "off",
   "typescript/prefer-ts-expect-error": "off",
   "unicorn/escape-case": "off",
   "unicorn/no-negated-condition": "off",
@@ -191,11 +182,8 @@ export const deferredUltraciteRules = {
   "typescript/method-signature-style": "off",
   "typescript/no-inferrable-types": "off",
   "typescript/parameter-properties": "off",
-  "typescript/prefer-find": "off",
-  "typescript/prefer-for-of": "off",
   "typescript/prefer-readonly": "off",
   "typescript/prefer-regexp-exec": "off",
-  "typescript/prefer-string-starts-ends-with": "off",
   "typescript/unified-signatures": "off",
   "unicorn/catch-error-name": "off",
   "unicorn/empty-brace-spaces": "off",

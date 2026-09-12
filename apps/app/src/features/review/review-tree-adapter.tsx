@@ -65,7 +65,7 @@ export function ReviewTreeAdapter({
   useEffect(() => {
     const host = containerRef.current?.querySelector("file-tree-container");
     const shadowRoot = host?.shadowRoot;
-    if (shadowRoot === undefined || shadowRoot === null) return;
+    if (shadowRoot === undefined || shadowRoot === null) return undefined;
 
     const annotateRows = (): void => {
       for (const row of shadowRoot.querySelectorAll<HTMLElement>("[data-item-path]")) {

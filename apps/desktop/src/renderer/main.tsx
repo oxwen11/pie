@@ -9,7 +9,7 @@ import { waitForDesktopPort } from "./desktop-port";
 import { DesktopRoot } from "./desktop-root";
 import { StartupFailure } from "./startup-failure";
 
-const rootElement = document.getElementById("root")!;
+const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 
 const host = waitForDesktopPort().then(async (port) => {

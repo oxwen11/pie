@@ -47,7 +47,7 @@ function TerminalPanelView({ instance }: { instance: TerminalInstance }) {
 
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount) return;
+    if (!mount) return undefined;
     const surface = attachTerminalSurface(mount, {
       client: orpcClient,
       ref: instance.sessionRef,

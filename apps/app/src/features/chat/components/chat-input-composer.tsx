@@ -148,6 +148,7 @@ function ChatComposerActions({
               void controller.submit().then(() => {
                 // Empty / already-submitting submit never reaches onSubmit.
                 nextDeliveryRef.current = undefined;
+                return undefined;
               });
             }}
           >

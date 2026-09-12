@@ -26,12 +26,28 @@ import {
 import { piBashExtension } from "../bash";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
+type HttpDispatcher = {
+  applyHttpProxySettings: (proxy: unknown) => void;
+  configureHttpDispatcher: (idleTimeoutMs?: number) => void;
+};
+
+function isHttpDispatcher(value: unknown): value is HttpDispatcher {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "applyHttpProxySettings" in value &&
+    "configureHttpDispatcher" in value &&
+    typeof value.applyHttpProxySettings === "function" &&
+    typeof value.configureHttpDispatcher === "function"
+  );
+}
+
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
-process.emitWarning = (() => {
+process.emitWarning = () => {
   /* Pi RPC child must not leak Node experimental warnings onto the JSONL pipe */
-}) as typeof process.emitWarning;
+};
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {
   if (sessionId !== undefined) {
@@ -44,14 +60,17 @@ const openSessionManager = async (sessionId: string | undefined, cwd: string) =>
 };
 
 const start = async (): Promise<void> => {
-  const { applyHttpProxySettings, configureHttpDispatcher } = await import(
-    url.pathToFileURL(
-      path.join(
-        path.dirname(url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),
-        "core/http-dispatcher.js",
-      ),
-    ).href
-  );
+  const dispatcherUrl = url.pathToFileURL(
+    path.join(
+      path.dirname(url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),
+      "core/http-dispatcher.js",
+    ),
+  ).href;
+  const dispatcherModule: unknown = await import(dispatcherUrl);
+  if (!isHttpDispatcher(dispatcherModule)) {
+    throw new Error("Pi http-dispatcher export mismatch");
+  }
+  const { applyHttpProxySettings, configureHttpDispatcher } = dispatcherModule;
   const parsed = parseArgs(process.argv.slice(2));
   const cwd = process.cwd();
   const agentDir = getAgentDir();

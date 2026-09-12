@@ -92,6 +92,7 @@ export const ProjectServiceLayer: Layer.Layer<
             return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
           }
           yield* repo.save(projects.filter((p) => p.id !== id));
+          return undefined;
         }),
     };
   }),

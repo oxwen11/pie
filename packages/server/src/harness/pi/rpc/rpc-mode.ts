@@ -29,7 +29,6 @@ import {
 } from "./output-guard";
 import type {
   RpcCommand,
-  RpcExtensionUIRequest,
   RpcExtensionUIResponse,
   RpcResponse,
   RpcSessionState,
@@ -69,14 +68,16 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     writeRawStdout(serializeJsonLine(frame));
   };
 
-  const success = <T extends RpcCommand["type"]>(
+  const success = (
     id: string | undefined,
-    command: T,
+    command: RpcCommand["type"],
     data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
       return { id, type: "response", command, success: true } as RpcResponse;
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
     return { id, type: "response", command, success: true, data } as RpcResponse;
   };
 
@@ -87,7 +88,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   // Pending extension UI requests waiting for response
   const pendingExtensionRequests = new Map<
     string,
-    { resolve: (value: any) => void; reject: (error: Error) => void }
+    { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
   >();
 
   // Shutdown request flag
@@ -134,7 +135,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         },
         reject,
       });
-      output({ type: "extension_ui_request", id, ...request } as RpcExtensionUIRequest);
+      output({ type: "extension_ui_request", id, ...request });
     });
   }
 
@@ -174,7 +175,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         method: "notify",
         message,
         notifyType: type,
-      } as RpcExtensionUIRequest);
+      });
     },
 
     onTerminalInput(): () => void {
@@ -192,7 +193,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         method: "setStatus",
         statusKey: key,
         statusText: text,
-      } as RpcExtensionUIRequest);
+      });
     },
 
     setWorkingMessage(_message?: string): void {
@@ -221,7 +222,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
           widgetKey: key,
           widgetLines: content as string[] | undefined,
           widgetPlacement: options?.placement,
-        } as RpcExtensionUIRequest);
+        });
       }
       // Component factories are not supported in RPC mode - would need TUI access
     },
@@ -241,11 +242,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         id: crypto.randomUUID(),
         method: "setTitle",
         title,
-      } as RpcExtensionUIRequest);
+      });
     },
 
     async custom() {
       // Custom UI not supported in RPC mode
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ExtensionUIContext.custom is typed Promise<T>
       return undefined as never;
     },
 
@@ -261,7 +263,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         id: crypto.randomUUID(),
         method: "set_editor_text",
         text,
-      } as RpcExtensionUIRequest);
+      });
     },
 
     getEditorText(): string {
@@ -291,7 +293,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
           method: "editor",
           title,
           prefill,
-        } as RpcExtensionUIRequest);
+        });
       });
     },
 
@@ -820,6 +822,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       "type" in parsed &&
       parsed.type === "extension_ui_response"
     ) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already === "extension_ui_response"
       const response = parsed as RpcExtensionUIResponse;
       const pending = pendingExtensionRequests.get(response.id);
       if (pending) {
@@ -829,6 +832,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return;
     }
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL command; handleCommand switches on type
     const command = parsed as RpcCommand;
     try {
       const response = await handleCommand(command);

@@ -38,8 +38,7 @@ function flatten(
 
 function plain(input: unknown): input is Record<string, unknown> {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return false;
-  const prototype = Object.getPrototypeOf(input);
-  return prototype === Object.prototype || prototype === null;
+  return Object.getPrototypeOf(input) === Object.prototype || Object.getPrototypeOf(input) === null;
 }
 
 function format(input: unknown): string {
@@ -77,7 +76,8 @@ export function minimumLogLevel(): LogLevel.LogLevel {
     WARN: "Warn",
     ERROR: "Error",
   } as const satisfies Record<string, LogLevel.LogLevel>;
-  return value && value in levels ? levels[value as keyof typeof levels] : levels.INFO;
+  const isLevel = (name: string): name is keyof typeof levels => name in levels;
+  return value !== undefined && isLevel(value) ? levels[value] : levels.INFO;
 }
 
 export function loggers(logsDir: string, id: string) {

@@ -85,6 +85,10 @@ export const pullRequestActionInput = (
       };
     case "disable-auto-merge":
       return { ref, expected: { pullRequest: snapshot.ref }, action };
+    default: {
+      const exhaustive: never = action;
+      return exhaustive;
+    }
   }
 };
 
@@ -104,6 +108,10 @@ export const pullRequestReviewLabel = (snapshot: PullRequestSnapshot): string =>
       return "Review required";
     case "none":
       return "No review decision";
+    default: {
+      const exhaustive: never = snapshot.reviewDecision;
+      return exhaustive;
+    }
   }
 };
 

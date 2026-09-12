@@ -2,8 +2,8 @@ import path from "node:path";
 
 /**
  * The three lifecycle files, named relative to a daemon directory the caller
- * already resolved. Deliberately no default of its own — see
- * `resolveDaemonLocation` in `config/paths.ts`.
+ * already resolved (`$PIE_HOME/daemon`). Deliberately no default of its own —
+ * see `daemonDirectory` in `config/paths.ts`.
  *
  * All three are *state*, not output. The daemon's stdout/stderr used to be a
  * fourth file here; it now sits with the process log under

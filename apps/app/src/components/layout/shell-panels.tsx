@@ -130,7 +130,7 @@ export function ShellSeparator({
         locked && "pointer-events-none",
         className,
       )}
-      disabled={disabled || locked}
+      disabled={disabled === true || locked}
       {...props}
     />
   );
@@ -217,12 +217,12 @@ function useSidebarDrawer(
 
   useEffect(() => {
     const panel = panelRef.current;
-    if (panel === null || !laidOut.current) return;
+    if (panel === null || !laidOut.current) return undefined;
 
     if (skipNextAnimation.current) {
       skipNextAnimation.current = false;
       animatedWidth.jump(open ? expandedWidth.get() : 0);
-      return;
+      return undefined;
     }
 
     if (reduceMotion) {
@@ -233,7 +233,7 @@ function useSidebarDrawer(
       } else if (!panel.isCollapsed()) {
         panel.collapse();
       }
-      return;
+      return undefined;
     }
 
     const controls = animate(animatedWidth, open ? expandedWidth.get() : 0, {

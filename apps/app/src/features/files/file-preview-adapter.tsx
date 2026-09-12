@@ -62,9 +62,9 @@ function TargetLineScroller({
   useLayoutEffect(() => {
     if (targetKey === null || targetLine === undefined) {
       lastScrolledTarget.current = null;
-      return;
+      return undefined;
     }
-    if (virtualizer === undefined || lastScrolledTarget.current === targetKey) return;
+    if (virtualizer === undefined || lastScrolledTarget.current === targetKey) return undefined;
 
     let scrollFrame = 0;
     const renderFrame = requestAnimationFrame(() => {

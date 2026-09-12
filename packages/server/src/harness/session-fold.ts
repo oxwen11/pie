@@ -11,7 +11,7 @@ import type {
   SessionStatus,
 } from "@getpie/contract";
 
-import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
+import { isSessionEvent, type SessionEnvelopeBody } from "./events/framework";
 
 /**
  * The server-side truth a session's native event stream sheds, as a pure fold.
@@ -43,9 +43,9 @@ const EVICT_TO_BYTES = Math.floor(MAX_BUFFERED_BYTES * 0.75);
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */
 const chunkBytes = (chunk: WireChunk): number => {
-  const delta = (chunk as { delta?: unknown }).delta;
+  const delta = "delta" in chunk ? chunk.delta : undefined;
   if (typeof delta === "string") return delta.length + 32;
-  const text = (chunk as { text?: unknown }).text;
+  const text = "text" in chunk ? chunk.text : undefined;
   if (typeof text === "string") return text.length + 32;
   try {
     return JSON.stringify(chunk).length;
@@ -103,9 +103,9 @@ export const toWireBody = (
   if (!isSessionEvent(body)) {
     // A UI chunk with no active turn is unexpected; drop rather than mislabel it.
     if (activeTurnId === undefined) return null;
-    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body as WireChunk };
+    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body };
   }
-  const event = body as SessionEvent;
+  const event = body;
   switch (event.type) {
     case "session.turn.started":
       return { type: "session.turn.started", turnId: event.turnId };
@@ -129,12 +129,16 @@ export const toWireBody = (
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 
 const startChunkMessageId = (chunk: WireChunk): string | null =>
-  chunk.type === "start" && typeof (chunk as { messageId?: unknown }).messageId === "string"
-    ? (chunk as { messageId: string }).messageId
+  chunk.type === "start" && "messageId" in chunk && typeof chunk.messageId === "string"
+    ? chunk.messageId
     : null;
 
 // In-place append under the caps (see the ActiveTurn comment); overflow evicts
@@ -251,6 +255,10 @@ export const foldSessionEvent = (
         pendingRequests: new Map(),
         pendingPrompt: emptyPendingPrompt,
       };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 

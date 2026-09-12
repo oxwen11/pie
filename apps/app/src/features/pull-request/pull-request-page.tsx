@@ -62,6 +62,7 @@ export function PullRequestPage() {
   const refresh = (): void => {
     void detail.refetch().then((result) => {
       if (!result.isError) setPostActionRefreshFailed(false);
+      return undefined;
     });
     void diff.refetch();
   };

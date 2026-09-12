@@ -16,7 +16,7 @@ Desktop supervision may respawn unless a `daemon.stopped` tombstone is present (
 ## Driving it
 
 1. Connect (splash gone).
-2. Stop the daemon with the run's env (`packages/pie` `tsx … daemon stop` and the run `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_DAEMON_COMPATIBILITY_KEY`).
+2. Stop the daemon with the run's env (`packages/pie` `tsx … daemon stop` and the run `PIE_HOME` / `PIE_DAEMON_COMPATIBILITY_KEY`).
 3. Overlay first shows **Reconnecting…** for several seconds, then **The local server stopped**, the failed subtitle, **Quit**, and **Retry**.
 4. Start the same isolated daemon again (export `PIE_PORT` to the recorded port — bare `daemon start` in `NODE_ENV=development` may pick an ephemeral port). Click **Retry**; overlay hides.
 

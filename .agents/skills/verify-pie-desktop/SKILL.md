@@ -9,11 +9,11 @@ Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web ap
 
 This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
 
-Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
+Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie_*`.
 
 ## Launch
 
-Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. First spawn prefers **4000** (`reservePort(options.port ?? 4000)`). Main passes `port === 0` on the first attempt, so **`PIE_PORT` is ignored until a later pinned respawn**. Always read `address` from `daemon.pid`. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
+Isolated `$PIE_HOME` (daemon is `$PIE_HOME/daemon`). First spawn prefers **4000** (`reservePort(options.port ?? 4000)`). Main passes `port === 0` on the first attempt, so **`PIE_PORT` is ignored until a later pinned respawn**. Always read `address` from `daemon.pid`. CDP on **9223** via `PIE_REMOTE_DEBUG_PORT` (desktop-runtime already wires this and isolates `userData`).
 
 ```bash
 pnpm exec pie-verify desktop launch
@@ -23,19 +23,19 @@ pnpm exec pie-verify desktop launch
 Ready when all of these hold:
 
 - Electron (or electron-vite) pid from the run is alive.
-- `$PIE_DAEMON_DIR/daemon.pid` exists; `GET $address/api/health` is `ok`.
+- `$PIE_HOME/daemon/daemon.pid` exists; `GET $address/api/health` is `ok`.
 - Chromium CDP is listening on **9223** (launch waits on that port). Doctor then attaches internally (`agent-browser --session pie-verify-desktop connect 9223`).
 
 What launch also does:
 
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
 - Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
-- Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
+- Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
 - Starts `cd apps/desktop && pnpm exec electron-vite dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. electron-vite injects `ELECTRON_RENDERER_URL` (renderer is often **5173**).
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
 
-If **4000** is already taken, the launcher falls back to an ephemeral port — still isolated because `$PIE_DAEMON_DIR` is ours. Launch **refuses** a taken **9223** (CDP). Never point this run at `~/.pie` or a live user `PIE_DAEMON_DIR`. Never use web 4180/4190 or CLI-verify 4182 as *this* home's ports.
+If **4000** is already taken, the launcher falls back to an ephemeral port — still isolated because `$PIE_HOME` is ours. Launch **refuses** a taken **9223** (CDP). Never point this run at `~/.pie` or `~/.pie_*`. Never use web 4180/4190 or CLI-verify 4182 as *this* home's ports.
 
 `daemon.pid` contains a token. **Do not copy the token into evidence.**
 
@@ -48,7 +48,7 @@ pnpm exec pie-verify desktop doctor
 Checks, in order:
 
 1. Current run at `/tmp/pie-verify-desktop/current` (else refuse a live listener that is not ours).
-2. Isolated `$PIE_HOME` (not `~/.pie` / `~/.pie-dev`).
+2. Isolated `$PIE_HOME` (not `~/.pie` / `~/.pie_*`).
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
 5. Ticket: anonymous **401**, bearer **200**.
@@ -117,7 +117,7 @@ pnpm exec pie-verify desktop cleanup
 ```
 
 1. Kill the recorded electron-vite process tree (TERM then KILL). **This does not stop the daemon.**
-2. `pie daemon stop` with this run's `PIE_HOME` / `PIE_DAEMON_DIR` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
+2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
 Never `pkill` electron / pie / vite.

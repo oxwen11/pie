@@ -179,6 +179,7 @@ export const makePiAgentRuntime = (
       yield* process.session
         .interrupt(sessionId)
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
+      return undefined;
     });
 
     const replaceQueue: PiAgentRuntime["replaceQueue"] = (pending) =>
@@ -187,6 +188,7 @@ export const makePiAgentRuntime = (
         yield* process.session
           .replaceQueue(sessionId, pending)
           .pipe(Effect.mapError((cause) => operationError(sessionId, "replace-queue", cause)));
+        return undefined;
       });
 
     yield* Scope.addFinalizer(scope, close);
