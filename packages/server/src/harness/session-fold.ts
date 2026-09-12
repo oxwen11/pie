@@ -11,7 +11,7 @@ import type {
   SessionStatus,
 } from "@getpie/contract";
 
-import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
+import { isSessionEvent, type SessionEnvelopeBody } from "./events/framework";
 
 /**
  * The server-side truth a session's native event stream sheds, as a pure fold.
@@ -103,9 +103,9 @@ export const toWireBody = (
   if (!isSessionEvent(body)) {
     // A UI chunk with no active turn is unexpected; drop rather than mislabel it.
     if (activeTurnId === undefined) return null;
-    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body as WireChunk };
+    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body };
   }
-  const event = body as SessionEvent;
+  const event = body;
   switch (event.type) {
     case "session.turn.started":
       return { type: "session.turn.started", turnId: event.turnId };
@@ -129,6 +129,10 @@ export const toWireBody = (
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 
@@ -251,6 +255,10 @@ export const foldSessionEvent = (
         pendingRequests: new Map(),
         pendingPrompt: emptyPendingPrompt,
       };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 
