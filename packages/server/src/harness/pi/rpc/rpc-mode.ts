@@ -51,8 +51,8 @@ function isExtensionUiResponse(value: unknown): value is RpcExtensionUIResponse 
   return isRecord(value) && value.type === "extension_ui_response" && typeof value.id === "string";
 }
 
-function isRpcCommand(value: unknown): value is RpcCommand {
-  return isRecord(value) && typeof value.type === "string";
+function isStringWidgetLines(value: unknown): value is string[] | undefined {
+  return value === undefined || Array.isArray(value);
 }
 
 /** Thrown after stdin is paused so the child can set `process.exitCode` and drain. */
@@ -223,10 +223,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     setWidget(key: string, content: unknown, options?: ExtensionWidgetOptions): void {
       // Only support string arrays in RPC mode - factory functions are ignored
-      if (
-        content === undefined ||
-        (Array.isArray(content) && content.every((line) => typeof line === "string"))
-      ) {
+      if (isStringWidgetLines(content)) {
         output({
           type: "extension_ui_request",
           id: crypto.randomUUID(),
@@ -258,7 +255,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     },
 
     async custom() {
-      throw new Error("Custom UI not supported in RPC mode");
+      // Custom UI not supported in RPC mode
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ExtensionUIContext.custom is typed Promise<T>
+      return undefined as never;
     },
 
     pasteToEditor(text: string): void {
@@ -835,12 +834,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return;
     }
 
-    if (!isRpcCommand(parsed)) {
-      output(error(undefined, "parse", "Invalid command"));
-      await waitForRawStdoutBackpressure();
-      return;
-    }
-    const command = parsed;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL command; handleCommand switches on type
+    const command = parsed as RpcCommand;
     try {
       const response = await handleCommand(command);
       if (response) {

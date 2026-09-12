@@ -39,17 +39,6 @@ type PendingRequest = {
   readonly settle: (response: AgentResponse) => unknown;
 };
 
-function isRpcExtensionUIResponse(value: unknown): value is RpcExtensionUIResponse {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    value.type === "extension_ui_response" &&
-    "id" in value &&
-    typeof value.id === "string"
-  );
-}
-
 type PiTurnState =
   | { readonly _tag: "Idle" }
   | {
@@ -388,9 +377,10 @@ export const makePiProcessWithDependencies = <R>(
         declineUiResponse(request),
       ).pipe(
         Effect.flatMap((result) =>
-          isRpcExtensionUIResponse(result)
-            ? session.transport.respondUi(result).pipe(Effect.catch(() => Effect.void))
-            : Effect.void,
+          session.transport
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mapUiResponse/declineUiResponse return RpcExtensionUIResponse
+            .respondUi(result as RpcExtensionUIResponse)
+            .pipe(Effect.catch(() => Effect.void)),
         ),
       );
 

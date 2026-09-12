@@ -194,8 +194,8 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    const [payload] = payloadArgs;
-    if (payload === undefined) return this.open(sessionRef, definition, ...payloadArgs);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- PayloadArgs is a 0/1 tuple; [0] is Payload when present
+    const payload = payloadArgs[0] as Payload;
     const nextId = panelId(definition, payload);
     const session = this.#sessionOf(sessionRef);
     const currentIndex = session.panels.findIndex((panel) => panel.id === currentId);
