@@ -9,7 +9,7 @@ import { Clock, Effect, Result, Schedule } from "effect";
 import { PiAgentSessionService } from "../harness";
 import { ScheduleRepository } from "./repository";
 import { patchRun } from "./run-record";
-import { logSchedule, ScheduleRuntime } from "./runtime";
+import { logSchedule, releaseInFlight, ScheduleRuntime } from "./runtime";
 
 const SETTLE_ATTEMPTS = 300;
 
@@ -142,11 +142,4 @@ export const settleAfterPrompt = (
       status: "failed",
       error: "session did not settle",
     });
-  }).pipe(
-    Effect.ensuring(
-      Effect.gen(function* () {
-        const runtime = yield* ScheduleRuntime;
-        runtime.inFlight.delete(scheduleId);
-      }),
-    ),
-  );
+  }).pipe(Effect.ensuring(releaseInFlight(scheduleId)));
