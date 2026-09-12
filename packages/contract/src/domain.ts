@@ -196,6 +196,9 @@ export const SessionScopedEventTypes = [
   "session.request.rejected",
   "session.queue.updated",
   "session.crashed",
+  // Runtime was stopped on purpose (e.g. idle timeout). Session stays;
+  // the next prompt re-acquires a process. Phase is idle — not crashed.
+  "session.runtime.stopped",
 ] as const;
 export type SessionScopedEventType = (typeof SessionScopedEventTypes)[number];
 
@@ -257,7 +260,11 @@ export type SessionScopedEventBody =
       readonly steering: ReadonlyArray<string>;
       readonly followUp: ReadonlyArray<string>;
     }
-  | { readonly type: "session.crashed"; readonly reason: string };
+  | { readonly type: "session.crashed"; readonly reason: string }
+  // Process gone, session kept. `reason` is a short machine token
+  // (`idle` today). Clients clear live turn UI but must not treat this
+  // as a terminal error — prompting will resume the runtime.
+  | { readonly type: "session.runtime.stopped"; readonly reason: string };
 
 /** A session-scoped event before the server's `HarnessAgentSession` stamps its `seq`. */
 export type SessionScopedEventDraft = { readonly ref: SessionRef } & SessionScopedEventBody;

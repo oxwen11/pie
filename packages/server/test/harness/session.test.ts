@@ -4,6 +4,7 @@ import { it } from "@effect/vitest";
 import type { AgentRequest, SessionRef } from "@getpie/contract";
 import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
 import type * as Cause from "effect/Cause";
+import { TestClock } from "effect/testing";
 
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
@@ -464,6 +465,61 @@ it.effect("a turn under the buffer caps is not marked truncated", () =>
       const snapshot = yield* awaitCursor(session, 2);
       assert.equal(snapshot.activeTurn?.truncated, false);
       assert.equal(snapshot.activeTurn?.chunks.length, 1);
+    }),
+  ),
+);
+
+it.effect("suspendRuntime kills the process, leaves idle, and allows re-acquire", () =>
+  run(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      const closes = yield* Ref.make(0);
+
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+      assert.ok(yield* session.peekRuntime);
+      const before = yield* session.snapshot;
+
+      yield* session.suspendRuntime("idle");
+      assert.equal(yield* Ref.get(closes), 1);
+      assert.equal(yield* session.peekRuntime, undefined);
+      const after = yield* session.snapshot;
+      assert.equal(after.status.phase, "idle");
+      assert.ok(after.cursor > before.cursor);
+
+      const replacement = yield* makeQueue;
+      const again = yield* session.ensureRuntime(Effect.succeed(runtimeFrom(replacement)));
+      assert.ok(again);
+      assert.ok(yield* session.peekRuntime);
+    }),
+  ),
+);
+
+const FastIdleSessionLayer = Layer.effect(
+  SessionService,
+  Effect.gen(function* () {
+    const bus = yield* EventBus;
+    return yield* makePiAgentSession(ref, bus, { idleTimeoutMs: 40 });
+  }),
+).pipe(Layer.provide(EventBusLayer));
+
+const runFastIdle = <A, E>(program: Effect.Effect<A, E, SessionService>) =>
+  program.pipe(Effect.provide(FastIdleSessionLayer));
+
+it.effect("idle timeout suspends a held idle runtime", () =>
+  runFastIdle(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      const closes = yield* Ref.make(0);
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+      assert.ok(yield* session.peekRuntime);
+
+      // @effect/vitest installs TestClock — real sleeps never fire the idle fiber.
+      yield* TestClock.adjust("100 millis");
+      assert.equal(yield* session.peekRuntime, undefined);
+      assert.equal(yield* Ref.get(closes), 1);
+      assert.equal((yield* session.status).phase, "idle");
     }),
   ),
 );

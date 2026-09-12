@@ -13,6 +13,7 @@ const RESERVED_VERBS = new Set([
   "replied",
   "rejected",
   "crashed",
+  "stopped",
   "failed",
   "exited",
   "connected",
@@ -45,5 +46,6 @@ describe("event manifest naming invariant", () => {
     expect(types).toContain("session.request.asked");
     expect(types).toContain("session.queue.updated");
     expect(types).toContain("session.crashed");
+    expect(types).toContain("session.runtime.stopped");
   });
 });
