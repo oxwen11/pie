@@ -30,6 +30,7 @@ import {
 import type {
   RpcCommand,
   RpcExtensionUIResponse,
+  RpcResponse,
   RpcSessionState,
   RpcSlashCommand,
 } from "./rpc-types";
@@ -42,18 +43,6 @@ export type {
   RpcResponse,
   RpcSessionState,
 } from "./rpc-types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isExtensionUiResponse(value: unknown): value is RpcExtensionUIResponse {
-  return isRecord(value) && value.type === "extension_ui_response" && typeof value.id === "string";
-}
-
-function isStringWidgetLines(value: unknown): value is string[] | undefined {
-  return value === undefined || Array.isArray(value);
-}
 
 /** Thrown after stdin is paused so the child can set `process.exitCode` and drain. */
 export class RpcChildExitError extends Error {
@@ -79,14 +68,16 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     writeRawStdout(serializeJsonLine(frame));
   };
 
-  const success = (
+  const success = <T extends RpcCommand["type"]>(
     id: string | undefined,
-    command: RpcCommand["type"],
+    command: T,
     data?: unknown,
   ): RpcResponse => {
     if (data === undefined) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
       return { id, type: "response", command, success: true } as RpcResponse;
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- command is RpcCommand["type"]; union is not correlated
     return { id, type: "response", command, success: true, data } as RpcResponse;
   };
 
@@ -97,7 +88,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   // Pending extension UI requests waiting for response
   const pendingExtensionRequests = new Map<
     string,
-    { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
+    { resolve: (value: any) => void; reject: (error: Error) => void }
   >();
 
   // Shutdown request flag
@@ -144,7 +135,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         },
         reject,
       });
-      output({ type: "extension_ui_request", id, ...request });
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- spread request is the extension UI method payload
+      output({ type: "extension_ui_request", id, ...request } as RpcExtensionUIRequest);
     });
   }
 
@@ -184,7 +176,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         method: "notify",
         message,
         notifyType: type,
-      });
+      } as RpcExtensionUIRequest);
     },
 
     onTerminalInput(): () => void {
@@ -202,7 +194,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         method: "setStatus",
         statusKey: key,
         statusText: text,
-      });
+      } as RpcExtensionUIRequest);
     },
 
     setWorkingMessage(_message?: string): void {
@@ -223,15 +215,15 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     setWidget(key: string, content: unknown, options?: ExtensionWidgetOptions): void {
       // Only support string arrays in RPC mode - factory functions are ignored
-      if (isStringWidgetLines(content)) {
+      if (content === undefined || Array.isArray(content)) {
         output({
           type: "extension_ui_request",
           id: crypto.randomUUID(),
           method: "setWidget",
           widgetKey: key,
-          widgetLines: content,
+          widgetLines: content as string[] | undefined,
           widgetPlacement: options?.placement,
-        });
+        } as RpcExtensionUIRequest);
       }
       // Component factories are not supported in RPC mode - would need TUI access
     },
@@ -251,7 +243,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         id: crypto.randomUUID(),
         method: "setTitle",
         title,
-      });
+      } as RpcExtensionUIRequest);
     },
 
     async custom() {
@@ -272,7 +264,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
         id: crypto.randomUUID(),
         method: "set_editor_text",
         text,
-      });
+      } as RpcExtensionUIRequest);
     },
 
     getEditorText(): string {
@@ -432,7 +424,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   registerSignalHandlers();
 
   // Handle a single command
-  const handleCommand = async (command: RpcCommand): Promise<RpcFrame | undefined> => {
+  const handleCommand = async (command: RpcCommand): Promise<RpcResponse | undefined> => {
     const id = command.id;
 
     switch (command.type) {
@@ -825,11 +817,18 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     }
 
     // Handle extension UI responses
-    if (isExtensionUiResponse(parsed)) {
-      const pending = pendingExtensionRequests.get(parsed.id);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "type" in parsed &&
+      parsed.type === "extension_ui_response"
+    ) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already === "extension_ui_response"
+      const response = parsed as RpcExtensionUIResponse;
+      const pending = pendingExtensionRequests.get(response.id);
       if (pending) {
-        pendingExtensionRequests.delete(parsed.id);
-        pending.resolve(parsed);
+        pendingExtensionRequests.delete(response.id);
+        pending.resolve(response);
       }
       return;
     }

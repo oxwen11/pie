@@ -46,37 +46,24 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
 const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIMessage => ({
   id: messageId,
   role: "user",
-  parts: parts.map((part): UIMessage["parts"][number] =>
+  parts: parts.map((part) =>
     part.type === "data-inspector" ? { type: "data-inspector", data: part.data } : part,
-  ),
+  ) as UIMessage["parts"],
 });
 
 const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
-  if (chunk.type !== "data-retry" || !("data" in chunk)) return undefined;
-  const data = chunk.data;
-  const errorMessage =
-    typeof data === "object" &&
-    data !== null &&
-    "errorMessage" in data &&
-    typeof data.errorMessage === "string"
-      ? data.errorMessage
-      : "";
+  if (chunk.type !== "data-retry") return undefined;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- data-retry payload is untyped JSON
+  const data = chunk.data as {
+    readonly errorMessage?: unknown;
+    readonly attempt?: unknown;
+    readonly maxAttempts?: unknown;
+  };
+  const errorMessage = typeof data.errorMessage === "string" ? data.errorMessage : "";
   const reason =
     errorMessage === "Connection error." ? "Couldn't reach the model provider" : errorMessage;
-  const attempt =
-    typeof data === "object" &&
-    data !== null &&
-    "attempt" in data &&
-    typeof data.attempt === "number"
-      ? data.attempt
-      : undefined;
-  const maxAttempts =
-    typeof data === "object" &&
-    data !== null &&
-    "maxAttempts" in data &&
-    typeof data.maxAttempts === "number"
-      ? data.maxAttempts
-      : undefined;
+  const attempt = typeof data.attempt === "number" ? data.attempt : undefined;
+  const maxAttempts = typeof data.maxAttempts === "number" ? data.maxAttempts : undefined;
   const suffix =
     attempt !== undefined && maxAttempts !== undefined
       ? `Retrying (${attempt}/${maxAttempts})…`

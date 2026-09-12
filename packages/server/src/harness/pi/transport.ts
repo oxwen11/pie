@@ -50,23 +50,15 @@ type CommandState =
 const transportError = (operation: string, cause: unknown) =>
   new PiTransportError({ operation, cause });
 
-function isAgentSessionEvent(value: unknown): value is AgentSessionEvent {
-  return (
-    typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
-  );
-}
-
-function isCommandData<A>(_value: unknown): _value is A {
-  return true;
-}
-
 const normalizeFailure = (operation: string, error: unknown): PiTransportFailure => {
-  if (
-    error instanceof PiTransportError ||
-    error instanceof PiRpcError ||
-    error instanceof AgentProcessExited
-  ) {
-    return error;
+  if (typeof error === "object" && error !== null && "_tag" in error) {
+    switch (error._tag) {
+      case "PiTransportError":
+      case "PiRpcError":
+      case "AgentProcessExited":
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- _tag already matched a PiTransportFailure
+        return error as PiTransportFailure;
+    }
   }
   return transportError(operation, error);
 };
@@ -180,39 +172,45 @@ export const makePiTransport = (
           return;
         }
         if (typeof decoded !== "object" || decoded === null) return;
-        if (!("type" in decoded) || typeof decoded.type !== "string") return;
+        const frame = decoded as { type?: unknown; id?: unknown };
+        if (typeof frame.type !== "string") return;
 
-        if (decoded.type === "response") {
-          const id = "id" in decoded && typeof decoded.id === "string" ? decoded.id : undefined;
-          if (id === undefined) return;
-          const success = "success" in decoded && decoded.success === true;
-          const data = "data" in decoded ? decoded.data : undefined;
-          const errorMessage =
-            "error" in decoded && typeof decoded.error === "string" ? decoded.error : undefined;
-          yield* resolvePending(id, ({ deferred, command }) =>
-            success
-              ? Deferred.succeed(deferred, data).pipe(Effect.asVoid)
+        if (frame.type === "response") {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL response frame after type === "response"
+          const response = frame as {
+            id?: string;
+            command: string;
+            success: boolean;
+            data?: unknown;
+            error?: string;
+          };
+          if (response.id === undefined) return;
+          yield* resolvePending(response.id, ({ deferred, command }) =>
+            response.success
+              ? Deferred.succeed(deferred, response.data).pipe(Effect.asVoid)
               : Deferred.fail(
                   deferred,
                   new PiRpcError({
                     command,
-                    errorMessage: errorMessage ?? "unknown error",
+                    errorMessage: response.error ?? "unknown error",
                   }),
                 ).pipe(Effect.asVoid),
           );
           return;
         }
 
-        if (decoded.type === "extension_ui_request") {
+        if (frame.type === "extension_ui_request") {
+          const request = decoded as Parameters<typeof isBlockingUiRequest>[0];
           // Fire-and-forget display hints (notify/setStatus/setWidget/…) need
           // no reply and have no chunk-track meaning — drop them.
-          if (isBlockingUiRequest(decoded)) yield* Queue.offer(uiRequests, decoded);
+          if (isBlockingUiRequest(request)) yield* Queue.offer(uiRequests, request);
           return;
         }
 
-        if (decoded.type === "extension_error") return;
+        if (frame.type === "extension_error") return;
 
-        if (isAgentSessionEvent(decoded)) yield* Queue.offer(events, decoded);
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- remaining JSONL frames are AgentSessionEvent
+        yield* Queue.offer(events, decoded as AgentSessionEvent);
       });
 
     yield* Stream.fromQueue(outgoing).pipe(
@@ -284,10 +282,8 @@ export const makePiTransport = (
           Effect.andThen(Deferred.await(deferred)),
           Effect.onInterrupt(() => removePending(id)),
         );
-        if (!isCommandData<A>(data)) {
-          return yield* Effect.die(new TypeError("Pi RPC response data mismatch"));
-        }
-        return data;
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- RPC data is untyped JSON; caller chooses A
+        return data as A;
       });
 
     return {
