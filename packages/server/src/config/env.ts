@@ -37,7 +37,12 @@ export const npmPackageVersion = Config.string("npm_package_version").pipe(Confi
 
 export const pieLogLevel = Config.string("PIE_LOG_LEVEL").pipe(
   Config.withDefault("INFO"),
-  Config.map((value) => LOG_LEVELS[value.toUpperCase() as keyof typeof LOG_LEVELS] ?? "Info"),
+  Config.map((value) => {
+    const level = value.toUpperCase();
+    return level === "DEBUG" || level === "INFO" || level === "WARN" || level === "ERROR"
+      ? LOG_LEVELS[level]
+      : "Info";
+  }),
 );
 
 export const piePrintLogs = Config.boolean("PIE_PRINT_LOGS").pipe(Config.withDefault(false));
