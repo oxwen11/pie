@@ -90,7 +90,18 @@ export default defineConfig({
       },
     ],
     "pie/node-import-style": "error",
-    "pie/no-node-modules-import": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: ["**/node_modules", "**/node_modules/**"],
+            message:
+              'Do not import through node_modules. Import the package by name instead of a relative path like "../../../../node_modules/<pkg>".',
+          },
+        ],
+      },
+    ],
     "pie/no-restricted-disable": "error",
     "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
     "import/no-mutable-exports": "error",

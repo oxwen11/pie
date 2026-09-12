@@ -4,7 +4,6 @@ import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
 import { noLet } from "./no-let";
-import { noNodeModulesImport } from "./no-node-modules-import";
 import { noRestrictedDisable } from "./no-restricted-disable";
 
 const { isBuiltin } = module;
@@ -105,7 +104,6 @@ export default definePlugin({
   meta: { name: "pie" },
   rules: {
     "node-import-style": nodeImportStyleRule,
-    "no-node-modules-import": noNodeModulesImport,
     "no-restricted-disable": noRestrictedDisable,
     "no-let": noLet,
   },
