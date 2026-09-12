@@ -278,6 +278,18 @@ controls are delegated to the rendering library and browser download handling;
 they are user-initiated output, not Pie application state, and have no Pie-owned
 migration or retention policy.
 
+## Development Electron installation
+
+Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
+Electron's official `install-electron` before starting electron-vite. This
+materializes `dist/` and `path.txt` in the resolved Electron dependency package
+and uses the installer's download cache and environment overrides. These are
+dependency-owned artifacts, not Pie application data: Electron owns their
+format, version checks, extraction permissions and retry behavior. Pie adds no
+storage schema, migration or concurrent-install lock. Verification cleanup
+leaves the installed binary and shared download cache intact; packaged startup
+is unchanged.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the
