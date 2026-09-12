@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
+import type { ResourceSource } from "@getpie/contract/resource-monitoring";
 import { type GitCheckout, resolveGitCheckout } from "@getpie/core/development-scope";
 import { Context, Layer } from "effect";
 
@@ -32,6 +33,7 @@ export const LOG_FILE_MODE = 0o600;
 
 export const PIE_LOG_FILE = "pie.log";
 export const DAEMON_STDIO_LOG_FILE = "daemon-stdio.log";
+export const RESOURCE_LOGS_DIRECTORY = "resources";
 
 const resolve = (home: string) => ({
   home,
@@ -74,6 +76,10 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
+
+/** One independently owned resource-log source below `$PIE_HOME/logs/resources`. */
+export const resourceSourceDirectory = (logsDir: string, source: ResourceSource): string =>
+  path.join(logsDir, RESOURCE_LOGS_DIRECTORY, source);
 
 export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 
