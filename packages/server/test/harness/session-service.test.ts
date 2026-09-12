@@ -875,10 +875,10 @@ describe("PiAgentSessionService", () => {
         // log lands so the identity wrap is still on the fiber.
         yield* Effect.gen(function* () {
           for (let attempt = 0; attempt < 200; attempt += 1) {
-            if (records.some((record) => record.message === "pi creating")) return;
+            if (records.some((record) => record.message === "pi creating")) return undefined;
             yield* Effect.sleep("10 millis");
           }
-          yield* Effect.die(new Error("timed out waiting for pi creating"));
+          return yield* Effect.die(new Error("timed out waiting for pi creating"));
         });
       }).pipe(
         Effect.provide(
