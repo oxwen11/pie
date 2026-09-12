@@ -5,7 +5,6 @@ import type {
   SessionPendingPrompt,
   SessionPhase,
   SessionRuntimeSnapshot,
-  SessionScopedEvent,
   SessionScopedEventBody,
 } from "@getpie/contract";
 import type { UIMessage, UIMessageChunk } from "ai";
@@ -107,7 +106,7 @@ export const makeChat = (options?: { onTerminated?: () => void }) => {
     await settle();
   };
   const live = (seq: number, body: SessionScopedEventBody & { phase?: SessionPhase }) =>
-    emit({ seq, ref, ...body } as SessionScopedEvent);
+    emit({ seq, ref, ...body });
   return { chat, transport, attach, live, emit };
 };
 
@@ -115,8 +114,7 @@ export const chunkEvent = (
   seq: number,
   turnId: string,
   chunk: UIMessageChunk,
-): SessionMessageChunkEvent =>
-  ({ seq, ref, type: "session.message.chunk", turnId, chunk }) as SessionMessageChunkEvent;
+): SessionMessageChunkEvent => ({ seq, ref, type: "session.message.chunk", turnId, chunk });
 
 type ActiveTurnInit = Partial<NonNullable<SessionRuntimeSnapshot["activeTurn"]>> & {
   turnId: string;

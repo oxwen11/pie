@@ -626,7 +626,7 @@ describe("ScheduleService", () => {
       });
       const bound = h.catalog.find((session) => session.sessionId === "sess-1");
       assert.isDefined(bound);
-      bound!.archived = true;
+      bound.archived = true;
       yield* h.service.runNow(created.id);
       yield* Effect.yieldNow;
       assert.strictEqual(h.created.length, 2);

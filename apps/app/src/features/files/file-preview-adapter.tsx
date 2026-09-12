@@ -58,9 +58,9 @@ function TargetLineScroller({
   useLayoutEffect(() => {
     if (targetKey === null || targetLine === undefined) {
       onResetScroll();
-      return;
+      return undefined;
     }
-    if (virtualizer === undefined || hasScrolled(targetKey)) return;
+    if (virtualizer === undefined || hasScrolled(targetKey)) return undefined;
 
     let scrollFrame = 0;
     const renderFrame = requestAnimationFrame(() => {

@@ -31,6 +31,10 @@ export function reviewHeading(review: {
       if (review.branch !== null && target !== null) return `${review.branch} → ${target}`;
       return "Branch comparison";
     }
+    default: {
+      const exhaustive: never = review.mode;
+      return exhaustive;
+    }
   }
 }
 
@@ -51,6 +55,10 @@ export function emptyReviewMessage(review: {
       return target === null
         ? "No changes against the selected branch."
         : `No changes against ${target}.`;
+    }
+    default: {
+      const exhaustive: never = review.mode;
+      return exhaustive;
     }
   }
 }

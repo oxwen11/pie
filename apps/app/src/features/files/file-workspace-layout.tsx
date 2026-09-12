@@ -26,7 +26,7 @@ export function FileWorkspaceLayout({
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (container === null) return;
+    if (container === null) return undefined;
 
     const updateWidth = (width: number): void => {
       setIsNarrow(width < MIN_SPLIT_WIDTH);
