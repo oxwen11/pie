@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { resolvePieHome, sshEnvironmentsFile } from "@getpie/server/daemon";
 import {
   connectSshEnvironment,
   discoverSshHosts,
@@ -17,10 +18,10 @@ import {
   type SshHostDiscoveryError,
   type SshTarget,
 } from "@getpie/ssh";
-import { Context, Effect, FileSystem, Layer, Ref, type PlatformError } from "effect";
+import { Context, Effect, FileSystem, Layer, Ref, Semaphore, type PlatformError } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
-import { DesktopConfig } from "../desktop-config";
+import { LoginShellEnvironment } from "../server/login-shell-environment";
 
 export { environmentLabel, formatSshInput, SshHostDiscoveryError } from "@getpie/ssh";
 export type {
@@ -30,7 +31,6 @@ export type {
   SshTarget,
 } from "@getpie/ssh";
 
-const SAVED_ENVIRONMENTS_FILE = "ssh-environments.json";
 const SAVED_FILE_MODE = 0o600;
 
 export type SavedSshEnvironment = {
@@ -46,6 +46,8 @@ export type DesktopSshConnectResult = {
     readonly wsBaseUrl: string;
     readonly token: string;
   };
+  /** Completes when the live local forward ends. */
+  readonly closed: Effect.Effect<void>;
 };
 
 type LiveSshSession = {
@@ -54,8 +56,7 @@ type LiveSshSession = {
   readonly connected: SshConnectedEnvironment;
 };
 
-type SavedFile = {
-  readonly version: 1;
+type SavedFileData = {
   readonly environments: ReadonlyArray<{
     readonly id: string;
     readonly alias: string;
@@ -65,12 +66,20 @@ type SavedFile = {
   }>;
 };
 
+type SavedFile = {
+  readonly version: 1;
+  readonly data: SavedFileData;
+};
+
+type SavedState = {
+  readonly environments: readonly SavedSshEnvironment[];
+};
+
 export type DesktopSshShape = {
   readonly client: SshClientAvailability;
   readonly listSaved: Effect.Effect<readonly SavedSshEnvironment[]>;
   readonly connect: (raw: string) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError>;
-  readonly disconnect: (id: string) => Effect.Effect<void>;
-  readonly disconnectAll: Effect.Effect<void>;
+  readonly disconnect: Effect.Effect<void>;
   readonly remove: (id: string) => Effect.Effect<void>;
   readonly discoverHosts: Effect.Effect<readonly DiscoveredSshHost[], SshHostDiscoveryError>;
 };
@@ -85,93 +94,107 @@ export function disabledDesktopSsh(overrides?: Partial<DesktopSshShape>): Deskto
     client: { available: true },
     listSaved: Effect.succeed([]),
     connect: () => Effect.fail(new SshInvalidTargetError({ message: "SSH is disabled." })),
-    disconnect: () => Effect.void,
-    disconnectAll: Effect.void,
+    disconnect: Effect.void,
     remove: () => Effect.void,
     discoverHosts: Effect.succeed([]),
     ...overrides,
   });
 }
 
-function savedFilePath(userDataPath: string): string {
-  return path.join(userDataPath, SAVED_ENVIRONMENTS_FILE);
+function parseEnvironments(value: unknown): SavedSshEnvironment[] {
+  if (!Array.isArray(value)) return [];
+  const environments: SavedSshEnvironment[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const item = entry as {
+      id?: unknown;
+      alias?: unknown;
+      hostname?: unknown;
+      username?: unknown;
+      port?: unknown;
+    };
+    if (typeof item.id !== "string" || item.id.length === 0) continue;
+    if (typeof item.alias !== "string" || item.alias.length === 0) continue;
+    if (typeof item.hostname !== "string" || item.hostname.length === 0) continue;
+    if (item.username !== null && typeof item.username !== "string") continue;
+    if (item.port !== null && (typeof item.port !== "number" || !Number.isInteger(item.port))) {
+      continue;
+    }
+    environments.push({
+      id: item.id,
+      target: {
+        alias: item.alias,
+        hostname: item.hostname,
+        username: item.username,
+        port: item.port,
+      },
+    });
+  }
+  return environments;
 }
 
-function parseSavedFile(raw: string): readonly SavedSshEnvironment[] {
+function parseSavedData(value: unknown): SavedState {
+  if (typeof value !== "object" || value === null) {
+    return { environments: [] };
+  }
+  const record = value as { environments?: unknown };
+  return { environments: parseEnvironments(record.environments) };
+}
+
+function parseSavedFile(raw: string): SavedState {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return [];
-    const record = parsed as { version?: unknown; environments?: unknown };
-    if (record.version !== 1 || !Array.isArray(record.environments)) return [];
-    const environments: SavedSshEnvironment[] = [];
-    for (const entry of record.environments) {
-      if (typeof entry !== "object" || entry === null) continue;
-      const item = entry as {
-        id?: unknown;
-        alias?: unknown;
-        hostname?: unknown;
-        username?: unknown;
-        port?: unknown;
-      };
-      if (typeof item.id !== "string" || item.id.length === 0) continue;
-      if (typeof item.alias !== "string" || item.alias.length === 0) continue;
-      if (typeof item.hostname !== "string" || item.hostname.length === 0) continue;
-      if (item.username !== null && typeof item.username !== "string") continue;
-      if (item.port !== null && (typeof item.port !== "number" || !Number.isInteger(item.port))) {
-        continue;
-      }
-      environments.push({
-        id: item.id,
-        target: {
-          alias: item.alias,
-          hostname: item.hostname,
-          username: item.username,
-          port: item.port,
-        },
-      });
+    if (typeof parsed !== "object" || parsed === null) {
+      return { environments: [] };
     }
-    return environments;
+    const record = parsed as { version?: unknown; data?: unknown; environments?: unknown };
+    if (record.version !== 1) {
+      return { environments: [] };
+    }
+    if ("data" in record) return parseSavedData(record.data);
+    return parseSavedData(record);
   } catch {
-    return [];
+    return { environments: [] };
   }
 }
 
-function serializeSavedFile(environments: readonly SavedSshEnvironment[]): string {
+function serializeSavedFile(state: SavedState): string {
   const file: SavedFile = {
     version: 1,
-    environments: environments.map((entry) => ({
-      id: entry.id,
-      alias: entry.target.alias,
-      hostname: entry.target.hostname,
-      username: entry.target.username,
-      port: entry.target.port,
-    })),
+    data: {
+      environments: state.environments.map((entry) => ({
+        id: entry.id,
+        alias: entry.target.alias,
+        hostname: entry.target.hostname,
+        username: entry.target.username,
+        port: entry.target.port,
+      })),
+    },
   };
   return `${JSON.stringify(file, null, 2)}\n`;
 }
 
-const readSaved = (
-  filePath: string,
-): Effect.Effect<readonly SavedSshEnvironment[], never, FileSystem.FileSystem> =>
+const readSaved = (filePath: string): Effect.Effect<SavedState, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
-    return raw.length === 0 ? [] : parseSavedFile(raw);
+    return raw.length === 0 ? { environments: [] } : parseSavedFile(raw);
   });
 
 const writeSaved = (
   filePath: string,
-  environments: readonly SavedSshEnvironment[],
+  state: SavedState,
 ): Effect.Effect<void, PlatformError.PlatformError, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
-    yield* fs.writeFileString(filePath, serializeSavedFile(environments));
+    yield* fs.writeFileString(filePath, serializeSavedFile(state));
     yield* fs.chmod(filePath, SAVED_FILE_MODE);
   });
 
 export function makeDesktopSsh(input: {
-  readonly userDataPath: string;
+  readonly persistPath: string;
+  readonly env?: NodeJS.ProcessEnv;
 }): Effect.Effect<
   DesktopSsh["Service"],
   never,
@@ -181,24 +204,59 @@ export function makeDesktopSsh(input: {
     const platform = yield* Effect.context<
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
-    const filePath = savedFilePath(input.userDataPath);
-    const liveRef = yield* Ref.make<LiveSshSession | undefined>(undefined);
-    const client = yield* probeSshClient();
+    const filePath = input.persistPath;
+    const liveRef = yield* Ref.make(new Map<string, LiveSshSession>());
+    const persistGate = yield* Semaphore.make(1);
+    const cli = { env: input.env };
+    const client = yield* probeSshClient(cli);
 
-    const persist = (environments: readonly SavedSshEnvironment[]) =>
-      writeSaved(filePath, environments).pipe(Effect.provide(platform), Effect.ignore);
+    const persistEnvironments = (environments: readonly SavedSshEnvironment[]) =>
+      persistGate.withPermit(
+        writeSaved(filePath, { environments }).pipe(Effect.provide(platform), Effect.ignore),
+      );
 
-    const disconnectLive = (id: string | undefined) =>
+    const resultFromLive = (live: LiveSshSession): DesktopSshConnectResult => ({
+      id: live.id,
+      target: live.target,
+      connection: {
+        httpBaseUrl: live.connected.httpBaseUrl,
+        wsBaseUrl: live.connected.wsBaseUrl,
+        token: live.connected.token,
+      },
+      closed: live.connected.closed,
+    });
+
+    const adoptLive = (session: LiveSshSession) =>
       Effect.gen(function* () {
-        const live = yield* Ref.get(liveRef);
-        if (!live || (id !== undefined && live.id !== id)) return;
-        yield* live.connected.close;
-        yield* Ref.set(liveRef, undefined);
+        yield* Ref.update(liveRef, (lives) => new Map([...lives, [session.id, session]]));
+        yield* session.connected.closed.pipe(
+          Effect.andThen(() =>
+            Ref.update(liveRef, (lives) => {
+              if (lives.get(session.id) !== session) return lives;
+              const next = new Map(lives);
+              next.delete(session.id);
+              return next;
+            }),
+          ),
+          Effect.forkDetach,
+        );
       });
+
+    const closeSession = (session: LiveSshSession) => session.connected.close;
+
+    const disconnectAll = Effect.gen(function* () {
+      const lives = yield* Ref.getAndSet(liveRef, new Map());
+      for (const live of lives.values()) {
+        yield* closeSession(live);
+      }
+    });
 
     return DesktopSsh.of({
       client,
-      listSaved: readSaved(filePath).pipe(Effect.provide(platform)),
+      listSaved: readSaved(filePath).pipe(
+        Effect.provide(platform),
+        Effect.map((state) => state.environments),
+      ),
       connect: (raw) =>
         Effect.gen(function* () {
           if (!client.available) {
@@ -207,28 +265,19 @@ export function makeDesktopSsh(input: {
               message: client.message,
             });
           }
-          const target = yield* resolveSshInput(raw);
+          const target = yield* resolveSshInput(raw, cli);
           const id = remoteStateKey(target);
-          const current = yield* Ref.get(liveRef);
-          if (current?.id === id) {
-            return {
-              id,
-              target: current.target,
-              connection: {
-                httpBaseUrl: current.connected.httpBaseUrl,
-                wsBaseUrl: current.connected.wsBaseUrl,
-                token: current.connected.token,
-              },
-            } satisfies DesktopSshConnectResult;
+          const existing = yield* Ref.get(liveRef).pipe(Effect.map((lives) => lives.get(id)));
+          if (existing !== undefined) {
+            return resultFromLive(existing);
           }
 
-          const connected = yield* connectSshEnvironment(target);
-          if (current) yield* current.connected.close;
-          yield* Ref.set(liveRef, { id, target, connected });
+          const connected = yield* connectSshEnvironment(target, cli);
+          yield* adoptLive({ id, target, connected });
 
-          const saved = yield* readSaved(filePath);
-          const next = [...saved.filter((entry) => entry.id !== id), { id, target }];
-          yield* persist(next);
+          const saved = yield* readSaved(filePath).pipe(Effect.provide(platform));
+          const next = [...saved.environments.filter((entry) => entry.id !== id), { id, target }];
+          yield* persistEnvironments(next);
 
           yield* Effect.log("ssh.environment.connected").pipe(
             Effect.annotateLogs({
@@ -239,23 +288,23 @@ export function makeDesktopSsh(input: {
             }),
           );
 
-          return {
-            id,
-            target,
-            connection: {
-              httpBaseUrl: connected.httpBaseUrl,
-              wsBaseUrl: connected.wsBaseUrl,
-              token: connected.token,
-            },
-          } satisfies DesktopSshConnectResult;
+          return resultFromLive({ id, target, connected });
         }).pipe(Effect.provide(platform)),
-      disconnect: (id) => disconnectLive(id),
-      disconnectAll: disconnectLive(undefined),
+      disconnect: disconnectAll,
       remove: (id) =>
         Effect.gen(function* () {
-          yield* disconnectLive(id);
-          const saved = yield* readSaved(filePath);
-          yield* persist(saved.filter((entry) => entry.id !== id));
+          const current = yield* Ref.modify(liveRef, (lives) => {
+            const live = lives.get(id);
+            if (live === undefined) return [undefined, lives];
+            const next = new Map(lives);
+            next.delete(id);
+            return [live, next];
+          });
+          if (current !== undefined) {
+            yield* closeSession(current);
+          }
+          const saved = yield* readSaved(filePath).pipe(Effect.provide(platform));
+          yield* persistEnvironments(saved.environments.filter((entry) => entry.id !== id));
         }).pipe(Effect.provide(platform)),
       discoverHosts: discoverSshHosts().pipe(Effect.provide(platform)),
     });
@@ -265,9 +314,12 @@ export function makeDesktopSsh(input: {
 export const DesktopSshLive = Layer.effect(
   DesktopSsh,
   Effect.gen(function* () {
-    const config = yield* DesktopConfig;
-    const ssh = yield* makeDesktopSsh({ userDataPath: config.userDataPath });
-    yield* Effect.addFinalizer(() => ssh.disconnectAll);
+    const loginShell = yield* LoginShellEnvironment;
+    const ssh = yield* makeDesktopSsh({
+      persistPath: sshEnvironmentsFile(resolvePieHome()),
+      env: loginShell.env,
+    });
+    yield* Effect.addFinalizer(() => ssh.disconnect);
     return ssh;
   }),
 );

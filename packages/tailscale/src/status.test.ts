@@ -52,7 +52,6 @@ describe("decodeTailscaleStatus", () => {
     const status = decodeTailscaleStatus(JSON.stringify(STATUS));
     expect(status.backendState).toBe("Running");
     expect(status.magicDnsName).toBe("laptop.tailnet.ts.net");
-    expect(status.tailnetIpv4Addresses).toEqual(["100.64.1.2"]);
     expect(status.peers).toEqual([
       {
         alias: "100.71.0.8",
@@ -92,8 +91,8 @@ describe("decodeTailscaleStatus", () => {
   });
 
   it("rejects non-object JSON", () => {
-    expect(() => decodeTailscaleStatus("[]")).toThrowError(/status JSON/);
-    expect(() => decodeTailscaleStatus("{")).toThrowError(/status JSON/);
+    expect(() => decodeTailscaleStatus("[]")).toThrow(/status JSON/);
+    expect(() => decodeTailscaleStatus("{")).toThrow(/status JSON/);
   });
 });
 

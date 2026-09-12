@@ -14,16 +14,13 @@ export type SshTarget = {
 };
 
 export type DiscoveredSshHost = SshTarget & {
-  readonly source: "ssh-config" | "known-hosts";
+  readonly source: "ssh-config";
 };
-
-export type RemoteServerKind = "daemon";
 
 /** Result of launching or attaching to the remote pie daemon. */
 export type RemoteLaunchResult = {
   readonly remotePort: number;
   readonly token: string;
-  readonly serverKind: RemoteServerKind;
 };
 
 /** Loopback URLs plus the daemon token after the local forward is up. */
@@ -33,7 +30,6 @@ export type SshEnvironmentBootstrap = {
   readonly wsBaseUrl: string;
   readonly token: string;
   readonly remotePort: number;
-  readonly remoteServerKind: RemoteServerKind;
 };
 
 const IPV6_HOST = /^\[([^\]]+)\](?::(\d+))?$/u;
@@ -154,53 +150,38 @@ export function environmentLabel(target: SshTarget): string {
   return target.alias.trim() || target.hostname;
 }
 
-export function getLastNonEmptyOutputLine(stdout: string): string | null {
-  const lines = stdout
-    .trim()
-    .split(/\r?\n/u)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  return lines.length === 0 ? null : (lines[lines.length - 1] ?? null);
-}
-
 /** Last `{...}` object in mixed SSH stdout (daemon chatter, then launch JSON). */
 export function extractJsonObject(stdout: string): string {
   const start = stdout.lastIndexOf("{");
   const end = stdout.lastIndexOf("}");
-  if (start >= 0 && end > start) return stdout.slice(start, end + 1);
+  if (start !== -1 && end > start) return stdout.slice(start, end + 1);
   return stdout.trim();
 }
 
 export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | undefined {
-  const candidates = [extractJsonObject(stdout), getLastNonEmptyOutputLine(stdout) ?? ""];
-  for (const raw of candidates) {
-    if (raw.length === 0) continue;
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null) continue;
-      const record = parsed as {
-        remotePort?: unknown;
-        token?: unknown;
-        serverKind?: unknown;
-      };
-      if (
-        typeof record.remotePort !== "number" ||
-        !Number.isInteger(record.remotePort) ||
-        record.remotePort <= 0 ||
-        typeof record.token !== "string" ||
-        record.token.length === 0 ||
-        record.serverKind !== "daemon"
-      ) {
-        continue;
-      }
-      return {
-        remotePort: record.remotePort,
-        token: record.token,
-        serverKind: "daemon",
-      };
-    } catch {
-      continue;
+  const raw = extractJsonObject(stdout);
+  if (raw.length === 0) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+    const record = parsed as {
+      remotePort?: unknown;
+      token?: unknown;
+    };
+    if (
+      typeof record.remotePort !== "number" ||
+      !Number.isInteger(record.remotePort) ||
+      record.remotePort <= 0 ||
+      typeof record.token !== "string" ||
+      record.token.length === 0
+    ) {
+      return undefined;
     }
+    return {
+      remotePort: record.remotePort,
+      token: record.token,
+    };
+  } catch {
+    return undefined;
   }
-  return undefined;
 }

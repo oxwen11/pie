@@ -1,11 +1,7 @@
 import { Effect, Option, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-  LOCAL_ENVIRONMENT_ID,
-  type ServerConnection,
-  type ServerStatusSnapshot,
-} from "../../shared/desktop-rpc";
+import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
 import { disabledDesktopSsh, SshHostDiscoveryError } from "../ssh/desktop-ssh";
 import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
@@ -47,7 +43,6 @@ function makeHarness(
     server,
     ssh,
     tailscale,
-    initialRemotes: [],
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -74,7 +69,6 @@ describe("DesktopApplication", () => {
       tailscaleClient: { available: true },
       environments: {
         revision: 0,
-        activeId: LOCAL_ENVIRONMENT_ID,
         connectingLabel: null,
         remotes: [],
       },
@@ -132,7 +126,7 @@ describe("DesktopApplication", () => {
     });
   });
 
-  it("switches serverConnection to the forwarded SSH endpoint and back to local", async () => {
+  it("keeps the window on the local daemon while SSH remotes connect in parallel", async () => {
     const h = makeHarness(
       Effect.succeed(localConnection),
       disabledDesktopSsh({
@@ -146,32 +140,24 @@ describe("DesktopApplication", () => {
               port: null,
             },
             connection: sshConnection,
+            closed: Effect.never,
           }),
       }),
     );
 
     await Effect.runPromise(h.application.connectSsh("alice@example.com"));
-    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(sshConnection);
+    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(
+      localConnection,
+    );
     await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
-      activeId: "remote-1",
       connectingLabel: null,
       remotes: [
         {
           id: "remote-1",
           label: "alice@example.com",
           alias: "alice@example.com",
-          status: "ready",
         },
       ],
-    });
-
-    await Effect.runPromise(h.application.disconnectSsh);
-    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(
-      localConnection,
-    );
-    await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
-      activeId: LOCAL_ENVIRONMENT_ID,
-      remotes: [{ id: "remote-1", status: "idle" }],
     });
   });
 
@@ -266,6 +252,99 @@ describe("DesktopApplication", () => {
         port: null,
         source: "tailscale",
       },
+    ]);
+  });
+
+  it("lists a connected SSH remote without changing the window daemon", async () => {
+    const previousToken = "stale-token-must-not-return";
+    const restored: ServerConnection = {
+      httpBaseUrl: "http://127.0.0.1:52001",
+      wsBaseUrl: "ws://127.0.0.1:52001",
+      token: "fresh-ssh-token",
+    };
+    let connects = 0;
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: () =>
+          Effect.sync(() => {
+            connects += 1;
+            return {
+              id: "remote-1",
+              target: {
+                alias: "example.com",
+                hostname: "example.com",
+                username: "alice",
+                port: null,
+              },
+              connection: restored,
+              closed: Effect.never,
+            };
+          }),
+      }),
+    );
+
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(
+      localConnection,
+    );
+    expect(connects).toBe(1);
+    expect(restored.token).not.toBe(previousToken);
+    await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
+      remotes: [{ id: "remote-1" }],
+    });
+  });
+
+  it("holds more than one SSH forward at once", async () => {
+    const other: ServerConnection = {
+      httpBaseUrl: "http://127.0.0.1:61234",
+      wsBaseUrl: "ws://127.0.0.1:61234",
+      token: "ssh-token-2",
+    };
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: (raw) =>
+          Effect.succeed(
+            raw.includes("bob")
+              ? {
+                  id: "remote-2",
+                  target: {
+                    alias: "other.example",
+                    hostname: "other.example",
+                    username: "bob",
+                    port: null,
+                  },
+                  connection: other,
+                  closed: Effect.never,
+                }
+              : {
+                  id: "remote-1",
+                  target: {
+                    alias: "example.com",
+                    hostname: "example.com",
+                    username: "alice",
+                    port: null,
+                  },
+                  connection: sshConnection,
+                  closed: Effect.never,
+                },
+          ),
+      }),
+    );
+
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    await Effect.runPromise(h.application.connectSsh("bob@other.example"));
+    await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(
+      localConnection,
+    );
+    await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
+      remotes: [{ id: "remote-1" }, { id: "remote-2" }],
+    });
+    const snapshot = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(snapshot.remotes.map((remote) => remote.environmentId)).toEqual([
+      "remote-1",
+      "remote-2",
     ]);
   });
 });

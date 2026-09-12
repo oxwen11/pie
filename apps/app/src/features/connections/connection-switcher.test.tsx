@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
-import { LOCAL_ENVIRONMENT_ID, type PlatformSsh } from "@/platform";
+import type { PlatformSsh } from "@/platform";
 import { PlatformProvider } from "@/platform-provider";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,7 +32,6 @@ let container: HTMLDivElement | undefined;
 
 const hangingSnapshot = {
   revision: 0,
-  activeId: LOCAL_ENVIRONMENT_ID,
   connectingLabel: null,
   remotes: [],
 } as const;
@@ -45,7 +44,6 @@ const hangingSsh: PlatformSsh = {
   },
   discoverHosts: () => new Promise(() => {}),
   connect: () => Promise.resolve(),
-  disconnect: () => Promise.resolve(),
   remove: () => Promise.resolve(),
 };
 
@@ -119,7 +117,7 @@ describe("ConnectionSwitcher", () => {
     const addItem = [...document.querySelectorAll('[data-slot="menu-item"]')].find((node) =>
       node.textContent?.includes("Add SSH host"),
     );
-    expect(addItem).not.toBeUndefined();
+    expect(addItem).toBeDefined();
 
     await act(async () => {
       dispatch(addItem!, "pointerdown");

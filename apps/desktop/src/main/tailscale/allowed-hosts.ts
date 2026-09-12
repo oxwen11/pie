@@ -26,7 +26,7 @@ export function mergePieAllowedHosts(
 
 /** Add this machine's MagicDNS name to CORS when Tailscale is up. Failures are ignored. */
 export const withTailscaleAllowedHosts = (env: NodeJS.ProcessEnv) =>
-  readTailscaleStatus.pipe(
+  readTailscaleStatus().pipe(
     Effect.map((status) =>
       mergePieAllowedHosts(env, status.magicDnsName === null ? [] : [status.magicDnsName]),
     ),

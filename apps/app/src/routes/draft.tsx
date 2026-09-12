@@ -31,6 +31,7 @@ import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
+import { toEnvironmentSessionRef } from "@/lib/session-ref";
 
 type DraftSearch = {
   readonly projectId?: string;
@@ -60,7 +61,7 @@ export const Route = createFileRoute("/draft")({
 });
 
 function DraftRoute() {
-  const { orpcQueryUtils } = Route.useRouteContext();
+  const { orpcQueryUtils, localEnvironmentId } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const chats = useChatManager();
@@ -126,7 +127,7 @@ function DraftRoute() {
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
-        .chatFor(created.ref)
+        .chatFor(toEnvironmentSessionRef(localEnvironmentId, created.ref))
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
@@ -135,7 +136,7 @@ function DraftRoute() {
       navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
-        search: { projectId: created.ref.projectId },
+        search: { projectId: created.ref.projectId, environmentId: localEnvironmentId },
       }).catch((error: unknown) => {
         console.error("Failed to open the new session", error);
       });

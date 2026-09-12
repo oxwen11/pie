@@ -1,17 +1,16 @@
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@getpie/ui/components/menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
-import { Check, Laptop, Plus, Server, Share2 } from "lucide-react";
+import { Laptop, Plus, Server, Share2 } from "lucide-react";
 import { useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import { AddSshHostDialog } from "@/features/connections/add-ssh-host-dialog";
 import { ShareTailscaleDialog } from "@/features/connections/share-tailscale-dialog";
-import { LOCAL_ENVIRONMENT_ID, type EnvironmentSnapshot } from "@/platform";
+import type { EnvironmentSnapshot } from "@/platform";
 import { usePlatform } from "@/platform-context";
 
 const MISSING_SNAPSHOT: EnvironmentSnapshot = {
   revision: 0,
-  activeId: LOCAL_ENVIRONMENT_ID,
   connectingLabel: null,
   remotes: [],
 };
@@ -38,10 +37,11 @@ export function ConnectionSwitcher(): ReactElement | null {
   if (!ssh) return null;
 
   const launch = ssh.client;
-  const activeRemote = environments.remotes.find((remote) => remote.id === environments.activeId);
-  const label = activeRemote?.label ?? "This computer";
   const connecting = environments.connectingLabel !== null;
-  const canLaunch = launch.available;
+  const label =
+    environments.remotes.length === 0
+      ? "Connections"
+      : `${String(environments.remotes.length)} connected`;
 
   return (
     <>
@@ -73,40 +73,17 @@ export function ConnectionSwitcher(): ReactElement | null {
             }}
           >
             <MenuTrigger disabled={connecting} render={<SidebarMenuButton />}>
-              {activeRemote ? <Server /> : <Laptop />}
+              <Laptop />
               <span>{environments.connectingLabel ?? label}</span>
             </MenuTrigger>
             <MenuPopup align="start" className="min-w-56">
-              <MenuItem
-                disabled={connecting}
-                onClick={() => {
-                  if (environments.activeId !== LOCAL_ENVIRONMENT_ID) {
-                    void ssh.disconnect().catch((error: unknown) => {
-                      toast.error(sshErrorMessage(error, "Failed to disconnect SSH."));
-                    });
-                  }
-                }}
-              >
-                {environments.activeId === LOCAL_ENVIRONMENT_ID ? <Check /> : <Laptop />}
-                <span>This computer</span>
-              </MenuItem>
               {environments.remotes.map((remote) => (
-                <MenuItem
-                  disabled={connecting || !canLaunch}
-                  key={remote.id}
-                  onClick={() => {
-                    if (remote.id !== environments.activeId) {
-                      void ssh.connect(remote.alias).catch((error: unknown) => {
-                        toast.error(sshErrorMessage(error, "Failed to connect over SSH."));
-                      });
-                    }
-                  }}
-                >
-                  {remote.id === environments.activeId ? <Check /> : <Server />}
+                <MenuItem disabled key={remote.id}>
+                  <Server />
                   <span>{remote.label}</span>
                 </MenuItem>
               ))}
-              <MenuSeparator />
+              {environments.remotes.length > 0 ? <MenuSeparator /> : null}
               {launch.available ? (
                 <MenuItem
                   disabled={connecting}
@@ -137,19 +114,20 @@ export function ConnectionSwitcher(): ReactElement | null {
                   <span>Tailscale client not found</span>
                 </MenuItem>
               )}
-              {activeRemote ? (
+              {environments.remotes.map((remote) => (
                 <MenuItem
                   disabled={connecting}
+                  key={`remove-${remote.id}`}
                   variant="destructive"
                   onClick={() => {
-                    void ssh.remove(activeRemote.id).catch((error: unknown) => {
+                    void ssh.remove(remote.id).catch((error: unknown) => {
                       toast.error(sshErrorMessage(error, "Failed to remove SSH host."));
                     });
                   }}
                 >
-                  <span>Remove {activeRemote.label}</span>
+                  <span>Remove {remote.label}</span>
                 </MenuItem>
-              ) : null}
+              ))}
             </MenuPopup>
           </Menu>
         </SidebarMenuItem>

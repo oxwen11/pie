@@ -1,6 +1,6 @@
 import os from "node:os";
-import path from "node:path";
 
+import { findExecutable } from "@getpie/core/executable";
 import { Duration, Effect, FileSystem, Option, Scope, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -27,22 +27,6 @@ export type TailscaleCommandResult = {
   readonly stderr: string;
 };
 
-function pathDelimiter(platform: NodeJS.Platform): string {
-  return platform === "win32" ? ";" : ":";
-}
-
-const isRunnableTailscale = (
-  fs: FileSystem.FileSystem,
-  candidate: string,
-  platform: NodeJS.Platform,
-): Effect.Effect<boolean> =>
-  fs.stat(candidate).pipe(
-    Effect.map(
-      (info) => info.type === "File" && (platform === "win32" || (info.mode & 0o111) !== 0),
-    ),
-    Effect.catch(() => Effect.succeed(false)),
-  );
-
 export function tailscaleCommandForPlatform(platform: NodeJS.Platform = os.platform()): string {
   return platform === "win32" ? "tailscale.exe" : "tailscale";
 }
@@ -57,20 +41,9 @@ export function tailscaleClientMissingMessage(
 export const findTailscaleCommand = (
   input: FindTailscaleCommandOptions = {},
 ): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const platform = input.platform ?? os.platform();
-    const env = input.env ?? process.env;
-    const command = tailscaleCommandForPlatform(platform);
-    const fs = yield* FileSystem.FileSystem;
-    if (path.isAbsolute(command)) {
-      return (yield* isRunnableTailscale(fs, command, platform)) ? command : undefined;
-    }
-    for (const dir of (env["PATH"] ?? "").split(pathDelimiter(platform))) {
-      if (!dir) continue;
-      const candidate = path.join(dir, command);
-      if (yield* isRunnableTailscale(fs, candidate, platform)) return candidate;
-    }
-    return undefined;
+  findExecutable(tailscaleCommandForPlatform(input.platform ?? os.platform()), {
+    env: input.env,
+    platform: input.platform,
   });
 
 export const requireTailscaleCommand = (
@@ -86,7 +59,7 @@ export const requireTailscaleCommand = (
         message: tailscaleClientMissingMessage(command),
       });
     }
-    return command;
+    return found;
   });
 
 export const probeTailscaleClient = (
@@ -163,13 +136,14 @@ const collectProcessOutput = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.E
 const runTailscaleCommandInScope = (
   args: ReadonlyArray<string>,
   commandScope: Scope.Scope,
+  input: FindTailscaleCommandOptions,
 ): Effect.Effect<
   TailscaleCommandResult,
   TailscaleCommandError | TailscaleClientMissingError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
-    const command = yield* requireTailscaleCommand();
+    const command = yield* requireTailscaleCommand(input);
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const argv = [command, ...args];
     yield* Effect.logDebug("tailscale.command.start").pipe(
@@ -177,25 +151,23 @@ const runTailscaleCommandInScope = (
         command: argv,
       }),
     );
-    const child = yield* spawner
-      .spawn(
-        ChildProcess.make(command, args, {
-          stdin: "ignore",
-        }),
-      )
-      .pipe(
-        Effect.provideService(Scope.Scope, commandScope),
-        Effect.mapError((cause) =>
-          isTailscaleSpawnNotFound(cause)
-            ? missingTailscaleClientError(command)
-            : new TailscaleCommandError({
-                command: argv,
-                exitCode: null,
-                message: "Failed to run Tailscale.",
-                cause,
-              }),
-        ),
-      );
+    const spawnOptions =
+      input.env === undefined
+        ? { stdin: "ignore" as const }
+        : { stdin: "ignore" as const, env: input.env, extendEnv: false };
+    const child = yield* spawner.spawn(ChildProcess.make(command, args, spawnOptions)).pipe(
+      Effect.provideService(Scope.Scope, commandScope),
+      Effect.mapError((cause) =>
+        isTailscaleSpawnNotFound(cause)
+          ? missingTailscaleClientError(command)
+          : new TailscaleCommandError({
+              command: argv,
+              exitCode: null,
+              message: "Failed to run Tailscale.",
+              cause,
+            }),
+      ),
+    );
 
     const [stdout, stderr, exitCode] = yield* Effect.all(
       [
@@ -251,12 +223,13 @@ const runTailscaleCommandInScope = (
 export const runTailscaleCommand = (
   args: ReadonlyArray<string>,
   timeoutMs: number,
+  input: FindTailscaleCommandOptions = {},
 ): Effect.Effect<
   TailscaleCommandResult,
   TailscaleCommandError | TailscaleClientMissingError,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
-  Effect.scopedWith((commandScope) => runTailscaleCommandInScope(args, commandScope)).pipe(
+  Effect.scopedWith((commandScope) => runTailscaleCommandInScope(args, commandScope, input)).pipe(
     Effect.timeoutOption(Duration.millis(timeoutMs)),
     Effect.flatMap((result) =>
       Option.match(result, {
