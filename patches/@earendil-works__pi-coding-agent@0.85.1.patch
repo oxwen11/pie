@@ -20,11 +20,146 @@ index e8e8859..d0fce35 100644
  import { resolvePath } from "../../utils/paths.js";
  import { createEventBus } from "../event-bus.js";
  import { execCommand } from "../exec.js";
+diff --git a/dist/core/tools/render-utils.js b/dist/core/tools/render-utils.js
+index 479a0b4..0cb9757 100644
+--- a/dist/core/tools/render-utils.js
++++ b/dist/core/tools/render-utils.js
+@@ -1,6 +1,6 @@
+ import * as os from "node:os";
+ import { pathToFileURL } from "node:url";
+-import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "@earendil-works/pi-tui";
++import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "../../tui-stub.js";
+ import { stripAnsi } from "../../utils/ansi.js";
+ import { resolvePath } from "../../utils/paths.js";
+ import { sanitizeBinaryOutput } from "../../utils/shell.js";
+diff --git a/dist/core/tools/renderers/bash.js b/dist/core/tools/renderers/bash.js
+index f749aa9..193bb93 100644
+--- a/dist/core/tools/renderers/bash.js
++++ b/dist/core/tools/renderers/bash.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `bash.ts` spreads these into the shell
+  * tool definition, so the tool's public shape is unchanged.
+  */
+-import { Container, Text, truncateToWidth } from "@earendil-works/pi-tui";
++import { Container, Text, truncateToWidth } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { truncateToVisualLines } from "../../../modes/interactive/components/visual-truncate.js";
+ import { theme } from "../../../modes/interactive/theme/theme.js";
+diff --git a/dist/core/tools/renderers/edit.js b/dist/core/tools/renderers/edit.js
+index 4def3e2..66d53fc 100644
+--- a/dist/core/tools/renderers/edit.js
++++ b/dist/core/tools/renderers/edit.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `edit.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
++import { Box, Container, Spacer, Text } from "../../../tui-stub.js";
+ import { renderDiff } from "../../../modes/interactive/components/diff.js";
+ import { computeEditsDiff } from "../edit-diff.js";
+ import { renderToolPath, str } from "../render-utils.js";
+diff --git a/dist/core/tools/renderers/find.js b/dist/core/tools/renderers/find.js
+index 61b9896..7641ab0 100644
+--- a/dist/core/tools/renderers/find.js
++++ b/dist/core/tools/renderers/find.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `find.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/grep.js b/dist/core/tools/renderers/grep.js
+index c8d832e..ff39125 100644
+--- a/dist/core/tools/renderers/grep.js
++++ b/dist/core/tools/renderers/grep.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `grep.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/ls.js b/dist/core/tools/renderers/ls.js
+index ff33131..87ba9bd 100644
+--- a/dist/core/tools/renderers/ls.js
++++ b/dist/core/tools/renderers/ls.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `ls.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getTextOutput, renderToolPath, str } from "../render-utils.js";
+ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.js";
+diff --git a/dist/core/tools/renderers/read.js b/dist/core/tools/renderers/read.js
+index c331317..e660a58 100644
+--- a/dist/core/tools/renderers/read.js
++++ b/dist/core/tools/renderers/read.js
+@@ -6,7 +6,7 @@
+  * definition, so the tool's public shape is unchanged.
+  */
+ import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from "node:path";
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ import { getReadmePath } from "../../../config.js";
+ import { keyHint, keyText } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getLanguageFromPath, highlightCode } from "../../../modes/interactive/theme/theme.js";
+diff --git a/dist/core/tools/renderers/write.js b/dist/core/tools/renderers/write.js
+index dcf5bf9..be2bb4a 100644
+--- a/dist/core/tools/renderers/write.js
++++ b/dist/core/tools/renderers/write.js
+@@ -5,7 +5,7 @@
+  * load the execution path or its typebox parameter schema. `write.ts` spreads these into its
+  * definition, so the tool's public shape is unchanged.
+  */
+-import { Container, Text } from "@earendil-works/pi-tui";
++import { Container, Text } from "../../../tui-stub.js";
+ import { keyHint } from "../../../modes/interactive/components/keybinding-hints.js";
+ import { getLanguageFromPath, highlightCode } from "../../../modes/interactive/theme/theme.js";
+ import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.js";
+diff --git a/dist/modes/interactive/components/keybinding-hints.js b/dist/modes/interactive/components/keybinding-hints.js
+index 03a6c66..2884b4c 100644
+--- a/dist/modes/interactive/components/keybinding-hints.js
++++ b/dist/modes/interactive/components/keybinding-hints.js
+@@ -1,7 +1,7 @@
+ /**
+  * Utilities for formatting keybinding hints in the UI.
+  */
+-import { getKeybindings } from "@earendil-works/pi-tui";
++import { getKeybindings } from "../../../tui-stub.js";
+ import { theme } from "../theme/theme.js";
+ function formatKeyPart(part, options) {
+     const displayPart = process.platform === "darwin" && part.toLowerCase() === "alt" ? "option" : part;
+diff --git a/dist/modes/interactive/components/visual-truncate.js b/dist/modes/interactive/components/visual-truncate.js
+index 492636b..fd4be33 100644
+--- a/dist/modes/interactive/components/visual-truncate.js
++++ b/dist/modes/interactive/components/visual-truncate.js
+@@ -2,7 +2,7 @@
+  * Shared utility for truncating text to visual lines (accounting for line wrapping).
+  * Used by both tool-execution.ts and bash-execution.ts for consistent behavior.
+  */
+-import { Text } from "@earendil-works/pi-tui";
++import { Text } from "../../../tui-stub.js";
+ /**
+  * Truncate text to a maximum number of visual lines (from the end).
+  * This accounts for line wrapping based on terminal width.
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
-index 5418167..d9de2a1 100644
+index 5418167..6e2c8a4 100644
 --- a/dist/modes/interactive/theme/theme.js
 +++ b/dist/modes/interactive/theme/theme.js
-@@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
+@@ -1,11 +1,13 @@
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+-import { getCapabilities, } from "@earendil-works/pi-tui";
++import { getCapabilities, } from "../../../tui-stub.js";
+ import chalk from "chalk";
+ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
  import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
  import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
  import { stripBom } from "../../../utils/text.js";
@@ -48,3 +183,227 @@ index 5418167..d9de2a1 100644
      }
      return BUILTIN_THEMES;
  }
+diff --git a/dist/tui-stub.js b/dist/tui-stub.js
+new file mode 100644
+index 0000000..7324833
+--- /dev/null
++++ b/dist/tui-stub.js
+@@ -0,0 +1,31 @@
++const empty = () => "";
++class Widget { render() { return empty(); } }
++export const TUI_KEYBINDINGS = new Proxy({}, { get: () => ({ defaultKeys: "", description: "" }) });
++export const CURSOR_MARKER = "";
++export const Key = class {};
++export const KeybindingsManager = class {};
++export function getCapabilities() { return { trueColor: false }; }
++export const Box = Widget;
++export const Text = Widget;
++export const TruncatedText = Widget;
++export const Markdown = Widget;
++export const Image = Widget;
++export const Spacer = Widget;
++export const HStack = Widget;
++export const VStack = Widget;
++export const Container = Widget;
++export const Loader = Widget;
++export const CancellableLoader = Widget;
++export function hyperlink() { return empty(); }
++export function imageFallback() { return empty(); }
++export function getImageDimensions() { return undefined; }
++export function visibleWidth() { return 0; }
++export function truncateToWidth() { return empty(); }
++export function wrapTextWithAnsi() { return empty(); }
++
++export function getKeybindings() { return {}; }
++export function setKeybindings() {}
++export function fuzzyFilter() { return []; }
++export function matchesKey() { return false; }
++export function sliceByColumn() { return empty(); }
++export function stripTerminalSequences() { return empty(); }
+diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
+index 711fb57..738f550 100644
+--- a/dist/utils/syntax-highlight.js
++++ b/dist/utils/syntax-highlight.js
+@@ -1,177 +1,4 @@
+-import hljs from "highlight.js/lib/core.js";
+-import bash from "highlight.js/lib/languages/bash.js";
+-import c from "highlight.js/lib/languages/c.js";
+-import cpp from "highlight.js/lib/languages/cpp.js";
+-import csharp from "highlight.js/lib/languages/csharp.js";
+-import dart from "highlight.js/lib/languages/dart.js";
+-import go from "highlight.js/lib/languages/go.js";
+-import groovy from "highlight.js/lib/languages/groovy.js";
+-import java from "highlight.js/lib/languages/java.js";
+-import javascript from "highlight.js/lib/languages/javascript.js";
+-import kotlin from "highlight.js/lib/languages/kotlin.js";
+-import lua from "highlight.js/lib/languages/lua.js";
+-import nix from "highlight.js/lib/languages/nix.js";
+-import perl from "highlight.js/lib/languages/perl.js";
+-import php from "highlight.js/lib/languages/php.js";
+-import python from "highlight.js/lib/languages/python.js";
+-import ruby from "highlight.js/lib/languages/ruby.js";
+-import rust from "highlight.js/lib/languages/rust.js";
+-import scala from "highlight.js/lib/languages/scala.js";
+-import swift from "highlight.js/lib/languages/swift.js";
+-import typescript from "highlight.js/lib/languages/typescript.js";
+-import { decodeHtmlEntityAt } from "./html.js";
+-const eagerLanguages = {
+-    python,
+-    java,
+-    go,
+-    javascript,
+-    cpp,
+-    typescript,
+-    php,
+-    ruby,
+-    c,
+-    csharp,
+-    nix,
+-    bash,
+-    rust,
+-    scala,
+-    kotlin,
+-    swift,
+-    dart,
+-    groovy,
+-    perl,
+-    lua,
+-};
+-for (const [name, language] of Object.entries(eagerLanguages)) {
+-    hljs.registerLanguage(name, language);
+-}
+-let allLanguagesPromise;
+-export function loadAllHighlightLanguages() {
+-    if (!allLanguagesPromise) {
+-        allLanguagesPromise = new Promise((resolve) => {
+-            setImmediate(() => {
+-                void import("highlight.js/lib/index.js").then(() => resolve(), () => {
+-                    // Eager languages and plaintext fallback remain available.
+-                    resolve();
+-                });
+-            });
+-        });
+-    }
+-    return allLanguagesPromise;
+-}
+-const SPAN_CLOSE = "</span>";
+-const HIGHLIGHT_CLASS_PREFIX = "hljs-";
+-function getScopeFromSpanTag(tag) {
+-    const match = /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag);
+-    const classValue = match?.[1] ?? match?.[2];
+-    if (!classValue) {
+-        return undefined;
+-    }
+-    for (const className of classValue.split(/\s+/)) {
+-        if (className.startsWith(HIGHLIGHT_CLASS_PREFIX)) {
+-            return className.slice(HIGHLIGHT_CLASS_PREFIX.length);
+-        }
+-    }
+-    return undefined;
+-}
+-function getScopeFormatter(scope, theme) {
+-    const exact = theme[scope];
+-    if (exact) {
+-        return exact;
+-    }
+-    const dotIndex = scope.indexOf(".");
+-    if (dotIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dotIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    const dashIndex = scope.indexOf("-");
+-    if (dashIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dashIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    return undefined;
+-}
+-function getActiveFormatter(scopes, theme) {
+-    for (let i = scopes.length - 1; i >= 0; i--) {
+-        const scope = scopes[i];
+-        if (!scope) {
+-            continue;
+-        }
+-        const formatter = getScopeFormatter(scope, theme);
+-        if (formatter) {
+-            return formatter;
+-        }
+-    }
+-    return theme.default;
+-}
+-function isSpanOpenTagStart(html, index) {
+-    if (!html.startsWith("<span", index)) {
+-        return false;
+-    }
+-    const nextChar = html[index + "<span".length];
+-    return nextChar === ">" || nextChar === " " || nextChar === "\t" || nextChar === "\n" || nextChar === "\r";
+-}
+-export function renderHighlightedHtml(html, theme = {}) {
+-    let output = "";
+-    let textBuffer = "";
+-    const scopes = [];
+-    const flushText = () => {
+-        if (!textBuffer) {
+-            return;
+-        }
+-        const formatter = getActiveFormatter(scopes, theme);
+-        output += formatter ? formatter(textBuffer) : textBuffer;
+-        textBuffer = "";
+-    };
+-    let index = 0;
+-    while (index < html.length) {
+-        if (isSpanOpenTagStart(html, index)) {
+-            const tagEndIndex = html.indexOf(">", index + 5);
+-            if (tagEndIndex !== -1) {
+-                flushText();
+-                const tag = html.slice(index, tagEndIndex + 1);
+-                const scope = getScopeFromSpanTag(tag);
+-                scopes.push(scope);
+-                index = tagEndIndex + 1;
+-                continue;
+-            }
+-        }
+-        if (html.startsWith(SPAN_CLOSE, index)) {
+-            flushText();
+-            if (scopes.length > 0) {
+-                scopes.pop();
+-            }
+-            index += SPAN_CLOSE.length;
+-            continue;
+-        }
+-        if (html[index] === "&") {
+-            const decoded = decodeHtmlEntityAt(html, index);
+-            if (decoded) {
+-                textBuffer += decoded.text;
+-                index += decoded.length;
+-                continue;
+-            }
+-        }
+-        textBuffer += html[index];
+-        index++;
+-    }
+-    flushText();
+-    return output;
+-}
+-export function highlight(code, options = {}) {
+-    const html = options.language
+-        ? hljs.highlight(code, {
+-            language: options.language,
+-            ignoreIllegals: options.ignoreIllegals,
+-        }).value
+-        : hljs.highlightAuto(code, options.languageSubset).value;
+-    return renderHighlightedHtml(html, options.theme);
+-}
+-export function supportsLanguage(name) {
+-    return hljs.getLanguage(name) !== undefined;
+-}
+-//# sourceMappingURL=syntax-highlight.js.map
+\ No newline at end of file
++export function loadAllHighlightLanguages() { return Promise.resolve(); }
++export function renderHighlightedHtml(html, _theme = {}) { return html; }
++export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
++export function supportsLanguage(_name) { return false; }

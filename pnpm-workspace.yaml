@@ -128,8 +128,8 @@ patchedDependencies:
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
-  # Headless Pi RPC. loader.js namespace-imports the package barrel and
-  # pi-tui for extensions; theme.js reads builtin JSON from disk. On bump:
-  # dist/core/extensions/loader.js and dist/modes/interactive/theme/theme.js.
+  # Headless Pi RPC. Only modules in the bun-build graph: loader, theme,
+  # tool renderers, syntax-highlight. On bump, re-check those files still
+  # import @earendil-works/pi-tui / highlight.js.
   "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch
