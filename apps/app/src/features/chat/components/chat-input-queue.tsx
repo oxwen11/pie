@@ -35,6 +35,7 @@ export function promoteQueuedFollowUp(
 ): SessionPendingPrompt {
   const items = pending.followUp;
   if (index < 0 || index >= items.length) return pending;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- index is in bounds of followUp
   const text = items[index] as string;
   return {
     steering: [...pending.steering, text],

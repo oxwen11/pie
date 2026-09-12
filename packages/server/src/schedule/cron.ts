@@ -39,6 +39,7 @@ export function parseCron(cron: string): CronExpr {
   if (/[a-zA-Z?#LW]/.test(cron)) {
     throw new CronError("INVALID_CRON", "names and extensions (L, W, ?, #) are not supported");
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- length === 5 was checked above
   const [minute, hour, dom, month, dow] = parts as [string, string, string, string, string];
   return {
     minute: parseField(minute, 0, 59),
@@ -59,6 +60,7 @@ function parseField(raw: string, min: number, max: number): Field {
     if (!stepMatch) {
       throw new CronError("INVALID_CRON", `invalid field: ${item}`);
     }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- group 1 is required by the field regex
     const range = stepMatch[1] as string;
     const step = stepMatch[2] ? Number(stepMatch[2]) : 1;
     if (!Number.isInteger(step) || step <= 0) {
@@ -68,7 +70,9 @@ function parseField(raw: string, min: number, max: number): Field {
     let end = max;
     if (range !== "*") {
       const bounds = range.split("-").map(Number);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- range is non-empty after split
       start = bounds[0] as number;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- length === 2 was checked
       end = bounds.length === 2 ? (bounds[1] as number) : start;
     }
     if (start < min || end > max || start > end) {

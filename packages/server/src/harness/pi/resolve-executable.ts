@@ -147,6 +147,7 @@ export const checkPiAvailability = (
 
     // Owned / npm Pi is a JS entry run under Node — npm does not mark it +x.
     if (executable.prefixArgs.length > 0) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- prefixArgs.length > 0 was checked
       const script = executable.prefixArgs[0] as string;
       const fileSystem = yield* FileSystem.FileSystem;
       const info = yield* fileSystem.stat(script).pipe(Effect.option);
