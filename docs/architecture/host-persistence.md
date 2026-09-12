@@ -290,6 +290,15 @@ storage schema, migration or concurrent-install lock. Verification cleanup
 leaves the installed binary and shared download cache intact; packaged startup
 is unchanged.
 
+Verify prepares Electron before starting its service-readiness timeout. Both
+preparation and Desktop append to the existing run-local `logs/electron-vite.log`.
+The existing decimal `pids/electron-vite.pid` tracks the active launch phase:
+installer first, removed on successful installation, then replaced by the Desktop
+launcher pid. Paths, permissions and file formats are unchanged; older cleanup
+code can still stop the recorded process. Installation/startup failure or
+SIGINT/SIGTERM uses the normal run cleanup and failure-log retention, without
+removing Electron's dependency-owned binary or download cache.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the

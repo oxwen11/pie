@@ -20,6 +20,8 @@ pnpm exec pie-verify desktop launch
 # pnpm exec pie-verify desktop launch --replace
 ```
 
+A Desktop process that exits before readiness fails launch immediately, including exit code zero; its exit status and log path are reported instead of waiting for the readiness timeout.
+
 Ready when all of these hold:
 
 - Electron (or electron-vite) pid from the run is alive.
@@ -31,6 +33,7 @@ What launch also does:
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
 - Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
 - Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
+- Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
 - Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
@@ -116,7 +119,7 @@ pnpm exec pie-verify desktop evidence path
 pnpm exec pie-verify desktop cleanup
 ```
 
-1. Kill the recorded electron-vite process tree (TERM then KILL). **This does not stop the daemon.**
+1. Stop the recorded desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
 2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
