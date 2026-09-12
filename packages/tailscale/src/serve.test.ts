@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildTailscaleHttpsBaseUrl,
+  decodeTailscaleServeOwnership,
   DEFAULT_TAILSCALE_SERVE_PORT,
   tailscaleServeDisableArgs,
   tailscaleServeEnableArgs,
@@ -23,6 +24,35 @@ describe("tailscale serve args", () => {
       `--https=${DEFAULT_TAILSCALE_SERVE_PORT}`,
       "off",
     ]);
+  });
+});
+
+describe("decodeTailscaleServeOwnership", () => {
+  it("treats an empty status as unused", () => {
+    expect(decodeTailscaleServeOwnership("{}", 4000)).toBe("empty");
+    expect(decodeTailscaleServeOwnership("", 4000)).toBe("empty");
+  });
+
+  it("recognizes this computer's loopback handler", () => {
+    expect(
+      decodeTailscaleServeOwnership(
+        JSON.stringify({
+          Web: { "https://host:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:4000" } } } },
+        }),
+        4000,
+      ),
+    ).toBe("ours");
+  });
+
+  it("refuses a handler that points somewhere else", () => {
+    expect(
+      decodeTailscaleServeOwnership(
+        JSON.stringify({
+          Web: { "https://host:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:9999" } } } },
+        }),
+        4000,
+      ),
+    ).toBe("foreign");
   });
 });
 

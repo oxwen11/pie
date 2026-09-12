@@ -2,7 +2,6 @@ import childProcess from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import url from "node:url";
 
 import { createPieClient } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
@@ -10,6 +9,10 @@ import { afterEach, describe, expect, it } from "vitest";
 const cliBin = path.join(import.meta.dirname, "../../dist/cli.mjs");
 
 const FAKE = `#!/usr/bin/env node
+if (process.argv.includes("--list-models")) {
+  process.stdout.write("provider       model         context\\nxai            grok-4.3      1M\\n");
+  process.exit(0);
+}
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");

@@ -83,6 +83,25 @@ describe("listenRelay + attachRelay", () => {
     );
   });
 
+  it("rejects a bad token instead of hanging", async () => {
+    const relay = await listenRelay({
+      port: 0,
+      token: "relay-token-test",
+      publicHost: "96.44.165.19",
+      host: "127.0.0.1",
+    });
+    cleanups.push(relay.close);
+    await expect(
+      attachRelay({
+        relayHost: "127.0.0.1",
+        relayPort: relay.controlPort,
+        token: "wrong-token",
+        localHost: "127.0.0.1",
+        localPort: 9,
+      }),
+    ).rejects.toThrow(/closed|accept|timed out/i);
+  });
+
   it("releases the public port when the control port cannot bind", async () => {
     const blocker = net.createServer();
     await new Promise<void>((resolve, reject) => {
