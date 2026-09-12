@@ -48,7 +48,7 @@ export function applyPackagedPiRuntime(
 ): NodeJS.ProcessEnv {
   if (!options.isPackaged || options.bundledBun === undefined) return env;
 
-  const next = { ...env, PIE_BUN: env.PIE_BUN ?? options.bundledBun };
+  const next: NodeJS.ProcessEnv = { ...env, PIE_BUN: env.PIE_BUN ?? options.bundledBun };
   if (options.bundledRpc !== undefined) {
     next.PIE_PI_EXECUTABLE = env.PIE_PI_EXECUTABLE ?? options.bundledRpc;
   }
