@@ -152,8 +152,6 @@ export default defineConfig({
     "oxc/no-async-endpoint-handlers": "off",
     "react/iframe-missing-sandbox": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
-    "typescript/consistent-return": "off",
     "typescript/no-unnecessary-type-parameters": "off",
     "promise/always-return": "off",
     "no-unused-vars": [
@@ -270,6 +268,8 @@ export default defineConfig({
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/prefer-reduce-type-parameter": "off",
         "no-promise-executor-return": "off",
+        "typescript/consistent-return": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
       },
     },
     {

@@ -58,6 +58,7 @@ export const trySession = (
     if (found.archived) {
       return yield* Effect.fail(new InvalidSchedule({ reason: "session is archived" }));
     }
+    return undefined;
   });
 };
 

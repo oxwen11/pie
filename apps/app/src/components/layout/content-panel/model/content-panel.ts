@@ -160,11 +160,7 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    return this.#openWith(
-      sessionRef,
-      definition as AnyPanelDefinition<View>,
-      payloadArgs[0],
-    ) as PanelInstance<Payload, Extra>;
+    return this.#openWith(sessionRef, definition, payloadArgs[0]) as PanelInstance<Payload, Extra>;
   }
 
   /**
@@ -192,11 +188,10 @@ export class ContentPanel<View = unknown> {
           panel.id === currentId ? { id: nextId, type: definition.type, payload } : panel,
         ),
       });
-      const instance = this.#ensureInstance(
-        sessionRef,
-        nextId,
-        definition as AnyPanelDefinition<View>,
-      ) as PanelInstance<Payload, Extra>;
+      const instance = this.#ensureInstance(sessionRef, nextId, definition) as PanelInstance<
+        Payload,
+        Extra
+      >;
       instance.reopen(payload);
       return instance;
     }
@@ -217,11 +212,10 @@ export class ContentPanel<View = unknown> {
           ),
     });
 
-    const instance = this.#ensureInstance(
-      sessionRef,
-      nextId,
-      definition as AnyPanelDefinition<View>,
-    ) as PanelInstance<Payload, Extra>;
+    const instance = this.#ensureInstance(sessionRef, nextId, definition) as PanelInstance<
+      Payload,
+      Extra
+    >;
     if (targetIsOpen) instance.reopen(payload);
     return instance;
   }

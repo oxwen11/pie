@@ -564,7 +564,7 @@ export class Chat {
         // overrides this seed.
         const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as UIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
-          this.#state.upsertMessage(message as UIMessage);
+          this.#state.upsertMessage(message);
         }
       } catch (foldError) {
         console.error("Failed to fold turn", foldError);

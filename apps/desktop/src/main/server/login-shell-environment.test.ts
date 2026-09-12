@@ -84,7 +84,9 @@ describe("resolveLoginShellEnvironment", () => {
         PATH: "/from/launchctl:/usr/bin",
         HTTPS_PROXY: "http://launchctl-proxy.test:8443",
       };
-      return Effect.succeed(`${values[args[1]!] ?? ""}\n`);
+      const key = args[1];
+      if (key !== "PATH" && key !== "HTTPS_PROXY") return Effect.succeed("\n");
+      return Effect.succeed(`${values[key]}\n`);
     });
 
     await expect(
