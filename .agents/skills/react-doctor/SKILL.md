@@ -1,14 +1,14 @@
 ---
 name: react-doctor
 description: Use when finishing a feature, fixing a bug, before committing React code, or when the user types `/doctor`, asks to scan, triage, or clean up React diagnostics. Covers lint, accessibility, bundle size, architecture. Includes a regression check, a focused `design` audit, a runtime `scan`, and a full local-triage workflow that fetches the canonical playbook.
-version: "1.2.0"
+version: "1.3.0"
 ---
 
 # React Doctor
 
 Scans React codebases for security, performance, correctness, and architecture issues. Outputs a 0–100 health score.
 
-This repo pins CLI **0.9.14** and a **strict opt-in set** in `doctor.config.json`. Default scans only report proven defects; we re-enable the cleanup and graph checks that map to practices we already teach. Read [references/strict-value.md](references/strict-value.md) before disabling a rule or adding a Next.js / React Native check. CI still fails on error-severity findings only.
+This repo pins CLI **0.9.14**. Root `doctor.config.json` turns **every** shipped rule on at its recommended severity, then promotes the SPA graph/cleanup set to **error**. Three rules stay off because they are wrong on this stack — read [references/strict-value.md](references/strict-value.md) before adding a fourth. CI still fails on error-severity findings only.
 
 Prefer the workspace CLI over `npx react-doctor@latest` so the scan matches the config and the CI pin. Run it from `apps/app`:
 
@@ -26,13 +26,13 @@ If the score dropped, fix the regressions before committing.
 
 ## For general cleanup or code improvement:
 
-Run `pnpm exec react-doctor --yes --verbose` from `apps/app` (the default `--scope full`) to scan the full codebase. Fix issues by severity — errors first, then warnings.
+Run `pnpm exec react-doctor --yes --verbose` from `apps/app` (the default `--scope full`) to scan the full codebase. Fix issues by severity — errors first, then warnings. Do not silence a finding by turning the rule off unless it is one of the three documented stack mismatches.
 
 ## For a focused UI design audit:
 
-Run `pnpm exec react-doctor design --verbose` from `apps/app`. This selects only design-tagged UI composition, typography, interaction, accessibility, and motion rules. Those rules stay **off** during a general health scan and are **not** in `doctor.config.json` or CI — `design` turns them on for that run only.
+Run `pnpm exec react-doctor design --verbose` from `apps/app`. This selects only design-tagged UI composition, typography, interaction, accessibility, and motion rules. The same rules also run in the default health scan (`surfaces.*.includeTags: ["design"]`); `design` is the focused pass, not a separate enablement switch.
 
-Pair findings with `.agents/skills/web-design-guidelines`. Do not promote design-tagged rules to error in the root config to “make CI stricter”; 0.9.14 left them opt-in because they are weak-signal style cleanup.
+Pair findings with `.agents/skills/web-design-guidelines`. Do not promote design-tagged rules to error in the root config to “make CI stricter”; they stay warn.
 
 ## For runtime performance problems:
 
@@ -66,7 +66,7 @@ Pair it with the matching per-rule prompts at `https://www.react.doctor/prompts/
 
 When the user wants to understand a rule, disagrees with one, or wants to disable / tune which rules run (not fix code), read [references/explain.md](references/explain.md) and follow it. Start with `pnpm exec react-doctor rules explain <rule>` from `apps/app`, or `pnpm exec react-doctor why <file:line>` when the question is a specific diagnostic. Then apply the narrowest control via `pnpm exec react-doctor rules disable|set|category|ignore-tag …`, which edits `doctor.config.json` (or `package.json#reactDoctor`).
 
-Do not `rules disable` a strict SPA rule from [references/strict-value.md](references/strict-value.md) to land a PR.
+Do not `rules disable` a listed rule from [references/strict-value.md](references/strict-value.md) to land a PR. Fix the code.
 
 ## Command
 

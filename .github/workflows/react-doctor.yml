@@ -62,10 +62,9 @@ jobs:
         shell: bash
 
       - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2.2.9
-        # The repo is error-clean on default Doctor rules. 0.9.14 made cleanup /
-        # graph checks opt-in; doctor.config.json turns the SPA-relevant ones
-        # back on at error. New error-severity findings fail the check.
-        # Warnings stay advisory (including the agent/MCP capability inventory).
+        # doctor.config.json enables every 0.9.14 rule at recommended severity
+        # (SPA graph/cleanup promoted to error; three stack mismatches off).
+        # New error-severity findings fail the check. Warnings stay advisory.
         # Full reference: https://www.react.doctor/ci
         with:
           node-version: ${{ steps.project-node.outputs.version }}

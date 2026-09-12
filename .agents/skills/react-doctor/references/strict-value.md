@@ -1,31 +1,29 @@
 # Strict rules that earn their keep
 
-React Doctor 0.9.14 retired low-signal style/migration IDs and made 26
-cleanup checks opt-in. This repo opts back in only where a finding maps to
-a practice we already teach — so agents fix the code instead of silencing
-the diagnostic.
+React Doctor 0.9.14 ships hundreds of checks with many off by default. This
+repo turns **all of them on** at the rule's recommended severity, then
+promotes the SPA graph/cleanup set to error. Next.js / React Native / Ink
+IDs stay listed; they are inert here because this is a Vite SPA — do not
+turn them off "because we are not Next." Retired IDs (`prefer-explicit-variants`,
+`no-many-boolean-props`, …) report nothing even when listed.
 
 Config lives in the repo-root `doctor.config.json` (inherited by `@getpie/app`
 and `@getpie/desktop`). `packages/ui` layers `only-export-components: off` on
 top because those files are vendored from the coss registry.
 
-## Do not re-enable
+## The only rules that stay off
 
-Retired IDs (`prefer-explicit-variants`, `no-many-boolean-props`,
-`js-early-exit`, `js-tosorted-immutable`, `rendering-usetransition-loading`,
-design/typography rules, React Native `setNativeProps` / Reanimated
-migrations, …) report nothing even if listed. Follow
-`.agents/rules/ui-components.md` and
-`.agents/skills/vercel-composition-patterns` for API shape; do not expect
-Doctor to police boolean-prop counts.
+These three fight the stack. Anything else that fires must be fixed in code.
 
-Skip Next.js RSC, `next/image`, Firebase, and BaaS rules — this is a Vite
-SPA. Do not add them "for completeness."
+| Rule | Why it stays off |
+| --- | --- |
+| `react-in-jsx-scope` | React 19 automatic JSX runtime. Adding `import React` makes an unused import that oxlint then rejects. |
+| `jsx-props-no-spreading` | `.agents/rules/ui-components.md` requires spreading props **last** on the wrapped element so callers can override defaults. |
+| `js-cache-property-access` | The detector cannot tell a stable lookup from a value that must be re-read (`abort.signal.aborted`, layout, time). Caching those changes behavior. Hoist a local `const` yourself when the value is actually stable. |
 
-`js-cache-property-access` stays off. 0.9.14 made it opt-in because the
-detector cannot tell a stable lookup from a value that must be re-read
-(`abort.signal.aborted`, layout, time). Caching those changes behavior.
-Hoist a local `const` yourself when the value is actually stable.
+Do not add a fourth `off` to land a PR. Inline
+`react-doctor-disable-next-line` is the last resort and needs a comment
+naming the invariant the rule cannot see.
 
 ## Enabled at error — write this way on purpose
 
@@ -57,11 +55,16 @@ capabilities. They are not proof of a hole. When they fire on a tool you
 touched, read the finding, confirm the policy, and leave the warn in place
 unless the code is wrong.
 
+Design-tagged rules are warn and **included** in the health scan
+(`surfaces.*.includeTags: ["design"]`). Fix the code (padding shorthand,
+`motion-safe:` animations, `group-focus-within` with hover reveals). Do not
+`ignore-tag design` to land a PR.
+
 ## Sibling commands (not CI)
 
 `design` and `scan` ship with 0.9.14. They are not CI gates.
 
-- UI composition / typography / motion: `pnpm exec react-doctor design --verbose` from `apps/app`, then `.agents/skills/web-design-guidelines`. Design-tagged rules stay off in the health scan on purpose.
+- UI composition / typography / motion: `pnpm exec react-doctor design --verbose` from `apps/app`, then `.agents/skills/web-design-guidelines`.
 - A slow interaction: `/performance` → `pnpm exec react-doctor scan http://localhost:4190/ --format json`.
 - A roadmap rather than a fix-it-now pass: `/improve-react` (read-only; writes `plans/`).
 - Why this line fired: `pnpm exec react-doctor why <file:line>`.
@@ -74,6 +77,6 @@ unless the code is wrong.
    `pnpm exec react-doctor --yes --verbose --scope changed` from `apps/app`
    (or `pnpm doctor`).
 
-Do not `rules disable` a strict rule to land a PR. Inline
+Do not `rules disable` an enabled rule to land a PR. Inline
 `react-doctor-disable-next-line` is the last resort and needs a comment
 naming the invariant the rule cannot see.

@@ -13,12 +13,15 @@ Run every command below from `apps/app` with the workspace CLI (0.9.14), not
 ## In this repository
 
 Root `doctor.config.json` is the shared severity map for `@getpie/app` and
-`@getpie/desktop`. Read [strict-value.md](strict-value.md) before changing it.
-Do not set `projects` in the root config (that breaks per-package `pnpm doctor`).
-Do not add Next.js / React Native / retired design IDs "for completeness."
-Do not disable a strict SPA rule to land a PR — inline
-`react-doctor-disable-next-line` is last resort and needs a comment naming the
-invariant the rule cannot see.
+`@getpie/desktop`. Every 0.9.14 rule is on except the three stack mismatches
+in [strict-value.md](strict-value.md). Do not set `projects` in the root config
+(that breaks per-package `pnpm doctor`). Do not add a fourth `off` to land a
+PR — inline `react-doctor-disable-next-line` is last resort and needs a comment
+naming the invariant the rule cannot see.
+
+Next.js / React Native IDs are enabled and inert on this Vite SPA. Leave them
+on. Design-tagged rules are included in the health scan via
+`surfaces.*.includeTags`; do not `ignore-tag design` to silence a finding.
 
 ## Workflow
 
@@ -61,11 +64,11 @@ Rule references accept the full key (`react-doctor/no-danger`), the bare id (`no
 
 Match the control to the intent — prefer the narrowest one:
 
-- **User disagrees with one rule / it's a false positive for them** → `rules disable <rule>` (sets `rules.<key> = "off"`; the rule stops running everywhere). This is the default for "I don't want this rule" — except for the strict SPA set in [strict-value.md](strict-value.md), which needs a comment or a config note, not a silent off.
+- **User disagrees with one rule / it's a false positive for them** → fix the code first. `rules disable <rule>` (sets `rules.<key> = "off"`) is only for a documented stack mismatch, the three in [strict-value.md](strict-value.md). A new off needs a comment in `doctor.config.json`.
 - **Rule is fine but wrong severity** → `rules set <rule> warn` or `rules set <rule> error`.
-- **A disabled-by-default rule they want on** → `rules enable <rule>`.
-- **A whole area is unwanted** (e.g. all React Native rules) → `rules category "<Category>" off`. The CLI only accepts Security / Bugs / Performance / Accessibility / Maintainability — "React Native" is not a category name here.
-- **A behavioral family is noisy** (`design`, `test-noise`, `migration-hint`) → `rules ignore-tag <tag>`. Prefer `react-doctor design` for a one-off UI audit instead of enabling design tags in the health scan.
+- **A disabled-by-default rule they want on** → already the repo default; `rules enable <rule>` restores recommended severity if someone turned it off.
+- **A whole area is unwanted** (e.g. all React Native rules) → do not category-off React Native here; those IDs are inert. The CLI only accepts Security / Bugs / Performance / Accessibility / Maintainability.
+- **A behavioral family is noisy** (`design`, `test-noise`, `migration-hint`) → do not `ignore-tag design` in this repo. Prefer `react-doctor design` for a focused UI audit; the health scan already includes design tags.
 - **Keep it locally but hide from PR comment / score / CI gate only** → do NOT disable. Edit `surfaces` in your config (`surfaces.prComment.excludeRules`, `surfaces.score.excludeTags`, `surfaces.ciFailure.excludeCategories`). The rule still shows in local `cli` output.
 - **Restore test or story findings to production health** → set `surfaces.score.includeFileContexts` or `surfaces.ciFailure.includeFileContexts` to `["test"]`, `["story"]`, or both. Other surface exclusions still apply.
 
@@ -86,4 +89,4 @@ export default {
 
 ## Educating the user
 
-When explaining a rule, lead with the "Why it matters" guidance from `rules explain` and, when they want depth, the per-rule recipe at `https://www.react.doctor/prompts/rules/<plugin>/<rule>.md`. Only after they understand it should you offer to disable it — many "bad" rules are catching real issues.
+When explaining a rule, lead with the "Why it matters" guidance from `rules explain` and, when they want depth, the per-rule recipe at `https://www.react.doctor/prompts/rules/<plugin>/<rule>.md`. Only after they understand it should you offer to disable it — many "bad" rules are catching real issues. In this repo the answer is almost always "fix the code."
