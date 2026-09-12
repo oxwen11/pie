@@ -10,6 +10,9 @@
 import path from "node:path";
 import url from "node:url";
 
+import { bedrockProviderModule } from "@earendil-works/pi-ai/bedrock-provider";
+import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
+import { setBedrockProviderModule } from "@earendil-works/pi-ai/compat";
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -60,6 +63,9 @@ const openSessionManager = async (sessionId: string | undefined, cwd: string) =>
 };
 
 const start = async (): Promise<void> => {
+  // Match Pi's Bun bootstrap: these loaders use bundler-opaque imports otherwise.
+  registerBunOAuthFlows();
+  setBedrockProviderModule(bedrockProviderModule);
   const dispatcherUrl = url.pathToFileURL(
     path.join(
       path.dirname(url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),

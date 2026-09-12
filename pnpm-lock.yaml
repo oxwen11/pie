@@ -594,6 +594,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: 0.85.1
+        version: 0.85.1(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.4))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.4)
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
         version: 0.85.1(patch_hash=cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.5.4))(supports-color@10.2.2)(ws@8.21.3)(zod@4.5.4)
