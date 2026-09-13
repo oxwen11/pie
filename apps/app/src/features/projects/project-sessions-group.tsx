@@ -1,4 +1,4 @@
-import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
+import type { Project, SessionSummary } from "@getpie/contract";
 import { collectFiredSessionIds } from "@getpie/contract";
 import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import {
@@ -13,15 +13,15 @@ import {
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
+import { useCurrentSession } from "@/features/projects/current-session";
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import {
   ProjectSessionRow,
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
-import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
@@ -53,10 +53,8 @@ const selectNewestFirst = (
  * grouping and fetching; each row composes its own navigation and actions.
  */
 export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
+  const isSessionActive = useCurrentSession();
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const router = useRouter();
-  const isSessionActive = (ref: SessionRef) =>
-    sameSessionRef(ref, sessionRefFromRouterMatches(router.state.matches));
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -125,7 +123,6 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
                     key={session.sessionId}
                     active={active}
                     createdBySchedule={firedSessionIds.data?.has(session.sessionId) === true}
-                    isActive={() => isSessionActive(session)}
                     pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}
                   />

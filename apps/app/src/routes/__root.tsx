@@ -1,5 +1,12 @@
+import type { SessionRef } from "@getpie/contract";
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  useMatch,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
+import { useCallback } from "react";
 
 import {
   AppShell,
@@ -14,12 +21,14 @@ import { ContentPanelSessionProvider } from "@/components/layout/content-panel/r
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
+import { CurrentSessionProvider } from "@/features/projects/current-session";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
+import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
@@ -79,13 +88,21 @@ function RootLayout() {
   });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
+  const router = useRouter();
+  const isSessionActive = useCallback(
+    (candidate: SessionRef) =>
+      sameSessionRef(candidate, sessionRefFromRouterMatches(router.state.matches)),
+    [router],
+  );
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar />
+            <CurrentSessionProvider isSessionActive={isSessionActive}>
+              <AppSidebar />
+            </CurrentSessionProvider>
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
