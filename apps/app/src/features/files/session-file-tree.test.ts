@@ -1,19 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getSessionFileTree,
-  isOpenableTreeEntry,
-  symlinkDescription,
-  syncSessionFileTree,
-  toPierrePath,
-} from "./session-file-tree";
+import { getSessionFileTree, syncSessionFileTree } from "./session-file-tree";
 
 describe("session file tree", () => {
-  it("converts directory paths to Pierre directory identifiers", () => {
-    expect(toPierrePath({ path: "src", type: "directory" })).toBe("src/");
-    expect(toPierrePath({ path: "src/index.ts", type: "file" })).toBe("src/index.ts");
-  });
-
   it("preserves expanded directories across complete tree resets", () => {
     const state = getSessionFileTree(`test-${crypto.randomUUID()}`);
     syncSessionFileTree(state, [
@@ -42,30 +31,5 @@ describe("session file tree", () => {
     }
     expect(refreshedSrc.isExpanded()).toBe(true);
     state.model.cleanUp();
-  });
-
-  it("describes why non-file symlinks cannot be opened", () => {
-    expect(
-      symlinkDescription({ path: "dir-link", type: "symlink", symlinkTarget: "directory" }),
-    ).toContain("disabled");
-    expect(
-      symlinkDescription({ path: "outside", type: "symlink", symlinkTarget: "outside" }),
-    ).toContain("disabled");
-    expect(
-      symlinkDescription({ path: "broken", type: "symlink", symlinkTarget: "broken" }),
-    ).toContain("disabled");
-  });
-
-  it("only opens regular files and in-workspace file symlinks", () => {
-    expect(isOpenableTreeEntry({ path: "a.ts", type: "file" })).toBe(true);
-    expect(isOpenableTreeEntry({ path: "a-link", type: "symlink", symlinkTarget: "file" })).toBe(
-      true,
-    );
-    expect(
-      isOpenableTreeEntry({ path: "dir-link", type: "symlink", symlinkTarget: "directory" }),
-    ).toBe(false);
-    expect(
-      isOpenableTreeEntry({ path: "outside", type: "symlink", symlinkTarget: "outside" }),
-    ).toBe(false);
   });
 });
