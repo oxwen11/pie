@@ -1,3 +1,4 @@
+import childProcess from "node:child_process";
 import module from "node:module";
 import path from "node:path";
 import url from "node:url";
@@ -71,6 +72,18 @@ NodeRuntime.runMain(
       naming: "writer-worker.mjs",
       target: "bun",
       format: "esm",
+    });
+
+    yield* Effect.try({
+      try: () => {
+        const result = childProcess.spawnSync(
+          process.execPath,
+          [url.fileURLToPath(new URL("./scripts/build-resource-monitor.mjs", import.meta.url))],
+          { stdio: "inherit" },
+        );
+        if (result.status !== 0) throw new Error("Failed to build resource monitor");
+      },
+      catch: (cause) => new Error("Failed to build resource monitor", { cause }),
     });
 
     for (const [name, entry] of Object.entries({
