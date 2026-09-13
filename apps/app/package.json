@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "doctor": "react-doctor --yes",
+    "doctor": "react-doctor --yes --blocking warning",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
@@ -57,7 +57,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "code-inspector-plugin": "latest",
-    "react-doctor": "^0.9.13",
+    "react-doctor": "^0.9.14",
     "react-grab": "^0.1.50",
     "react-scan": "catalog:",
     "vitest": "catalog:"

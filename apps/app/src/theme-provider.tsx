@@ -43,7 +43,7 @@ export function ThemeProvider({
   defaultTheme = "system",
   storageKey = DEFAULT_THEME_STORAGE_KEY,
 }: ThemeProviderProps): ReactElement {
-  const [theme, setThemeState] = useState<ThemePreference>(() =>
+  const [theme, setTheme] = useState<ThemePreference>(() =>
     readStoredTheme(storageKey, defaultTheme),
   );
 
@@ -59,7 +59,7 @@ export function ThemeProvider({
         } catch {
           // Keep the in-memory preference usable when storage is unavailable.
         }
-        setThemeState(nextTheme);
+        setTheme(nextTheme);
       },
     }),
     [storageKey, theme],

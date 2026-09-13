@@ -129,7 +129,7 @@ export function PullRequestPage() {
           maxSize="50%"
           minSize="16rem"
         >
-          <div className="px-3 py-3">
+          <div className="p-3">
             <InputGroup>
               <InputGroupAddon>
                 <SearchIcon />

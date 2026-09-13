@@ -1,4 +1,4 @@
-export type ModelErrorDetails = {
+type ModelErrorDetails = {
   title: string;
   message: string;
 };

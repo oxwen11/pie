@@ -10,7 +10,7 @@ import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/co
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { GitBranchIcon, NavigationIcon, SquareIcon } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
@@ -18,6 +18,7 @@ import { useLatestRef } from "@/hooks/use-latest-ref";
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
 import { ChatInput } from "./input/chat-input";
+import type { ChatInputController } from "./input/chat-input-controller";
 import { ChatInputProvider } from "./input/chat-input-provider";
 import { createChatBaseExtensions } from "./input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "./input/extensions/keymaps";
@@ -41,7 +42,8 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
-  const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
+  const currentBranch =
+    branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
@@ -95,63 +97,133 @@ export function ChatInputComposer({
           <ChatInput />
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
-            <div className="flex items-center gap-1">
-              {canInterrupt ? (
-                <>
-                  <PromptInputButton
-                    aria-label="Steer message"
-                    disabled={!hasContent || workspaceUnavailable}
-                    onClick={() => {
-                      if (!controller) return;
-                      nextDeliveryRef.current = "steer";
-                      void controller.submit().then(() => {
-                        // Empty / already-submitting submit never reaches onSubmit.
-                        nextDeliveryRef.current = undefined;
-                        return undefined;
-                      });
-                    }}
-                  >
-                    <NavigationIcon className="size-4" />
-                    Steer
-                  </PromptInputButton>
-                  <PromptInputButton
-                    aria-label="Stop generating"
-                    onClick={() => void interrupt()}
-                    variant={hasContent ? "ghost" : "default"}
-                  >
-                    <SquareIcon className="size-4" />
-                  </PromptInputButton>
-                </>
-              ) : null}
-              {!canInterrupt || hasContent ? (
-                <PromptInputSubmit
-                  aria-label="Send message"
-                  disabled={!hasContent || workspaceUnavailable}
-                />
-              ) : null}
-            </div>
+            <ChatComposerActions
+              canInterrupt={canInterrupt}
+              controller={controller}
+              hasContent={hasContent}
+              interrupt={interrupt}
+              nextDeliveryRef={nextDeliveryRef}
+              workspaceUnavailable={workspaceUnavailable}
+            />
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>
       <CardFrameFooter className="px-3 py-2">
-        <span className="flex h-4 min-w-0 items-center text-xs">
-          {branch.isPending ? (
-            <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />
-          ) : currentBranch ? (
-            <span
-              className="text-muted-foreground flex min-w-0 items-center gap-1.5"
-              title="Current git branch"
-            >
-              <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
-              <span className="truncate">{currentBranch}</span>
-            </span>
-          ) : branch.data?.kind === "not-repository" ? (
-            <span className="text-muted-foreground">Not a Git repository</span>
-          ) : workspaceUnavailable ? (
-            <span className="text-destructive">Workspace unavailable</span>
-          ) : null}
-        </span>
+        <ChatComposerGitStatus
+          currentBranch={currentBranch}
+          isPending={branch.isPending}
+          kind={branch.data?.kind}
+          workspaceUnavailable={workspaceUnavailable}
+        />
       </CardFrameFooter>
     </CardFrame>
   );
+}
+
+function ChatComposerActions({
+  canInterrupt,
+  controller,
+  hasContent,
+  interrupt,
+  nextDeliveryRef,
+  workspaceUnavailable,
+}: {
+  canInterrupt: boolean;
+  controller: ChatInputController | null;
+  hasContent: boolean;
+  interrupt: () => Promise<void>;
+  nextDeliveryRef: RefObject<"steer" | undefined>;
+  workspaceUnavailable: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {canInterrupt ? (
+        <>
+          <PromptInputButton
+            aria-label="Steer message"
+            disabled={!hasContent || workspaceUnavailable}
+            onClick={() => {
+              if (!controller) return;
+              nextDeliveryRef.current = "steer";
+              void controller.submit().then(() => {
+                // Empty / already-submitting submit never reaches onSubmit.
+                nextDeliveryRef.current = undefined;
+                return undefined;
+              });
+            }}
+          >
+            <NavigationIcon className="size-4" />
+            Steer
+          </PromptInputButton>
+          <PromptInputButton
+            aria-label="Stop generating"
+            onClick={() => void interrupt()}
+            variant={hasContent ? "ghost" : "default"}
+          >
+            <SquareIcon className="size-4" />
+          </PromptInputButton>
+        </>
+      ) : null}
+      {!canInterrupt || hasContent ? (
+        <PromptInputSubmit
+          aria-label="Send message"
+          disabled={!hasContent || workspaceUnavailable}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ChatComposerGitStatus({
+  currentBranch,
+  isPending,
+  kind,
+  workspaceUnavailable,
+}: {
+  currentBranch: string | undefined;
+  isPending: boolean;
+  kind: "repository" | "not-repository" | "workspace-unavailable" | undefined;
+  workspaceUnavailable: boolean;
+}) {
+  return (
+    <span className="flex h-4 min-w-0 items-center text-xs">
+      {gitStatusLabel({ currentBranch, isPending, kind, workspaceUnavailable })}
+    </span>
+  );
+}
+
+function gitStatusLabel({
+  currentBranch,
+  isPending,
+  kind,
+  workspaceUnavailable,
+}: {
+  currentBranch: string | undefined;
+  isPending: boolean;
+  kind: "repository" | "not-repository" | "workspace-unavailable" | undefined;
+  workspaceUnavailable: boolean;
+}): ReactNode {
+  if (isPending) {
+    return (
+      <span aria-hidden="true" className="bg-muted h-2 w-24 rounded-sm motion-safe:animate-pulse" />
+    );
+  }
+  if (currentBranch) {
+    return (
+      <span
+        className="text-muted-foreground flex min-w-0 items-center gap-1.5"
+        title="Current git branch"
+      >
+        <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+        <span className="truncate">{currentBranch}</span>
+      </span>
+    );
+  }
+  if (kind === "not-repository") {
+    return <span className="text-muted-foreground">Not a Git repository</span>;
+  }
+  if (workspaceUnavailable) {
+    return <span className="text-destructive">Workspace unavailable</span>;
+  }
+  return null;
 }

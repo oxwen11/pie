@@ -12,6 +12,8 @@ import type { ServerStatusFeed } from "./server-status";
  */
 export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): ReactElement | null {
   const platform = usePlatform();
+  const handleQuit = platform.quit;
+  const handleRetry = feed.retry;
   // The host owns this status; React only reads it. `feed` is a host singleton,
   // so both methods are referentially stable.
   const status = useSyncExternalStore(feed.subscribe, feed.getSnapshot);
@@ -47,12 +49,12 @@ export function ServerStatusOverlay({ feed }: { feed: ServerStatusFeed }): React
             </p>
           </div>
           <div className="flex gap-2">
-            {platform.quit && (
-              <Button variant="outline" onClick={platform.quit}>
+            {handleQuit ? (
+              <Button variant="outline" onClick={handleQuit}>
                 Quit
               </Button>
-            )}
-            <Button onClick={feed.retry}>Retry</Button>
+            ) : null}
+            <Button onClick={handleRetry}>Retry</Button>
           </div>
         </div>
       </div>

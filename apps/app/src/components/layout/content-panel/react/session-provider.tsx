@@ -13,7 +13,7 @@ import type { AnyPanelView } from "./view";
  * The ref is identity, not an ambient data bag: panel-specific values such as a
  * workspace path or git ref still belong in that panel's own payload/model.
  */
-export interface ContentPanelSessionProviderProps {
+interface ContentPanelSessionProviderProps {
   readonly contentPanel: ContentPanel<AnyPanelView>;
   /** null off a session route; every panel hook below degrades to a no-op. */
   readonly sessionRef: SessionRef | null;

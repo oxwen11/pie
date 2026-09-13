@@ -1,7 +1,6 @@
-import type { Project, Schedule, ScheduleSession, ScheduleSpec } from "@getpie/contract";
+import type { Project, Schedule } from "@getpie/contract";
 import {
   scheduleSessionOf,
-  MAX_SCHEDULE_MAX_RUNS,
   MAX_SCHEDULE_NAME_CHARS,
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
@@ -29,7 +28,6 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  CREATE_ON_FIRST_RUN_VALUE,
   type ScheduleFormValues,
   defaultScheduleForm,
   formFromSpec,
@@ -41,21 +39,17 @@ import {
 } from "./cadence";
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
+import {
+  parseScheduleMaxRuns,
+  scheduleFormCanSubmit,
+  scheduleMaxRunsValid,
+  scheduleModelOptions,
+  scheduleSessionItems,
+  type ScheduleFormSubmit,
+} from "./schedule-form-model";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
 
-export type ScheduleFormSubmit = {
-  readonly name: string;
-  readonly projectId: string;
-  readonly prompt: string;
-  readonly spec: ScheduleSpec;
-  readonly worktree: boolean;
-  readonly session: ScheduleSession;
-  readonly expiresAt: string | null;
-  readonly maxRuns: number | null;
-  readonly runNow: boolean;
-  readonly provider?: string;
-  readonly modelId?: string;
-};
+export type { ScheduleFormSubmit } from "./schedule-form-model";
 
 export type ScheduleFormDefaults = {
   readonly projectId?: string;
@@ -126,7 +120,7 @@ export function ScheduleForm({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: form.projectId, archived: false },
     }),
-    enabled: form.reuseSession && form.projectId.length > 0,
+    enabled: scheduleSessionsEnabled(form.reuseSession, form.projectId),
   });
   const models = useQuery({
     ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
@@ -134,45 +128,21 @@ export function ScheduleForm({
   });
   const listedModels = models.data?.models ?? [];
   const model = form.model ?? models.data?.defaultModel;
-  const modelOptions =
-    model !== undefined &&
-    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
-      ? [...listedModels, model]
-      : listedModels;
+  const modelOptions = scheduleModelOptions(listedModels, model);
   const listed = sessions.data ?? [];
-  const listedIds = sessions.isSuccess
-    ? new Set(listed.map((session) => session.sessionId))
-    : undefined;
+  const listedIds = listedSessionIds(sessions.isSuccess, listed);
   const selectedSessionValue = sessionSelectValue(form, listedIds);
-  const sessionItems = [
-    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
-    ...listed.map((session) => ({
-      label: session.title ?? "New chat",
-      value: session.sessionId,
-    })),
-    ...(selectedSessionValue !== CREATE_ON_FIRST_RUN_VALUE &&
-    !listed.some((session) => session.sessionId === selectedSessionValue)
-      ? [{ label: "Selected session", value: selectedSessionValue }]
-      : []),
-  ];
+  const sessionItems = scheduleSessionItems(listed, selectedSessionValue);
   const everyAmount = Number(form.everyAmount);
-  const maxRunsTrimmed = form.maxRuns.trim();
-  const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
-  const maxRunsValid =
-    maxRunsNumber === null ||
-    (Number.isInteger(maxRunsNumber) &&
-      maxRunsNumber >= 1 &&
-      maxRunsNumber <= MAX_SCHEDULE_MAX_RUNS);
-  const canSubmit =
-    !submitting &&
-    maxRunsValid &&
-    form.name.trim().length > 0 &&
-    form.projectId.length > 0 &&
-    form.prompt.trim().length > 0 &&
-    (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
-    (listedModels.length === 0 || model !== undefined);
+  const maxRunsNumber = parseScheduleMaxRuns(form.maxRuns);
+  const maxRunsValid = scheduleMaxRunsValid(maxRunsNumber);
+  const canSubmit = scheduleFormCanSubmit({
+    submitting,
+    form,
+    everyAmount,
+    maxRunsValid,
+    hasModel: scheduleHasModel(listedModels.length, model !== undefined),
+  });
 
   return (
     <form
@@ -220,7 +190,7 @@ export function ScheduleForm({
       <Field>
         <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
         <Select
-          disabled={projectLocked || projects.length === 0}
+          disabled={scheduleProjectLocked(projectLocked, projects.length)}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
             if (typeof next === "string") {
@@ -233,7 +203,7 @@ export function ScheduleForm({
               }));
             }
           }}
-          value={form.projectId === "" ? null : form.projectId}
+          value={scheduleProjectValue(form.projectId)}
         >
           <SelectTrigger id="schedule-project">
             <SelectValue placeholder="Select a project" />
@@ -289,32 +259,76 @@ export function ScheduleForm({
           />
         </div>
       </Field>
-      {creating ? (
-        <Field>
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="min-w-0">
-              <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
-              <FieldDescription>
-                Start a session as soon as this schedule is created.
-              </FieldDescription>
-            </div>
-            <Switch
-              checked={form.runNow}
-              id="schedule-run-now"
-              onCheckedChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
-            />
-          </div>
-        </Field>
-      ) : null}
-      {error !== null ? <FieldError>{error}</FieldError> : null}
+      <ScheduleFormCreateOptions
+        creating={creating}
+        onRunNowChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
+        runNow={form.runNow}
+      />
+      <ScheduleFormError error={error} />
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="outline">
           Cancel
         </Button>
         <Button disabled={!canSubmit} type="submit">
-          {initial === undefined ? "Create" : "Save"}
+          {scheduleSubmitLabel(creating)}
         </Button>
       </div>
     </form>
+  );
+}
+
+function scheduleSubmitLabel(creating: boolean): string {
+  return creating ? "Create" : "Save";
+}
+
+function scheduleSessionsEnabled(reuseSession: boolean, projectId: string): boolean {
+  return reuseSession && projectId.length > 0;
+}
+
+function listedSessionIds(
+  isSuccess: boolean,
+  listed: ReadonlyArray<{ readonly sessionId: string }>,
+): Set<string> | undefined {
+  if (!isSuccess) return undefined;
+  return new Set(listed.map((session) => session.sessionId));
+}
+
+function scheduleHasModel(listedCount: number, modelPicked: boolean): boolean {
+  return listedCount === 0 || modelPicked;
+}
+
+function scheduleProjectLocked(projectLocked: boolean, projectCount: number): boolean {
+  return projectLocked || projectCount === 0;
+}
+
+function scheduleProjectValue(projectId: string): string | null {
+  return projectId === "" ? null : projectId;
+}
+
+function ScheduleFormError({ error }: { error: string | null }) {
+  if (error === null) return null;
+  return <FieldError>{error}</FieldError>;
+}
+
+function ScheduleFormCreateOptions({
+  creating,
+  runNow,
+  onRunNowChange,
+}: {
+  creating: boolean;
+  runNow: boolean;
+  onRunNowChange: (checked: boolean) => void;
+}) {
+  if (!creating) return null;
+  return (
+    <Field>
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="min-w-0">
+          <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
+          <FieldDescription>Start a session as soon as this schedule is created.</FieldDescription>
+        </div>
+        <Switch checked={runNow} id="schedule-run-now" onCheckedChange={onRunNowChange} />
+      </div>
+    </Field>
   );
 }

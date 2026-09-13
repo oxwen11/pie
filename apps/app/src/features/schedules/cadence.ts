@@ -197,7 +197,7 @@ export function everyMsFromForm(amount: string, unit: ScheduleEveryUnit): number
   return n * DAY_MS;
 }
 
-export type SplitEveryMs = {
+type SplitEveryMs = {
   readonly amount: string;
   readonly unit: ScheduleEveryUnit;
 };
@@ -296,5 +296,4 @@ export {
   formatSkipReason,
   formatSpec,
   summarizeRuns,
-  type ScheduleRunSummary,
 } from "./format";
