@@ -15,10 +15,10 @@ import {
   WorkspaceLayoutTree,
   WorkspaceLayoutTreeTrigger,
 } from "@/components/layout/workspace-layout";
+import { WorkspaceState } from "@/components/workspace-state";
 
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
-import { FileState } from "./file-state";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export interface FilePayload {
@@ -91,9 +91,9 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
 
   if (panel === null) {
     return (
-      <FileState title="Workspace unavailable">
+      <WorkspaceState icon={FileCodeIcon} title="Workspace unavailable">
         This session no longer resolves to an imported project.
-      </FileState>
+      </WorkspaceState>
     );
   }
 
