@@ -31,13 +31,53 @@ const parseArgs = (argv) => {
   return out;
 };
 
+const packageDirFromEntry = (name, entry) => {
+  let current = path.dirname(entry);
+  for (;;) {
+    const manifest = path.join(current, "package.json");
+    if (fs.existsSync(manifest)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        if (parsed.name === name) return current;
+      } catch {
+        /* keep walking */
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+};
+
 const resolvePackageDir = (name, paths) => {
-  const manifest = require.resolve(`${name}/package.json`, { paths });
-  return path.dirname(manifest);
+  for (const root of paths) {
+    const direct = path.join(root, "node_modules", ...name.split("/"));
+    if (fs.existsSync(path.join(direct, "package.json"))) return direct;
+  }
+  try {
+    return path.dirname(require.resolve(`${name}/package.json`, { paths }));
+  } catch {
+    const fromEntry = packageDirFromEntry(name, require.resolve(name, { paths }));
+    if (fromEntry) return fromEntry;
+    throw new Error(`materialize-fff: cannot resolve ${name}`);
+  }
+};
+
+/** pnpm places deps next to the package under `<pkg-store>/node_modules`. */
+const packageSearchRoot = (packageDir) => {
+  const parent = path.dirname(packageDir);
+  const grandparent = path.dirname(parent);
+  if (path.basename(grandparent) === "node_modules") {
+    return path.dirname(grandparent);
+  }
+  if (path.basename(parent) === "node_modules") {
+    return path.dirname(parent);
+  }
+  return packageDir;
 };
 
 const copyPackage = (name, destNodeModules, searchPaths) => {
-  const src = resolvePackageDir(name, searchPaths);
+  const src = fs.realpathSync(resolvePackageDir(name, searchPaths));
   const dest = path.join(destNodeModules, ...name.split("/"));
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.cpSync(src, dest, {
@@ -45,7 +85,7 @@ const copyPackage = (name, destNodeModules, searchPaths) => {
     dereference: true,
     filter: (from) => path.basename(from) !== "node_modules",
   });
-  return dest;
+  return { dest, src };
 };
 
 const dependencyNames = (packageDir) => {
@@ -59,7 +99,7 @@ export function materializeFffIsland(options) {
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(destNodeModules, { recursive: true });
 
-  const searchPaths = [serverRoot, destNodeModules];
+  const searchPaths = [serverRoot];
   const queued = [
     "@ff-labs/pi-fff",
     "@ff-labs/fff-bun",
@@ -75,7 +115,8 @@ export function materializeFffIsland(options) {
     if (name === "@ff-labs/fff-node") continue;
     seen.add(name);
     const copied = copyPackage(name, destNodeModules, searchPaths);
-    for (const dep of dependencyNames(copied)) {
+    searchPaths.push(packageSearchRoot(copied.src));
+    for (const dep of dependencyNames(copied.dest)) {
       if (dep === "ffi-rs") continue;
       queued.push(dep);
     }

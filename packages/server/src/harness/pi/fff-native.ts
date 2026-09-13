@@ -96,7 +96,7 @@ const isJsonRecord = (value: unknown): value is Record<string, unknown> =>
 
 const existingFile = (pathname: string): string | undefined => {
   try {
-    return fs.existsSync(pathname) ? pathname : undefined;
+    return fs.statSync(pathname).isFile() ? pathname : undefined;
   } catch {
     return undefined;
   }
