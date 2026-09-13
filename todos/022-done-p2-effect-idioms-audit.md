@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 priority: p2
 issue_id: "022"
 tags: [effect, architecture, code-review, observability, testing]
@@ -394,3 +394,4 @@ Layer.sync(ScheduleRuntime, () => ({
 - 2026-09-03: Finding 28 wontfix outside session-service: `http/serve.test.ts` and `rpc-*.test.ts` wrap Node `http` listen + oRPC client (finding 17 Promise seam). `worktree-service.test.ts` module-level `mkdtempSync` is a shared git-CLI fixture, not an Effect Scope. session-service (+ worktree) already use `makeTempDirectoryScoped`.
 - 2026-09-03: Finding 16 design: keep the handwritten EventBus. `PubSub.dropping` does not evict a slow subscriber and emit `closed: slow_consumer` — that notification is part of the wire contract (`SubscribeStreamEvent`). Replacing the subscriber table with PubSub would drop that reason or reimplement eviction outside PubSub, which is the current code. Not worth a behavior-risk rewrite.
 - 2026-09-03: Finding 17 design: `createServer` stays Promise-shaped at the Node `http` + `ws` upgrade seam (oRPC owns `upgrade`; Effect `HttpServer.serve` would fight it). Startup failures already map through `ServerStartupError` at `Effect.tryPromise`. A `Layer<Server, ServerStartupError, Scope>` is a follow-up that must keep desktop's Promise call site; do not mix it into this stack.
+- 2026-09-12: Finding 3 follow-up: `Config.redacted` only masks logs. `serveWith` deletes `process.env.PIE_AUTH_TOKEN` after the one-shot Config read so Pi tool-call shells cannot inherit the credential (PR #201). Ticket closed: remaining findings are landed, wontfix, or explicit design-not-this-stack.
