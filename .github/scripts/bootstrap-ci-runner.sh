@@ -25,7 +25,7 @@ fi
 # node-pty 1.1.0 has no Linux prebuild; compile on the runner like t3code's WSL job.
 if command -v apt-get >/dev/null; then
   apt-get update -qq
-  apt-get install -y --no-install-recommends build-essential python3
+  apt-get install -y --no-install-recommends build-essential python3 lsof
 fi
 
 # Warm toolchain when the repo is already checked out on the runner.
