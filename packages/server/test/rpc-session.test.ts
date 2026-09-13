@@ -55,7 +55,7 @@ rl.on("line", (line) => {
 `;
 
 function makeFake(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-rpc-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pie-pi-process-"));
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE);
   fs.chmodSync(file, 0o755);

@@ -14,10 +14,10 @@
     "./http": "./src/http/index.ts",
     "./daemon": "./src/daemon/index.ts",
     "./observability": "./src/observability/index.ts",
-    "./pi-rpc": "./dist/pi-rpc/pi-rpc.js"
+    "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "tsdown && bun build src/harness/pi/rpc/entry.ts --target bun --outfile dist/pi-rpc/pi-rpc.js",
+    "build": "tsdown && bun build src/harness/pi/rpc/entry.ts --target bun --outfile dist/pi-process/pi-process.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
