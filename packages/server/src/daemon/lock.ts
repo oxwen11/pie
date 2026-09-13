@@ -50,7 +50,9 @@ export const acquireLock = (
       } catch (error) {
         try {
           database.exec("ROLLBACK");
-        } catch {}
+        } catch {
+          // ROLLBACK fails when the transaction never began.
+        }
         database.close();
         throw error;
       }

@@ -7,9 +7,13 @@ import { Effect, FileSystem, type PlatformError } from "effect";
 
 import { daemonRecordPath } from "./paths";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 /**
- * The discovery record the launcher writes to `$PIE_DAEMON_DIR/daemon.pid`.
- * SSH launch reuses this same file on the remote host; `~/.pie/ssh-launch/<stateKey>/`
+ * The discovery record the launcher writes to `$PIE_HOME/daemon/daemon.pid`.
+ * SSH launch reuses this same file on the remote host; `$PIE_HOME/ssh-launch/<stateKey>/`
  * only holds the runner script and log. It is the single-instance marker: staleness
  * is decided by "is the pid alive", never a lock the server holds. The server itself
  * never reads or writes it.
@@ -38,12 +42,12 @@ export const readRecord = (
       .pipe(Effect.orElseSucceed(() => undefined));
     if (raw === undefined) return undefined;
 
-    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown).pipe(
+    const parsed = yield* Effect.try((): unknown => JSON.parse(raw)).pipe(
       Effect.orElseSucceed(() => undefined),
     );
-    if (typeof parsed !== "object" || parsed === null) return undefined;
+    if (!isRecord(parsed)) return undefined;
 
-    const candidate = parsed as Record<string, unknown>;
+    const candidate = parsed;
     if (
       typeof candidate.pid === "number" &&
       typeof candidate.address === "string" &&

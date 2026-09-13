@@ -9,6 +9,7 @@ import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
 import { tailwindcssVite } from "../app/tailwindcss-vite";
+import { themeBootstrapPlugin } from "../app/theme-bootstrap-plugin";
 
 const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
 const RUNNING_IN_AGENT = isRunningFromAgent({ experimentalProcessTree: true });
@@ -73,7 +74,7 @@ export default defineConfig({
   preload: {
     build: {
       outDir: "dist/preload",
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: "src/preload/index.ts" },
         // A sandboxed renderer receives the MessagePort through a CommonJS preload.
         output: {
@@ -99,6 +100,7 @@ export default defineConfig({
       },
     },
     plugins: [
+      themeBootstrapPlugin({ csp: true }),
       devOverlayCsp(),
       codeInspectorPlugin({ bundler: "vite", hideConsole: true }),
       tanstackRouter({
@@ -114,7 +116,7 @@ export default defineConfig({
     ],
     build: {
       outDir: "dist/renderer",
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: url.fileURLToPath(new URL("./src/renderer/index.html", import.meta.url)),
         },

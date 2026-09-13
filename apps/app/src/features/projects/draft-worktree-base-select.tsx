@@ -66,7 +66,7 @@ export function DraftWorktreeBaseSelect({
   return (
     <Combobox
       autoHighlight
-      disabled={disabled || branch === undefined || groups.length === 0}
+      disabled={disabled === true || branch === undefined || groups.length === 0}
       filter={matchesQuery}
       items={groups}
       onValueChange={(next) => {
@@ -89,6 +89,7 @@ export function DraftWorktreeBaseSelect({
         <div className="border-b px-2 py-1.5">
           <ComboboxInput
             aria-label="Search branches"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus search when the combobox opens
             autoFocus
             className="border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0"
             placeholder="Search branches…"

@@ -3,30 +3,16 @@
 import "zod/compile";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
-import {
-  resolveDaemonDirectory,
-  resolveDaemonLocation,
-  resolveOrSpawnDaemon,
-  statusDaemon,
-  stopDaemon,
-} from "@getpie/server/daemon";
+import { resolveDaemonDirectory, statusDaemon, stopDaemon } from "@getpie/server/daemon";
 import { daemonServeEnvironment, resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
 import { attachRelay, relayPublicBaseUrl } from "@getpie/server/relay";
 import { Effect, Option } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
 import pkg from "../../package.json" with { type: "json" };
+import { resolveCliDaemon } from "./daemon";
 import { parseHostPort, relayListenFlags, runRelayListen, takeRelayToken } from "./relay-cli";
-
-/**
- * argv that re-launches this very CLI in foreground `serve` mode. The daemon is
- * just `pie serve` spawned detached — no second bundle, and `execArgv`
- * carries the dev loader (e.g. tsx) so it works from source too.
- */
-function serverArgv(): string[] {
-  return [process.execPath, ...process.execArgv, process.argv[1] ?? "", "serve"];
-}
+import { runCommand } from "./session-cli";
 
 type DaemonStartInput = {
   readonly port: Option.Option<number>;
@@ -37,22 +23,19 @@ type DaemonStartInput = {
 
 // Default startup is the daemon: a short-lived `pie` command must operate a
 // backend that outlives it, so it attaches to the running daemon or spawns one.
-// Both directories come from the ambient environment through the shared
-// resolver, which is also what `stop`/`status` and a desktop app inheriting the
-// same `PIE_DAEMON_DIR` use — that is what makes them address one daemon.
+// `$PIE_HOME` comes from the ambient environment through the shared resolver,
+// which is also what `stop`/`status` and a desktop app inheriting the same
+// home use — that is what makes them address one daemon.
 const startDaemon = (input: DaemonStartInput) =>
   Effect.gen(function* () {
     // Same flag > env > default port precedence as `pie serve`. CORS is not
     // resolved here: the daemon's policy is static, and any extra origins are
     // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
-    const config = resolveServeConfig(input);
-    const handle = yield* resolveOrSpawnDaemon({
-      ...resolveDaemonLocation(),
-      requiredCompatibilityKey: embeddedDaemonCompatibilityKey(),
-      serverArgv: serverArgv(),
-      port: config.port,
-      environment: daemonServeEnvironment(process.env, config),
-    });
+    const config = yield* resolveServeConfig(input);
+    const handle = yield* resolveCliDaemon(
+      config.port,
+      daemonServeEnvironment(process.env, config),
+    );
     console.log(
       handle.reused
         ? `pie daemon already running at ${handle.address} (pid ${handle.pid})`
@@ -77,6 +60,7 @@ const statusHandler = () =>
     const status = yield* statusDaemon(resolveDaemonDirectory());
     if (!status.running) {
       console.log("pie daemon is not running");
+      console.log("Start it with: pie daemon start");
       return;
     }
     console.log(`pie daemon running at ${status.record.address} (pid ${status.record.pid})`);
@@ -114,17 +98,20 @@ const mintPairing = () =>
     if (!response.ok) {
       return yield* Effect.fail(new Error(`pairing mint failed (${String(response.status)})`));
     }
-    const body = (yield* Effect.tryPromise(() => response.json())) as {
-      code?: unknown;
-      expiresAt?: unknown;
-    };
-    if (typeof body.code !== "string") {
+    const body: unknown = yield* Effect.tryPromise(() => response.json());
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      !("code" in body) ||
+      typeof body.code !== "string"
+    ) {
       return yield* Effect.fail(new Error("pairing mint returned no code"));
     }
     console.log(body.code);
-    if (typeof body.expiresAt === "number") {
+    if ("expiresAt" in body && typeof body.expiresAt === "number") {
       console.log(`expires ${new Date(body.expiresAt).toISOString()}`);
     }
+    return yield* Effect.void;
   });
 
 const pairingMint = Command.make("mint", {}, mintPairing).pipe(
@@ -216,7 +203,7 @@ const relay = Command.make("relay", {}, () =>
 // Bare `pie` defaults to daemon startup.
 const pie = Command.make("pie", serveFlags, startDaemon).pipe(
   Command.withDescription("Pie local server"),
-  Command.withSubcommands([serve, daemon, pairing, relay]),
+  Command.withSubcommands([serve, daemon, pairing, relay, runCommand]),
 );
 
 Command.run(pie, { version: pkg.version }).pipe(

@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import { Context, Effect, Layer, type FileSystem, type Scope } from "effect";
+import { Context, Effect, type FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
@@ -59,13 +59,15 @@ type MutableAvailability = {
 };
 
 export const makePiAgent = (
-  process: PiProcess,
+  piProcess: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
 ): PiAgentShape => {
   const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(options.executable ?? { command: "pi" }),
-    create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(process, input)),
-    resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(process, input)),
+    availability: checkPiAvailability(
+      options.executable ?? { command: process.execPath, prefixArgs: [] },
+    ),
+    create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(piProcess, input)),
+    resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(piProcess, input)),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   };
   return pi;
@@ -80,5 +82,3 @@ export const cachePiAgentAvailability = (
     (pi as MutableAvailability).availability = Effect.uninterruptible(cachedCheck);
     return pi;
   });
-
-export const PiAgentLayer = (pi: PiAgentShape): Layer.Layer<PiAgent> => Layer.succeed(PiAgent, pi);

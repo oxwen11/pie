@@ -1,4 +1,5 @@
 import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -22,7 +23,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
@@ -50,8 +50,11 @@ const asText = (value: unknown): string | undefined =>
 const optional = <K extends keyof DraftSearch>(
   key: K,
   value: DraftSearch[K],
-): Pick<DraftSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
+): Partial<Pick<DraftSearch, K>> => {
+  const result: Partial<Pick<DraftSearch, K>> = {};
+  if (value !== undefined) result[key] = value;
+  return result;
+};
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
@@ -226,7 +229,7 @@ function DraftRoute() {
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
-          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
+          <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
             <ProjectSelect
               onChange={(next) => {
                 navigate({
@@ -285,6 +288,7 @@ function DraftRoute() {
         <Card
           render={
             <PromptInput
+              className="divide-y-0"
               onSubmit={(e) => {
                 e.preventDefault();
                 void controller?.submit();
@@ -296,10 +300,9 @@ function DraftRoute() {
             <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
-                <DraftModelSelect
-                  projectId={selected?.id}
-                  providerId={draftModel?.provider}
+                <ModelSelectorPicker
                   modelId={draftModel?.modelId}
+                  models={modelsQuery.data?.models ?? []}
                   onChange={(provider, modelId) => {
                     navigate({
                       to: "/draft",
@@ -309,6 +312,7 @@ function DraftRoute() {
                       console.error("Failed to set the draft model", error);
                     });
                   }}
+                  providerId={draftModel?.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit

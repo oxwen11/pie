@@ -24,7 +24,7 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
+    runs-on: [self-hosted, pie]
     steps:
       # A push to a branch with an open PR targeting main is already published
       # by the pull_request run of this workflow (same SHA, plus the PR comment),
@@ -78,6 +78,11 @@ jobs:
           } >> "$GITHUB_PATH"
           export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
           mise install --locked
+        shell: bash
+
+      - name: Native toolchain (node-pty)
+        if: steps.pr-gate.outputs.skip != 'true'
+        run: bash .github/scripts/ensure-native-toolchain.sh
         shell: bash
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"

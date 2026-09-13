@@ -4,8 +4,7 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { describe, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber } from "effect";
 
-import type { PiAgentShape } from "../../src/harness/pi/agent";
-import { cacheAvailability } from "../../src/rpc/runtime";
+import { cachePiAgentAvailability, type PiAgentShape } from "../../src/harness/pi/agent";
 
 const unusedPi = {
   create: () => Effect.die("unused"),
@@ -13,7 +12,7 @@ const unusedPi = {
   getSessionInfo: () => Effect.die("unused"),
 } satisfies Omit<PiAgentShape, "availability">;
 
-describe("cacheAvailability", () => {
+describe("cachePiAgentAvailability", () => {
   layer(NodeFileSystem.layer)((it) => {
     it.effect("a caller interrupted mid-check does not poison the cache", () =>
       Effect.gen(function* () {
@@ -34,7 +33,7 @@ describe("cacheAvailability", () => {
             );
           }),
         };
-        const cached = yield* cacheAvailability(pi);
+        const cached = yield* cachePiAgentAvailability(pi);
 
         const caller = yield* Effect.forkChild(cached.availability);
         yield* Deferred.await(started);

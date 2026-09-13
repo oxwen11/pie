@@ -1,19 +1,22 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, useState, type ReactElement } from "react";
+import { use, useEffect, useRef, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { parseEnvironmentId } from "./lib/environment-id";
 import { createAppClients, disposeAppClients, type AppClients } from "./lib/orpc";
 import { toSessionRef } from "./lib/session-ref";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
+import { useTheme } from "./theme-provider";
 
 declare global {
   interface ImportMetaEnv {
@@ -30,9 +33,7 @@ declare global {
 // the default init fires a version check at react-grab.com, which the Electron
 // renderer's CSP blocks with a console error.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  void import("react-grab/core").then(({ init }) => {
-    init({ telemetry: false });
-  });
+  void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
 }
 
 // Dev only: highlights components as they re-render so you can spot wasted
@@ -110,11 +111,40 @@ function AppRuntime({
   environmentId: string;
 }): ReactElement {
   const platform = usePlatform();
-  const tokenHolder = useState(() => ({ current: server?.token ?? "" }))[0];
+  const { theme } = useTheme();
+  const tokenHolder = useRef(server?.token ?? "");
+  // Token rotation must not remount AppRuntime; getTicket reads this box later.
+  // oxlint-disable-next-line react/refs
   if (server?.token !== undefined) tokenHolder.current = server.token;
+  // oxlint-disable-next-line react/refs
   const localClients = useState(() => createAppClients(server, tokenHolder))[0];
   const remoteClients = useState(() => new Map<string, CachedRemote>())[0];
-  const chatManagerHolder = useState(() => ({ current: null as ChatManager | null }))[0];
+
+  function clientsFor(id: string): AppClients {
+    if (id === environmentId) return localClients;
+    const remote = platform.ssh?.environments
+      .getSnapshot()
+      .remotes.find((entry) => entry.environmentId === id);
+    if (remote === undefined) throw new UnknownEnvironmentError(id);
+    const key = connectionKey(remote.connection);
+    const cached = remoteClients.get(id);
+    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
+    if (cached !== undefined) {
+      remoteClients.delete(id);
+      disposeAppClients(cached.clients);
+    }
+    const created = createAppClients(remote.connection);
+    remoteClients.set(id, { connectionKey: key, clients: created });
+    return created;
+  }
+
+  const [chatManager] = useState(
+    () =>
+      new ChatManager((sessionRef) => {
+        const clients = clientsFor(sessionRef.environmentId);
+        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(sessionRef));
+      }),
+  );
 
   useEffect(() => {
     const feed = platform.ssh?.environments;
@@ -122,7 +152,7 @@ function AppRuntime({
     const dropRemote = (id: string, clients: AppClients) => {
       remoteClients.delete(id);
       disposeAppClients(clients);
-      chatManagerHolder.current?.forgetEnvironment(id);
+      chatManager.forgetEnvironment(id);
     };
     const prune = () => {
       const live = new Map(
@@ -141,36 +171,10 @@ function AppRuntime({
     };
     prune();
     return feed.subscribe(prune);
-  }, [platform.ssh, remoteClients, chatManagerHolder]);
-
-  const clientsFor = (id: string): AppClients => {
-    if (id === environmentId) return localClients;
-    const remote = platform.ssh?.environments
-      .getSnapshot()
-      .remotes.find((entry) => entry.environmentId === id);
-    if (remote === undefined) throw new UnknownEnvironmentError(id);
-    const key = connectionKey(remote.connection);
-    const cached = remoteClients.get(id);
-    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
-    if (cached !== undefined) {
-      remoteClients.delete(id);
-      disposeAppClients(cached.clients);
-      chatManagerHolder.current?.forgetEnvironment(id);
-    }
-    const created = createAppClients(remote.connection);
-    remoteClients.set(id, { connectionKey: key, clients: created });
-    return created;
-  };
+  }, [platform.ssh, remoteClients, chatManager]);
 
   const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => localClients);
-  const [chatManager] = useState(
-    () =>
-      new ChatManager((ref) => {
-        const clients = clientsFor(ref.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
-      }),
-  );
-  chatManagerHolder.current = chatManager;
+  useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   const [router] = useState(() =>
     createRouter({
       orpcClient,
@@ -190,7 +194,7 @@ function AppRuntime({
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
          */}
-        <Toaster theme="system" />
+        <Toaster theme={theme} />
       </ChatManagerProvider>
     </QueryClientProvider>
   );

@@ -50,7 +50,7 @@ layer(NodeServices.layer)("PiTransport", (it) => {
   it.effect("correlates command responses and exposes typed RPC errors", () =>
     Effect.gen(function* () {
       const transport = yield* makePiTransport({
-        executable: { command: makeFake() },
+        executable: { command: makeFake(), prefixArgs: [] },
       });
 
       assert.deepEqual(yield* transport.command({ type: "get_state" }), {
@@ -69,7 +69,7 @@ layer(NodeServices.layer)("PiTransport", (it) => {
   it.effect("skips CLI banner lines and fire-and-forget UI hints", () =>
     Effect.gen(function* () {
       const transport = yield* makePiTransport({
-        executable: { command: makeFake() },
+        executable: { command: makeFake(), prefixArgs: [] },
       });
       // The banner and setStatus arrive before this response; neither must
       // fail the frame reader nor surface as an event or a blocking request.
@@ -82,7 +82,7 @@ layer(NodeServices.layer)("PiTransport", (it) => {
   it.effect("routes events and blocking UI requests as streams, and replies over stdin", () =>
     Effect.gen(function* () {
       const transport = yield* makePiTransport({
-        executable: { command: makeFake() },
+        executable: { command: makeFake(), prefixArgs: [] },
       });
       const eventFiber = yield* Stream.runHead(transport.events).pipe(Effect.forkChild);
       const requestFiber = yield* Stream.runHead(transport.uiRequests).pipe(Effect.forkChild);
@@ -112,7 +112,7 @@ layer(NodeServices.layer)("PiTransport", (it) => {
   it.effect("drains child stderr without blocking protocol responses", () =>
     Effect.gen(function* () {
       const transport = yield* makePiTransport({
-        executable: { command: makeFake() },
+        executable: { command: makeFake(), prefixArgs: [] },
       });
       assert.equal(yield* transport.command({ type: "bash", command: "x" }), "drained");
     }),
@@ -121,7 +121,7 @@ layer(NodeServices.layer)("PiTransport", (it) => {
   it.effect("settles pending commands with a stderr tail when the process exits", () =>
     Effect.gen(function* () {
       const transport = yield* makePiTransport({
-        executable: { command: makeFake() },
+        executable: { command: makeFake(), prefixArgs: [] },
       });
       const error = yield* transport.command({ type: "abort" }).pipe(Effect.flip);
 
@@ -151,7 +151,7 @@ rl.on("line", (line) => {
       );
       fs.chmodSync(file, 0o755);
       const transport = yield* makePiTransport({
-        executable: { command: file },
+        executable: { command: file, prefixArgs: [] },
         sessionId: "sid-42",
       });
       assert.deepEqual(yield* transport.command({ type: "get_state" }), {

@@ -25,6 +25,7 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -54,7 +55,7 @@ rl.on("line", (line) => {
 `;
 
 function makeFake(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-rpc-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pie-pi-process-"));
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE);
   fs.chmodSync(file, 0o755);
@@ -66,7 +67,7 @@ async function setup() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const piExecutable = { command: makeFake() };
+  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
   const piProcessLayer = Layer.effect(
     PiProcessTag,
     makePiProcess({ executable: piExecutable }),
@@ -115,7 +116,7 @@ async function setup() {
   );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
     scheduleServiceLayer,
@@ -124,6 +125,7 @@ async function setup() {
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );

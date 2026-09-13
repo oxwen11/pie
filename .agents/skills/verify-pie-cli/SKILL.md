@@ -9,11 +9,11 @@ The CLI (`packages/pie`, package `@getpie/cli`, bin `pie`) is a **different fron
 
 This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). The helper is **`pnpm exec pie-verify cli`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). **Not Bash. Not Bun.** Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
 
-Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie-dev`.
+Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie_*`.
 
 ## Launch
 
-Isolated `$PIE_HOME` + `$PIE_DAEMON_DIR`. Default daemon port **4182** (not 4000, not web 4180).
+Isolated `$PIE_HOME` (daemon is `$PIE_HOME/daemon`). Default daemon port **4182** (not 4000, not web 4180).
 
 ```bash
 pnpm exec pie-verify cli launch
@@ -22,16 +22,16 @@ pnpm exec pie-verify cli launch
 # pnpm exec pie-verify cli launch --serve   # foreground pie serve
 ```
 
-Ready when `GET $address/api/health` returns `ok`. **Read `address` from `$PIE_DAEMON_DIR/daemon.pid`** — do not guess the port. Preferred port is 4182; if it is taken the launcher refuses rather than silently moving.
+Ready when `GET $address/api/health` returns `ok`. **Read `address` from `$PIE_HOME/daemon/daemon.pid`** — do not guess the port. Preferred port is 4182; if it is taken the launcher refuses rather than silently moving.
 
 What launch also does:
 
 - Requires **Node >= 24**. Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing.
-- Sets `PIE_HOME=/tmp/pie-verify-cli/runs/<id>/pie-home` and `PIE_DAEMON_DIR=$PIE_HOME/daemon`.
+- Sets `PIE_HOME=/tmp/pie-verify-cli/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
 - Invokes source: `cd packages/pie && pnpm exec tsx src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
 - Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.mjs`; **tsx does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
-- Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME` / `PIE_DAEMON_DIR`, not killing the short-lived CLI pid.
+- Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME`, not killing the short-lived CLI pid.
 - `--serve` starts foreground `pie serve` instead (no token). Use that only for the serve-foreground feature.
 
 Never `PIE_PORT=4000` (user / desktop daemon). Never `4180` / `4190` (web verify). If 4182 is already taken by a process this skill did not start, launch **refuses**.
@@ -43,7 +43,7 @@ Stdout you should see:
 - status: `pie daemon running at …` or `pie daemon is not running`
 - stop: `pie daemon stopped`
 
-`$PIE_DAEMON_DIR/daemon.pid` is `{ pid, address, token, startedAt, compatibilityKey }` mode `0600`. **The token is a secret. Do not copy it into evidence, notes, or PR bodies.**
+`$PIE_HOME/daemon/daemon.pid` is `{ pid, address, token, startedAt, compatibilityKey }` mode `0600`. **The token is a secret. Do not copy it into evidence, notes, or PR bodies.**
 
 ## Doctor
 
@@ -56,7 +56,7 @@ pnpm exec pie-verify cli doctor
 It checks, in order:
 
 1. A current run pointer exists at `/tmp/pie-verify-cli/current` (else: a live 4182 without that pointer is a **foreign** daemon — refuse).
-2. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie-dev`.
+2. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie_*`.
 3. Daemon mode: `daemon.pid` exists, recorded pid is alive, `GET $address/api/health` is `ok`.
 4. `POST $address/api/ws-ticket` is **401** without `Authorization`, **200** with `Authorization: Bearer <token>` from the live record (token is not printed).
 5. Serve mode: foreground pid is alive, health is `ok`, ticket is **200** with no token (browser mode).
@@ -72,7 +72,7 @@ pnpm exec pie-verify cli run daemon status
 pnpm exec pie-verify cli run --help
 ```
 
-`pie-verify cli run` injects the current run's `PIE_HOME` / `PIE_DAEMON_DIR` / `PIE_PORT` and runs `tsx src/node/cli.ts` with the remaining args. Do not call a global `pie` — it may point at another home.
+`pie-verify cli run` injects the current run's `PIE_HOME` / `PIE_PORT` and runs `tsx src/node/cli.ts` with the remaining args. Do not call a global `pie` — it may point at another home.
 
 Commands:
 
@@ -123,8 +123,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Resource | Shared? |
 | --- | --- |
-| `$PIE_HOME` | Isolated under `/tmp/pie-verify-cli/runs/<id>/pie-home`. |
-| `$PIE_DAEMON_DIR` | `$PIE_HOME/daemon`. |
+| `$PIE_HOME` | Isolated under `/tmp/pie-verify-cli/runs/<id>/pie-home`. Daemon is `$PIE_HOME/daemon`. |
 | Port 4182 | Default. Launch refuses a taken port. Never 4000 / 4180 / 4190. |
 | Web verify 4180/4190 | **Do not touch.** |
 | Desktop verify (prefers 4000) | **Do not touch.** Different `$PIE_HOME`. |

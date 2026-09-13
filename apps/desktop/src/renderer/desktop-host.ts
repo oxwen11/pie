@@ -63,7 +63,9 @@ export function createDesktopHost(
                     console.error("Desktop environment stream failed", error);
                   }
                 },
-                onFinish: () => {},
+                onFinish: () => {
+                  /* environment stream close is handled by the abort controller */
+                },
               },
             );
 
@@ -112,7 +114,9 @@ export function createDesktopHost(
                 console.error("Desktop status stream failed", error);
               }
             },
-            onFinish: () => {},
+            onFinish: () => {
+              /* status stream close is handled by the abort controller */
+            },
           },
         );
 

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestRef, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { Effect, Layer } from "effect";
 import { simpleGit } from "simple-git";
 import { describe, expect, it } from "vitest";
@@ -36,6 +36,13 @@ const snapshot: PullRequestSnapshot = {
   autoMerge: null,
   offeredActions: [],
   updatedAt: "2026-08-30T00:00:00Z",
+  body: "",
+};
+
+const unusedInbox = {
+  list: () => Effect.succeed([]),
+  detail: () => Effect.succeed(null),
+  diffFor: () => Effect.die("unexpected pull request diffFor"),
 };
 
 const quietPullRequestLayer = Layer.succeed(PullRequestService, {
@@ -43,6 +50,7 @@ const quietPullRequestLayer = Layer.succeed(PullRequestService, {
   diff: () => Effect.succeed({ patch: "", truncated: false }),
   runAction: () => Effect.die("unexpected pull request action"),
   sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, () => Effect.succeed(null)),
+  ...unusedInbox,
 });
 
 describe("pull request router", () => {
@@ -60,8 +68,8 @@ describe("pull request router", () => {
         receivedCwd = cwd;
         return Effect.succeed({ patch: "diff --git a/a.txt b/a.txt\n", truncated: false });
       },
-      runAction: (cwd, _expected, action) => {
-        receivedCwd = cwd;
+      runAction: (target, _expected, action) => {
+        receivedCwd = "cwd" in target ? target.cwd : undefined;
         return Effect.succeed({
           pullRequest: snapshot.ref,
           action: action.type,
@@ -71,6 +79,7 @@ describe("pull request router", () => {
         });
       },
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -121,6 +130,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -157,6 +167,7 @@ describe("pull request router", () => {
       diff: () => Effect.die("unexpected pull request diff"),
       runAction: () => Effect.die("unexpected pull request action"),
       sessionStatuses: (workspaces) => foldSessionStatuses(workspaces, current),
+      ...unusedInbox,
     });
     const harness = await makeRpcTestHarness(home, { pullRequestLayer });
     try {
@@ -201,6 +212,62 @@ describe("pull request router", () => {
           ref: { projectId: crypto.randomUUID(), sessionId: crypto.randomUUID() },
         }),
       ).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("lists and details pull requests without a session", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-pr-home-"));
+    const item = {
+      ref: snapshot.ref,
+      title: snapshot.title,
+      url: snapshot.url,
+      authorLogin: "getpie",
+      headBranch: snapshot.head.branch,
+      baseBranch: snapshot.baseBranch,
+      lifecycle: snapshot.lifecycle,
+      additions: 4,
+      deletions: 1,
+      updatedAt: snapshot.updatedAt,
+    };
+    const detailed = { ...snapshot, body: "## Summary" };
+    let actionTarget: { readonly pullRequest: PullRequestRef } | undefined;
+    const pullRequestLayer = Layer.succeed(PullRequestService, {
+      current: () => Effect.die("unexpected current"),
+      diff: () => Effect.die("unexpected pull request diff"),
+      diffFor: () => Effect.die("unexpected pull request diffFor"),
+      runAction: (target, _expected, action) => {
+        actionTarget = "pullRequest" in target ? target : undefined;
+        return Effect.succeed({
+          pullRequest: snapshot.ref,
+          action: action.type,
+          appliedHeadSha: snapshot.head.sha,
+        });
+      },
+      sessionStatuses: () => Effect.die("unexpected statuses"),
+      list: () => Effect.succeed([item]),
+      detail: (pullRequest) =>
+        Effect.succeed(pullRequest.number === snapshot.ref.number ? detailed : null),
+    });
+    const harness = await makeRpcTestHarness(home, { pullRequestLayer });
+    try {
+      await expect(harness.client.pullRequest.list()).resolves.toEqual([item]);
+      await expect(
+        harness.client.pullRequest.detail({ pullRequest: snapshot.ref }),
+      ).resolves.toEqual(detailed);
+      await expect(
+        harness.client.pullRequest.runAction({
+          ref: snapshot.ref,
+          expected: { pullRequest: snapshot.ref, headSha: snapshot.head.sha },
+          action: { type: "merge", method: "squash" },
+        }),
+      ).resolves.toEqual({
+        pullRequest: snapshot.ref,
+        action: "merge",
+        appliedHeadSha: snapshot.head.sha,
+      });
+      expect(actionTarget).toEqual({ pullRequest: snapshot.ref });
     } finally {
       await harness.dispose();
     }

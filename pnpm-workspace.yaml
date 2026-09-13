@@ -6,6 +6,7 @@ onlyBuiltDependencies:
   - electron
   - esbuild
   - "@swc/core"
+  - node-pty
 catalog:
   "@tanstack/react-query": ^5.102.8
   "@tanstack/react-router": ^1.170.32
@@ -27,7 +28,10 @@ catalog:
   typescript: ^7.0.2
   uuid: ^14.0.2
   vite: ^8.2.2
-  vitest: 4.1.10
+  # Exact pin: Vitest majors rewrite config defaults (clearMocks, reporters,
+  # artifact root). Catalog + override keep every workspace package and
+  # electron-vite/vite-plus on one copy.
+  vitest: 5.0.0
   ws: ^8.21.3
   zod: ^4.5.4
   zustand: ^5.0.15
@@ -88,6 +92,13 @@ overrides:
   "@effect/platform-node-shared": "catalog:effect"
   "@effect/vitest": "catalog:effect"
   effect: "catalog:effect"
+# @effect/vitest@4.0.0-rc.112 still peers vitest <5. It only imports
+# TestRunner / expect from `vitest` and runs on 5; drop this when the
+# Effect catalog moves.
+packageExtensions:
+  "@effect/vitest":
+    peerDependencies:
+      vitest: ">=4.1.0"
 # pnpm 11+ defaults minimumReleaseAge to 24h; disable it — the same-day
 # dependency bumps this repo does (e.g. claude-agent-sdk) would be blocked.
 minimumReleaseAge: 0
@@ -117,9 +128,8 @@ patchedDependencies:
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
-  # Pi 0.84.2's SDK has session.clearQueue() (TUI Escape) but the RPC
-  # command table does not. The patch adds `clear_queue` so pie can
-  # rewrite the native queue (edit/delete a row = clear + re-steer /
-  # re-follow_up). Drop this when a published Pi exposes the command.
-  "@earendil-works/pi-coding-agent@0.84.2": patches/@earendil-works__pi-coding-agent@0.84.2.patch
+  # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
+  # InteractiveMode and highlight.js; inline builtin theme JSON.
+  # On bump: index.js, modes/index.js, theme.js, syntax-highlight.js.
+  "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

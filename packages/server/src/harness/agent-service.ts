@@ -1,11 +1,8 @@
 import type { ListAgentModelsOutput } from "@getpie/contract";
-import { Context, Effect, FileSystem, Layer } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { Context, Effect, Layer } from "effect";
 
 import { AgentOperationError } from "./errors";
 import { listAvailablePiModels } from "./pi/list-available-models";
-
-type PiAgentServicePlatform = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner;
 
 export type PiAgentServiceShape = {
   readonly listModels: (cwd: string) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
@@ -15,17 +12,10 @@ export class PiAgentService extends Context.Service<PiAgentService, PiAgentServi
   "PiAgentService",
 ) {}
 
-export const makePiAgentService = (
-  platform: Context.Context<PiAgentServicePlatform>,
-): PiAgentServiceShape => ({
-  listModels: (cwd) => listAvailablePiModels(cwd).pipe(Effect.provide(platform)),
+export const makePiAgentService = (): PiAgentServiceShape => ({
+  listModels: Effect.fn("PiAgentService.listModels")(function* (cwd: string) {
+    return yield* listAvailablePiModels(cwd);
+  }),
 });
 
-export const PiAgentServiceLayer: Layer.Layer<PiAgentService, never, PiAgentServicePlatform> =
-  Layer.effect(
-    PiAgentService,
-    Effect.gen(function* () {
-      const platform = yield* Effect.context<PiAgentServicePlatform>();
-      return makePiAgentService(platform);
-    }),
-  );
+export const PiAgentServiceLayer = Layer.succeed(PiAgentService, makePiAgentService());

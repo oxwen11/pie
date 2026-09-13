@@ -9,7 +9,10 @@ const PORT_TIMEOUT_MS = 15_000;
 export function waitForDesktopPort(): Promise<MessagePort> {
   return new Promise((resolve, reject) => {
     const onMessage = (event: MessageEvent): void => {
-      if (event.source !== window || event.data?.type !== DESKTOP_PORT_CHANNEL) return;
+      const data: unknown = event.data;
+      if (event.source !== window) return;
+      if (typeof data !== "object" || data === null || !("type" in data)) return;
+      if (data.type !== DESKTOP_PORT_CHANNEL) return;
       const [port] = event.ports;
       if (!port) return;
 

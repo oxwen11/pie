@@ -118,10 +118,10 @@ it.effect("a failed awaitTermination crashes an open turn as failed", () =>
     const bodies = yield* Ref.get(collected.bodies);
     assert.deepEqual(typesOf(bodies), [
       "session.turn.started",
-      "session.crashed",
       "session.turn.ended",
+      "session.crashed",
     ]);
-    const ended = bodies[2];
+    const ended = bodies[1];
     assert.equal(ended?.type, "session.turn.ended");
     if (ended?.type === "session.turn.ended") {
       assert.equal(ended.outcome, "failed");

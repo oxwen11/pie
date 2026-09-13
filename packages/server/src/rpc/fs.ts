@@ -61,7 +61,7 @@ export const fsRouter = orpc.router({
       .readDirectory(dir)
       .pipe(Effect.mapError(() => errors.READ_FAILED({ data: { path: dir } })));
     const candidates = names.filter(
-      (name) => (input.includeHidden || !name.startsWith(".")) && !IGNORED_DIRS.has(name),
+      (name) => (input.includeHidden === true || !name.startsWith(".")) && !IGNORED_DIRS.has(name),
     );
     const flagged = yield* Effect.forEach(
       candidates,

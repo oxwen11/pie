@@ -84,6 +84,7 @@ export const PullRequestSnapshotSchema = Schema.Struct({
   autoMerge: Schema.Union([Schema.Struct({ method: PullRequestMergeMethodSchema }), Schema.Null]),
   offeredActions: Schema.Array(PullRequestOfferedActionSchema),
   updatedAt: Schema.String,
+  body: Schema.String,
 });
 export type PullRequestSnapshot = typeof PullRequestSnapshotSchema.Type;
 
@@ -99,10 +100,11 @@ const ExpectedPullRequestHeadSchema = Schema.Struct({
   pullRequest: PullRequestRefSchema,
   headSha: Schema.String,
 });
+const PullRequestActionRefSchema = Schema.Union([SessionRefSchema, PullRequestRefSchema]);
 
 export const PullRequestActionInputSchema = Schema.Union([
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("merge"),
@@ -110,7 +112,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("enable-auto-merge"),
@@ -118,7 +120,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestSchema,
     action: Schema.Struct({ type: Schema.Literal("disable-auto-merge") }),
   }),
@@ -134,6 +136,20 @@ export const PullRequestActionAppliedSchema = Schema.Struct({
 });
 export type PullRequestActionApplied = typeof PullRequestActionAppliedSchema.Type;
 
+export const PullRequestListItemSchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  title: Schema.String,
+  url: Schema.String,
+  authorLogin: Schema.String,
+  headBranch: Schema.String,
+  baseBranch: Schema.String,
+  lifecycle: PullRequestLifecycleSchema,
+  additions: Schema.Number,
+  deletions: Schema.Number,
+  updatedAt: Schema.String,
+});
+export type PullRequestListItem = typeof PullRequestListItemSchema.Type;
+
 export const PullRequestDiffSchema = Schema.Struct({
   patch: Schema.String,
   truncated: Schema.Boolean,
@@ -146,6 +162,15 @@ const sessionNotFound = {
 
 const currentErrors = {
   SESSION_NOT_FOUND: sessionNotFound,
+  MISSING_GH: {},
+  UNAUTHENTICATED: {},
+  RATE_LIMITED: {},
+  UNSUPPORTED_CONTEXT: {},
+  HOST_UNAVAILABLE: {},
+  INVALID_RESPONSE: {},
+};
+
+const listErrors = {
   MISSING_GH: {},
   UNAUTHENTICATED: {},
   RATE_LIMITED: {},
@@ -174,13 +199,23 @@ export const pullRequestContract = {
     .errors(currentErrors)
     .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   diff: oc
-    .input(Schema.Struct({ ref: SessionRefSchema }))
+    .input(
+      Schema.Union([
+        Schema.Struct({ ref: SessionRefSchema }),
+        Schema.Struct({ pullRequest: PullRequestRefSchema }),
+      ]),
+    )
     .errors(currentErrors)
     .output(PullRequestDiffSchema),
   statuses: oc
     .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema) }))
     .errors(currentErrors)
     .output(Schema.Array(PullRequestSessionStatusSchema)),
+  list: oc.errors(listErrors).output(Schema.Array(PullRequestListItemSchema)),
+  detail: oc
+    .input(Schema.Struct({ pullRequest: PullRequestRefSchema }))
+    .errors(listErrors)
+    .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   runAction: oc
     .input(PullRequestActionInputSchema)
     .errors(actionErrors)

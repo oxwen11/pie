@@ -45,7 +45,7 @@ describe("pi request mapping", () => {
       header: "Run tool?",
       kind: "choice",
     });
-    expect(request.questions[0]!.options?.map((o) => o.label)).toEqual(["Yes", "No"]);
+    expect(request.questions[0]?.options?.map((o) => o.label)).toEqual(["Yes", "No"]);
 
     expect(buildUiRequest(select).questions[0]).toMatchObject({
       question: "Pick one",

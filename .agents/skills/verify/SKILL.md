@@ -82,3 +82,10 @@ binary. Always pass an explicit `open` URL. Prefer `find` / `wait` over
 `snapshot` + `@eN`.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.
+
+## Evidence
+
+The web app is a UI surface: every proof needs before/after screenshots
+(`pnpm exec pie-verify web evidence screenshot <name>`) **and** a video of the
+drive (`agent-browser record start "$(pnpm exec pie-verify web evidence path)/<feature>.webm"`
+… `agent-browser record stop`). See `.agents/rules/verify-evidence.md`.

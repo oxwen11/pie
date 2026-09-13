@@ -25,6 +25,7 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -58,7 +59,7 @@ export function writeFakePiExecutable(): PiExecutable {
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE_PI);
   fs.chmodSync(file, 0o755);
-  return { command: file };
+  return { command: file, prefixArgs: [] };
 }
 
 export interface RpcTestHarnessOptions {
@@ -117,7 +118,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
     scheduleServiceLayer,
@@ -126,6 +127,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     pullRequestLayer,
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );

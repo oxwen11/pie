@@ -1,4 +1,4 @@
-import { createPieClient, type PieClient } from "@getpie/client";
+import { createPieClient, getWsTicket, type PieClient } from "@getpie/client";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -56,24 +56,27 @@ function createQueryClient(): QueryClient {
   return queryClient;
 }
 
+async function getBrowserWsTicket(): Promise<string> {
+  const response = await globalThis.fetch("/api/bootstrap");
+  if (!response.ok) {
+    throw new Error(`Failed to bootstrap the local server: ${response.status}`);
+  }
+  const body: unknown = await response.json();
+  const token =
+    typeof body === "object" && body !== null && "token" in body && typeof body.token === "string"
+      ? body.token
+      : undefined;
+  return getWsTicket(globalThis.location.origin, token);
+}
+
 function createOrpcClient(server?: ServerConnection, tokenRef?: { current: string }): PieClient {
-  if (!server) return createPieClient();
+  if (!server) return createPieClient({ getTicket: getBrowserWsTicket });
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
   const presented = tokenRef ?? { current: token };
   return createPieClient({
     url: `${wsBaseUrl}/ws/rpc`,
-    getTicket: async () => {
-      const response = await globalThis.fetch(`${httpBaseUrl}/api/ws-ticket`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${presented.current}` },
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
-      }
-      const body = (await response.json()) as { ticket: string };
-      return body.ticket;
-    },
+    getTicket: () => getWsTicket(httpBaseUrl, presented.current),
   });
 }
 
@@ -86,7 +89,7 @@ export function createAppClients(
   const orpcClient = createOrpcClient(server, tokenRef);
   const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
 
-  // Draft seeds optimistic rows; `useSessionListSync` patches titles. Hold briefly.
+  // Draft seeds optimistic rows; the session event stream invalidates this list.
   queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
     staleTime: 30_000,
   });
@@ -98,6 +101,8 @@ export function createAppClients(
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.diff.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.list.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.detail.key(), pullRequestDefaults);
 
   // These queries render their own error state in the workspace panels.
   for (const key of [

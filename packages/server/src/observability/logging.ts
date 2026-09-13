@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Formatter, Logger, type LogLevel } from "effect";
+import { Effect, FileSystem, Formatter, Logger } from "effect";
 
 import { LOG_FILE_MODE, LOGS_DIRECTORY_MODE, pieLogPath } from "../config/paths";
 
@@ -38,8 +38,7 @@ function flatten(
 
 function plain(input: unknown): input is Record<string, unknown> {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return false;
-  const prototype = Object.getPrototypeOf(input);
-  return prototype === Object.prototype || prototype === null;
+  return Object.getPrototypeOf(input) === Object.prototype || Object.getPrototypeOf(input) === null;
 }
 
 function format(input: unknown): string {
@@ -69,18 +68,7 @@ function stderrLogger(id: string) {
   return Logger.make((options) => process.stderr.write(`${formatter(id).log(options)}\n`));
 }
 
-export function minimumLogLevel(): LogLevel.LogLevel {
-  const value = process.env.PIE_LOG_LEVEL?.toUpperCase();
-  const levels = {
-    DEBUG: "Debug",
-    INFO: "Info",
-    WARN: "Warn",
-    ERROR: "Error",
-  } as const satisfies Record<string, LogLevel.LogLevel>;
-  return value && value in levels ? levels[value as keyof typeof levels] : levels.INFO;
-}
-
-export function loggers(logsDir: string, id: string) {
+export function loggers(logsDir: string, id: string, printLogs: boolean) {
   const logger = fileLogger(pieLogPath(logsDir), id);
-  return process.env.PIE_PRINT_LOGS === "1" ? [logger, stderrLogger(id)] : [logger];
+  return printLogs ? [logger, stderrLogger(id)] : [logger];
 }

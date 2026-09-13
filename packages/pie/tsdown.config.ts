@@ -27,11 +27,17 @@ export default defineConfig([
     clean: true,
     // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
     // artifact beside the final CLI so runtime lookup never depends on a repo.
-    copy: {
-      from: "../../apps/app/dist",
-      to: "dist",
-      rename: "client",
-    },
+    copy: [
+      {
+        from: "../../apps/app/dist",
+        to: "dist",
+        rename: "client",
+      },
+      {
+        from: "../server/dist/pi-process/pi-process.js",
+        to: "dist/pi-process",
+      },
+    ],
   },
   {
     ...shared,

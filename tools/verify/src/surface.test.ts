@@ -37,9 +37,8 @@ describe("expectLaunch", () => {
       piePort: 4182,
       request: { replace: false, mode: "daemon" },
       env: {},
-      daemonDir: "/tmp/daemon",
     } satisfies Extract<LaunchCtx, { surface: "cli" }>;
-    expect(expectLaunch(ctx, "cli").daemonDir).toBe("/tmp/daemon");
+    expect(expectLaunch(ctx, "cli").pieHome).toBe("/tmp/pie-home");
     expect(() => expectLaunch(ctx, "web")).toThrow(/expected web launch ctx/);
   });
 });

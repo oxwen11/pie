@@ -82,12 +82,19 @@ describe("scheduler", () => {
     expect(created.kind).toBe("recurring");
     expect(sent).toHaveLength(0);
 
-    clock.nowMs = Date.parse(created.next_fire_at!);
+    if (created.next_fire_at === null) {
+      throw new Error("expected next_fire_at");
+    }
+    clock.nowMs = Date.parse(created.next_fire_at);
     scheduler.tick();
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.content).not.toMatch(/^\//);
-    expect(sent[0]!.content).not.toContain("<system-reminder>");
-    expect(sent[0]!.details.prompt).toBe("check deploy");
+    const first = sent[0];
+    if (first === undefined) {
+      throw new Error("expected dispatched message");
+    }
+    expect(first.content).not.toMatch(/^\//);
+    expect(first.content).not.toContain("<system-reminder>");
+    expect(first.details.prompt).toBe("check deploy");
     fire(scheduler);
 
     clock.advance(30 * 60_000);
@@ -128,8 +135,12 @@ describe("scheduler", () => {
     dispatch.idle = true;
     scheduler.handleSettled();
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.content).toContain("schedule_wakeup");
-    expect(sent[0]!.details.prompt).toBe("check CI");
+    const first = sent[0];
+    if (first === undefined) {
+      throw new Error("expected dispatched message");
+    }
+    expect(first.content).toContain("schedule_wakeup");
+    expect(first.details.prompt).toBe("check CI");
   });
 
   it("never uses steer", () => {
@@ -166,15 +177,21 @@ describe("scheduler", () => {
     expect(scheduled).toContain("120");
     expect(() => scheduler.scheduleWakeup({ delay_seconds: 120 })).toThrow(LoopError);
     scheduler.handleSettled();
-    const listed = scheduler.list().find((item) => item.task_id === created.task_id)!;
-    expect(Date.parse(listed.next_fire_at!) - clock.now()).toBe(120_000);
+    const listed = scheduler.list().find((item) => item.task_id === created.task_id);
+    if (listed === undefined || listed.next_fire_at === null) {
+      throw new Error("expected listed next_fire_at");
+    }
+    expect(Date.parse(listed.next_fire_at) - clock.now()).toBe(120_000);
 
     clock.advance(120_000);
     scheduler.tick();
     fire(scheduler);
     scheduler.handleSettled();
-    const afterMiss = scheduler.list().find((item) => item.task_id === created.task_id)!;
-    expect(Date.parse(afterMiss.next_fire_at!) - clock.now()).toBe(FALLBACK_MS);
+    const afterMiss = scheduler.list().find((item) => item.task_id === created.task_id);
+    if (afterMiss === undefined || afterMiss.next_fire_at === null) {
+      throw new Error("expected fallback next_fire_at");
+    }
+    expect(Date.parse(afterMiss.next_fire_at) - clock.now()).toBe(FALLBACK_MS);
 
     clock.advance(FALLBACK_MS);
     scheduler.tick();

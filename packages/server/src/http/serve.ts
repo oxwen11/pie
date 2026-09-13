@@ -1,6 +1,17 @@
-import { Cause, Context, Effect, Option, Scope } from "effect";
+import { Cause, Context, Effect, Option, Redacted, Scope } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
+import {
+  npmPackageVersion,
+  optionString,
+  pieAllowedHosts,
+  pieAuthToken,
+  pieCorsOrigins,
+  pieDaemonCompatibilityKey,
+  pieHost,
+  piePort,
+  nodeEnv,
+} from "../config/env";
 import { Paths, PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { loadOrCreateEnvironmentId } from "./environment-id";
@@ -15,36 +26,42 @@ import { createServer, ServerStartupError } from "./server";
 
 const DEFAULT_PORT = 4000;
 
-/**
- * Read the token, then scrub it. The agent spawns a shell for every tool call
- * and children inherit this environment — an agent-run command must not be
- * able to read the credential that guards the agent. Kept env-only (never a
- * flag) so it stays out of the process list.
- */
-function takeAuthToken(): string | undefined {
-  const token = process.env.PIE_AUTH_TOKEN;
-  delete process.env.PIE_AUTH_TOKEN;
-  return token;
-}
+export const serveFlags = {
+  port: Flag.integer("port").pipe(
+    Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
+    Flag.optional,
+  ),
+  host: Flag.string("host").pipe(
+    Flag.withDescription(
+      "bind this address (default 127.0.0.1; a LAN IP is auto-allowlisted as Host/Origin; 0.0.0.0 still needs --allowed-host)",
+    ),
+    Flag.optional,
+  ),
+  corsOrigin: Flag.string("cors-origin").pipe(
+    Flag.withDescription("Origin allowed to make cross-origin requests; repeatable"),
+    Flag.atLeast(0),
+  ),
+  allowedHost: Flag.string("allowed-host").pipe(
+    Flag.withDescription(
+      "Extra Host header accepted besides loopback, for a trusted reverse proxy; repeatable",
+    ),
+    Flag.atLeast(0),
+  ),
+};
 
-function listFromEnv(name: string): string[] {
-  return (process.env[name] ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
+type ServeInput = {
+  readonly port: Option.Option<number>;
+  readonly host?: Option.Option<string>;
+  readonly corsOrigin: ReadonlyArray<string>;
+  readonly allowedHost: ReadonlyArray<string>;
+};
 
-function portFromEnv(): number {
-  const raw = process.env.PIE_PORT;
-  if (raw === undefined) return process.env.NODE_ENV === "development" ? 0 : DEFAULT_PORT;
-  const port = Number.parseInt(raw, 10);
-  return Number.isInteger(port) && port >= 0 ? port : DEFAULT_PORT;
-}
-
-function hostFromEnv(): string {
-  const raw = process.env.PIE_HOST?.trim();
-  return raw === undefined || raw.length === 0 ? DEFAULT_LISTEN_HOST : raw;
-}
+export type ServeConfig = {
+  readonly port: number;
+  readonly host: string;
+  readonly corsOrigins: readonly string[];
+  readonly allowedHosts: readonly string[];
+};
 
 function uniqueHosts(hosts: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -76,59 +93,30 @@ export function daemonServeEnvironment(
   return next;
 }
 
-export const serveFlags = {
-  port: Flag.integer("port").pipe(
-    Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
-    Flag.optional,
-  ),
-  host: Flag.string("host").pipe(
-    Flag.withDescription(
-      "bind this address (default 127.0.0.1; a LAN IP is auto-allowlisted as Host/Origin; 0.0.0.0 still needs --allowed-host)",
-    ),
-    Flag.optional,
-  ),
-  corsOrigin: Flag.string("cors-origin").pipe(
-    Flag.withDescription("Origin allowed to make cross-origin requests; repeatable"),
-    Flag.atLeast(0),
-  ),
-  allowedHost: Flag.string("allowed-host").pipe(
-    Flag.withDescription(
-      "Extra Host header accepted besides loopback, for a trusted reverse proxy; repeatable",
-    ),
-    Flag.atLeast(0),
-  ),
-};
-
-type ServeInput = {
-  readonly port: Option.Option<number>;
-  readonly host: Option.Option<string>;
-  readonly corsOrigin: ReadonlyArray<string>;
-  readonly allowedHost: ReadonlyArray<string>;
-};
-
-export type ServeConfig = {
-  readonly port: number;
-  readonly host: string;
-  readonly corsOrigins: readonly string[];
-  readonly allowedHosts: readonly string[];
-};
-
 /**
- * Resolve the effective port and CORS origins from parsed flags, falling back
- * to `PIE_*` env and finally the defaults — precedence flag > env > default.
- * Pure so the precedence can be tested without booting a server.
+ * Resolve the effective port, bind host, and CORS origins from parsed flags,
+ * falling back to `PIE_*` config and finally the defaults — precedence flag >
+ * config > default.
  */
-export function resolveServeConfig(input: ServeInput): ServeConfig {
-  const host = Option.getOrElse(input.host, hostFromEnv);
-  const allowedHosts =
-    input.allowedHost.length > 0 ? input.allowedHost : listFromEnv("PIE_ALLOWED_HOSTS");
-  return {
-    port: Option.getOrElse(input.port, portFromEnv),
-    host,
-    corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : listFromEnv("PIE_CORS_ORIGINS"),
-    allowedHosts: uniqueHosts([...allowedHosts, ...extraAllowedHostsForListen(host)]),
-  };
-}
+export const resolveServeConfig = (input: ServeInput) =>
+  Effect.gen(function* () {
+    const envPort = yield* piePort;
+    const envName = yield* nodeEnv;
+    const corsFromEnv = yield* pieCorsOrigins;
+    const hostsFromEnv = yield* pieAllowedHosts;
+    const envHost = yield* pieHost;
+    const defaultPort = envName === "development" ? 0 : DEFAULT_PORT;
+    const host = Option.getOrElse(input.host ?? Option.none(), () =>
+      Option.getOrElse(envHost, () => DEFAULT_LISTEN_HOST),
+    );
+    const allowedHosts = input.allowedHost.length > 0 ? input.allowedHost : hostsFromEnv;
+    return {
+      port: Option.getOrElse(input.port, () => Option.getOrElse(envPort, () => defaultPort)),
+      host,
+      corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : corsFromEnv,
+      allowedHosts: uniqueHosts([...allowedHosts, ...extraAllowedHostsForListen(host)]),
+    } satisfies ServeConfig;
+  });
 
 /**
  * Boot the HTTP server and keep the process alive until interrupted.
@@ -159,7 +147,7 @@ export const runServe = (input: ServeInput) =>
       Effect.logError("server startup failed", Cause.fail(error)).pipe(
         Effect.annotateLogs({
           event: "server.startup_failed",
-          phase: error.phase,
+          phase: error._tag === "ServerStartupError" ? error.phase : "config",
           pid: process.pid,
         }),
       ),
@@ -170,8 +158,22 @@ export const runServe = (input: ServeInput) =>
 
 const serveWith = (input: ServeInput) =>
   Effect.gen(function* () {
-    const authToken = takeAuthToken();
-    const { port: requestedPort, host, corsOrigins, allowedHosts } = resolveServeConfig(input);
+    const token = yield* pieAuthToken;
+    // Config.redacted masks logs but does not stop child processes from
+    // inheriting the credential that guards the agent.
+    yield* Effect.sync(() => {
+      delete process.env.PIE_AUTH_TOKEN;
+    });
+    const authToken = Option.match(token, {
+      onNone: () => undefined,
+      onSome: Redacted.value,
+    });
+    const {
+      port: requestedPort,
+      host,
+      corsOrigins,
+      allowedHosts,
+    } = yield* resolveServeConfig(input);
     if (!isLoopbackBind(host) && authToken === undefined) {
       return yield* new ServerStartupError({
         phase: "create",
@@ -182,6 +184,8 @@ const serveWith = (input: ServeInput) =>
     const environmentId = yield* loadOrCreateEnvironmentId(paths.home).pipe(
       Effect.mapError((cause) => new ServerStartupError({ phase: "create", cause })),
     );
+    const compatibilityKey = optionString(yield* pieDaemonCompatibilityKey);
+    const version = optionString(yield* npmPackageVersion);
 
     // The first line of every run, and the one that dates the file. It also
     // records the shape of the run — auth on or off, which origins are allowed
@@ -193,11 +197,11 @@ const serveWith = (input: ServeInput) =>
         requestedPort,
         host,
         authenticated: authToken !== undefined,
-        compatibilityKey: process.env.PIE_DAEMON_COMPATIBILITY_KEY,
+        compatibilityKey,
         corsOrigins,
         allowedHosts,
         pid: process.pid,
-        version: process.env.npm_package_version,
+        version,
         node: process.version,
       }),
     );

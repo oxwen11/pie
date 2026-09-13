@@ -97,6 +97,44 @@ describe("ContentPanel", () => {
     expect(disposed).toBe(1);
   });
 
+  it("replacing a restored tab calls onClose without materializing", () => {
+    let created = 0;
+    let disposed = 0;
+    const closed: unknown[] = [];
+    const counted = definePanelFamily({
+      type: "counted",
+      key: (payload: { n: number }) => String(payload.n),
+      label: (payload) => `#${payload.n}`,
+      create: () => {
+        created += 1;
+        return { dispose: () => void disposed++ };
+      },
+      onClose: (sessionRef, payload) => {
+        closed.push({ sessionRef, payload });
+      },
+      view: null,
+    });
+    const host = new ContentPanel<null>({
+      storage: storageHolding({
+        [sessionRefKey(S)]: {
+          presentation: "docked",
+          activeId: "counted:1",
+          panels: [{ id: "counted:1", type: "counted", payload: { n: 1 } }],
+        },
+      }),
+    });
+    host.register(counted);
+    host.register(file);
+
+    host.replace(S, "counted:1", file, { path: "a.ts" });
+
+    expect(created).toBe(0);
+    expect(disposed).toBe(0);
+    expect(closed).toEqual([{ sessionRef: S, payload: { n: 1 } }]);
+    expect(host.instanceFor(S, "counted:1")).toBeUndefined();
+    expect(snapshotOf(host).panels.map((panel) => panel.id)).toEqual(["file:a.ts"]);
+  });
+
   it("reuses an existing replacement target instead of duplicating it", () => {
     const host = withPanels(diff, file);
     host.open(S, diff);
@@ -155,10 +193,14 @@ describe("ContentPanel", () => {
 
   it("closing disposes the instance", () => {
     let disposed = 0;
+    const closed: unknown[] = [];
     const disposable = definePanel({
       type: "disposable",
       label: "Disposable",
       create: () => ({ dispose: () => void disposed++ }),
+      onClose: (sessionRef) => {
+        closed.push(sessionRef);
+      },
       view: null,
     });
     const host = withPanels(disposable);
@@ -167,6 +209,7 @@ describe("ContentPanel", () => {
     host.close(S, "disposable");
 
     expect(disposed).toBe(1);
+    expect(closed).toEqual([S]);
   });
 
   it("toggling visibility keeps the panels and their instances", () => {
@@ -313,6 +356,45 @@ describe("ContentPanel", () => {
     expect(created).toBe(1);
   });
 
+  it("closing a restored tab calls onClose without materializing", () => {
+    let created = 0;
+    let disposed = 0;
+    const closed: unknown[] = [];
+    const counted = definePanelFamily({
+      type: "counted",
+      key: (payload: { n: number }) => String(payload.n),
+      label: (payload) => `#${payload.n}`,
+      create: () => {
+        created += 1;
+        return { dispose: () => void disposed++ };
+      },
+      onClose: (sessionRef, payload) => {
+        closed.push({ sessionRef, payload });
+      },
+      view: null,
+    });
+    const host = new ContentPanel<null>({
+      storage: storageHolding({
+        [sessionRefKey(S)]: {
+          presentation: "docked",
+          activeId: "counted:1",
+          panels: [
+            { id: "counted:1", type: "counted", payload: { n: 1 } },
+            { id: "counted:2", type: "counted", payload: { n: 2 } },
+          ],
+        },
+      }),
+    });
+    host.register(counted);
+
+    host.close(S, "counted:2");
+    expect(created).toBe(0);
+    expect(disposed).toBe(0);
+    expect(closed).toEqual([{ sessionRef: S, payload: { n: 2 } }]);
+    expect(host.instanceFor(S, "counted:2")).toBeUndefined();
+    expect(snapshotOf(host).panels.map((panel) => panel.id)).toEqual(["counted:1"]);
+  });
+
   it("scopes panels by Environment and session", () => {
     const host = withPanels(diff);
     const otherEnvironment = ref({ environmentId: "env-2" });
@@ -341,6 +423,50 @@ describe("ContentPanel", () => {
     expect(disposed).toBe(1);
     expect(snapshotOf(host).panels).toHaveLength(0);
     expect(host.instanceFor(S, "disposable")).toBeUndefined();
+  });
+
+  it("forget calls onClose on restored tabs without materializing", () => {
+    let created = 0;
+    let disposed = 0;
+    const closed: unknown[] = [];
+    const counted = definePanelFamily({
+      type: "counted",
+      key: (payload: { n: number }) => String(payload.n),
+      label: (payload) => `#${payload.n}`,
+      create: () => {
+        created += 1;
+        return { dispose: () => void disposed++ };
+      },
+      onClose: (sessionRef, payload) => {
+        closed.push({ sessionRef, payload });
+      },
+      view: null,
+    });
+    const host = new ContentPanel<null>({
+      storage: storageHolding({
+        [sessionRefKey(S)]: {
+          presentation: "docked",
+          activeId: "counted:1",
+          panels: [
+            { id: "counted:1", type: "counted", payload: { n: 1 } },
+            { id: "counted:2", type: "counted", payload: { n: 2 } },
+          ],
+        },
+      }),
+    });
+    host.register(counted);
+
+    host.forget(S);
+
+    expect(created).toBe(0);
+    expect(disposed).toBe(0);
+    expect(closed).toEqual([
+      { sessionRef: S, payload: { n: 1 } },
+      { sessionRef: S, payload: { n: 2 } },
+    ]);
+    expect(snapshotOf(host).panels).toHaveLength(0);
+    expect(host.instanceFor(S, "counted:1")).toBeUndefined();
+    expect(host.instanceFor(S, "counted:2")).toBeUndefined();
   });
 
   it("no session means no panels", () => {

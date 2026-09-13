@@ -161,11 +161,9 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
-    return this.#openWith(
-      sessionRef,
-      definition as AnyPanelDefinition<View>,
-      payloadArgs[0],
-    ) as PanelInstance<Payload, Extra>;
+    const instance = this.#openWith(sessionRef, definition, payloadArgs[0]);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
+    return instance as PanelInstance<Payload, Extra>;
   }
 
   /**
@@ -180,6 +178,7 @@ export class ContentPanel<View = unknown> {
     definition: PanelDefinition<Type, Payload, Extra, View>,
     ...payloadArgs: PayloadArgs<Payload>
   ): PanelInstance<Payload, Extra> {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- PayloadArgs is a 0/1 tuple; [0] is Payload when present
     const payload = payloadArgs[0] as Payload;
     const nextId = panelId(definition, payload);
     const session = this.#sessionOf(sessionRef);
@@ -193,17 +192,15 @@ export class ContentPanel<View = unknown> {
           panel.id === currentId ? { id: nextId, type: definition.type, payload } : panel,
         ),
       });
-      const instance = this.#ensureInstance(
-        sessionRef,
-        nextId,
-        definition as AnyPanelDefinition<View>,
-      ) as PanelInstance<Payload, Extra>;
-      instance.reopen(payload);
-      return instance;
+      const instance = this.#ensureInstance(sessionRef, nextId, definition);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
+      const typed = instance as PanelInstance<Payload, Extra>;
+      typed.reopen(payload);
+      return typed;
     }
 
     const targetIsOpen = session.panels.some((panel) => panel.id === nextId);
-    this.#disposeInstance(sessionRef, currentId);
+    this.#disposeRecord(sessionRef, currentId);
     const activeId = session.activeId === currentId ? nextId : session.activeId;
     this.#writeSession(sessionRef, {
       ...session,
@@ -218,13 +215,11 @@ export class ContentPanel<View = unknown> {
           ),
     });
 
-    const instance = this.#ensureInstance(
-      sessionRef,
-      nextId,
-      definition as AnyPanelDefinition<View>,
-    ) as PanelInstance<Payload, Extra>;
-    if (targetIsOpen) instance.reopen(payload);
-    return instance;
+    const instance = this.#ensureInstance(sessionRef, nextId, definition);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- instance was created from this definition
+    const typed = instance as PanelInstance<Payload, Extra>;
+    if (targetIsOpen) typed.reopen(payload);
+    return typed;
   }
 
   /**
@@ -256,7 +251,7 @@ export class ContentPanel<View = unknown> {
     const session = this.#sessionOf(sessionRef);
     const index = session.panels.findIndex((panel) => panel.id === id);
     if (index === -1) return;
-    this.#disposeInstance(sessionRef, id);
+    this.#disposeRecord(sessionRef, id);
     const panels = session.panels.filter((panel) => panel.id !== id);
     // Closing the active tab lands on its neighbour, the way an editor does.
     const fallback = panels[Math.min(index, panels.length - 1)] ?? null;
@@ -286,11 +281,8 @@ export class ContentPanel<View = unknown> {
    */
   forget(sessionRef: EnvironmentSessionRef): void {
     const sessionKey = sessionRefKey(sessionRef);
-    const prefix = `${sessionKey}\0`;
-    for (const [key, instance] of this.#instances) {
-      if (!key.startsWith(prefix)) continue;
-      instance.dispose?.();
-      this.#instances.delete(key);
+    for (const panel of this.#sessionOf(sessionRef).panels) {
+      this.#disposeRecord(sessionRef, panel.id);
     }
     this.#tabs.delete(sessionKey);
     this.store.setState((state) => {
@@ -347,6 +339,7 @@ export class ContentPanel<View = unknown> {
     for (const record of records) {
       const definition = this.#definitions.get(record.type);
       if (!definition) continue;
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.parse is the any-erasure slot
       const payload = definition.parse ? definition.parse(record.payload) : record.payload;
       if (payload === null) continue;
       // Arrow, so `this` is the host without aliasing it into the literal.
@@ -454,7 +447,8 @@ export class ContentPanel<View = unknown> {
               // no panel has one, and the updater form is worth more.
               payload:
                 typeof next === "function"
-                  ? (next as (p: unknown) => unknown)(panel.payload)
+                  ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- updater form of setPayload
+                    (next as (p: unknown) => unknown)(panel.payload)
                   : next,
             }
           : panel,
@@ -462,7 +456,19 @@ export class ContentPanel<View = unknown> {
     });
   }
 
-  #disposeInstance(sessionRef: EnvironmentSessionRef, id: string): void {
+  /**
+   * `onClose` always, from the persisted payload. `dispose` only if an
+   * instance already exists — never materialize just to tear it down.
+   */
+  #disposeRecord(sessionRef: EnvironmentSessionRef, id: string): void {
+    const session = this.#sessionOf(sessionRef);
+    const record = session.panels.find((panel) => panel.id === id);
+    const definition = record ? this.#definitions.get(record.type) : undefined;
+    if (record && definition?.onClose) {
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.parse is the any-erasure slot
+      const payload = definition.parse ? definition.parse(record.payload) : record.payload;
+      if (payload !== null) definition.onClose(sessionRef, payload);
+    }
     const key = instanceKey(sessionRef, id);
     this.#instances.get(key)?.dispose?.();
     this.#instances.delete(key);
@@ -470,8 +476,7 @@ export class ContentPanel<View = unknown> {
 
   /**
    * Get-or-create, like `ChatManager.chatFor`. Reached through `OpenPanel`'s
-   * lazy `instance`, so a panel restored from storage gets its instance the
-   * moment it is rendered — and not before.
+   * lazy `instance` on first render, and through `open`/`replace`.
    */
   #ensureInstance(
     sessionRef: EnvironmentSessionRef,
@@ -484,8 +489,10 @@ export class ContentPanel<View = unknown> {
     const handle = this.#createHandle(sessionRef, id);
     // Prototype-linked, not spread: `payload` is an accessor on the handle, and
     // copying it would freeze the value it had the moment the panel opened.
+    // oxlint-disable-next-line typescript/no-unsafe-assignment -- AnyPanelDefinition.create is the any-erasure slot
     const instance: PanelHandle<unknown> = definition.create
-      ? Object.assign(Object.create(handle) as PanelHandle<unknown>, definition.create(handle))
+      ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Object.create is untyped; prototype is the handle
+        Object.assign(Object.create(handle) as PanelHandle<unknown>, definition.create(handle))
       : handle;
     this.#instances.set(key, instance);
     return instance;
@@ -505,7 +512,9 @@ export class ContentPanel<View = unknown> {
       activate: () => this.activate(sessionRef, id),
       close: () => this.close(sessionRef, id),
       setPayload: (next) => this.#setPayload(sessionRef, id, next),
-      reopen: () => {},
+      reopen: () => {
+        /* default handle: a second open is a no-op unless the family overrides */
+      },
     };
   }
 }

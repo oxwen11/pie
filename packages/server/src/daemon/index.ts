@@ -1,8 +1,6 @@
 export {
-  type DaemonLocation,
-  developmentDaemonEnvironment,
+  daemonDirectory,
   resolveDaemonDirectory,
-  resolveDaemonLocation,
   resolvePieHome,
   sshEnvironmentsFile,
 } from "../config/paths";

@@ -1,5 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch, useRouteContext } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  useMatch,
+  useRouteContext,
+  useRouterState,
+} from "@tanstack/react-router";
 import { use, useMemo, type ReactNode } from "react";
 
 import {
@@ -11,7 +16,6 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
-import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
@@ -33,14 +37,7 @@ export interface RouterAppContext {
   clientsFor: (environmentId: string) => Promise<AppClients>;
 }
 
-contentPanel.registerAll([
-  filesPanel,
-  filePanel,
-  reviewPanel,
-  pullRequestPanel,
-  terminalPanel,
-  browserPanel,
-]);
+contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
@@ -79,11 +76,24 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
-  const schedulesRoute =
-    useMatch({
-      from: "/schedules",
-      shouldThrow: false,
-    }) ?? null;
+  const cardHeading = useRouterState({
+    select: (state): string | false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const heading = state.matches[index]?.staticData.cardHeading;
+        if (heading !== undefined) return heading;
+      }
+      return undefined;
+    },
+  });
+  const cardHeader = useRouterState({
+    select: (state): false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const header = state.matches[index]?.staticData.cardHeader;
+        if (header !== undefined) return header;
+      }
+      return undefined;
+    },
+  });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
 
@@ -98,13 +108,13 @@ function RootLayout() {
             <SessionBoundMain sessionRef={sessionRef}>
               <CardPanel
                 heading={
-                  schedulesRoute !== null
-                    ? "Schedule"
-                    : sessionRef === null
-                      ? "New chat"
-                      : (sessionTitle ?? "New chat")
+                  cardHeading === false
+                    ? undefined
+                    : (cardHeading ??
+                      (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
                 }
-                supportingText={schedulesRoute !== null ? undefined : project?.name}
+                hideHeader={cardHeader === false}
+                supportingText={cardHeading !== undefined ? undefined : project?.name}
               />
             </SessionBoundMain>
           </AppShellMain>

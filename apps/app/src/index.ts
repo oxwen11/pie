@@ -17,3 +17,6 @@ export type {
 } from "./platform";
 export { PlatformProvider } from "./platform-provider";
 export type { ServerConnection } from "./server-connection";
+export type { ThemePreference } from "./theme";
+export { ThemeProvider, useTheme } from "./theme-provider";
+export type { ThemeContextValue, ThemeProviderProps } from "./theme-provider";

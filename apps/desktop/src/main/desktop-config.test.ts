@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDesktopConfig } from "./desktop-config";
+import { applyPackagedPiRuntime, buildDesktopConfig } from "./desktop-config";
 
 describe("buildDesktopConfig", () => {
   it("resolves the packaged server entry under resourcesPath", () => {
@@ -15,6 +15,7 @@ describe("buildDesktopConfig", () => {
       "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
     );
     expect(config.userDataPath).toBe("/tmp/pie-user-data");
+    expect(config.resourcesPath).toBe("/Applications/Pie.app/Contents/Resources");
   });
 
   it("resolves the dev server entry relative to the package output", () => {
@@ -26,5 +27,48 @@ describe("buildDesktopConfig", () => {
     });
 
     expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.mjs$/);
+    expect(config.resourcesPath).toBe("/unused");
+  });
+});
+
+describe("applyPackagedPiRuntime", () => {
+  const bundled = {
+    isPackaged: true,
+    bundledBun: "/Resources/vendor/bun",
+    bundledPiProcess: "/Resources/pi-process/pi-process.js",
+  } as const;
+
+  it("leaves unpackaged env unchanged", () => {
+    const env = { PATH: "/usr/bin" };
+    expect(applyPackagedPiRuntime(env, { ...bundled, isPackaged: false })).toEqual(env);
+  });
+
+  it("points packaged desktop at the shipped bun and pie-pi-process", () => {
+    expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
+      PATH: "/usr/bin",
+      PIE_BUN: "/Resources/vendor/bun",
+      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
+    });
+  });
+
+  it("keeps a launch-time PIE_BUN override", () => {
+    expect(
+      applyPackagedPiRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled),
+    ).toEqual({
+      PIE_BUN: "/custom/bun",
+      PIE_HOME: "/tmp/pie",
+      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
+    });
+  });
+
+  it("does not invent PIE_BUN when the binary is missing", () => {
+    const env = { PATH: "/usr/bin" };
+    expect(
+      applyPackagedPiRuntime(env, {
+        isPackaged: true,
+        bundledBun: undefined,
+        bundledPiProcess: undefined,
+      }),
+    ).toEqual(env);
   });
 });

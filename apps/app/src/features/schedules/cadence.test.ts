@@ -116,6 +116,9 @@ describe("formatNextRun", () => {
     expect(formatNextRun(null, false, "max_runs", 1)).toBe("Stopped after 1 run");
     expect(formatNextRun(null, false, "max_runs", 24)).toBe("Stopped after 24 runs");
     expect(formatNextRun(null, true)).toBe("Run now only");
+    expect(formatNextRun("2026-08-27T09:00:00.000Z", true)).toBe(
+      `Next run ${new Date("2026-08-27T09:00:00.000Z").toLocaleString()}`,
+    );
     expect(formatFiredCap(3, 24)).toBe("3 / 24 runs");
     expect(formatFiredCap(1, 1)).toBe("1 / 1 run");
   });

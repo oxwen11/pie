@@ -14,17 +14,18 @@
     "./http": "./src/http/index.ts",
     "./relay": "./src/relay/index.ts",
     "./daemon": "./src/daemon/index.ts",
-    "./observability": "./src/observability/index.ts"
+    "./observability": "./src/observability/index.ts",
+    "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && bun build src/harness/pi/rpc/entry.ts --target bun --outfile dist/pi-process/pi-process.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
@@ -33,6 +34,7 @@
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "node-pty": "1.1.0",
     "simple-git": "catalog:",
     "uuid": "catalog:",
     "ws": "catalog:",
@@ -42,6 +44,7 @@
     "@effect/vitest": "catalog:effect",
     "@getpie/client": "workspace:*",
     "@getpie/typescript": "workspace:*",
-    "@types/ws": "catalog:"
+    "@types/ws": "catalog:",
+    "vitest": "catalog:"
   }
 }

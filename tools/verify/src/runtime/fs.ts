@@ -14,8 +14,9 @@ export function writeText(filePath: string, contents: string): void {
   fs.writeFileSync(filePath, contents);
 }
 
-export function readJson<T>(filePath: string): T {
-  return JSON.parse(readText(filePath)) as T;
+export function readJson(filePath: string): unknown {
+  const value: unknown = JSON.parse(readText(filePath));
+  return value;
 }
 
 export function writeJson(filePath: string, value: unknown): void {
@@ -23,19 +24,37 @@ export function writeJson(filePath: string, value: unknown): void {
 }
 
 export function patchJson(filePath: string, patch: Record<string, unknown>): void {
-  const current = readJson<Record<string, unknown>>(filePath);
+  const current = readJson(filePath);
+  if (!isRecord(current)) {
+    writeJson(filePath, patch);
+    return;
+  }
   writeJson(filePath, { ...current, ...patch });
 }
 
-export function readJsonField<T>(filePath: string, key: string): T {
-  const data = readJson<Record<string, unknown>>(filePath);
-  const value = data[key];
-  if (value === undefined || value === null) {
-    throw new Error(`missing ${key} in ${filePath}`);
-  }
-  return value as T;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- type predicate target
+function isFieldValue<T>(value: unknown): value is T {
+  return value !== undefined && value !== null;
+}
+
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- caller-chosen JSON field type
+export function readJsonField<T>(filePath: string, key: string): T {
+  const data = readJson(filePath);
+  if (!isRecord(data)) {
+    throw new Error(`missing ${key} in ${filePath}`);
+  }
+  const value = data[key];
+  if (!isFieldValue<T>(value)) {
+    throw new Error(`missing ${key} in ${filePath}`);
+  }
+  return value;
+}
+
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- caller-chosen JSON field type
 export function tryReadJsonField<T>(filePath: string, key: string): T | undefined {
   try {
     return readJsonField<T>(filePath, key);

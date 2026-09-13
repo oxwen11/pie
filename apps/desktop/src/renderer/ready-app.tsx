@@ -46,8 +46,10 @@ function KeyedApp({
       if (next !== "ready") return;
       void load()
         .then((fresh) => {
-          if (cancelled) return;
-          setConnection((current) => (sameConnection(current, fresh) ? current : fresh));
+          if (!cancelled) {
+            setConnection((current) => (sameConnection(current, fresh) ? current : fresh));
+          }
+          return undefined;
         })
         .catch((error: unknown) => {
           console.error("Failed to refresh the server connection", error);

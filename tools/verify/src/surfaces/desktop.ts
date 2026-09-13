@@ -5,7 +5,7 @@ import { DESKTOP } from "../identity.ts";
 import { driveHintLines } from "../lifecycle/env.ts";
 import { expectMeta, patchRunMeta, type DesktopRunMeta, type RunMeta } from "../meta.ts";
 import { agentBrowser, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
-import { readDaemonRecord, stopRecordedDaemon } from "../runtime/daemon.ts";
+import { daemonPidPath, readDaemonRecord, stopRecordedDaemon } from "../runtime/daemon.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
 import { fail } from "../runtime/fail.ts";
 import { removePath, writeText } from "../runtime/fs.ts";
@@ -35,9 +35,9 @@ export const desktopSurface: Surface = {
 async function startDesktop(ctx: LaunchCtx): Promise<void> {
   const desktop = expectLaunch(ctx, "desktop");
   const logPath = path.join(desktop.runDir, "logs/electron-vite.log");
-  const viteArgs = ["exec", "electron-vite", "dev"];
+  const viteArgs = ["run", "dev"];
   const child =
-    process.env.DISPLAY === undefined
+    process.platform !== "darwin" && process.env.DISPLAY === undefined
       ? spawnLogged("xvfb-run", ["-a", "pnpm", ...viteArgs], logPath, {
           cwd: path.join(desktop.repo, "apps/desktop"),
           env: desktop.env,
@@ -51,7 +51,7 @@ async function startDesktop(ctx: LaunchCtx): Promise<void> {
   }
   writePidFile(path.join(desktop.runDir, "pids/electron-vite.pid"), child.pid);
 
-  const recordPath = path.join(desktop.daemonDir, "daemon.pid");
+  const recordPath = daemonPidPath(desktop.pieHome);
   await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 90);
   const record = readDaemonRecord(recordPath);
   await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
@@ -81,7 +81,7 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   if (!pidAlive(evPid)) {
     fail(`${DESKTOP.logPrefix} FAIL — electron-vite pid ${evPid} is not running`);
   }
-  const recordPath = path.join(desktop.daemonDir, "daemon.pid");
+  const recordPath = daemonPidPath(desktop.pieHome);
   if (!fs.existsSync(recordPath)) {
     fail(
       `${DESKTOP.logPrefix} FAIL — missing ${recordPath} — Electron did not attach/spawn a daemon`,
@@ -144,7 +144,6 @@ async function stopDesktop(runDir: string, meta: RunMeta | undefined): Promise<v
     await stopRecordedDaemon({
       repo: meta.repo,
       pieHome: meta.pieHome,
-      daemonDir: meta.daemonDir,
       piePort: meta.piePort,
       runDir,
       logPrefix: DESKTOP.logPrefix,
@@ -187,7 +186,7 @@ export async function extraEvidence(
 }
 
 async function curlTranscript(meta: DesktopRunMeta): Promise<string> {
-  const record = readDaemonRecord(path.join(meta.daemonDir, "daemon.pid"));
+  const record = readDaemonRecord(daemonPidPath(meta.pieHome));
   const health = await fetchText(`${record.address.replace(/\/$/, "")}/api/health`);
   const anon = await ticketStatus(record.address);
   const auth = await ticketStatus(record.address, record.token);
