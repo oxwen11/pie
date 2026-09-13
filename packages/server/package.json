@@ -15,6 +15,7 @@
     "./daemon": "./src/daemon/index.ts",
     "./observability": "./src/observability/index.ts",
     "./observability/resources": "./src/observability/resources/index.ts",
+    "./resource-writer": "./dist/resources/writer-worker.mjs",
     "./pi-rpc": "./dist/pi-rpc/pi-rpc.js"
   },
   "scripts": {
