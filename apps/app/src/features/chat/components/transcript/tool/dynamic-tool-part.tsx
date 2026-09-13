@@ -5,15 +5,15 @@ import { WrenchIcon } from "lucide-react";
 
 type AnyToolPart = ToolUIPart | DynamicToolUIPart;
 
-// dynamic-tool input/output shapes are unconstrained (any MCP server can feed
-// them); JSON.stringify can throw on cycles — fall back to a placeholder
-// instead of letting the card crash.
+// Dynamic-tool input shapes are unconstrained (any MCP server can feed them);
+// JSON.stringify can throw on cycles — fall back to a placeholder instead of
+// letting the card crash.
 function serialize(value: unknown): string {
   if (typeof value === "string") return value;
   try {
     return JSON.stringify(value, null, 2);
   } catch {
-    return "Failed to render tool output";
+    return "Failed to render tool input";
   }
 }
 
@@ -31,12 +31,6 @@ export function DynamicToolPart({ part, name }: { part: AnyToolPart; name: strin
           <div className="space-y-1.5">
             <span className="text-muted-foreground text-xs font-medium">Input</span>
             <CodeBlock code={serialize(input)} language="json" />
-          </div>
-        )}
-        {part.output != null && (
-          <div className="space-y-1.5">
-            <span className="text-muted-foreground text-xs font-medium">Output</span>
-            <CodeBlock code={serialize(part.output)} language="json" />
           </div>
         )}
       </ToolContent>

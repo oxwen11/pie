@@ -17,10 +17,10 @@ const runningParts = (count: number): IndexedBatchPart[] =>
   Array.from({ length: count }, (_, index) => ({
     index,
     part: {
-      type: "tool-Read",
+      type: "tool-read",
       toolCallId: `tool-${index}`,
       state: "input-available",
-      input: { file_path: `/tmp/file-${index}` },
+      input: { path: `/tmp/file-${index}` },
     },
   }));
 
