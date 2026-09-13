@@ -1,4 +1,10 @@
-import type { Project, Schedule, ScheduleSession, ScheduleSpec } from "@getpie/contract";
+import type {
+  Project,
+  Schedule,
+  ScheduleSession,
+  ScheduleSpec,
+  SessionSummary,
+} from "@getpie/contract";
 import {
   scheduleSessionOf,
   MAX_SCHEDULE_MAX_RUNS,
@@ -62,24 +68,42 @@ export type ScheduleFormDefaults = {
   readonly sessionId?: string;
 };
 
-export type ScheduleFormProps = {
+type ScheduleFormSource =
+  | { readonly kind: "create"; readonly defaults?: ScheduleFormDefaults }
+  | { readonly kind: "edit"; readonly schedule: Schedule };
+
+type ScheduleFormFieldsProps = {
   readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
-  readonly initial?: Schedule;
+  readonly source: ScheduleFormSource;
+  readonly submitting?: boolean;
+  readonly onSubmit: (value: ScheduleFormSubmit) => void;
+  readonly onCancel: () => void;
+};
+
+export type ScheduleCreateFormProps = {
+  readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
   readonly defaults?: ScheduleFormDefaults;
   readonly submitting?: boolean;
   readonly onSubmit: (value: ScheduleFormSubmit) => void;
   readonly onCancel: () => void;
 };
 
-function formFromSchedule(
+export type ScheduleEditFormProps = {
+  readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
+  readonly schedule: Schedule;
+  readonly submitting?: boolean;
+  readonly onSubmit: (value: ScheduleFormSubmit) => void;
+  readonly onCancel: () => void;
+};
+
+function formFromSource(
   projects: ReadonlyArray<Pick<Project, "id" | "name">>,
-  initial?: Schedule,
-  defaults?: ScheduleFormDefaults,
+  source: ScheduleFormSource,
 ): ScheduleFormValues {
-  const projectId = initial?.projectId ?? defaults?.projectId ?? projects[0]?.id ?? "";
-  const base = defaultScheduleForm(projectId);
-  if (initial === undefined) {
-    const sessionId = defaults?.sessionId ?? "";
+  if (source.kind === "create") {
+    const projectId = source.defaults?.projectId ?? projects[0]?.id ?? "";
+    const base = defaultScheduleForm(projectId);
+    const sessionId = source.defaults?.sessionId ?? "";
     if (sessionId === "") return base;
     return {
       ...base,
@@ -88,40 +112,122 @@ function formFromSchedule(
       sessionId,
     };
   }
-  const session = scheduleSessionOf(initial);
+  const schedule = source.schedule;
+  const base = defaultScheduleForm(schedule.projectId);
+  const session = scheduleSessionOf(schedule);
   const boundId = reuseSessionIdOf(session);
   return {
     ...base,
-    name: initial.name,
-    prompt: initial.prompt,
-    worktree: initial.worktree !== undefined,
+    name: schedule.name,
+    prompt: schedule.prompt,
+    worktree: schedule.worktree !== undefined,
     reuseSession: session.policy !== "isolated",
     sessionPick: boundId !== undefined ? "existing" : "create",
     sessionId: boundId ?? "",
-    expiresAt: initial.expiresAt !== undefined ? isoToLocalDateTime(initial.expiresAt) : "",
-    maxRuns: initial.maxRuns !== undefined ? String(initial.maxRuns) : "",
+    expiresAt: schedule.expiresAt !== undefined ? isoToLocalDateTime(schedule.expiresAt) : "",
+    maxRuns: schedule.maxRuns !== undefined ? String(schedule.maxRuns) : "",
     runNow: false,
     model:
-      initial.provider !== undefined && initial.modelId !== undefined
-        ? { provider: initial.provider, modelId: initial.modelId }
+      schedule.provider !== undefined && schedule.modelId !== undefined
+        ? { provider: schedule.provider, modelId: schedule.modelId }
         : undefined,
-    ...formFromSpec(initial.spec, base),
+    ...formFromSpec(schedule.spec, base),
   };
 }
 
-export function ScheduleForm({
+type ScheduleModel = {
+  readonly provider: string;
+  readonly modelId: string;
+  readonly name?: string;
+};
+
+type ScheduleSessionItem = { readonly label: string; readonly value: string };
+
+function includeSelectedModel(
+  models: ReadonlyArray<ScheduleModel>,
+  selected: ScheduleModel | undefined,
+): ReadonlyArray<ScheduleModel> {
+  if (
+    selected !== undefined &&
+    !models.some(
+      (model) => model.provider === selected.provider && model.modelId === selected.modelId,
+    )
+  ) {
+    return [...models, selected];
+  }
+  return models;
+}
+
+function listedSessionIds(
+  sessions: ReadonlyArray<SessionSummary>,
+  ready: boolean,
+): ReadonlySet<string> | undefined {
+  return ready ? new Set(sessions.map((session) => session.sessionId)) : undefined;
+}
+
+function scheduleSessionItems(
+  sessions: ReadonlyArray<SessionSummary>,
+  selected: string,
+): ReadonlyArray<ScheduleSessionItem> {
+  const items: ScheduleSessionItem[] = [
+    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
+    ...sessions.map((session) => ({
+      label: session.title ?? "New chat",
+      value: session.sessionId,
+    })),
+  ];
+  if (
+    selected !== CREATE_ON_FIRST_RUN_VALUE &&
+    !sessions.some((session) => session.sessionId === selected)
+  ) {
+    items.push({ label: "Selected session", value: selected });
+  }
+  return items;
+}
+
+function parseMaxRuns(value: string) {
+  const trimmed = value.trim();
+  if (trimmed === "") return { number: null, valid: true };
+  const number = Number(trimmed);
+  return {
+    number,
+    valid: Number.isInteger(number) && number >= 1 && number <= MAX_SCHEDULE_MAX_RUNS,
+  };
+}
+
+function canSubmitSchedule(
+  form: ScheduleFormValues,
+  submitting: boolean,
+  maxRunsValid: boolean,
+  listedModelCount: number,
+  model: ScheduleModel | undefined,
+): boolean {
+  return (
+    !submitting &&
+    maxRunsValid &&
+    form.name.trim().length > 0 &&
+    form.projectId.length > 0 &&
+    form.prompt.trim().length > 0 &&
+    (form.cadence !== "once" || form.runAt.length > 0) &&
+    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
+    (form.cadence !== "every" ||
+      (Number.isInteger(Number(form.everyAmount)) && Number(form.everyAmount) >= 1)) &&
+    (listedModelCount === 0 || model !== undefined)
+  );
+}
+
+function ScheduleFormFields({
   projects,
-  initial,
-  defaults,
+  source,
   submitting = false,
   onSubmit,
   onCancel,
-}: ScheduleFormProps) {
+}: ScheduleFormFieldsProps) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const [form, setForm] = useState(() => formFromSchedule(projects, initial, defaults));
+  const [form, setForm] = useState(() => formFromSource(projects, source));
   const [error, setError] = useState<string | null>(null);
-  const projectLocked = initial !== undefined;
-  const creating = initial === undefined;
+  const projectLocked = source.kind === "edit";
+  const creating = source.kind === "create";
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: form.projectId, archived: false },
@@ -134,45 +240,13 @@ export function ScheduleForm({
   });
   const listedModels = models.data?.models ?? [];
   const model = form.model ?? models.data?.defaultModel;
-  const modelOptions =
-    model !== undefined &&
-    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
-      ? [...listedModels, model]
-      : listedModels;
+  const modelOptions = includeSelectedModel(listedModels, model);
   const listed = sessions.data ?? [];
-  const listedIds = sessions.isSuccess
-    ? new Set(listed.map((session) => session.sessionId))
-    : undefined;
+  const listedIds = listedSessionIds(listed, sessions.isSuccess);
   const selectedSessionValue = sessionSelectValue(form, listedIds);
-  const sessionItems = [
-    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
-    ...listed.map((session) => ({
-      label: session.title ?? "New chat",
-      value: session.sessionId,
-    })),
-    ...(selectedSessionValue !== CREATE_ON_FIRST_RUN_VALUE &&
-    !listed.some((session) => session.sessionId === selectedSessionValue)
-      ? [{ label: "Selected session", value: selectedSessionValue }]
-      : []),
-  ];
-  const everyAmount = Number(form.everyAmount);
-  const maxRunsTrimmed = form.maxRuns.trim();
-  const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
-  const maxRunsValid =
-    maxRunsNumber === null ||
-    (Number.isInteger(maxRunsNumber) &&
-      maxRunsNumber >= 1 &&
-      maxRunsNumber <= MAX_SCHEDULE_MAX_RUNS);
-  const canSubmit =
-    !submitting &&
-    maxRunsValid &&
-    form.name.trim().length > 0 &&
-    form.projectId.length > 0 &&
-    form.prompt.trim().length > 0 &&
-    (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
-    (listedModels.length === 0 || model !== undefined);
+  const sessionItems = scheduleSessionItems(listed, selectedSessionValue);
+  const maxRuns = parseMaxRuns(form.maxRuns);
+  const canSubmit = canSubmitSchedule(form, submitting, maxRuns.valid, listedModels.length, model);
 
   return (
     <form
@@ -181,22 +255,24 @@ export function ScheduleForm({
         event.preventDefault();
         if (!canSubmit) return;
         try {
+          const name = form.name.trim();
+          const prompt = form.prompt.trim();
           const spec = specFromForm({
             ...form,
-            name: form.name.trim(),
-            prompt: form.prompt.trim(),
+            name,
+            prompt,
             cron: form.cron.trim(),
           });
           setError(null);
           onSubmit({
-            name: form.name.trim(),
+            name,
             projectId: form.projectId,
-            prompt: form.prompt.trim(),
+            prompt,
             spec,
             worktree: form.worktree,
             session: sessionFromForm(form, listedIds),
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
-            maxRuns: maxRunsNumber,
+            maxRuns: maxRuns.number,
             runNow: creating && form.runNow,
             ...(model !== undefined
               ? { provider: model.provider, modelId: model.modelId }
@@ -223,15 +299,14 @@ export function ScheduleForm({
           disabled={projectLocked || projects.length === 0}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
-            if (typeof next === "string") {
-              setForm((current) => ({
-                ...current,
-                projectId: next,
-                sessionPick: "create",
-                sessionId: "",
-                model: undefined,
-              }));
-            }
+            if (typeof next !== "string") return;
+            setForm((current) => ({
+              ...current,
+              projectId: next,
+              sessionPick: "create",
+              sessionId: "",
+              model: undefined,
+            }));
           }}
           value={form.projectId === "" ? null : form.projectId}
         >
@@ -312,9 +387,45 @@ export function ScheduleForm({
           Cancel
         </Button>
         <Button disabled={!canSubmit} type="submit">
-          {initial === undefined ? "Create" : "Save"}
+          {creating ? "Create" : "Save"}
         </Button>
       </div>
     </form>
+  );
+}
+
+export function ScheduleCreateForm({
+  projects,
+  defaults,
+  submitting,
+  onSubmit,
+  onCancel,
+}: ScheduleCreateFormProps) {
+  return (
+    <ScheduleFormFields
+      onCancel={onCancel}
+      onSubmit={onSubmit}
+      projects={projects}
+      source={{ kind: "create", defaults }}
+      submitting={submitting}
+    />
+  );
+}
+
+export function ScheduleEditForm({
+  projects,
+  schedule,
+  submitting,
+  onSubmit,
+  onCancel,
+}: ScheduleEditFormProps) {
+  return (
+    <ScheduleFormFields
+      onCancel={onCancel}
+      onSubmit={onSubmit}
+      projects={projects}
+      source={{ kind: "edit", schedule }}
+      submitting={submitting}
+    />
   );
 }
