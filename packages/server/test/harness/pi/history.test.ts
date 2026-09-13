@@ -211,6 +211,61 @@ describe("entriesToUIMessages", () => {
     ]);
   });
 
+  it("omits successful read contents from settled history", () => {
+    const messages = entriesToUIMessages(
+      [
+        userEntry("u1", null, "read"),
+        assistantEntry("a1", "u1", [toolCall("c1", "read", { path: "secret.txt" })]),
+        toolResultEntry("tr1", "a1", {
+          content: [{ type: "text", text: "secret" }],
+          details: {
+            truncation: {
+              content: "secret",
+              truncated: true,
+              truncatedBy: "lines",
+              totalLines: 3000,
+              totalBytes: 60_000,
+              outputLines: 2000,
+              outputBytes: 50_000,
+              lastLinePartial: false,
+              firstLineExceedsLimit: false,
+              maxLines: 2000,
+              maxBytes: 51_200,
+            },
+          },
+        }),
+      ],
+      "tr1",
+      "s1",
+    );
+    expect(messages[1]?.parts).toEqual([
+      {
+        type: "tool-read",
+        toolCallId: "c1",
+        state: "output-available",
+        input: { path: "secret.txt" },
+        output: {
+          content: [],
+          details: {
+            truncation: {
+              truncated: true,
+              truncatedBy: "lines",
+              totalLines: 3000,
+              totalBytes: 60_000,
+              outputLines: 2000,
+              outputBytes: 50_000,
+              lastLinePartial: false,
+              firstLineExceedsLimit: false,
+              maxLines: 2000,
+              maxBytes: 51_200,
+            },
+          },
+        },
+        providerExecuted: true,
+      },
+    ]);
+  });
+
   it("maps error results to output-error with the text-block errorText", () => {
     const messages = entriesToUIMessages(
       [

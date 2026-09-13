@@ -24,7 +24,17 @@ import { z } from "zod";
 
 export const read = tool({
   inputSchema: z.custom<ReadToolInput>(),
-  outputSchema: z.custom<AgentToolResult<ReadToolDetails>>(),
+  outputSchema: z.custom<
+    Omit<
+      AgentToolResult<
+        | (Omit<ReadToolDetails, "truncation"> & {
+            truncation?: Omit<NonNullable<ReadToolDetails["truncation"]>, "content">;
+          })
+        | undefined
+      >,
+      "content"
+    > & { content: [] }
+  >(),
 });
 export const bash = tool({
   inputSchema: z.custom<BashToolInput>(),

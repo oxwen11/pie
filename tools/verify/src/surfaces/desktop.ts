@@ -1,3 +1,4 @@
+import events from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -7,7 +8,7 @@ import { expectMeta, patchRunMeta, type DesktopRunMeta, type RunMeta } from "../
 import { agentBrowser, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
 import { daemonPidPath, readDaemonRecord, stopRecordedDaemon } from "../runtime/daemon.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
-import { fail } from "../runtime/fail.ts";
+import { fail, VerifyError } from "../runtime/fail.ts";
 import { removePath, writeText } from "../runtime/fs.ts";
 import { cdpOk, fetchText, healthOk, ticketStatus, urlPort } from "../runtime/http.ts";
 import {
@@ -33,7 +34,49 @@ export const desktopSurface: Surface = {
 };
 
 async function startDesktop(ctx: LaunchCtx): Promise<void> {
+  const controller = new AbortController();
+  const onInterrupt = () =>
+    controller.abort(new VerifyError("Desktop launch cancelled (SIGINT)", 130));
+  const onTerminate = () =>
+    controller.abort(new VerifyError("Desktop launch cancelled (SIGTERM)", 143));
+  process.once("SIGINT", onInterrupt);
+  process.once("SIGTERM", onTerminate);
+  try {
+    await installElectron(ctx, controller.signal);
+    await startElectron(ctx, controller);
+  } catch (error) {
+    controller.signal.throwIfAborted();
+    throw error;
+  } finally {
+    process.off("SIGINT", onInterrupt);
+    process.off("SIGTERM", onTerminate);
+  }
+}
+
+async function installElectron(ctx: LaunchCtx, signal: AbortSignal): Promise<void> {
   const desktop = expectLaunch(ctx, "desktop");
+  const logPath = path.join(desktop.runDir, "logs/electron-vite.log");
+  const pidPath = path.join(desktop.runDir, "pids/electron-vite.pid");
+  console.log(`${DESKTOP.logPrefix}: ensuring Electron is installed (log: ${logPath})`);
+  const child = spawnLogged("pnpm", ["exec", "install-electron"], logPath, {
+    cwd: path.join(desktop.repo, "apps/desktop"),
+    env: desktop.env,
+  });
+  // Unlike the long-lived Desktop process, keep Node alive until installation finishes.
+  child.ref();
+  if (child.pid !== undefined) writePidFile(pidPath, child.pid);
+  await events.once(child, "exit", { signal });
+  if (child.exitCode !== 0) {
+    throw new Error(
+      `Electron installation exited with ${child.signalCode ?? `code ${child.exitCode}`} (log: ${logPath})`,
+    );
+  }
+  removePath(pidPath);
+}
+
+async function startElectron(ctx: LaunchCtx, controller: AbortController): Promise<void> {
+  const desktop = expectLaunch(ctx, "desktop");
+  controller.signal.throwIfAborted();
   const logPath = path.join(desktop.runDir, "logs/electron-vite.log");
   const viteArgs = ["run", "dev"];
   const child =
@@ -46,16 +89,29 @@ async function startDesktop(ctx: LaunchCtx): Promise<void> {
           cwd: path.join(desktop.repo, "apps/desktop"),
           env: desktop.env,
         });
+  child.once("error", (error) => controller.abort(error));
+  child.once("exit", (code, signal) => {
+    controller.abort(
+      new Error(
+        `Desktop launch exited with ${signal ?? `code ${code}`} before readiness (log: ${logPath})`,
+      ),
+    );
+  });
   if (child.pid === undefined) {
     throw new Error("failed to spawn electron-vite");
   }
   writePidFile(path.join(desktop.runDir, "pids/electron-vite.pid"), child.pid);
 
   const recordPath = daemonPidPath(desktop.pieHome);
-  await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 90);
+  await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 90, controller.signal);
   const record = readDaemonRecord(recordPath);
-  await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
-  await waitUntil(`CDP on ${desktop.cdpPort}`, () => cdpOk(desktop.cdpPort), 40);
+  await waitUntil(
+    `daemon health at ${record.address}`,
+    () => healthOk(record.address),
+    40,
+    controller.signal,
+  );
+  await waitUntil(`CDP on ${desktop.cdpPort}`, () => cdpOk(desktop.cdpPort), 40, controller.signal);
   const bound = urlPort(record.address);
   patchRunMeta(path.join(desktop.runDir, "meta.json"), "desktop", {
     address: record.address,
@@ -137,7 +193,7 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
 
 async function stopDesktop(runDir: string, meta: RunMeta | undefined): Promise<void> {
   const evPid = readPidFile(path.join(runDir, "pids/electron-vite.pid"));
-  console.log(`${DESKTOP.logPrefix}: stopping electron-vite pid=${evPid ?? "none"}`);
+  console.log(`${DESKTOP.logPrefix}: stopping desktop launch pid=${evPid ?? "none"}`);
   killTree(evPid);
   await waitDead(evPid);
   if (meta?.surface === "desktop") {
