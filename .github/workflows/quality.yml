@@ -80,6 +80,22 @@ jobs:
         run: bash .github/scripts/ensure-native-toolchain.sh
         shell: bash
 
+      - name: Ensure lsof (verify desktop tests)
+        run: |
+          # tools/verify port checks shell out to lsof; install it when the
+          # self-hosted runner does not provide it.
+          if command -v lsof >/dev/null; then
+            exit 0
+          fi
+          if command -v apt-get >/dev/null && command -v sudo >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends lsof
+            exit 0
+          fi
+          echo "desktop verify tests need lsof on PATH." >&2
+          exit 1
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       # `build` / `typecheck` / `lint:check` go through turbo.
