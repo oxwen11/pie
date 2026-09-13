@@ -18,6 +18,10 @@ const ENV_KEYS = [
   // Pin it per test so the suite never touches the developer's real home.
   "PIE_HOME",
   "PIE_AUTH_TOKEN",
+  // `AgentRuntimeLayer` forks a background fff native download into
+  // `$PIE_HOME/vendor/fff`. These cases are not about that path — kill it so
+  // `fs.rm` does not race a still-writing extract.
+  "PIE_FFF",
 ] as const;
 
 let saved: Record<string, string | undefined>;
@@ -116,6 +120,7 @@ describe("runServe", () => {
 
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-serve-"));
     process.env.PIE_HOME = home;
+    process.env.PIE_FFF = "0";
     const token = "scrub-test-token-0000";
     process.env.PIE_AUTH_TOKEN = token;
 
@@ -166,6 +171,7 @@ describe("runServe", () => {
 
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-serve-"));
     process.env.PIE_HOME = home;
+    process.env.PIE_FFF = "0";
 
     try {
       const exit = await Effect.runPromiseExit(
