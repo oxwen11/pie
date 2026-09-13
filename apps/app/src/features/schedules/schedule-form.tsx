@@ -1,4 +1,10 @@
-import type { Project, Schedule, ScheduleSession, ScheduleSpec } from "@getpie/contract";
+import type {
+  Project,
+  Schedule,
+  ScheduleSession,
+  ScheduleSpec,
+  SessionSummary,
+} from "@getpie/contract";
 import {
   scheduleSessionOf,
   MAX_SCHEDULE_MAX_RUNS,
@@ -129,6 +135,87 @@ function formFromSource(
   };
 }
 
+type ScheduleModel = {
+  readonly provider: string;
+  readonly modelId: string;
+  readonly name?: string;
+};
+
+type ScheduleSessionItem = { readonly label: string; readonly value: string };
+
+function includeSelectedModel(
+  models: ReadonlyArray<ScheduleModel>,
+  selected: ScheduleModel | undefined,
+): ReadonlyArray<ScheduleModel> {
+  if (
+    selected !== undefined &&
+    !models.some(
+      (model) => model.provider === selected.provider && model.modelId === selected.modelId,
+    )
+  ) {
+    return [...models, selected];
+  }
+  return models;
+}
+
+function listedSessionIds(
+  sessions: ReadonlyArray<SessionSummary>,
+  ready: boolean,
+): ReadonlySet<string> | undefined {
+  return ready ? new Set(sessions.map((session) => session.sessionId)) : undefined;
+}
+
+function scheduleSessionItems(
+  sessions: ReadonlyArray<SessionSummary>,
+  selected: string,
+): ReadonlyArray<ScheduleSessionItem> {
+  const items: ScheduleSessionItem[] = [
+    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
+    ...sessions.map((session) => ({
+      label: session.title ?? "New chat",
+      value: session.sessionId,
+    })),
+  ];
+  if (
+    selected !== CREATE_ON_FIRST_RUN_VALUE &&
+    !sessions.some((session) => session.sessionId === selected)
+  ) {
+    items.push({ label: "Selected session", value: selected });
+  }
+  return items;
+}
+
+function parseMaxRuns(value: string) {
+  const trimmed = value.trim();
+  if (trimmed === "") return { number: null, valid: true };
+  const number = Number(trimmed);
+  return {
+    number,
+    valid: Number.isInteger(number) && number >= 1 && number <= MAX_SCHEDULE_MAX_RUNS,
+  };
+}
+
+function canSubmitSchedule(
+  form: ScheduleFormValues,
+  submitting: boolean,
+  maxRunsValid: boolean,
+  listedModelCount: number,
+  model: ScheduleModel | undefined,
+): boolean {
+  return (
+    !submitting &&
+    maxRunsValid &&
+    form.name.trim().length > 0 &&
+    form.projectId.length > 0 &&
+    form.prompt.trim().length > 0 &&
+    (form.cadence !== "once" || form.runAt.length > 0) &&
+    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
+    (form.cadence !== "every" ||
+      (Number.isInteger(Number(form.everyAmount)) && Number(form.everyAmount) >= 1)) &&
+    (listedModelCount === 0 || model !== undefined)
+  );
+}
+
 function ScheduleFormFields({
   projects,
   source,
@@ -153,45 +240,13 @@ function ScheduleFormFields({
   });
   const listedModels = models.data?.models ?? [];
   const model = form.model ?? models.data?.defaultModel;
-  const modelOptions =
-    model !== undefined &&
-    !listedModels.some((item) => item.provider === model.provider && item.modelId === model.modelId)
-      ? [...listedModels, model]
-      : listedModels;
+  const modelOptions = includeSelectedModel(listedModels, model);
   const listed = sessions.data ?? [];
-  const listedIds = sessions.isSuccess
-    ? new Set(listed.map((session) => session.sessionId))
-    : undefined;
+  const listedIds = listedSessionIds(listed, sessions.isSuccess);
   const selectedSessionValue = sessionSelectValue(form, listedIds);
-  const sessionItems = [
-    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
-    ...listed.map((session) => ({
-      label: session.title ?? "New chat",
-      value: session.sessionId,
-    })),
-    ...(selectedSessionValue !== CREATE_ON_FIRST_RUN_VALUE &&
-    !listed.some((session) => session.sessionId === selectedSessionValue)
-      ? [{ label: "Selected session", value: selectedSessionValue }]
-      : []),
-  ];
-  const everyAmount = Number(form.everyAmount);
-  const maxRunsTrimmed = form.maxRuns.trim();
-  const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
-  const maxRunsValid =
-    maxRunsNumber === null ||
-    (Number.isInteger(maxRunsNumber) &&
-      maxRunsNumber >= 1 &&
-      maxRunsNumber <= MAX_SCHEDULE_MAX_RUNS);
-  const canSubmit =
-    !submitting &&
-    maxRunsValid &&
-    form.name.trim().length > 0 &&
-    form.projectId.length > 0 &&
-    form.prompt.trim().length > 0 &&
-    (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1)) &&
-    (listedModels.length === 0 || model !== undefined);
+  const sessionItems = scheduleSessionItems(listed, selectedSessionValue);
+  const maxRuns = parseMaxRuns(form.maxRuns);
+  const canSubmit = canSubmitSchedule(form, submitting, maxRuns.valid, listedModels.length, model);
 
   return (
     <form
@@ -200,22 +255,24 @@ function ScheduleFormFields({
         event.preventDefault();
         if (!canSubmit) return;
         try {
+          const name = form.name.trim();
+          const prompt = form.prompt.trim();
           const spec = specFromForm({
             ...form,
-            name: form.name.trim(),
-            prompt: form.prompt.trim(),
+            name,
+            prompt,
             cron: form.cron.trim(),
           });
           setError(null);
           onSubmit({
-            name: form.name.trim(),
+            name,
             projectId: form.projectId,
-            prompt: form.prompt.trim(),
+            prompt,
             spec,
             worktree: form.worktree,
             session: sessionFromForm(form, listedIds),
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
-            maxRuns: maxRunsNumber,
+            maxRuns: maxRuns.number,
             runNow: creating && form.runNow,
             ...(model !== undefined
               ? { provider: model.provider, modelId: model.modelId }
@@ -242,15 +299,14 @@ function ScheduleFormFields({
           disabled={projectLocked || projects.length === 0}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
-            if (typeof next === "string") {
-              setForm((current) => ({
-                ...current,
-                projectId: next,
-                sessionPick: "create",
-                sessionId: "",
-                model: undefined,
-              }));
-            }
+            if (typeof next !== "string") return;
+            setForm((current) => ({
+              ...current,
+              projectId: next,
+              sessionPick: "create",
+              sessionId: "",
+              model: undefined,
+            }));
           }}
           value={form.projectId === "" ? null : form.projectId}
         >
