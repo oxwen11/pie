@@ -85,6 +85,7 @@ export function splitCompareRefs(
 export function pierreGitStatus(
   status: GitReviewFileStatus,
 ): "added" | "deleted" | "modified" | "renamed" {
+  // Pierre has no "copied" badge, so copied files render as modified.
   return status === "copied" ? "modified" : status;
 }
 
