@@ -205,9 +205,9 @@ export const runCommand = Command.make(
             });
             ref = created.ref;
             console.log(`created session ${ref.sessionId} project ${ref.projectId}`);
-            if (created.workspace.gitBranch !== undefined) {
+            if (created.workspace.worktree !== undefined) {
               console.log(
-                `worktree ${created.workspace.cwd} branch ${created.workspace.gitBranch}`,
+                `worktree ${created.workspace.cwd} branch ${created.workspace.worktree.branch}`,
               );
             }
           }
