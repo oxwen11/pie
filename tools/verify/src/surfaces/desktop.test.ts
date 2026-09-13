@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { killTree, pidAlive, waitDead } from "../runtime/process.ts";
+import { commandOnPath, killTree, pidAlive, waitDead } from "../runtime/process.ts";
 
 const roots: string[] = [];
 const children: childProcess.ChildProcess[] = [];
@@ -177,7 +177,10 @@ describe("desktop launch lifecycle", () => {
   it("reports a failed installer spawn without an unhandled process error", async () => {
     const { root, env } = await fixture();
     fs.rmSync(path.join(root, "bin/pnpm"));
-    env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
+    const lsof = commandOnPath("lsof");
+    if (lsof === undefined) throw new Error("lsof is required for the launch port check");
+    fs.symlinkSync(lsof, path.join(root, "bin/lsof"));
+    env.PATH = path.join(root, "bin");
     const result = await start(env).exited;
     expect(result.code).toBe(1);
     expect(result.output).toContain("spawn pnpm ENOENT");
