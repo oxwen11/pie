@@ -15,7 +15,8 @@
   ],
   "type": "module",
   "exports": {
-    "./pi-rpc": "./dist/pi-rpc/pi-rpc.js"
+    "./pi-rpc": "./dist/pi-rpc/pi-rpc.js",
+    "./resource-writer": "./dist/resources/writer-worker.mjs"
   },
   "publishConfig": {
     "access": "public"
