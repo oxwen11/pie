@@ -101,4 +101,5 @@ not 4000 (daemon). See `.agents/skills/verify`.
 - `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
 - `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
 - `.agents/skills/react-doctor` — React health check; CI fails on error-level only
+- `.agents/skills/prune-tests` — recurring playbook for deleting meaningless tests; user-invoked only
 - `todos/` — numbered security/perf remediation tickets
