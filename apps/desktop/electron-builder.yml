@@ -19,13 +19,12 @@ asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
-# pi-rpc.js comes from @getpie/server#build (bun-build, outside asar).
+# pi-process.js comes from @getpie/server#build (bun-build, outside asar).
 beforePack: scripts/before-pack.cjs
 extraResources:
-  - from: vendor/bun
-    to: vendor/bun
-  - from: ../../packages/server/dist/pi-rpc
-    to: pi-rpc
+  - vendor
+  - from: ../../packages/server/dist/pi-process
+    to: pi-process
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns

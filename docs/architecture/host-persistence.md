@@ -278,6 +278,27 @@ controls are delegated to the rendering library and browser download handling;
 they are user-initiated output, not Pie application state, and have no Pie-owned
 migration or retention policy.
 
+## Development Electron installation
+
+Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
+Electron's official `install-electron` before starting electron-vite. This
+materializes `dist/` and `path.txt` in the resolved Electron dependency package
+and uses the installer's download cache and environment overrides. These are
+dependency-owned artifacts, not Pie application data: Electron owns their
+format, version checks, extraction permissions and retry behavior. Pie adds no
+storage schema, migration or concurrent-install lock. Verification cleanup
+leaves the installed binary and shared download cache intact; packaged startup
+is unchanged.
+
+Verify prepares Electron before starting its service-readiness timeout. Both
+preparation and Desktop append to the existing run-local `logs/electron-vite.log`.
+The existing decimal `pids/electron-vite.pid` tracks the active launch phase:
+installer first, removed on successful installation, then replaced by the Desktop
+launcher pid. Paths, permissions and file formats are unchanged; older cleanup
+code can still stop the recorded process. Installation/startup failure or
+SIGINT/SIGTERM uses the normal run cleanup and failure-log retention, without
+removing Electron's dependency-owned binary or download cache.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the
@@ -300,8 +321,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches a pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, Bun) with the session cwd
-and optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)
+with the session cwd and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie
