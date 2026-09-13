@@ -47,7 +47,7 @@ export function SchedulePage({
   onOpenCreate,
   onCloseCreate,
 }: SchedulePageProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils, localEnvironmentId } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Schedule | null>(null);
@@ -92,7 +92,7 @@ export function SchedulePage({
         navigate({
           to: "/session/$sessionId",
           params: { sessionId: created.lastSessionId },
-          search: { projectId: created.projectId },
+          search: { projectId: created.projectId, environmentId: localEnvironmentId },
         }).catch((error: unknown) => {
           console.error("Failed to open the schedule session", error);
         });
@@ -154,7 +154,7 @@ export function SchedulePage({
         navigate({
           to: "/session/$sessionId",
           params: { sessionId: result.ref.sessionId },
-          search: { projectId: result.ref.projectId },
+          search: { projectId: result.ref.projectId, environmentId: localEnvironmentId },
         }).catch((error: unknown) => {
           console.error("Failed to open the schedule session", error);
         });
@@ -302,7 +302,7 @@ export function SchedulePage({
           navigate({
             to: "/session/$sessionId",
             params: { sessionId },
-            search: { projectId },
+            search: { projectId, environmentId: localEnvironmentId },
           }).catch((error: unknown) => {
             console.error("Failed to open the schedule session", error);
           });

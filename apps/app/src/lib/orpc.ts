@@ -69,20 +69,24 @@ async function getBrowserWsTicket(): Promise<string> {
   return getWsTicket(globalThis.location.origin, token);
 }
 
-function createOrpcClient(server?: ServerConnection): PieClient {
+function createOrpcClient(server?: ServerConnection, tokenRef?: { current: string }): PieClient {
   if (!server) return createPieClient({ getTicket: getBrowserWsTicket });
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
+  const presented = tokenRef ?? { current: token };
   return createPieClient({
     url: `${wsBaseUrl}/ws/rpc`,
-    getTicket: () => getWsTicket(httpBaseUrl, token),
+    getTicket: () => getWsTicket(httpBaseUrl, presented.current),
   });
 }
 
 /** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
-export function createAppClients(server?: ServerConnection): AppClients {
+export function createAppClients(
+  server?: ServerConnection,
+  tokenRef?: { current: string },
+): AppClients {
   const queryClient = createQueryClient();
-  const orpcClient = createOrpcClient(server);
+  const orpcClient = createOrpcClient(server, tokenRef);
   const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
 
   // Draft seeds optimistic rows; the session event stream invalidates this list.
@@ -111,4 +115,10 @@ export function createAppClients(server?: ServerConnection): AppClients {
   }
 
   return { orpcClient, queryClient, orpcQueryUtils };
+}
+
+/** Drop cached queries for an environment that left the snapshot. */
+export function disposeAppClients(clients: AppClients): void {
+  void clients.queryClient.cancelQueries();
+  clients.queryClient.clear();
 }

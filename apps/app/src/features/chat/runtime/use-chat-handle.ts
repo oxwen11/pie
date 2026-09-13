@@ -1,5 +1,6 @@
-import type { SessionRef } from "@getpie/contract";
 import { useMemo } from "react";
+
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { Chat } from "./chat";
 import { useChatManager } from "./chat-context";
@@ -14,10 +15,11 @@ export const selectTurnInProgress = (s: ChatStoreState): boolean =>
 // Get-or-create a Chat by SessionRef and return it with a stable identity.
 // This hook does not subscribe to the store — consumers that read state do
 // their own useStore(chat.store, selector).
-export function useChatHandle(sessionRef: SessionRef): Chat {
+export function useChatHandle(sessionRef: EnvironmentSessionRef): Chat {
   const manager = useChatManager();
-  // Depend on the primitive fields, not the (per-render) ref object identity, so
-  // the lookup runs once per distinct session rather than on every render.
-  const { projectId, sessionId } = sessionRef;
-  return useMemo(() => manager.chatFor({ projectId, sessionId }), [manager, projectId, sessionId]);
+  const { environmentId, projectId, sessionId } = sessionRef;
+  return useMemo(
+    () => manager.chatFor({ environmentId, projectId, sessionId }),
+    [manager, environmentId, projectId, sessionId],
+  );
 }

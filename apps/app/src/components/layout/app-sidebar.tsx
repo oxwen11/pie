@@ -16,6 +16,7 @@ import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
@@ -89,6 +90,14 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
+        {platform.ssh ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <ConnectionSwitcher />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

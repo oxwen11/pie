@@ -4,6 +4,7 @@ import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
 import { corsHeaders, isLoopbackHost } from "./cors";
+import { parsePairingExchange, type PairingStore } from "./pairing";
 import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
@@ -17,6 +18,10 @@ export type RequestAppOptions = {
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
   readonly tickets: TicketStore;
+  /** Pairing codes → process-lifetime session tokens. Unset when auth is off. */
+  readonly pairing: PairingStore | undefined;
+  /** Stable daemon Environment id. Returned by GET /api/environment. */
+  readonly environmentId: string;
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
   /** Everything the API routes below do not claim. */
@@ -26,6 +31,14 @@ export type RequestAppOptions = {
 const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
 const unauthorized = HttpServerResponse.text("Unauthorized", { status: 401 });
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
+const badRequest = HttpServerResponse.text("Bad Request", { status: 400 });
+
+function isAuthorized(options: RequestAppOptions, header: string | undefined): boolean {
+  if (options.authToken === undefined) return true;
+  const presented = bearerToken(header);
+  if (tokensMatch(options.authToken, presented)) return true;
+  return options.pairing?.accepts(presented) === true;
+}
 
 /**
  * The request half of the server. The WebSocket upgrade half stays on raw
@@ -138,9 +151,41 @@ const route = (
     }
 
     if (
+      options.pairing !== undefined &&
+      request.method === "POST" &&
+      pathname === "/api/pairing/exchange"
+    ) {
+      const raw = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
+      const body = parsePairingExchange(raw);
+      if (body === null) return withCors(badRequest);
+      const session = options.pairing.exchange(body.code);
+      if (session === null) return withCors(unauthorized);
+      return withCors(
+        HttpServerResponse.jsonUnsafe({
+          token: session.token,
+          environmentId: options.environmentId,
+        }),
+      );
+    }
+
+    if (
+      options.pairing !== undefined &&
+      request.method === "POST" &&
+      pathname === "/api/pairing/mint"
+    ) {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
+      return withCors(HttpServerResponse.jsonUnsafe(options.pairing.mint()));
+    }
+
+    if (
       options.authToken !== undefined &&
       pathname.startsWith("/api/") &&
-      !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      !isAuthorized(options, request.headers.authorization)
     ) {
       return withCors(unauthorized);
     }
@@ -150,12 +195,22 @@ const route = (
       pathname === "/api/shutdown" &&
       options.shutdown !== undefined
     ) {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
       options.shutdown();
       return withCors(HttpServerResponse.text("shutting down", { status: 202 }));
     }
 
     if (request.method === "POST" && pathname === "/api/ws-ticket") {
       return withCors(HttpServerResponse.jsonUnsafe({ ticket: options.tickets.issue() }));
+    }
+
+    if (request.method === "GET" && pathname === "/api/environment") {
+      return withCors(HttpServerResponse.jsonUnsafe({ id: options.environmentId }));
     }
 
     if (pathname.startsWith("/api/")) {

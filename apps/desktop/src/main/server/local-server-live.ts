@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { Effect, Layer } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { applyPackagedPiRuntime, DesktopConfig } from "../desktop-config";
+import { withTailscaleAllowedHosts } from "../tailscale/allowed-hosts";
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import { LocalServer, makeLocalServer } from "./local-server";
 import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
@@ -17,6 +18,9 @@ export const LocalServerLive = Layer.effect(
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const platform = yield* Effect.context<
+      FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+    >();
     const environment = (
       config.isPackaged
         ? resolveLoginShellEnvironmentWith(spawner)
@@ -37,6 +41,8 @@ export const LocalServerLive = Layer.effect(
           ),
         }),
       ),
+      Effect.flatMap(withTailscaleAllowedHosts),
+      Effect.provide(platform),
     );
 
     // Attach the daemon selected by PIE_HOME (the same one the CLI uses)

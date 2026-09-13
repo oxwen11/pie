@@ -12,6 +12,10 @@
     "./development-scope": {
       "types": "./dist/development-scope.d.mts",
       "default": "./dist/development-scope.mjs"
+    },
+    "./executable": {
+      "types": "./dist/executable.d.mts",
+      "default": "./dist/executable.mjs"
     }
   },
   "scripts": {
@@ -20,6 +24,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "dependencies": {
+    "effect": "catalog:effect"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",

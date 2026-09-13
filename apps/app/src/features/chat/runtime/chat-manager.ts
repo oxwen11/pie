@@ -1,6 +1,5 @@
-import type { SessionRef } from "@getpie/contract";
-
-import { sessionRefKey } from "@/lib/session-ref";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
+import { sessionRefKey, toSessionRef } from "@/lib/session-ref";
 
 import { Chat } from "./chat";
 import type { ChatSessionTransportFactory } from "./chat-transport-port";
@@ -8,7 +7,7 @@ import type { ChatSessionTransportFactory } from "./chat-transport-port";
 // The narrow surface features are allowed to touch. Orchestration internals
 // (the session map, disposal) stay on the class.
 export interface ChatManagerApi {
-  chatFor(sessionRef: SessionRef): Chat;
+  chatFor(sessionRef: EnvironmentSessionRef): Chat;
 }
 
 // Owns the live Chat instances keyed by the complete SessionRef. Sessions survive
@@ -26,12 +25,22 @@ export class ChatManager implements ChatManagerApi {
 
   // chatFor is get-or-create per SessionRef; later calls return the existing
   // Chat for that ref.
-  chatFor(sessionRef: SessionRef): Chat {
+  forgetEnvironment(environmentId: string): void {
+    for (const [key, chat] of this.#chats) {
+      const parsed: unknown = JSON.parse(key);
+      const id = Array.isArray(parsed) ? parsed[0] : undefined;
+      if (id !== environmentId) continue;
+      this.#chats.delete(key);
+      chat.dispose();
+    }
+  }
+
+  chatFor(sessionRef: EnvironmentSessionRef): Chat {
     const key = sessionRefKey(sessionRef);
     const existing = this.#chats.get(key);
     if (existing) return existing;
     const chat = new Chat({
-      sessionRef,
+      sessionRef: toSessionRef(sessionRef),
       transport: this.createTransport(sessionRef),
       onTerminated: () => this.#evict(key),
     });

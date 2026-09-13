@@ -1,11 +1,12 @@
 import type {
   PromptPart,
   SessionPendingPrompt,
-  SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
 } from "@getpie/contract";
 import type { UIMessage } from "ai";
+
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { AgentResponse } from "./agent-requests";
 
@@ -89,4 +90,6 @@ export interface ChatSessionTransport {
 // Binds a SessionRef to a transport. ChatManager holds one of these instead of
 // the wire client, so swapping the oRPC binding for anything else is a one-line
 // change at the composition root.
-export type ChatSessionTransportFactory = (sessionRef: SessionRef) => ChatSessionTransport;
+export type ChatSessionTransportFactory = (
+  sessionRef: EnvironmentSessionRef,
+) => ChatSessionTransport;

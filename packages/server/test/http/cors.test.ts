@@ -18,6 +18,16 @@ describe("isAllowedOrigin", () => {
     expect(isAllowedOrigin("http://localhost.evil.example")).toBe(false);
   });
 
+  it("trusts a LAN origin when that IP is an allowed Host, not a ts.net wildcard", () => {
+    expect(
+      isAllowedOrigin("http://192.168.31.135:4000", { allowedHosts: ["192.168.31.135"] }),
+    ).toBe(true);
+    expect(isAllowedOrigin("http://192.168.31.135:4000")).toBe(false);
+    expect(
+      isAllowedOrigin("https://evil.tail590c10.ts.net", { allowedHosts: ["192.168.31.135"] }),
+    ).toBe(false);
+  });
+
   it("accepts extra configured origins (e.g. a hosted web app)", () => {
     expect(isAllowedOrigin("https://app.pie.dev", { extraOrigins: ["https://app.pie.dev"] })).toBe(
       true,
@@ -67,6 +77,8 @@ describe("isLoopbackHost", () => {
     expect(isLoopbackHost("proxy.ts.net:8443", ["proxy.ts.net:8443"])).toBe(true);
     expect(isLoopbackHost("PROXY.TS.NET", ["proxy.ts.net"])).toBe(true);
     expect(isLoopbackHost("evil.example", ["proxy.ts.net"])).toBe(false);
+    expect(isLoopbackHost("192.168.31.135:4180", ["192.168.31.135"])).toBe(true);
+    expect(isLoopbackHost("192.168.31.135:4180")).toBe(false);
   });
 });
 

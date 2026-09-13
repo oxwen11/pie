@@ -1,45 +1,48 @@
 import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { defineConfig } from "tsdown";
 
-export default defineConfig({
-  entry: ["src/node/cli.ts"],
-  platform: "node",
-  // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
-  // artifact beside the final CLI so runtime lookup never depends on a repo.
-  copy: [
-    {
-      from: "../../apps/app/dist",
-      to: "dist",
-      rename: "client",
-    },
-    {
-      from: "../server/dist/pi-process/pi-process.js",
-      to: "dist/pi-process",
-    },
-  ],
+const shared = {
+  platform: "node" as const,
+  format: ["esm" as const],
+  minify: true,
   deps: {
-    // The private server/harness/contract packages are compiled into the CLI.
-    // Whitelist their bundled runtime dependencies so additions fail closed.
-    // `simple-git` (and its tree) is pulled in by GitService on the serve path.
-    onlyBundle: [
-      "effect",
-      "@effect/platform-node-shared",
-      "@effect/platform-node",
-      "@standardserver/shared",
-      "@orpc/experimental-effect",
-      "simple-git",
-      /^@simple-git\//,
-      /^@kwsites\//,
-      "debug",
-      "ms",
-      "supports-color",
-      "has-flag",
-    ],
+    // Bundle what npm must not reinstall (Effect dual-runtime under npx).
+    // Pi is a host install (`pi` on PATH), not a published or bundled dep.
+    alwaysBundle: [/.*/],
+    neverBundle: ["@earendil-works/pi-coding-agent", "vite"],
+    onlyBundle: false,
   },
   dts: false,
-  clean: true,
+  shims: true,
   env: {
     NODE_ENV: "production",
     PIE_DAEMON_COMPATIBILITY_KEY: resolveDaemonCompatibilityKey(),
   },
-});
+};
+
+export default defineConfig([
+  {
+    ...shared,
+    entry: ["src/node/cli.ts"],
+    clean: true,
+    // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
+    // artifact beside the final CLI so runtime lookup never depends on a repo.
+    copy: [
+      {
+        from: "../../apps/app/dist",
+        to: "dist",
+        rename: "client",
+      },
+      {
+        from: "../server/dist/pi-process/pi-process.js",
+        to: "dist/pi-process",
+      },
+    ],
+  },
+  {
+    ...shared,
+    // Own build so the hop is one file, not a chunk shared with `pie`.
+    entry: ["src/node/relay.ts"],
+    clean: false,
+  },
+]);

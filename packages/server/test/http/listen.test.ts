@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { listenServer } from "../../src/http/listen";
+import { extraAllowedHostsForListen, isLoopbackBind, listenServer } from "../../src/http/listen";
 
 const servers = new Set<ReturnType<typeof http.createServer>>();
 
@@ -24,6 +24,22 @@ afterEach(async () => {
     ),
   );
   servers.clear();
+});
+
+describe("extraAllowedHostsForListen", () => {
+  it("adds a specific LAN address and ignores wildcard or loopback binds", () => {
+    expect(extraAllowedHostsForListen("192.168.31.135")).toEqual(["192.168.31.135"]);
+    expect(extraAllowedHostsForListen("0.0.0.0")).toEqual([]);
+    expect(extraAllowedHostsForListen("127.0.0.1")).toEqual([]);
+  });
+});
+
+describe("isLoopbackBind", () => {
+  it("treats 127.0.0.1 as loopback and LAN or wildcard as not", () => {
+    expect(isLoopbackBind("127.0.0.1")).toBe(true);
+    expect(isLoopbackBind("0.0.0.0")).toBe(false);
+    expect(isLoopbackBind("192.168.31.135")).toBe(false);
+  });
 });
 
 describe("listenServer", () => {

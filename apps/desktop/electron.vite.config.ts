@@ -1,7 +1,6 @@
 import url from "node:url";
 
 import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
-import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { isRunningFromAgent } from "agent-cli-detector";
@@ -9,6 +8,7 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
+import { tailwindcssVite } from "../app/tailwindcss-vite";
 import { themeBootstrapPlugin } from "../app/theme-bootstrap-plugin";
 
 const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
@@ -61,11 +61,13 @@ export default defineConfig({
     build: {
       outDir: "dist/main",
       // electron-vite externalizes every production dependency by default, but
-      // Server source must be compiled into Main. Core's built compatibility
-      // module is bundled too so the define above replaces its environment read
-      // with this artifact's static key rather than consulting runtime env.
+      // server/ssh/tailscale source must be compiled into Main. Core's built
+      // compatibility module is bundled too so the define above replaces its
+      // environment read with this artifact's static key rather than consulting
+      // runtime env. Left external, the packaged app imports TypeScript from
+      // the asar's node_modules, where Node refuses to strip types.
       externalizeDeps: {
-        exclude: ["@getpie/core", "@getpie/server"],
+        exclude: ["@getpie/core", "@getpie/server", "@getpie/ssh", "@getpie/tailscale"],
       },
     },
   },
@@ -100,7 +102,7 @@ export default defineConfig({
     plugins: [
       themeBootstrapPlugin({ csp: true }),
       devOverlayCsp(),
-      codeInspectorPlugin({ bundler: "vite" }),
+      codeInspectorPlugin({ bundler: "vite", hideConsole: true }),
       tanstackRouter({
         target: "react",
         autoCodeSplitting: true,
@@ -110,7 +112,7 @@ export default defineConfig({
         ),
       }),
       react(),
-      tailwindcss(),
+      ...tailwindcssVite(),
     ],
     build: {
       outDir: "dist/renderer",

@@ -18,7 +18,22 @@ export function ReadyApp({
   status: ServerStatusFeed;
   onReady: () => void;
 }): ReactElement {
-  const initial = use(server);
+  use(server);
+  return <KeyedApp load={refresh} status={status} onReady={onReady} />;
+}
+
+function KeyedApp({
+  load,
+  status,
+  onReady,
+}: {
+  load: () => Promise<ServerConnection>;
+  status: ServerStatusFeed;
+  onReady: () => void;
+}): ReactElement {
+  // One promise per mount. A new promise every render would re-suspend `use`.
+  const [promise] = useState(() => load());
+  const initial = use(promise);
   const [connection, setConnection] = useState(initial);
 
   // The daemon mints a fresh token on every respawn, so the startup connection
@@ -29,7 +44,7 @@ export function ReadyApp({
     let cancelled = false;
     const unsubscribe = status.subscribe((next) => {
       if (next !== "ready") return;
-      void refresh()
+      void load()
         .then((fresh) => {
           if (!cancelled) {
             setConnection((current) => (sameConnection(current, fresh) ? current : fresh));
@@ -44,7 +59,7 @@ export function ReadyApp({
       cancelled = true;
       unsubscribe();
     };
-  }, [status, refresh]);
+  }, [status, load]);
 
   use(startupAnimation);
   useEffect(onReady, [onReady]);
