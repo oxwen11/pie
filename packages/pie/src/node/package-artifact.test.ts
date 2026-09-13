@@ -15,6 +15,17 @@ layer(NodeFileSystem.layer)("published CLI bundle", (it) => {
     }),
   );
 
+  it.effect("ships the fff JS island and no platform native bins", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.access(fromModuleUrl("../../dist/fff/node_modules/@ff-labs/pi-fff/src/index.ts"));
+      const labs = yield* fs.readDirectory(fromModuleUrl("../../dist/fff/node_modules/@ff-labs"), {
+        recursive: true,
+      });
+      assert.ok(!Array.from(labs).some((entry) => entry.includes("fff-bin-")));
+    }),
+  );
+
   it.effect("ships the complete web UI beside the CLI entry", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

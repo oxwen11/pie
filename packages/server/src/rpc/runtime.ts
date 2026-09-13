@@ -15,6 +15,7 @@ import {
   PiAgentSessionServiceLayer,
 } from "../harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
+import { ensureFffNativeLibEffect } from "../harness/pi/fff-native-download";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
@@ -90,6 +91,11 @@ const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.fork
   Layer.provide(ScheduleServiceProvided),
 );
 
+/** Same background download for Desktop and CLI — does not block listen. */
+const FffNativeEnsureLayer = Layer.effectDiscard(
+  ensureFffNativeLibEffect.pipe(Effect.forkScoped),
+).pipe(Layer.provide(PathsLayer));
+
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   PiAgentServiceProvided,
@@ -97,6 +103,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   ProjectServiceProvided,
   ScheduleServiceProvided,
   ScheduleDaemonLayer,
+  FffNativeEnsureLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

@@ -23,6 +23,8 @@ export class Paths extends Context.Service<
     readonly worktreesDir: string;
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
     readonly logsDir: string;
+    /** `$PIE_HOME/vendor/fff` — cached fff native lib (downloaded, not shipped). */
+    readonly vendorFffDir: string;
   }
 >()("Paths") {}
 
@@ -40,6 +42,7 @@ const resolve = (home: string) => ({
   schedulesDir: path.join(home, "storage", "schedules"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
+  vendorFffDir: vendorFffDirectory(home),
 });
 
 /**
@@ -74,6 +77,9 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
+
+/** `$PIE_HOME/vendor/fff` — checksum-locked `@ff-labs/fff-bin-*` cache. */
+export const vendorFffDirectory = (home: string): string => path.join(home, "vendor", "fff");
 
 export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 

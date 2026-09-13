@@ -15,16 +15,21 @@ files:
   # binary. We do not ship it: the server execs the user's own Claude Code
   # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # Native fff libs are downloaded into $PIE_HOME/vendor/fff after launch.
+  - "!**/node_modules/@ff-labs/fff-bin-*/**"
 asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
 # pi-process.js comes from @getpie/server#build (bun-build, outside asar).
+# fff JS island only — native fff-bin-* is downloaded into $PIE_HOME/vendor/fff/.
 beforePack: scripts/before-pack.cjs
 extraResources:
   - vendor
   - from: ../../packages/server/dist/pi-process
     to: pi-process
+  - from: ../../packages/server/dist/fff
+    to: fff
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns

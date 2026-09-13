@@ -16,6 +16,11 @@ export default defineConfig({
       from: "../server/dist/pi-process/pi-process.js",
       to: "dist/pi-process",
     },
+    {
+      from: "../server/dist/fff",
+      to: "dist",
+      rename: "fff",
+    },
   ],
   deps: {
     // The private server/harness/contract packages are compiled into the CLI.

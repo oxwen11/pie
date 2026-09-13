@@ -17,7 +17,7 @@
     "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "tsdown && bun build src/harness/pi/rpc/entry.ts --target bun --outfile dist/pi-process/pi-process.js",
+    "build": "tsdown && bun build src/harness/pi/rpc/entry.ts --target bun --outfile dist/pi-process/pi-process.js && node scripts/materialize-fff.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -26,6 +26,7 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
+    "@ff-labs/pi-fff": "0.10.6",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",
