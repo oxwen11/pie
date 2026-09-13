@@ -74,6 +74,13 @@ jobs:
 
           printf '%s %s, Node %s, pnpm %s, %s\n' \
             "$ID" "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
+
+          # pie-verify desktop launch uses lsof to probe the preferred daemon port.
+          if ! command -v lsof >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends lsof
+          fi
+          command -v lsof >/dev/null
         shell: bash
 
       - name: Native toolchain (node-pty)

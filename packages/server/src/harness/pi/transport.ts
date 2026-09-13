@@ -2,6 +2,7 @@ import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from 
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
+import { fffNativeChildEnv } from "./fff-native";
 import {
   isBlockingUiRequest,
   type AgentSessionEvent,
@@ -74,6 +75,7 @@ export const makePiTransport = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
     const executable = options.executable ?? { command: process.execPath, prefixArgs: [] };
+    const fffEnv = fffNativeChildEnv(process.env);
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
@@ -87,6 +89,7 @@ export const makePiTransport = (
           ],
           {
             ...(options.cwd ? { cwd: options.cwd } : undefined),
+            ...(fffEnv === undefined ? undefined : { env: fffEnv, extendEnv: true }),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),

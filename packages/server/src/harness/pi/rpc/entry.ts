@@ -6,6 +6,8 @@
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
  * extension bind/UI/protocol here, and extension loading via
  * `createAgentSessionServices` (`resourceLoaderOptions.extensionFactories`).
+ * Bundled `@ff-labs/pi-fff` is an additionalExtensionPath — never a static
+ * import — so bun-build does not inline the native FFI graph.
  */
 import path from "node:path";
 import url from "node:url";
@@ -24,6 +26,15 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { piBashExtension } from "../bash";
+import {
+  applyBundledFffEnvInPlace,
+  bundledFffExtensionFlags,
+  isBundledFffEnabled,
+  resolveBundledFffExtension,
+  shouldLoadBundledFff,
+  withoutUserInstalledPiFff,
+} from "../fff";
+import { applyFffNativeEnvInPlace, resolveFffNativeLib } from "../fff-native";
 import { RpcChildExitError, runRpcMode } from "./rpc-mode";
 
 type HttpDispatcher = {
@@ -45,6 +56,8 @@ function isHttpDispatcher(value: unknown): value is HttpDispatcher {
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
+applyBundledFffEnvInPlace(process.env);
+applyFffNativeEnvInPlace(process.env);
 process.emitWarning = () => {
   /* pie-pi-process must not leak Node experimental warnings onto the JSONL pipe */
 };
@@ -79,13 +92,30 @@ const start = async (): Promise<void> => {
   configureHttpDispatcher();
   const sessionManager = await openSessionManager(parsed.sessionId, cwd);
 
+  const nativeReady = resolveFffNativeLib() !== undefined;
+  const bundledFff = shouldLoadBundledFff(process.env) ? resolveBundledFffExtension() : undefined;
+  if (isBundledFffEnabled(process.env) && !nativeReady) {
+    console.error("warning: fff native lib is not ready; Pi find/grep stay built-in");
+  } else if (isBundledFffEnabled(process.env) && bundledFff === undefined) {
+    console.error("warning: bundled @ff-labs/pi-fff was not found; Pi find/grep stay built-in");
+  }
+
   const createRuntime: CreateAgentSessionRuntimeFactory = async (options) => {
     const services = await createAgentSessionServices({
       cwd: options.cwd,
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
+      ...(bundledFff === undefined
+        ? undefined
+        : { extensionFlagValues: bundledFffExtensionFlags(process.env) }),
       resourceLoaderOptions: {
         extensionFactories: [piBashExtension(options.cwd)],
+        ...(bundledFff === undefined
+          ? undefined
+          : {
+              additionalExtensionPaths: [bundledFff],
+              extensionsOverride: (loaded) => withoutUserInstalledPiFff(loaded, bundledFff),
+            }),
       },
     });
     const resolved = resolveCliModel({

@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-12.
+Last audited: 2026-09-13.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -53,6 +53,8 @@ $PIE_HOME/
 ├── logs/
 │   ├── pie.log
 │   └── daemon-stdio.log
+├── vendor/
+│   └── fff/
 └── daemon/
     ├── daemon.pid
     ├── daemon.lock
@@ -200,6 +202,23 @@ $PIE_HOME/daemon/
 | `daemon.stopped` | Decimal epoch-millisecond timestamp; file existence is the stop signal                                          | Direct mode-`0600` write; explicit start removes it                                                            |
 
 The daemon directory itself uses normal mkdir/umask behavior.
+
+### Cached fff native library
+
+| Property      | Current contract                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Path          | `$PIE_HOME/vendor/fff/` (`manifest.json` plus `node_modules/@ff-labs/fff-bin-<platform>/`)                                                                                                       |
+| Owner         | Server process (`ensureFffNativeLib`); Desktop and CLI share the cache because both start this server                                                                                            |
+| Data          | Locked `@ff-labs/fff-bin-*@0.10.6` tarball, verified with the pinned npm `integrity` (sha512) and `shasum` (sha1) before extract. Manifest records version, package, integrity, and lib filename |
+| Write points  | Background download on server start when the pin is missing or corrupt. Does not block listen, CLI commands, or session create                                                                   |
+| Compatibility | Version / integrity mismatch discards the cache and re-downloads. `FFF_BUN_LIB` pointing at an existing file wins over the cache                                                                 |
+| Extension     | Bump `FFF_NATIVE_VERSION` and the pinned hashes together with `@ff-labs/pi-fff`                                                                                                                  |
+| Retention     | Kept until `$PIE_HOME` is removed. Not deleted on session/project/schedule delete. Uninstall has no separate cleanup                                                                             |
+| Permissions   | Directory mode `0700` when created by the downloader. The native lib is not secret                                                                                                               |
+
+This is a Pie-owned cache, not Pi agent data. The frecency / history DBs fff writes stay under `~/.pi/agent/fff/` and remain Pi-owned.
+
+Override: `PIE_FFF=0` skips the download. `FFF_BUN_LIB` selects a ready lib file without using this tree.
 
 `$PIE_HOME/logs` is created with mode `0700`; log files use `0600`:
 

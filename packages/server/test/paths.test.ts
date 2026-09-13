@@ -10,6 +10,7 @@ import {
   resolveDaemonDirectory,
   resolvePieHome,
   pieLogPath,
+  vendorFffDirectory,
 } from "../src/config/paths";
 
 describe("defaultPieHomeDir", () => {
@@ -42,6 +43,12 @@ describe("resolvePieHome", () => {
 describe("daemonDirectory", () => {
   it("is always $PIE_HOME/daemon", () => {
     expect(daemonDirectory("/tmp/data")).toBe(path.join("/tmp/data", "daemon"));
+  });
+});
+
+describe("vendorFffDirectory", () => {
+  it("is $PIE_HOME/vendor/fff for Desktop and CLI", () => {
+    expect(vendorFffDirectory("/tmp/data")).toBe(path.join("/tmp/data", "vendor", "fff"));
   });
 });
 
