@@ -1,4 +1,4 @@
-import { use, useState, type FormEvent, type ReactElement } from "react";
+import { use, useState, type ReactElement } from "react";
 
 import { AppInterface } from "./app-interface";
 import {
@@ -17,13 +17,15 @@ async function probeAccess(): Promise<{
   readonly mode: Awaited<ReturnType<typeof probePairingMode>>;
   readonly session: StoredPairingSession | null;
 }> {
-  const mode = await probePairingMode();
-  const session = await validateStoredPairingSession(readPairingSession());
+  const [mode, session] = await Promise.all([
+    probePairingMode(),
+    validateStoredPairingSession(readPairingSession()),
+  ]);
   return { mode, session };
 }
 
 export function PairingGate(): ReactElement {
-  const [probe] = useState(probeAccess);
+  const [probe, _setProbe] = useState(probeAccess);
   const probed = use(probe);
   const [session, setSession] = useState(probed.session);
   const access = resolvePairingAccess(probed.mode, session);
@@ -51,7 +53,7 @@ function PairingForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     setPending(true);
     setError(null);
@@ -69,8 +71,15 @@ function PairingForm({
               : "Pairing failed.",
           );
         }
-        const body = (await response.json()) as { token?: unknown; environmentId?: unknown };
-        if (typeof body.token !== "string" || typeof body.environmentId !== "string") {
+        const body: unknown = await response.json();
+        if (
+          typeof body !== "object" ||
+          body === null ||
+          !("token" in body) ||
+          !("environmentId" in body) ||
+          typeof body.token !== "string" ||
+          typeof body.environmentId !== "string"
+        ) {
           throw new TypeError("Pairing failed.");
         }
         const next = { token: body.token, environmentId: body.environmentId };
@@ -92,15 +101,18 @@ function PairingForm({
           Enter the code from <code>pie pairing mint</code> on the daemon. This browser never stores
           the daemon token.
         </p>
-        <input
-          autoComplete="one-time-code"
-          className="border-input bg-background rounded-md border px-3 py-2"
-          disabled={pending}
-          name="code"
-          onChange={(event) => setCode(event.target.value)}
-          placeholder="Pairing code"
-          value={code}
-        />
+        <label className="flex flex-col gap-1">
+          <span className="text-sm">Pairing code</span>
+          <input
+            autoComplete="one-time-code"
+            className="border-input bg-background rounded-md border px-3 py-2"
+            disabled={pending}
+            name="code"
+            onChange={(event) => setCode(event.target.value)}
+            placeholder="e.g. 7K2M-9Q"
+            value={code}
+          />
+        </label>
         {error !== null ? <p className="text-destructive text-sm">{error}</p> : null}
         <button
           className="bg-primary text-primary-foreground rounded-md px-3 py-2 disabled:opacity-50"

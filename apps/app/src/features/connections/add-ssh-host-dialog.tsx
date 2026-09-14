@@ -9,7 +9,7 @@ import {
 } from "@getpie/ui/components/dialog";
 import { Input } from "@getpie/ui/components/input";
 import { Label } from "@getpie/ui/components/label";
-import { Suspense, use, useState, type FormEvent, type ReactElement } from "react";
+import { Suspense, use, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import type { DiscoveredSshHost, PlatformSsh } from "@/platform";
@@ -36,7 +36,7 @@ function loadDiscoveredHosts(ssh: PlatformSsh): Promise<readonly DiscoveredSshHo
 }
 
 function DiscoveredSshHostOptions({ ssh }: { ssh: PlatformSsh }): ReactElement {
-  const [hostsPromise] = useState(() => loadDiscoveredHosts(ssh));
+  const [hostsPromise, _setHostsPromise] = useState(() => loadDiscoveredHosts(ssh));
   const hosts = use(hostsPromise);
   return (
     <>
@@ -57,7 +57,7 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
 
   if (!ssh || !ssh.client.available) return null;
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (trimmed.length === 0 || pending) return;
     setPending(true);
@@ -65,6 +65,7 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
       .connect(trimmed)
       .then(() => {
         onClose();
+        return undefined;
       })
       .catch((error: unknown) => {
         setPending(false);
@@ -90,7 +91,6 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
               <Input
                 id="ssh-target"
                 autoComplete="off"
-                autoFocus
                 disabled={pending}
                 list="ssh-discovered-hosts"
                 placeholder="user@host or user@machine.tailnet.ts.net"

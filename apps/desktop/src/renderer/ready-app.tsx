@@ -32,7 +32,7 @@ function KeyedApp({
   onReady: () => void;
 }): ReactElement {
   // One promise per mount. A new promise every render would re-suspend `use`.
-  const [promise] = useState(() => load());
+  const [promise, _setPromise] = useState(() => load());
   const initial = use(promise);
   const [connection, setConnection] = useState(initial);
   const tokenHolder = useRef(initial.token);

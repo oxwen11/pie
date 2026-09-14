@@ -16,7 +16,9 @@ const MISSING_SNAPSHOT: EnvironmentSnapshot = {
   remotes: [],
 };
 
-const subscribeNoop = (): (() => void) => () => {};
+const subscribeNoop = (): (() => void) => {
+  return () => undefined;
+};
 const getMissingSnapshot = (): EnvironmentSnapshot => MISSING_SNAPSHOT;
 
 type PendingDialog = "add" | "share";
@@ -78,6 +80,7 @@ export function ConnectionSwitcher(): ReactElement | null {
                     return exhaustive;
                   }
                 }
+                return undefined;
               }, 0);
             }}
           >
@@ -86,8 +89,8 @@ export function ConnectionSwitcher(): ReactElement | null {
               <span>{connectionsLabel(environments)}</span>
             </MenuTrigger>
             <MenuPopup align="start" className="min-w-56">
-              {environments.connecting.map((entry, index) => (
-                <MenuItem disabled key={`connecting-${entry.target}-${String(index)}`}>
+              {environments.connecting.map((entry) => (
+                <MenuItem disabled key={`connecting-${entry.target}`}>
                   <Spinner />
                   <span>Connecting {entry.target}…</span>
                 </MenuItem>
