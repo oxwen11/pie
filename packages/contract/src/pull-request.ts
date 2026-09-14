@@ -4,10 +4,10 @@ import { SessionRefSchema } from "./domain";
 import { oc, toStandardSchema } from "./orpc";
 
 export const PullRequestRefSchema = Schema.Struct({
-  host: Schema.String,
-  owner: Schema.String,
-  repository: Schema.String,
-  number: Schema.Number,
+  host: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?$/)),
+  owner: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/)),
+  repository: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/)),
+  number: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
 });
 export type PullRequestRef = typeof PullRequestRefSchema.Type;
 
@@ -87,12 +87,83 @@ export const PullRequestSnapshotSchema = Schema.Struct({
 });
 export type PullRequestSnapshot = typeof PullRequestSnapshotSchema.Type;
 
+export const PullRequestSummarySchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  title: Schema.String,
+  headBranch: Schema.String,
+  baseBranch: Schema.String,
+  lifecycle: PullRequestLifecycleSchema,
+  checkedAt: Schema.String,
+});
+export type PullRequestSummary = typeof PullRequestSummarySchema.Type;
+
+export const PullRequestStackLayerSchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  headBranch: Schema.String,
+  lifecycle: PullRequestLifecycleSchema,
+});
+export const PullRequestStackSchema = Schema.Struct({
+  id: Schema.String,
+  number: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  baseBranch: Schema.String,
+  // Native host order, bottom to top. Never inferred from PR numbers.
+  layers: Schema.Array(PullRequestStackLayerSchema).check(Schema.isMaxLength(100)),
+});
+export type PullRequestStack = typeof PullRequestStackSchema.Type;
+export const PullRequestLinkSourceSchema = Schema.Literals(["agent", "created", "branch", "stack", "legacy"]);
+export type PullRequestLinkSource = typeof PullRequestLinkSourceSchema.Type;
+export const SessionPullRequestLinkSchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  source: PullRequestLinkSourceSchema,
+  linkedAt: Schema.String,
+  excluded: Schema.Boolean,
+  snapshot: Schema.NullOr(PullRequestSummarySchema),
+  stack: Schema.NullOr(PullRequestStackSchema),
+  stackCheckedAt: Schema.NullOr(Schema.String),
+});
+export type SessionPullRequestLink = typeof SessionPullRequestLinkSchema.Type;
 export const PullRequestSessionStatusSchema = Schema.Struct({
   ref: SessionRefSchema,
-  lifecycle: PullRequestLifecycleSchema,
-  url: Schema.String,
+  links: Schema.Array(SessionPullRequestLinkSchema),
+  state: Schema.Literals(["idle", "pending", "ready", "unbound", "error"]),
+  error: Schema.optionalKey(Schema.String),
 });
 export type PullRequestSessionStatus = typeof PullRequestSessionStatusSchema.Type;
+
+export const PullRequestStackActionSchema = Schema.Literals(["merge", "rebase"]);
+export type PullRequestStackAction = typeof PullRequestStackActionSchema.Type;
+export const PullRequestStackExpectedSchema = Schema.Struct({
+  stackId: Schema.String,
+  // Entire native topology plus heads, not just the affected subset.
+  members: Schema.Array(Schema.Struct({ pullRequest: PullRequestRefSchema, headSha: Schema.String })).check(Schema.isMaxLength(100)),
+});
+export type PullRequestStackExpected = typeof PullRequestStackExpectedSchema.Type;
+export const PullRequestStackPreviewSchema = Schema.Struct({
+  pullRequest: PullRequestRefSchema,
+  action: PullRequestStackActionSchema,
+  stack: PullRequestStackSchema,
+  expected: PullRequestStackExpectedSchema,
+  affected: Schema.Array(PullRequestRefSchema),
+  methods: Schema.Array(PullRequestMergeMethodSchema),
+  allowed: Schema.Boolean,
+  reason: Schema.optionalKey(Schema.String),
+});
+export type PullRequestStackPreview = typeof PullRequestStackPreviewSchema.Type;
+export const PullRequestStackActionResultSchema = Schema.Struct({
+  action: PullRequestStackActionSchema,
+  completed: Schema.Array(PullRequestRefSchema),
+  outcome: Schema.Literals(["applied", "partial", "unknown"]),
+  message: Schema.optionalKey(Schema.String),
+});
+export type PullRequestStackActionResult = typeof PullRequestStackActionResultSchema.Type;
+export const PullRequestDemandInputSchema = Schema.Struct({
+  leaseId: Schema.optionalKey(Schema.String),
+  version: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)),
+});
+export type PullRequestDemandInput = typeof PullRequestDemandInputSchema.Type;
+export const PullRequestDemandOutputSchema = Schema.Struct({ leaseId: Schema.String, expiresAt: Schema.String });
+export type PullRequestDemandOutput = typeof PullRequestDemandOutputSchema.Type;
 
 const ExpectedPullRequestSchema = Schema.Struct({ pullRequest: PullRequestRefSchema });
 const ExpectedPullRequestHeadSchema = Schema.Struct({
@@ -168,11 +239,95 @@ export const pullRequestContract = {
     .errors(currentErrors)
     .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
   statuses: oc
-    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema) }))
+    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
     .errors(currentErrors)
     .output(Schema.Array(PullRequestSessionStatusSchema)),
+  demand: oc.input(PullRequestDemandInputSchema).errors({ ...currentErrors, INVALID_LEASE: {} }).output(PullRequestDemandOutputSchema),
+  refresh: oc.input(Schema.Struct({ ref: SessionRefSchema })).errors(currentErrors).output(PullRequestSessionStatusSchema),
+  exclude: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema })).errors({ ...currentErrors, STORE_WRITE_FAILED: {} }).output(Schema.Void),
+  detail: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema })).errors({ ...currentErrors, STALE_CONTEXT: {} }).output(Schema.NullOr(PullRequestSnapshotSchema)),
+  stackPreview: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema, action: PullRequestStackActionSchema })).errors(actionErrors).output(PullRequestStackPreviewSchema),
+  runStackAction: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema, action: PullRequestStackActionSchema, expected: PullRequestStackExpectedSchema, method: Schema.optionalKey(PullRequestMergeMethodSchema) })).errors(actionErrors).output(PullRequestStackActionResultSchema),
   runAction: oc
     .input(PullRequestActionInputSchema)
     .errors(actionErrors)
     .output(PullRequestActionAppliedSchema),
+};
+
+/** Canonical identity; branch spelling is deliberately untouched. */
+export const normalizePullRequestRef = (ref: PullRequestRef): PullRequestRef => ({
+  host: ref.host.toLowerCase(), owner: ref.owner.toLowerCase(),
+  repository: ref.repository.toLowerCase(), number: ref.number,
+});
+export const pullRequestKey = (ref: PullRequestRef): string => {
+  const normalized = normalizePullRequestRef(ref);
+  return `${normalized.host}/${normalized.owner}/${normalized.repository}#${normalized.number}`;
+};
+export const pullRequestUrl = (ref: PullRequestRef): string =>
+  `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
+
+export type PullRequestGroup = {
+  readonly type: "native" | "derived" | "single";
+  readonly links: ReadonlyArray<SessionPullRequestLink>;
+  readonly stack: PullRequestStack | null;
+};
+export type PullRequestProjection = {
+  readonly groups: ReadonlyArray<PullRequestGroup>;
+  readonly representative: SessionPullRequestLink | null;
+  readonly badge: "pr" | "stack" | null;
+  readonly count: number;
+  readonly lifecycle: PullRequestLifecycle | null;
+};
+
+/** Only unique linear components are chains. Ambiguous components stay individual. */
+export const projectSessionPullRequests = (links: ReadonlyArray<SessionPullRequestLink>): PullRequestProjection => {
+  const visible = links.filter((link) => !link.excluded).sort((a, b) => a.linkedAt.localeCompare(b.linkedAt));
+  const remaining = new Map(visible.map((link) => [pullRequestKey(link.ref), link]));
+  const groups: PullRequestGroup[] = [];
+  for (const link of visible) {
+    if (!link.stack || !remaining.has(pullRequestKey(link.ref))) continue;
+    const members = link.stack.layers.flatMap((layer) => {
+      const member = remaining.get(pullRequestKey(layer.ref));
+      return member ? [member] : [];
+    });
+    if (members.length === 0) continue;
+    for (const member of members) remaining.delete(pullRequestKey(member.ref));
+    groups.push({ type: "native", links: members, stack: link.stack });
+  }
+  const candidates = [...remaining.values()];
+  const repoKey = (link: SessionPullRequestLink) => pullRequestKey({ ...link.ref, number: 1 });
+  const adjacent = (a: SessionPullRequestLink, b: SessionPullRequestLink) =>
+    a !== b && repoKey(a) === repoKey(b) && a.snapshot !== null && b.snapshot !== null &&
+    (a.snapshot.headBranch === b.snapshot.baseBranch || b.snapshot.headBranch === a.snapshot.baseBranch || a.snapshot.headBranch === b.snapshot.headBranch);
+  while (remaining.size > 0) {
+    const first = remaining.values().next().value;
+    if (!first) break;
+    const component = [first];
+    remaining.delete(pullRequestKey(first.ref));
+    for (const member of component) {
+      for (const candidate of candidates) {
+        if (remaining.has(pullRequestKey(candidate.ref)) && adjacent(member, candidate)) {
+          remaining.delete(pullRequestKey(candidate.ref)); component.push(candidate);
+        }
+      }
+    }
+    const parents = (child: SessionPullRequestLink) => component.filter((parent) => parent !== child && parent.snapshot?.headBranch === child.snapshot?.baseBranch);
+    const children = (parent: SessionPullRequestLink) => component.filter((child) => parent !== child && child.snapshot?.baseBranch === parent.snapshot?.headBranch);
+    const heads = component.map((member) => member.snapshot?.headBranch);
+    const roots = component.filter((member) => parents(member).length === 0);
+    const unique = new Set(heads).size === heads.length;
+    const ordered: SessionPullRequestLink[] = [];
+    let cursor = roots.length === 1 ? roots[0] : undefined;
+    if (unique && component.every((member) => parents(member).length <= 1 && children(member).length <= 1)) {
+      while (cursor && !ordered.includes(cursor)) { ordered.push(cursor); cursor = children(cursor)[0]; }
+    }
+    if (component.length > 1 && ordered.length === component.length) groups.push({ type: "derived", links: ordered, stack: null });
+    else for (const member of component) groups.push({ type: "single", links: [member], stack: null });
+  }
+  const unfinished = (link: SessionPullRequestLink) => link.snapshot === null || link.snapshot.lifecycle.type === "open";
+  const chain = groups.length === 1 && groups[0]?.type !== "single" ? groups[0] : undefined;
+  const ordered = chain ? [...chain.links].reverse() : visible;
+  const representative = ordered.find(unfinished) ?? ordered[0] ?? null;
+  const lifecycle = visible.some((link) => link.snapshot === null) ? null : representative?.snapshot?.lifecycle ?? null;
+  return { groups, representative, badge: visible.length === 0 ? null : chain ? "stack" : "pr", count: visible.length, lifecycle };
 };

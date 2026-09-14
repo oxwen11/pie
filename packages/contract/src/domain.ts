@@ -205,6 +205,7 @@ export const CollectionEventTypes = [
   "session.deleted",
   "session.renamed",
   "session.closed",
+  "session.pull-requests.updated",
 ] as const;
 export type CollectionEventType = (typeof CollectionEventTypes)[number];
 
@@ -269,6 +270,7 @@ export type SessionScopedEvent = {
 } & SessionScopedEventDraft;
 
 export type CollectionEvent = { readonly ref: SessionRef } & (
+  | { readonly type: "session.pull-requests.updated" }
   | { readonly type: "session.created" }
   // Self-owned display data changed on the server (title from the first prompt).
   | { readonly type: "session.updated"; readonly title?: string }
