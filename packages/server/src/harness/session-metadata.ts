@@ -29,7 +29,7 @@ export type SessionWithCwd = Session & { readonly cwd: string };
 
 export const toSessionWorkspace = (metadata: SessionWithCwd): SessionWorkspace => ({
   cwd: metadata.cwd,
-  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
+  ...(metadata.worktree !== undefined ? { worktree: metadata.worktree } : undefined),
 });
 
 const samePullRequestRef = (left: PullRequestRef, right: PullRequestRef): boolean =>

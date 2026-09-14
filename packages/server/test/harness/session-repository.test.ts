@@ -115,6 +115,41 @@ describe("SessionRepository", () => {
     expect(raw.data).not.toHaveProperty("pendingWorktree");
   });
 
+  it("lifts a legacy gitBranch into worktree and never writes gitBranch back", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy-wt.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "sess-legacy-wt",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+          cwd: "/tmp/pie-worktree",
+          gitBranch: "pie/abcd1234",
+        },
+      }),
+    );
+
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        const loaded = yield* repo.read("proj-a", "sess-legacy-wt");
+        yield* repo.write(loaded);
+        return loaded;
+      }),
+    );
+    expect(read.worktree).toEqual({ branch: "pie/abcd1234" });
+    expect(read).not.toHaveProperty("gitBranch");
+
+    const raw = JSON.parse(await fs.readFile(file, "utf8")) as {
+      readonly data: Record<string, unknown>;
+    };
+    expect(raw.data.worktree).toEqual({ branch: "pie/abcd1234" });
+    expect(raw.data).not.toHaveProperty("gitBranch");
+  });
+
   it("omits agentSessionId until Pi has opened, and drops the old sentinel on read", async () => {
     const neverOpened = await run(
       Effect.gen(function* () {

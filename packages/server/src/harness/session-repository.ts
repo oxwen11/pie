@@ -13,6 +13,7 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.String })),
   pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
@@ -24,14 +25,17 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, ...rest } = parsed;
+  const { agentSessionId, gitBranch, worktree, ...rest } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
       : undefined;
+  const resolvedWorktree =
+    worktree ?? (gitBranch !== undefined ? { branch: gitBranch } : undefined);
   return {
     ...rest,
     ...(opened !== undefined ? { agentSessionId: opened } : undefined),
+    ...(resolvedWorktree !== undefined ? { worktree: resolvedWorktree } : undefined),
   };
 };
 
@@ -43,7 +47,7 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
     ? { agentSessionId: metadata.agentSessionId }
     : undefined),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
-  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
+  ...(metadata.worktree !== undefined ? { worktree: metadata.worktree } : undefined),
   ...(metadata.pullRequestRefs !== undefined && metadata.pullRequestRefs.length > 0
     ? { pullRequestRefs: metadata.pullRequestRefs }
     : undefined),
