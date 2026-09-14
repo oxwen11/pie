@@ -82,8 +82,6 @@ export type SessionState = {
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
   readonly pendingPrompt: SessionPendingPrompt;
   readonly compaction: SessionRuntimeSnapshot["compaction"];
-  readonly transcriptReset: SessionRuntimeSnapshot["transcriptReset"];
-  readonly lastCompactionSeq: number;
 };
 
 const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
@@ -97,8 +95,6 @@ export const initialSessionState: SessionState = {
   pendingRequests: new Map(),
   pendingPrompt: emptyPendingPrompt,
   compaction: null,
-  transcriptReset: null,
-  lastCompactionSeq: 0,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -216,7 +212,6 @@ export const foldSessionEvent = (
       return {
         ...base,
         phase: "running",
-        transcriptReset: null,
         activeTurn: {
           turnId: event.turnId,
           messageId: null,
@@ -270,9 +265,10 @@ export const foldSessionEvent = (
       return {
         ...base,
         compaction: null,
+        // Existing clients keep their rendered transcript. Only discard the
+        // reconnect buffer before the boundary so a cold history floor cannot
+        // replay pre-compaction chunks over its trimmed projection.
         activePrompt: null,
-        transcriptReset: { seq: event.seq, messages: event.result.messages },
-        lastCompactionSeq: event.seq,
         activeTurn: current.activeTurn
           ? {
               ...current.activeTurn,
@@ -287,7 +283,6 @@ export const foldSessionEvent = (
       return {
         ...base,
         compaction: null,
-        transcriptReset: null,
         phase: "crashed",
         activeTurn: null,
         activePrompt: null,
@@ -324,7 +319,5 @@ export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntime
     : null,
   activePrompt: state.activePrompt,
   compaction: state.compaction,
-  transcriptReset: state.transcriptReset,
-  lastCompactionSeq: state.lastCompactionSeq,
   cursor: state.cursor,
 });
