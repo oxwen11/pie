@@ -415,7 +415,9 @@ describe("entriesToUIMessages", () => {
       update({ type: "text_end", contentIndex: 0, content: "done" }),
       event({ type: "agent_settled" }),
     ];
-    const chunks: PiUIMessageChunk[] = liveEvents.flatMap((liveEvent) => [...transform(liveEvent)]);
+    const chunks = liveEvents
+      .flatMap((liveEvent) => [...transform(liveEvent)])
+      .filter((item): item is PiUIMessageChunk => item.type !== "session.prompt.submitted");
     const stream = new ReadableStream<UIMessageChunk>({
       start(controller) {
         for (const chunk of chunks) controller.enqueue(chunk);

@@ -85,7 +85,13 @@ rl.on("line", (line) => {
 
   if (msg.type !== "prompt") return;
 
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({
+    id: msg.id,
+    type: "response",
+    command: "prompt",
+    success: true,
+    data: { started: true },
+  });
   send({ type: "agent_start" });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });

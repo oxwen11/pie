@@ -450,7 +450,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       prompt: (input: PromptInput) =>
         Effect.fn("PiAgentSessionService.prompt")(function* () {
-          const queued = input.delivery !== undefined;
           const userInput = yield* toUserInput(input.parts, input.delivery);
           yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
           const messageId = input.messageId ?? (yield* newSessionId);
@@ -469,19 +468,11 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
               reason,
             });
 
-          // Idle prompts publish the optimistic boundary first, then return the
-          // runtime's real admission receipt. A failure emits the compensating
-          // rejection for every subscriber and still fails the initiating RPC.
-          if (!queued) {
-            yield* submitted();
-            return yield* deliverPrompt(input.ref, userInput).pipe(
-              Effect.tapError((error) =>
-                reject(error instanceof Error ? error.message : String(error)),
-              ),
-            );
-          }
-
-          const receipt = yield* deliverPrompt(input.ref, userInput);
+          const receipt = yield* deliverPrompt(input.ref, userInput).pipe(
+            Effect.tapError((error) =>
+              reject(error instanceof Error ? error.message : String(error)),
+            ),
+          );
           if (receipt.started) yield* submitted();
           return receipt;
         })().pipe(inSession(input.ref)),

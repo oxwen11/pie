@@ -239,10 +239,14 @@ export const makePiAgentRuntime = (
           const lastChunkWasFinish = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
           const pump = Stream.runForEach(prompt.output, (chunk) =>
-            Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
-              Effect.andThen(chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void),
-              Effect.andThen(emit(chunk)),
-            ),
+            chunk.type === "session.prompt.submitted"
+              ? emit(chunk)
+              : Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
+                  Effect.andThen(
+                    chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void,
+                  ),
+                  Effect.andThen(emit(chunk)),
+                ),
           ).pipe(
             Effect.flatMap(() => Ref.get(lastChunkWasFinish)),
             Effect.flatMap((didFinish) => {

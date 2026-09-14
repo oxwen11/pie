@@ -42,6 +42,7 @@ export class FakeTransport implements ChatSessionTransport {
     delivery?: "steer" | "followUp";
   }> = [];
   promptError: Error | null = null;
+  promptStarted = true;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
   // (a dropped socket queues it until the link reconnects).
   promptGate: Promise<void> | null = null;
@@ -65,7 +66,7 @@ export class FakeTransport implements ChatSessionTransport {
     this.promptCalls.push(input);
     if (this.promptGate) await this.promptGate;
     if (this.promptError) throw this.promptError;
-    return { turnId: "turn-receipt", started: true };
+    return { turnId: "turn-receipt", started: this.promptStarted };
   };
   getMessages = async () => {
     this.getMessagesCalls += 1;

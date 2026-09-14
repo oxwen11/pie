@@ -49,8 +49,12 @@ rl.on("line", (line) => {
   if (msg.type === "set_model") {
     const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);
     if (!next) { send({ id: msg.id, type: "response", command: "set_model", success: false, error: "unknown model" }); return; }
-    currentModel = { provider: next.provider, modelId: next.id, name: next.name };
-    send({ id: msg.id, type: "response", command: "set_model", success: true, data: next });
+    const apply = () => {
+      currentModel = { provider: next.provider, modelId: next.id, name: next.name };
+      send({ id: msg.id, type: "response", command: "set_model", success: true, data: next });
+    };
+    if (next.id === "m2") setTimeout(apply, 50);
+    else apply();
     return;
   }
   if (msg.type === "extension_ui_response") {
@@ -65,15 +69,6 @@ rl.on("line", (line) => {
   if (msg.type === "steer") {
     steering.push(msg.message);
     send({ id: msg.id, type: "response", command: "steer", success: true });
-    if (holding && msg.message === "split") {
-      send({ type: "message_start", message: { role: "user", content: [{ type: "text", text: msg.message }], timestamp: 0 } });
-      send({ type: "message_start", message: assistant() });
-      upd({ type: "text_start", contentIndex: 0 });
-      upd({ type: "text_delta", contentIndex: 0, delta: "after split" });
-      upd({ type: "text_end", contentIndex: 0, content: "after split" });
-      send({ type: "queue_update", steering, followUp });
-      return;
-    }
     send({ type: "queue_update", steering, followUp });
     if (holding) { holding = false; settle(); }
     return;
@@ -103,8 +98,28 @@ rl.on("line", (line) => {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
     return;
   }
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
-  if (holding) { holding = false; settle(); return; }
+  const started = !holding;
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started } });
+  if (!started) {
+    const queue = msg.streamingBehavior === "followUp" ? followUp : steering;
+    queue.push(text);
+    send({ type: "queue_update", steering, followUp });
+    if (msg.streamingBehavior === "followUp") return;
+
+    queue.splice(queue.indexOf(text), 1);
+    send({ type: "queue_update", steering, followUp });
+    send({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } });
+    if (text === "split") {
+      send({ type: "message_start", message: assistant() });
+      upd({ type: "text_start", contentIndex: 0 });
+      upd({ type: "text_delta", contentIndex: 0, delta: "after split" });
+      upd({ type: "text_end", contentIndex: 0, content: "after split" });
+      return;
+    }
+    holding = false;
+    settle();
+    return;
+  }
   send({ type: "agent_start" });
   if (text === "hold") {
     holding = true;
@@ -132,7 +147,7 @@ rl.on("line", (line) => {
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });
-  upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
+  upd({ type: "text_delta", contentIndex: 0, delta: text === "which model" ? currentModel.modelId : "pong" });
   upd({ type: "text_end", contentIndex: 0, content: "pong" });
   send({ type: "message_end", message: assistant() });
   settle();
@@ -284,12 +299,19 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const first = yield* agent.session.prompt({ sessionId, text: "hold" });
       assert.equal(first.started, true);
 
-      const second = yield* agent.session.prompt({ sessionId, text: "also do this" });
+      const second = yield* agent.session.prompt({
+        sessionId,
+        text: "also do this",
+        delivery: "steer",
+      });
       assert.equal(second.started, false);
       assert.equal(second.turnId, first.turnId);
 
       const chunks = yield* Stream.runCollect(first.output);
-      assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+      assert.deepEqual(
+        Array.from(chunks, (chunk) => chunk.type),
+        ["start", "text-start", "text-delta", "text-end", "finish", "session.prompt.submitted"],
+      );
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -353,9 +375,14 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         delivery: "steer",
       });
 
-      const types = Array.from(yield* Fiber.join(collected), (event) => event.body.type);
+      const bodies = Array.from(yield* Fiber.join(collected), (event) => event.body);
+      const types = bodies.map((body) => body.type);
       assert.equal(types.filter((type) => type === "finish").length, 2);
       assert.equal(types.filter((type) => type === "session.turn.ended").length, 1);
+      assert.deepEqual(
+        bodies.filter((body) => body.type === "session.prompt.submitted").map((body) => body.parts),
+        [[{ type: "text", text: "split" }], [{ type: "text", text: "replace this" }]],
+      );
       yield* session.close;
     }),
   );
@@ -519,6 +546,30 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const after = yield* agent.session.getModelState(sessionId);
       assert.deepEqual(after, { provider: "p", modelId: "m2", name: "Model 2" });
 
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("orders a prompt after an in-flight model switch", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+
+      const switching = yield* agent.session
+        .setModel(sessionId, { provider: "p", modelId: "m2" })
+        .pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      const prompting = yield* agent.session
+        .prompt({ sessionId, text: "which model" })
+        .pipe(Effect.forkChild);
+      yield* Fiber.join(switching);
+      const prompt = yield* Fiber.join(prompting);
+      const chunks = Array.from(yield* Stream.runCollect(prompt.output));
+
+      assert.ok(
+        chunks.some((chunk) => chunk.type === "text-delta" && chunk.delta === "m2"),
+        "the prompt ran before the requested model switch completed",
+      );
       yield* agent.session.abort(sessionId);
     }),
   );
