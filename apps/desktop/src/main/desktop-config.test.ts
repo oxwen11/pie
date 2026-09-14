@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyPackagedPiRuntime, buildDesktopConfig } from "./desktop-config";
+import { applyDesktopRuntime, buildDesktopConfig } from "./desktop-config";
 
 describe("buildDesktopConfig", () => {
   it("resolves the packaged server entry under resourcesPath", () => {
@@ -10,9 +10,7 @@ describe("buildDesktopConfig", () => {
       devUrl: undefined,
     });
 
-    expect(config.serverEntry).toBe(
-      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
-    );
+    expect(config.serverEntry).toBe("/Applications/Pie.app/Contents/Resources/server/server.mjs");
     expect(config.resourcesPath).toBe("/Applications/Pie.app/Contents/Resources");
   });
 
@@ -28,31 +26,34 @@ describe("buildDesktopConfig", () => {
   });
 });
 
-describe("applyPackagedPiRuntime", () => {
+describe("applyDesktopRuntime", () => {
   const bundled = {
     isPackaged: true,
     bundledBun: "/Resources/vendor/bun",
     bundledPiProcess: "/Resources/pi-process/pi-process.js",
   } as const;
 
-  it("leaves unpackaged env unchanged", () => {
+  it("runs the unpackaged Desktop daemon with PATH bun", () => {
     const env = { PATH: "/usr/bin" };
-    expect(applyPackagedPiRuntime(env, { ...bundled, isPackaged: false })).toEqual(env);
+    expect(applyDesktopRuntime(env, { ...bundled, isPackaged: false })).toEqual({
+      PATH: "/usr/bin",
+      PIE_DAEMON_RUNTIME: "bun",
+    });
   });
 
   it("points packaged desktop at the shipped bun and pie-pi-process", () => {
-    expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
+    expect(applyDesktopRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
       PATH: "/usr/bin",
       PIE_BUN: "/Resources/vendor/bun",
+      PIE_DAEMON_RUNTIME: "bun",
       PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 
   it("keeps a launch-time PIE_BUN override", () => {
-    expect(
-      applyPackagedPiRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled),
-    ).toEqual({
+    expect(applyDesktopRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled)).toEqual({
       PIE_BUN: "/custom/bun",
+      PIE_DAEMON_RUNTIME: "bun",
       PIE_HOME: "/tmp/pie",
       PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
@@ -61,11 +62,11 @@ describe("applyPackagedPiRuntime", () => {
   it("does not invent PIE_BUN when the binary is missing", () => {
     const env = { PATH: "/usr/bin" };
     expect(
-      applyPackagedPiRuntime(env, {
+      applyDesktopRuntime(env, {
         isPackaged: true,
         bundledBun: undefined,
         bundledPiProcess: undefined,
       }),
-    ).toEqual(env);
+    ).toEqual({ PATH: "/usr/bin", PIE_DAEMON_RUNTIME: "bun" });
   });
 });

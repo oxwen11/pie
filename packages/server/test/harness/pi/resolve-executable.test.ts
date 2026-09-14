@@ -24,7 +24,7 @@ describe("resolvePiExecutable", () => {
   it("spawns bun plus the pie-owned RPC entry", () => {
     expect(resolvePiExecutable({}, { resolveBundledCli: () => rpc })).toEqual({
       command: "bun",
-      prefixArgs: [rpc],
+      prefixArgs: ["--no-install", rpc],
     });
   });
 
@@ -33,7 +33,7 @@ describe("resolvePiExecutable", () => {
       resolvePiExecutable({ PIE_BUN: process.execPath }, { resolveBundledCli: () => rpc }),
     ).toEqual({
       command: process.execPath,
-      prefixArgs: [rpc],
+      prefixArgs: ["--no-install", rpc],
     });
   });
 
@@ -42,7 +42,7 @@ describe("resolvePiExecutable", () => {
       resolvePiExecutable({ PIE_BUN: "/does/not/exist/bun" }, { resolveBundledCli: () => rpc }),
     ).toEqual({
       command: "bun",
-      prefixArgs: [rpc],
+      prefixArgs: ["--no-install", rpc],
     });
   });
 
@@ -52,13 +52,13 @@ describe("resolvePiExecutable", () => {
         { PIE_PI_EXECUTABLE: "/opt/custom/cli.js" },
         { resolveBundledCli: () => rpc },
       ),
-    ).toEqual({ command: "bun", prefixArgs: ["/opt/custom/cli.js"] });
+    ).toEqual({ command: "bun", prefixArgs: ["--no-install", "/opt/custom/cli.js"] });
   });
 
   it("does not run a shebang PIE_PI_EXECUTABLE under bun", () => {
     expect(
       resolvePiExecutable({ PIE_PI_EXECUTABLE: "/usr/bin/pi" }, { resolveBundledCli: () => rpc }),
-    ).toEqual({ command: "bun", prefixArgs: [rpc] });
+    ).toEqual({ command: "bun", prefixArgs: ["--no-install", rpc] });
   });
 
   it("returns bun with no script when pie-pi-process cannot be resolved", () => {
@@ -73,6 +73,7 @@ describe("resolvePiExecutable", () => {
     expect(resolvePiExecutable({}, { resolveBundledCli: () => asarEntry })).toEqual({
       command: "bun",
       prefixArgs: [
+        "--no-install",
         "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-process/pi-process.js",
       ],
     });
@@ -81,7 +82,7 @@ describe("resolvePiExecutable", () => {
 
 describe("piAvailabilityTarget", () => {
   it("checks the script path when Pi is run under bun", () => {
-    expect(piAvailabilityTarget({ command: "bun", prefixArgs: [rpc] })).toBe(rpc);
+    expect(piAvailabilityTarget({ command: "bun", prefixArgs: ["--no-install", rpc] })).toBe(rpc);
   });
 
   it("checks the command name for PATH lookup", () => {
@@ -93,7 +94,7 @@ describe("checkPiAvailability", () => {
   it("reports bun missing when bun is not on PATH", () => {
     const result = Effect.runSync(
       checkPiAvailability(
-        { command: "bun", prefixArgs: [rpc] },
+        { command: "bun", prefixArgs: ["--no-install", rpc] },
         { env: { PATH: "/usr/local/bin" }, platform: "linux" },
       ).pipe(Effect.provide(fakeStats({ [rpc]: fileInfo("File", 0o644) }))),
     );
@@ -119,7 +120,7 @@ describe("checkPiAvailability", () => {
   it("reports bun available when bun and pie-pi-process both exist", () => {
     const result = Effect.runSync(
       checkPiAvailability(
-        { command: "bun", prefixArgs: [rpc] },
+        { command: "bun", prefixArgs: ["--no-install", rpc] },
         { env: { PATH: "/usr/local/bin" }, platform: "linux" },
       ).pipe(
         Effect.provide(
