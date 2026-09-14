@@ -3,17 +3,25 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { DESKTOP } from "../identity.ts";
-import { driveHintLines } from "../lifecycle/env.ts";
+import { browserEnvForRun, driveHintLines, writeBrowserEnvFile } from "../lifecycle/env.ts";
 import { expectMeta, patchRunMeta, type DesktopRunMeta, type RunMeta } from "../meta.ts";
-import { agentBrowser, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
+import { agentBrowser, applyBrowserEnv, saveScreenshot, saveSnapshot } from "../runtime/browser.ts";
 import { daemonPidPath, readDaemonRecord, stopRecordedDaemon } from "../runtime/daemon.ts";
 import { copySideEffects } from "../runtime/evidence.ts";
 import { fail, VerifyError } from "../runtime/fail.ts";
 import { removePath, writeText } from "../runtime/fs.ts";
-import { cdpOk, fetchText, healthOk, ticketStatus, urlPort } from "../runtime/http.ts";
+import {
+  cdpOk,
+  fetchText,
+  healthOk,
+  loopbackOrigins,
+  ticketStatus,
+  urlPort,
+} from "../runtime/http.ts";
 import {
   killTree,
   pidAlive,
+  portOwnedByAncestor,
   readPidFile,
   spawnLogged,
   waitDead,
@@ -111,7 +119,27 @@ async function startElectron(ctx: LaunchCtx, controller: AbortController): Promi
     40,
     controller.signal,
   );
-  await waitUntil(`CDP on ${desktop.cdpPort}`, () => cdpOk(desktop.cdpPort), 40, controller.signal);
+  let page: DesktopPage | undefined;
+  await waitUntil(
+    `Pie renderer on CDP ${desktop.cdpPort}`,
+    async () => {
+      if (!(await cdpOk(desktop.cdpPort))) return false;
+      page = await ownedDesktopPage(desktop.cdpPort, child.pid);
+      return page !== undefined;
+    },
+    40,
+    controller.signal,
+  );
+  if (page === undefined) throw new Error("missing Pie renderer");
+  writeBrowserEnvFile(DESKTOP, desktop.runDir);
+  applyBrowserEnv(browserEnvForRun(DESKTOP, desktop.runDir), process.env);
+  // Only a fresh run may adopt a target. All later commands retain the native sticky pin.
+  agentBrowser(["--no-pin-tab", "tab", page.id], {
+    session: sessionName(),
+    cdpPort: desktop.cdpPort,
+  });
+  inspectBrowser(desktop.cdpPort, page);
+  controller.signal.throwIfAborted();
   const bound = urlPort(record.address);
   patchRunMeta(path.join(desktop.runDir, "meta.json"), "desktop", {
     address: record.address,
@@ -164,11 +192,13 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   }
   let title = "";
   let url = "";
+  let targetId = "";
   const session = sessionName();
   try {
-    agentBrowser(["connect", String(desktop.cdpPort)], { session });
-    title = agentBrowser(["get", "title"], { session }).trim();
-    url = agentBrowser(["get", "url"], { session }).trim();
+    const page = await ownedDesktopPage(desktop.cdpPort, evPid);
+    if (page === undefined) throw new Error("missing Pie renderer; launch a fresh run");
+    applyBrowserEnv(browserEnvForRun(DESKTOP, runDir), process.env);
+    ({ title, url, targetId } = inspectBrowser(desktop.cdpPort, page));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     fail(
@@ -180,6 +210,7 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
     lines: [
       `  api     ${record.address}/api/health`,
       `  cdp     ${desktop.cdpPort} (doctor already attached session ${session})`,
+      `  target  ${targetId} (pinned)`,
       `  title   ${title || "(empty)"}`,
       `  url     ${url || "(empty)"}`,
       `  home    ${desktop.pieHome}`,
@@ -189,6 +220,83 @@ async function inspectDesktop(runDir: string, meta: RunMeta): Promise<ProbeOk> {
       ...driveHintLines(DESKTOP),
     ],
   };
+}
+
+type DesktopPage = { id: string; url: string };
+
+async function ownedDesktopPage(
+  cdpPort: number,
+  evPid: number | undefined,
+): Promise<DesktopPage | undefined> {
+  if (evPid === undefined || !portOwnedByAncestor(cdpPort, evPid)) {
+    throw new Error(`CDP ${cdpPort} is not owned by this Desktop run`);
+  }
+  const response = await fetchText(`http://127.0.0.1:${cdpPort}/json/list`);
+  const targets: unknown = JSON.parse(response?.body ?? "null");
+  if (response?.status !== 200 || !Array.isArray(targets))
+    throw new Error("invalid CDP target list");
+  const pages = targets.filter(
+    (target: unknown): target is DesktopPage =>
+      typeof target === "object" &&
+      target !== null &&
+      "type" in target &&
+      target.type === "page" &&
+      "id" in target &&
+      typeof target.id === "string" &&
+      target.id !== "" &&
+      "url" in target &&
+      typeof target.url === "string" &&
+      !target.url.startsWith("devtools://"),
+  );
+  if (pages.length > 1) throw new Error("ambiguous Desktop renderer: expected one page");
+  const page = pages[0];
+  if (page === undefined || page.url === "about:blank") return undefined;
+  const port = urlPort(page.url);
+  if (
+    !loopbackOrigins(port).includes(new URL(page.url).origin) ||
+    !portOwnedByAncestor(port, evPid)
+  ) {
+    throw new Error("renderer origin is not owned by this Desktop run");
+  }
+  return page;
+}
+
+function inspectBrowser(cdpPort: number, page: DesktopPage) {
+  const target = { session: sessionName(), cdpPort };
+  const endpoint = new URL(agentBrowser(["get", "cdp-url"], target).trim());
+  if (!loopbackOrigins(cdpPort).includes(endpoint.origin.replace(/^ws:/, "http:"))) {
+    throw new Error(`agent-browser is attached to a different CDP endpoint (expected ${cdpPort})`);
+  }
+  const result: unknown = JSON.parse(agentBrowser(["--json", "tab"], target));
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("data" in result) ||
+    typeof result.data !== "object" ||
+    result.data === null ||
+    !("tabs" in result.data) ||
+    !Array.isArray(result.data.tabs)
+  )
+    throw new Error("invalid agent-browser tab list");
+  const active = result.data.tabs.filter(
+    (tab: unknown): tab is Record<"active", unknown> =>
+      typeof tab === "object" && tab !== null && "active" in tab && tab.active === true,
+  );
+  const bound = active[0];
+  if (
+    active.length !== 1 ||
+    bound === undefined ||
+    !("targetId" in bound) ||
+    bound.targetId !== page.id
+  ) {
+    throw new Error("agent-browser is not pinned to this Desktop renderer; launch a fresh run");
+  }
+  const title = agentBrowser(["get", "title"], target).trim();
+  const url = agentBrowser(["get", "url"], target).trim();
+  if (new URL(url).origin !== new URL(page.url).origin) {
+    throw new Error("agent-browser renderer origin does not match this Desktop run");
+  }
+  return { title, url, targetId: page.id };
 }
 
 async function stopDesktop(runDir: string, meta: RunMeta | undefined): Promise<void> {
