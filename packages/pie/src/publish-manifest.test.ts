@@ -1,14 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import url from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 const packageJson = JSON.parse(
-  fs.readFileSync(
-    path.join(path.dirname(url.fileURLToPath(import.meta.url)), "../package.json"),
-    "utf8",
-  ),
+  fs.readFileSync(path.join(import.meta.dirname, "../package.json"), "utf8"),
 ) as { dependencies?: Record<string, string> };
 
 describe("published CLI manifest", () => {
@@ -23,7 +19,7 @@ describe("published CLI manifest", () => {
     expect(packageJson.dependencies ?? {}).not.toHaveProperty("@effect/platform-node");
   });
 
-  it("publishes no runtime npm dependencies (Pi comes from PATH)", () => {
-    expect(Object.keys(packageJson.dependencies ?? {})).toEqual([]);
+  it("publishes only native addons as runtime dependencies", () => {
+    expect(Object.keys(packageJson.dependencies ?? {})).toEqual(["node-pty"]);
   });
 });

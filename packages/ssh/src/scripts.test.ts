@@ -182,8 +182,12 @@ nvm() { :; }
       await writeExecutable(first, nodeShim("v24.0.0"));
       await writeExecutable(last, nodeShim("v24.18.0"));
       await writeExecutable(path.join(home, ".local", "bin", "pie"), "#!/bin/sh\necho pie-ok\n");
+      // PATH must not already contain Node 24, or ensure_remote_node_path
+      // returns before the fnm glob (CI images ship /usr/bin/node v24.x).
+      const other = path.join(home, "opt", "other", "bin");
+      await writeExecutable(path.join(other, "node"), nodeShim("v25.2.1"));
 
-      const result = await runEnsure(home, "/usr/bin:/bin");
+      const result = await runEnsure(home, `${other}:/bin`);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("v24.0.0");
       expect(result.stdout).not.toContain("v24.18.0");

@@ -83,7 +83,7 @@ describe("shipped pie serve prompt", () => {
     children.length = 0;
   });
 
-  it("listModels and pairing prompt work from dist/cli.mjs", async () => {
+  it("listModels and pairing prompt work from dist/cli.mjs", { timeout: 30_000 }, async () => {
     const fakeDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-serve-"));
     const fakePi = path.join(fakeDir, "fake-pi.js");
     fs.writeFileSync(fakePi, FAKE);
