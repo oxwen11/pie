@@ -30,6 +30,8 @@ extraResources:
     to: server/server.mjs
   - from: ../../packages/server/dist/pi-process
     to: pi-process
+  - from: ../../packages/server/dist/resources
+    to: resources
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns

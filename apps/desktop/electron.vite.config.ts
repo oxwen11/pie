@@ -65,7 +65,7 @@ export default defineConfig({
       // module is bundled too so the define above replaces its environment read
       // with this artifact's static key rather than consulting runtime env.
       externalizeDeps: {
-        exclude: ["@getpie/core", "@getpie/server"],
+        exclude: ["@getpie/contract", "@getpie/core", "@getpie/server"],
       },
     },
   },

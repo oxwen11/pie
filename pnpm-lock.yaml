@@ -515,6 +515,9 @@ importers:
       '@getpie/app':
         specifier: workspace:*
         version: link:../app
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
       '@getpie/core':
         specifier: workspace:*
         version: link:../../packages/core
