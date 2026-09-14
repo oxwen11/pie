@@ -174,13 +174,16 @@ function toLaunchCtx(
   },
 ): LaunchCtx {
   switch (identity.id) {
-    case "web":
+    case "web": {
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "web",
         vitePort: identity.vitePort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
+        env: { ...base.env, PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot },
       };
+    }
     case "cli": {
       return {
         ...base,
@@ -189,13 +192,15 @@ function toLaunchCtx(
     }
     case "desktop": {
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "desktop",
         cdpPort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
         env: {
           ...base.env,
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };
@@ -208,9 +213,12 @@ function toLaunchCtx(
   }
 }
 
-function scaffold(identity: Extract<SurfaceIdentity, { sample: unknown }>): SampleProject {
+function scaffold(
+  identity: Extract<SurfaceIdentity, { sample: unknown }>,
+  projectBrowseRoot: string,
+): SampleProject {
   return ensureSampleProject({
-    home: process.env.HOME ?? "",
+    home: projectBrowseRoot,
     name: identity.sample.name,
     marker: identity.sample.marker,
     readme: identity.sample.readme,

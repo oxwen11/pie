@@ -38,11 +38,6 @@ export async function cleanup(surface: Surface, args: string[]): Promise<void> {
     case "web":
     case "desktop": {
       removeScaffold(sampleProjectOf(meta), identity.sample.marker, identity.logPrefix);
-      removeScaffold(
-        path.join(process.env.HOME ?? "", identity.sample.name),
-        identity.sample.marker,
-        identity.logPrefix,
-      );
       const socketDir = agentBrowserIsolation(runDir).socketDir;
       if (isManagedAgentBrowserSocketDir(socketDir)) {
         removePath(socketDir);
