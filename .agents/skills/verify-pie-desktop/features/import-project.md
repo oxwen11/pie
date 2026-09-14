@@ -11,7 +11,7 @@ pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor
 ```
 
-Empty isolated home: heading **Import your first project**, button **Import project**. Launch creates `$HOME/verify-pie-desktop-sample`.
+Empty isolated home: heading **Import your first project**, button **Import project**. Launch creates `$PIE_HOME/workspace/verify-pie-desktop-sample`; the picker is confined to `$PIE_HOME/workspace`.
 
 ## Driving it
 
