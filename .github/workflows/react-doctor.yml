@@ -61,15 +61,16 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
         shell: bash
 
-      - uses: millionco/react-doctor@01820bb4fd4d0a4aebcd8df2b2a143a098649cb2 # v2.2.8
-        # The repo is error-clean as of the react-doctor integration, so the gate
-        # is armed: any new error-severity finding fails the check. Warnings stay
-        # advisory — there are ~115 of them left to work through, and blocking on
-        # them today would red-X every PR.
+      - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2.2.9
+        # doctor.config.json enables every 0.9.14 rule at error (three stack
+        # mismatches off). Warning-severity findings fail the check too.
         # Full reference: https://www.react.doctor/ci
         with:
           node-version: ${{ steps.project-node.outputs.version }}
-          blocking: error
+          # Pin the scanner to the same CLI we ship in apps/app. `latest`
+          # would silently pick up new opt-in defaults and fail PRs.
+          version: 0.9.14
+          blocking: warning
           scope: full
           # Everything except @getpie/ui. Its base components are vendored
           # wholesale from the coss registry via `shadcn add @coss/ui --overwrite`
@@ -78,7 +79,7 @@ jobs:
           # upstream. Scan it deliberately with `cd packages/ui && react-doctor`,
           # which picks up packages/ui/doctor.config.json.
           # Note this is an allowlist: a new React workspace must be added here to
-          # be covered. It lives in the workflow rather than a root
-          # doctor.config.json because config is inherited by subdirectories, and
-          # a root `projects` field makes the per-project `pnpm doctor` run fail.
+          # be covered. The project list stays in the workflow, not in root
+          # doctor.config.json: a root `projects` field makes the per-project
+          # `pnpm doctor` run fail. Root config is for shared rule severity only.
           project: "@getpie/app,@getpie/desktop"

@@ -22,6 +22,7 @@ interface ToolBucketMap {
 }
 
 const TOOL_BUCKETS: ToolBucketMap = {
+  "tool-read": "files",
   "tool-Read": "files",
   "tool-WebFetch": "files",
   "tool-Glob": "lists",
@@ -62,6 +63,10 @@ function toolInputRecord(input: unknown): Record<string, unknown> | undefined {
 export function filePathOf(part: ToolUIPart): string | undefined {
   const input = toolInputRecord(part.input);
   switch (part.type) {
+    case "tool-read": {
+      const path = input?.path;
+      return typeof path === "string" ? path : undefined;
+    }
     case "tool-Read":
     case "tool-Edit":
     case "tool-Write": {

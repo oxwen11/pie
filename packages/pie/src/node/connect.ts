@@ -25,7 +25,7 @@ const emptyToUndefined = (value: string | undefined): string | undefined =>
 export const normalizeAddress = (raw: string): string => new URL(raw).origin;
 
 export const urlFlag = () =>
-  Flag.string("url").pipe(
+  Flag.String("url").pipe(
     Flag.withDescription(
       "Pie server URL (also PIE_URL). Connects only — never starts a daemon. Token from PIE_AUTH_TOKEN, or the local daemon record when the URL matches.",
     ),

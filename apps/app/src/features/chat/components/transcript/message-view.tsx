@@ -67,8 +67,8 @@ function SummaryTrigger({ label }: { label: string }) {
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
           <span className="relative">
-            <ListTreeIcon className="size-4 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
-            <div className="absolute inset-0 size-4 opacity-0 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+            <ListTreeIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
+            <div className="absolute inset-0 size-4 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
             </div>

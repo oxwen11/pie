@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveTheme, startThemeSync } from "./theme";
+import { startThemeSync } from "./theme";
 
 class StubMediaQueryList extends EventTarget implements MediaQueryList {
   readonly media = "(prefers-color-scheme: dark)";
@@ -36,13 +36,6 @@ afterEach(() => {
 });
 
 describe("theme", () => {
-  it("resolves explicit and system preferences", () => {
-    expect(resolveTheme("dark", false)).toBe("dark");
-    expect(resolveTheme("light", true)).toBe("light");
-    expect(resolveTheme("system", true)).toBe("dark");
-    expect(resolveTheme("system", false)).toBe("light");
-  });
-
   it("follows system theme changes until synchronization stops", () => {
     const systemTheme = stubSystemTheme(false);
     const stop = startThemeSync("system");

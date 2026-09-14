@@ -28,8 +28,9 @@ export function evidenceNeedsBrowser(id: Surface["identity"]["id"], command: str
     case "cli":
       return false;
     case "web":
-    case "desktop":
       return BROWSER_EVIDENCE_COMMANDS.has(command);
+    case "desktop":
+      return command === "curl" || BROWSER_EVIDENCE_COMMANDS.has(command);
     default: {
       const exhaustive: never = id;
       void exhaustive;

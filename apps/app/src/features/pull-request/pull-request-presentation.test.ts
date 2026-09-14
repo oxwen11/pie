@@ -2,11 +2,8 @@ import type { PullRequestListItem, PullRequestSnapshot } from "@getpie/contract/
 import { describe, expect, it } from "vitest";
 
 import {
-  actionConfirmationTitle,
-  checksSummaryLabel,
   countDiffFiles,
   filterPullRequestItems,
-  mergeMethodActionLabel,
   pullRequestActionInput,
   pullRequestSessionState,
   selectedPullRequest,
@@ -92,15 +89,6 @@ describe("pull request presentation", () => {
       expected: { pullRequest: snapshot.ref, headSha: "head-a" },
       action: { type: "merge", method: "squash" },
     });
-  });
-
-  it("labels checks, merge methods, and confirmation titles", () => {
-    expect(checksSummaryLabel("passing")).toBe("Checks passing");
-    expect(mergeMethodActionLabel("squash")).toBe("Squash and merge");
-    expect(actionConfirmationTitle({ type: "disable-auto-merge" })).toBe("Disable auto-merge");
-    expect(actionConfirmationTitle({ type: "enable-auto-merge", method: "rebase" })).toBe(
-      "Enable auto-merge · Rebase",
-    );
   });
 
   it("counts files in a git patch", () => {

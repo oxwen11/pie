@@ -2,6 +2,7 @@ import childProcess from "node:child_process";
 import type { ChildProcess, SpawnOptions } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import timers from "node:timers/promises";
 
 export type CommandResult = {
   status: number;
@@ -181,23 +182,25 @@ export async function waitDead(pid: number | undefined, attempts = 20): Promise<
   }
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return timers.setTimeout(ms, undefined, { signal });
 }
 
 export async function waitUntil(
   name: string,
   check: () => boolean | Promise<boolean>,
   seconds: number,
+  signal?: AbortSignal,
 ): Promise<void> {
   const deadline = Date.now() + seconds * 1000;
   while (Date.now() < deadline) {
-    if (await check()) {
+    signal?.throwIfAborted();
+    const ready = await check();
+    signal?.throwIfAborted();
+    if (ready) {
       return;
     }
-    await sleep(1000);
+    await sleep(1000, signal);
   }
   throw new Error(`timed out waiting for ${name}`);
 }
