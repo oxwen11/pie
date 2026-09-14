@@ -25,8 +25,6 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
-  const reduceMotion = useReducedMotion() === true;
-  const chromeTransition = reduceMotion ? { duration: 0 } : undefined;
   const showHeader = !hideHeader || isMobile || webCollapsedChrome;
 
   return (
@@ -39,49 +37,16 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
       )}
     >
       {showHeader ? (
-        <header
-          className={cn(
-            SHELL_TITLEBAR_HEADER_CLASS,
-            "[-webkit-app-region:drag]",
-            !hideHeader && "shadow-[inset_0_-1px_0_var(--color-border)]",
-            desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
-          )}
-        >
-          <div className="flex min-w-0 flex-1 items-center">
-            {isMobile ? (
-              <SidebarTrigger className="-ms-0.5 me-2 [-webkit-app-region:no-drag]" />
-            ) : webCollapsedChrome ? (
-              <div className="me-2 flex items-center">
-                <BrandMark className="shrink-0" />
-                <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
-              </div>
-            ) : null}
-            {!hideHeader ? (
-              <m.div
-                className={SHELL_TITLEBAR_LABEL_CLASS}
-                layout={reduceMotion ? false : "position"}
-                transition={chromeTransition}
-              >
-                {heading !== undefined ? (
-                  <span className="min-w-0 truncate font-medium" title={heading}>
-                    {heading}
-                  </span>
-                ) : null}
-                {supportingText !== undefined && (
-                  <span
-                    className="text-muted-foreground max-w-[50%] min-w-0 truncate"
-                    title={supportingText}
-                  >
-                    {supportingText}
-                  </span>
-                )}
-              </m.div>
-            ) : null}
-          </div>
-          {hasContentPanelToggle ? (
-            <div aria-hidden="true" className="ms-auto size-7 shrink-0" />
-          ) : null}
-        </header>
+        <CardPanelHeader
+          collapsedDesktop={collapsedDesktop}
+          desktop={desktop}
+          hasContentPanelToggle={hasContentPanelToggle}
+          heading={heading}
+          hideHeader={hideHeader}
+          isMobile={isMobile}
+          supportingText={supportingText}
+          webCollapsedChrome={webCollapsedChrome}
+        />
       ) : null}
       {/*
        * Always the Outlet, never a router-state-driven swap: `isLoading` flips
@@ -95,5 +60,74 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
         <Outlet />
       </div>
     </SidebarInset>
+  );
+}
+
+function CardPanelHeader({
+  collapsedDesktop,
+  desktop,
+  hasContentPanelToggle,
+  heading,
+  hideHeader,
+  isMobile,
+  supportingText,
+  webCollapsedChrome,
+}: {
+  collapsedDesktop: boolean;
+  desktop: boolean;
+  hasContentPanelToggle: boolean;
+  heading: string | undefined;
+  hideHeader: boolean;
+  isMobile: boolean;
+  supportingText: string | undefined;
+  webCollapsedChrome: boolean;
+}) {
+  const reduceMotion = useReducedMotion() === true;
+  const chromeTransition = reduceMotion ? { duration: 0 } : undefined;
+
+  return (
+    <header
+      className={cn(
+        SHELL_TITLEBAR_HEADER_CLASS,
+        "[-webkit-app-region:drag]",
+        !hideHeader && "shadow-[inset_0_-1px_0_var(--color-border)]",
+        desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
+      )}
+    >
+      <div className="flex min-w-0 flex-1 items-center">
+        {isMobile ? (
+          <SidebarTrigger className="-ms-0.5 me-2 [-webkit-app-region:no-drag]" />
+        ) : webCollapsedChrome ? (
+          <div className="me-2 flex items-center">
+            <BrandMark className="shrink-0" />
+            <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
+          </div>
+        ) : null}
+        {!hideHeader ? (
+          <m.div
+            className={SHELL_TITLEBAR_LABEL_CLASS}
+            layout={reduceMotion ? false : "position"}
+            transition={chromeTransition}
+          >
+            {heading !== undefined ? (
+              <span className="min-w-0 truncate font-medium" title={heading}>
+                {heading}
+              </span>
+            ) : null}
+            {supportingText !== undefined && (
+              <span
+                className="text-muted-foreground max-w-[50%] min-w-0 truncate"
+                title={supportingText}
+              >
+                {supportingText}
+              </span>
+            )}
+          </m.div>
+        ) : null}
+      </div>
+      {hasContentPanelToggle ? (
+        <div aria-hidden="true" className="ms-auto size-7 shrink-0" />
+      ) : null}
+    </header>
   );
 }

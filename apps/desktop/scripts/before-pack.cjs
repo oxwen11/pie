@@ -4,11 +4,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-/** Pin the current latest Bun. Bump when shipping a newer runtime. */
 const BUN_VERSION = "bun-v1.4.2";
 
-const DESKTOP_DIR = path.join(__dirname, "..");
-const VENDOR_BUN = path.join(DESKTOP_DIR, "vendor", "bun");
+const VENDOR_DIR = path.join(__dirname, "..", "vendor");
 
 function bunDownloadName(platform, arch) {
   if (platform === "darwin" && arch === "arm64") return "bun-darwin-aarch64";
@@ -20,68 +18,43 @@ function bunDownloadName(platform, arch) {
   throw new Error(`Unsupported Bun target: ${platform}-${arch}`);
 }
 
-function bunBinaryName(platform) {
-  return platform === "win32" ? "bun.exe" : "bun";
-}
-
-function download(url, dest) {
-  execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", "-o", dest, url], {
-    stdio: "pipe",
+const curl = (...args) =>
+  execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
+    encoding: "utf8",
   });
-}
 
-function sha256(filePath) {
-  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
-}
-
-function downloadBun(platform, arch, destDir) {
+function downloadBun(platform, arch) {
   const name = bunDownloadName(platform, arch);
-  const binary = bunBinaryName(platform);
-  const dest = path.join(destDir, binary);
-  fs.mkdirSync(destDir, { recursive: true });
-  try {
-    if (fs.statSync(dest).isFile()) return dest;
-  } catch {
-    // download
-  }
+  const binary = platform === "win32" ? "bun.exe" : "bun";
+  const dest = path.join(VENDOR_DIR, binary);
+  fs.mkdirSync(VENDOR_DIR, { recursive: true });
+  if (fs.statSync(dest, { throwIfNoEntry: false })?.isFile()) return;
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bun-"));
   try {
-    const zipUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/${name}.zip`;
-    const sumUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/SHASUMS256.txt`;
+    const releaseUrl = `https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}`;
     const zipPath = path.join(tmp, `${name}.zip`);
-    const sumPath = path.join(tmp, "SHASUMS256.txt");
 
     console.log(`Downloading ${BUN_VERSION} ${name}…`);
-    download(zipUrl, zipPath);
-    download(sumUrl, sumPath);
+    curl("-o", zipPath, `${releaseUrl}/${name}.zip`);
 
-    const expected = fs
-      .readFileSync(sumPath, "utf8")
+    const expected = curl(`${releaseUrl}/SHASUMS256.txt`)
       .split("\n")
       .find((line) => line.includes(`${name}.zip`))
       ?.split(/\s+/)[0];
-    if (!expected) {
-      throw new Error(`No checksum for ${name}.zip`);
-    }
-    const actual = sha256(zipPath);
-    if (actual !== expected) {
-      throw new Error(`Checksum mismatch for ${name}.zip`);
-    }
+    const actual = crypto.createHash("sha256").update(fs.readFileSync(zipPath)).digest("hex");
+    if (!expected || actual !== expected)
+      throw new Error(`Checksum verification failed for ${name}.zip`);
 
     execFileSync("unzip", ["-o", zipPath, "-d", tmp], { stdio: "pipe" });
-    const source = path.join(tmp, name, binary);
-    fs.copyFileSync(source, dest);
-    if (platform !== "win32") {
-      fs.chmodSync(dest, 0o755);
-    }
-    return dest;
+    fs.copyFileSync(path.join(tmp, name, binary), dest);
+    if (platform !== "win32") fs.chmodSync(dest, 0o755);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 }
 
-/** electron-builder hook: vendor the target Bun binary. */
-exports.default = async function beforePack(context) {
-  downloadBun(context.electronPlatformName, context.arch ?? process.arch, VENDOR_BUN);
+exports.default = function beforePack(context) {
+  const arch = ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch];
+  downloadBun(context.electronPlatformName, arch);
 };

@@ -118,7 +118,7 @@ export function FilePreviewAdapter({
     () => (validTargetLine === undefined ? null : { start: validTargetLine, end: validTargetLine }),
     [validTargetLine],
   );
-  const options = useMemo<FileOptions<undefined>>(
+  const options = useMemo<FileOptions<undefined, undefined>>(
     () => ({
       disableFileHeader: true,
       overflow: "scroll",

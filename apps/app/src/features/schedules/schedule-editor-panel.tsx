@@ -40,9 +40,9 @@ export function ScheduleEditorPanel({
   const reduceMotion = useReducedMotion() === true;
   return (
     <m.div
-      animate={{ opacity: 1, x: 0 }}
+      animate={{ opacity: 1, transform: "translateX(0%)" }}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-      initial={{ opacity: 0, x: "100%" }}
+      initial={{ opacity: 0, transform: "translateX(100%)" }}
       transition={reduceMotion ? { duration: 0 } : EDITOR_TRANSITION}
     >
       <SchedulePanel aria-label={heading} className="border-s-0">

@@ -76,7 +76,29 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
     }),
   );
 
-  it.effect("logs a declared ORPCError that oRPC turned into a success", () =>
+  it.effect("logs a declared ORPCError from the failure channel", () =>
+    Effect.gen(function* () {
+      const records: Array<LogRecord> = [];
+      const wrap = makeRpcWrap(yield* captureContext(records));
+      const error = new ORPCError("BINARY_FILE", { data: { path: "note.pdf" } });
+
+      const exit = yield* Effect.exit(wrap(Effect.fail(error), { path: ["fs", "readFileString"] }));
+
+      assert.ok(exit._tag === "Failure");
+      const record = records.find((candidate) => candidate.annotations.event === "rpc.error");
+      assert.ok(record !== undefined);
+      assert.equal(record.level, "WARN");
+      assert.equal(record.annotations.procedure, "fs.readFileString");
+      assert.equal(record.annotations.code, "BINARY_FILE");
+      assert.deepEqual(record.annotations.data, { path: "note.pdf" });
+      assert.equal(
+        records.find((candidate) => candidate.annotations.event === "rpc.failed"),
+        undefined,
+      );
+    }),
+  );
+
+  it.effect("still logs a declared ORPCError that arrives as a success value", () =>
     Effect.gen(function* () {
       const records: Array<LogRecord> = [];
       const wrap = makeRpcWrap(yield* captureContext(records));
@@ -87,10 +109,7 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
       assert.equal(value, error);
       const record = records.find((candidate) => candidate.annotations.event === "rpc.error");
       assert.ok(record !== undefined);
-      assert.equal(record.level, "WARN");
-      assert.equal(record.annotations.procedure, "fs.readFileString");
       assert.equal(record.annotations.code, "BINARY_FILE");
-      assert.deepEqual(record.annotations.data, { path: "note.pdf" });
     }),
   );
 

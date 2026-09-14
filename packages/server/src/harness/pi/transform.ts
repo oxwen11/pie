@@ -21,8 +21,8 @@ import type { PiUIMessageChunk } from "./ui-message";
 //     persisted history fold. The echo of the *prompting* input arrives
 //     before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
-//     The AI-SDK tool chunks are generic, so args/results forward whole; the
-//     PiTools types still discriminate `message.parts` downstream.
+//     Successful read output drops file content because the UI only renders
+//     its input path; other tool results forward whole.
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
@@ -46,6 +46,12 @@ export function toolResultText(result: unknown): string {
     )
     .map((block) => block.text)
     .join("\n");
+}
+
+export function stripReadDetailsContent(details: unknown) {
+  if (!isRecord(details) || !isRecord(details.truncation)) return details;
+  const { content: _content, ...truncation } = details.truncation;
+  return { ...details, truncation };
 }
 
 /** Per-session render transform factory: one `createPiTransform()` call per session. */
@@ -154,12 +160,20 @@ export function createPiTransform(
         };
         break;
 
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const result =
+          event.toolName === "read" && !event.isError
+            ? {
+                ...event.result,
+                content: [],
+                details: stripReadDetailsContent(event.result.details),
+              }
+            : event.result;
         if (event.isError) {
           yield {
             type: "tool-output-error",
             toolCallId: event.toolCallId,
-            errorText: toolResultText(event.result) || "Tool execution failed",
+            errorText: toolResultText(result) || "Tool execution failed",
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
@@ -167,12 +181,13 @@ export function createPiTransform(
           yield {
             type: "tool-output-available",
             toolCallId: event.toolCallId,
-            output: event.result,
+            output: result,
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
         }
         break;
+      }
 
       case "agent_end": {
         // A model-level failure surfaces as the run's last assistant message

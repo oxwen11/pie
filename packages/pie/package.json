@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "exports": {
-    "./pi-rpc": "./dist/pi-rpc/pi-rpc.js"
+    "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "publishConfig": {
     "access": "public"

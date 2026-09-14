@@ -294,38 +294,35 @@ export const GitServiceLayer: Layer.Layer<
       });
 
     return {
-      status: (cwd) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const result = yield* Effect.tryPromise({
-            try: () => simpleGit(realRoot).status(),
-            catch: gitError(realRoot),
+      status: Effect.fn("GitService.status")(function* (cwd: string) {
+        const realRoot = yield* resolveRoot(cwd);
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const result = yield* Effect.tryPromise({
+          try: () => simpleGit(realRoot).status(),
+          catch: gitError(realRoot),
+        });
+        const files: GitStatusFile[] = [];
+        for (const file of result.files) {
+          const nextPath = toWorkspacePath(realRoot, repoRoot, file.path);
+          if (nextPath === null) continue;
+          const renameFrom =
+            "from" in file && typeof file.from === "string" ? file.from : undefined;
+          const relocatedFrom =
+            renameFrom === undefined ? undefined : toWorkspacePath(realRoot, repoRoot, renameFrom);
+          files.push({
+            path: nextPath,
+            index: file.index,
+            worktree: file.working_dir,
+            ...(relocatedFrom === undefined || relocatedFrom === null
+              ? undefined
+              : { oldPath: relocatedFrom }),
           });
-          const files: GitStatusFile[] = [];
-          for (const file of result.files) {
-            const nextPath = toWorkspacePath(realRoot, repoRoot, file.path);
-            if (nextPath === null) continue;
-            const renameFrom =
-              "from" in file && typeof file.from === "string" ? file.from : undefined;
-            const relocatedFrom =
-              renameFrom === undefined
-                ? undefined
-                : toWorkspacePath(realRoot, repoRoot, renameFrom);
-            files.push({
-              path: nextPath,
-              index: file.index,
-              worktree: file.working_dir,
-              ...(relocatedFrom === undefined || relocatedFrom === null
-                ? undefined
-                : { oldPath: relocatedFrom }),
-            });
-          }
-          return { branch: result.current ?? null, files };
-        }),
+        }
+        return { branch: result.current ?? null, files };
+      }),
 
-      branch: (cwd) =>
-        Effect.gen(function* () {
+      branch: Effect.fn("GitService.branch")(
+        function* (cwd: string) {
           const realRoot = yield* resolveRoot(cwd);
           const current = yield* currentBranch(realRoot);
           const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
@@ -337,63 +334,61 @@ export const GitServiceLayer: Layer.Layer<
             branches: listed.all,
             remotes: listed.remotes,
           };
-        }).pipe(
-          Effect.catchTags({
-            GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
-            WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
-            WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
-          }),
-        ),
-
-      review: (query) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(query.cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch = yield* currentBranch(realRoot);
-          const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
-          return {
-            mode: plan.mode,
-            other: plan.other,
-            branch,
-            base: plan.base,
-            baseBranch: plan.baseBranch,
-            files,
-          };
+        },
+        Effect.catchTags({
+          GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
+          WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+          WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
         }),
+      ),
 
-      diff: (query) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(query.cwd);
-          if (path.isAbsolute(query.path) || query.path.split(/[\\/]/).includes("..")) {
-            return yield* new WorkspacePathEscape({ cwd: realRoot, path: query.path });
-          }
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
-          const file = files.find((entry) => entry.path === query.path);
-          if (file === undefined) {
-            return yield* new WorkspaceFileNotFound({ path: query.path });
-          }
-          const oldBlobPath = toBlobPath(realRoot, repoRoot, file.oldPath ?? file.path);
-          const newBlobPath = toBlobPath(realRoot, repoRoot, file.path);
-          const oldContents =
-            file.status === "added" ? null : yield* readBlobText(realRoot, plan.base, oldBlobPath);
-          const newContents =
-            file.status === "deleted"
-              ? null
-              : plan.head === null
-                ? yield* readWorktreeText(realRoot, file.path)
-                : yield* readBlobText(realRoot, plan.head, newBlobPath);
-          return {
-            path: file.path,
-            status: file.status,
-            ...(file.oldPath === undefined ? undefined : { oldPath: file.oldPath }),
-            oldContents,
-            newContents,
-            binary: false,
-          };
-        }),
+      review: Effect.fn("GitService.review")(function* (query: GitReviewCwdQuery) {
+        const realRoot = yield* resolveRoot(query.cwd);
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const branch = yield* currentBranch(realRoot);
+        const plan = yield* resolveCompare(realRoot, query);
+        const files = yield* reviewFiles(realRoot, repoRoot, plan);
+        return {
+          mode: plan.mode,
+          other: plan.other,
+          branch,
+          base: plan.base,
+          baseBranch: plan.baseBranch,
+          files,
+        };
+      }),
+
+      diff: Effect.fn("GitService.diff")(function* (query: GitDiffCwdQuery) {
+        const realRoot = yield* resolveRoot(query.cwd);
+        if (path.isAbsolute(query.path) || query.path.split(/[\\/]/).includes("..")) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: query.path });
+        }
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const plan = yield* resolveCompare(realRoot, query);
+        const files = yield* reviewFiles(realRoot, repoRoot, plan);
+        const file = files.find((entry) => entry.path === query.path);
+        if (file === undefined) {
+          return yield* new WorkspaceFileNotFound({ path: query.path });
+        }
+        const oldBlobPath = toBlobPath(realRoot, repoRoot, file.oldPath ?? file.path);
+        const newBlobPath = toBlobPath(realRoot, repoRoot, file.path);
+        const oldContents =
+          file.status === "added" ? null : yield* readBlobText(realRoot, plan.base, oldBlobPath);
+        const newContents =
+          file.status === "deleted"
+            ? null
+            : plan.head === null
+              ? yield* readWorktreeText(realRoot, file.path)
+              : yield* readBlobText(realRoot, plan.head, newBlobPath);
+        return {
+          path: file.path,
+          status: file.status,
+          ...(file.oldPath === undefined ? undefined : { oldPath: file.oldPath }),
+          oldContents,
+          newContents,
+          binary: false,
+        };
+      }),
     };
   }),
 );

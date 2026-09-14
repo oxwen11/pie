@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 
 import { ScheduleService } from "./service";
 
@@ -11,28 +11,24 @@ export const runScheduleLoop = Effect.gen(function* () {
   yield* Effect.logInfo("schedule daemon started").pipe(
     Effect.annotateLogs({ event: "schedule.daemon_started" }),
   );
-  yield* schedules.recover().pipe(
-    Effect.catch((error) =>
-      Effect.logWarning("schedule recover failed").pipe(
-        Effect.annotateLogs({
-          event: "schedule.recover_failed",
-          error: String(error),
-        }),
+  yield* schedules
+    .recover()
+    .pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("schedule recover failed", cause).pipe(
+          Effect.annotateLogs({ event: "schedule.recover_failed" }),
+        ),
       ),
-    ),
-  );
+    );
   yield* Effect.forever(
     schedules.tick().pipe(
-      Effect.catch((error) =>
-        Effect.logWarning("schedule tick failed").pipe(
-          Effect.annotateLogs({
-            event: "schedule.tick_failed",
-            error: String(error),
-          }),
+      Effect.catchCause((cause) =>
+        Effect.logWarning("schedule tick failed", cause).pipe(
+          Effect.annotateLogs({ event: "schedule.tick_failed" }),
         ),
       ),
       Effect.andThen(schedules.nextWakeDelay()),
-      Effect.flatMap((ms) => Effect.sleep(`${ms} millis`)),
+      Effect.flatMap((ms) => Effect.sleep(Duration.millis(ms))),
     ),
   );
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Pie-owned Pi RPC child. Session construction uses the published SDK;
+ * pie-pi-process. Session construction uses the published SDK;
  * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v0.85.1).
  *
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
@@ -46,7 +46,7 @@ process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
 process.emitWarning = () => {
-  /* Pi RPC child must not leak Node experimental warnings onto the JSONL pipe */
+  /* pie-pi-process must not leak Node experimental warnings onto the JSONL pipe */
 };
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {

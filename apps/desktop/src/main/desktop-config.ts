@@ -35,7 +35,7 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
 }
 
 /**
- * Packaged desktop ships Bun and a bun-build of pi-rpc in extraResources.
+ * Packaged desktop ships Bun and a bun-build of pie-pi-process in extraResources.
  * Point the Pi child at that pair; launch-time PIE_* wins.
  */
 export function applyPackagedPiRuntime(
@@ -43,14 +43,14 @@ export function applyPackagedPiRuntime(
   options: {
     readonly isPackaged: boolean;
     readonly bundledBun: string | undefined;
-    readonly bundledRpc: string | undefined;
+    readonly bundledPiProcess: string | undefined;
   },
 ): NodeJS.ProcessEnv {
   if (!options.isPackaged || options.bundledBun === undefined) return env;
 
   const next: NodeJS.ProcessEnv = { ...env, PIE_BUN: env.PIE_BUN ?? options.bundledBun };
-  if (options.bundledRpc !== undefined) {
-    next.PIE_PI_EXECUTABLE = env.PIE_PI_EXECUTABLE ?? options.bundledRpc;
+  if (options.bundledPiProcess !== undefined) {
+    next.PIE_PI_EXECUTABLE = env.PIE_PI_EXECUTABLE ?? options.bundledPiProcess;
   }
   return next;
 }

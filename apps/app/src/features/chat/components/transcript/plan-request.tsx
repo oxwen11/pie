@@ -75,7 +75,7 @@ export function PlanRequestView({
         <pre className="text-foreground text-sm whitespace-pre-wrap">{request.plan}</pre>
       </div>
 
-      <div className="border-border/50 space-y-3 border-t px-3 py-3">
+      <div className="border-border/50 space-y-3 border-t p-3">
         <p className="text-foreground text-sm font-medium">Ready to implement?</p>
 
         <RadioGroup

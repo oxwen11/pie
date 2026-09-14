@@ -2,7 +2,7 @@ import type { SessionPendingPrompt } from "@getpie/contract";
 import { createContext, useContext } from "react";
 import type { StoreApi } from "zustand/vanilla";
 
-import type { AgentRequest, AgentResponse } from "@/features/chat/runtime/agent-requests";
+import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
 import type { ChatStoreState } from "@/features/chat/runtime/chat-state";
 
 export type ChatSessionValue = {
@@ -22,5 +22,3 @@ export function useChatSession(): ChatSessionValue {
   if (!ctx) throw new Error("useChatSession must be used within <ChatSessionProvider>");
   return ctx;
 }
-
-export type { AgentRequest };

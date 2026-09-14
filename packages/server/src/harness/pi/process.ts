@@ -25,10 +25,10 @@ import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
 
-// Pi facade: one pie-owned Pi RPC child per session (the child hosts a
-// single AgentSession), unlike codex's shared app-server with thread demuxing.
-// Crash isolation therefore comes for free — a dead child only takes down its
-// own session — and there is no transport-generation bookkeeping.
+// Pi facade: one pie-pi-process per session (the process hosts a single
+// AgentSession), unlike codex's shared app-server with thread demuxing. Crash
+// isolation therefore comes for free — a dead process only takes down its own
+// session — and there is no transport-generation bookkeeping.
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";

@@ -20,18 +20,22 @@ pnpm exec pie-verify desktop launch
 # pnpm exec pie-verify desktop launch --replace
 ```
 
+A Desktop process that exits before readiness fails launch immediately, including exit code zero; its exit status and log path are reported instead of waiting for the readiness timeout.
+
 Ready when all of these hold:
 
 - Electron (or electron-vite) pid from the run is alive.
 - `$PIE_HOME/daemon/daemon.pid` exists; `GET $address/api/health` is `ok`.
-- Chromium CDP is listening on **9223** (launch waits on that port). Doctor then attaches internally (`agent-browser --session pie-verify-desktop connect 9223`).
+- CDP is listening on `PIE_REMOTE_DEBUG_PORT` (default **9223**), and both that listener and the renderer's HTTP origin belong to the recorded launch process tree.
+- The run's agent-browser session has selected the existing renderer target and enabled its sticky pin. Initialization selects that target before pinning: agent-browser 0.36 otherwise tries to create a tab, which Electron does not support.
 
 What launch also does:
 
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
 - Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
 - Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
-- Starts `cd apps/desktop && pnpm exec electron-vite dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. electron-vite injects `ELECTRON_RENDERER_URL` (renderer is often **5173**).
+- Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
+- Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
 
@@ -52,7 +56,7 @@ Checks, in order:
 3. Recorded electron-vite pid is alive.
 4. `daemon.pid` pid is alive; health at the **recorded address** is `ok`.
 5. Ticket: anonymous **401**, bearer **200**.
-6. Doctor attaches agent-browser to CDP (session `pie-verify-desktop`). That session is **not** `pie-verify-web`. Override with `VERIFY_PIE_DESKTOP_BROWSER_SESSION` if needed. After launch, `agent-browser get title` / `get url` work.
+6. Doctor loads this run's browser environment, verifies CDP and renderer process ownership, and checks the active target ID and origin. It prints the pinned target ID. Doctor and launch reuse never unpin or adopt a replacement; missing, ambiguous, or mismatched targets fail. For an older run without a binding, clean up and launch again.
 
 Splash copy: `aria-label="Starting Pie"`. Failure dialog: **Pie could not start**. Overlay: **Reconnecting…**, **The local server stopped**, **Retry**, **Quit**. Window title **Pie**, `#root`. Doctor does not require the splash to have cleared — that is the window-connects feature.
 
@@ -69,17 +73,17 @@ For a **real** isolated window (import, overlay, attach), drive **`agent-browser
 
 ```bash
 pnpm exec pie-verify desktop launch
-pnpm exec pie-verify desktop doctor   # attaches session pie-verify-desktop to CDP
+pnpm exec pie-verify desktop doctor   # verifies the existing pinned renderer
 agent-browser get title
-# if doctor did not run:
-agent-browser connect 9223
 agent-browser wait --text "Import your first project"
 agent-browser find role button --name "Import project" click
 ```
 
 `agent-browser session` must print `pie-verify-desktop`. If it prints `default`, use `pnpm exec agent-browser` or `/tmp/pie-verify-desktop/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=desktop`. `agent-browser skills get electron` is the install-versioned attach recipe.
 
-After connect, selectors match `.cursor/skills/verify-pie` (same `@getpie/app`). Prefer `find` / `wait --text` over `snapshot` + `@eN`. CDP Enter still does not submit TipTap — click send. Draft send has no `aria-label`. Do not `open http://localhost:5173/` and call that desktop.
+Keep this run's binding throughout the proof: no `connect` to another browser, `tab new` / tab switching, or `--no-pin-tab`. A lost target requires cleanup and a fresh launch, not a fallback window.
+
+After Doctor, selectors match `.cursor/skills/verify-pie` (same `@getpie/app`). Prefer `find` / `wait --text` over `snapshot` + `@eN`. CDP Enter still does not submit TipTap — click send. Draft send has no `aria-label`. Do not `open http://localhost:5173/` and call that desktop.
 
 Existing e2e worth knowing:
 
@@ -95,7 +99,7 @@ pnpm exec pie-verify desktop evidence init
 EVIDENCE="$(pnpm exec pie-verify desktop evidence path)"
 pnpm exec pie-verify desktop evidence screenshot <feature>-before
 pnpm exec pie-verify desktop evidence snapshot <feature>-before
-agent-browser record start "$EVIDENCE/<feature>.webm"
+agent-browser record restart "$EVIDENCE/<feature>.webm"
 # …drive…
 agent-browser record stop
 pnpm exec pie-verify desktop evidence screenshot <feature>-after
@@ -106,7 +110,7 @@ pnpm exec pie-verify desktop evidence note "<feature>.webm: what the clip shows"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`agent-browser record` runs against the CDP-attached session (`pie-verify-desktop`). If it refuses on that attach, record the launcher's display instead — `ffmpeg -f x11grab -i "$DISPLAY" "$EVIDENCE/<feature>.mp4"` on the `$DISPLAY` / Xvfb launch used — and say so in `evidence note`. A green Playwright e2e run is not a substitute for the screenshots and video.
+`record restart` captures the existing pinned page, including when no recording has started yet. `record start` creates a fresh context, so it is not part of this bound-window workflow. Recording frame rate is unchanged. If it refuses on that attach, record the launcher's display instead — `ffmpeg -f x11grab -i "$DISPLAY" "$EVIDENCE/<feature>.mp4"` on the `$DISPLAY` / Xvfb launch used — and say so in `evidence note`. A green Playwright e2e run is not a substitute for the screenshots and video.
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
@@ -116,7 +120,7 @@ pnpm exec pie-verify desktop evidence path
 pnpm exec pie-verify desktop cleanup
 ```
 
-1. Kill the recorded electron-vite process tree (TERM then KILL). **This does not stop the daemon.**
+1. Stop the recorded desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
 2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
@@ -133,7 +137,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify desktop env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
-| `agent-browser record start <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
+| `agent-browser record restart <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate
@@ -147,6 +151,8 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | Web 4180/4190 | **Do not touch.** |
 | CLI verify 4182 | **Do not touch.** |
 | User daemon 4000 | **Do not touch.** |
+
+Parallel Desktop runs need separate `VERIFY_PIE_DESKTOP_ROOT`, `HOME`, and `PIE_REMOTE_DEBUG_PORT` values. Let Verify derive each run's socket directory; do not share a `VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override. The same session name can be used in separate socket directories. Drive each run through its own `<root>/bin/agent-browser`, rather than a shared current-run pointer.
 
 ## Feature map
 
