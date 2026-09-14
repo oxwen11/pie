@@ -7,6 +7,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 import {
   WorkspaceLayout,
   WorkspaceLayoutBody,
@@ -15,7 +16,6 @@ import {
   WorkspaceLayoutTree,
   WorkspaceLayoutTreeTrigger,
 } from "@/components/layout/workspace-layout";
-import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
