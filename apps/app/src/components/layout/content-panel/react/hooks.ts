@@ -9,7 +9,7 @@ import { useContentPanelContext } from "./context";
 import type { AnyPanelView } from "./view";
 
 /** Session-level operations, with the session already bound. Panel-level ones live on the instance. */
-export interface ContentPanelSession {
+interface ContentPanelSession {
   readonly sessionKey: string;
   open<Type extends string, Payload, Extra extends object>(
     definition: PanelDefinition<Type, Payload, Extra, AnyPanelView>,
