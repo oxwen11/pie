@@ -48,7 +48,13 @@ if (args.join(' ') === 'exec install-electron') {
         console.log('exiting at ' + process.env.DEV_FAIL_AT);
         process.exit(24);
       }
-      res.end('ok');
+      if (req.url === '/api/ws-ticket') res.statusCode = req.headers.authorization ? 200 : 401;
+      if (req.url === '/json/list') {
+        const pages = [{ type: 'page', id: 'fixture-page',
+          url: process.env.PAGE_URL || 'http://127.0.0.1:' + process.env.PIE_REMOTE_DEBUG_PORT + '/draft' }];
+        if (process.env.EXTRA_PAGE === '1') pages.push({ ...pages[0], id: 'second-page' });
+        res.end(JSON.stringify(pages));
+      } else res.end('ok');
     });
     server.listen(Number(process.env.PIE_REMOTE_DEBUG_PORT), '127.0.0.1', () => {
       fs.writeFileSync(path.join(process.env.PIE_HOME, 'daemon/daemon.pid'), JSON.stringify({
@@ -56,6 +62,30 @@ if (args.join(' ') === 'exec install-electron') {
       }));
     });
   }
+}
+`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(
+    path.join(root, "bin/agent-browser"),
+    `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('AGENT_BROWSER_')));
+fs.appendFileSync(process.env.TRACE + '.browser', JSON.stringify({ args, env }) + '\\n');
+const binding = process.env.TRACE + '.binding';
+if (args.includes('--no-pin-tab')) {
+  if (!args.includes('fixture-page')) throw new Error('must select the existing target');
+  fs.writeFileSync(binding, 'fixture-page');
+} else {
+  if (!fs.existsSync(binding)) throw new Error('Target.createTarget: Not supported');
+  if (process.env.TAB_GONE === '1') throw new Error('bound target is gone');
+  if (args.includes('tab')) console.log(process.env.TAB_LIST_JSON || JSON.stringify({ success: true, data: { tabs: [
+    { active: true, targetId: process.env.ACTIVE_TARGET || 'fixture-page' }
+  ] } }));
+  else if (args.includes('cdp-url')) console.log('ws://127.0.0.1:' + (process.env.BROWSER_CDP || env.AGENT_BROWSER_CDP) + '/devtools/browser/fixture');
+  else if (args.includes('title')) console.log('Pie');
+  else if (args.includes('url')) console.log('http://127.0.0.1:' + env.AGENT_BROWSER_CDP + '/draft');
 }
 `,
     { mode: 0o755 },
@@ -74,7 +104,7 @@ if (args.join(' ') === 'exec install-electron') {
     PATH: `${path.join(root, "bin")}${path.delimiter}${process.env.PATH}`,
     VERIFY_PIE_REPO: root,
     VERIFY_PIE_DESKTOP_ROOT: path.join(root, "run"),
-    VERIFY_PIE_AGENT_BROWSER: process.execPath,
+    VERIFY_PIE_AGENT_BROWSER: path.join(root, "bin/agent-browser"),
     PIE_REMOTE_DEBUG_PORT: String(address.port),
     DISPLAY: ":test",
     TRACE: path.join(root, "trace"),
@@ -83,8 +113,12 @@ if (args.join(' ') === 'exec install-electron') {
   return { root, env };
 }
 
-function start(env: NodeJS.ProcessEnv) {
-  const child = childProcess.spawn(process.execPath, [cli, "desktop", "launch"], { env });
+function start(env: NodeJS.ProcessEnv, ...args: string[]) {
+  const child = childProcess.spawn(
+    process.execPath,
+    [cli, "desktop", ...(args.length > 0 ? args : ["launch"])],
+    { env },
+  );
   children.push(child);
   let output = "";
   child.stdout.on("data", (chunk) => {
@@ -105,6 +139,17 @@ function trace(root: string): Array<{ args: string[]; pid: number }> {
         .trim()
         .split("\n")
         .filter(Boolean)
+        .map((line) => JSON.parse(line))
+    : [];
+}
+
+function browserTrace(root: string): Array<{ args: string[]; env: NodeJS.ProcessEnv }> {
+  const file = path.join(root, "trace.browser");
+  return fs.existsSync(file)
+    ? fs
+        .readFileSync(file, "utf8")
+        .trim()
+        .split("\n")
         .map((line) => JSON.parse(line))
     : [];
 }
@@ -160,6 +205,11 @@ describe("desktop launch lifecycle", () => {
       ["run", "dev"],
     ]);
     expect(Number(fs.readFileSync(pidPath, "utf8"))).toBe(trace(root)[1]?.pid);
+    const calls = browserTrace(root);
+    expect(calls[0]?.args).toContain("--no-pin-tab");
+    expect(calls[0]?.args).toContain("fixture-page");
+    expect(calls.slice(1).every((call) => !call.args.includes("--no-pin-tab"))).toBe(true);
+    expect(calls.at(-1)?.env.AGENT_BROWSER_PIN_TAB).toBe("true");
   }, 10_000);
 
   it("reports installation failure without starting Desktop and preserves the log", async () => {
@@ -246,4 +296,119 @@ describe("desktop launch lifecycle", () => {
     expect(result.code).toBe(130);
     await stopped(root);
   }, 10_000);
+});
+
+describe("desktop browser binding", () => {
+  it("uses the run environment for Doctor, reuse, drive and all browser evidence without rebinding", async () => {
+    const { root, env } = await fixture();
+    await expect(start(env).exited).resolves.toMatchObject({ code: 0 });
+    const initial = browserTrace(root)[0]?.env;
+    const poisoned = {
+      ...env,
+      AGENT_BROWSER_CDP: "1",
+      AGENT_BROWSER_SOCKET_DIR: "/tmp/foreign-browser",
+      AGENT_BROWSER_NAMESPACE: "foreign",
+      AGENT_BROWSER_CONFIG: "/tmp/foreign-browser.json",
+      AGENT_BROWSER_PROFILE: "/tmp/foreign-profile",
+      AGENT_BROWSER_PIN_TAB: "false",
+    };
+    for (const args of [
+      ["doctor"],
+      ["launch"],
+      ["evidence", "screenshot"],
+      ["evidence", "snapshot"],
+      ["evidence", "curl"],
+    ]) {
+      const result = await start(poisoned, ...args).exited;
+      expect(result).toMatchObject({ code: 0 });
+    }
+    const drive = childProcess.spawnSync(
+      path.join(root, "run/bin/agent-browser"),
+      ["get", "title"],
+      { env: poisoned, encoding: "utf8" },
+    );
+    expect(drive.status).toBe(0);
+    expect(drive.stdout.trim()).toBe("Pie");
+    const calls = browserTrace(root);
+    expect(calls.filter((call) => call.args.includes("--no-pin-tab"))).toHaveLength(1);
+    for (const call of calls) {
+      expect(call.env.AGENT_BROWSER_CDP).toBe(env.PIE_REMOTE_DEBUG_PORT);
+      expect(call.env.AGENT_BROWSER_SOCKET_DIR).toBe(initial?.AGENT_BROWSER_SOCKET_DIR);
+      expect(fs.realpathSync(call.env.AGENT_BROWSER_CONFIG ?? "")).toBe(
+        fs.realpathSync(initial?.AGENT_BROWSER_CONFIG ?? ""),
+      );
+      expect(call.env.AGENT_BROWSER_NAMESPACE).toBe(initial?.AGENT_BROWSER_NAMESPACE);
+      expect(call.env.AGENT_BROWSER_PIN_TAB).toBe("true");
+      expect(call.env.AGENT_BROWSER_PROFILE).toBeUndefined();
+    }
+  }, 20_000);
+
+  it.each([
+    [{ TAB_GONE: "1" }, "bound target is gone"],
+    [{ ACTIVE_TARGET: "replacement" }, "not pinned to this Desktop renderer"],
+    [{ BROWSER_CDP: "1" }, "different CDP endpoint"],
+    [{ TAB_LIST_JSON: "null" }, "invalid agent-browser tab list"],
+  ])(
+    "fails closed for a lost or mismatched browser (%j)",
+    async (overrides, message) => {
+      const { root, env } = await fixture();
+      await expect(start(env).exited).resolves.toMatchObject({ code: 0 });
+      const before = browserTrace(root).length;
+      const result = await start({ ...env, ...overrides }, "doctor").exited;
+      expect(result.code).toBe(1);
+      expect(result.output).toContain(message);
+      const calls = browserTrace(root).slice(before);
+      expect(calls.some((call) => call.args.includes("--no-pin-tab"))).toBe(false);
+      expect(calls.some((call) => call.args.includes("title"))).toBe(false);
+      await expect(start({ ...env, ...overrides }, "launch").exited).resolves.toMatchObject({
+        code: 1,
+      });
+      expect(browserTrace(root).filter((call) => call.args.includes("--no-pin-tab"))).toHaveLength(
+        1,
+      );
+    },
+    15_000,
+  );
+
+  it("refuses ambiguous renderers rather than selecting the first page", async () => {
+    const { root, env } = await fixture({ EXTRA_PAGE: "1" });
+    const result = await start(env).exited;
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("ambiguous Desktop renderer");
+    expect(browserTrace(root)).toHaveLength(0);
+    await stopped(root);
+  }, 10_000);
+
+  it("rejects a renderer served by another run before attaching", async () => {
+    const first = await fixture();
+    await expect(start(first.env).exited).resolves.toMatchObject({ code: 0 });
+    const second = await fixture({
+      PAGE_URL: `http://127.0.0.1:${first.env.PIE_REMOTE_DEBUG_PORT}/draft`,
+    });
+    const result = await start(second.env).exited;
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("renderer origin is not owned by this Desktop run");
+    expect(browserTrace(second.root)).toHaveLength(0);
+    await expect(start(first.env, "doctor").exited).resolves.toMatchObject({ code: 0 });
+  }, 15_000);
+
+  it("isolates parallel runs and rejects another run's CDP owner without touching either browser", async () => {
+    const first = await fixture();
+    const second = await fixture();
+    await expect(start(first.env).exited).resolves.toMatchObject({ code: 0 });
+    await expect(start(second.env).exited).resolves.toMatchObject({ code: 0 });
+    expect(browserTrace(first.root)[0]?.env.AGENT_BROWSER_SOCKET_DIR).not.toBe(
+      browserTrace(second.root)[0]?.env.AGENT_BROWSER_SOCKET_DIR,
+    );
+    const before = browserTrace(first.root).length;
+    fs.writeFileSync(
+      path.join(first.root, "run/current/pids/electron-vite.pid"),
+      String(trace(second.root)[1]?.pid),
+    );
+    const result = await start(first.env, "doctor").exited;
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("is not owned by this Desktop run");
+    expect(browserTrace(first.root)).toHaveLength(before);
+    await expect(start(second.env, "doctor").exited).resolves.toMatchObject({ code: 0 });
+  }, 15_000);
 });

@@ -1,29 +1,27 @@
 import type { Project, Schedule } from "@getpie/contract";
 import { MAX_SCHEDULES } from "@getpie/contract";
-import { Button } from "@getpie/ui/components/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Clock } from "lucide-react";
-import { useState } from "react";
-import { Group, Separator } from "react-resizable-panels";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
 
-import { formatSessionReuse } from "./cadence";
-import { ScheduleCard } from "./schedule-card";
-import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
-import { ScheduleDetailPanel } from "./schedule-detail-panel";
-import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
-import type { ScheduleFormSubmit } from "./schedule-form";
+import type { ScheduleEditorState } from "./schedule-editor-panel";
+import {
+  scheduleCreateInput,
+  scheduleUpdateInput,
+  type ScheduleFormSubmit,
+} from "./schedule-form-model";
+import { SchedulePageFrame, SchedulePageSide } from "./schedule-page-frame";
+import { SchedulePageList } from "./schedule-page-list";
 
 export type ScheduleCreateDefaults = {
   readonly projectId?: string;
@@ -56,11 +54,7 @@ export function SchedulePage({
 
   const schedules = useQuery({
     ...orpcQueryUtils.schedule.list.queryOptions(),
-    refetchInterval: (query) => {
-      const items = query.state.data;
-      if (items === undefined) return false;
-      return items.some((item) => item.lastRunStatus === "running") ? 2_000 : 10_000;
-    },
+    refetchInterval: (query) => scheduleListInterval(query.state.data),
   });
 
   const invalidate = () =>
@@ -71,40 +65,15 @@ export function SchedulePage({
 
   const create = useMutation({
     mutationFn: (value: ScheduleFormSubmit) =>
-      orpcQueryUtils.schedule.create.call({
-        name: value.name,
-        projectId: value.projectId,
-        prompt: value.prompt,
-        spec: value.spec,
-        session: value.session,
-        ...(value.expiresAt !== null ? { expiresAt: value.expiresAt } : undefined),
-        ...(value.maxRuns !== null ? { maxRuns: value.maxRuns } : undefined),
-        ...(value.runNow ? { runNow: true } : undefined),
-        ...(value.worktree ? { worktree: {} } : undefined),
-        ...(value.provider !== undefined && value.modelId !== undefined
-          ? { provider: value.provider, modelId: value.modelId }
-          : undefined),
-      }),
+      orpcQueryUtils.schedule.create.call(scheduleCreateInput(value)),
     onSuccess: (created) => {
       onCloseCreate();
       void invalidate();
       if (created.lastSessionId !== undefined) {
-        navigate({
-          to: "/session/$sessionId",
-          params: { sessionId: created.lastSessionId },
-          search: { projectId: created.projectId },
-        }).catch((error: unknown) => {
-          console.error("Failed to open the schedule session", error);
-        });
+        openScheduleSession(navigate, created.lastSessionId, created.projectId);
         return;
       }
-      if (created.lastRunStatus === "skipped") {
-        toast.error("Schedule did not start a session (skipped).");
-        return;
-      }
-      if (created.lastRunStatus === "failed") {
-        toast.error(created.lastError ?? "Schedule failed to start a session.");
-      }
+      reportScheduleStart(created);
     },
     onError: (error) => toast.error(`Failed to create schedule: ${error.message}`),
   });
@@ -114,20 +83,7 @@ export function SchedulePage({
       input: { readonly id: string } & Partial<ScheduleFormSubmit> & {
           readonly enabled?: boolean;
         },
-    ) =>
-      orpcQueryUtils.schedule.update.call({
-        id: input.id,
-        ...(input.name !== undefined ? { name: input.name } : undefined),
-        ...(input.prompt !== undefined ? { prompt: input.prompt } : undefined),
-        ...(input.spec !== undefined ? { spec: input.spec } : undefined),
-        ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
-        ...(input.session !== undefined ? { session: input.session } : undefined),
-        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
-        ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
-        ...(input.worktree === true ? { worktree: {} } : undefined),
-        ...(input.provider !== undefined ? { provider: input.provider } : undefined),
-        ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
-      }),
+    ) => orpcQueryUtils.schedule.update.call(scheduleUpdateInput(input)),
     onSuccess: () => {
       setEditing(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
@@ -151,208 +107,174 @@ export function SchedulePage({
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
-        navigate({
-          to: "/session/$sessionId",
-          params: { sessionId: result.ref.sessionId },
-          search: { projectId: result.ref.projectId },
-        }).catch((error: unknown) => {
-          console.error("Failed to open the schedule session", error);
-        });
+        openScheduleSession(navigate, result.ref.sessionId, result.ref.projectId);
         return;
       }
-      if (result.schedule.lastRunStatus === "skipped") {
-        toast.error("Schedule did not start a session (skipped).");
-        return;
-      }
-      if (result.schedule.lastRunStatus === "failed") {
-        toast.error(result.schedule.lastError ?? "Schedule failed to start a session.");
-      }
+      reportScheduleStart(result.schedule);
     },
     onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
   });
 
   const items = schedules.data ?? [];
-  const selected = selectedId === null ? undefined : items.find((item) => item.id === selectedId);
+  const selected = selectedSchedule(items, selectedId);
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
-      input:
-        selected === undefined ? skipToken : { projectId: selected.projectId, archived: false },
+      input: selectedSessionListInput(selected),
     }),
   });
-  const sessionTitleById = new Map<string, string>();
-  for (const session of sessions.data ?? []) {
-    sessionTitleById.set(session.sessionId, session.title ?? "New chat");
-  }
-  const editor: ScheduleEditorState | null =
-    editing !== null
-      ? { mode: "edit", schedule: editing }
-      : createOpen
-        ? {
-            mode: "create",
-            projectId: createDefaults?.projectId,
-            sessionId: createDefaults?.sessionId,
-          }
-        : null;
-  const atLimit = items.length >= MAX_SCHEDULES;
-  const canCreate = projectsReady && projects.length > 0 && !atLimit;
-
-  if (!projectsReady || schedules.isPending) {
-    return <Loader />;
-  }
-
-  if (schedules.isError) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>Could not load schedules</EmptyTitle>
-          <EmptyDescription>{schedules.error.message}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
-
-  const list = (
-    <>
-      <div className="flex items-start justify-between gap-3 px-6 py-4">
-        <p className="text-muted-foreground text-sm">
-          Create a session on a cadence. These live on the server, not inside a chat.
-        </p>
-        <Button
-          disabled={!canCreate}
-          onClick={onOpenCreate}
-          title={
-            projects.length === 0
-              ? "Import a project first"
-              : atLimit
-                ? `You can have at most ${MAX_SCHEDULES} schedules`
-                : undefined
-          }
-        >
-          New schedule
-        </Button>
-      </div>
-
-      {items.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Clock aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle>No schedules yet</EmptyTitle>
-            <EmptyDescription>
-              {projects.length === 0
-                ? "Import a project from the sidebar, then create a schedule to start a session later."
-                : "A schedule creates a new session in a project and sends the prompt when it is due."}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
-          {items.map((schedule) => (
-            <ScheduleCard
-              schedule={schedule}
-              key={schedule.id}
-              onSelect={() => {
-                setEditing(null);
-                setSelectedId(schedule.id);
-                if (createOpen) onCloseCreate();
-              }}
-              onToggle={(enabled) => update.mutate({ id: schedule.id, enabled })}
-              projectName={
-                projects.find((item) => item.id === schedule.projectId)?.name ?? "Unknown project"
-              }
-              selected={schedule.id === selectedId}
-              updating={update.isPending}
-            />
-          ))}
-        </ul>
-      )}
-    </>
-  );
-
-  const sidePanel =
-    editor !== null ? (
-      <ScheduleEditorPanel
-        editor={editor}
-        onClose={() => {
-          if (editor.mode === "create") {
-            onCloseCreate();
-            return;
-          }
-          setEditing(null);
-        }}
-        onSubmit={(value) => {
-          if (editor.mode === "create") {
-            create.mutate(value);
-            return;
-          }
-          update.mutate({ id: editor.schedule.id, ...value });
-        }}
-        projects={projects}
-        submitting={create.isPending || update.isPending}
-      />
-    ) : selected === undefined ? null : (
-      <ScheduleDetailPanel
-        nowMs={Date.now()}
-        onClose={() => setSelectedId(null)}
-        onDelete={() => setDeleting(selected)}
-        onEdit={() => setEditing(selected)}
-        onOpenSession={(sessionId) => {
-          const projectId = selected.projectId;
-          navigate({
-            to: "/session/$sessionId",
-            params: { sessionId },
-            search: { projectId },
-          }).catch((error: unknown) => {
-            console.error("Failed to open the schedule session", error);
-          });
-        }}
-        onRunNow={() => runNow.mutate(selected.id)}
-        projectName={
-          projects.find((item) => item.id === selected.projectId)?.name ?? "Unknown project"
-        }
-        running={runNow.isPending}
-        schedule={selected}
-        sessionLine={formatSessionReuse(selected.session, sessionTitleById)}
-      />
-    );
+  const editor = scheduleEditorState(editing, createOpen, createDefaults);
+  const placeholder = schedulePagePlaceholder(projectsReady, schedules);
+  if (placeholder !== null) return placeholder;
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      {sidePanel === null ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{list}</div>
-      ) : (
-        <Group
-          className="flex min-h-0 flex-1"
-          orientation="horizontal"
-          resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
-        >
-          <ResizablePanel className="flex min-w-0 flex-col" minSize="16rem">
-            {list}
-          </ResizablePanel>
-          <Separator
-            aria-label="Resize schedule panel"
-            className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
-          />
-          <ResizablePanel
-            className="flex min-w-0 flex-col"
-            defaultSize="28rem"
-            maxSize="50%"
-            minSize="18rem"
-          >
-            {sidePanel}
-          </ResizablePanel>
-        </Group>
-      )}
-
-      {deleting !== null ? (
-        <ScheduleDeleteDialog
-          name={deleting.name}
-          onCancel={() => setDeleting(null)}
-          onConfirm={() => remove.mutate(deleting.id)}
-          pending={remove.isPending}
+    <SchedulePageFrame
+      deletePending={remove.isPending}
+      deleting={deleting}
+      list={
+        <SchedulePageList
+          atLimit={items.length >= MAX_SCHEDULES}
+          canCreate={projectsReady && projects.length > 0 && items.length < MAX_SCHEDULES}
+          items={items}
+          onOpenCreate={onOpenCreate}
+          onSelect={(scheduleId) => {
+            setEditing(null);
+            setSelectedId(scheduleId);
+            if (createOpen) onCloseCreate();
+          }}
+          onToggle={(id, enabled) => update.mutate({ id, enabled })}
+          projects={projects}
+          selectedId={selectedId}
+          updating={update.isPending}
         />
-      ) : null}
-    </div>
+      }
+      onCancelDelete={() => setDeleting(null)}
+      onConfirmDelete={(id) => remove.mutate(id)}
+      sidePanel={
+        editor === null && selected === undefined ? null : (
+          <SchedulePageSide
+            editor={editor}
+            nowMs={Date.now()}
+            onCloseEditor={(mode) => {
+              if (mode === "create") {
+                onCloseCreate();
+                return;
+              }
+              setEditing(null);
+            }}
+            onCloseSelected={() => setSelectedId(null)}
+            onDelete={() => {
+              if (selected !== undefined) setDeleting(selected);
+            }}
+            onEdit={() => {
+              if (selected !== undefined) setEditing(selected);
+            }}
+            onOpenSession={(sessionId) => {
+              if (selected === undefined) return;
+              openScheduleSession(navigate, sessionId, selected.projectId);
+            }}
+            onRunNow={() => {
+              if (selected !== undefined) runNow.mutate(selected.id);
+            }}
+            onSubmit={(value, current) => {
+              if (current.mode === "create") {
+                create.mutate(value);
+                return;
+              }
+              update.mutate({ id: current.schedule.id, ...value });
+            }}
+            projects={projects}
+            running={runNow.isPending}
+            selected={selected}
+            sessionTitleById={sessionTitleMap(sessions.data)}
+            submitting={create.isPending || update.isPending}
+          />
+        )
+      }
+    />
   );
+}
+
+function selectedSchedule(
+  items: ReadonlyArray<Schedule>,
+  selectedId: string | null,
+): Schedule | undefined {
+  if (selectedId === null) return undefined;
+  return items.find((item) => item.id === selectedId);
+}
+
+function selectedSessionListInput(selected: Schedule | undefined) {
+  if (selected === undefined) return skipToken;
+  return { projectId: selected.projectId, archived: false };
+}
+
+function scheduleListInterval(items: ReadonlyArray<Schedule> | undefined): number | false {
+  if (items === undefined) return false;
+  return items.some((item) => item.lastRunStatus === "running") ? 2_000 : 10_000;
+}
+
+function scheduleEditorState(
+  editing: Schedule | null,
+  createOpen: boolean,
+  createDefaults?: ScheduleCreateDefaults,
+): ScheduleEditorState | null {
+  if (editing !== null) return { mode: "edit", schedule: editing };
+  if (!createOpen) return null;
+  return {
+    mode: "create",
+    projectId: createDefaults?.projectId,
+    sessionId: createDefaults?.sessionId,
+  };
+}
+
+function sessionTitleMap(
+  sessions:
+    | ReadonlyArray<{ readonly sessionId: string; readonly title?: string | null }>
+    | undefined,
+): Map<string, string> {
+  return new Map(
+    (sessions ?? []).map((session) => [session.sessionId, session.title ?? "New chat"]),
+  );
+}
+
+function schedulePagePlaceholder(
+  projectsReady: boolean,
+  schedules: UseQueryResult<ReadonlyArray<Schedule>>,
+): ReactNode {
+  if (!projectsReady || schedules.isPending) return <Loader />;
+  if (!schedules.isError) return null;
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>Could not load schedules</EmptyTitle>
+        <EmptyDescription>{schedules.error.message}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function openScheduleSession(
+  navigate: ReturnType<typeof useNavigate>,
+  sessionId: string,
+  projectId: string,
+): void {
+  navigate({
+    to: "/session/$sessionId",
+    params: { sessionId },
+    search: { projectId },
+  }).catch((error: unknown) => {
+    console.error("Failed to open the schedule session", error);
+  });
+}
+
+function reportScheduleStart(schedule: {
+  readonly lastRunStatus?: string;
+  readonly lastError?: string | null;
+}): void {
+  if (schedule.lastRunStatus === "skipped") {
+    toast.error("Schedule did not start a session (skipped).");
+    return;
+  }
+  if (schedule.lastRunStatus === "failed") {
+    toast.error(schedule.lastError ?? "Schedule failed to start a session.");
+  }
 }

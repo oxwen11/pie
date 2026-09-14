@@ -149,7 +149,7 @@ function Tab({
       </button>
       <button
         type="button"
-        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${panel.label}`}
         onClick={() => session.close(panel.id)}
       >

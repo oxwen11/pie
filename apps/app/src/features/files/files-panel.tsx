@@ -1,12 +1,4 @@
 import type { Project } from "@getpie/contract";
-import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { FilesIcon, FileTextIcon } from "lucide-react";
@@ -15,6 +7,7 @@ import { useCallback } from "react";
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -56,9 +49,9 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
 
   if (panel === null) {
     return (
-      <WorkspaceState title="Workspace unavailable">
+      <PanelEmptyState icon={FilesIcon} title="Workspace unavailable">
         This session no longer resolves to an imported project.
-      </WorkspaceState>
+      </PanelEmptyState>
     );
   }
 
@@ -88,34 +81,5 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
       tree={treePane}
       treeLabel={workspaceName}
     />
-  );
-}
-
-function WorkspaceState({
-  title,
-  children,
-  onRetry,
-}: {
-  title: string;
-  children: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <Empty className="py-8 md:py-8">
-      <EmptyMedia variant="icon">
-        <FilesIcon />
-      </EmptyMedia>
-      <EmptyContent>
-        <div>
-          <EmptyTitle className="text-base">{title}</EmptyTitle>
-          <EmptyDescription>{children}</EmptyDescription>
-        </div>
-        {onRetry ? (
-          <Button onClick={onRetry} size="sm" variant="outline">
-            Try again
-          </Button>
-        ) : null}
-      </EmptyContent>
-    </Empty>
   );
 }
