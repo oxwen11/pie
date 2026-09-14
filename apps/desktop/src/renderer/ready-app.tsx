@@ -1,5 +1,5 @@
 import { AppInterface, type ServerConnection, type ServerStatusFeed } from "@getpie/app";
-import { use, useEffect, useState, type ReactElement } from "react";
+import { use, useEffect, useRef, useState, type ReactElement } from "react";
 
 import { startupAnimation } from "./startup-animation";
 
@@ -35,6 +35,7 @@ function KeyedApp({
   const [promise] = useState(() => load());
   const initial = use(promise);
   const [connection, setConnection] = useState(initial);
+  const tokenHolder = useRef(initial.token);
 
   // The daemon mints a fresh token on every respawn, so the startup connection
   // dies with the first server restart. The feed only emits transitions, so
@@ -47,6 +48,7 @@ function KeyedApp({
       void load()
         .then((fresh) => {
           if (!cancelled) {
+            tokenHolder.current = fresh.token;
             setConnection((current) => (sameConnection(current, fresh) ? current : fresh));
           }
           return undefined;
@@ -63,5 +65,5 @@ function KeyedApp({
 
   use(startupAnimation);
   useEffect(onReady, [onReady]);
-  return <AppInterface server={connection} />;
+  return <AppInterface server={connection} tokenHolder={tokenHolder} />;
 }

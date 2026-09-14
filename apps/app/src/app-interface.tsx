@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, useRef, useState, type ReactElement } from "react";
+import { use, useEffect, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -84,39 +84,52 @@ export class UnknownEnvironmentError extends Error {
 export function AppInterface({
   server,
   environmentId,
+  tokenHolder,
 }: {
   server?: ServerConnection;
   environmentId?: string;
+  /** Host-owned token box. Updated in the event that mints a new token, not during render. */
+  tokenHolder?: { current: string };
 }): ReactElement {
   usePlatform();
   const identity = server?.httpBaseUrl ?? "default";
   if (environmentId !== undefined) {
-    return <AppRuntime key={identity} server={server} environmentId={environmentId} />;
+    return (
+      <AppRuntime
+        key={identity}
+        server={server}
+        environmentId={environmentId}
+        tokenHolder={tokenHolder}
+      />
+    );
   }
-  return <ResolveLocalEnvironment key={identity} server={server} />;
+  return <ResolveLocalEnvironment key={identity} server={server} tokenHolder={tokenHolder} />;
 }
 
-function ResolveLocalEnvironment({ server }: { server?: ServerConnection }): ReactElement {
+function ResolveLocalEnvironment({
+  server,
+  tokenHolder,
+}: {
+  server?: ServerConnection;
+  tokenHolder?: { current: string };
+}): ReactElement {
   const [promise] = useState(() => loadEnvironmentId(server));
   const environmentId = use(promise);
-  return <AppRuntime server={server} environmentId={environmentId} />;
+  return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({
   server,
   environmentId,
+  tokenHolder,
 }: {
   server?: ServerConnection;
   environmentId: string;
+  tokenHolder?: { current: string };
 }): ReactElement {
   const platform = usePlatform();
   const { theme } = useTheme();
-  const tokenHolder = useRef(server?.token ?? "");
-  // Token rotation must not remount AppRuntime; getTicket reads this box later.
-  // oxlint-disable-next-line react/refs
-  if (server?.token !== undefined) tokenHolder.current = server.token;
-  // oxlint-disable-next-line react/refs
   const localClients = useState(() => createAppClients(server, tokenHolder))[0];
   const remoteClients = useState(() => new Map<string, CachedRemote>())[0];
 

@@ -9,7 +9,7 @@ const shared = {
     // Bundle what npm must not reinstall (Effect dual-runtime under npx).
     // Pi is a host install (`pi` on PATH), not a published or bundled dep.
     alwaysBundle: [/.*/],
-    neverBundle: ["@earendil-works/pi-coding-agent", "vite"],
+    neverBundle: ["@earendil-works/pi-coding-agent", "node-pty", "vite"],
     onlyBundle: false,
   },
   dts: false,
