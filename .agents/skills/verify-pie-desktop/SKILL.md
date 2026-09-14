@@ -18,6 +18,7 @@ Isolated `$PIE_HOME` (daemon is `$PIE_HOME/daemon`). First spawn prefers **4000*
 ```bash
 pnpm exec pie-verify desktop launch
 # pnpm exec pie-verify desktop launch --replace
+# pnpm exec pie-verify desktop launch --replace --empty-projects  # import-flow proof only
 ```
 
 A Desktop process that exits before readiness fails launch immediately, including exit code zero; its exit status and log path are reported instead of waiting for the readiness timeout.
@@ -37,7 +38,7 @@ What launch also does:
 - Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
 - Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
-- Creates `$PIE_HOME/workspace/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) and confines the project picker to `$PIE_HOME/workspace`. The picker cannot browse the host home or escape through `..` or symlinks.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
 
 If **4000** is already taken, the launcher falls back to an ephemeral port — still isolated because `$PIE_HOME` is ours. Launch **refuses** a taken **9223** (CDP). Never point this run at `~/.pie` or `~/.pie_*`. Never use web 4180/4190 or CLI-verify 4182 as *this* home's ports.
 
@@ -75,8 +76,7 @@ For a **real** isolated window (import, overlay, attach), drive **`agent-browser
 pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor   # verifies the existing pinned renderer
 agent-browser get title
-agent-browser wait --text "Import your first project"
-agent-browser find role button --name "Import project" click
+agent-browser wait --text "verify-pie-desktop-sample"
 ```
 
 `agent-browser session` must print `pie-verify-desktop`. If it prints `default`, use `pnpm exec agent-browser` or `/tmp/pie-verify-desktop/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=desktop`. `agent-browser skills get electron` is the install-versioned attach recipe.

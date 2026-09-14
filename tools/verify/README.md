@@ -30,6 +30,9 @@ agent-browser get title
 pnpm exec pie-verify desktop cleanup
 ```
 
+Fresh Web and Desktop runs register their isolated sample Project by default.
+Use `launch --replace --empty-projects` only when proving the first-import flow.
+
 After launch, **drive with `agent-browser`**. Launch writes a native env file
 (`session`, `namespace`, sockets, screenshots/downloads, idle timeout off,
 plus Chrome args for web or CDP + `PIN_TAB` for desktop). The repo shim
