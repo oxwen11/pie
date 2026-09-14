@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, useState, type ReactElement } from "react";
+import { use, useEffect, useRef, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -44,8 +44,6 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
 // Its own version check has no opt-out and is patched out instead — see
 // `patches/react-scan@0.5.7.patch`.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  // react-scan's intro is another %c console.log; hideIntro skips it.
-  Object.assign(window, { hideIntro: true });
   void import("react-scan").then(({ scan }) => scan());
 }
 
@@ -78,6 +76,25 @@ export class UnknownEnvironmentError extends Error {
     super(`Environment ${environmentId} is not connected`);
     this.name = "UnknownEnvironmentError";
   }
+}
+
+/** Create once per mount — composition-root singletons, not updatable state. */
+function useStable<T>(create: () => T): T {
+  const ref = useRef<T | null>(null);
+  // Null-guarded lazy init during render is the documented create-once pattern
+  // (https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents).
+  // `react/refs` forbids any `.current` read in render; this ref is the store, not a subscription.
+  /* oxlint-disable react/refs */
+  if (ref.current === null) {
+    const created = create();
+    // Create-once composition-root singleton. React documents this null-guarded
+    // write during render; the detector still flags the assignment.
+    // react-doctor-disable-next-line no-ref-current-in-render
+    ref.current = created;
+    return created;
+  }
+  return ref.current;
+  /* oxlint-enable react/refs */
 }
 
 /** Shared application entry. PlatformProvider is the host seam above it. */
@@ -130,8 +147,8 @@ function AppRuntime({
 }): ReactElement {
   const platform = usePlatform();
   const { theme } = useTheme();
-  const localClients = useState(() => createAppClients(server, tokenHolder))[0];
-  const remoteClients = useState(() => new Map<string, CachedRemote>())[0];
+  const localClients = useStable(() => createAppClients(server, tokenHolder));
+  const remoteClients = useStable(() => new Map<string, CachedRemote>());
 
   function clientsFor(id: string): AppClients {
     if (id === environmentId) return localClients;
@@ -151,7 +168,7 @@ function AppRuntime({
     return created;
   }
 
-  const [chatManager] = useState(
+  const chatManager = useStable(
     () =>
       new ChatManager((sessionRef) => {
         const clients = clientsFor(sessionRef.environmentId);
@@ -186,9 +203,9 @@ function AppRuntime({
     return feed.subscribe(prune);
   }, [platform.ssh, remoteClients, chatManager]);
 
-  const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => localClients);
+  const { orpcClient, queryClient, orpcQueryUtils } = localClients;
   useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
-  const [router] = useState(() =>
+  const router = useStable(() =>
     createRouter({
       orpcClient,
       queryClient,

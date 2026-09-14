@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { RPCHandler as WsRPCHandler } from "@orpc/server/websocket";
-import { Cause, Context, Effect, Layer, ManagedRuntime } from "effect";
+import { Cause, Context, Effect, Layer, ManagedRuntime, Option } from "effect";
 import type { WebSocket } from "ws";
 
 import type { RpcContext } from "./context";
@@ -15,9 +15,10 @@ import { AgentRuntimeLayer } from "./runtime";
  * One function here instruments all ~25 procedures at once: no router file
  * knows about logging, and none can forget to.
  *
- * oRPC turns declared `ORPCError`s into success values before this runs, so
- * they never hit `tapCause`. Log those as `rpc.error`. Interrupt-only causes
- * stay silent (client disconnected mid-call). Anything else is a defect.
+ * Declared `ORPCError`s travel the Effect failure channel (and historically
+ * could appear as success values before beta.35). Log those as `rpc.error`.
+ * Interrupt-only causes stay silent (client disconnected mid-call). Anything
+ * else is a defect.
  *
  * The native span names the procedure for any configured tracer. The failure
  * tap writes the actionable local record, including the procedure and cause.
@@ -29,13 +30,18 @@ export function makeRpcWrap(effectContext: Context.Context<never> = Context.empt
       Effect.tap((value) =>
         value instanceof ORPCError ? logDeclaredRpcError(procedure, value) : Effect.void,
       ),
-      Effect.tapCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.void
-          : Effect.logError("rpc procedure failed", cause).pipe(
-              Effect.annotateLogs({ event: "rpc.failed", procedure }),
-            ),
-      ),
+      Effect.tapCause((cause) => {
+        if (Cause.hasInterruptsOnly(cause)) return Effect.void;
+        if (!Cause.hasDies(cause)) {
+          const error = Cause.findErrorOption(cause);
+          if (Option.isSome(error) && error.value instanceof ORPCError) {
+            return logDeclaredRpcError(procedure, error.value);
+          }
+        }
+        return Effect.logError("rpc procedure failed", cause).pipe(
+          Effect.annotateLogs({ event: "rpc.failed", procedure }),
+        );
+      }),
       // Outside the tap so a failure is logged inside the span it failed in.
       Effect.withSpan(`rpc.${procedure}`),
       Effect.provide(effectContext),

@@ -19,7 +19,7 @@ import {
 } from "./connect";
 
 const projectIdFlag = () =>
-  Flag.string("project-id").pipe(
+  Flag.String("project-id").pipe(
     Flag.withDescription(
       "Registered project id (default: look up or create the project for --cwd / cwd)",
     ),
@@ -27,31 +27,31 @@ const projectIdFlag = () =>
   );
 
 const cwdFlag = () =>
-  Flag.string("cwd").pipe(
+  Flag.String("cwd").pipe(
     Flag.withDescription("Project directory used when --project-id is omitted (default: cwd)"),
     Flag.optional,
   );
 
 const sessionIdFlag = () =>
-  Flag.string("session-id").pipe(Flag.withDescription("Reuse an existing session"), Flag.optional);
+  Flag.String("session-id").pipe(Flag.withDescription("Reuse an existing session"), Flag.optional);
 
 const providerFlag = () =>
-  Flag.string("provider").pipe(Flag.withDescription("Model provider"), Flag.optional);
+  Flag.String("provider").pipe(Flag.withDescription("Model provider"), Flag.optional);
 
 const modelIdFlag = () =>
-  Flag.string("model-id").pipe(
+  Flag.String("model-id").pipe(
     Flag.withDescription("Model id (must be passed with --provider)"),
     Flag.optional,
   );
 
 const worktreeFlag = () =>
-  Flag.boolean("worktree").pipe(
+  Flag.Boolean("worktree").pipe(
     Flag.withDescription("Create a git worktree for this session (branch name is server-assigned)"),
     Flag.withDefault(false),
   );
 
 const worktreeBaseFlag = () =>
-  Flag.string("worktree-base").pipe(
+  Flag.String("worktree-base").pipe(
     Flag.withDescription("Ref to branch the worktree from (implies --worktree; default HEAD)"),
     Flag.optional,
   );
@@ -164,7 +164,7 @@ const promptTurn = async (client: PieClient, ref: SessionRef, text: string): Pro
 export const runCommand = Command.make(
   "run",
   {
-    text: Argument.string("text").pipe(Argument.withDescription("Prompt text")),
+    text: Argument.String("text").pipe(Argument.withDescription("Prompt text")),
     projectId: projectIdFlag(),
     cwd: cwdFlag(),
     sessionId: sessionIdFlag(),
@@ -205,9 +205,9 @@ export const runCommand = Command.make(
             });
             ref = created.ref;
             console.log(`created session ${ref.sessionId} project ${ref.projectId}`);
-            if (created.workspace.gitBranch !== undefined) {
+            if (created.workspace.worktree !== undefined) {
               console.log(
-                `worktree ${created.workspace.cwd} branch ${created.workspace.gitBranch}`,
+                `worktree ${created.workspace.cwd} branch ${created.workspace.worktree.branch}`,
               );
             }
           }

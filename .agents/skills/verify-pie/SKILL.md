@@ -17,6 +17,7 @@ Two processes, **isolated `$PIE_HOME`**, default ports. Vite is hardcoded to **4
 pnpm exec pie-verify web launch
 # idempotent if the current run is healthy
 # pnpm exec pie-verify web launch --replace   # stop ours, then start
+# pnpm exec pie-verify web launch --replace --empty-projects  # import-flow proof only
 ```
 
 Ready when both answer `ok`:
@@ -39,7 +40,7 @@ What launch also does:
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
@@ -77,9 +78,7 @@ First machine only: `pnpm exec agent-browser install` if the packaged CLI says n
 pnpm exec pie-verify web launch
 pnpm exec pie-verify web doctor   # if launch reused an existing run
 agent-browser open http://localhost:4190/
-agent-browser wait --text "Import your first project"
-agent-browser find role button --name "Import project" click
-agent-browser wait --text "Import this folder"
+agent-browser wait --text "verify-pie-sample"
 ```
 
 `agent-browser session` must print `pie-verify-web`. If it prints `default`, you hit the raw mise binary — use `pnpm exec agent-browser` or `/tmp/pie-verify-web/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=web` (or clean up one).
@@ -161,7 +160,7 @@ Standards:
 pnpm exec pie-verify web cleanup
 ```
 
-Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
 
 After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web evidence path` printed before teardown (or `.agents/skills/verify-pie/evidence/<run-id>/`).
 
@@ -186,7 +185,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | Vite 4190 | **No.** `strictPort`, IPv6 `[::1]` only. One web instance. Open `http://localhost:4190/`. |
 | Server 4180 | Movable via `PIE_PORT` (both processes). Launch still refuses a taken 4180. |
 | `$PIE_HOME` | Isolated per run under `/tmp/pie-verify-web/runs/<id>/pie-home`. |
-| `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |
+| `$PIE_HOME/workspace/verify-pie-sample` | Run-local scaffold, registered by default; removed with the run. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 
 If the user already has `pnpm dev` on 4180/4190 against `~/.pie` / `~/.pie_*`, **stop and tell them**. Do not point this skill at that pair.

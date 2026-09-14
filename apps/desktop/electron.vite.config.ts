@@ -1,6 +1,7 @@
 import url from "node:url";
 
 import { resolveDaemonCompatibilityKey } from "@getpie/core/compatibility";
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { isRunningFromAgent } from "agent-cli-detector";
@@ -8,7 +9,6 @@ import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 
-import { tailwindcssVite } from "../app/tailwindcss-vite";
 import { themeBootstrapPlugin } from "../app/theme-bootstrap-plugin";
 
 const DAEMON_COMPATIBILITY_KEY = resolveDaemonCompatibilityKey();
@@ -112,7 +112,7 @@ export default defineConfig({
         ),
       }),
       react(),
-      ...tailwindcssVite(),
+      tailwindcss(),
     ],
     build: {
       outDir: "dist/renderer",

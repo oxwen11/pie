@@ -31,8 +31,8 @@ export function parseHostPort(value: string): HostPort {
 }
 
 export const relayListenFlags = {
-  port: Flag.integer("port").pipe(Flag.withDescription("Public port to listen on")),
-  publicHost: Flag.string("public-host").pipe(
+  port: Flag.Int("port").pipe(Flag.withDescription("Public port to listen on")),
+  publicHost: Flag.String("public-host").pipe(
     Flag.withDescription("Public hop clients must use (not Tailscale, LAN, or loopback)"),
   ),
 };

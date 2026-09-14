@@ -1,4 +1,4 @@
-import { firedRunCount, type Schedule } from "@getpie/contract";
+import { firedRunCount } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 
 import {
@@ -9,6 +9,8 @@ import {
   formatSpec,
   summarizeRuns,
 } from "./cadence";
+import { projectNameOf } from "./format";
+import { useSchedule } from "./schedule-context";
 import {
   ScheduleDetailActions,
   ScheduleDetailDescription,
@@ -24,43 +26,22 @@ import {
 } from "./schedule-panel";
 import { ScheduleRunHistory } from "./schedule-run-history";
 
-export type ScheduleDetailPanelProps = {
-  readonly schedule: Schedule;
-  readonly projectName: string;
-  readonly sessionLine: string | null;
-  readonly nowMs: number;
-  readonly running: boolean;
-  readonly onClose: () => void;
-  readonly onEdit: () => void;
-  readonly onDelete: () => void;
-  readonly onRunNow: () => void;
-  readonly onOpenSession: (sessionId: string) => void;
-};
-
-export function ScheduleDetailPanel({
-  schedule,
-  projectName,
-  sessionLine,
-  nowMs,
-  running,
-  onClose,
-  onEdit,
-  onDelete,
-  onRunNow,
-  onOpenSession,
-}: ScheduleDetailPanelProps) {
+export function ScheduleDetailPanel() {
+  const { actions, meta } = useSchedule();
+  const schedule = meta.selected;
+  if (schedule === undefined) return null;
   const lastRun = formatLastRun(schedule);
   const summary = formatRunSummary(summarizeRuns(schedule.runs));
   return (
     <SchedulePanel aria-label={schedule.name}>
       <SchedulePanelHeader>
         <SchedulePanelTitle>{schedule.name}</SchedulePanelTitle>
-        <SchedulePanelClose onClick={onClose} />
+        <SchedulePanelClose onClick={() => actions.closePanel()} />
       </SchedulePanelHeader>
       <SchedulePanelBody className="gap-4">
         <ScheduleDetailDescription>
           <ScheduleDetailLine>
-            {projectName} · {formatSpec(schedule.spec)}
+            {projectNameOf(meta.projects, schedule.projectId)} · {formatSpec(schedule.spec)}
           </ScheduleDetailLine>
           <ScheduleDetailLine>
             {formatNextRun(
@@ -70,7 +51,9 @@ export function ScheduleDetailPanel({
               schedule.maxRuns,
             )}
           </ScheduleDetailLine>
-          {sessionLine !== null ? <ScheduleDetailLine>{sessionLine}</ScheduleDetailLine> : null}
+          {meta.sessionLine !== null ? (
+            <ScheduleDetailLine>{meta.sessionLine}</ScheduleDetailLine>
+          ) : null}
           {schedule.maxRuns !== undefined ? (
             <ScheduleDetailLine>
               {formatFiredCap(firedRunCount(schedule), schedule.maxRuns)}
@@ -80,19 +63,28 @@ export function ScheduleDetailPanel({
           {summary !== null ? <ScheduleDetailLine>{summary}</ScheduleDetailLine> : null}
         </ScheduleDetailDescription>
         <ScheduleDetailActions>
-          <Button disabled={running} onClick={onRunNow} size="sm" variant="ghost">
+          <Button
+            disabled={meta.running}
+            onClick={() => actions.runNow(schedule.id)}
+            size="sm"
+            variant="ghost"
+          >
             Run now
           </Button>
-          <Button onClick={onEdit} size="sm" variant="ghost">
+          <Button onClick={() => actions.edit(schedule.id)} size="sm" variant="ghost">
             Edit
           </Button>
-          <Button onClick={onDelete} size="sm" variant="ghost">
+          <Button onClick={() => actions.askDelete(schedule.id)} size="sm" variant="ghost">
             Delete
           </Button>
         </ScheduleDetailActions>
         <ScheduleDetailHistory>
           <h3 className="text-sm font-medium">Recent runs</h3>
-          <ScheduleRunHistory nowMs={nowMs} onOpenSession={onOpenSession} schedule={schedule} />
+          <ScheduleRunHistory
+            nowMs={meta.nowMs}
+            onOpenSession={(sessionId) => actions.openSession(schedule.projectId, sessionId)}
+            schedule={schedule}
+          />
         </ScheduleDetailHistory>
       </SchedulePanelBody>
     </SchedulePanel>

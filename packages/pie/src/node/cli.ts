@@ -127,13 +127,13 @@ const relayListen = Command.make("listen", relayListenFlags, runRelayListen).pip
 );
 
 const relayAttachFlags = {
-  to: Flag.string("to").pipe(
+  to: Flag.String("to").pipe(
     Flag.withDescription("Public relay host:port (e.g. 96.44.165.19:8443)"),
   ),
-  control: Flag.string("control").pipe(
+  control: Flag.String("control").pipe(
     Flag.withDescription("Control host:port printed by pie relay listen"),
   ),
-  local: Flag.string("local").pipe(
+  local: Flag.String("local").pipe(
     Flag.withDescription("Foreground pie serve host:port instead of the running daemon"),
     Flag.optional,
   ),

@@ -15,7 +15,7 @@ import {
   tailFile,
 } from "../runtime/fs.ts";
 import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
-import { ensureSampleProject, type SampleProject } from "../runtime/scaffold.ts";
+import { ensureSampleProject, seedSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
 import { writeBrowserEnvFile } from "./env.ts";
@@ -26,9 +26,10 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
     allowServe: identity.allowServe,
+    allowEmptyProjects: identity.id !== "cli",
     usage: identity.allowServe
       ? `${identity.bin} launch [--replace] [--serve]`
-      : `${identity.bin} launch [--replace]`,
+      : `${identity.bin} launch [--replace] [--empty-projects]`,
   });
   const repo = findRepoRoot();
   if (
@@ -120,6 +121,9 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
       NODE_ENV: "development",
     },
   });
+  if (ctx.surface !== "cli" && ctx.request.seedProject === true) {
+    seedSampleProject(pieHome, ctx.sample);
+  }
   writeRunMeta(path.join(runDir, "meta.json"), initialMeta(ctx));
   setCurrentRun(identity.currentLink, runDir);
 
@@ -174,13 +178,16 @@ function toLaunchCtx(
   },
 ): LaunchCtx {
   switch (identity.id) {
-    case "web":
+    case "web": {
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "web",
         vitePort: identity.vitePort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
+        env: { ...base.env, PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot },
       };
+    }
     case "cli": {
       return {
         ...base,
@@ -189,13 +196,15 @@ function toLaunchCtx(
     }
     case "desktop": {
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "desktop",
         cdpPort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
         env: {
           ...base.env,
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };
@@ -208,9 +217,12 @@ function toLaunchCtx(
   }
 }
 
-function scaffold(identity: Extract<SurfaceIdentity, { sample: unknown }>): SampleProject {
+function scaffold(
+  identity: Extract<SurfaceIdentity, { sample: unknown }>,
+  projectBrowseRoot: string,
+): SampleProject {
   return ensureSampleProject({
-    home: process.env.HOME ?? "",
+    home: projectBrowseRoot,
     name: identity.sample.name,
     marker: identity.sample.marker,
     readme: identity.sample.readme,

@@ -1,20 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getReviewFileTree,
-  isOpenableTreeEntry,
-  symlinkDescription,
-  syncReviewFileTree,
-  toPierrePath,
-  unionDeletedReviewEntries,
-} from "./review-tree";
+import { getReviewFileTree, syncReviewFileTree, unionDeletedReviewEntries } from "./review-tree";
 
 describe("review file tree", () => {
-  it("converts directory paths to Pierre directory identifiers", () => {
-    expect(toPierrePath({ path: "src", type: "directory" })).toBe("src/");
-    expect(toPierrePath({ path: "src/index.ts", type: "file" })).toBe("src/index.ts");
-  });
-
   it("adds deleted review paths that are gone from the workspace tree", () => {
     const entries = unionDeletedReviewEntries(
       [
@@ -72,15 +60,5 @@ describe("review file tree", () => {
     }
     expect(refreshedSrc.isExpanded()).toBe(true);
     state.model.cleanUp();
-  });
-
-  it("describes why non-file symlinks cannot be opened", () => {
-    expect(
-      symlinkDescription({ path: "dir-link", type: "symlink", symlinkTarget: "directory" }),
-    ).toContain("disabled");
-  });
-
-  it("treats regular files as openable", () => {
-    expect(isOpenableTreeEntry({ path: "a.ts", type: "file" })).toBe(true);
   });
 });

@@ -16,7 +16,7 @@ export type BatchPart = ToolUIPart | ReasoningUIPart;
 
 export type IndexedBatchPart = { part: BatchPart; index: number };
 
-export type RenderItem =
+type RenderItem =
   | {
       kind: "tool-batch";
       parts: IndexedBatchPart[];
