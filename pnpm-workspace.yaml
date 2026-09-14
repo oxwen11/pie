@@ -53,14 +53,12 @@ catalogs:
   # runtime (stable client imports ORPC_HEADER, absent from the beta contract).
   # The published beta packages depend on each other with exact versions, so
   # pinning the direct deps here is sufficient — no override needed.
-  # Hold at beta.32: beta.35 logs expected ORPCError as "desktop rpc failed"
-  # (breaks Desktop MessagePort RPC silence for expected errors).
   orpc:
-    "@orpc/client": 2.0.0-beta.32
-    "@orpc/contract": 2.0.0-beta.32
-    "@orpc/experimental-effect": 2.0.0-beta.32
-    "@orpc/server": 2.0.0-beta.32
-    "@orpc/tanstack-query": 2.0.0-beta.32
+    "@orpc/client": 2.0.0-beta.35
+    "@orpc/contract": 2.0.0-beta.35
+    "@orpc/experimental-effect": 2.0.0-beta.35
+    "@orpc/server": 2.0.0-beta.35
+    "@orpc/tanstack-query": 2.0.0-beta.35
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
   # split that singleton, so the family upgrades together.
   tiptap:
