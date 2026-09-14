@@ -1,8 +1,9 @@
-import type { Project, Schedule } from "@getpie/contract";
 import { useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
+import type { ReactNode } from "react";
 
-import { ScheduleCreateForm, ScheduleEditForm, type ScheduleFormSubmit } from "./schedule-form";
+import { useSchedule } from "./schedule-context";
+import { ScheduleCreateForm, ScheduleEditForm } from "./schedule-form";
 import {
   SchedulePanel,
   SchedulePanelBody,
@@ -17,26 +18,56 @@ const EDITOR_TRANSITION = {
   ease: [0.32, 0.72, 0, 1],
 } as const;
 
-export type ScheduleEditorState =
-  | { readonly mode: "create"; readonly projectId?: string; readonly sessionId?: string }
-  | { readonly mode: "edit"; readonly schedule: Schedule };
+export function ScheduleEditorPanel() {
+  const { actions, meta } = useSchedule();
+  if (meta.createOpen) {
+    return (
+      <ScheduleEditorFrame
+        heading="New schedule"
+        onClose={() => actions.closeCreate()}
+        submitting={meta.submitting}
+      >
+        <ScheduleCreateForm
+          defaults={meta.createDefaults}
+          onCancel={() => actions.closeCreate()}
+          onSubmit={(value) => actions.create(value)}
+          projects={meta.projects}
+          submitting={meta.submitting}
+        />
+      </ScheduleEditorFrame>
+    );
+  }
+  const schedule = meta.editing;
+  if (schedule === undefined) return null;
+  return (
+    <ScheduleEditorFrame
+      heading="Edit schedule"
+      onClose={() => actions.cancelEdit()}
+      submitting={meta.submitting}
+    >
+      <ScheduleEditForm
+        key={schedule.id}
+        onCancel={() => actions.cancelEdit()}
+        onSubmit={(value) => actions.save(schedule.id, value)}
+        projects={meta.projects}
+        schedule={schedule}
+        submitting={meta.submitting}
+      />
+    </ScheduleEditorFrame>
+  );
+}
 
-export type ScheduleEditorPanelProps = {
-  readonly editor: ScheduleEditorState;
-  readonly projects: ReadonlyArray<Project>;
-  readonly submitting: boolean;
-  readonly onClose: () => void;
-  readonly onSubmit: (value: ScheduleFormSubmit) => void;
-};
-
-export function ScheduleEditorPanel({
-  editor,
-  projects,
+function ScheduleEditorFrame({
+  heading,
   submitting,
   onClose,
-  onSubmit,
-}: ScheduleEditorPanelProps) {
-  const heading = editor.mode === "create" ? "New schedule" : "Edit schedule";
+  children,
+}: {
+  heading: string;
+  submitting: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   const reduceMotion = useReducedMotion() === true;
   return (
     <m.div
@@ -54,24 +85,7 @@ export function ScheduleEditorPanel({
           <p className="text-muted-foreground mb-4 text-sm">
             When this is due, pie starts a session in the project and sends the prompt.
           </p>
-          {editor.mode === "create" ? (
-            <ScheduleCreateForm
-              defaults={{ projectId: editor.projectId, sessionId: editor.sessionId }}
-              onCancel={onClose}
-              onSubmit={onSubmit}
-              projects={projects}
-              submitting={submitting}
-            />
-          ) : (
-            <ScheduleEditForm
-              key={editor.schedule.id}
-              onCancel={onClose}
-              onSubmit={onSubmit}
-              projects={projects}
-              schedule={editor.schedule}
-              submitting={submitting}
-            />
-          )}
+          {children}
         </SchedulePanelBody>
       </SchedulePanel>
     </m.div>
