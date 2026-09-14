@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Option, PlatformError } from "effect";
+import { ByteSize, Effect, FileSystem, Layer, Option, PlatformError } from "effect";
 import { expect, it } from "vitest";
 
 import { findExecutable, type FindExecutableDeps } from "./executable";
@@ -15,7 +15,7 @@ const fileInfo = (type: FileSystem.File.Info["type"], mode: number): FileSystem.
   uid: Option.none(),
   gid: Option.none(),
   rdev: Option.none(),
-  size: FileSystem.Size(0),
+  size: ByteSize.bytes(0),
   blksize: Option.none(),
   blocks: Option.none(),
 });

@@ -1,8 +1,8 @@
 import { clearPairingSession, type StoredPairingSession } from "./pairing-session";
 
-export type PairingMode = "open" | "required";
+type PairingMode = "open" | "required";
 
-export type PairingAccess =
+type PairingAccess =
   | { readonly kind: "open" }
   | { readonly kind: "session"; readonly session: StoredPairingSession }
   | { readonly kind: "pair" };
