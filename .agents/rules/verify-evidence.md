@@ -74,8 +74,10 @@ browser and no UI evidence requirement.
 
 ## Non-negotiables
 
-- No screenshots of a mocked or hand-seeded state — drive the real user path
-  (see the Evidence standards in each `verify-pie*` skill).
+- No screenshots of mocked or manually edited state. Verify's default run-local
+  sample Project is approved setup for features other than Import project. For
+  Import project, launch with `--replace --empty-projects` and drive the real
+  import path (see the Evidence standards in each `verify-pie*` skill).
 - Do not swap the video for a snapshot series or a description of what happened.
 - A green Playwright e2e run (`apps/desktop/e2e/`, test mode) does not replace
   this evidence for a UI change.

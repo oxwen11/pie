@@ -219,11 +219,25 @@ describe("desktop launch lifecycle", () => {
       ),
     ).toBe(true);
     expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(meta.pieHome, "storage/projects.json"), "utf8")),
+    ).toMatchObject({
+      version: 1,
+      data: [{ name: "verify-pie-desktop-sample", path: meta.sampleProject }],
+    });
     const calls = browserTrace(root);
     expect(calls[0]?.args).toContain("--no-pin-tab");
     expect(calls[0]?.args).toContain("fixture-page");
     expect(calls.slice(1).every((call) => !call.args.includes("--no-pin-tab"))).toBe(true);
     expect(calls.at(-1)?.env.AGENT_BROWSER_PIN_TAB).toBe("true");
+  }, 10_000);
+
+  it("leaves the project list empty only when requested", async () => {
+    const { root, env } = await fixture();
+    const result = await start(env, "launch", "--empty-projects").exited;
+    expect(result.code).toBe(0);
+    const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
+    expect(fs.existsSync(path.join(meta.pieHome, "storage/projects.json"))).toBe(false);
   }, 10_000);
 
   it("reports installation failure without starting Desktop and preserves the log", async () => {

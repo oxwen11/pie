@@ -7,11 +7,11 @@ Same SPA flow as `.cursor/skills/verify-pie/features/import-project.md`. Drive t
 Real launch (not Playwright e2e — e2e seeds a project and uses fake-pi):
 
 ```bash
-pnpm exec pie-verify desktop launch
+pnpm exec pie-verify desktop launch --replace --empty-projects
 pnpm exec pie-verify desktop doctor
 ```
 
-Empty isolated home: heading **Import your first project**, button **Import project**. Launch creates `$PIE_HOME/workspace/verify-pie-desktop-sample`; the picker is confined to `$PIE_HOME/workspace`.
+`--empty-projects` is reserved for this import proof. It shows heading **Import your first project** and button **Import project** while still creating `$PIE_HOME/workspace/verify-pie-desktop-sample`; the picker is confined to `$PIE_HOME/workspace`.
 
 ## Driving it
 

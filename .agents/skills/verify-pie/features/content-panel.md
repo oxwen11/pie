@@ -27,7 +27,7 @@ agent-browser wait --text "Choose what to show alongside the chat."
 ```
 
 1. Pressed toggle; complementary/`data-slot="content-panel"` is in the tree (or the empty copy is visible). Hidden unmounts the column — it is not merely CSS-hidden.
-2. Click **Files**. Tab label **Files**. Tree named **Project files** lists the imported folder's files (`README.md` in `verify-pie-sample`).
+2. Click **Files**. Tab label **Files**. Tree named **Project files** lists the sample Project's files (`README.md` in `verify-pie-sample`).
 3. Click `README.md` if shown — the **Files** tab **becomes** **README.md** (File family). Preview is the file text.
 4. **Toggle content panel** again unmounts the column; chat and URL remain.
 
