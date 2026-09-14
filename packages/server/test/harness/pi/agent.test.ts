@@ -325,6 +325,41 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
+  it.effect("ends one runtime turn after all steered message segments", () =>
+    Effect.gen(function* () {
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      let finishCount = 0;
+      const collected = yield* Effect.forkChild(
+        Stream.runCollect(
+          session.events.pipe(
+            Stream.takeUntil((event) => {
+              if (event.body.type === "finish") finishCount += 1;
+              return event.body.type === "session.turn.ended" && finishCount === 2;
+            }),
+          ),
+        ),
+      );
+
+      yield* session.prompt({ parts: [{ type: "text", text: "hold" }] });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "split" }],
+        delivery: "steer",
+      });
+      yield* session.setModel({ provider: "p", modelId: "m2" });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "replace this" }],
+        delivery: "steer",
+      });
+
+      const types = Array.from(yield* Fiber.join(collected), (event) => event.body.type);
+      assert.equal(types.filter((type) => type === "finish").length, 2);
+      assert.equal(types.filter((type) => type === "session.turn.ended").length, 1);
+      yield* session.close;
+    }),
+  );
+
   it.effect("queues a follow-up on an active turn instead of starting a new one", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });

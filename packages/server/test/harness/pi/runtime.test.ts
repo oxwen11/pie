@@ -29,7 +29,9 @@ const makeFakeProcess = Effect.gen(function* () {
         Effect.succeed({
           turnId: TURN_ID,
           started: true,
-          output: streamFromQueueOne(output),
+          output: streamFromQueueOne(output).pipe(
+            Stream.takeUntil((chunk) => chunk.type === "finish"),
+          ),
         }),
       getEntries: () => unexpected(),
       requestPermission: () => Stream.empty,

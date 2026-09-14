@@ -236,40 +236,34 @@ export const makePiAgentRuntime = (
             yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
           }
 
-          const finished = yield* Ref.make(false);
+          const lastChunkWasFinish = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
           const pump = Stream.runForEach(prompt.output, (chunk) =>
-            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
+            Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
+              Effect.andThen(chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void),
               Effect.andThen(emit(chunk)),
-              Effect.andThen(
-                chunk.type === "finish"
-                  ? Ref.set(finished, true).pipe(
-                      Effect.andThen(Ref.get(outcome)),
-                      Effect.flatMap((turnOutcome) =>
-                        emit({
-                          type: "session.turn.ended",
-                          sessionId,
-                          turnId: prompt.turnId,
-                          outcome: turnOutcome,
-                        }).pipe(
-                          Effect.andThen(
-                            Ref.update(activeTurn, (current) =>
-                              current === prompt.turnId ? undefined : current,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Effect.void,
-              ),
             ),
           ).pipe(
-            Effect.flatMap(() => Ref.get(finished)),
-            Effect.flatMap((didFinish) =>
-              prompt.started && !didFinish
-                ? crash(new Error("Pi turn ended without a finish event"))
-                : Effect.void,
-            ),
+            Effect.flatMap(() => Ref.get(lastChunkWasFinish)),
+            Effect.flatMap((didFinish) => {
+              if (!prompt.started) return Effect.void;
+              if (!didFinish) return crash(new Error("Pi turn ended without a finish event"));
+              return Ref.get(outcome).pipe(
+                Effect.flatMap((turnOutcome) =>
+                  emit({
+                    type: "session.turn.ended",
+                    sessionId,
+                    turnId: prompt.turnId,
+                    outcome: turnOutcome,
+                  }),
+                ),
+                Effect.andThen(
+                  Ref.update(activeTurn, (current) =>
+                    current === prompt.turnId ? undefined : current,
+                  ),
+                ),
+              );
+            }),
             Effect.catch(crash),
           );
           yield* Effect.forkIn(pump, scope);
