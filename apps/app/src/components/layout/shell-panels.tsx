@@ -305,6 +305,7 @@ export function ShellSidebarPanel({
   const panelRef = usePanelRef();
   const panelElementRef = useRef<HTMLDivElement>(null);
   const drawer = useSidebarDrawer(open, setOpen, panelRef, panelElementRef);
+  const handleSidebarResize = drawer.onResize;
 
   return (
     <>
@@ -318,7 +319,7 @@ export function ShellSidebarPanel({
         id={PANEL_IDS.sidebar}
         maxSize="30rem"
         minSize={drawer.minSize}
-        onResize={drawer.onResize}
+        onResize={handleSidebarResize}
         panelRef={panelRef}
       >
         <m.div
