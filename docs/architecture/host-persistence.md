@@ -290,6 +290,34 @@ storage schema, migration or concurrent-install lock. Verification cleanup
 leaves the installed binary and shared download cache intact; packaged startup
 is unchanged.
 
+Verify prepares Electron before starting its service-readiness timeout. Both
+preparation and Desktop append to the existing run-local `logs/electron-vite.log`.
+The existing decimal `pids/electron-vite.pid` tracks the active launch phase:
+installer first, removed on successful installation, then replaced by the Desktop
+launcher pid. Paths, permissions and file formats are unchanged; older cleanup
+code can still stop the recorded process. Installation/startup failure or
+SIGINT/SIGTERM uses the normal run cleanup and failure-log retention, without
+removing Electron's dependency-owned binary or download cache.
+
+## Verify Desktop browser binding
+
+Verify uses agent-browser's existing native binding, not a second lock or target
+store. Fresh Desktop launch selects the existing renderer and then pins it;
+Doctor, reuse and evidence retain that binding. Runs without a usable binding
+must be cleaned up and relaunched, not automatically rebound.
+
+The native owner writes `{ targetId, url, pinned }` to
+`<socketDir>/namespaces/<session>/run/<session>.target`. The socket directory is
+normally `/tmp/pvs-<run-hash>`, derived from the run's real path; the existing
+`VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override remains caller-owned configuration
+and must not be shared by parallel runs. Agent-browser strips URL credentials,
+query and fragment, writes mode `0600` via a synced temporary file and rename,
+and restores the binding across its daemon restarts. Corrupt or unreadable
+bindings fail closed. Native format evolution and backward compatibility remain
+agent-browser-owned; Verify does not read or rewrite this file. Run metadata,
+browser config formats and permissions are unchanged. Existing cleanup removes
+managed socket trees with the run; no migration or separate uninstall is added.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the

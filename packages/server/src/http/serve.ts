@@ -20,15 +20,15 @@ import { createServer, ServerStartupError } from "./server";
 const DEFAULT_PORT = 4000;
 
 export const serveFlags = {
-  port: Flag.integer("port").pipe(
+  port: Flag.Int("port").pipe(
     Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
     Flag.optional,
   ),
-  corsOrigin: Flag.string("cors-origin").pipe(
+  corsOrigin: Flag.String("cors-origin").pipe(
     Flag.withDescription("Origin allowed to make cross-origin requests; repeatable"),
     Flag.atLeast(0),
   ),
-  allowedHost: Flag.string("allowed-host").pipe(
+  allowedHost: Flag.String("allowed-host").pipe(
     Flag.withDescription(
       "Extra Host header accepted besides loopback, for a trusted reverse proxy; repeatable",
     ),

@@ -77,7 +77,7 @@ export interface PanelSnapshot<View> {
   readonly openable: readonly OpenablePanel<View>[];
 }
 
-export interface ContentPanelOptions {
+interface ContentPanelOptions {
   /** Omit to keep everything in memory — the default in tests. */
   readonly storage?: Storage;
 }

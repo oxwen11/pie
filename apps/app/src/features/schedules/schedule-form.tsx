@@ -1,13 +1,6 @@
-import type {
-  Project,
-  Schedule,
-  ScheduleSession,
-  ScheduleSpec,
-  SessionSummary,
-} from "@getpie/contract";
+import type { Project, Schedule } from "@getpie/contract";
 import {
   scheduleSessionOf,
-  MAX_SCHEDULE_MAX_RUNS,
   MAX_SCHEDULE_NAME_CHARS,
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
@@ -35,7 +28,6 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  CREATE_ON_FIRST_RUN_VALUE,
   type ScheduleFormValues,
   defaultScheduleForm,
   formFromSpec,
@@ -47,21 +39,17 @@ import {
 } from "./cadence";
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
+import {
+  parseScheduleMaxRuns,
+  scheduleFormCanSubmit,
+  scheduleMaxRunsValid,
+  scheduleModelOptions,
+  scheduleSessionItems,
+  type ScheduleFormSubmit,
+} from "./schedule-form-model";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
 
-export type ScheduleFormSubmit = {
-  readonly name: string;
-  readonly projectId: string;
-  readonly prompt: string;
-  readonly spec: ScheduleSpec;
-  readonly worktree: boolean;
-  readonly session: ScheduleSession;
-  readonly expiresAt: string | null;
-  readonly maxRuns: number | null;
-  readonly runNow: boolean;
-  readonly provider?: string;
-  readonly modelId?: string;
-};
+export type { ScheduleFormSubmit } from "./schedule-form-model";
 
 export type ScheduleFormDefaults = {
   readonly projectId?: string;
@@ -135,87 +123,6 @@ function formFromSource(
   };
 }
 
-type ScheduleModel = {
-  readonly provider: string;
-  readonly modelId: string;
-  readonly name?: string;
-};
-
-type ScheduleSessionItem = { readonly label: string; readonly value: string };
-
-function includeSelectedModel(
-  models: ReadonlyArray<ScheduleModel>,
-  selected: ScheduleModel | undefined,
-): ReadonlyArray<ScheduleModel> {
-  if (
-    selected !== undefined &&
-    !models.some(
-      (model) => model.provider === selected.provider && model.modelId === selected.modelId,
-    )
-  ) {
-    return [...models, selected];
-  }
-  return models;
-}
-
-function listedSessionIds(
-  sessions: ReadonlyArray<SessionSummary>,
-  ready: boolean,
-): ReadonlySet<string> | undefined {
-  return ready ? new Set(sessions.map((session) => session.sessionId)) : undefined;
-}
-
-function scheduleSessionItems(
-  sessions: ReadonlyArray<SessionSummary>,
-  selected: string,
-): ReadonlyArray<ScheduleSessionItem> {
-  const items: ScheduleSessionItem[] = [
-    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
-    ...sessions.map((session) => ({
-      label: session.title ?? "New chat",
-      value: session.sessionId,
-    })),
-  ];
-  if (
-    selected !== CREATE_ON_FIRST_RUN_VALUE &&
-    !sessions.some((session) => session.sessionId === selected)
-  ) {
-    items.push({ label: "Selected session", value: selected });
-  }
-  return items;
-}
-
-function parseMaxRuns(value: string) {
-  const trimmed = value.trim();
-  if (trimmed === "") return { number: null, valid: true };
-  const number = Number(trimmed);
-  return {
-    number,
-    valid: Number.isInteger(number) && number >= 1 && number <= MAX_SCHEDULE_MAX_RUNS,
-  };
-}
-
-function canSubmitSchedule(
-  form: ScheduleFormValues,
-  submitting: boolean,
-  maxRunsValid: boolean,
-  listedModelCount: number,
-  model: ScheduleModel | undefined,
-): boolean {
-  return (
-    !submitting &&
-    maxRunsValid &&
-    form.name.trim().length > 0 &&
-    form.projectId.length > 0 &&
-    form.prompt.trim().length > 0 &&
-    (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" ||
-      (Number.isInteger(Number(form.everyAmount)) && Number(form.everyAmount) >= 1)) &&
-    (listedModelCount === 0 || model !== undefined)
-  );
-}
-
 function ScheduleFormFields({
   projects,
   source,
@@ -232,7 +139,7 @@ function ScheduleFormFields({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: form.projectId, archived: false },
     }),
-    enabled: form.reuseSession && form.projectId.length > 0,
+    enabled: scheduleSessionsEnabled(form.reuseSession, form.projectId),
   });
   const models = useQuery({
     ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
@@ -240,13 +147,21 @@ function ScheduleFormFields({
   });
   const listedModels = models.data?.models ?? [];
   const model = form.model ?? models.data?.defaultModel;
-  const modelOptions = includeSelectedModel(listedModels, model);
+  const modelOptions = scheduleModelOptions(listedModels, model);
   const listed = sessions.data ?? [];
-  const listedIds = listedSessionIds(listed, sessions.isSuccess);
+  const listedIds = listedSessionIds(sessions.isSuccess, listed);
   const selectedSessionValue = sessionSelectValue(form, listedIds);
   const sessionItems = scheduleSessionItems(listed, selectedSessionValue);
-  const maxRuns = parseMaxRuns(form.maxRuns);
-  const canSubmit = canSubmitSchedule(form, submitting, maxRuns.valid, listedModels.length, model);
+  const everyAmount = Number(form.everyAmount);
+  const maxRunsNumber = parseScheduleMaxRuns(form.maxRuns);
+  const maxRunsValid = scheduleMaxRunsValid(maxRunsNumber);
+  const canSubmit = scheduleFormCanSubmit({
+    submitting,
+    form,
+    everyAmount,
+    maxRunsValid,
+    hasModel: scheduleHasModel(listedModels.length, model !== undefined),
+  });
 
   return (
     <form
@@ -255,24 +170,22 @@ function ScheduleFormFields({
         event.preventDefault();
         if (!canSubmit) return;
         try {
-          const name = form.name.trim();
-          const prompt = form.prompt.trim();
           const spec = specFromForm({
             ...form,
-            name,
-            prompt,
+            name: form.name.trim(),
+            prompt: form.prompt.trim(),
             cron: form.cron.trim(),
           });
           setError(null);
           onSubmit({
-            name,
+            name: form.name.trim(),
             projectId: form.projectId,
-            prompt,
+            prompt: form.prompt.trim(),
             spec,
             worktree: form.worktree,
             session: sessionFromForm(form, listedIds),
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
-            maxRuns: maxRuns.number,
+            maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
             ...(model !== undefined
               ? { provider: model.provider, modelId: model.modelId }
@@ -296,19 +209,20 @@ function ScheduleFormFields({
       <Field>
         <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
         <Select
-          disabled={projectLocked || projects.length === 0}
+          disabled={scheduleProjectLocked(projectLocked, projects.length)}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
-            if (typeof next !== "string") return;
-            setForm((current) => ({
-              ...current,
-              projectId: next,
-              sessionPick: "create",
-              sessionId: "",
-              model: undefined,
-            }));
+            if (typeof next === "string") {
+              setForm((current) => ({
+                ...current,
+                projectId: next,
+                sessionPick: "create",
+                sessionId: "",
+                model: undefined,
+              }));
+            }
           }}
-          value={form.projectId === "" ? null : form.projectId}
+          value={scheduleProjectValue(form.projectId)}
         >
           <SelectTrigger id="schedule-project">
             <SelectValue placeholder="Select a project" />
@@ -364,30 +278,18 @@ function ScheduleFormFields({
           />
         </div>
       </Field>
-      {creating ? (
-        <Field>
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="min-w-0">
-              <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
-              <FieldDescription>
-                Start a session as soon as this schedule is created.
-              </FieldDescription>
-            </div>
-            <Switch
-              checked={form.runNow}
-              id="schedule-run-now"
-              onCheckedChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
-            />
-          </div>
-        </Field>
-      ) : null}
-      {error !== null ? <FieldError>{error}</FieldError> : null}
+      <ScheduleFormCreateOptions
+        creating={creating}
+        onRunNowChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
+        runNow={form.runNow}
+      />
+      <ScheduleFormError error={error} />
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="outline">
           Cancel
         </Button>
         <Button disabled={!canSubmit} type="submit">
-          {creating ? "Create" : "Save"}
+          {scheduleSubmitLabel(creating)}
         </Button>
       </div>
     </form>
@@ -427,5 +329,61 @@ export function ScheduleEditForm({
       source={{ kind: "edit", schedule }}
       submitting={submitting}
     />
+  );
+}
+
+function scheduleSubmitLabel(creating: boolean): string {
+  return creating ? "Create" : "Save";
+}
+
+function scheduleSessionsEnabled(reuseSession: boolean, projectId: string): boolean {
+  return reuseSession && projectId.length > 0;
+}
+
+function listedSessionIds(
+  isSuccess: boolean,
+  listed: ReadonlyArray<{ readonly sessionId: string }>,
+): Set<string> | undefined {
+  if (!isSuccess) return undefined;
+  return new Set(listed.map((session) => session.sessionId));
+}
+
+function scheduleHasModel(listedCount: number, modelPicked: boolean): boolean {
+  return listedCount === 0 || modelPicked;
+}
+
+function scheduleProjectLocked(projectLocked: boolean, projectCount: number): boolean {
+  return projectLocked || projectCount === 0;
+}
+
+function scheduleProjectValue(projectId: string): string | null {
+  return projectId === "" ? null : projectId;
+}
+
+function ScheduleFormError({ error }: { error: string | null }) {
+  if (error === null) return null;
+  return <FieldError>{error}</FieldError>;
+}
+
+function ScheduleFormCreateOptions({
+  creating,
+  runNow,
+  onRunNowChange,
+}: {
+  creating: boolean;
+  runNow: boolean;
+  onRunNowChange: (checked: boolean) => void;
+}) {
+  if (!creating) return null;
+  return (
+    <Field>
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="min-w-0">
+          <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
+          <FieldDescription>Start a session as soon as this schedule is created.</FieldDescription>
+        </div>
+        <Switch checked={runNow} id="schedule-run-now" onCheckedChange={onRunNowChange} />
+      </div>
+    </Field>
   );
 }

@@ -25,7 +25,7 @@ export default defineConfig({
       "effect",
       "@effect/platform-node-shared",
       "@effect/platform-node",
-      "@standardserver/shared",
+      "@standard-server/shared",
       "@orpc/experimental-effect",
       "simple-git",
       /^@simple-git\//,

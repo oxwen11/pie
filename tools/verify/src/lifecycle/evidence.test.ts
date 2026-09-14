@@ -11,10 +11,16 @@ describe("evidenceNeedsBrowser", () => {
   });
 
   it("skips the browser env for file-only evidence", () => {
-    for (const command of ["path", "init", "note", "side-effects", "curl"]) {
+    for (const command of ["path", "init", "note", "side-effects"]) {
       expect(evidenceNeedsBrowser("web", command)).toBe(false);
       expect(evidenceNeedsBrowser("desktop", command)).toBe(false);
     }
+  });
+
+  it("loads the browser env for Desktop curl evidence, but not web or CLI curl", () => {
+    expect(evidenceNeedsBrowser("desktop", "curl")).toBe(true);
+    expect(evidenceNeedsBrowser("web", "curl")).toBe(false);
+    expect(evidenceNeedsBrowser("cli", "curl")).toBe(false);
   });
 
   it("never touches a browser for the CLI surface", () => {
