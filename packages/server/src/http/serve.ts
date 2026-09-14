@@ -13,6 +13,7 @@ import {
 } from "../config/env";
 import { PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
+import { ResourceMonitoringLayer } from "../observability/resources";
 import { formatReadyLine } from "./handshake";
 import { listenServer } from "./listen";
 import { createServer, ServerStartupError } from "./server";
@@ -100,6 +101,7 @@ export const runServe = (input: ServeInput) =>
         }),
       ),
     ),
+    Effect.provide(ResourceMonitoringLayer),
     Effect.provide(Observability.layer()),
     Effect.provide(PathsLayer),
   );
