@@ -8,6 +8,7 @@ import { WebSocket } from "ws";
 
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";
+import { ResourceMonitoring, ResourceMonitoringDisabled } from "../../src/observability/resources";
 import type { RpcRuntime } from "../../src/rpc";
 import { structured, type LogRecord } from "../log-record";
 import { discardContext } from "../platform";
@@ -38,6 +39,32 @@ describe("createServer auth", () => {
     const base = await start({ authToken: TOKEN });
     const response = await fetch(`${base}/api/health`);
     expect(response.status).toBe(200);
+  });
+
+  it("accepts bounded authenticated Electron resource registration", async () => {
+    const registrations: unknown[] = [];
+    const effectContext = Context.add(await discardContext(), ResourceMonitoring, {
+      ...ResourceMonitoringDisabled,
+      enabled: true,
+      registerElectron: (registration) => registrations.push(registration),
+    });
+    const base = await start({ authToken: TOKEN, effectContext });
+    const response = await fetch(`${base}/api/resources/electron`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        instanceId: "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61",
+        revision: 1,
+        root: { pid: 123 },
+        processes: [{ process: { pid: 124 }, role: "electron-renderer" }],
+      }),
+    });
+    expect(response.status).toBe(204);
+    expect(registrations).toHaveLength(1);
   });
 
   it("does not expose an HTTP RPC endpoint", async () => {

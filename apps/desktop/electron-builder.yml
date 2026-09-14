@@ -27,11 +27,14 @@ asarUnpack:
   # rewrites app.asar → app.asar.unpacked. The sibling fff island is copied
   # into that unpacked tree in afterPack.
   - "**/node_modules/@getpie/server/dist/pi-process/**"
+  - "**/node_modules/@getpie/server/dist/resources/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
 # The Node daemon lives in asar; node-pty and pie-pi-process are unpacked.
 beforePack: scripts/before-pack.cjs
 extraResources:
   - vendor
+  - from: ../../packages/server/dist/resources
+    to: resources
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns
