@@ -355,10 +355,13 @@ operator's home directory. Verify overwrites an inherited value with its own
 run path; parallel runs therefore do not share this boundary.
 
 The sample has no independent schema or migration. Its marker retains the
-existing cleanup compatibility check. Normal cleanup removes the sample and
-then the whole run; it no longer probes the operator's home for a same-named
-legacy sample. Interrupted runs are retained with the rest of `$PIE_HOME` until
-normal Verify cleanup. Uninstall behavior is unchanged.
+existing cleanup compatibility check. Fresh Web and Desktop runs also seed the
+normal version-1 `$PIE_HOME/storage/projects.json` envelope with this sample;
+the server remains the schema owner. `launch --empty-projects` skips that file
+only for import-flow verification. Normal cleanup removes the sample and then
+the whole run; it no longer probes the operator's home for a same-named legacy
+sample. Interrupted runs are retained with the rest of `$PIE_HOME` until normal
+Verify cleanup. Uninstall behavior is unchanged.
 
 ## Development Electron installation
 

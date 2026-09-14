@@ -15,7 +15,7 @@ import {
   tailFile,
 } from "../runtime/fs.ts";
 import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
-import { ensureSampleProject, type SampleProject } from "../runtime/scaffold.ts";
+import { ensureSampleProject, seedSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
 import { writeBrowserEnvFile } from "./env.ts";
@@ -26,9 +26,10 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
     allowServe: identity.allowServe,
+    allowEmptyProjects: identity.id !== "cli",
     usage: identity.allowServe
       ? `${identity.bin} launch [--replace] [--serve]`
-      : `${identity.bin} launch [--replace]`,
+      : `${identity.bin} launch [--replace] [--empty-projects]`,
   });
   const repo = findRepoRoot();
   if (
@@ -120,6 +121,9 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
       NODE_ENV: "development",
     },
   });
+  if (ctx.surface !== "cli" && ctx.request.seedProject === true) {
+    seedSampleProject(pieHome, ctx.sample);
+  }
   writeRunMeta(path.join(runDir, "meta.json"), initialMeta(ctx));
   setCurrentRun(identity.currentLink, runDir);
 

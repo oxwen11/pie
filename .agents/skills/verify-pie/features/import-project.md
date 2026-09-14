@@ -11,8 +11,8 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 
 ## How to get to it (user POV)
 
-1. Open `http://localhost:4190/` — lands on `/draft`.
-2. If the isolated home is empty: click **Import project** in the empty state.
+1. Start a fresh empty run with `pnpm exec pie-verify web launch --replace --empty-projects`, then open `http://localhost:4190/` — lands on `/draft`.
+2. Click **Import project** in the empty state.
 3. If projects already exist: click **Import project** on the sidebar Projects header.
 4. In the dialog, enter the `$PIE_HOME/workspace/verify-pie-sample` folder created by launch.
 5. Click **Import this folder**.
@@ -20,6 +20,7 @@ Register a local folder as a **Project**. The server stores `{ id, name, path, c
 ## Driving it with agent-browser
 
 ```bash
+pnpm exec pie-verify web launch --replace --empty-projects
 pnpm exec pie-verify web doctor
 agent-browser open http://localhost:4190/
 # wait for empty heading or the draft composer — not the root-route flash
