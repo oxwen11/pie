@@ -64,6 +64,11 @@ export function resolvePieHome(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(os.homedir(), defaultPieHomeDir(resolveGitCheckout(import.meta.dirname)));
 }
 
+export function resolveProjectBrowseRoot(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const raw = env.PIE_PROJECT_BROWSE_ROOT;
+  return raw === undefined || raw.trim() === "" ? undefined : path.resolve(raw);
+}
+
 /** `$PIE_HOME/daemon` — pid, lock, and stop tombstone. */
 export const daemonDirectory = (home: string): string => path.join(home, "daemon");
 

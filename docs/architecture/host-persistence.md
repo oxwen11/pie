@@ -335,6 +335,31 @@ controls are delegated to the rendering library and browser download handling;
 they are user-initiated output, not Pie application state, and have no Pie-owned
 migration or retention policy.
 
+## Verify project picker isolation
+
+Web and Desktop Verify runs create one disposable sample workspace beneath the
+run's only `$PIE_HOME`:
+
+```text
+$PIE_HOME/workspace/verify-pie[-desktop]-sample/
+├── .verify-pie[-desktop]-scaffold
+└── README.md
+```
+
+Verify owns these non-sensitive, umask-permissioned files and sets
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` for the run's server. When this
+environment value is set, the project picker starts at that directory, reports
+no parent there, and resolves real paths before rejecting traversal or symlinks
+outside it. An unset or blank value preserves the production default of the
+operator's home directory. Verify overwrites an inherited value with its own
+run path; parallel runs therefore do not share this boundary.
+
+The sample has no independent schema or migration. Its marker retains the
+existing cleanup compatibility check. Normal cleanup removes the sample and
+then the whole run; it no longer probes the operator's home for a same-named
+legacy sample. Interrupted runs are retained with the rest of `$PIE_HOME` until
+normal Verify cleanup. Uninstall behavior is unchanged.
+
 ## Development Electron installation
 
 Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke

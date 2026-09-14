@@ -39,7 +39,7 @@ What launch also does:
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
+- Creates `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) and confines the project picker to `$PIE_HOME/workspace`. The picker cannot browse the host home or escape through `..` or symlinks.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
