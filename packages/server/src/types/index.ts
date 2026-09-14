@@ -29,8 +29,8 @@ export interface Session {
    * path when that create requested `worktree`.
    */
   readonly cwd?: string;
-  /** Branch checked out in `cwd` when this session has a git worktree. */
-  readonly gitBranch?: string;
+  /** Pie-created git worktree at `cwd`. Absent for sessions on the project path. */
+  readonly worktree?: { readonly branch: string };
   /** GitHub pull requests associated with this session, newest last. Identity only. */
   readonly pullRequestRefs?: ReadonlyArray<PullRequestRef>;
   /** Model selected at create; applied when Pi opens on the first prompt. */
