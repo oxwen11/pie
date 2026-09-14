@@ -37,16 +37,14 @@ describe("compaction lifecycle", () => {
       expect(state.phase).toBe("running");
     },
   );
-  it("replaces the replay floor and discards pre-compaction chunks without ending the turn", () => {
-    const messages = [{ id: "compact", role: "assistant" as const, parts: [] }];
+  it("discards only the replay buffer at the cold-history boundary without ending the turn", () => {
     const state = fold(
       { type: "session.turn.started", turnId: "t" },
       { type: "session.message.chunk", turnId: "t", chunk: { type: "start", messageId: "old" } },
-      { type: "session.compaction.ended", result: { outcome: "completed", messages } },
+      { type: "session.compaction.ended", result: { outcome: "completed" } },
       { type: "session.message.chunk", turnId: "t", chunk: { type: "start", messageId: "new" } },
     );
     const snapshot = toSnapshot(ref, state);
-    expect(snapshot.transcriptReset).toEqual({ seq: 3, messages });
     expect(snapshot.activeTurn?.chunks.map((e) => e.seq)).toEqual([4]);
     expect(snapshot.activeTurn?.complete).toBe(false);
     expect(snapshot.status.phase).toBe("running");

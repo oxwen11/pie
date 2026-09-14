@@ -288,8 +288,8 @@ export function createPiTransform(
 
       case "compaction_end":
         if (event.result && !event.aborted) {
-          // The client resets its fold at the lifecycle event. A continuation
-          // is a new UI message, NOT a finished agent turn.
+          // Existing clients retain every rendered message. A continuation is
+          // merely a new UI message, NOT a finished agent turn.
           pendingRestart = turnOpen;
           pendingAssistantStart = false;
           messageOrdinal = 0;
