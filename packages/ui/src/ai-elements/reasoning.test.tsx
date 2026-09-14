@@ -88,7 +88,9 @@ describe("Reasoning trigger", () => {
     expect(trigger.className).toContain("leading-5");
     expect(trigger.className).toContain("gap-2.5");
     const loader = trigger.querySelector('[data-slot="pie-loader"]');
-    expect(loader?.parentElement?.className).toContain("size-(--dot-grid-size,1em)");
+    expect(loader?.parentElement?.className).toContain("size-4");
+    // The loader keeps its own var-driven size instead of filling the slot.
+    expect(loader?.className).not.toContain("size-full");
     expect(trigger.querySelector(".lucide-square-plus")?.getAttribute("class")).toContain(
       "size-full",
     );
