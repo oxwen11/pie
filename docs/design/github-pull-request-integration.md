@@ -2,7 +2,15 @@
 
 ## Status
 
-Proposed.
+Historical V1 proposal; some details below no longer match the current implementation.
+
+The proposed follow-up, [Session PR: early association, demand-driven updates](session-pull-request-sync.md),
+addresses sidebar reliability, multiple linked PRs, and stacks. Agents register known PRs early;
+remote synchronization runs only while users need the data, not for the daemon's lifetime.
+Once accepted and implemented, it supersedes this document's sidebar data source, PR discovery,
+persistence, refresh ownership, and current-checkout-only panel scope. Until then it is a
+proposal, not a claim of shipped behavior. The CLI safety boundaries, mutation acknowledgement,
+and host-atomic stale-head protection below remain applicable.
 
 ## Summary
 
