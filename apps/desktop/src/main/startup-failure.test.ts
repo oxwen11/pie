@@ -15,7 +15,7 @@ describe("formatStartupFailure", () => {
   it("describes a config failure", () => {
     const result = Effect.runSync(
       Effect.result(
-        Config.int("PIE_PORT").pipe(
+        Config.Int("PIE_PORT").pipe(
           Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({ PIE_PORT: "nope" }))),
         ),
       ),

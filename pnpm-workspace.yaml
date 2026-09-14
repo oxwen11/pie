@@ -42,12 +42,10 @@ catalogs:
   # `@effect/platform-node-shared` is transitive-only and is listed so the
   # override below can pin it; no workspace package.json depends on it.
   effect:
-    # Hold at rc.112: rc.115 renames Config/Flag APIs (string→String, int→Int,
-    # etc.) — migrate deliberately, not via taze patch.
-    effect: 4.0.0-rc.112
-    "@effect/platform-node": 4.0.0-rc.112
-    "@effect/platform-node-shared": 4.0.0-rc.112
-    "@effect/vitest": 4.0.0-rc.112
+    effect: 4.0.0-rc.115
+    "@effect/platform-node": 4.0.0-rc.115
+    "@effect/platform-node-shared": 4.0.0-rc.115
+    "@effect/vitest": 4.0.0-rc.115
   # oRPC must move as one family: exact pins (no caret) because prerelease
   # caret ranges admit the 2.0.0 stable release, and a mixed tree crashes at
   # runtime (stable client imports ORPC_HEADER, absent from the beta contract).

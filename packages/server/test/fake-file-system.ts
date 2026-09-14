@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Option, PlatformError } from "effect";
+import { ByteSize, Effect, FileSystem, Layer, Option, PlatformError } from "effect";
 
 /** The `NotFound` a real platform FileSystem reports for a missing path. */
 export const notFound = (method: string, path: string): PlatformError.PlatformError =>
@@ -44,7 +44,7 @@ export const fileInfo = (
   uid: Option.none(),
   gid: Option.none(),
   rdev: Option.none(),
-  size: FileSystem.Size(0),
+  size: ByteSize.bytes(0),
   blksize: Option.none(),
   blocks: Option.none(),
 });
