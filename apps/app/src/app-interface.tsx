@@ -71,7 +71,7 @@ async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
   }
 }
 
-export class UnknownEnvironmentError extends Error {
+class UnknownEnvironmentError extends Error {
   constructor(readonly environmentId: string) {
     super(`Environment ${environmentId} is not connected`);
     this.name = "UnknownEnvironmentError";
@@ -130,7 +130,7 @@ function ResolveLocalEnvironment({
   server?: ServerConnection;
   tokenHolder?: { current: string };
 }): ReactElement {
-  const [promise] = useState(() => loadEnvironmentId(server));
+  const [promise, _setPromise] = useState(() => loadEnvironmentId(server));
   const environmentId = use(promise);
   return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }
