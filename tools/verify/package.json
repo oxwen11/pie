@@ -20,6 +20,10 @@
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
+  "dependencies": {
+    "@getpie/contract": "workspace:*",
+    "effect": "catalog:effect"
+  },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
     "@types/node": "catalog:",

@@ -3,6 +3,7 @@ import { RPCHandler as WsRPCHandler } from "@orpc/server/websocket";
 import { Cause, Context, Effect, Layer, ManagedRuntime, Option } from "effect";
 import type { WebSocket } from "ws";
 
+import { ResourceMonitoring, ResourceMonitoringDisabled } from "../observability/resources";
 import type { RpcContext } from "./context";
 import { router } from "./router";
 import { AgentRuntimeLayer } from "./runtime";
@@ -82,8 +83,15 @@ export async function createRpcRuntime(
   // observability loggers, and fibers forked while `AgentRuntimeLayer` is
   // building must see them. `mergeAll` leaves those forks on Effect's default
   // logger (OpenCode #34730).
+  const resources = Option.getOrElse(
+    Context.getOption(effectContext, ResourceMonitoring),
+    () => ResourceMonitoringDisabled,
+  );
   const runtime = ManagedRuntime.make(
-    AgentRuntimeLayer.pipe(Layer.provideMerge(Layer.succeedContext(effectContext))),
+    AgentRuntimeLayer.pipe(
+      Layer.provide(Layer.succeed(ResourceMonitoring, resources)),
+      Layer.provideMerge(Layer.succeedContext(effectContext)),
+    ),
   );
   const context: RpcContext = {
     "effect/context": await runtime.runPromise(runtime.contextEffect),
