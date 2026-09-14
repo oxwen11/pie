@@ -190,10 +190,11 @@ fn refresh(system: &mut System) {
 
 fn birth_matches(actual_seconds: u64, expected: Option<&BirthIdentity>) -> bool {
     expected.is_none_or(|identity| {
-        identity
-            .value
-            .parse::<u64>()
-            .is_ok_and(|value| value == actual_seconds.saturating_mul(1_000))
+        identity.value.parse::<u64>().is_ok_and(|value| {
+            let actual_ms = actual_seconds.saturating_mul(1_000);
+            let precision = identity.precision_ms.max(1_000);
+            value / precision == actual_ms / precision
+        })
     })
 }
 
@@ -208,4 +209,22 @@ fn role_priority(role: &str) -> u8 {
 
 pub fn now() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::birth_matches;
+    use crate::protocol::BirthIdentity;
+
+    #[test]
+    fn compares_birth_times_at_the_coarser_precision() {
+        assert!(birth_matches(
+            1_000,
+            Some(&BirthIdentity {
+                value: "1000999".to_owned(),
+                source: "electron".to_owned(),
+                precision_ms: 1,
+            }),
+        ));
+    }
 }
