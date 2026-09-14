@@ -102,7 +102,7 @@ export function ReviewTreeAdapter({
     onSelectFile(path);
   };
 
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+  const handleSelectFile = (event: MouseEvent<HTMLElement>): void => {
     openPath(pathFromComposedEvent(event));
   };
 
@@ -123,7 +123,7 @@ export function ReviewTreeAdapter({
       <PierreFileTree
         aria-label="Project files"
         model={state.model}
-        onClick={handleClick}
+        onClick={handleSelectFile}
         onKeyDown={handleKeyDown}
         style={TREE_STYLE}
       />

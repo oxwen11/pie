@@ -10,7 +10,7 @@ export function notifyUserLayoutListeners(
   for (const listener of listeners) listener();
 }
 
-export interface SidebarUserLayout {
+interface SidebarUserLayout {
   expandedWidth?: number;
   open?: boolean;
 }

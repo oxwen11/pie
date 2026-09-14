@@ -1,15 +1,18 @@
 import type { Project, WorkspaceQuery } from "@getpie/contract";
 import {
+  type GitBranch,
+  type GitRepositoryBranch,
+  type GitReview,
   type GitReviewFile,
   type GitReviewMode,
   isGitRepositoryBranch,
 } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
-import { skipToken, useQueries, useQuery } from "@tanstack/react-query";
+import { skipToken, useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
@@ -90,18 +93,16 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   });
   const branchData = branch.data;
   const repositoryBranch = isGitRepositoryBranch(branchData) ? branchData : undefined;
-  const other =
-    mode === "branch"
-      ? (instance.payload.other ?? repositoryBranch?.defaultBranch ?? undefined)
-      : undefined;
+  const defaultBranch = repositoryBranch?.defaultBranch ?? undefined;
+  const other = reviewCompareOther(mode, instance.payload.other, defaultBranch);
   const review = useQuery(
     orpcQueryUtils.git.review.queryOptions({
-      input: repositoryBranch === undefined ? skipToken : reviewInput(gitWorkspace, mode, other),
+      input: skipUnlessBranch(repositoryBranch, reviewInput(gitWorkspace, mode, other)),
     }),
   );
   const tree = useQuery(
     orpcQueryUtils.fs.readTree.queryOptions({
-      input: repositoryBranch === undefined ? skipToken : gitWorkspace,
+      input: skipUnlessBranch(repositoryBranch, gitWorkspace),
     }),
   );
   const diffs = useQueries({
@@ -113,6 +114,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   });
   const [locateRequest, setLocateRequest] = useState(0);
   const selectedPath = instance.payload.path;
+  const workspaceName = projectName ?? "Workspace";
 
   const selectFile = useCallback(
     (path: string) => {
@@ -126,7 +128,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     (next: GitReviewMode) => {
       instance.setPayload((current) => {
         if (next === "branch") {
-          const nextOther = current.other ?? repositoryBranch?.defaultBranch ?? undefined;
+          const nextOther = current.other ?? defaultBranch ?? undefined;
           return {
             ...current,
             mode: next,
@@ -137,7 +139,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
         return { ...rest, mode: next };
       });
     },
-    [instance, repositoryBranch?.defaultBranch],
+    [instance, defaultBranch],
   );
 
   const setOther = useCallback(
@@ -147,8 +149,6 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     [instance],
   );
 
-  const heading = review.data === undefined ? "" : reviewHeading(review.data);
-
   if (panel === null) {
     return (
       <ReviewState title="Workspace unavailable">
@@ -157,76 +157,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
     );
   }
 
-  if (branch.isPending && branch.data === undefined) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (branch.isError && branch.data === undefined) {
-    return (
-      <ReviewState title="Unable to inspect repository" onRetry={() => void branch.refetch()}>
-        {branch.error.message}
-      </ReviewState>
-    );
-  }
-
-  if (branchData?.kind === "not-repository") {
-    return (
-      <ReviewState title="Not a Git repository">
-        Open a Git project to review uncommitted work, commits, or another branch.
-      </ReviewState>
-    );
-  }
-
-  if (branchData?.kind === "workspace-unavailable") {
-    return (
-      <ReviewState title="Workspace unavailable">
-        This session&apos;s workspace folder no longer exists or cannot be read.
-      </ReviewState>
-    );
-  }
-
-  if (mode === "branch" && other === undefined && !branch.isPending) {
-    return (
-      <ReviewState title="Compare branch not found">
-        This repository has no local default branch or remote-tracking ref to compare against.
-      </ReviewState>
-    );
-  }
-
-  if (
-    (review.isPending && review.data === undefined) ||
-    (mode === "branch" && other === undefined)
-  ) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <Spinner className="text-muted-foreground size-4" />
-      </div>
-    );
-  }
-
-  if (review.isError && review.data === undefined) {
-    return (
-      <ReviewState title={reviewErrorTitle(review.error)} onRetry={() => void review.refetch()}>
-        {reviewErrorMessage(review.error)}
-      </ReviewState>
-    );
-  }
-
-  const workspaceName = projectName ?? "Workspace";
-  const workspacePath = tree.data?.cwd ?? "";
-  const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
-  const refresh = (): void => {
-    void Promise.all([
-      review.refetch(),
-      branch.refetch(),
-      tree.refetch(),
-      ...diffs.map((diff) => diff.refetch()),
-    ]);
-  };
+  const placeholder = reviewPanelPlaceholder(branch, review, mode, other);
+  if (placeholder !== null) return placeholder;
 
   return (
     <ReviewWorkspaceLayout
@@ -237,7 +169,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           sessionId={panel.sessionKey}
           tree={tree}
           workspaceName={workspaceName}
-          workspacePath={workspacePath}
+          workspacePath={tree.data?.cwd ?? ""}
         />
       }
       filesLabel={workspaceName}
@@ -253,17 +185,100 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
       toolbar={
         <ReviewToolbar
           branch={repositoryBranch}
-          heading={heading}
+          heading={review.data === undefined ? "" : reviewHeading(review.data)}
           mode={mode}
           onModeChange={setMode}
           onOtherChange={setOther}
-          onRefresh={refresh}
+          onRefresh={() => {
+            void Promise.all([
+              review.refetch(),
+              branch.refetch(),
+              tree.refetch(),
+              ...diffs.map((diff) => diff.refetch()),
+            ]);
+          }}
           other={other}
-          refreshing={refreshing}
+          refreshing={review.isFetching || branch.isFetching || tree.isFetching}
         />
       }
     />
   );
+}
+
+function reviewCompareOther(
+  mode: GitReviewMode,
+  payloadOther: string | undefined,
+  defaultBranch: string | undefined,
+): string | undefined {
+  if (mode !== "branch") return undefined;
+  return payloadOther ?? defaultBranch;
+}
+
+function skipUnlessBranch<T>(
+  repositoryBranch: GitRepositoryBranch | undefined,
+  value: T,
+): T | typeof skipToken {
+  if (repositoryBranch === undefined) return skipToken;
+  return value;
+}
+
+function ReviewSpinner() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center">
+      <Spinner className="text-muted-foreground size-4" />
+    </div>
+  );
+}
+
+function reviewPanelPlaceholder(
+  branch: UseQueryResult<GitBranch>,
+  review: UseQueryResult<GitReview>,
+  mode: GitReviewMode,
+  other: string | undefined,
+): ReactNode {
+  if (branch.isPending && branch.data === undefined) return <ReviewSpinner />;
+  if (branch.isError && branch.data === undefined) {
+    return (
+      <ReviewState onRetry={() => void branch.refetch()} title="Unable to inspect repository">
+        {branch.error.message}
+      </ReviewState>
+    );
+  }
+  if (branch.data?.kind === "not-repository") {
+    return (
+      <ReviewState title="Not a Git repository">
+        Open a Git project to review uncommitted work, commits, or another branch.
+      </ReviewState>
+    );
+  }
+  if (branch.data?.kind === "workspace-unavailable") {
+    return (
+      <ReviewState title="Workspace unavailable">
+        This session&apos;s workspace folder no longer exists or cannot be read.
+      </ReviewState>
+    );
+  }
+  if (mode === "branch" && other === undefined && !branch.isPending) {
+    return (
+      <ReviewState title="Compare branch not found">
+        This repository has no local default branch or remote-tracking ref to compare against.
+      </ReviewState>
+    );
+  }
+  if (
+    (review.isPending && review.data === undefined) ||
+    (mode === "branch" && other === undefined)
+  ) {
+    return <ReviewSpinner />;
+  }
+  if (review.isError && review.data === undefined && review.error !== null) {
+    return (
+      <ReviewState onRetry={() => void review.refetch()} title={reviewErrorTitle(review.error)}>
+        {reviewErrorMessage(review.error)}
+      </ReviewState>
+    );
+  }
+  return null;
 }
 
 function reviewErrorTitle(error: Error): string {
