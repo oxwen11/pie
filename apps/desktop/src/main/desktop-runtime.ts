@@ -10,13 +10,33 @@ import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
 
 import icon from "../../resources/icon.png?asset";
-import { makeDesktopConfigLive } from "./desktop-config";
+import { DesktopApplication } from "./application/desktop-application";
+import { DesktopConfig, makeDesktopConfigLive } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
-import { registerAppScheme } from "./electron/app-protocol";
-import { MainWindow, MainWindowLive } from "./electron/main-window";
+import { registerAppProtocol, registerAppScheme } from "./electron/app-protocol";
+import { MainWindow, makeMainWindow, rendererRoot } from "./electron/main-window";
+import { RendererChannel } from "./electron/renderer-channel";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
+
+const MainWindowLive = Layer.effect(
+  MainWindow,
+  Effect.gen(function* () {
+    const config = yield* DesktopConfig;
+    const channel = yield* RendererChannel;
+    const application = yield* DesktopApplication;
+    const runFork = Effect.runForkWith(yield* Effect.context());
+    yield* registerAppProtocol(rendererRoot());
+    return yield* makeMainWindow({
+      devUrl: config.devUrl,
+      connectRenderer: channel.connect,
+      onVisibilityChanged: (visible) => {
+        runFork(application.setWindowVisible(visible));
+      },
+    });
+  }),
+);
 
 function makeRuntime(devUrl: string | undefined) {
   // The Node platform services: the daemon launcher's file state and token

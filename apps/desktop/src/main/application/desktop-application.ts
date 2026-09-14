@@ -1,4 +1,4 @@
-import { Context, Effect, Stream } from "effect";
+import { Context, Effect, Stream, SubscriptionRef } from "effect";
 
 import type {
   ServerConnection,
@@ -21,6 +21,8 @@ export class DesktopApplication extends Context.Service<
     readonly bootstrap: Effect.Effect<DesktopBootstrap>;
     readonly serverConnection: Effect.Effect<ServerConnection>;
     readonly watchServerStatus: (after: number) => Stream.Stream<ServerStatusSnapshot>;
+    readonly windowVisibility: Stream.Stream<boolean>;
+    readonly setWindowVisible: (visible: boolean) => Effect.Effect<void>;
     readonly retryServer: Effect.Effect<void>;
     readonly quit: Effect.Effect<void>;
   }
@@ -34,22 +36,27 @@ export type DesktopApplicationDependencies = {
 export function makeDesktopApplication({
   server,
   quit,
-}: DesktopApplicationDependencies): DesktopApplication["Service"] {
-  return {
-    bootstrap: Effect.gen(function* () {
-      const current = yield* server.snapshot;
-      return {
-        status: current.status,
-        statusRevision: current.revision,
-        os: currentOs(),
-      };
-    }),
-    serverConnection: server.connection,
-    // v4 SubscriptionRef.changes replays the latest snapshot on subscribe
-    // (PubSub replay: 1), so the stream always starts from the current status.
-    watchServerStatus: (after) =>
-      server.changes.pipe(Stream.filter((snapshot) => snapshot.revision > after)),
-    retryServer: server.retry,
-    quit,
-  } satisfies DesktopApplication["Service"];
+}: DesktopApplicationDependencies): Effect.Effect<DesktopApplication["Service"]> {
+  return Effect.gen(function* () {
+    const visible = yield* SubscriptionRef.make(false);
+    return {
+      bootstrap: Effect.gen(function* () {
+        const current = yield* server.snapshot;
+        return {
+          status: current.status,
+          statusRevision: current.revision,
+          os: currentOs(),
+        };
+      }),
+      serverConnection: server.connection,
+      // v4 SubscriptionRef.changes replays the latest snapshot on subscribe
+      // (PubSub replay: 1), so the stream always starts from the current status.
+      watchServerStatus: (after) =>
+        server.changes.pipe(Stream.filter((snapshot) => snapshot.revision > after)),
+      windowVisibility: SubscriptionRef.changes(visible),
+      setWindowVisible: (value) => SubscriptionRef.set(visible, value),
+      retryServer: server.retry,
+      quit,
+    } satisfies DesktopApplication["Service"];
+  });
 }

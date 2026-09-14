@@ -16,7 +16,7 @@ export const DesktopApplicationLive = Layer.effect(
   DesktopApplication,
   Effect.gen(function* () {
     const server = yield* LocalServer;
-    return makeDesktopApplication({
+    return yield* makeDesktopApplication({
       server,
       quit: Effect.sync(() => {
         setTimeout(() => app.quit(), 0);

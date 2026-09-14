@@ -24,6 +24,13 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
         );
       }),
     },
+    window: {
+      visibility: orpc.window.visibility.effect(function* () {
+        return yield* Effect.sync(() =>
+          streamToAsyncIteratorObject(Stream.toReadableStream(application.windowVisibility)),
+        );
+      }),
+    },
     server: {
       connection: orpc.server.connection.effect(function* () {
         return yield* application.serverConnection;

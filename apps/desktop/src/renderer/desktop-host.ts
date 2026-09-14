@@ -39,8 +39,55 @@ export function createDesktopHost(
   let status = bootstrap.status;
   let statusRevision = bootstrap.statusRevision;
 
+  // Start closed: Electron reports a show:false window as document-visible.
+  // One replaying Main stream owns the snapshot for all renderer consumers.
+  let visible = false;
+  const visibilityListeners = new Set<() => void>();
+  let stopVisibility: (() => void) | undefined;
+  const setVisible = (value: boolean) => {
+    if (visible === value) return;
+    visible = value;
+    for (const listener of visibilityListeners) listener();
+  };
+  const visibility = {
+    getSnapshot: () => visible,
+    subscribe: (listener: () => void) => {
+      visibilityListeners.add(listener);
+      if (!stopVisibility) {
+        const controller = new AbortController();
+        const unsubscribe = consumeEventIterator(
+          client.window.visibility(undefined, { signal: controller.signal }),
+          {
+            onEvent: (value) => {
+              if (!controller.signal.aborted) setVisible(value);
+            },
+            onError: () => {
+              if (!controller.signal.aborted) setVisible(false);
+            },
+            onFinish: () => {
+              if (!controller.signal.aborted) setVisible(false);
+            },
+          },
+        );
+        stopVisibility = () => {
+          controller.abort();
+          void unsubscribe().catch(() => {});
+          setVisible(false);
+        };
+      }
+      return () => {
+        visibilityListeners.delete(listener);
+        if (visibilityListeners.size === 0) {
+          stopVisibility?.();
+          stopVisibility = undefined;
+        }
+      };
+    },
+  };
+
   return {
     platform: {
+      visibility,
       quit: () => {
         void client.app.quit().catch((error: unknown) => {
           if (!isAbortError(error)) console.error("Failed to request desktop quit", error);

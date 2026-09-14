@@ -44,6 +44,9 @@ export const desktopContract = {
       .input(StatusSubscribeInputSchema)
       .output(asyncIteratorObject(toStandardSchema(ServerStatusSnapshotSchema))),
   },
+  window: {
+    visibility: oc.output(asyncIteratorObject(toStandardSchema(Schema.Boolean))),
+  },
   server: {
     connection: oc.output(ServerConnectionSchema),
     retry: oc.output(Schema.Void),
