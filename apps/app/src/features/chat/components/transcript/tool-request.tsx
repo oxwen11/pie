@@ -34,7 +34,7 @@ function InputSummary({ input }: { input: unknown }) {
   if (input == null) return null;
   const text =
     typeof input === "object"
-      ? Object.entries(input as Record<string, unknown>)
+      ? Object.entries(input)
           .slice(0, 3)
           .map(([k, v]) => `${k}: ${stringifyInputValue(v)}`)
           .join("\n")

@@ -40,7 +40,7 @@ const assistant = (over = {}) => ({
 const upd = (ev) =>
   send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
 const settle = (last) => {
-  send({ type: "agent_end", messages: [last || assistant()], willRetry: false });
+  send({ type: "agent_end", messages: [last ?? assistant()], willRetry: false });
   send({ type: "agent_settled" });
 };
 

@@ -21,8 +21,8 @@ import type { PiUIMessageChunk } from "./ui-message";
 //     persisted history fold. The echo of the *prompting* input arrives
 //     before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
-//     The AI-SDK tool chunks are generic, so args/results forward whole; the
-//     PiTools types still discriminate `message.parts` downstream.
+//     Successful read output drops file content because the UI only renders
+//     its input path; other tool results forward whole.
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
@@ -31,25 +31,27 @@ import type { PiUIMessageChunk } from "./ui-message";
 //   • agent_start/agent_settled → `start`/`finish`; a retry re-emits
 //     agent_start, so `start` is guarded to fire once per turn.
 
-type AssistantMessage = Extract<
-  Extract<AgentSessionEvent, { type: "message_end" }>["message"],
-  { role: "assistant" }
->;
-
 /** A tool result's display text: the concatenated text blocks of its content. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function toolResultText(result: unknown): string {
-  const content = (result as { content?: unknown } | undefined)?.content;
+  const content = isRecord(result) ? result.content : undefined;
   if (!Array.isArray(content)) return "";
   return content
     .filter(
       (block): block is { type: "text"; text: string } =>
-        typeof block === "object" &&
-        block !== null &&
-        (block as { type?: unknown }).type === "text" &&
-        typeof (block as { text?: unknown }).text === "string",
+        isRecord(block) && block.type === "text" && typeof block.text === "string",
     )
     .map((block) => block.text)
     .join("\n");
+}
+
+export function stripReadDetailsContent(details: unknown) {
+  if (!isRecord(details) || !isRecord(details.truncation)) return details;
+  const { content: _content, ...truncation } = details.truncation;
+  return { ...details, truncation };
 }
 
 /** Per-session render transform factory: one `createPiTransform()` call per session. */
@@ -158,12 +160,20 @@ export function createPiTransform(
         };
         break;
 
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const result =
+          event.toolName === "read" && !event.isError
+            ? {
+                ...event.result,
+                content: [],
+                details: stripReadDetailsContent(event.result.details),
+              }
+            : event.result;
         if (event.isError) {
           yield {
             type: "tool-output-error",
             toolCallId: event.toolCallId,
-            errorText: toolResultText(event.result) || "Tool execution failed",
+            errorText: toolResultText(result) || "Tool execution failed",
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
@@ -171,12 +181,13 @@ export function createPiTransform(
           yield {
             type: "tool-output-available",
             toolCallId: event.toolCallId,
-            output: event.result,
+            output: result,
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
         }
         break;
+      }
 
       case "agent_end": {
         // A model-level failure surfaces as the run's last assistant message
@@ -184,7 +195,7 @@ export function createPiTransform(
         // events follow): emit a transient retry chunk so the UI can show it,
         // and only a terminal failure becomes an error chunk. The finish
         // always comes from agent_settled.
-        const last = event.messages.at(-1) as AssistantMessage | undefined;
+        const last = event.messages.at(-1);
         if (last?.role === "assistant" && last.stopReason === "error") {
           const errorMessage = last.errorMessage ?? "Pi run failed";
           if (event.willRetry) {

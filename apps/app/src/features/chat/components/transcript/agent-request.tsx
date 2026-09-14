@@ -20,5 +20,9 @@ export function AgentRequestView({
       return <PlanRequestView request={request} onRespond={onRespond} />;
     case "tool":
       return <ToolRequestView request={request} onRespond={onRespond} />;
+    default: {
+      const exhaustive: never = request;
+      return exhaustive;
+    }
   }
 }

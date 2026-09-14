@@ -124,3 +124,16 @@ export class WorkspaceReadError extends Data.TaggedError("WorkspaceReadError")<{
   readonly path: string;
   readonly cause: unknown;
 }> {}
+
+/** No live PTY for this session-scoped terminal id. */
+export class TerminalNotRunning extends Data.TaggedError("TerminalNotRunning")<{
+  readonly projectId: string;
+  readonly sessionId: string;
+  readonly terminalId: string;
+}> {}
+
+/** node-pty failed to spawn a shell in the session workspace. */
+export class TerminalSpawnFailed extends Data.TaggedError("TerminalSpawnFailed")<{
+  readonly cwd: string;
+  readonly cause: unknown;
+}> {}

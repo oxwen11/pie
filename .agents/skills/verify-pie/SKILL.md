@@ -36,7 +36,7 @@ What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
-- Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie-dev`.
+- Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
 - Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
@@ -60,7 +60,7 @@ It checks, in order:
 2. Server and Vite pids from that run are alive.
 3. Those pids (or their children) own 4180 and 4190.
 4. Both `/api/health` endpoints return `ok`.
-5. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie-dev`.
+5. `$PIE_HOME` is the isolated run directory, not `~/.pie` / `~/.pie_*`.
 6. `POST /api/ws-ticket` through the Vite proxy returns 200. **401** means the proxy is aimed at the desktop daemon.
 
 If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -sTCP:LISTEN` and compare to the doctor pids.
@@ -126,20 +126,27 @@ Proof directory (survives cleanup):
 .cursor/skills/verify-pie/evidence/<run-id>/
 ```
 
+Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+
 ```bash
 pnpm exec pie-verify web evidence init
+EVIDENCE="$(pnpm exec pie-verify web evidence path)"
+agent-browser open http://localhost:4190/            # settle the page first
 pnpm exec pie-verify web evidence snapshot before
 pnpm exec pie-verify web evidence screenshot before
+agent-browser record start "$EVIDENCE/<feature>.webm" # fresh context on the current URL
 # …drive…
+agent-browser record stop
 pnpm exec pie-verify web evidence snapshot after
 pnpm exec pie-verify web evidence screenshot after
 pnpm exec pie-verify web evidence url
 pnpm exec pie-verify web evidence side-effects
-pnpm exec pie-verify web evidence note "what you proved"
+pnpm exec pie-verify web evidence note "<feature>.webm: what the clip shows"
 ```
 
 Standards:
 
+- **Screenshots and video are both mandatory** (UI rule). Name them after the feature (`import-project-before.png`, `import-project.webm`). `record start` reopens the current URL in a fresh context, so open and settle the page before starting it; use `record restart <path>` to split long drives.
 - Exercise the real user path (sidebar / empty state / composer), not a test-only HTTP method and not a hand-edited `projects.json`.
 - Capture **the action and the resulting state**, not only the last screenshot.
 - Confirm side effects on disk:
@@ -169,6 +176,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
+| `agent-browser record start <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 
 ## Isolate
@@ -181,7 +189,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 
-If the user already has `pnpm dev` on 4180/4190 against `~/.pie-dev`, **stop and tell them**. Do not point this skill at that pair.
+If the user already has `pnpm dev` on 4180/4190 against `~/.pie` / `~/.pie_*`, **stop and tell them**. Do not point this skill at that pair.
 
 ## Feature map
 

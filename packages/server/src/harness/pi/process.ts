@@ -25,10 +25,10 @@ import { createPiTransform } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 import type { PiUIMessageChunk } from "./ui-message";
 
-// Pi facade: one `pi --mode rpc` child per session (pi's RPC mode hosts a
-// single session), unlike codex's shared app-server with thread demuxing.
-// Crash isolation therefore comes for free — a dead child only takes down its
-// own session — and there is no transport-generation bookkeeping.
+// Pi facade: one pie-pi-process per session (the process hosts a single
+// AgentSession), unlike codex's shared app-server with thread demuxing. Crash
+// isolation therefore comes for free — a dead process only takes down its own
+// session — and there is no transport-generation bookkeeping.
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
@@ -378,6 +378,7 @@ export const makePiProcessWithDependencies = <R>(
       ).pipe(
         Effect.flatMap((result) =>
           session.transport
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mapUiResponse/declineUiResponse return RpcExtensionUIResponse
             .respondUi(result as RpcExtensionUIResponse)
             .pipe(Effect.catch(() => Effect.void)),
         ),
@@ -454,7 +455,7 @@ export const makePiProcessWithDependencies = <R>(
             error instanceof PiTransportError ||
             error instanceof AgentOperationError ||
             (typeof error === "object" && error !== null && "_tag" in error)
-              ? (error as PiTransportFailure)
+              ? error
               : new PiTransportError({ operation: "open-session", cause: error }),
           ),
           Effect.onError(() => Scope.close(scope, Exit.void)),
@@ -530,6 +531,10 @@ export const makePiProcessWithDependencies = <R>(
                           return [{ _tag: "Steer", turn: current }, current];
                         case "Finishing":
                           return [{ _tag: "Wait", ended: current.ended }, current];
+                        default: {
+                          const exhaustive: never = current;
+                          return exhaustive;
+                        }
                       }
                     },
                   );

@@ -5,7 +5,7 @@ import { Schema } from "effect";
 // bare "failed to open" with the cause dropped is undiagnosable in the field.
 const causeSummary = (cause: unknown): string => {
   if (typeof cause === "object" && cause !== null && "message" in cause) {
-    const message = (cause as { message: unknown }).message;
+    const message = cause.message;
     if (typeof message === "string" && message.length > 0) return message;
   }
   return String(cause);

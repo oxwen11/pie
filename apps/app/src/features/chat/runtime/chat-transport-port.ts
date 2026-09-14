@@ -54,10 +54,10 @@ export interface ChatSessionTransport {
    */
   subscribe(onEvent: (event: ChatTransportEvent) => void): () => void;
   /**
-   * Submit a prompt: fire-and-forget at the wire level. The returned receipt
-   * only acknowledges acceptance — the turn's content arrives through the
-   * subscription like everyone else's. `messageId` is the optimistic user
-   * message's id; the server echoes it on `session.prompt.submitted` (dedupe).
+   * Submit a prompt and wait for the runtime's admission receipt; the turn's
+   * content still arrives through the subscription like everyone else's.
+   * `messageId` is the optimistic user message's id; the server echoes it on
+   * `session.prompt.submitted` so the sender can dedupe its local copy.
    */
   prompt(input: {
     readonly messageId: string;

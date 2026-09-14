@@ -104,9 +104,19 @@ function fileErrorMessage(error: Error): string {
     case "BINARY_FILE":
       return "Binary preview unavailable.";
     case "FILE_TOO_LARGE": {
-      const data = error.data as { size?: number; limit?: number } | undefined;
-      const size = data?.size;
-      const limit = data?.limit;
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- ORPCError.data is untyped
+      const data: unknown = error.data;
+      const size =
+        typeof data === "object" && data !== null && "size" in data && typeof data.size === "number"
+          ? data.size
+          : undefined;
+      const limit =
+        typeof data === "object" &&
+        data !== null &&
+        "limit" in data &&
+        typeof data.limit === "number"
+          ? data.limit
+          : undefined;
       if (size !== undefined && limit !== undefined) {
         return `${formatBytes(size)} exceeds the ${formatBytes(limit)} preview limit.`;
       }

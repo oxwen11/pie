@@ -16,7 +16,7 @@ pnpm exec pie-verify cli run --version
 
 Proof:
 
-- `--help` lists `daemon` and `serve`.
+- `--help` lists `daemon`, `serve`, and `run`.
 - `daemon --help` lists `start`, `stop`, `status`. Bare `pie daemon` still shows `--port` / `--cors-origin` / `--allowed-host`; `daemon stop` and `daemon status` do not.
 - `--version` prints `pie v<version>` from `packages/pie/package.json`.
 - After `launch`, `pnpm exec pie-verify cli run nosuchcommand` exits non-zero with `Unknown subcommand` and does not spawn a second listener. Without a current run that same wrapper command fails with `no current run. Launch first.`

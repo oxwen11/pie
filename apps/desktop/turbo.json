@@ -11,11 +11,11 @@
     },
     "build:unpack": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@getpie/server#build"]
     },
     "build:mac": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@getpie/server#build"]
     },
     "e2e": {
       "cache": false,

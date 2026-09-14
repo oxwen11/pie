@@ -7,7 +7,7 @@ import type {
   SessionSummary,
 } from "@getpie/contract";
 import { CAPABILITY_UNAVAILABLE_TAG } from "@getpie/contract";
-import { Context, Effect, Fiber, Layer, Logger } from "effect";
+import { Context, Effect, Fiber, Layer, Logger, Ref } from "effect";
 import { TestClock } from "effect/testing";
 
 import { ProjectNotFound, ScheduleNotFound, StoreWriteError } from "../../src/errors";
@@ -236,7 +236,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(created.name, "Morning review");
       assert.strictEqual(created.enabled, true);
       assert.isTrue(created.nextRunAt !== null);
-      assert.isTrue(Date.parse(created.nextRunAt!) > ORIGIN);
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      assert.isTrue(Date.parse(created.nextRunAt) > ORIGIN);
     }),
   );
 
@@ -298,6 +301,25 @@ describe("ScheduleService", () => {
     }),
   );
 
+  it.effect("stores the chosen model and updates it", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+      );
+      assert.strictEqual(h.store.get(created.id)?.provider, "anthropic");
+      assert.strictEqual(h.store.get(created.id)?.modelId, "claude-sonnet-4-5");
+      const changed = yield* h.service.update({
+        id: created.id,
+        provider: "openai",
+        modelId: "gpt-5",
+      });
+      assert.strictEqual(changed.provider, "openai");
+      assert.strictEqual(changed.modelId, "gpt-5");
+    }),
+  );
+
   it.effect("settles a still-running session after TestClock advances the poll", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
@@ -343,7 +365,10 @@ describe("ScheduleService", () => {
       const created = yield* h.service.create(
         cronInput({ spec: { kind: "cron", expr: "* * * * *" } }),
       );
-      const firstNext = created.nextRunAt!;
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      const firstNext = created.nextRunAt;
       yield* TestClock.setTime(Date.parse(firstNext));
       yield* h.service.tick();
       yield* Effect.yieldNow;
@@ -352,7 +377,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(after?.lastRunStatus, "succeeded");
       assert.strictEqual(after?.runs[0]?.reason, "scheduled");
       assert.notStrictEqual(after?.nextRunAt, firstNext);
-      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse(firstNext));
+      if (after?.nextRunAt == null) {
+        throw new Error("expected nextRunAt after tick");
+      }
+      assert.isTrue(Date.parse(after.nextRunAt) > Date.parse(firstNext));
     }),
   );
 
@@ -369,7 +397,10 @@ describe("ScheduleService", () => {
           session: { policy: "existing", sessionId: "picked" },
         }),
       );
-      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(created.nextRunAt));
       yield* h.service.tick();
       const after = h.store.get(created.id);
       assert.strictEqual(h.created.length, 0);
@@ -433,7 +464,10 @@ describe("ScheduleService", () => {
       yield* Effect.yieldNow;
       assert.strictEqual(first.schedule.lastSessionId, "sess-1");
       live.add("sess-1");
-      yield* TestClock.setTime(Date.parse(first.schedule.nextRunAt!));
+      if (first.schedule.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(first.schedule.nextRunAt));
       yield* h.service.tick();
       yield* Effect.yieldNow;
       const after = h.store.get(created.id);
@@ -563,8 +597,10 @@ describe("ScheduleService", () => {
       assert.strictEqual(after?.lastRunStatus, "missed");
       assert.strictEqual(after?.runs[0]?.skipReason, "stale");
       assert.isTrue((after?.runs[0]?.missedCount ?? 0) > 0);
-      assert.isTrue(after?.nextRunAt !== null && after?.nextRunAt !== undefined);
-      assert.isTrue(Date.parse(after!.nextRunAt!) > Date.parse("2026-09-10T09:00:00.000Z"));
+      if (after?.nextRunAt == null) {
+        throw new Error("expected nextRunAt after stale miss");
+      }
+      assert.isTrue(Date.parse(after.nextRunAt) > Date.parse("2026-09-10T09:00:00.000Z"));
     }),
   );
 
@@ -606,8 +642,10 @@ describe("ScheduleService", () => {
         sessionId: "sess-1",
       });
       const bound = h.catalog.find((session) => session.sessionId === "sess-1");
-      assert.isDefined(bound);
-      bound!.archived = true;
+      if (bound === undefined) {
+        throw new Error("expected bound session");
+      }
+      bound.archived = true;
       yield* h.service.runNow(created.id);
       yield* Effect.yieldNow;
       assert.strictEqual(h.created.length, 2);
@@ -843,7 +881,10 @@ describe("ScheduleService", () => {
           maxRuns: 1,
         }),
       );
-      yield* TestClock.setTime(Date.parse(created.nextRunAt!));
+      if (created.nextRunAt === null) {
+        throw new Error("expected nextRunAt");
+      }
+      yield* TestClock.setTime(Date.parse(created.nextRunAt));
       yield* h.service.tick();
       yield* Effect.yieldNow;
       const afterFire = h.store.get(created.id);
@@ -897,6 +938,62 @@ describe("ScheduleService", () => {
       assert.strictEqual(stored?.lastRunStatus, "succeeded");
       assert.strictEqual(stored?.runs[0]?.reason, "scheduled");
       yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("daemon keeps looping after a tick defect and logs the Cause", () =>
+    Effect.gen(function* () {
+      const records: Array<LogRecord> = [];
+      let ticks = 0;
+      const schedules = ScheduleService.of({
+        list: unused,
+        get: unused,
+        create: unused,
+        update: unused,
+        delete: unused,
+        runNow: unused,
+        recover: () => Effect.void,
+        tick: () =>
+          Effect.gen(function* () {
+            ticks += 1;
+            if (ticks === 1) {
+              return yield* Effect.die("tick boom");
+            }
+            return undefined;
+          }),
+        nextWakeDelay: () => Effect.succeed(60_000),
+      });
+      const fiber = yield* captureLogs(
+        runScheduleLoop.pipe(Effect.provideService(ScheduleService, schedules)),
+        records,
+      ).pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      yield* TestClock.adjust("60 seconds");
+      yield* Effect.yieldNow;
+      assert.ok(ticks >= 2, `expected the loop to tick again after the defect, got ${ticks}`);
+      const failed = records.find((record) => record.annotations.event === "schedule.tick_failed");
+      assert.ok(failed, "expected a schedule.tick_failed log");
+      assert.notEqual(failed?.cause, undefined);
+      assert.match(String(failed?.cause), /tick boom/);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("closing the schedule runtime scope interrupts in-flight settle work", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const interrupted = yield* Ref.make(false);
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* harness({
+            prompt: () => Effect.never.pipe(Effect.onInterrupt(() => Ref.set(interrupted, true))),
+          });
+          const created = yield* h.service.create(cronInput({ spec: { kind: "manual" } }));
+          yield* h.service.runNow(created.id);
+          yield* Effect.yieldNow;
+        }),
+      );
+      assert.equal(yield* Ref.get(interrupted), true);
     }),
   );
 });

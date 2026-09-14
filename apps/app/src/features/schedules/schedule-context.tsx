@@ -6,7 +6,11 @@ import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { formatSessionReuse } from "./cadence";
-import type { ScheduleFormSubmit } from "./schedule-form";
+import {
+  scheduleCreateInput,
+  scheduleUpdateInput,
+  type ScheduleFormSubmit,
+} from "./schedule-form-model";
 
 export type ScheduleCreateDefaults = {
   readonly projectId?: string;
@@ -45,6 +49,7 @@ export type ScheduleMeta = {
   readonly createOpen: boolean;
   readonly createDefaults?: ScheduleCreateDefaults;
   readonly sessionLine: string | null;
+  readonly nowMs: number;
   readonly submitting: boolean;
   readonly running: boolean;
   readonly updating: boolean;
@@ -63,14 +68,11 @@ export type ScheduleContextValue = {
 };
 
 const EMPTY_SCHEDULES: ReadonlyArray<Schedule> = [];
-
 const ScheduleContext = createContext<ScheduleContextValue | null>(null);
 
 export function useSchedule(): ScheduleContextValue {
   const value = use(ScheduleContext);
-  if (value === null) {
-    throw new Error("useSchedule must be used within ScheduleProvider");
-  }
+  if (value === null) throw new Error("useSchedule must be used within ScheduleProvider");
   return value;
 }
 
@@ -83,20 +85,6 @@ export type ScheduleProviderProps = {
   readonly onCloseCreate: () => void;
   readonly children: ReactNode;
 };
-
-function openScheduleSession(
-  navigate: ReturnType<typeof useNavigate>,
-  projectId: string,
-  sessionId: string,
-) {
-  navigate({
-    to: "/session/$sessionId",
-    params: { sessionId },
-    search: { projectId },
-  }).catch((error: unknown) => {
-    console.error("Failed to open the schedule session", error);
-  });
-}
 
 export function ScheduleProvider({
   projects,
@@ -116,11 +104,7 @@ export function ScheduleProvider({
 
   const schedules = useQuery({
     ...orpcQueryUtils.schedule.list.queryOptions(),
-    refetchInterval: (query) => {
-      const items = query.state.data;
-      if (items === undefined) return false;
-      return items.some((item) => item.lastRunStatus === "running") ? 2_000 : 10_000;
-    },
+    refetchInterval: (query) => scheduleListInterval(query.state.data),
   });
 
   const invalidate = () =>
@@ -131,17 +115,7 @@ export function ScheduleProvider({
 
   const create = useMutation({
     mutationFn: (value: ScheduleFormSubmit) =>
-      orpcQueryUtils.schedule.create.call({
-        name: value.name,
-        projectId: value.projectId,
-        prompt: value.prompt,
-        spec: value.spec,
-        session: value.session,
-        ...(value.expiresAt !== null ? { expiresAt: value.expiresAt } : undefined),
-        ...(value.maxRuns !== null ? { maxRuns: value.maxRuns } : undefined),
-        ...(value.runNow ? { runNow: true } : undefined),
-        ...(value.worktree ? { worktree: {} } : undefined),
-      }),
+      orpcQueryUtils.schedule.create.call(scheduleCreateInput(value)),
     onSuccess: (created) => {
       onCloseCreate();
       void invalidate();
@@ -149,13 +123,7 @@ export function ScheduleProvider({
         openScheduleSession(navigate, created.projectId, created.lastSessionId);
         return;
       }
-      if (created.lastRunStatus === "skipped") {
-        toast.error("Schedule did not start a session (skipped).");
-        return;
-      }
-      if (created.lastRunStatus === "failed") {
-        toast.error(created.lastError ?? "Schedule failed to start a session.");
-      }
+      reportScheduleStart(created);
     },
     onError: (error) => toast.error(`Failed to create schedule: ${error.message}`),
   });
@@ -165,18 +133,7 @@ export function ScheduleProvider({
       input: { readonly id: string } & Partial<ScheduleFormSubmit> & {
           readonly enabled?: boolean;
         },
-    ) =>
-      orpcQueryUtils.schedule.update.call({
-        id: input.id,
-        ...(input.name !== undefined ? { name: input.name } : undefined),
-        ...(input.prompt !== undefined ? { prompt: input.prompt } : undefined),
-        ...(input.spec !== undefined ? { spec: input.spec } : undefined),
-        ...(input.enabled !== undefined ? { enabled: input.enabled } : undefined),
-        ...(input.session !== undefined ? { session: input.session } : undefined),
-        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : undefined),
-        ...(input.maxRuns !== undefined ? { maxRuns: input.maxRuns } : undefined),
-        ...(input.worktree === true ? { worktree: {} } : undefined),
-      }),
+    ) => orpcQueryUtils.schedule.update.call(scheduleUpdateInput(input)),
     onSuccess: () => {
       setEditingId(null);
       return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() });
@@ -203,34 +160,27 @@ export function ScheduleProvider({
         openScheduleSession(navigate, result.ref.projectId, result.ref.sessionId);
         return;
       }
-      if (result.schedule.lastRunStatus === "skipped") {
-        toast.error("Schedule did not start a session (skipped).");
-        return;
-      }
-      if (result.schedule.lastRunStatus === "failed") {
-        toast.error(result.schedule.lastError ?? "Schedule failed to start a session.");
-      }
+      reportScheduleStart(result.schedule);
     },
     onError: (error) => toast.error(`Failed to run schedule: ${error.message}`),
   });
 
   const items = schedules.data ?? EMPTY_SCHEDULES;
-  const selected = selectedId === null ? undefined : items.find((item) => item.id === selectedId);
-  const editing = editingId === null ? undefined : items.find((item) => item.id === editingId);
-  const deleting = deletingId === null ? undefined : items.find((item) => item.id === deletingId);
+  const selected = scheduleOf(items, selectedId);
+  const editing = scheduleOf(items, editingId);
+  const deleting = scheduleOf(items, deletingId);
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input:
         selected === undefined ? skipToken : { projectId: selected.projectId, archived: false },
     }),
   });
-  const sessionTitleById = new Map<string, string>();
-  for (const session of sessions.data ?? []) {
-    sessionTitleById.set(session.sessionId, session.title ?? "New chat");
-  }
   const atLimit = items.length >= MAX_SCHEDULES;
   const sessionLine =
-    selected === undefined ? null : formatSessionReuse(selected.session, sessionTitleById);
+    selected === undefined
+      ? null
+      : formatSessionReuse(selected.session, sessionTitleMap(sessions.data));
+  const nowMs = schedules.dataUpdatedAt;
   const createPending = create.isPending;
   const updatePending = update.isPending;
   const runNowPending = runNow.isPending;
@@ -271,6 +221,7 @@ export function ScheduleProvider({
         createOpen,
         createDefaults,
         sessionLine,
+        nowMs,
         submitting: createPending || updatePending,
         running: runNowPending,
         updating: updatePending,
@@ -296,6 +247,7 @@ export function ScheduleProvider({
       listError,
       listPending,
       navigate,
+      nowMs,
       onCloseCreate,
       onOpenCreate,
       projects,
@@ -313,4 +265,51 @@ export function ScheduleProvider({
   );
 
   return <ScheduleContext value={value}>{children}</ScheduleContext>;
+}
+
+function scheduleOf(items: ReadonlyArray<Schedule>, id: string | null): Schedule | undefined {
+  if (id === null) return undefined;
+  return items.find((item) => item.id === id);
+}
+
+function scheduleListInterval(items: ReadonlyArray<Schedule> | undefined): number | false {
+  if (items === undefined) return false;
+  return items.some((item) => item.lastRunStatus === "running") ? 2_000 : 10_000;
+}
+
+function sessionTitleMap(
+  sessions:
+    | ReadonlyArray<{ readonly sessionId: string; readonly title?: string | null }>
+    | undefined,
+): Map<string, string> {
+  return new Map(
+    (sessions ?? []).map((session) => [session.sessionId, session.title ?? "New chat"]),
+  );
+}
+
+function openScheduleSession(
+  navigate: ReturnType<typeof useNavigate>,
+  projectId: string,
+  sessionId: string,
+): void {
+  navigate({
+    to: "/session/$sessionId",
+    params: { sessionId },
+    search: { projectId },
+  }).catch((error: unknown) => {
+    console.error("Failed to open the schedule session", error);
+  });
+}
+
+function reportScheduleStart(schedule: {
+  readonly lastRunStatus?: string;
+  readonly lastError?: string | null;
+}): void {
+  if (schedule.lastRunStatus === "skipped") {
+    toast.error("Schedule did not start a session (skipped).");
+    return;
+  }
+  if (schedule.lastRunStatus === "failed") {
+    toast.error(schedule.lastError ?? "Schedule failed to start a session.");
+  }
 }

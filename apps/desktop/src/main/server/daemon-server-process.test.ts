@@ -12,7 +12,12 @@ import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
 import { describe, expect, it as test } from "vitest";
 
-import { makeDaemonServerProcess, resolveServerRuntimeExecutable } from "./daemon-server-process";
+import {
+  makeDaemonServerProcess,
+  parseDaemonRuntime,
+  resolveDaemonServerArgv,
+  resolveServerRuntimeExecutable,
+} from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
 
 describe("resolveServerRuntimeExecutable", () => {
@@ -35,6 +40,47 @@ describe("resolveServerRuntimeExecutable", () => {
       "/opt/homebrew/bin/node",
     );
     expect(resolveServerRuntimeExecutable("linux", "/opt/Pie/pie")).toBe("/opt/Pie/pie");
+  });
+});
+
+describe("parseDaemonRuntime", () => {
+  test("defaults to node", () => {
+    expect(parseDaemonRuntime(undefined)).toBe("node");
+    expect(parseDaemonRuntime("node")).toBe("node");
+    expect(parseDaemonRuntime("bun")).toBe("bun");
+    expect(parseDaemonRuntime(" BUN ")).toBe("bun");
+  });
+});
+
+describe("resolveDaemonServerArgv", () => {
+  const entry = "/app/server.mjs";
+
+  test("uses the Electron helper as Node by default", () => {
+    expect(
+      resolveDaemonServerArgv({}, entry, "darwin", "/Applications/Pie.app/Contents/MacOS/Pie"),
+    ).toEqual({
+      argv: [
+        "/Applications/Pie.app/Contents/Frameworks/Pie Helper.app/Contents/MacOS/Pie Helper",
+        entry,
+      ],
+      electronAsNode: true,
+    });
+  });
+
+  test("uses PATH bun when PIE_DAEMON_RUNTIME=bun and PIE_BUN is unset", () => {
+    expect(resolveDaemonServerArgv({ PIE_DAEMON_RUNTIME: "bun" }, entry)).toEqual({
+      argv: ["bun", entry],
+      electronAsNode: false,
+    });
+  });
+
+  test("uses PIE_BUN when that path exists", () => {
+    expect(
+      resolveDaemonServerArgv({ PIE_DAEMON_RUNTIME: "bun", PIE_BUN: process.execPath }, entry),
+    ).toEqual({
+      argv: [process.execPath, entry],
+      electronAsNode: false,
+    });
   });
 });
 
@@ -90,7 +136,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
     const workspace = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-desktop-" });
-      const daemonDir = path.join(home, "isolated-daemon");
+      const daemonDir = path.join(home, "daemon");
       const entry = path.join(home, "fake-server.mjs");
       const wedgeFile = path.join(home, "wedge-health");
       yield* fs.writeFileString(entry, FAKE_SERVER);
@@ -100,7 +146,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         environment: {
           ...process.env,
           PIE_HOME: home,
-          PIE_DAEMON_DIR: daemonDir,
           PIE_TEST_WEDGE_FILE: wedgeFile,
         },
       };
@@ -149,7 +194,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
               const spawn = yield* makeDaemonServerProcess({ requiredCompatibilityKey });
               const running = yield* spawn(config, 0);
               yield* running.ready;
-              return (yield* readRecord(daemonDir))!;
+              const record = yield* readRecord(daemonDir);
+              assert.ok(record);
+              return record;
             }),
           );
 

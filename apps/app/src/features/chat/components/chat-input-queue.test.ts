@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { promoteQueuedFollowUp, removeQueuedItem, replaceQueuedItem } from "./chat-input-queue";
+import {
+  promoteQueuedFollowUp,
+  queuedPromptKey,
+  removeQueuedItem,
+  replaceQueuedItem,
+} from "./chat-input-queue-model";
 
 const pending = {
   steering: ["steer-a", "steer-b"],
@@ -51,5 +56,11 @@ describe("queued prompt edits", () => {
       steering: ["steer-a", "steer-b", "later-a"],
       followUp: ["later-b"],
     });
+  });
+
+  it("keys duplicate queued texts by occurrence", () => {
+    const items = ["same", "other", "same"];
+    expect(queuedPromptKey("followUp", items, 0)).toBe("followUp:same:0");
+    expect(queuedPromptKey("followUp", items, 2)).toBe("followUp:same:1");
   });
 });

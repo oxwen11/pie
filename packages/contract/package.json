@@ -14,7 +14,8 @@
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts",
-    "./schedule": "./src/schedule.ts"
+    "./schedule": "./src/schedule.ts",
+    "./terminal": "./src/terminal.ts"
   },
   "scripts": {
     "test": "vitest run",

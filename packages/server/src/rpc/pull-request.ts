@@ -58,6 +58,9 @@ export const pullRequestRouter = orpc.router({
   }),
   diff: orpc.diff.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
+    if ("pullRequest" in input) {
+      return yield* service.diffFor(input.pullRequest).pipe(catchCurrentRead(errors));
+    }
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
     return yield* service.diff(cwd).pipe(catchCurrentRead(errors));
   }),
@@ -86,10 +89,21 @@ export const pullRequestRouter = orpc.router({
     );
     return yield* service.sessionStatuses(workspaces).pipe(catchCurrentRead(errors));
   }),
+  list: orpc.list.effect(function* ({ errors }) {
+    const service = yield* PullRequestService;
+    return yield* service.list().pipe(catchCurrentRead(errors));
+  }),
+  detail: orpc.detail.effect(function* ({ input, errors }) {
+    const service = yield* PullRequestService;
+    return yield* service.detail(input.pullRequest).pipe(catchCurrentRead(errors));
+  }),
   runAction: orpc.runAction.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
-    const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
-    return yield* service.runAction(cwd, input.expected, input.action).pipe(
+    const target =
+      "sessionId" in input.ref
+        ? { cwd: yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors) }
+        : { pullRequest: input.ref };
+    return yield* service.runAction(target, input.expected, input.action).pipe(
       Effect.catchTags({
         ...pullRequestReadErrorHandlers(errors),
         PullRequestStaleContext: () =>

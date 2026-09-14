@@ -56,7 +56,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
     [patch],
   );
 
-  const items = useMemo<ReadonlyArray<CodeViewItem>>(
+  const items = useMemo<ReadonlyArray<CodeViewItem<undefined>>>(
     () =>
       fileDiffs.map((fileDiff) => ({
         id: fileDiff.name,
@@ -67,7 +67,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
     [collapsed, fileDiffs],
   );
 
-  const options = useMemo<CodeViewReactOptions>(
+  const options = useMemo<CodeViewReactOptions<undefined, undefined>>(
     () => ({
       overflow: "scroll",
       stickyHeaders: true,
@@ -99,7 +99,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
 
   return (
     <div className="h-full min-h-0 w-full">
-      <CodeView className="h-full w-full" items={items} options={options} />
+      <CodeView className="h-full w-full overflow-auto" items={items} options={options} />
     </div>
   );
 }

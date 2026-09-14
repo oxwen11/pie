@@ -9,6 +9,7 @@ import {
   formatSpec,
   summarizeRuns,
 } from "./cadence";
+import { projectNameOf } from "./format";
 import { useSchedule } from "./schedule-context";
 import {
   ScheduleDetailActions,
@@ -31,18 +32,16 @@ export function ScheduleDetailPanel() {
   if (schedule === undefined) return null;
   const lastRun = formatLastRun(schedule);
   const summary = formatRunSummary(summarizeRuns(schedule.runs));
-  const projectName =
-    meta.projects.find((item) => item.id === schedule.projectId)?.name ?? "Unknown project";
   return (
     <SchedulePanel aria-label={schedule.name}>
       <SchedulePanelHeader>
         <SchedulePanelTitle>{schedule.name}</SchedulePanelTitle>
-        <SchedulePanelClose onClick={actions.closePanel} />
+        <SchedulePanelClose onClick={() => actions.closePanel()} />
       </SchedulePanelHeader>
       <SchedulePanelBody className="gap-4">
         <ScheduleDetailDescription>
           <ScheduleDetailLine>
-            {projectName} · {formatSpec(schedule.spec)}
+            {projectNameOf(meta.projects, schedule.projectId)} · {formatSpec(schedule.spec)}
           </ScheduleDetailLine>
           <ScheduleDetailLine>
             {formatNextRun(
@@ -82,7 +81,7 @@ export function ScheduleDetailPanel() {
         <ScheduleDetailHistory>
           <h3 className="text-sm font-medium">Recent runs</h3>
           <ScheduleRunHistory
-            nowMs={Date.now()}
+            nowMs={meta.nowMs}
             onOpenSession={(sessionId) => actions.openSession(schedule.projectId, sessionId)}
             schedule={schedule}
           />

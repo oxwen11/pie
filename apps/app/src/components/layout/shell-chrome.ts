@@ -38,7 +38,13 @@ export function shellTitlebarContentLeftPx(platform: Platform): number {
  * (`start-[var(--shell-controls-left)]`, `ps-[var(--shell-titlebar-content-left)]`,
  * `ms-[var(--shell-sidebar-brand-inset)]`) so the scanner can see them.
  */
-export function shellProviderStyle(platform: Platform): CSSProperties {
+type ShellProviderStyle = CSSProperties & {
+  "--shell-controls-left"?: string;
+  "--shell-titlebar-content-left"?: string;
+  "--shell-sidebar-brand-inset"?: string;
+};
+
+export function shellProviderStyle(platform: Platform): ShellProviderStyle {
   if (!isDesktopHost(platform)) return {};
 
   const controlsLeft = desktopToggleLeftPx(platform);
@@ -48,7 +54,7 @@ export function shellProviderStyle(platform: Platform): CSSProperties {
     "--shell-controls-left": `${controlsLeft}px`,
     "--shell-titlebar-content-left": `${contentLeft}px`,
     "--shell-sidebar-brand-inset": `${contentLeft - SHELL_GUTTER_PX}px`,
-  } as CSSProperties;
+  };
 }
 
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */

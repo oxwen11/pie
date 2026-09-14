@@ -1,0 +1,243 @@
+diff --git a/dist/index.js b/dist/index.js
+index 01017cd..fe2674d 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -29,10 +29,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+ // Tools
+ export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
+ export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
+-// Main entry point
+-export { main } from "./main.js";
+ // Run modes for programmatic SDK usage
+-export { InteractiveMode, RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
++export { RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
+ // UI components for extensions
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
+ // Theme utilities for custom tools and extensions
+diff --git a/dist/modes/index.js b/dist/modes/index.js
+index 10528c3..0102883 100644
+--- a/dist/modes/index.js
++++ b/dist/modes/index.js
+@@ -1,7 +1,6 @@
+ /**
+  * Run modes for the coding agent.
+  */
+-export { InteractiveMode } from "./interactive/interactive-mode.js";
+ export { runPrintMode } from "./print-mode.js";
+ export { RpcClient } from "./rpc/rpc-client.js";
+ export { runRpcMode } from "./rpc/rpc-mode.js";
+diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
+index 5418167..d9de2a1 100644
+--- a/dist/modes/interactive/theme/theme.js
++++ b/dist/modes/interactive/theme/theme.js
+@@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
+ import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
+ import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
+ import { stripBom } from "../../../utils/text.js";
++import darkThemeJson from "./dark.json" with { type: "json" };
++import lightThemeJson from "./light.json" with { type: "json" };
+ let themeJsonValidator;
+ /**
+  * Install full theme validation. Without it, documents are accepted as-is, which is what built-in
+@@ -270,13 +272,7 @@ export class Theme {
+ let BUILTIN_THEMES;
+ function getBuiltinThemes() {
+     if (!BUILTIN_THEMES) {
+-        const themesDir = getThemesDir();
+-        const darkPath = path.join(themesDir, "dark.json");
+-        const lightPath = path.join(themesDir, "light.json");
+-        BUILTIN_THEMES = {
+-            dark: JSON.parse(stripBom(fs.readFileSync(darkPath, "utf-8"))),
+-            light: JSON.parse(stripBom(fs.readFileSync(lightPath, "utf-8"))),
+-        };
++        BUILTIN_THEMES = { dark: darkThemeJson, light: lightThemeJson };
+     }
+     return BUILTIN_THEMES;
+ }
+diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
+index 711fb57..738f550 100644
+--- a/dist/utils/syntax-highlight.js
++++ b/dist/utils/syntax-highlight.js
+@@ -1,177 +1,4 @@
+-import hljs from "highlight.js/lib/core.js";
+-import bash from "highlight.js/lib/languages/bash.js";
+-import c from "highlight.js/lib/languages/c.js";
+-import cpp from "highlight.js/lib/languages/cpp.js";
+-import csharp from "highlight.js/lib/languages/csharp.js";
+-import dart from "highlight.js/lib/languages/dart.js";
+-import go from "highlight.js/lib/languages/go.js";
+-import groovy from "highlight.js/lib/languages/groovy.js";
+-import java from "highlight.js/lib/languages/java.js";
+-import javascript from "highlight.js/lib/languages/javascript.js";
+-import kotlin from "highlight.js/lib/languages/kotlin.js";
+-import lua from "highlight.js/lib/languages/lua.js";
+-import nix from "highlight.js/lib/languages/nix.js";
+-import perl from "highlight.js/lib/languages/perl.js";
+-import php from "highlight.js/lib/languages/php.js";
+-import python from "highlight.js/lib/languages/python.js";
+-import ruby from "highlight.js/lib/languages/ruby.js";
+-import rust from "highlight.js/lib/languages/rust.js";
+-import scala from "highlight.js/lib/languages/scala.js";
+-import swift from "highlight.js/lib/languages/swift.js";
+-import typescript from "highlight.js/lib/languages/typescript.js";
+-import { decodeHtmlEntityAt } from "./html.js";
+-const eagerLanguages = {
+-    python,
+-    java,
+-    go,
+-    javascript,
+-    cpp,
+-    typescript,
+-    php,
+-    ruby,
+-    c,
+-    csharp,
+-    nix,
+-    bash,
+-    rust,
+-    scala,
+-    kotlin,
+-    swift,
+-    dart,
+-    groovy,
+-    perl,
+-    lua,
+-};
+-for (const [name, language] of Object.entries(eagerLanguages)) {
+-    hljs.registerLanguage(name, language);
+-}
+-let allLanguagesPromise;
+-export function loadAllHighlightLanguages() {
+-    if (!allLanguagesPromise) {
+-        allLanguagesPromise = new Promise((resolve) => {
+-            setImmediate(() => {
+-                void import("highlight.js/lib/index.js").then(() => resolve(), () => {
+-                    // Eager languages and plaintext fallback remain available.
+-                    resolve();
+-                });
+-            });
+-        });
+-    }
+-    return allLanguagesPromise;
+-}
+-const SPAN_CLOSE = "</span>";
+-const HIGHLIGHT_CLASS_PREFIX = "hljs-";
+-function getScopeFromSpanTag(tag) {
+-    const match = /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag);
+-    const classValue = match?.[1] ?? match?.[2];
+-    if (!classValue) {
+-        return undefined;
+-    }
+-    for (const className of classValue.split(/\s+/)) {
+-        if (className.startsWith(HIGHLIGHT_CLASS_PREFIX)) {
+-            return className.slice(HIGHLIGHT_CLASS_PREFIX.length);
+-        }
+-    }
+-    return undefined;
+-}
+-function getScopeFormatter(scope, theme) {
+-    const exact = theme[scope];
+-    if (exact) {
+-        return exact;
+-    }
+-    const dotIndex = scope.indexOf(".");
+-    if (dotIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dotIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    const dashIndex = scope.indexOf("-");
+-    if (dashIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dashIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    return undefined;
+-}
+-function getActiveFormatter(scopes, theme) {
+-    for (let i = scopes.length - 1; i >= 0; i--) {
+-        const scope = scopes[i];
+-        if (!scope) {
+-            continue;
+-        }
+-        const formatter = getScopeFormatter(scope, theme);
+-        if (formatter) {
+-            return formatter;
+-        }
+-    }
+-    return theme.default;
+-}
+-function isSpanOpenTagStart(html, index) {
+-    if (!html.startsWith("<span", index)) {
+-        return false;
+-    }
+-    const nextChar = html[index + "<span".length];
+-    return nextChar === ">" || nextChar === " " || nextChar === "\t" || nextChar === "\n" || nextChar === "\r";
+-}
+-export function renderHighlightedHtml(html, theme = {}) {
+-    let output = "";
+-    let textBuffer = "";
+-    const scopes = [];
+-    const flushText = () => {
+-        if (!textBuffer) {
+-            return;
+-        }
+-        const formatter = getActiveFormatter(scopes, theme);
+-        output += formatter ? formatter(textBuffer) : textBuffer;
+-        textBuffer = "";
+-    };
+-    let index = 0;
+-    while (index < html.length) {
+-        if (isSpanOpenTagStart(html, index)) {
+-            const tagEndIndex = html.indexOf(">", index + 5);
+-            if (tagEndIndex !== -1) {
+-                flushText();
+-                const tag = html.slice(index, tagEndIndex + 1);
+-                const scope = getScopeFromSpanTag(tag);
+-                scopes.push(scope);
+-                index = tagEndIndex + 1;
+-                continue;
+-            }
+-        }
+-        if (html.startsWith(SPAN_CLOSE, index)) {
+-            flushText();
+-            if (scopes.length > 0) {
+-                scopes.pop();
+-            }
+-            index += SPAN_CLOSE.length;
+-            continue;
+-        }
+-        if (html[index] === "&") {
+-            const decoded = decodeHtmlEntityAt(html, index);
+-            if (decoded) {
+-                textBuffer += decoded.text;
+-                index += decoded.length;
+-                continue;
+-            }
+-        }
+-        textBuffer += html[index];
+-        index++;
+-    }
+-    flushText();
+-    return output;
+-}
+-export function highlight(code, options = {}) {
+-    const html = options.language
+-        ? hljs.highlight(code, {
+-            language: options.language,
+-            ignoreIllegals: options.ignoreIllegals,
+-        }).value
+-        : hljs.highlightAuto(code, options.languageSubset).value;
+-    return renderHighlightedHtml(html, options.theme);
+-}
+-export function supportsLanguage(name) {
+-    return hljs.getLanguage(name) !== undefined;
+-}
+-//# sourceMappingURL=syntax-highlight.js.map
+\ No newline at end of file
++export function loadAllHighlightLanguages() { return Promise.resolve(); }
++export function renderHighlightedHtml(html, _theme = {}) { return html; }
++export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
++export function supportsLanguage(_name) { return false; }

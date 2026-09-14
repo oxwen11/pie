@@ -31,14 +31,15 @@ interface BrowserExtra {
 
 type BrowserInstance = PanelInstance<BrowserPayload, BrowserExtra>;
 
-let nextTab = 0;
-
 export const browserPanel = definePanelFamily({
   type: "browser",
   key: (payload: BrowserPayload) => payload.tabId,
   label: (payload) => hostOf(payload.url),
   title: "Browser",
-  newPayload: () => ({ tabId: `tab-${++nextTab}`, url: "http://localhost:5173" }),
+  newPayload: (): BrowserPayload => ({
+    tabId: crypto.randomUUID(),
+    url: "http://localhost:5173",
+  }),
   parse: (raw) => {
     const { tabId, url } = asRecord(raw) ?? {};
     return typeof tabId === "string" && typeof url === "string" ? { tabId, url } : null;

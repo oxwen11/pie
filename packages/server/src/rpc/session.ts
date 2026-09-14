@@ -16,6 +16,7 @@ import {
 import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
+import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
 import { openScopedSubscription } from "./session-stream";
@@ -96,6 +97,7 @@ export const sessionRouter = orpc.router({
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
+      mapGitWorktreeErrors(errors),
     );
     return preparedWorkspace;
   }),
@@ -140,12 +142,14 @@ export const sessionRouter = orpc.router({
   }),
   delete: orpc.delete.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
+    const terminals = yield* TerminalManager;
     yield* sessions.delete(input.ref).pipe(
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
       }),
     );
+    yield* terminals.closeAll(input.ref);
   }),
   getMessages: orpc.getMessages.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
@@ -208,6 +212,7 @@ export const sessionRouter = orpc.router({
           ),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
+      mapGitWorktreeErrors(errors),
     );
   }),
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {

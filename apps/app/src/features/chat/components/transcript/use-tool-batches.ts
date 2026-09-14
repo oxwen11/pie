@@ -16,7 +16,7 @@ export type BatchPart = ToolUIPart | ReasoningUIPart;
 
 export type IndexedBatchPart = { part: BatchPart; index: number };
 
-export type RenderItem =
+type RenderItem =
   | {
       kind: "tool-batch";
       parts: IndexedBatchPart[];
@@ -42,6 +42,10 @@ function isTransparentControlPart(part: Part): boolean {
 
 function isStandaloneToolPart(part: Part): boolean {
   return "type" in part && isStandalone(part.type);
+}
+
+function isBatchPart(part: Part): part is BatchPart {
+  return isToolUIPart(part) || isReasoningUIPart(part);
 }
 
 // Empty / whitespace-only text parts carry no user-visible content; treated as
@@ -101,8 +105,8 @@ export function batchToolParts(parts: readonly Part[]): RenderItem[] {
     // Every other tool participates in batching, including dynamic-tool and
     // tools with no bucket mapping. Bucket-vs-no-bucket is purely a
     // trigger-phrase concern handled in compute-batch-trigger.ts.
-    if (isToolUIPart(part) || isReasoningUIPart(part)) {
-      pending.push({ part: part as BatchPart, index });
+    if (isBatchPart(part)) {
+      pending.push({ part, index });
       continue;
     }
     // Transparent parts: skip without breaking pending.

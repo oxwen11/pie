@@ -152,6 +152,58 @@ describe("createPiTransform", () => {
     expect(done[0]).toMatchObject({ type: "tool-output-available", output: result });
   });
 
+  it("omits successful read contents from UI chunks", () => {
+    const t = createPiTransform("s1");
+    const done = [
+      ...t(
+        e({
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "read",
+          result: {
+            content: [{ type: "text", text: "secret" }],
+            details: {
+              truncation: {
+                content: "secret",
+                truncated: true,
+                truncatedBy: "lines",
+                totalLines: 3000,
+                totalBytes: 60_000,
+                outputLines: 2000,
+                outputBytes: 50_000,
+                lastLinePartial: false,
+                firstLineExceedsLimit: false,
+                maxLines: 2000,
+                maxBytes: 51_200,
+              },
+            },
+          },
+          isError: false,
+        }),
+      ),
+    ];
+    expect(done[0]).toMatchObject({
+      output: {
+        content: [],
+        details: {
+          truncation: {
+            truncated: true,
+            truncatedBy: "lines",
+            totalLines: 3000,
+            totalBytes: 60_000,
+            outputLines: 2000,
+            outputBytes: 50_000,
+            lastLinePartial: false,
+            firstLineExceedsLimit: false,
+            maxLines: 2000,
+            maxBytes: 51_200,
+          },
+        },
+      },
+    });
+    expect(JSON.stringify(done[0])).not.toContain("secret");
+  });
+
   it("maps tool failures to tool-output-error and extension tools to dynamic", () => {
     const t = createPiTransform("s1");
     const started = [

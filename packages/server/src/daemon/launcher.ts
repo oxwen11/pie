@@ -5,6 +5,7 @@ import type { DaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Clock, Crypto, Effect, Encoding, FileSystem, type PlatformError } from "effect";
 
 import {
+  daemonDirectory,
   daemonStdioLogPath,
   LOG_FILE_MODE,
   LOGS_DIRECTORY_MODE,
@@ -33,17 +34,10 @@ export type DaemonHandle = {
 
 export type ResolveDaemonOptions = {
   /**
-   * `$PIE_HOME` — persistent Project and Session data. Only passed on to the
-   * spawned daemon; no lifecycle file is derived from it.
+   * `$PIE_HOME` — Project and Session data, and the daemon directory
+   * (`$PIE_HOME/daemon`). Front doors pass `resolvePieHome()`.
    */
   readonly home: string;
-  /**
-   * `$PIE_DAEMON_DIR` — where the four lifecycle files live and what the
-   * single-instance invariant is keyed on. Required; front doors get it from
-   * `resolveDaemonLocation` (`config/paths.ts`), which explains why there is no
-   * default here.
-   */
-  readonly daemonDir: string;
   /** Exact compatibility class the running daemon must match to be reused. */
   readonly requiredCompatibilityKey: DaemonCompatibilityKey;
   /**
@@ -83,7 +77,7 @@ export type DaemonPlatform = FileSystem.FileSystem | Crypto.Crypto;
  * `daemon/daemon.pid`; attach only when a healthy daemon has the required exact
  * compatibility key, otherwise replace it with the foreground server detached,
  * record it, and wait for health. Both the CLI and Desktop go through here so
- * there is exactly one daemon per daemon directory — concurrent launches and
+ * there is exactly one daemon per `$PIE_HOME` — concurrent launches and
  * replacements are serialized by an OS-backed SQLite transaction at `daemon.lock`.
  *
  * Effect-based orchestration around one deliberately-raw seam: the detached
@@ -98,7 +92,8 @@ export const resolveOrSpawnDaemon = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    if (options.autoRespawn === true && (yield* hasTombstone(options.daemonDir))) {
+    const daemonDir = daemonDirectory(options.home);
+    if (options.autoRespawn === true && (yield* hasTombstone(daemonDir))) {
       return yield* daemonStopped();
     }
 
@@ -216,11 +211,9 @@ const spawnLocked = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    yield* ensureDaemonDirectory(options.daemonDir);
-    const lock = yield* acquireDaemonLock(
-      options.daemonDir,
-      options.readyTimeoutMs ?? READY_TIMEOUT_MS,
-    );
+    const daemonDir = daemonDirectory(options.home);
+    yield* ensureDaemonDirectory(daemonDir);
+    const lock = yield* acquireDaemonLock(daemonDir, options.readyTimeoutMs ?? READY_TIMEOUT_MS);
     return yield* resolveLocked(options).pipe(Effect.ensuring(lock.release));
   });
 
@@ -233,12 +226,13 @@ const resolveLocked = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
-    if (options.autoRespawn === true && (yield* hasTombstone(options.daemonDir))) {
+    const daemonDir = daemonDirectory(options.home);
+    if (options.autoRespawn === true && (yield* hasTombstone(daemonDir))) {
       return yield* daemonStopped();
     }
-    yield* clearTombstone(options.daemonDir);
+    yield* clearTombstone(daemonDir);
 
-    const existing = yield* readRecord(options.daemonDir);
+    const existing = yield* readRecord(daemonDir);
     const existingHealthy = existing !== undefined && (yield* daemonAlive(existing));
     if (existing !== undefined && existing.compatibilityKey === options.requiredCompatibilityKey) {
       if (existingHealthy) return attach(existing, true);
@@ -274,7 +268,7 @@ const resolveLocked = (
           }),
         );
       }
-      yield* removeRecord(options.daemonDir);
+      yield* removeRecord(daemonDir);
     }
 
     return yield* spawnDaemon(options);
@@ -318,6 +312,7 @@ const spawnDaemon = (
   options: ResolveDaemonOptions,
 ): Effect.Effect<DaemonHandle, DaemonLaunchError, DaemonPlatform> =>
   Effect.gen(function* () {
+    const daemonDir = daemonDirectory(options.home);
     const crypto = yield* Crypto.Crypto;
     const port = yield* reservePort(options.port ?? DEFAULT_PORT);
     const token = yield* crypto.randomBytes(32).pipe(
@@ -343,14 +338,15 @@ const spawnDaemon = (
     // nothing can ever attach to it or stop it, and the next launch spawns a
     // second daemon beside it. A successor that recovers the launch lock polls
     // a live, same-key record for the remainder of this readiness window.
+    const startedAt = yield* Clock.currentTimeMillis;
     const record: DaemonRecord = {
       pid,
       address,
       token,
-      startedAt: yield* Clock.currentTimeMillis,
+      startedAt,
       compatibilityKey: options.requiredCompatibilityKey,
     };
-    yield* writeRecord(options.daemonDir, record).pipe(
+    yield* writeRecord(daemonDir, record).pipe(
       Effect.mapError(
         (cause) =>
           new DaemonLaunchError({
@@ -358,13 +354,13 @@ const spawnDaemon = (
             cause,
           }),
       ),
-      Effect.tapError(() => Effect.andThen(killPid(pid), removeRecord(options.daemonDir))),
+      Effect.tapError(() => Effect.andThen(killPid(pid), removeRecord(daemonDir))),
     );
 
     const timeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
     if (!(yield* waitHealthy(address, pid, timeoutMs))) {
       yield* killPid(pid);
-      yield* removeRecord(options.daemonDir);
+      yield* removeRecord(daemonDir);
       return yield* Effect.fail(
         new DaemonLaunchError({
           message: `pie daemon did not become healthy within ${timeoutMs}ms; see ${logsDirectory(options.home)}`,
@@ -409,7 +405,7 @@ function openStdioLog(home: string): number {
  * — the local `nohup pie serve > log`.
  */
 function spawnDetached(options: ResolveDaemonOptions, port: number, token: string): number {
-  const { home, daemonDir } = options;
+  const { home } = options;
   const logFd = openStdioLog(home);
   try {
     const [command, ...args] = options.serverArgv;
@@ -426,7 +422,6 @@ function spawnDetached(options: ResolveDaemonOptions, port: number, token: strin
         // set, since the daemon's policy is otherwise static.
         ...inherited,
         PIE_HOME: home,
-        PIE_DAEMON_DIR: daemonDir,
         PIE_PORT: String(port),
         PIE_AUTH_TOKEN: token,
       },

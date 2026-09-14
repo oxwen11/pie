@@ -4,6 +4,7 @@ import path from "node:path";
 import { CLI } from "../identity.ts";
 import { expectMeta, patchRunMeta, readRunMeta, type CliRunMeta, type RunMeta } from "../meta.ts";
 import {
+  daemonPidPath,
   ensureCoreBuilt,
   invokePie,
   readDaemonRecord,
@@ -82,7 +83,7 @@ async function startDaemon(
   if (started.status !== 0) {
     throw new Error("daemon start failed");
   }
-  const recordPath = path.join(ctx.daemonDir, "daemon.pid");
+  const recordPath = daemonPidPath(ctx.pieHome);
   await waitUntil("daemon.pid", () => fs.existsSync(recordPath), 20);
   const record = readDaemonRecord(recordPath);
   await waitUntil(`daemon health at ${record.address}`, () => healthOk(record.address), 40);
@@ -130,7 +131,7 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
     };
   }
 
-  const recordPath = path.join(cli.daemonDir, "daemon.pid");
+  const recordPath = daemonPidPath(cli.pieHome);
   if (!fs.existsSync(recordPath)) {
     fail(`${CLI.logPrefix} FAIL — missing ${recordPath}`);
   }
@@ -181,7 +182,6 @@ async function stopCli(runDir: string, meta: RunMeta | undefined): Promise<void>
     await stopRecordedDaemon({
       repo: meta.repo,
       pieHome: meta.pieHome,
-      daemonDir: meta.daemonDir,
       piePort: meta.piePort,
       runDir,
       logPrefix: CLI.logPrefix,
@@ -218,7 +218,7 @@ async function curlTranscript(cli: CliRunMeta): Promise<string> {
       "",
     ].join("\n");
   }
-  const record = readDaemonRecord(path.join(cli.daemonDir, "daemon.pid"));
+  const record = readDaemonRecord(daemonPidPath(cli.pieHome));
   const health = await fetchText(`${record.address.replace(/\/$/, "")}/api/health`);
   const anon = await ticketStatus(record.address);
   const auth = await ticketStatus(record.address, record.token);
@@ -246,7 +246,6 @@ export async function runPie(args: string[]): Promise<void> {
   if (runDir !== undefined) {
     const cli = expectMeta(readRunMeta(path.join(runDir, "meta.json")), "cli");
     env.PIE_HOME = cli.pieHome;
-    env.PIE_DAEMON_DIR = cli.daemonDir;
     env.PIE_PORT = String(cli.piePort);
     env.PIE_DAEMON_COMPATIBILITY_KEY =
       process.env.PIE_DAEMON_COMPATIBILITY_KEY ?? (await resolveCompatKey(repo));

@@ -1,17 +1,20 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
+import { useTheme } from "./theme-provider";
 
 declare global {
   interface ImportMetaEnv {
@@ -42,18 +45,39 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
+/** Create once per mount — composition-root singletons, not updatable state. */
+function useStable<T>(create: () => T): T {
+  const ref = useRef<T | null>(null);
+  // Null-guarded lazy init during render is the documented create-once pattern
+  // (https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents).
+  // `react/refs` forbids any `.current` read in render; this ref is the store, not a subscription.
+  /* oxlint-disable react/refs */
+  if (ref.current === null) {
+    const created = create();
+    // Create-once composition-root singleton. React documents this null-guarded
+    // write during render; the detector still flags the assignment.
+    // react-doctor-disable-next-line no-ref-current-in-render
+    ref.current = created;
+    return created;
+  }
+  return ref.current;
+  /* oxlint-enable react/refs */
+}
+
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
-  const [clients] = useState(() => createAppClients(server));
+  const clients = useStable(() => createAppClients(server));
   return <AppRuntime {...clients} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
-  const [router] = useState(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+  const { theme } = useTheme();
+  const router = useStable(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+  useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
-  const [chatManager] = useState(
+  const chatManager = useStable(
     () => new ChatManager((ref) => new OrpcChatSessionTransport(orpcClient.agent, ref)),
   );
 
@@ -66,7 +90,7 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
          * global query-error handler in lib/orpc.ts, failed imports, failed
          * session creates, failed resumes — renders nothing without this mount.
          */}
-        <Toaster theme="system" />
+        <Toaster theme={theme} />
       </ChatManagerProvider>
     </QueryClientProvider>
   );

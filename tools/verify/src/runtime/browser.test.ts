@@ -303,7 +303,7 @@ describe("formatBrowserEnv", () => {
 
 function restoreEnv(name: string, previous: string | undefined): void {
   if (previous === undefined) {
-    delete process.env[name];
+    Reflect.deleteProperty(process.env, name);
   } else {
     process.env[name] = previous;
   }

@@ -121,9 +121,8 @@ export function resolveActiveBrowserEnv(
   input: ActiveBrowserEnvInput = {},
 ): BrowserEnvVars | undefined {
   const surface = parseSurfaceOverride(input.surface ?? process.env.PIE_VERIFY_SURFACE);
-  const webRun = input.webRun !== undefined ? input.webRun : currentRun(WEB.currentLink);
-  const desktopRun =
-    input.desktopRun !== undefined ? input.desktopRun : currentRun(DESKTOP.currentLink);
+  const webRun = input.webRun ?? currentRun(WEB.currentLink);
+  const desktopRun = input.desktopRun ?? currentRun(DESKTOP.currentLink);
   if (surface === "web") {
     if (webRun === undefined) {
       throw new Error(`no current run. Launch first: ${WEB.bin} launch`);

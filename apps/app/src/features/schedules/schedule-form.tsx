@@ -1,11 +1,17 @@
-import type { Project, Schedule, ScheduleSession, ScheduleSpec } from "@getpie/contract";
+import type { Project, Schedule } from "@getpie/contract";
 import {
   scheduleSessionOf,
-  MAX_SCHEDULE_MAX_RUNS,
   MAX_SCHEDULE_NAME_CHARS,
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
+import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
+import {
+  PromptInputBox,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@getpie/ui/components/field";
 import { Input } from "@getpie/ui/components/input";
@@ -17,13 +23,11 @@ import {
   SelectValue,
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
-import { Textarea } from "@getpie/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  CREATE_ON_FIRST_RUN_VALUE,
   type ScheduleFormValues,
   defaultScheduleForm,
   formFromSpec,
@@ -35,19 +39,17 @@ import {
 } from "./cadence";
 import { ScheduleFormCadenceFields } from "./schedule-form-cadence";
 import { ScheduleFormLimitsFields } from "./schedule-form-limits";
+import {
+  parseScheduleMaxRuns,
+  scheduleFormCanSubmit,
+  scheduleMaxRunsValid,
+  scheduleModelOptions,
+  scheduleSessionItems,
+  type ScheduleFormSubmit,
+} from "./schedule-form-model";
 import { ScheduleFormSessionFields } from "./schedule-form-session";
 
-export type ScheduleFormSubmit = {
-  readonly name: string;
-  readonly projectId: string;
-  readonly prompt: string;
-  readonly spec: ScheduleSpec;
-  readonly worktree: boolean;
-  readonly session: ScheduleSession;
-  readonly expiresAt: string | null;
-  readonly maxRuns: number | null;
-  readonly runNow: boolean;
-};
+export type { ScheduleFormSubmit } from "./schedule-form-model";
 
 export type ScheduleFormDefaults = {
   readonly projectId?: string;
@@ -113,6 +115,10 @@ function formFromSource(
     expiresAt: schedule.expiresAt !== undefined ? isoToLocalDateTime(schedule.expiresAt) : "",
     maxRuns: schedule.maxRuns !== undefined ? String(schedule.maxRuns) : "",
     runNow: false,
+    model:
+      schedule.provider !== undefined && schedule.modelId !== undefined
+        ? { provider: schedule.provider, modelId: schedule.modelId }
+        : undefined,
     ...formFromSpec(schedule.spec, base),
   };
 }
@@ -133,41 +139,29 @@ function ScheduleFormFields({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: form.projectId, archived: false },
     }),
-    enabled: form.reuseSession && form.projectId.length > 0,
+    enabled: scheduleSessionsEnabled(form.reuseSession, form.projectId),
   });
+  const models = useQuery({
+    ...orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: form.projectId } }),
+    enabled: form.projectId.length > 0,
+  });
+  const listedModels = models.data?.models ?? [];
+  const model = form.model ?? models.data?.defaultModel;
+  const modelOptions = scheduleModelOptions(listedModels, model);
   const listed = sessions.data ?? [];
-  const listedIds = sessions.isSuccess
-    ? new Set(listed.map((session) => session.sessionId))
-    : undefined;
+  const listedIds = listedSessionIds(sessions.isSuccess, listed);
   const selectedSessionValue = sessionSelectValue(form, listedIds);
-  const sessionItems = [
-    { label: "Create on first run", value: CREATE_ON_FIRST_RUN_VALUE },
-    ...listed.map((session) => ({
-      label: session.title ?? "New chat",
-      value: session.sessionId,
-    })),
-    ...(selectedSessionValue !== CREATE_ON_FIRST_RUN_VALUE &&
-    !listed.some((session) => session.sessionId === selectedSessionValue)
-      ? [{ label: "Selected session", value: selectedSessionValue }]
-      : []),
-  ];
+  const sessionItems = scheduleSessionItems(listed, selectedSessionValue);
   const everyAmount = Number(form.everyAmount);
-  const maxRunsTrimmed = form.maxRuns.trim();
-  const maxRunsNumber = maxRunsTrimmed === "" ? null : Number(maxRunsTrimmed);
-  const maxRunsValid =
-    maxRunsNumber === null ||
-    (Number.isInteger(maxRunsNumber) &&
-      maxRunsNumber >= 1 &&
-      maxRunsNumber <= MAX_SCHEDULE_MAX_RUNS);
-  const canSubmit =
-    !submitting &&
-    maxRunsValid &&
-    form.name.trim().length > 0 &&
-    form.projectId.length > 0 &&
-    form.prompt.trim().length > 0 &&
-    (form.cadence !== "once" || form.runAt.length > 0) &&
-    (form.cadence !== "cron" || form.cron.trim().length > 0) &&
-    (form.cadence !== "every" || (Number.isInteger(everyAmount) && everyAmount >= 1));
+  const maxRunsNumber = parseScheduleMaxRuns(form.maxRuns);
+  const maxRunsValid = scheduleMaxRunsValid(maxRunsNumber);
+  const canSubmit = scheduleFormCanSubmit({
+    submitting,
+    form,
+    everyAmount,
+    maxRunsValid,
+    hasModel: scheduleHasModel(listedModels.length, model !== undefined),
+  });
 
   return (
     <form
@@ -193,6 +187,9 @@ function ScheduleFormFields({
             expiresAt: form.expiresAt === "" ? null : localDateTimeToIso(form.expiresAt),
             maxRuns: maxRunsNumber,
             runNow: creating && form.runNow,
+            ...(model !== undefined
+              ? { provider: model.provider, modelId: model.modelId }
+              : undefined),
           });
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
@@ -212,7 +209,7 @@ function ScheduleFormFields({
       <Field>
         <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
         <Select
-          disabled={projectLocked || projects.length === 0}
+          disabled={scheduleProjectLocked(projectLocked, projects.length)}
           items={projects.map((project) => ({ label: project.name, value: project.id }))}
           onValueChange={(next) => {
             if (typeof next === "string") {
@@ -221,10 +218,11 @@ function ScheduleFormFields({
                 projectId: next,
                 sessionPick: "create",
                 sessionId: "",
+                model: undefined,
               }));
             }
           }}
-          value={form.projectId === "" ? null : form.projectId}
+          value={scheduleProjectValue(form.projectId)}
         >
           <SelectTrigger id="schedule-project">
             <SelectValue placeholder="Select a project" />
@@ -238,17 +236,30 @@ function ScheduleFormFields({
           </SelectContent>
         </Select>
       </Field>
-      <Field>
-        <FieldLabel htmlFor="schedule-prompt">Prompt</FieldLabel>
-        <Textarea
+      <PromptInputBox>
+        <PromptInputTextarea
+          aria-label="Prompt"
           id="schedule-prompt"
           maxLength={MAX_SCHEDULE_PROMPT_CHARS}
           onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+          placeholder="Ask Pi anything..."
           required
-          rows={5}
           value={form.prompt}
         />
-      </Field>
+        <PromptInputToolbar>
+          <PromptInputTools>
+            <ModelSelectorPicker
+              aria-label="Model"
+              modelId={model?.modelId}
+              models={modelOptions}
+              onChange={(provider, modelId) =>
+                setForm((current) => ({ ...current, model: { provider, modelId } }))
+              }
+              providerId={model?.provider}
+            />
+          </PromptInputTools>
+        </PromptInputToolbar>
+      </PromptInputBox>
       <ScheduleFormCadenceFields form={form} setForm={setForm} />
       <ScheduleFormLimitsFields form={form} setForm={setForm} />
       <ScheduleFormSessionFields
@@ -267,30 +278,18 @@ function ScheduleFormFields({
           />
         </div>
       </Field>
-      {creating ? (
-        <Field>
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="min-w-0">
-              <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
-              <FieldDescription>
-                Start a session as soon as this schedule is created.
-              </FieldDescription>
-            </div>
-            <Switch
-              checked={form.runNow}
-              id="schedule-run-now"
-              onCheckedChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
-            />
-          </div>
-        </Field>
-      ) : null}
-      {error !== null ? <FieldError>{error}</FieldError> : null}
+      <ScheduleFormCreateOptions
+        creating={creating}
+        onRunNowChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
+        runNow={form.runNow}
+      />
+      <ScheduleFormError error={error} />
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel} type="button" variant="outline">
           Cancel
         </Button>
         <Button disabled={!canSubmit} type="submit">
-          {creating ? "Create" : "Save"}
+          {scheduleSubmitLabel(creating)}
         </Button>
       </div>
     </form>
@@ -330,5 +329,61 @@ export function ScheduleEditForm({
       source={{ kind: "edit", schedule }}
       submitting={submitting}
     />
+  );
+}
+
+function scheduleSubmitLabel(creating: boolean): string {
+  return creating ? "Create" : "Save";
+}
+
+function scheduleSessionsEnabled(reuseSession: boolean, projectId: string): boolean {
+  return reuseSession && projectId.length > 0;
+}
+
+function listedSessionIds(
+  isSuccess: boolean,
+  listed: ReadonlyArray<{ readonly sessionId: string }>,
+): Set<string> | undefined {
+  if (!isSuccess) return undefined;
+  return new Set(listed.map((session) => session.sessionId));
+}
+
+function scheduleHasModel(listedCount: number, modelPicked: boolean): boolean {
+  return listedCount === 0 || modelPicked;
+}
+
+function scheduleProjectLocked(projectLocked: boolean, projectCount: number): boolean {
+  return projectLocked || projectCount === 0;
+}
+
+function scheduleProjectValue(projectId: string): string | null {
+  return projectId === "" ? null : projectId;
+}
+
+function ScheduleFormError({ error }: { error: string | null }) {
+  if (error === null) return null;
+  return <FieldError>{error}</FieldError>;
+}
+
+function ScheduleFormCreateOptions({
+  creating,
+  runNow,
+  onRunNowChange,
+}: {
+  creating: boolean;
+  runNow: boolean;
+  onRunNowChange: (checked: boolean) => void;
+}) {
+  if (!creating) return null;
+  return (
+    <Field>
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="min-w-0">
+          <FieldLabel htmlFor="schedule-run-now">Run now</FieldLabel>
+          <FieldDescription>Start a session as soon as this schedule is created.</FieldDescription>
+        </div>
+        <Switch checked={runNow} id="schedule-run-now" onCheckedChange={onRunNowChange} />
+      </div>
+    </Field>
   );
 }

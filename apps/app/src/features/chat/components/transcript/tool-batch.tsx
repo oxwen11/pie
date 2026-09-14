@@ -5,7 +5,6 @@ import {
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
 import { cn } from "@getpie/ui/lib/utils";
-import type { ToolUIPart } from "ai";
 import { ChevronDownIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -107,8 +106,7 @@ export function ToolBatch({
               />
             );
           }
-          const toolPart = part as ToolUIPart;
-          return <ToolPart key={toolPart.toolCallId} part={toolPart} />;
+          return <ToolPart key={part.toolCallId} part={part} />;
         })}
       </CollapsibleContent>
     </Collapsible>

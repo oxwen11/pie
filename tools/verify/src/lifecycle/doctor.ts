@@ -18,7 +18,7 @@ export async function doctorReport(surface: Surface): Promise<string> {
     const live = identity.foreignPorts.flatMap((port) => listenPids(port));
     if (live.length > 0) {
       fail(
-        `${identity.logPrefix} doctor: FAIL — port(s) ${identity.foreignPorts.join("/")} are live but this is not a ${identity.skill} run (no ${identity.currentLink}). Refuse to drive a shared ~/.pie or ~/.pie-dev instance.`,
+        `${identity.logPrefix} doctor: FAIL — port(s) ${identity.foreignPorts.join("/")} are live but this is not a ${identity.skill} run (no ${identity.currentLink}). Refuse to drive a shared ~/.pie or ~/.pie_* instance.`,
       );
     }
     fail(
