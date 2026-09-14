@@ -1,5 +1,5 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import {
   Collapsible,
   CollapsiblePanel,
@@ -11,9 +11,10 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
+import { useState } from "react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import {
@@ -27,15 +28,7 @@ const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
 const selectPullRequestStatuses = (
   statuses: ReadonlyArray<PullRequestSessionStatus>,
 ): ReadonlyMap<string, SessionPullRequest> =>
-  new Map(
-    statuses.map((status) => [
-      status.ref.sessionId,
-      { lifecycle: status.lifecycle, url: status.url },
-    ]),
-  );
-
-const selectPullRequest = (snapshot: PullRequestSnapshot | null): SessionPullRequest | null =>
-  snapshot === null ? null : { lifecycle: snapshot.lifecycle, url: snapshot.url };
+  new Map(statuses.map((status) => [status.ref.sessionId, status]));
 
 // Newest-first: a session is opened right after it is created. Module scope
 // keeps `select` referentially stable across renders.
@@ -51,13 +44,16 @@ const selectNewestFirst = (
  * grouping and fetching; each row composes its own navigation and actions.
  */
 export function ProjectSessionsGroup({
+  displayed,
   isSessionActive,
   project,
 }: {
+  readonly displayed: boolean;
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly project: Project;
 }) {
   const navigate = useNavigate();
+  const [expanded, setExpanded] = useState(true);
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
@@ -73,17 +69,10 @@ export function ProjectSessionsGroup({
     placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
   });
-  const activeSession = rows.find(isSessionActive);
-  const activePullRequest = useQuery({
-    ...orpcQueryUtils.pullRequest.current.queryOptions({
-      input: activeSession === undefined ? skipToken : { ref: activeSession },
-    }),
-    select: selectPullRequest,
-  });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
 
   return (
-    <Collapsible defaultOpen>
+    <Collapsible open={expanded} onOpenChange={setExpanded}>
       <section className="relative min-w-0" aria-labelledby={`project-${project.id}`}>
         {/* pe-8 keeps a long name off the absolutely positioned action; w-full is what
             makes it and `truncate` bite, since the label renders as a shrink-to-fit <button>. */}
@@ -127,8 +116,9 @@ export function ProjectSessionsGroup({
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
+                    displayed={displayed && expanded}
                     isActive={() => isSessionActive(session)}
-                    pullRequest={active ? (activePullRequest.data ?? listed) : listed}
+                    pullRequest={listed}
                     session={session}
                   />
                 );

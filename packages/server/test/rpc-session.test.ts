@@ -23,9 +23,13 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { PiProcessTag } from "../src/rpc/runtime";
+import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/rpc/runtime";
 
 const FAKE = `#!/usr/bin/env node
+// This protocol fixture acknowledges extension startup; the real-Pi tests exercise tool loading.
+if (process.env.PIE_SESSION_BRIDGE_URL) fetch(process.env.PIE_SESSION_BRIDGE_URL + "/ready", {
+  method: "POST", headers: { authorization: "Bearer " + process.env.PIE_SESSION_BRIDGE_TOKEN, "content-type": "application/json" }, body: "{}",
+}).catch(() => process.exit(1));
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
@@ -103,9 +107,11 @@ async function setup() {
     Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
     Layer.provide(worktreeProvided),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
 
+  const pullRequestLayer = PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -115,7 +121,14 @@ async function setup() {
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
-    PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    pullRequestLayer,
+    PullRequestCoordinatorLayer.pipe(
+      Layer.provide(harnessSessionLayer),
+      Layer.provide(pullRequestLayer),
+      Layer.provide(EventBusLayer),
+      Layer.provide(projectServiceLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     NodeServices.layer,
     Observability.discard,
   );

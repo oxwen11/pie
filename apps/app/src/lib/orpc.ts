@@ -93,6 +93,7 @@ export function createAppClients(server?: ServerConnection): AppClients {
   };
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.detail.key(), pullRequestDefaults);
 
   // These queries render their own error state in the workspace panels.
   for (const key of [

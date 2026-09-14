@@ -1,12 +1,13 @@
 import type { SessionRef } from "@getpie/contract";
-import type { PullRequestRef, PullRequestSessionStatus } from "@getpie/contract/pull-request";
-import { pullRequestContract } from "@getpie/contract/pull-request";
+import type { PullRequestRef } from "@getpie/contract/pull-request";
+import { pullRequestContract, pullRequestKey } from "@getpie/contract/pull-request";
 import { Effect } from "effect";
 
 import { ProjectNotFound, SessionNotFound, StoreReadError } from "../errors";
 import { PiAgentSessionService } from "../harness";
+import { ProjectService } from "../project";
 import { PullRequestService } from "../pull-request";
-import { pickSessionPullRequest } from "../pull-request/pick-lifecycle";
+import { PullRequestCoordinator } from "../pull-request/coordinator";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
 import { resolveWorkspaceCwd } from "./resolve-workspace";
@@ -35,9 +36,6 @@ const resolveCwd = <
         ),
     }),
   );
-
-const pullRequestKey = (ref: PullRequestRef): string =>
-  `${ref.host}/${ref.owner}/${ref.repository}#${ref.number}`;
 
 const catchCurrentRead = <
   E extends {
@@ -68,101 +66,129 @@ const catchCurrentRead = <
       Effect.fail(errors.INVALID_RESPONSE({ message: "GitHub returned an invalid response" })),
   });
 
+const resolveLinkedCwd = <
+  E extends {
+    SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown;
+    STALE_CONTEXT: (input: { message: string }) => unknown;
+  },
+>(
+  ref: SessionRef,
+  pullRequest: PullRequestRef,
+  errors: E,
+) =>
+  Effect.gen(function* () {
+    const sessions = yield* PiAgentSessionService;
+    const projects = yield* ProjectService;
+    const links = yield* sessions
+      .pullRequestsFor(ref)
+      .pipe(
+        Effect.catch(() =>
+          Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+        ),
+      );
+    if (
+      !links.some(
+        (link) => !link.excluded && pullRequestKey(link.ref) === pullRequestKey(pullRequest),
+      )
+    )
+      return yield* Effect.fail(
+        errors.STALE_CONTEXT({ message: "Pull request is not associated with this Session" }),
+      );
+    return yield* projects.findById(ref.projectId).pipe(
+      Effect.map((project) => project.path),
+      Effect.catch(() =>
+        Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Project is unavailable" } })),
+      ),
+    );
+  });
+
 export const pullRequestRouter = orpc.router({
   current: orpc.current.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
-    const sessions = yield* PiAgentSessionService;
     const cwd = yield* resolveCwd(input.ref, errors);
-    const snapshot = yield* service.current(cwd).pipe(catchCurrentRead(errors));
-    if (snapshot !== null) {
-      yield* sessions.rememberPullRequestRef(input.ref, snapshot.ref).pipe(
-        Effect.catchTags({
-          SessionNotFound: () => Effect.void,
-          StoreReadError: () => Effect.void,
-          StoreWriteError: () => Effect.void,
-        }),
-      );
-    }
-    return snapshot;
+    return yield* service.current(cwd).pipe(catchCurrentRead(errors));
   }),
-  statuses: orpc.statuses.effect(function* ({ input, errors }) {
-    const service = yield* PullRequestService;
-    const sessions = yield* PiAgentSessionService;
-    const workspaces = yield* Effect.forEach(input.refs, (ref) =>
-      Effect.gen(function* () {
-        const cwd = yield* resolveCwd(ref, errors);
-        const pullRequestRefs = yield* sessions.pullRequestRefsFor(ref).pipe(
-          Effect.catchTags({
-            SessionNotFound: (error: SessionNotFound) =>
-              Effect.fail(
-                errors.SESSION_NOT_FOUND({
-                  data: { message: `session ${error.sessionId} not found` },
-                }),
-              ),
-            StoreReadError: () =>
-              Effect.fail(
-                errors.SESSION_NOT_FOUND({ data: { message: "session workspace unavailable" } }),
-              ),
-          }),
-        );
-        return { cwd, ref, pullRequestRefs };
-      }),
-    );
-    const storedLookups: Array<{ key: string; cwd: string; pullRequest: PullRequestRef }> = [];
-    const storedKeys = new Set<string>();
-    const cwdLookups = new Map<string, Array<SessionRef>>();
-    for (const { cwd, ref, pullRequestRefs } of workspaces) {
-      if (pullRequestRefs.length === 0) {
-        const refs = cwdLookups.get(cwd);
-        if (refs === undefined) cwdLookups.set(cwd, [ref]);
-        else refs.push(ref);
-        continue;
-      }
-      for (const pullRequest of pullRequestRefs) {
-        const key = pullRequestKey(pullRequest);
-        if (storedKeys.has(key)) continue;
-        storedKeys.add(key);
-        storedLookups.push({ key, cwd, pullRequest });
-      }
-    }
-
-    const storedSnapshots = yield* Effect.forEach(storedLookups, ({ key, cwd, pullRequest }) =>
-      service.current(cwd, pullRequest).pipe(
-        catchCurrentRead(errors),
-        Effect.map((snapshot) => [key, snapshot] as const),
-      ),
-    );
-    const snapshotsByKey = new Map(storedSnapshots);
-    const cwdSnapshots = yield* Effect.forEach(cwdLookups, ([cwd]) =>
-      service.current(cwd).pipe(
-        catchCurrentRead(errors),
-        Effect.map((snapshot) => [cwd, snapshot] as const),
-      ),
-    );
-    const snapshotsByCwd = new Map(cwdSnapshots);
-
-    const statuses: Array<PullRequestSessionStatus> = [];
-    for (const { cwd, ref, pullRequestRefs } of workspaces) {
-      if (pullRequestRefs.length === 0) {
-        const snapshot = snapshotsByCwd.get(cwd);
-        if (snapshot) statuses.push({ ref, lifecycle: snapshot.lifecycle, url: snapshot.url });
-        continue;
-      }
-      const snapshot = pickSessionPullRequest(
-        pullRequestRefs.map(
-          (pullRequest) => snapshotsByKey.get(pullRequestKey(pullRequest)) ?? null,
+  statuses: orpc.statuses.effect(function* ({ input }) {
+    return yield* (yield* PullRequestCoordinator).statuses(input.refs);
+  }),
+  demand: orpc.demand.effect(function* ({ input, errors }) {
+    return yield* (yield* PullRequestCoordinator)
+      .demand(input)
+      .pipe(
+        Effect.catchTag("InvalidPullRequestLease", () =>
+          Effect.fail(errors.INVALID_LEASE({ message: "Demand lease is invalid or expired" })),
         ),
       );
-      if (snapshot !== undefined) {
-        statuses.push({ ref, lifecycle: snapshot.lifecycle, url: snapshot.url });
-      }
-    }
-    return statuses;
+  }),
+  refresh: orpc.refresh.effect(function* ({ input }) {
+    return yield* (yield* PullRequestCoordinator).refresh(input.ref);
+  }),
+  exclude: orpc.exclude.effect(function* ({ input, errors }) {
+    return yield* (yield* PiAgentSessionService)
+      .excludePullRequest(input.ref, input.pullRequest)
+      .pipe(
+        Effect.catchTags({
+          SessionNotFound: () =>
+            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+          StoreReadError: () =>
+            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+          StoreWriteError: () =>
+            Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
+        }),
+      );
+  }),
+  detail: orpc.detail.effect(function* ({ input, errors }) {
+    const cwd = yield* resolveLinkedCwd(input.ref, input.pullRequest, errors);
+    return yield* (yield* PullRequestService)
+      .current(cwd, input.pullRequest)
+      .pipe(catchCurrentRead(errors));
+  }),
+  stackPreview: orpc.stackPreview.effect(function* ({ input, errors }) {
+    const cwd = yield* resolveLinkedCwd(input.ref, input.pullRequest, errors);
+    return yield* (yield* PullRequestService)
+      .stackPreview(cwd, input.pullRequest, input.action)
+      .pipe(
+        catchCurrentRead(errors),
+        Effect.catchTags({
+          PullRequestStaleContext: () =>
+            Effect.fail(errors.STALE_CONTEXT({ message: "Stack context changed" })),
+          PullRequestUnsupportedAction: () =>
+            Effect.fail(
+              errors.UNSUPPORTED_ACTION({ message: "Safe Stack actions are unavailable" }),
+            ),
+          PullRequestHostRejected: () =>
+            Effect.fail(errors.HOST_REJECTED({ message: "GitHub rejected the operation" })),
+          PullRequestActionOutcomeUnknown: () =>
+            Effect.fail(errors.OUTCOME_UNKNOWN({ message: "Stack action outcome is unknown" })),
+        }),
+      );
+  }),
+  runStackAction: orpc.runStackAction.effect(function* ({ input, errors }) {
+    const cwd = yield* resolveLinkedCwd(input.ref, input.pullRequest, errors);
+    const result = yield* (yield* PullRequestService)
+      .runStackAction(cwd, input.pullRequest, input.action, input.expected, input.method)
+      .pipe(
+        catchCurrentRead(errors),
+        Effect.catchTags({
+          PullRequestStaleContext: () =>
+            Effect.fail(errors.STALE_CONTEXT({ message: "Stack context changed; preview again" })),
+          PullRequestUnsupportedAction: () =>
+            Effect.fail(
+              errors.UNSUPPORTED_ACTION({ message: "Safe Stack actions are unavailable" }),
+            ),
+          PullRequestHostRejected: () =>
+            Effect.fail(errors.HOST_REJECTED({ message: "GitHub rejected the operation" })),
+          PullRequestActionOutcomeUnknown: () =>
+            Effect.fail(errors.OUTCOME_UNKNOWN({ message: "Stack action outcome is unknown" })),
+        }),
+      );
+    yield* (yield* PullRequestCoordinator).dirty(input.ref);
+    return result;
   }),
   runAction: orpc.runAction.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
     const cwd = yield* resolveCwd(input.ref, errors);
-    return yield* service.runAction(cwd, input.expected, input.action).pipe(
+    const result = yield* service.runAction(cwd, input.expected, input.action).pipe(
       Effect.catchTags({
         PullRequestStaleContext: () =>
           Effect.fail(errors.STALE_CONTEXT({ message: "Pull request context changed" })),
@@ -196,6 +222,8 @@ export const pullRequestRouter = orpc.router({
           Effect.fail(errors.INVALID_RESPONSE({ message: "GitHub returned an invalid response" })),
       }),
     );
+    yield* (yield* PullRequestCoordinator).dirty(input.ref);
+    return result;
   }),
 });
 

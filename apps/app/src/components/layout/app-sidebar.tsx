@@ -32,7 +32,7 @@ export function AppSidebar({
   const [importOpen, setImportOpen] = useState(false);
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
-  const { isMobile, state } = useSidebar();
+  const { isMobile, state, openMobile } = useSidebar();
   const expanded = !isMobile && state === "expanded";
 
   return (
@@ -66,7 +66,11 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
+        <ProjectList
+          displayed={isMobile ? openMobile : state === "expanded"}
+          isSessionActive={isSessionActive}
+          onImport={() => setImportOpen(true)}
+        />
       </SidebarContent>
 
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}

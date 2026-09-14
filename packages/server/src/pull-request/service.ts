@@ -10,6 +10,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { PullRequestStaleContext } from "./errors";
 import {
+  type GitHubCliAdapter,
   type PullRequestCliActionFailure,
   type PullRequestReadFailure,
   makeGitHubCliAdapter,
@@ -26,6 +27,11 @@ export type PullRequestActionFailure = PullRequestReadFailure | PullRequestCliAc
 export class PullRequestService extends Context.Service<
   PullRequestService,
   {
+    readonly summary: GitHubCliAdapter["summary"];
+    readonly discover: GitHubCliAdapter["discover"];
+    readonly stack: GitHubCliAdapter["stack"];
+    readonly stackPreview: GitHubCliAdapter["stackPreview"];
+    readonly runStackAction: GitHubCliAdapter["runStackAction"];
     readonly current: (
       cwd: string,
       pullRequest?: PullRequestRef,
@@ -86,6 +92,14 @@ export const PullRequestServiceLayer: Layer.Layer<
         };
       });
 
-    return { current, runAction };
+    return {
+      current,
+      runAction,
+      summary: cli.summary,
+      discover: cli.discover,
+      stack: cli.stack,
+      stackPreview: cli.stackPreview,
+      runStackAction: cli.runStackAction,
+    };
   }),
 );

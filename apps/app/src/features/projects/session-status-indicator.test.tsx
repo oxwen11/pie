@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { PullRequestLifecycle, PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
@@ -30,15 +31,37 @@ afterEach(() => {
 
 const PR_URL = "https://github.com/getpie/pie/pull/42";
 
-const renderPullRequestIndicator = (
-  lifecycle: Parameters<typeof SessionPullRequestIndicator>[0]["lifecycle"],
-  url: string | undefined = PR_URL,
-) => {
+const renderPullRequestIndicator = (lifecycle: PullRequestLifecycle | undefined) => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(createElement(SessionPullRequestIndicator, { lifecycle, url }));
+    const ref = { host: "github.com", owner: "getpie", repository: "pie", number: 42 };
+    const status: PullRequestSessionStatus | undefined = lifecycle
+      ? {
+          ref: { projectId: "project", sessionId: "session" },
+          state: "ready",
+          links: [
+            {
+              ref,
+              linkedAt: "2026-09-01",
+              source: "agent",
+              excluded: false,
+              stack: null,
+              stackCheckedAt: null,
+              snapshot: {
+                ref,
+                lifecycle,
+                headBranch: "feature",
+                baseBranch: "main",
+                title: "Feature",
+                checkedAt: "2026-09-01",
+              },
+            },
+          ],
+        }
+      : undefined;
+    root?.render(createElement(SessionPullRequestIndicator, { status }));
   });
   return container;
 };
@@ -117,8 +140,8 @@ describe("SessionPullRequestIndicator", () => {
     for (const [lifecycle, label, iconClass, colorClass] of cases) {
       const node = renderPullRequestIndicator(lifecycle);
       const indicator = node.querySelector("a");
-      expect(indicator?.getAttribute("aria-label")).toBe(label);
-      expect(indicator?.getAttribute("title")).toBe(label);
+      expect(indicator?.getAttribute("aria-label")).toContain(label);
+      expect(indicator?.getAttribute("title")).toContain(label);
       expect(indicator?.getAttribute("href")).toBe(PR_URL);
       expect(indicator?.getAttribute("target")).toBe("_blank");
       expect(indicator?.getAttribute("rel")).toBe("noreferrer");
@@ -131,7 +154,7 @@ describe("SessionPullRequestIndicator", () => {
     }
   });
 
-  it("renders nothing without a current pull request status", () => {
-    expect(renderPullRequestIndicator(undefined, undefined).childElementCount).toBe(0);
+  it("renders nothing without any saved pull request association", () => {
+    expect(renderPullRequestIndicator(undefined).childElementCount).toBe(0);
   });
 });

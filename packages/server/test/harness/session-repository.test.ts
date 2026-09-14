@@ -67,7 +67,10 @@ describe("SessionRepository", () => {
         return yield* repo.read("proj-a", "sess-1");
       }),
     );
-    expect(read.pullRequestRefs).toEqual(pullRequestRefs);
+    expect(read.pullRequests?.map((link) => link.ref)).toEqual(pullRequestRefs);
+    expect(
+      read.pullRequests?.every((link) => link.source === "legacy" && link.snapshot === null),
+    ).toBe(true);
 
     await run(
       Effect.gen(function* () {

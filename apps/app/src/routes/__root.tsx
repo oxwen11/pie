@@ -19,12 +19,12 @@ import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
 import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
+import { PullRequestDemandProvider } from "@/components/layout/pull-request-demand-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
-import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
@@ -51,9 +51,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
-  // Keeps every `session.list` cache converged from the server's events
-  // (multi-tab / desktop), independent of which route is mounted.
-  useSessionListSync();
   const navigate = useNavigate();
 
   // This is the shell's one route-identity seam: the content panel, active
@@ -97,20 +94,22 @@ function RootLayout() {
   };
 
   return (
-    <AppShell>
-      <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
-        <AppShellBody>
-          <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
-          </AppShellSidebar>
-          <AppShellMain>
-            <CardPanel
-              heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
-              supportingText={project?.name}
-            />
-          </AppShellMain>
-        </AppShellBody>
-      </ContentPanelSessionProvider>
-    </AppShell>
+    <PullRequestDemandProvider>
+      <AppShell>
+        <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+          <AppShellBody>
+            <AppShellSidebar>
+              <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            </AppShellSidebar>
+            <AppShellMain>
+              <CardPanel
+                heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
+                supportingText={project?.name}
+              />
+            </AppShellMain>
+          </AppShellBody>
+        </ContentPanelSessionProvider>
+      </AppShell>
+    </PullRequestDemandProvider>
   );
 }

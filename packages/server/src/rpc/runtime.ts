@@ -3,22 +3,24 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { Context, Effect, Layer } from "effect";
+import { Context, Crypto, Effect, Layer } from "effect";
 
 import { PathsLayer } from "../config/paths";
-import { EventBusLayer } from "../events";
+import { EventBusLayer, EventBus } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import { GitServiceLayer, WorktreeServiceLayer } from "../git";
 import {
   PiAgentSessionManagerLayer,
   PiAgentServiceLayer,
   PiAgentSessionServiceLayer,
+  PiAgentSessionService,
 } from "../harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
-import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
-import { PullRequestServiceLayer } from "../pull-request";
+import { ProjectRepositoryLayer, ProjectServiceLayer, ProjectService } from "../project";
+import { PullRequestServiceLayer, PullRequestService } from "../pull-request";
+import { makePullRequestCoordinator, PullRequestCoordinator } from "../pull-request/coordinator";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -32,7 +34,7 @@ const piProcessOptions = { executable: piExecutable };
 export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
   PiProcessTag,
   makePiProcess(piProcessOptions),
-).pipe(Layer.provide(NodeProcessLayer));
+).pipe(Layer.provide(NodeProcessLayer), Layer.provide(PlatformLayer));
 
 const PiAgentProvided = Layer.effect(
   PiAgent,
@@ -70,11 +72,37 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(ProjectServiceProvided),
   Layer.provide(PathsLayer),
   Layer.provide(WorktreeProvided),
+  Layer.provide(GitProvided),
   Layer.provide(PlatformLayer),
 );
 
 const PiAgentServiceProvided = PiAgentServiceLayer;
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
+
+export const PullRequestCoordinatorLayer = Layer.effect(
+  PullRequestCoordinator,
+  Effect.gen(function* () {
+    const sessions = yield* PiAgentSessionService;
+    const github = yield* PullRequestService;
+    const bus = yield* EventBus;
+    const crypto = yield* Crypto.Crypto;
+    const projects = yield* ProjectService;
+    return yield* makePullRequestCoordinator({
+      sessions,
+      github,
+      bus,
+      newLeaseId: crypto.randomUUIDv4.pipe(Effect.orDie),
+      projectPathFor: (id) => projects.findById(id).pipe(Effect.map((project) => project.path)),
+    });
+  }),
+);
+const PullRequestCoordinatorProvided = PullRequestCoordinatorLayer.pipe(
+  Layer.provide(PiAgentSessionServiceProvided),
+  Layer.provide(PullRequestServiceProvided),
+  Layer.provide(EventBusLayer),
+  Layer.provide(ProjectServiceProvided),
+  Layer.provide(PlatformLayer),
+);
 
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
@@ -87,6 +115,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   GitProvided,
   WorktreeProvided,
   PullRequestServiceProvided,
+  PullRequestCoordinatorProvided,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

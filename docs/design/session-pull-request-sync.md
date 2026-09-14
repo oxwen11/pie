@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-**Proposed，按最新讨论统一；尚未实现。** 原问题排查的 Pie 代码基线为 `80078b14`。
+**实施已落地，自动化检查通过；完整产品验收尚未完成。** 原问题排查的 Pie 代码基线为 `80078b14`。实现与验证范围见文末记录。
 
 本方案取代此前的“daemon 常驻同步”草案。核心规则只有两条：
 
@@ -15,11 +15,11 @@
 
 不扩展到多 provider、webhook、全局 PR 数据库、通用任务调度平台或新的 PR 创建界面。Agent 可继续使用现有工具创建 PR，再登记结果。
 
-本文是后续实施的统一提案；[GitHub PR V1](github-pull-request-integration.md) 为历史设计，其 CLI 安全边界、写操作确认和实时 head 校验仍须保留。[t3code 最新源码调研](../research/t3code-multiple-pull-requests-and-stacks.md)记录参考依据，不能将上游无客户端需求的周期同步搬进 Pie。
+本文是已确认的实施规范；[GitHub PR V1](github-pull-request-integration.md) 为历史设计，其 CLI 安全边界、写操作确认和实时 head 校验仍须保留。[t3code 最新源码调研](../research/t3code-multiple-pull-requests-and-stacks.md)记录参考依据，不能将上游无客户端需求的周期同步搬进 Pie。
 
 ## 1. 问题与完成标准
 
-当前问题集中在：
+原始问题集中在：
 
 - `packages/server/src/rpc/pull-request.ts` 的 `statuses` 在批量 RPC 内访问 GitHub，一项失败可使整批失败；有旧身份时不再发现新 PR，发现结果也不持久化。
 - `current` 查询成功才追加身份；侧栏选中行优先使用它，未选中行使用 `statuses`，导致点击才出现和切走回退。
@@ -306,3 +306,27 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 小规模目标：10 个有需求 Session、最多 10 个唯一 PR、单次 host 读取 5 秒内且无退避时，首次核验及 open 状态外部变化在 120 秒内可见；分支补漏与拓扑周期更新按 5 分钟节奏。**计时从实际需求开始，不从 daemon 启动或 Agent 登记开始。** 超限、断网或限流应显示待更新 / 不完整，而非假装没有 PR。
 
 文档完成不代表实现完成；所有上述真实调用链与验收通过后，才可标记产品交付。
+
+## 实施与验证记录（2026-09-15）
+
+已实现离线 Agent 登记工具及其 Session 范围桥接、关联与排除持久化、单一需求协调器、缓存状态 RPC、摘要与原生 Stack 读取、可见行和活动面板的需求聚合、统一侧栏与关联面板，以及独立的 Stack 确认流程。独占 worktree 的标记随元数据保存；普通共享目录继续使用记录的分支。Stack 预览缺少生命周期字段时保留成员身份并显示未知，不猜测为 open；写操作校验确认时的 base、成员顺序、分支名与 head。
+
+### 已通过的检查
+
+- 全工作区 `pnpm check` 通过。受影响包的 Turbo test / typecheck / build / lint:check 全部通过：Server 435、App 183、Desktop 53、Contract 33 个测试通过；Server 原有 1 个测试跳过。
+- 实际安装的 Pi 进程加载扩展，登记成功后检查 Session 文件；覆盖 create、历史读取后的 resume、model-state 读取后的 resume、排除与显式恢复。未声明需求的完整调用链没有 GitHub 读取。
+- 回归覆盖持久化失败、并发元数据写入、跨 Project 相同 Session ID、重启后的成功时间戳、原生成员共享读取、租约过期与释放、迟到结果、独占 worktree 切换，以及排队读取取消不制造远端失败或退避。
+- React Doctor changed scope：89/100，无新增 error；唯一 warning 是需求协议中有意串行的发送循环，不能改为并行发送来消除告警。完整扫描与实施前 HEAD 归档均为 0/100，既有 error 数相同；不把变更检查通过说成整个仓库没有诊断问题。
+
+### 实际桌面操作
+
+在隔离 Desktop home 中，通过真实 Import project、聊天输入和 Agent 工具登记公开仓库 `pingdotgg/t3code` 的 PR #1、#2；未手工插入项目或 Session 元数据。侧栏显示多个关联的 `+1`，关联面板保留未知身份，显式刷新取得 #1、#2 的 merged 状态。切换到 New chat 后，未选中行保留相同的 #2 状态与核验时间。通过面板取消 #1 后再次让 Agent 普通登记，工具返回 excluded，磁盘记录也未被恢复。仅进行了 GitHub 读取，没有远端写操作。
+
+截图和侧效应证据保存在未提交的 `.agents/skills/verify-pie-desktop/evidence/20260914T173738Z-5585/`。运行环境禁用了图片读取，截图已生成，但不声称完成了视觉审查。
+
+### 尚未完成的验收与限制
+
+- Web 的 4180 / 4190 被另一 worktree（`pfmp`）占用，未停止、修改或复用它进行验收。
+- Desktop 后台窗口实际报告 document hidden；详情读取保持禁用。物理最小化 / 恢复、前台可见后的自动读取、滚动 / 折叠、多窗口和断线恢复的完整运行时矩阵仍需补验，不能用单元测试冒充这部分证明。
+- Native Stack 写操作只做了确定性命令测试，未在 GitHub 执行。**Stack merge 保持禁用**：当前 host API 不能原子保护所有受影响层的 head；不降级为连续单 PR merge。Rebase 仍要求新预览、确认与逐层校验，部分完成或未知结果不会自动重试。
+- 尚未向 GitHub 上传截图、推送分支或创建 PR；本次没有远端写入授权。

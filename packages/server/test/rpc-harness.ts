@@ -10,6 +10,7 @@ import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
+  PiAgentSessionService,
 } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
@@ -18,7 +19,7 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { PiProcessTag } from "../src/rpc/runtime";
+import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/rpc/runtime";
 
 export interface RpcTestHarnessOptions {
   readonly pullRequestLayer?: Layer.Layer<PullRequestService>;
@@ -62,6 +63,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
     Layer.provide(worktreeProvided),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
   const pullRequestLayer =
@@ -76,6 +78,13 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     pullRequestLayer,
+    PullRequestCoordinatorLayer.pipe(
+      Layer.provide(harnessSessionLayer),
+      Layer.provide(pullRequestLayer),
+      Layer.provide(EventBusLayer),
+      Layer.provide(projectServiceLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     NodeServices.layer,
     Observability.discard,
   );
@@ -84,5 +93,9 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     "effect/context": await runtime.runPromise(runtime.contextEffect),
   };
   const client = createRouterClient(router, { context });
-  return { client, dispose: () => runtime.dispose() };
+  return {
+    client,
+    sessions: await runtime.runPromise(PiAgentSessionService),
+    dispose: () => runtime.dispose(),
+  };
 }

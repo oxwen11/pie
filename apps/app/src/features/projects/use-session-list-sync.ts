@@ -12,7 +12,10 @@ const RESUBSCRIBE_DELAY_MS = 1000;
 // converged — across tabs and the desktop app, not just the tab that drove
 // the change — by folding each event through `applySessionListEvent`; chunks
 // and requests still belong to the per-session Chat transport.
-export function useSessionListSync(): void {
+export function useSessionListSync(
+  onSubscribed?: () => void,
+  onCollectionEvent?: (type: string) => void,
+): void {
   const { orpcClient, orpcQueryUtils, queryClient } = useRouteContext({ from: "__root__" });
   // The cleanup below does own every allocation, but the rule only recognizes
   // teardown it can name (`unsubscribe()`, `clearTimeout`, `socket.close`) and
@@ -35,9 +38,13 @@ export function useSessionListSync(): void {
             { scope: { kind: "global" } },
             { signal: abort.signal },
           );
+          onSubscribed?.();
+          // Repair the initial query/subscription gap as well as reconnects.
+          void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() });
           for await (const item of stream) {
             if (item.type !== "event") continue;
             applySessionListEvent(queryClient, listKeyFor, item.event);
+            onCollectionEvent?.(item.event.type);
           }
         } catch (error) {
           if (abort.signal.aborted || isAbortError(error)) return;
@@ -55,5 +62,5 @@ export function useSessionListSync(): void {
 
     void run();
     return () => abort.abort();
-  }, [orpcClient, queryClient, orpcQueryUtils]);
+  }, [orpcClient, queryClient, orpcQueryUtils, onSubscribed, onCollectionEvent]);
 }

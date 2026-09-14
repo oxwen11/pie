@@ -100,7 +100,7 @@ export type PullRequestSummary = typeof PullRequestSummarySchema.Type;
 export const PullRequestStackLayerSchema = Schema.Struct({
   ref: PullRequestRefSchema,
   headBranch: Schema.String,
-  lifecycle: PullRequestLifecycleSchema,
+  lifecycle: Schema.NullOr(PullRequestLifecycleSchema),
 });
 export const PullRequestStackSchema = Schema.Struct({
   id: Schema.String,
@@ -110,7 +110,13 @@ export const PullRequestStackSchema = Schema.Struct({
   layers: Schema.Array(PullRequestStackLayerSchema).check(Schema.isMaxLength(100)),
 });
 export type PullRequestStack = typeof PullRequestStackSchema.Type;
-export const PullRequestLinkSourceSchema = Schema.Literals(["agent", "created", "branch", "stack", "legacy"]);
+export const PullRequestLinkSourceSchema = Schema.Literals([
+  "agent",
+  "created",
+  "branch",
+  "stack",
+  "legacy",
+]);
 export type PullRequestLinkSource = typeof PullRequestLinkSourceSchema.Type;
 export const SessionPullRequestLinkSchema = Schema.Struct({
   ref: PullRequestRefSchema,
@@ -134,8 +140,15 @@ export const PullRequestStackActionSchema = Schema.Literals(["merge", "rebase"])
 export type PullRequestStackAction = typeof PullRequestStackActionSchema.Type;
 export const PullRequestStackExpectedSchema = Schema.Struct({
   stackId: Schema.String,
+  baseBranch: Schema.String,
   // Entire native topology plus heads, not just the affected subset.
-  members: Schema.Array(Schema.Struct({ pullRequest: PullRequestRefSchema, headSha: Schema.String })).check(Schema.isMaxLength(100)),
+  members: Schema.Array(
+    Schema.Struct({
+      pullRequest: PullRequestRefSchema,
+      headBranch: Schema.String,
+      headSha: Schema.String,
+    }),
+  ).check(Schema.isMaxLength(100)),
 });
 export type PullRequestStackExpected = typeof PullRequestStackExpectedSchema.Type;
 export const PullRequestStackPreviewSchema = Schema.Struct({
@@ -162,7 +175,10 @@ export const PullRequestDemandInputSchema = Schema.Struct({
   refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)),
 });
 export type PullRequestDemandInput = typeof PullRequestDemandInputSchema.Type;
-export const PullRequestDemandOutputSchema = Schema.Struct({ leaseId: Schema.String, expiresAt: Schema.String });
+export const PullRequestDemandOutputSchema = Schema.Struct({
+  leaseId: Schema.String,
+  expiresAt: Schema.String,
+});
 export type PullRequestDemandOutput = typeof PullRequestDemandOutputSchema.Type;
 
 const ExpectedPullRequestSchema = Schema.Struct({ pullRequest: PullRequestRefSchema });
@@ -242,12 +258,44 @@ export const pullRequestContract = {
     .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
     .errors(currentErrors)
     .output(Schema.Array(PullRequestSessionStatusSchema)),
-  demand: oc.input(PullRequestDemandInputSchema).errors({ ...currentErrors, INVALID_LEASE: {} }).output(PullRequestDemandOutputSchema),
-  refresh: oc.input(Schema.Struct({ ref: SessionRefSchema })).errors(currentErrors).output(PullRequestSessionStatusSchema),
-  exclude: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema })).errors({ ...currentErrors, STORE_WRITE_FAILED: {} }).output(Schema.Void),
-  detail: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema })).errors({ ...currentErrors, STALE_CONTEXT: {} }).output(Schema.NullOr(PullRequestSnapshotSchema)),
-  stackPreview: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema, action: PullRequestStackActionSchema })).errors(actionErrors).output(PullRequestStackPreviewSchema),
-  runStackAction: oc.input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema, action: PullRequestStackActionSchema, expected: PullRequestStackExpectedSchema, method: Schema.optionalKey(PullRequestMergeMethodSchema) })).errors(actionErrors).output(PullRequestStackActionResultSchema),
+  demand: oc
+    .input(PullRequestDemandInputSchema)
+    .errors({ ...currentErrors, INVALID_LEASE: {} })
+    .output(PullRequestDemandOutputSchema),
+  refresh: oc
+    .input(Schema.Struct({ ref: SessionRefSchema }))
+    .errors(currentErrors)
+    .output(PullRequestSessionStatusSchema),
+  exclude: oc
+    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
+    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
+    .output(Schema.Void),
+  detail: oc
+    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
+    .errors({ ...currentErrors, STALE_CONTEXT: {} })
+    .output(Schema.NullOr(PullRequestSnapshotSchema)),
+  stackPreview: oc
+    .input(
+      Schema.Struct({
+        ref: SessionRefSchema,
+        pullRequest: PullRequestRefSchema,
+        action: PullRequestStackActionSchema,
+      }),
+    )
+    .errors(actionErrors)
+    .output(PullRequestStackPreviewSchema),
+  runStackAction: oc
+    .input(
+      Schema.Struct({
+        ref: SessionRefSchema,
+        pullRequest: PullRequestRefSchema,
+        action: PullRequestStackActionSchema,
+        expected: PullRequestStackExpectedSchema,
+        method: Schema.optionalKey(PullRequestMergeMethodSchema),
+      }),
+    )
+    .errors(actionErrors)
+    .output(PullRequestStackActionResultSchema),
   runAction: oc
     .input(PullRequestActionInputSchema)
     .errors(actionErrors)
@@ -256,8 +304,10 @@ export const pullRequestContract = {
 
 /** Canonical identity; branch spelling is deliberately untouched. */
 export const normalizePullRequestRef = (ref: PullRequestRef): PullRequestRef => ({
-  host: ref.host.toLowerCase(), owner: ref.owner.toLowerCase(),
-  repository: ref.repository.toLowerCase(), number: ref.number,
+  host: ref.host.toLowerCase(),
+  owner: ref.owner.toLowerCase(),
+  repository: ref.repository.toLowerCase(),
+  number: ref.number,
 });
 export const pullRequestKey = (ref: PullRequestRef): string => {
   const normalized = normalizePullRequestRef(ref);
@@ -280,8 +330,12 @@ export type PullRequestProjection = {
 };
 
 /** Only unique linear components are chains. Ambiguous components stay individual. */
-export const projectSessionPullRequests = (links: ReadonlyArray<SessionPullRequestLink>): PullRequestProjection => {
-  const visible = links.filter((link) => !link.excluded).sort((a, b) => a.linkedAt.localeCompare(b.linkedAt));
+export const projectSessionPullRequests = (
+  links: ReadonlyArray<SessionPullRequestLink>,
+): PullRequestProjection => {
+  const visible = links
+    .filter((link) => !link.excluded)
+    .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt));
   const remaining = new Map(visible.map((link) => [pullRequestKey(link.ref), link]));
   const groups: PullRequestGroup[] = [];
   for (const link of visible) {
@@ -297,8 +351,13 @@ export const projectSessionPullRequests = (links: ReadonlyArray<SessionPullReque
   const candidates = [...remaining.values()];
   const repoKey = (link: SessionPullRequestLink) => pullRequestKey({ ...link.ref, number: 1 });
   const adjacent = (a: SessionPullRequestLink, b: SessionPullRequestLink) =>
-    a !== b && repoKey(a) === repoKey(b) && a.snapshot !== null && b.snapshot !== null &&
-    (a.snapshot.headBranch === b.snapshot.baseBranch || b.snapshot.headBranch === a.snapshot.baseBranch || a.snapshot.headBranch === b.snapshot.headBranch);
+    a !== b &&
+    repoKey(a) === repoKey(b) &&
+    a.snapshot !== null &&
+    b.snapshot !== null &&
+    (a.snapshot.headBranch === b.snapshot.baseBranch ||
+      b.snapshot.headBranch === a.snapshot.baseBranch ||
+      a.snapshot.headBranch === b.snapshot.headBranch);
   while (remaining.size > 0) {
     const first = remaining.values().next().value;
     if (!first) break;
@@ -307,27 +366,56 @@ export const projectSessionPullRequests = (links: ReadonlyArray<SessionPullReque
     for (const member of component) {
       for (const candidate of candidates) {
         if (remaining.has(pullRequestKey(candidate.ref)) && adjacent(member, candidate)) {
-          remaining.delete(pullRequestKey(candidate.ref)); component.push(candidate);
+          remaining.delete(pullRequestKey(candidate.ref));
+          component.push(candidate);
         }
       }
     }
-    const parents = (child: SessionPullRequestLink) => component.filter((parent) => parent !== child && parent.snapshot?.headBranch === child.snapshot?.baseBranch);
-    const children = (parent: SessionPullRequestLink) => component.filter((child) => parent !== child && child.snapshot?.baseBranch === parent.snapshot?.headBranch);
+    const parents = (child: SessionPullRequestLink) =>
+      component.filter(
+        (parent) => parent !== child && parent.snapshot?.headBranch === child.snapshot?.baseBranch,
+      );
+    const children = (parent: SessionPullRequestLink) =>
+      component.filter(
+        (child) => parent !== child && child.snapshot?.baseBranch === parent.snapshot?.headBranch,
+      );
     const heads = component.map((member) => member.snapshot?.headBranch);
     const roots = component.filter((member) => parents(member).length === 0);
     const unique = new Set(heads).size === heads.length;
     const ordered: SessionPullRequestLink[] = [];
     let cursor = roots.length === 1 ? roots[0] : undefined;
-    if (unique && component.every((member) => parents(member).length <= 1 && children(member).length <= 1)) {
-      while (cursor && !ordered.includes(cursor)) { ordered.push(cursor); cursor = children(cursor)[0]; }
+    if (
+      unique &&
+      component.every((member) => parents(member).length <= 1 && children(member).length <= 1)
+    ) {
+      while (cursor && !ordered.includes(cursor)) {
+        ordered.push(cursor);
+        cursor = children(cursor)[0];
+      }
     }
-    if (component.length > 1 && ordered.length === component.length) groups.push({ type: "derived", links: ordered, stack: null });
-    else for (const member of component) groups.push({ type: "single", links: [member], stack: null });
+    if (component.length > 1 && ordered.length === component.length)
+      groups.push({ type: "derived", links: ordered, stack: null });
+    else
+      for (const member of component) groups.push({ type: "single", links: [member], stack: null });
   }
-  const unfinished = (link: SessionPullRequestLink) => link.snapshot === null || link.snapshot.lifecycle.type === "open";
+  const unfinished = (link: SessionPullRequestLink) =>
+    link.snapshot === null || link.snapshot.lifecycle.type === "open";
   const chain = groups.length === 1 && groups[0]?.type !== "single" ? groups[0] : undefined;
-  const ordered = chain ? [...chain.links].reverse() : visible;
+  const ordered = chain
+    ? chain.links.reduceRight<SessionPullRequestLink[]>((result, link) => {
+        result.push(link);
+        return result;
+      }, [])
+    : visible;
   const representative = ordered.find(unfinished) ?? ordered[0] ?? null;
-  const lifecycle = visible.some((link) => link.snapshot === null) ? null : representative?.snapshot?.lifecycle ?? null;
-  return { groups, representative, badge: visible.length === 0 ? null : chain ? "stack" : "pr", count: visible.length, lifecycle };
+  const lifecycle = visible.some((link) => link.snapshot === null)
+    ? null
+    : (representative?.snapshot?.lifecycle ?? null);
+  return {
+    groups,
+    representative,
+    badge: visible.length === 0 ? null : chain ? "stack" : "pr",
+    count: visible.length,
+    lifecycle,
+  };
 };

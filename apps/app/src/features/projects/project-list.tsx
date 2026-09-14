@@ -11,6 +11,7 @@ import {
   SidebarGroupLabel,
 } from "@getpie/ui/components/sidebar";
 import { ChevronRight, FolderPlus } from "lucide-react";
+import { useState } from "react";
 
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group";
@@ -18,16 +19,19 @@ import { useProjects } from "@/features/projects/use-projects";
 
 /** Every imported project, each rendering its own session list. */
 export function ProjectList({
+  displayed,
   isSessionActive,
   onImport,
 }: {
+  readonly displayed: boolean;
   readonly isSessionActive: (ref: SessionRef) => boolean;
   readonly onImport: () => void;
 }) {
   const projects = useProjects();
+  const [expanded, setExpanded] = useState(true);
 
   return (
-    <Collapsible defaultOpen>
+    <Collapsible open={expanded} onOpenChange={setExpanded}>
       <SidebarGroup>
         <SidebarGroupLabel
           className="text-sidebar-foreground/70 tracking-wider"
@@ -49,6 +53,7 @@ export function ProjectList({
             {(projects.data ?? []).map((project) => (
               <ProjectSessionsGroup
                 key={project.id}
+                displayed={displayed && expanded}
                 isSessionActive={isSessionActive}
                 project={project}
               />

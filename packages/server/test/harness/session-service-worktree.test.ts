@@ -67,6 +67,7 @@ describe("PiAgentSessionService worktree create", () => {
     });
     expect(result.afterCreate.cwd).toBe("/tmp/pie-worktree");
     expect(result.afterCreate.gitBranch).toBe("pie/abcd1234");
+    expect(result.afterCreate.ownsWorktree).toBe(true);
     expect(result.open).toEqual([{ cwd: "/tmp/pie-worktree" }]);
   });
 

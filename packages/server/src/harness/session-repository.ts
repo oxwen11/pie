@@ -1,4 +1,9 @@
-import { PullRequestRefSchema } from "@getpie/contract/pull-request";
+import {
+  PullRequestRefSchema,
+  SessionPullRequestLinkSchema,
+  normalizePullRequestRef,
+  pullRequestKey,
+} from "@getpie/contract/pull-request";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Effect, Option, Schema } from "effect";
 
@@ -12,7 +17,9 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  ownsWorktree: Schema.optionalKey(Schema.Boolean),
   pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
+  pullRequests: Schema.optionalKey(Schema.Array(SessionPullRequestLinkSchema)),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -23,13 +30,33 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, ...rest } = parsed;
+  const { agentSessionId, pullRequestRefs, ...rest } = parsed;
+  const links = new Map(
+    (parsed.pullRequests ?? []).map((link) => [
+      pullRequestKey(link.ref),
+      { ...link, ref: normalizePullRequestRef(link.ref) },
+    ]),
+  );
+  for (const ref of pullRequestRefs ?? []) {
+    const key = pullRequestKey(ref);
+    if (!links.has(key))
+      links.set(key, {
+        ref: normalizePullRequestRef(ref),
+        source: "legacy",
+        linkedAt: parsed.createdAt,
+        excluded: false,
+        snapshot: null,
+        stack: null,
+        stackCheckedAt: null,
+      });
+  }
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
       : undefined;
   return {
     ...rest,
+    pullRequests: [...links.values()],
     ...(opened !== undefined ? { agentSessionId: opened } : undefined),
   };
 };
@@ -43,9 +70,8 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
     : undefined),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
-  ...(metadata.pullRequestRefs !== undefined && metadata.pullRequestRefs.length > 0
-    ? { pullRequestRefs: metadata.pullRequestRefs }
-    : undefined),
+  ...(metadata.ownsWorktree !== undefined ? { ownsWorktree: metadata.ownsWorktree } : undefined),
+  pullRequests: fromStorage(metadata).pullRequests ?? [],
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
