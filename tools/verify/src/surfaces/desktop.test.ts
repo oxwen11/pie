@@ -29,7 +29,9 @@ const path = require('node:path');
 const http = require('node:http');
 const cp = require('node:child_process');
 const args = process.argv.slice(2);
-fs.appendFileSync(process.env.TRACE, JSON.stringify({ args, pid: process.pid }) + '\\n');
+fs.appendFileSync(process.env.TRACE, JSON.stringify({
+  args, pid: process.pid, projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
+}) + '\\n');
 if (args.join(' ') === 'exec install-electron') {
   if (process.env.INSTALL_CHILD === '1') {
     const child = cp.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
@@ -131,7 +133,11 @@ function start(env: NodeJS.ProcessEnv, ...args: string[]) {
   return { child, exited };
 }
 
-function trace(root: string): Array<{ args: string[]; pid: number }> {
+function trace(root: string): Array<{
+  args: string[];
+  pid: number;
+  projectBrowseRoot?: string;
+}> {
   const file = path.join(root, "trace");
   return fs.existsSync(file)
     ? fs
@@ -205,6 +211,14 @@ describe("desktop launch lifecycle", () => {
       ["run", "dev"],
     ]);
     expect(Number(fs.readFileSync(pidPath, "utf8"))).toBe(trace(root)[1]?.pid);
+    const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
+    expect(meta.sampleProject).toBe(path.join(meta.pieHome, "workspace/verify-pie-desktop-sample"));
+    expect(
+      trace(root).every(
+        (entry) => entry.projectBrowseRoot === path.join(meta.pieHome, "workspace"),
+      ),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
     const calls = browserTrace(root);
     expect(calls[0]?.args).toContain("--no-pin-tab");
     expect(calls[0]?.args).toContain("fixture-page");

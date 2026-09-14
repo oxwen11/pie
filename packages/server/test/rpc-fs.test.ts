@@ -104,6 +104,42 @@ describe("fs router", () => {
     }
   });
 
+  it("confines an isolated project picker to its configured root", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-root-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-outside-"));
+    fs.mkdirSync(path.join(root, "sample"));
+    fs.symlinkSync(outside, path.join(root, "outside-link"));
+    const previousRoot = process.env.PIE_PROJECT_BROWSE_ROOT;
+    process.env.PIE_PROJECT_BROWSE_ROOT = root;
+    const harness = await makeRpcTestHarness(home);
+    try {
+      await expect(harness.client.fs.browse({})).resolves.toEqual({
+        path: root,
+        parent: null,
+        directories: [
+          { name: "outside-link", path: path.join(root, "outside-link") },
+          { name: "sample", path: path.join(root, "sample") },
+        ],
+      });
+      await expect(harness.client.fs.browse({ path: path.join(root, "sample") })).resolves.toEqual({
+        path: path.join(root, "sample"),
+        parent: root,
+        directories: [],
+      });
+      await expect(harness.client.fs.browse({ path: outside })).rejects.toMatchObject({
+        code: "READ_FAILED",
+      });
+      await expect(
+        harness.client.fs.browse({ path: path.join(root, "outside-link") }),
+      ).rejects.toMatchObject({ code: "READ_FAILED" });
+    } finally {
+      await harness.dispose();
+      if (previousRoot === undefined) delete process.env.PIE_PROJECT_BROWSE_ROOT;
+      else process.env.PIE_PROJECT_BROWSE_ROOT = previousRoot;
+    }
+  });
+
   it("browses sorted subdirectories with parent, including dotfolders only when requested", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-"));
