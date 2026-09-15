@@ -85,11 +85,11 @@ function CollapsibleAssistantMessage({
 }
 
 function useElapsedSeconds(active: boolean): number {
-  const [startedAt] = useState(() => Date.now());
   const secondsRef = useRef(0);
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!active) return NO_UNSUBSCRIBE;
+      const startedAt = Date.now() - secondsRef.current * 1000;
       const tick = () => {
         const next = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         if (next === secondsRef.current) return;
@@ -103,7 +103,7 @@ function useElapsedSeconds(active: boolean): number {
         clearInterval(id);
       };
     },
-    [active, startedAt],
+    [active],
   );
   const getSnapshot = useCallback(() => secondsRef.current, []);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
