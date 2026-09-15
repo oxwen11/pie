@@ -30,7 +30,13 @@ import {
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
-import { ReviewToolbar } from "./review-toolbar";
+import {
+  ReviewBranchSelect,
+  ReviewModeSelect,
+  ReviewRefreshButton,
+  ReviewToolbar,
+  ReviewToolbarHeading,
+} from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 
 export interface ReviewPayload {
@@ -169,26 +175,29 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   const placeholder = reviewPanelPlaceholder(branch, review, mode, other);
   if (placeholder !== null) return placeholder;
 
+  const heading = review.data === undefined ? "" : reviewHeading(review.data);
+  const refreshing = review.isFetching || branch.isFetching || tree.isFetching;
+  const refresh = (): void => {
+    void Promise.all([
+      review.refetch(),
+      branch.refetch(),
+      tree.refetch(),
+      ...diffs.map((diff) => diff.refetch()),
+    ]);
+  };
+
   return (
     <WorkspaceLayout>
       <WorkspaceLayoutToolbar>
-        <ReviewToolbar
-          branch={repositoryBranch}
-          heading={review.data === undefined ? "" : reviewHeading(review.data)}
-          mode={mode}
-          onModeChange={setMode}
-          onOtherChange={setOther}
-          onRefresh={() => {
-            void Promise.all([
-              review.refetch(),
-              branch.refetch(),
-              tree.refetch(),
-              ...diffs.map((diff) => diff.refetch()),
-            ]);
-          }}
-          other={other}
-          refreshing={review.isFetching || branch.isFetching || tree.isFetching}
-        />
+        <ReviewToolbar>
+          <ReviewModeSelect onValueChange={setMode} value={mode} />
+          {mode === "branch" ? (
+            <ReviewBranchSelect branch={repositoryBranch} onValueChange={setOther} value={other} />
+          ) : (
+            <ReviewToolbarHeading>{heading}</ReviewToolbarHeading>
+          )}
+          <ReviewRefreshButton loading={refreshing} onClick={refresh} />
+        </ReviewToolbar>
         <WorkspaceLayoutTreeTrigger label={workspaceName} />
       </WorkspaceLayoutToolbar>
       <WorkspaceLayoutBody>
