@@ -352,6 +352,54 @@ describe("DesktopApplication", () => {
     ]);
   });
 
+  it("keeps one remote row when two SSH ids advertise the same environment", async () => {
+    const other: ServerConnection = {
+      httpBaseUrl: "http://127.0.0.1:61235",
+      wsBaseUrl: "ws://127.0.0.1:61235",
+      token: "ssh-token-alias",
+    };
+    const h = makeHarness(
+      Effect.succeed(localConnection),
+      disabledDesktopSsh({
+        connect: (raw) =>
+          Effect.succeed(
+            raw.includes("bob")
+              ? {
+                  id: "remote-dns",
+                  target: {
+                    alias: "box.ts.net",
+                    hostname: "box.ts.net",
+                    username: "bob",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-1",
+                  connection: other,
+                  closed: Effect.never,
+                }
+              : {
+                  id: "remote-ip",
+                  target: {
+                    alias: "example.com",
+                    hostname: "example.com",
+                    username: "alice",
+                    port: null,
+                  },
+                  environmentId: "env-ssh-1",
+                  connection: sshConnection,
+                  closed: Effect.never,
+                },
+          ),
+      }),
+    );
+
+    await Effect.runPromise(h.application.connectSsh("alice@example.com"));
+    await Effect.runPromise(h.application.connectSsh("bob@box.ts.net"));
+    const snapshot = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(snapshot.remotes).toHaveLength(1);
+    expect(snapshot.remotes[0]?.environmentId).toBe("env-ssh-1");
+    expect(snapshot.remotes[0]?.id).toBe("remote-dns");
+  });
+
   it("tracks parallel SSH connects independently", async () => {
     const first = Effect.runSync(Deferred.make<void>());
     const second = Effect.runSync(Deferred.make<void>());

@@ -369,23 +369,57 @@ export function makeDesktopSsh(input: {
           const environmentId = yield* loadEnvironmentId(connection).pipe(
             Effect.tapError(() => connected.close),
           );
-          yield* modifySaved((environments) => [
-            ...environments.filter((entry) => entry.id !== id),
-            { id, target },
-          ]).pipe(Effect.tapError(() => connected.close));
-
-          yield* adoptLive({ id, target, environmentId, connected });
-
-          yield* Effect.log("ssh.environment.connected").pipe(
-            Effect.annotateLogs({
-              id,
-              alias: target.alias,
-              hostname: target.hostname,
-              label: environmentLabel(target),
-            }),
-          );
-
-          return resultFromLive({ id, target, environmentId, connected });
+          const result = yield* persistGate
+            .withPermit(
+              Effect.gen(function* () {
+                const lives = yield* Ref.get(liveRef);
+                for (const live of lives.values()) {
+                  if (live.environmentId !== environmentId) continue;
+                  yield* connected.close;
+                  yield* Effect.log("ssh.environment.reused").pipe(
+                    Effect.annotateLogs({
+                      id: live.id,
+                      environmentId,
+                      alias: target.alias,
+                      hostname: target.hostname,
+                    }),
+                  );
+                  return resultFromLive(live);
+                }
+                yield* writeSaved(filePath, {
+                  environments: [
+                    ...(yield* readSaved(filePath)).environments.filter((entry) => entry.id !== id),
+                    { id, target },
+                  ],
+                }).pipe(
+                  Effect.tapError(() =>
+                    Effect.logError("ssh.environments.persist.failed").pipe(
+                      Effect.annotateLogs({ path: filePath }),
+                    ),
+                  ),
+                  Effect.mapError(
+                    (error) =>
+                      new SshPersistError({
+                        message: `Failed to persist SSH environments to ${filePath}.`,
+                        cause: error,
+                      }),
+                  ),
+                );
+                yield* adoptLive({ id, target, environmentId, connected });
+                yield* Effect.log("ssh.environment.connected").pipe(
+                  Effect.annotateLogs({
+                    id,
+                    environmentId,
+                    alias: target.alias,
+                    hostname: target.hostname,
+                    label: environmentLabel(target),
+                  }),
+                );
+                return resultFromLive({ id, target, environmentId, connected });
+              }).pipe(Effect.provide(platform)),
+            )
+            .pipe(Effect.tapError(() => connected.close));
+          return result;
         }).pipe(Effect.provide(platform)),
       disconnect: disconnectAll,
       remove: (id) =>
