@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { layer } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { GitNotRepository, GitRefNotFound } from "../../src/errors";
+import { GitNotRepository } from "../../src/errors";
 import { NodePlatformLayer } from "../platform";
 import { run } from "./session-service-fixture";
 
@@ -12,7 +12,6 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
     Effect.gen(function* () {
       let creates = 0;
       const bases: Array<string | undefined> = [];
-      const ensured: Array<{ repoCwd: string; path: string; branch: string }> = [];
       const result = yield* run(
         {
           worktreeCreate: (_cwd, input) => {
@@ -22,10 +21,6 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
               path: "/tmp/pie-worktree",
               branch: "pie/abcd1234",
             });
-          },
-          worktreeEnsure: (repoCwd, path, branch) => {
-            ensured.push({ repoCwd, path, branch });
-            return Effect.succeed({ path, branch });
           },
         },
         (fixture) =>
@@ -52,9 +47,6 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
       );
       assert.equal(creates, 1);
       assert.deepEqual(bases, ["main"]);
-      assert.deepEqual(ensured, [
-        { repoCwd: "/tmp/pie-app", path: "/tmp/pie-worktree", branch: "pie/abcd1234" },
-      ]);
       assert.deepEqual(result.created.workspace, {
         cwd: "/tmp/pie-worktree",
         worktree: { branch: "pie/abcd1234" },
@@ -116,17 +108,12 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
     }),
   );
 
-  it.effect("recreates the worktree on prepare from the stored branch", () =>
+  it.effect("prepare returns the stored worktree workspace without recreating it", () =>
     Effect.gen(function* () {
-      const ensured: Array<{ repoCwd: string; path: string; branch: string }> = [];
       const result = yield* run(
         {
           worktreeCreate: () =>
             Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
-          worktreeEnsure: (repoCwd, path, branch) => {
-            ensured.push({ repoCwd, path, branch });
-            return Effect.succeed({ path, branch });
-          },
         },
         (fixture) =>
           Effect.gen(function* () {
@@ -140,32 +127,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
             return { created, workspace };
           }),
       );
-      assert.deepEqual(ensured, [
-        { repoCwd: "/tmp/pie-app", path: "/tmp/pie-worktree", branch: "pie/abcd1234" },
-      ]);
       assert.deepEqual(result.workspace, result.created.workspace);
-    }),
-  );
-
-  it.effect("prepare fails when the stored worktree branch is gone", () =>
-    Effect.gen(function* () {
-      const error = yield* run(
-        {
-          worktreeCreate: () =>
-            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
-          worktreeEnsure: () => Effect.fail(new GitRefNotFound({ ref: "pie/abcd1234" })),
-        },
-        (fixture) =>
-          Effect.gen(function* () {
-            const created = yield* fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-              worktree: {},
-            });
-            return yield* Effect.flip(fixture.service.prepare(created.ref));
-          }),
-      );
-      assert.equal(error._tag, "GitRefNotFound");
     }),
   );
 

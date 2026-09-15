@@ -319,73 +319,18 @@ describe("agent.session router", () => {
     }
   }, 30_000);
 
-  it("restores a deleted worktree on prepare from the stored worktree branch", async () => {
+  it("prepares a worktree session after the checkout is gone", async () => {
     const { client, workspace, dispose } = await setup();
     try {
       const created = await createWorktreeSession(client, workspace);
-      expect(created.workspace.worktree?.branch).toBeDefined();
-      await client.agent.session.archive({ ref: created.ref, archived: true });
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
       const prepared = await client.agent.session.prepare({ ref: created.ref });
       expect(prepared.workspace).toEqual(created.workspace);
-      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
-
-      const branch = await client.git.branch({ ref: created.ref });
-      expect(branch.kind).toBe("repository");
-      if (branch.kind !== "repository") throw new Error("expected repository branch data");
-      expect(branch.current).toBe(created.workspace.worktree?.branch);
-
-      await client.agent.session.close({ ref: created.ref });
-    } finally {
-      await dispose();
-    }
-  }, 30_000);
-
-  it("restores a deleted worktree on the first prompt from the stored worktree branch", async () => {
-    const { client, workspace, dispose } = await setup();
-    try {
-      const created = await createWorktreeSession(client, workspace);
-      fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
-      await client.agent.session.prompt({
-        ref: created.ref,
-        parts: [{ type: "text", text: "hello" }],
-      });
-      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
-
-      const branch = await client.git.branch({ ref: created.ref });
-      expect(branch.kind).toBe("repository");
-      if (branch.kind !== "repository") throw new Error("expected repository branch data");
-      expect(branch.current).toBe(created.workspace.worktree?.branch);
-
       await client.agent.session.close({ ref: created.ref });
-    } finally {
-      await dispose();
-    }
-  }, 30_000);
-
-  it("prepare fails when the stored worktree branch is gone", async () => {
-    const { client, workspace, dispose } = await setup();
-    try {
-      const git = await initGitRepo(workspace);
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
-      const branch = created.workspace.worktree?.branch;
-      expect(branch).toBeDefined();
-      if (branch === undefined) throw new Error("expected worktree branch");
-      fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
-      await git.raw(["worktree", "prune"]);
-      await git.raw(["branch", "-D", branch]);
-
-      await expect(client.agent.session.prepare({ ref: created.ref })).rejects.toMatchObject({
-        code: "NOT_FOUND",
-      });
     } finally {
       await dispose();
     }
