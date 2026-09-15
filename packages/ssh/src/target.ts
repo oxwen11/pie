@@ -21,6 +21,8 @@ export type DiscoveredSshHost = SshTarget & {
 export type RemoteLaunchResult = {
   readonly remotePort: number;
   readonly token: string;
+  /** Remote `os.hostname()` after launch. Display only — not an SSH destination. */
+  readonly hostname?: string;
 };
 
 /** Loopback URLs plus the daemon token after the local forward is up. */
@@ -30,6 +32,8 @@ export type SshEnvironmentBootstrap = {
   readonly wsBaseUrl: string;
   readonly token: string;
   readonly remotePort: number;
+  /** Remote `os.hostname()` after launch. Display only — not an SSH destination. */
+  readonly reportedHostname?: string;
 };
 
 const IPV6_HOST = /^\[([^\]]+)\](?::(\d+))?$/u;
@@ -147,9 +151,17 @@ export const buildSshHostSpecEffect = (
       }),
   });
 
-export function environmentLabel(target: SshTarget): string {
-  if (target.username) return `${target.username}@${target.hostname}`;
-  return target.alias.trim() || target.hostname;
+export function environmentLabel(target: SshTarget, reportedHostname?: string): string {
+  const typed = target.alias.trim() || target.hostname.trim();
+  const reported = reportedHostname?.trim();
+  const extra =
+    reported !== undefined && reported.length > 0 && reported !== typed
+      ? reported
+      : target.hostname.trim() !== typed
+        ? target.hostname.trim()
+        : "";
+  const host = extra.length > 0 ? `${typed} (${extra})` : typed;
+  return target.username ? `${target.username}@${host}` : host;
 }
 
 /** Last `{...}` object in mixed SSH stdout (daemon chatter, then launch JSON). */
@@ -169,6 +181,7 @@ export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | un
     const record = parsed as {
       remotePort?: unknown;
       token?: unknown;
+      hostname?: unknown;
     };
     if (
       typeof record.remotePort !== "number" ||
@@ -179,10 +192,13 @@ export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | un
     ) {
       return undefined;
     }
-    return {
-      remotePort: record.remotePort,
-      token: record.token,
-    };
+    const hostname =
+      typeof record.hostname === "string" && record.hostname.trim().length > 0
+        ? record.hostname.trim()
+        : undefined;
+    return hostname === undefined
+      ? { remotePort: record.remotePort, token: record.token }
+      : { remotePort: record.remotePort, token: record.token, hostname };
   } catch {
     return undefined;
   }

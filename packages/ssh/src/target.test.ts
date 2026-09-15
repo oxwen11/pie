@@ -89,6 +89,26 @@ describe("connection identity", () => {
     expect(environmentLabel(parseSshInput("myserver"))).toBe("myserver");
   });
 
+  it("shows the typed address and the hostname learned after connect", () => {
+    expect(environmentLabel(parseSshInput("root@96.44.165.19"), "racknerd-5617bf0")).toBe(
+      "root@96.44.165.19 (racknerd-5617bf0)",
+    );
+    expect(
+      environmentLabel(
+        { alias: "myserver", hostname: "real.example.com", username: "alice", port: 22 },
+        "box",
+      ),
+    ).toBe("alice@myserver (box)");
+    expect(
+      environmentLabel({
+        alias: "myserver",
+        hostname: "real.example.com",
+        username: "alice",
+        port: 22,
+      }),
+    ).toBe("alice@myserver (real.example.com)");
+  });
+
   it("builds an ssh destination spec without doubling user@", () => {
     expect(buildSshHostSpec(parseSshInput("alice@example.com"))).toBe("alice@example.com");
     expect(buildSshHostSpec(parseSshInput("myserver"))).toBe("myserver");
@@ -120,8 +140,15 @@ describe("connection identity", () => {
 describe("parseRemoteLaunchOutput", () => {
   it("reads the last JSON object from mixed stdout", () => {
     expect(
-      parseRemoteLaunchOutput('starting\n{"remotePort":41234,"token":"secret-token"}\n'),
+      parseRemoteLaunchOutput(
+        'starting\n{"remotePort":41234,"token":"secret-token","hostname":"box.local"}\n',
+      ),
     ).toEqual({
+      remotePort: 41234,
+      token: "secret-token",
+      hostname: "box.local",
+    });
+    expect(parseRemoteLaunchOutput('{"remotePort":41234,"token":"secret-token"}')).toEqual({
       remotePort: 41234,
       token: "secret-token",
     });

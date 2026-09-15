@@ -65,6 +65,7 @@ describe("remote launch scripts", () => {
     expect(script).toContain("$HOME/.pie/ssh-launch/");
     expect(script).toContain("remotePort: port");
     expect(script).toContain("token: token");
+    expect(script).toContain("os.hostname()");
     expect(script).not.toContain("serverKind");
     expect(script).not.toContain("@@PIE_");
   });
