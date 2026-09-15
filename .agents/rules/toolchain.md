@@ -28,9 +28,9 @@
   is `error` everywhere except tests (keep it on in `packages/ui`,
   with three pre-existing presentation files off). Theme discovery
   follows `@import` from `apps/app/src/index.css` into
-  `packages/ui/src/globals.css`. `@source` globs must not contain
-  `/*` — the plugin's comment stripper treats that as a block
-  comment and swallows the `@theme` token block.
+  `packages/ui/src/globals.css`. `@shadcn/lint@0.1.0` is patched
+  (`patches/@shadcn__lint@0.1.0.patch`) so quoted `@source
+  ".../dist/*.js"` globs are not treated as CSS comments.
   `shadcn/no-arbitrary-values` is `error` with `allow: ["layout"]`
   plus exact chrome exceptions (shell card elevation, separator
   `transition-[opacity,width]`). Off in tests and `packages/ui`

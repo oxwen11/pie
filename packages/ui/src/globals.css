@@ -6,10 +6,8 @@
 @import "@fontsource-variable/inter";
 @import "./ai-elements/pie-loader.css";
 
-/* Directories, not `dist/*.js`: @shadcn/lint's theme parser treats `/*` as a
- * block comment and would swallow the @theme token block. */
-@source "../node_modules/streamdown/dist";
-@source "../node_modules/@streamdown/code/dist";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
