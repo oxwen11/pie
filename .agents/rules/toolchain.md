@@ -28,9 +28,9 @@
   is `error` everywhere except tests (keep it on in `packages/ui`,
   with three pre-existing presentation files off). Theme discovery
   follows `@import` from `apps/app/src/index.css` into
-  `packages/ui/src/globals.css`. `@source` globs must not contain
-  `/*` — the plugin's comment stripper treats that as a block
-  comment and swallows the `@theme` token block. `no-arbitrary-values`
+  `packages/ui/src/globals.css`. `@shadcn/lint@0.1.0` is patched
+  (`patches/@shadcn__lint@0.1.0.patch`) so quoted `@source
+  ".../dist/*.js"` globs are not treated as CSS comments. `no-arbitrary-values`
   is still off. Both `components.json` files use those `@getpie/ui`
   aliases so discovery does not look for a missing `@/components/ui`.
   Do not
