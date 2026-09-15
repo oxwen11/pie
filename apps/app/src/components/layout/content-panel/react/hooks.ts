@@ -9,7 +9,7 @@ import { useContentPanelContext } from "./context";
 import type { AnyPanelView } from "./view";
 
 /** Session-level operations, with the session already bound. Panel-level ones live on the instance. */
-export interface ContentPanelSession {
+interface ContentPanelSession {
   readonly sessionKey: string;
   open<Type extends string, Payload, Extra extends object>(
     definition: PanelDefinition<Type, Payload, Extra, AnyPanelView>,
@@ -51,6 +51,15 @@ export function useContentPanel(): ContentPanelSession | null {
       toggleVisibility: () => contentPanel.toggleVisibility(sessionRef),
     };
   }, [contentPanel, sessionRef]);
+}
+
+/** Bound session operations for outlet internals already gated off a session. */
+export function useRequiredContentPanel(): ContentPanelSession {
+  const session = useContentPanel();
+  if (session === null) {
+    throw new Error("Content panel outlet requires a session");
+  }
+  return session;
 }
 
 /**
