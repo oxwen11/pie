@@ -25,12 +25,18 @@ const TOOL_BUCKETS: ToolBucketMap = {
   "tool-read": "files",
   "tool-Read": "files",
   "tool-WebFetch": "files",
+  "tool-ls": "lists",
+  "tool-find": "lists",
   "tool-Glob": "lists",
+  "tool-grep": "searches",
   "tool-Grep": "searches",
   "tool-WebSearch": "searches",
+  "tool-edit": "edits",
   "tool-Edit": "edits",
+  "tool-write": "edits",
   "tool-Write": "edits",
   "tool-NotebookEdit": "edits",
+  "tool-bash": "commands",
   "tool-Bash": "commands",
   "tool-TaskOutput": "commands",
 };
@@ -63,7 +69,9 @@ function toolInputRecord(input: unknown): Record<string, unknown> | undefined {
 export function filePathOf(part: ToolUIPart): string | undefined {
   const input = toolInputRecord(part.input);
   switch (part.type) {
-    case "tool-read": {
+    case "tool-read":
+    case "tool-edit":
+    case "tool-write": {
       const path = input?.path;
       return typeof path === "string" ? path : undefined;
     }
