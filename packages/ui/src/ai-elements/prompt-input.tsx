@@ -83,7 +83,7 @@ export const PromptInputTextarea = ({
 export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputToolbar = ({ className, ...props }: PromptInputToolbarProps) => (
-  <div className={cn("flex items-end justify-between p-2 pt-1", className)} {...props} />
+  <div className={cn("flex items-end justify-end gap-1 p-2 pt-1", className)} {...props} />
 );
 
 export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
@@ -128,7 +128,7 @@ export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
 export const PromptInputSubmit = ({
   className,
   variant = "default",
-  size = "sm",
+  size = "icon-sm",
   status,
   children,
   ...props
@@ -151,7 +151,7 @@ export const PromptInputSubmit = ({
       size={size}
       type="submit"
       variant={variant}
-      className={cn("has-[>svg]:px-2", className)}
+      className={cn("rounded-full before:rounded-full", className)}
       {...props}
     >
       {children ?? Icon}
