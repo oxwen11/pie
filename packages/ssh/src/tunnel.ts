@@ -148,7 +148,7 @@ export const waitForHttpReady = (input: {
 
     if (healthy) return;
 
-    return yield* new SshReadinessError({
+    yield* new SshReadinessError({
       message: `Remote pie daemon did not become ready at ${input.address} within ${String(timeoutMs)}ms.`,
       cause: lastError,
     });

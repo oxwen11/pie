@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import type { DiscoveredSshHost, PlatformSsh } from "@/platform";
 import { usePlatform } from "@/platform-context";
+import { useStable } from "@/use-stable";
 
 function discoveredHostOptionLabel(host: DiscoveredSshHost): string {
   switch (host.source) {
@@ -36,7 +37,7 @@ function loadDiscoveredHosts(ssh: PlatformSsh): Promise<readonly DiscoveredSshHo
 }
 
 function DiscoveredSshHostOptions({ ssh }: { ssh: PlatformSsh }): ReactElement {
-  const [hostsPromise, _setHostsPromise] = useState(() => loadDiscoveredHosts(ssh));
+  const hostsPromise = useStable(() => loadDiscoveredHosts(ssh));
   const hosts = use(hostsPromise);
   return (
     <>

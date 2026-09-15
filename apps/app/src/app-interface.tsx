@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, useRef, useState, type ReactElement } from "react";
+import { use, useEffect, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -17,6 +17,7 @@ import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
 import { useTheme } from "./theme-provider";
+import { useStable } from "./use-stable";
 
 declare global {
   interface ImportMetaEnv {
@@ -78,25 +79,6 @@ class UnknownEnvironmentError extends Error {
   }
 }
 
-/** Create once per mount — composition-root singletons, not updatable state. */
-function useStable<T>(create: () => T): T {
-  const ref = useRef<T | null>(null);
-  // Null-guarded lazy init during render is the documented create-once pattern
-  // (https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents).
-  // `react/refs` forbids any `.current` read in render; this ref is the store, not a subscription.
-  /* oxlint-disable react/refs */
-  if (ref.current === null) {
-    const created = create();
-    // Create-once composition-root singleton. React documents this null-guarded
-    // write during render; the detector still flags the assignment.
-    // react-doctor-disable-next-line no-ref-current-in-render
-    ref.current = created;
-    return created;
-  }
-  return ref.current;
-  /* oxlint-enable react/refs */
-}
-
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({
   server,
@@ -130,7 +112,7 @@ function ResolveLocalEnvironment({
   server?: ServerConnection;
   tokenHolder?: { current: string };
 }): ReactElement {
-  const [promise, _setPromise] = useState(() => loadEnvironmentId(server));
+  const promise = useStable(() => loadEnvironmentId(server));
   const environmentId = use(promise);
   return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }

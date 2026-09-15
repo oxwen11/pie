@@ -147,13 +147,14 @@ export function makeDesktopTailscale(
       enableServe: (localPort) =>
         Effect.gen(function* () {
           if (!client.available) {
-            return yield* new TailscaleClientMissingError({
+            yield* new TailscaleClientMissingError({
               command: tailscaleCommandForPlatform(),
               message: client.message,
             });
+          } else {
+            yield* ensureTailscaleServe({ localPort, env: input.env });
+            yield* Ref.set(servePortRef, localPort);
           }
-          yield* ensureTailscaleServe({ localPort, env: input.env });
-          yield* Ref.set(servePortRef, localPort);
         }).pipe(Effect.provide(platform)),
       disableServe: Effect.gen(function* () {
         if (!client.available) return;

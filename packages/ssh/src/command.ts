@@ -36,9 +36,11 @@ export function sshSpawnEnv(
   base: NodeJS.ProcessEnv = process.env,
   extra: NodeJS.ProcessEnv = {},
 ): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...base };
-  for (const key of SSH_UNSET_ENV_KEYS) {
-    delete env[key];
+  const skip = new Set<string>(SSH_UNSET_ENV_KEYS);
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (skip.has(key) || value === undefined) continue;
+    env[key] = value;
   }
   return { ...env, ...extra };
 }
