@@ -83,6 +83,8 @@ type SessionState = {
 export interface PiProcessOptions {
   readonly executable?: PiExecutable;
   readonly args?: ReadonlyArray<string>;
+  readonly onSpawn?: (sessionId: string, pid: number) => void;
+  readonly onExit?: (sessionId: string, pid: number) => void;
 }
 
 export interface PiProcessDependencies<R> {
@@ -91,6 +93,8 @@ export interface PiProcessDependencies<R> {
     readonly cwd?: string;
     readonly args?: ReadonlyArray<string>;
   }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
+  readonly onSpawn?: (sessionId: string, pid: number) => void;
+  readonly onExit?: (sessionId: string, pid: number) => void;
 }
 
 export interface PiProcess {
@@ -400,6 +404,11 @@ export const makePiProcessWithDependencies = <R>(
               ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : undefined),
             })
             .pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(buildContext));
+          dependencies.onSpawn?.(sessionId, transport.pid);
+          yield* Scope.addFinalizer(
+            scope,
+            Effect.sync(() => dependencies.onExit?.(sessionId, transport.pid)),
+          );
 
           // Readiness handshake: pi's CLI front-end resolves the session (and
           // may exit with a human-readable error) before the RPC loop starts.
@@ -687,6 +696,8 @@ export const makePiProcess = (
   options: PiProcessOptions = {},
 ): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
   makePiProcessWithDependencies({
+    onSpawn: options.onSpawn,
+    onExit: options.onExit,
     makeTransport: (config) => {
       const args = [...(options.args ?? []), ...(config.args ?? [])];
       return makePiTransport({
