@@ -2,7 +2,7 @@ import { use, useState, type ReactElement } from "react";
 
 import { AppInterface } from "./app-interface";
 import {
-  probePairingMode,
+  readPairingMode,
   resolvePairingAccess,
   validateStoredPairingSession,
 } from "./pairing-mode";
@@ -14,22 +14,22 @@ import {
 } from "./pairing-session";
 import { useStable } from "./use-stable";
 
-async function probeAccess(): Promise<{
-  readonly mode: Awaited<ReturnType<typeof probePairingMode>>;
+async function loadPairingAccess(): Promise<{
+  readonly mode: Awaited<ReturnType<typeof readPairingMode>>;
   readonly session: StoredPairingSession | null;
 }> {
   const [mode, session] = await Promise.all([
-    probePairingMode(),
+    readPairingMode(),
     validateStoredPairingSession(readPairingSession()),
   ]);
   return { mode, session };
 }
 
 export function PairingGate(): ReactElement {
-  const probe = useStable(() => probeAccess());
-  const probed = use(probe);
-  const [session, setSession] = useState(probed.session);
-  const access = resolvePairingAccess(probed.mode, session);
+  const pairing = useStable(() => loadPairingAccess());
+  const loaded = use(pairing);
+  const [session, setSession] = useState(loaded.session);
+  const access = resolvePairingAccess(loaded.mode, session);
 
   if (access.kind === "open") {
     return <AppInterface />;
