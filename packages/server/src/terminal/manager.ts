@@ -2,7 +2,7 @@ import type { SessionRef, TerminalConnectEvent } from "@getpie/contract";
 import { Cause, Context, Effect, Layer, Queue, Semaphore, Stream } from "effect";
 
 import { TerminalNotRunning, TerminalSpawnFailed } from "../errors";
-import { spawnPty, type PtyProcess } from "./pty";
+import { Pty, type PtyProcess } from "./pty";
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
@@ -83,9 +83,10 @@ export class TerminalManager extends Context.Service<
   }
 >()("pie/terminal/TerminalManager") {}
 
-export const TerminalManagerLayer: Layer.Layer<TerminalManager> = Layer.effect(
+export const TerminalManagerLayer: Layer.Layer<TerminalManager, never, Pty> = Layer.effect(
   TerminalManager,
   Effect.gen(function* () {
+    const pty = yield* Pty;
     const records = new Map<string, TerminalRecord>();
     const tombstones = new Set<string>();
     const mutex = Semaphore.makeUnsafe(1);
@@ -140,7 +141,7 @@ export const TerminalManagerLayer: Layer.Layer<TerminalManager> = Layer.effect(
             cause: new Error(`at most ${MAX_TERMINALS_PER_SESSION} terminals per session`),
           });
         }
-        const process = yield* spawnPty({ cwd: input.cwd, cols, rows });
+        const process = yield* pty.spawn({ cwd: input.cwd, cols, rows });
         const record: TerminalRecord = {
           process,
           cols,

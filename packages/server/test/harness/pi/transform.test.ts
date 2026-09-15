@@ -83,12 +83,14 @@ describe("createPiTransform", () => {
     run(update({ type: "text_delta", contentIndex: 0, delta: "before" }));
     run(update({ type: "text_end", contentIndex: 0, content: "before" }));
 
-    // Steer delivery: deferred until the next assistant message opens, so an
-    // interrupt right after delivery leaves no empty trailing message.
-    expect(run(userStart("steer"))).toEqual([]);
+    // Steer delivery closes the assistant segment and emits the consumed user
+    // message immediately; the next assistant marker opens its own segment.
+    const user = run(userStart("steer"));
+    expect(types(user)).toEqual(["finish", "session.prompt.submitted"]);
+    expect(user[1]).toMatchObject({ parts: [{ type: "text", text: "steer" }] });
     const split = run(assistantStart());
-    expect(types(split)).toEqual(["finish", "start"]);
-    expect((split[1] as { messageId: string }).messageId).not.toBe(firstMessageId);
+    expect(types(split)).toEqual(["start"]);
+    expect((split[0] as { messageId: string }).messageId).not.toBe(firstMessageId);
 
     // Blocks of the continuation land under a fresh ordinal, in the new message.
     const cont = run(update({ type: "text_start", contentIndex: 0 }));
@@ -101,9 +103,10 @@ describe("createPiTransform", () => {
     const run = (event: AgentSessionEvent) => [...t(event)];
     run(e({ type: "agent_start" }));
     run(assistantStart());
-    run(userStart("steer"));
-    // Interrupted before the next LLM call: exactly one terminal finish.
-    expect(types(run(e({ type: "agent_settled" })))).toEqual(["finish"]);
+    expect(types(run(userStart("steer")))).toEqual(["finish", "session.prompt.submitted"]);
+    // Interrupted before the next LLM call: the prior assistant is already
+    // closed and no empty continuation was opened.
+    expect(run(e({ type: "agent_settled" }))).toEqual([]);
   });
 
   it("recovers whole text when a block ends without streaming deltas", () => {

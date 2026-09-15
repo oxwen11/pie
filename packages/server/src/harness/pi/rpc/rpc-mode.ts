@@ -443,7 +443,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
             preflightResult: (didSucceed) => {
               if (didSucceed) {
                 preflightSucceeded = true;
-                output(success(id, "prompt"));
+                output(success(id, "prompt", { started: !session.isStreaming }));
               }
             },
           })

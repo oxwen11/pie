@@ -27,6 +27,7 @@
     "@getpie/oxlint": "workspace:*",
     "@getpie/verify": "workspace:*",
     "@oxlint/plugins": "1.82.0",
+    "@shadcn/lint": "^0.1.0",
     "@types/node": "catalog:",
     "agent-cli-detector": "^0.1.7",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",

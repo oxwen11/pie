@@ -69,7 +69,7 @@ describe("resolveDaemonServerArgv", () => {
 
   test("uses PATH bun when PIE_DAEMON_RUNTIME=bun and PIE_BUN is unset", () => {
     expect(resolveDaemonServerArgv({ PIE_DAEMON_RUNTIME: "bun" }, entry)).toEqual({
-      argv: ["bun", entry],
+      argv: ["bun", "--no-install", entry],
       electronAsNode: false,
     });
   });
@@ -78,7 +78,7 @@ describe("resolveDaemonServerArgv", () => {
     expect(
       resolveDaemonServerArgv({ PIE_DAEMON_RUNTIME: "bun", PIE_BUN: process.execPath }, entry),
     ).toEqual({
-      argv: [process.execPath, entry],
+      argv: [process.execPath, "--no-install", entry],
       electronAsNode: false,
     });
   });

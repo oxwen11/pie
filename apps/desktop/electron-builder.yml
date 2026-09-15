@@ -15,14 +15,19 @@ files:
   # binary. We do not ship it: the server execs the user's own Claude Code
   # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # Desktop runs the external Bun server, so neither its duplicate dist nor the
+  # Node-only PTY backend belongs in Electron's asar.
+  - "!**/node_modules/@getpie/server/dist/**"
+  - "!**/node_modules/node-pty/**"
 asarUnpack:
   - resources/**
-  - "**/node_modules/node-pty/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
-# pi-process.js comes from @getpie/server#build (bun-build, outside asar).
+# The Bun server and pi-process runtime are staged outside asar.
 beforePack: scripts/before-pack.cjs
 extraResources:
   - vendor
+  - from: ../../packages/server/dist/server.mjs
+    to: server/server.mjs
   - from: ../../packages/server/dist/pi-process
     to: pi-process
 icon: resources/icon.png
