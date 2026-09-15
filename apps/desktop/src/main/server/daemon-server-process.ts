@@ -72,7 +72,7 @@ export type DaemonServerArgv = {
 
 /**
  * Daemon argv. Default is the Electron helper as Node. `PIE_DAEMON_RUNTIME=bun`
- * uses `PIE_BUN` when that path exists, otherwise PATH `bun`.
+ * uses `PIE_BUN` when that path exists, otherwise PATH `bun`, with installs disabled.
  */
 export function resolveDaemonServerArgv(
   env: NodeJS.ProcessEnv,
@@ -82,7 +82,7 @@ export function resolveDaemonServerArgv(
 ): DaemonServerArgv {
   if (parseDaemonRuntime(env.PIE_DAEMON_RUNTIME) === "bun") {
     return {
-      argv: [existingFile(env.PIE_BUN?.trim()) ?? "bun", entry],
+      argv: [existingFile(env.PIE_BUN?.trim()) ?? "bun", "--no-install", entry],
       electronAsNode: false,
     };
   }
