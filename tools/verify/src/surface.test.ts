@@ -3,9 +3,18 @@ import { describe, expect, it } from "vitest";
 import { expectLaunch, parseLaunchArgs, type LaunchCtx } from "./surface.ts";
 
 describe("parseLaunchArgs", () => {
-  it("accepts --replace", () => {
-    expect(parseLaunchArgs(["--replace"], { usage: "pie-verify web launch [--replace]" })).toEqual({
+  it("seeds UI projects by default and accepts an empty-project override", () => {
+    const options = {
+      allowEmptyProjects: true,
+      usage: "pie-verify web launch [--replace] [--empty-projects]",
+    };
+    expect(parseLaunchArgs(["--replace"], options)).toEqual({
       replace: true,
+      seedProject: true,
+    });
+    expect(parseLaunchArgs(["--empty-projects"], options)).toEqual({
+      replace: false,
+      seedProject: false,
     });
   });
 
@@ -19,6 +28,12 @@ describe("parseLaunchArgs", () => {
     expect(() =>
       parseLaunchArgs(["--serve"], { usage: "pie-verify web launch [--replace]" }),
     ).toThrow(/unknown arg --serve/);
+    expect(() =>
+      parseLaunchArgs(["--empty-projects"], {
+        allowServe: true,
+        usage: "pie-verify cli launch [--replace] [--serve]",
+      }),
+    ).toThrow(/unknown arg --empty-projects/);
   });
 
   it("rejects unknown flags", () => {

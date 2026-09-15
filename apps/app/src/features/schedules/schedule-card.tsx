@@ -2,6 +2,7 @@ import type { Schedule } from "@getpie/contract";
 import { Switch } from "@getpie/ui/components/switch";
 
 import { formatNextRun, formatSpec } from "./cadence";
+import { useSchedule } from "./schedule-context";
 import {
   ScheduleItem,
   ScheduleItemDescription,
@@ -12,26 +13,17 @@ import {
 export type ScheduleCardProps = {
   readonly schedule: Schedule;
   readonly projectName: string;
-  readonly selected: boolean;
-  readonly updating: boolean;
-  readonly onSelect: () => void;
-  readonly onToggle: (enabled: boolean) => void;
 };
 
-export function ScheduleCard({
-  schedule,
-  projectName,
-  selected,
-  updating,
-  onSelect,
-  onToggle,
-}: ScheduleCardProps) {
+export function ScheduleCard({ schedule, projectName }: ScheduleCardProps) {
+  const { state, actions, meta } = useSchedule();
+  const selected = schedule.id === state.selectedId;
   return (
     <ScheduleItem
       className={selected ? "bg-accent/50" : undefined}
       data-state={selected ? "selected" : undefined}
     >
-      <ScheduleItemTrigger aria-pressed={selected} onClick={onSelect}>
+      <ScheduleItemTrigger aria-pressed={selected} onClick={() => actions.select(schedule.id)}>
         <ScheduleItemTitle>{schedule.name}</ScheduleItemTitle>
         <ScheduleItemDescription>
           {projectName} · {formatSpec(schedule.spec)}
@@ -49,8 +41,8 @@ export function ScheduleCard({
         aria-label={schedule.enabled ? "Pause schedule" : "Enable schedule"}
         checked={schedule.enabled}
         className="[--thumb-size:--spacing(4)] sm:[--thumb-size:--spacing(3)]"
-        disabled={updating}
-        onCheckedChange={onToggle}
+        disabled={meta.updating}
+        onCheckedChange={(enabled) => actions.toggle(schedule.id, enabled)}
       />
     </ScheduleItem>
   );

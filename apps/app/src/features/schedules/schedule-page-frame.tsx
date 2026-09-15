@@ -1,39 +1,31 @@
-import type { Project, Schedule } from "@getpie/contract";
+import type { Schedule } from "@getpie/contract";
 import type { ReactNode } from "react";
 import { Group, Separator } from "react-resizable-panels";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
 
-import { formatSessionReuse } from "./cadence";
-import { projectNameOf } from "./format";
+import { useSchedule } from "./schedule-context";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
 import { ScheduleDetailPanel } from "./schedule-detail-panel";
-import { ScheduleEditorPanel, type ScheduleEditorState } from "./schedule-editor-panel";
-import type { ScheduleFormSubmit } from "./schedule-form-model";
+import { ScheduleEditorPanel } from "./schedule-editor-panel";
+import { SchedulePageList } from "./schedule-page-list";
 
-export function SchedulePageFrame({
-  list,
-  sidePanel,
-  deleting,
-  onCancelDelete,
-  onConfirmDelete,
-  deletePending,
-}: {
-  readonly list: ReactNode;
-  readonly sidePanel: ReactNode;
-  readonly deleting: Schedule | null;
-  readonly onCancelDelete: () => void;
-  readonly onConfirmDelete: (id: string) => void;
-  readonly deletePending: boolean;
-}) {
+export function SchedulePageFrame() {
+  const { actions, meta } = useSchedule();
+  const sidePanel =
+    meta.createOpen || meta.editing !== undefined ? (
+      <ScheduleEditorPanel />
+    ) : meta.selected === undefined ? null : (
+      <ScheduleDetailPanel />
+    );
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
-      <SchedulePageSplit list={list} sidePanel={sidePanel} />
+      <SchedulePageSplit list={<SchedulePageList />} sidePanel={sidePanel} />
       <SchedulePageDeleteDialog
-        deleting={deleting}
-        onCancel={onCancelDelete}
-        onConfirm={onConfirmDelete}
-        pending={deletePending}
+        deleting={meta.deleting}
+        onCancel={() => actions.cancelDelete()}
+        onConfirm={() => actions.confirmDelete()}
+        pending={meta.removing}
       />
     </div>
   );
@@ -74,77 +66,18 @@ function SchedulePageDeleteDialog({
   onConfirm,
   pending,
 }: {
-  deleting: Schedule | null;
+  deleting: Schedule | undefined;
   onCancel: () => void;
-  onConfirm: (id: string) => void;
+  onConfirm: () => void;
   pending: boolean;
 }) {
-  if (deleting === null) return null;
+  if (deleting === undefined) return null;
   return (
     <ScheduleDeleteDialog
       name={deleting.name}
       onCancel={onCancel}
-      onConfirm={() => onConfirm(deleting.id)}
+      onConfirm={onConfirm}
       pending={pending}
-    />
-  );
-}
-
-export function SchedulePageSide({
-  editor,
-  selected,
-  projects,
-  submitting,
-  sessionTitleById,
-  running,
-  nowMs,
-  onCloseEditor,
-  onSubmit,
-  onCloseSelected,
-  onDelete,
-  onEdit,
-  onOpenSession,
-  onRunNow,
-}: {
-  readonly editor: ScheduleEditorState | null;
-  readonly selected: Schedule | undefined;
-  readonly projects: ReadonlyArray<Project>;
-  readonly submitting: boolean;
-  readonly sessionTitleById: ReadonlyMap<string, string>;
-  readonly running: boolean;
-  readonly nowMs: number;
-  readonly onCloseEditor: (mode: ScheduleEditorState["mode"]) => void;
-  readonly onSubmit: (value: ScheduleFormSubmit, editor: ScheduleEditorState) => void;
-  readonly onCloseSelected: () => void;
-  readonly onDelete: () => void;
-  readonly onEdit: () => void;
-  readonly onOpenSession: (sessionId: string) => void;
-  readonly onRunNow: () => void;
-}) {
-  if (editor !== null) {
-    return (
-      <ScheduleEditorPanel
-        editor={editor}
-        onClose={() => onCloseEditor(editor.mode)}
-        onSubmit={(value) => onSubmit(value, editor)}
-        projects={projects}
-        submitting={submitting}
-      />
-    );
-  }
-  if (selected === undefined) return null;
-  return (
-    <ScheduleDetailPanel
-      nowMs={nowMs}
-      onClose={onCloseSelected}
-      onDelete={onDelete}
-      onEdit={onEdit}
-      onOpenSession={onOpenSession}
-      onRunNow={onRunNow}
-      projectName={projectNameOf(projects, selected.projectId)}
-      running={running}
-      schedule={selected}
-      sessionLine={formatSessionReuse(selected.session, sessionTitleById)}
     />
   );
 }
