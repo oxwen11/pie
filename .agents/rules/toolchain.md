@@ -28,8 +28,11 @@
   is `error` everywhere except tests (keep it on in `packages/ui`).
   App theme discovery reads `apps/app/src/index.css`; that file
   re-exports shared `--color-*` names because the linter does not
-  resolve `@import "@getpie/ui/globals.css"`. `no-arbitrary-values` is
-  still off. Both `components.json` files use those `@getpie/ui`
+  resolve `@import "@getpie/ui/globals.css"`. `shadcn/no-arbitrary-values`
+  is `error` with `allow: ["layout"]` plus exact chrome exceptions
+  (shell card elevation, separator `transition-[opacity,width]`). Off
+  in tests and `packages/ui` (structural values such as `ring-[3px]`).
+  Both `components.json` files use those `@getpie/ui`
   aliases so discovery does not look for a missing `@/components/ui`.
   Do not
   run `ultracite init` — it would overwrite AGENTS.md, editor settings, and

@@ -35,7 +35,7 @@ export function shellTitlebarContentLeftPx(platform: Platform): number {
 
 /**
  * Desktop titlebar geometry. Consumed as complete Tailwind literals
- * (`start-[var(--shell-controls-left)]`, `ps-[var(--shell-titlebar-content-left)]`,
+ * (`start-[var(--shell-controls-left)]`, `ps-(--shell-titlebar-content-left)`,
  * `ms-[var(--shell-sidebar-brand-inset)]`) so the scanner can see them.
  */
 type ShellProviderStyle = CSSProperties & {
