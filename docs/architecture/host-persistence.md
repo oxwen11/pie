@@ -397,6 +397,34 @@ agent-browser-owned; Verify does not read or rewrite this file. Run metadata,
 browser config formats and permissions are unchanged. Existing cleanup removes
 managed socket trees with the run; no migration or separate uninstall is added.
 
+## Verify automatic browser recording
+
+Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
+before its first browser command and retains the same take for later commands:
+
+```text
+.agents/skills/verify-pie[-desktop]/evidence/<run-id>/recording-<NNN>.webm
+```
+
+`evidence init` stops the current take and advances the run-local
+`agent-browser-recording-sequence` integer before the next browser command.
+Verify owns that ephemeral pointer, the output path, and the fixed 60 fps
+policy; agent-browser and ffmpeg own the WebM/VP8 bytes. The file follows the process umask and may contain sensitive UI
+content, local paths, or typed input, so it is gitignored and must only be
+uploaded as deliberate evidence. Parallel runs write different run-id paths.
+An already-active take is reused rather than replaced.
+
+`evidence pack-video <name>` stops the active take and uses ffmpeg's bounded
+near-duplicate removal to compress that current validation's near-static spans
+by up to 8×. It writes `<name>.webm` beside the unchanged numbered raw clip; a
+failed encode does not replace an existing packed file.
+
+Normal cleanup asks agent-browser to stop and flush the file before terminating
+the browser or Electron, then retains it with the other evidence. A crash may
+leave an incomplete WebM. There is no Pie schema, migration, retention limit, or
+uninstall removal for evidence files; upgrading agent-browser changes future
+recordings only.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the

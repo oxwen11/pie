@@ -11,7 +11,7 @@ describe("evidenceNeedsBrowser", () => {
   });
 
   it("skips the browser env for file-only evidence", () => {
-    for (const command of ["path", "init", "note", "side-effects"]) {
+    for (const command of ["path", "init", "note", "side-effects", "pack-video"]) {
       expect(evidenceNeedsBrowser("web", command)).toBe(false);
       expect(evidenceNeedsBrowser("desktop", command)).toBe(false);
     }

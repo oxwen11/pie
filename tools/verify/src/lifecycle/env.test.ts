@@ -15,6 +15,7 @@ import {
   parseEnvArgs,
   printEnv,
   resolveActiveBrowserEnv,
+  rotateAutoRecordingForRun,
   writeBrowserEnvFile,
   writeIsolationShim,
 } from "./env.ts";
@@ -99,6 +100,7 @@ describe("browserEnvForRun", () => {
         AGENT_BROWSER_EXECUTABLE_PATH: "/tmp/fake-chrome",
         AGENT_BROWSER_ARGS: "--no-sandbox,--disable-dev-shm-usage",
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
+        PIE_VERIFY_RECORDING_PATH: path.join(WEB.skillDir, "evidence/run-1/recording-001.webm"),
       });
     });
   });
@@ -113,6 +115,7 @@ describe("browserEnvForRun", () => {
         AGENT_BROWSER_NAMESPACE: DESKTOP.browserSession,
         AGENT_BROWSER_CDP: "9223",
         AGENT_BROWSER_PIN_TAB: "true",
+        PIE_VERIFY_RECORDING_PATH: path.join(DESKTOP.skillDir, "evidence/run-2/recording-001.webm"),
       });
       expect(browserEnvForRun(DESKTOP, dir).AGENT_BROWSER_ARGS).toBeUndefined();
     });
@@ -120,6 +123,55 @@ describe("browserEnvForRun", () => {
 
   it("refuses the CLI surface", () => {
     expect(() => browserEnvForRun(cliSurface.identity, "/tmp")).toThrow(/no browser/);
+  });
+});
+
+describe("rotateAutoRecordingForRun", () => {
+  it("keeps the first unused name and advances past completed recordings", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-recording-sequence-"));
+    const command = path.join(dir, "bin/agent-browser");
+    const trace = path.join(dir, "trace");
+    const identity = {
+      ...DESKTOP,
+      root: path.join(dir, "root"),
+      currentLink: path.join(dir, "root/current"),
+      skillDir: path.join(dir, "skill"),
+    };
+    writeRunMeta(path.join(dir, "meta.json"), desktopMeta());
+    fs.mkdirSync(path.dirname(command), { recursive: true });
+    fs.writeFileSync(command, `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(trace)}\n`, {
+      mode: 0o755,
+    });
+    const previous = process.env.VERIFY_PIE_AGENT_BROWSER;
+    process.env.VERIFY_PIE_AGENT_BROWSER = command;
+    try {
+      const first = browserEnvForRun(identity, dir).PIE_VERIFY_RECORDING_PATH;
+      if (first === undefined) throw new Error("missing recording path");
+      expect(path.basename(first)).toBe("recording-001.webm");
+      rotateAutoRecordingForRun(identity, dir);
+      expect(fs.existsSync(trace)).toBe(false);
+
+      fs.mkdirSync(path.dirname(first), { recursive: true });
+      fs.writeFileSync(first, "video");
+      rotateAutoRecordingForRun(identity, dir);
+      const second = browserEnvForRun(identity, dir).PIE_VERIFY_RECORDING_PATH;
+      if (second === undefined) throw new Error("missing recording path");
+      expect(path.basename(second)).toBe("recording-002.webm");
+      fs.writeFileSync(second, "video");
+      rotateAutoRecordingForRun(identity, dir);
+      const third = browserEnvForRun(identity, dir).PIE_VERIFY_RECORDING_PATH;
+      if (third === undefined) throw new Error("missing recording path");
+      expect(path.basename(third)).toBe("recording-003.webm");
+      expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual([
+        "record stop",
+        "record stop",
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.VERIFY_PIE_AGENT_BROWSER;
+      else process.env.VERIFY_PIE_AGENT_BROWSER = previous;
+      fs.rmSync(agentBrowserIsolation(dir).socketDir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -136,6 +188,7 @@ describe("writeBrowserEnvFile", () => {
         expect(text).toContain(`export AGENT_BROWSER_SESSION='${WEB.browserSession}'`);
         expect(text).toContain(`export AGENT_BROWSER_NAMESPACE='${WEB.browserSession}'`);
         expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
+        expect(text).toContain("export PIE_VERIFY_RECORDING_PATH=");
         expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
         expect(text).toContain("unset AGENT_BROWSER_CDP");
         const config = JSON.parse(
@@ -147,11 +200,14 @@ describe("writeBrowserEnvFile", () => {
         expect(config.session).toBe(WEB.browserSession);
         expect(config.idleTimeout).toBe("0");
         expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
+        expect(fs.existsSync(path.join(WEB.skillDir, "evidence/run-1"))).toBe(true);
         expect(text).toContain(`export AGENT_BROWSER_SOCKET_DIR='${isolation.socketDir}'`);
         expect(isolation.socketDir.startsWith("/tmp/pvs-")).toBe(true);
       });
     } finally {
       fs.rmSync(isolation.socketDir, { recursive: true, force: true });
+      fs.rmSync(path.join(WEB.skillDir, "evidence/run-1"), { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
@@ -216,7 +272,9 @@ describe("writeIsolationShim", () => {
     const dest = path.join(WEB.root, "bin/agent-browser");
     const text = fs.readFileSync(dest, "utf8");
     expect(text).toContain(path.join(WEB.currentLink, "agent-browser.env"));
-    expect(text).toContain('exec "$AGENT_BROWSER" "$@"');
+    expect(text).toContain("export PIE_VERIFY_SURFACE=web");
+    expect(text).toContain('export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"');
+    expect(text).toContain("tools/verify/bin/agent-browser");
     expect(fs.statSync(dest).mode & 0o111).not.toBe(0);
   });
 });

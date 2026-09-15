@@ -14,7 +14,7 @@ function surfaceLines(id: SurfaceId): string {
       return `  pie-verify web launch [--replace] [--empty-projects]
   pie-verify web doctor
   pie-verify web env [--export]
-  pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
+  pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note|pack-video
   pie-verify web cleanup [run-dir]`;
     case "cli":
       return `  pie-verify cli launch [--replace] [--serve]
@@ -26,7 +26,7 @@ function surfaceLines(id: SurfaceId): string {
       return `  pie-verify desktop launch [--replace] [--empty-projects]
   pie-verify desktop doctor
   pie-verify desktop env [--export]
-  pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
+  pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note|pack-video
   pie-verify desktop cleanup [run-dir]`;
     default: {
       const exhaustive: never = id;
