@@ -21,6 +21,10 @@ import type { ResourceWriterWorkerData, WriterStatus } from "./writer";
 
 type WorkerInput =
   | {
+      readonly type: "configure";
+      readonly data: ResourceWriterWorkerData;
+    }
+  | {
       readonly type: "write";
       readonly id: number;
       readonly payload: Uint8Array;
@@ -67,12 +71,13 @@ type WorkerState = {
   maintenanceAt: number;
 };
 
-const rawWorkerData: unknown = workerThreads.workerData;
-const data = readWorkerData(rawWorkerData);
-if (workerThreads.parentPort === null) {
-  throw new Error("resource writer must run in a worker thread");
-}
-const port = workerThreads.parentPort;
+const nodePort = workerThreads.parentPort;
+const boot = {
+  data:
+    workerThreads.workerData === undefined || workerThreads.workerData === null
+      ? undefined
+      : readWorkerData(workerThreads.workerData),
+};
 const state: WorkerState = {
   database: undefined,
   active: undefined,
@@ -81,7 +86,13 @@ const state: WorkerState = {
   maintenanceAt: 0,
 };
 
-port.on("message", (message: WorkerInput) => {
+function onMessage(message: WorkerInput): void {
+  if (message.type === "configure") {
+    if (boot.data !== undefined) return;
+    boot.data = readWorkerData(message.data);
+    initialize();
+    return;
+  }
   if (message.type === "stop") {
     stop(message.droppedRounds);
     return;
@@ -103,18 +114,34 @@ port.on("message", (message: WorkerInput) => {
     post({ type: "failed", id: message.id, reason: "writer-io" });
     pauseAndRecover();
   }
-});
+}
 
-initialize();
+if (nodePort !== null) nodePort.on("message", onMessage);
+else {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun Worker global is not in the Node type graph
+  const scope = globalThis as typeof globalThis & {
+    addEventListener(type: "message", listener: (event: { readonly data: unknown }) => void): void;
+  };
+  scope.addEventListener("message", (event) => {
+    const message = readIncoming(event.data);
+    if (message !== undefined) onMessage(message);
+  });
+}
+if (boot.data !== undefined) initialize();
+
+function config(): ResourceWriterWorkerData {
+  if (boot.data === undefined) throw new Error("resource writer worker is not configured");
+  return boot.data;
+}
 
 function initialize(): void {
   if (state.stopped) return;
   try {
     ensureDirectory();
-    const next = new sqlite.DatabaseSync(path.join(data.directory, ".writer.lock"), {
+    const next = new sqlite.DatabaseSync(path.join(config().directory, ".writer.lock"), {
       timeout: 100,
     });
-    fs.chmodSync(path.join(data.directory, ".writer.lock"), 0o600);
+    fs.chmodSync(path.join(config().directory, ".writer.lock"), 0o600);
     next.exec("BEGIN IMMEDIATE");
     state.database = next;
     maintain(Date.now());
@@ -128,8 +155,8 @@ function initialize(): void {
 }
 
 function ensureDirectory(): void {
-  fs.mkdirSync(data.directory, { recursive: true, mode: 0o700 });
-  const stat = fs.lstatSync(data.directory);
+  fs.mkdirSync(config().directory, { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(config().directory);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe resource directory");
   if (process.platform !== "win32" && (stat.mode & 0o077) !== 0) {
     throw new Error("resource directory is not owner-only");
@@ -171,8 +198,8 @@ function openFile(roundBytes: number, sampledAtMs: number, now: number): void {
   const header: ResourceFileStartRecord = {
     schemaVersion: 1,
     type: "file_start",
-    source: data.source,
-    writer: data.writer,
+    source: config().source,
+    writer: config().writer,
     writtenAt: createdAt,
     createdAt,
     retentionStartAt: new Date(retentionStartAtMs).toISOString(),
@@ -216,7 +243,7 @@ function reserve(additionalBytes: number, needsFile: boolean): boolean {
       .filter((file) => file.deletable && file.name !== activeName)
       .sort((left, right) => left.createdAtMs - right.createdAtMs)[0];
     if (oldest === undefined) return false;
-    fs.unlinkSync(path.join(data.directory, oldest.name));
+    fs.unlinkSync(path.join(config().directory, oldest.name));
   }
 }
 
@@ -227,9 +254,9 @@ function maintain(now: number): void {
 
 function scanFiles(now: number): JsonlFile[] {
   const files: JsonlFile[] = [];
-  for (const entry of fs.readdirSync(data.directory, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(config().directory, { withFileTypes: true })) {
     if (!entry.name.endsWith(".jsonl")) continue;
-    const pathname = path.join(data.directory, entry.name);
+    const pathname = path.join(config().directory, entry.name);
     if (!entry.isFile() || entry.isSymbolicLink()) throw new Error("unsafe resource log entry");
     const stat = fs.statSync(pathname);
     const filenameTime = timeFromFilename(entry.name);
@@ -275,7 +302,7 @@ function retentionFromHeader(
     const header: unknown = JSON.parse(buffer.subarray(0, newline).toString("utf8"));
     if (!isFileStartHeader(header)) return undefined;
     const retention = Date.parse(header.retentionStartAt);
-    return header.source === data.source &&
+    return header.source === config().source &&
       Number.isFinite(retention) &&
       retention <= filenameTime &&
       retention <= now
@@ -293,7 +320,7 @@ function createFile(createdAt: string) {
   for (let suffix = 0; ; suffix += 1) {
     const name = `${stem}${suffix === 0 ? "" : `-${suffix}`}.jsonl`;
     try {
-      const descriptor = fs.openSync(path.join(data.directory, name), "wx", 0o600);
+      const descriptor = fs.openSync(path.join(config().directory, name), "wx", 0o600);
       return { descriptor, name };
     } catch (error) {
       if (!isErrno(error) || error.code !== "EEXIST") throw error;
@@ -341,8 +368,8 @@ function stop(droppedRounds: number): void {
     const record: ResourceWriterStopRecord = {
       schemaVersion: 1,
       type: "writer_stop",
-      source: data.source,
-      writer: data.writer,
+      source: config().source,
+      writer: config().writer,
       writtenAt,
       droppedRounds,
     };
@@ -358,7 +385,7 @@ function stop(droppedRounds: number): void {
   closeActive();
   releaseLock();
   post({ type: "stopped" });
-  port.close();
+  nodePort?.close();
 }
 
 function closeActive(): void {
@@ -383,7 +410,25 @@ function releaseLock(): void {
 }
 
 function post(message: WorkerOutput): void {
-  port.postMessage(message, []);
+  if (nodePort !== null) {
+    nodePort.postMessage(message, []);
+    return;
+  }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun Worker global is not in the Node type graph
+  const scope = globalThis as typeof globalThis & {
+    postMessage(message: unknown): void;
+  };
+  // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Worker.postMessage has no targetOrigin
+  scope.postMessage(message);
+}
+
+function readIncoming(message: unknown): WorkerInput | undefined {
+  if (typeof message !== "object" || message === null || !("type" in message)) return undefined;
+  if (message.type === "configure" || message.type === "write" || message.type === "stop") {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already narrowed to WorkerInput tags
+    return message as WorkerInput;
+  }
+  return undefined;
 }
 
 function readWorkerData(value: unknown): ResourceWriterWorkerData {
