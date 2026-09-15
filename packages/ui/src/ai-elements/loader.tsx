@@ -28,7 +28,7 @@ const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
     </g>
     <defs>
       <clipPath id="clip0_2393_1490">
-        <rect fill="white" height="16" width="16" />
+        <rect fill="currentColor" height="16" width="16" />
       </clipPath>
     </defs>
   </svg>

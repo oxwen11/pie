@@ -24,11 +24,13 @@
   is `error` with `allow: ["layout"]` plus contracts for slot/chrome
   primitives (Separator, Sidebar*, Collapsible*, …). CVA appearance
   components (Button, Input, Textarea, …) stay on the default — use
-  `size`/`variant`, not padding or color classes. Tests and
-  `packages/ui` sources keep the rule off. Token rules
-  (`no-raw-colors`, `no-arbitrary-values`) are still off. Both
-  `components.json` files use those `@getpie/ui` aliases so discovery
-  does not look for a missing `@/components/ui`.
+  `size`/`variant`, not padding or color classes. `shadcn/no-raw-colors`
+  is `error` everywhere except tests (keep it on in `packages/ui`).
+  App theme discovery reads `apps/app/src/index.css`; that file
+  re-exports shared `--color-*` names because the linter does not
+  resolve `@import "@getpie/ui/globals.css"`. `no-arbitrary-values` is
+  still off. Both `components.json` files use those `@getpie/ui`
+  aliases so discovery does not look for a missing `@/components/ui`.
   Do not
   run `ultracite init` — it would overwrite AGENTS.md, editor settings, and
   oxfmt options. Plugin
