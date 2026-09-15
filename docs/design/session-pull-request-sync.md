@@ -318,15 +318,16 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 - 回归覆盖持久化失败、并发元数据写入、跨 Project 相同 Session ID、重启后的成功时间戳、原生成员共享读取、租约过期与释放、迟到结果、独占 worktree 切换，以及排队读取取消不制造远端失败或退避。
 - React Doctor changed scope：89/100，无新增 error；唯一 warning 是需求协议中有意串行的发送循环，不能改为并行发送来消除告警。完整扫描与实施前 HEAD 归档均为 0/100，既有 error 数相同；不把变更检查通过说成整个仓库没有诊断问题。
 
+### 实际 Web 操作（2026-09-15）
+
+4180 / 4190 空闲后，用隔离 `pie-verify web` 跑完真实用户路径：Import `verify-pie-sample`，Agent 登记 `pingdotgg/t3code` PR #1，工具返回 linked；可见侧栏需求自动核验为 merged，并打开关联面板显示 checks。再登记 #2，侧栏显示 `#2 +1`，随后 #2 也核验为 merged。取消 #1 后无 restore 再登记，工具返回 excluded，磁盘仍为 excluded。切到 New chat 后未选中行保留 #2；折叠项目组后该行从侧栏消失。未做 GitHub 写入。证据：`.agents/skills/verify-pie/evidence/20260915T132045Z-97478/`。
+
 ### 实际桌面操作
 
-在隔离 Desktop home 中，通过真实 Import project、聊天输入和 Agent 工具登记公开仓库 `pingdotgg/t3code` 的 PR #1、#2；未手工插入项目或 Session 元数据。侧栏显示多个关联的 `+1`，关联面板保留未知身份，显式刷新取得 #1、#2 的 merged 状态。切换到 New chat 后，未选中行保留相同的 #2 状态与核验时间。通过面板取消 #1 后再次让 Agent 普通登记，工具返回 excluded，磁盘记录也未被恢复。仅进行了 GitHub 读取，没有远端写操作。
-
-截图和侧效应证据保存在未提交的 `.agents/skills/verify-pie-desktop/evidence/20260914T173738Z-5585/`。运行环境禁用了图片读取，截图已生成，但不声称完成了视觉审查。
+先前隔离 Desktop 中，后台窗口 `document.hidden`，登记后身份立刻出现，详情读取保持禁用，显式刷新才取得 merged。本次再启动时 `document.visibilityState === "visible"`，空草稿与 Import 正常；该次模型请求重试失败，未再次完成登记。物理最小化 / 恢复、多窗口和断线恢复仍未做。证据：`.agents/skills/verify-pie-desktop/evidence/20260914T173738Z-5585/` 与 `20260915T132442Z-7266/`。运行环境禁用了图片读取，截图已生成，但不声称完成了视觉审查。
 
 ### 尚未完成的验收与限制
 
-- Web 的 4180 / 4190 被另一 worktree（`pfmp`）占用，未停止、修改或复用它进行验收。
-- Desktop 后台窗口实际报告 document hidden；详情读取保持禁用。物理最小化 / 恢复、前台可见后的自动读取、滚动 / 折叠、多窗口和断线恢复的完整运行时矩阵仍需补验，不能用单元测试冒充这部分证明。
+- 物理最小化 / 恢复、多窗口和断线恢复的完整运行时矩阵仍需补验，不能用单元测试冒充这部分证明。
 - Native Stack 写操作只做了确定性命令测试，未在 GitHub 执行。**Stack merge 保持禁用**：当前 host API 不能原子保护所有受影响层的 head；不降级为连续单 PR merge。Rebase 仍要求新预览、确认与逐层校验，部分完成或未知结果不会自动重试。
 - 尚未向 GitHub 上传截图、推送分支或创建 PR；本次没有远端写入授权。
