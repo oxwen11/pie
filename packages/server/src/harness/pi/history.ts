@@ -170,7 +170,7 @@ export function entriesToUIMessages(
     messages.push({
       id: entry.id,
       role: "user",
-      metadata: { sessionId },
+      metadata: { sessionId, timestamp: entry.timestamp },
       parts: userParts(message),
     });
   };
@@ -184,6 +184,7 @@ export function entriesToUIMessages(
     // stopReason; usage follows pi's own getLastAssistantUsage semantics).
     assistant.metadata = {
       sessionId,
+      timestamp: entry.timestamp,
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
@@ -228,7 +229,7 @@ export function entriesToUIMessages(
     }
   };
 
-  const onToolResult = (message: PiToolResultMessage) => {
+  const onToolResult = (entry: SessionMessageEntry, message: PiToolResultMessage) => {
     // Paired by id across the whole branch, not just the open segment: a
     // result landing after a steer-injected user entry still completes its
     // call. Results without a matching call (corruption) are dropped.
@@ -236,6 +237,8 @@ export function entriesToUIMessages(
     if (call === undefined) return;
     pendingCalls.delete(message.toolCallId);
     call.parts[call.index] = resultPart(call, message);
+    if (assistant === null) return;
+    assistant.metadata = { ...assistant.metadata, timestamp: entry.timestamp };
   };
 
   for (const entry of rebuildBranch(entries, leafId)) {
@@ -264,7 +267,7 @@ export function entriesToUIMessages(
         onAssistant(entry, message);
         break;
       case "toolResult":
-        onToolResult(message);
+        onToolResult(entry, message);
         break;
       default:
         // Custom message roles stay off the transcript this phase (§5).
