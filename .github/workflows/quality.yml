@@ -98,27 +98,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
-      # `build` / `typecheck` / `lint:check` go through turbo.
-      # `lint:check` depends on `@getpie/oxlint#build` so
-      # `@getpie/oxlint/<plugin>` resolves to dist files. Tests are the
-      # root Vitest workspace (`pnpm test`) after `build` so cli/core
-      # dist exists. Format only needs node_modules and stays parallel
-      # with typecheck/lint.
+      # `build` / `typecheck` / `lint:check` go through turbo in one graph
+      # so `@getpie/app#build` is not restored a second time. A follow-up
+      # `turbo run typecheck` hits `@getpie/desktop` → `^build` →
+      # `@getpie/app#build` and replaces `apps/app/dist` while
+      # `package-artifact.test.ts` reads it (actual client vs expected []).
+      # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
+      # root Vitest workspace (`pnpm test`) after that graph so cli/app
+      # dist is stable. Format only needs node_modules and stays parallel
+      # with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail
 
-          pnpm turbo run build
-
-          pnpm test &
-          test_pid=$!
-
-          pnpm turbo run typecheck lint:check &
+          pnpm turbo run build typecheck lint:check &
           turbo_pid=$!
 
           pnpm run format:check &
           format_pid=$!
 
-          wait "$test_pid"
           wait "$turbo_pid"
+          pnpm test
           wait "$format_pid"

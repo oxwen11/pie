@@ -121,7 +121,7 @@ export function PlanRequestView({
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="What should change?"
-            className="min-h-16 text-sm"
+            className="min-h-16"
           />
         )}
 

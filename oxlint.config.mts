@@ -31,9 +31,10 @@ const pieIgnorePatterns = [
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
- * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint rules
- * (`no-restyle`, then token rules). The plugin is registered below with
- * discovery settings only; do not enable `shadcn/*` in this slice.
+ * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint token
+ * rules (`no-raw-colors`, `no-arbitrary-values`). `no-restyle` is on
+ * below with `allow: ["layout"]` plus slot-primitive contracts; vendored
+ * UI sources keep it off.
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -81,6 +82,63 @@ export default defineConfig({
     ...deferredUltraciteRules,
 
     // Pie-specific plugins and options. These win over Ultracite.
+    "shadcn/no-restyle": [
+      "error",
+      {
+        allow: ["layout"],
+        // Contracts replace `allow` for the matching name — restate `layout`.
+        // Last match wins. Slot / chrome primitives are composed by the app;
+        // CVA appearance components (Button, Input, …) stay on the default.
+        contracts: [
+          { pattern: "^Alert$", allow: ["layout", "shape"] },
+          { pattern: "^CardFrame", allow: ["layout", "spacing"] },
+          {
+            pattern: "^Collapsible",
+            allow: [
+              "layout",
+              "color",
+              "spacing",
+              "shape",
+              "motion",
+              "effects",
+              "typography",
+              "not-prose",
+            ],
+          },
+          {
+            pattern: "^Combobox",
+            allow: ["layout", "color", "typography", "effects", "shape"],
+          },
+          { pattern: "^CommandItem$", allow: ["layout", "spacing"] },
+          { pattern: "^Empty$", allow: ["layout", "spacing"] },
+          { pattern: "^Label$", allow: ["layout", "color", "spacing", "shape"] },
+          { pattern: "^LoadingBox$", allow: ["layout", "spacing"] },
+          { pattern: "^MenuTrigger$", allow: ["layout", "color", "shape"] },
+          { pattern: "^PromptInput$", allow: ["layout", "shape"] },
+          { pattern: "^RadioGroup$", allow: ["layout", "spacing"] },
+          { pattern: "^Reasoning", allow: ["layout", "spacing", "typography"] },
+          { pattern: "^SelectTrigger$", allow: ["layout", "color", "effects"] },
+          {
+            pattern: "^Separator$",
+            allow: ["layout", "color", "effects", "motion"],
+          },
+          { pattern: "^Shimmer$", allow: ["layout", "typography"] },
+          {
+            pattern: "^Sheet",
+            allow: ["layout", "spacing", "shape", "typography"],
+          },
+          {
+            pattern: "^Sidebar",
+            allow: ["layout", "color", "spacing", "shape", "typography", "effects"],
+          },
+          { pattern: "^Spinner$", allow: ["layout", "color", "spacing"] },
+          { pattern: "^Tabs", allow: ["layout", "spacing"] },
+          // Pill icon buttons (scroll-to-bottom). Appearance otherwise stays on
+          // size / variant.
+          { pattern: "^Button$", allow: ["layout", "rounded-full"] },
+        ],
+      },
+    ],
     "import/no-unassigned-import": [
       "error",
       {
@@ -235,6 +293,7 @@ export default defineConfig({
         "typescript/no-unsafe-member-access": "off",
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-type-assertion": "off",
+        "shadcn/no-restyle": "off",
       },
     },
     {
@@ -320,6 +379,8 @@ export default defineConfig({
         "typescript/no-unsafe-member-access": "off",
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-type-assertion": "off",
+        // Coss sources and local wrappers own their appearance.
+        "shadcn/no-restyle": "off",
       },
     },
     {
