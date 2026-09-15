@@ -15,6 +15,7 @@
     "./daemon": "./src/daemon/index.ts",
     "./observability": "./src/observability/index.ts",
     "./observability/resources": "./src/observability/resources/index.ts",
+    "./resource-monitor": "./dist/resources/resource-monitor",
     "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {

@@ -3,13 +3,13 @@ import path from "node:path";
 import url from "node:url";
 
 export type ResourceArtifacts = {
-  readonly workerEntry: URL;
   readonly monitorCommand: string;
 };
 
 type ResolveResourceArtifactsOptions = {
   readonly resolve?: (specifier: string) => string | undefined;
   readonly platform?: NodeJS.Platform;
+  readonly fallbackDirectory?: string;
 };
 
 const ASAR_SEGMENT = `${path.sep}app.asar${path.sep}`;
@@ -19,16 +19,20 @@ export function resolveResourceArtifacts(
   options: ResolveResourceArtifactsOptions = {},
 ): ResourceArtifacts | undefined {
   const resolve = options.resolve ?? resolvePackageFile;
-  const worker =
-    resolve("@getpie/server/resource-writer") ?? resolve("@getpie/cli/resource-writer");
-  if (worker === undefined) return undefined;
-  const workerPath = asarUnpackedPath(worker);
-  const monitorCommand = path.join(
-    path.dirname(workerPath),
-    `resource-monitor${(options.platform ?? process.platform) === "win32" ? ".exe" : ""}`,
-  );
-  if (!isFile(workerPath) || !isFile(monitorCommand)) return undefined;
-  return { workerEntry: url.pathToFileURL(workerPath), monitorCommand };
+  const suffix = (options.platform ?? process.platform) === "win32" ? ".exe" : "";
+  const exported =
+    resolve("@getpie/server/resource-monitor") ?? resolve("@getpie/cli/resource-monitor");
+  const candidates = [
+    ...(exported === undefined ? [] : [asarUnpackedPath(exported)]),
+    ...(options.fallbackDirectory === undefined
+      ? []
+      : [path.join(options.fallbackDirectory, `resource-monitor${suffix}`)]),
+  ];
+  for (const command of candidates) {
+    const monitorCommand = command.endsWith(suffix) ? command : `${command}${suffix}`;
+    if (isFile(monitorCommand)) return { monitorCommand };
+  }
+  return undefined;
 }
 
 function resolvePackageFile(specifier: string): string | undefined {
