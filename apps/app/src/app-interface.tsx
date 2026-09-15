@@ -1,10 +1,12 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactElement } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { AppErrorPage } from "./components/app-error-page";
 import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
@@ -66,6 +68,14 @@ function useStable<T>(create: () => T): T {
 
 /** Shared application entry. PlatformProvider is the host seam above it. */
 export function AppInterface({ server }: { server?: ServerConnection }): ReactElement {
+  return (
+    <ErrorBoundary FallbackComponent={AppErrorPage}>
+      <AppHost server={server} />
+    </ErrorBoundary>
+  );
+}
+
+function AppHost({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
   const clients = useStable(() => createAppClients(server));
   return <AppRuntime {...clients} />;

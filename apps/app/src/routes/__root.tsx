@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
 
+import { AppErrorPage } from "@/components/app-error-page";
 import {
   AppShell,
   AppShellBody,
@@ -31,6 +32,7 @@ contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, 
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
+  errorComponent: AppErrorPage,
 });
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
