@@ -238,7 +238,11 @@ export function entriesToUIMessages(
     pendingCalls.delete(message.toolCallId);
     call.parts[call.index] = resultPart(call, message);
     if (assistant === null) return;
-    assistant.metadata = { ...assistant.metadata, timestamp: entry.timestamp };
+    assistant.metadata = {
+      ...assistant.metadata,
+      sessionId,
+      timestamp: entry.timestamp,
+    };
   };
 
   for (const entry of rebuildBranch(entries, leafId)) {
