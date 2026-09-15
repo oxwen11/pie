@@ -1,8 +1,22 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index e2b640b..a6b9844 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,3 +1,4 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
+ export { type Args, parseArgs } from "./cli/args.ts";
+ export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
+ export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
 diff --git a/dist/index.js b/dist/index.js
 index 01017cd..fe2674d 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -29,10 +29,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+@@ -1,3 +1,4 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
+ // Core session management
+ export { parseArgs } from "./cli/args.js";
+ // Config paths
+@@ -29,10 +30,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
  // Tools
  export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
  export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
