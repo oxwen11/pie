@@ -40,7 +40,7 @@ const completedParts = (): IndexedBatchPart[] => [
 let root: Root | undefined;
 let host: HTMLDivElement | undefined;
 
-function render(parts: IndexedBatchPart[], shouldShimmer: boolean): HTMLButtonElement {
+function render(parts: IndexedBatchPart[], shouldShimmer: boolean): HTMLElement {
   if (!host) {
     host = document.createElement("div");
     document.body.append(host);
@@ -51,12 +51,12 @@ function render(parts: IndexedBatchPart[], shouldShimmer: boolean): HTMLButtonEl
     root?.render(createElement(ToolBatch, { parts, shouldShimmer }));
   });
 
-  const trigger = host.querySelector<HTMLButtonElement>("[data-slot='collapsible-trigger']");
+  const trigger = host.querySelector<HTMLElement>("[data-slot='collapsible-trigger']");
   if (!trigger) throw new Error("Tool batch trigger was not rendered");
   return trigger;
 }
 
-function activate(trigger: HTMLButtonElement): void {
+function activate(trigger: HTMLElement): void {
   act(() => trigger.click());
 }
 
@@ -68,26 +68,47 @@ afterEach(() => {
   host = undefined;
 });
 
+const mixedParts = (): IndexedBatchPart[] => [
+  {
+    index: 0,
+    part: {
+      type: "tool-read",
+      toolCallId: "done-read",
+      state: "output-available",
+      input: { path: "/tmp/done.ts" },
+      output: "ok",
+    },
+  },
+  {
+    index: 1,
+    part: {
+      type: "tool-bash",
+      toolCallId: "run-bash",
+      state: "input-available",
+      input: { command: "git status" },
+    },
+  },
+];
+
 describe("ToolBatch", () => {
-  it("preserves the user-selected open state while running parts stream and complete", () => {
+  it("stays collapsed by default and shows the in-flight tool action", () => {
     let trigger = render(runningParts(1), true);
-    expect(trigger.tagName).toBe("BUTTON");
-    expect(trigger.textContent).toBe("Reading 1 file");
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger.textContent).toBe("Reading /tmp/file-0");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
     activate(trigger);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
 
     trigger = render(runningParts(2), true);
-    expect(trigger.textContent).toBe("Reading 2 files");
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.textContent).toBe("Reading /tmp/file-1");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
 
     activate(trigger);
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
     trigger = render(completedParts(), false);
     expect(trigger.textContent).toBe("Read 1 file");
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("keeps completed batches collapsed by default and toggleable", () => {
@@ -97,5 +118,30 @@ describe("ToolBatch", () => {
 
     activate(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("shows only the last in-flight action until every tool has settled", () => {
+    const trigger = render(mixedParts(), true);
+    expect(trigger.textContent).toBe("Running git status");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("aggregates completed Pi bash tools", () => {
+    const trigger = render(
+      [
+        {
+          index: 0,
+          part: {
+            type: "tool-bash",
+            toolCallId: "b1",
+            state: "output-available",
+            input: { command: "git status" },
+            output: "ok",
+          },
+        },
+      ],
+      false,
+    );
+    expect(trigger.textContent).toBe("Ran 1 command");
   });
 });

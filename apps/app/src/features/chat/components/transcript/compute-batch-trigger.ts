@@ -1,35 +1,20 @@
-import { isReasoningUIPart, isToolUIPart, type ToolUIPart } from "ai";
+import { isReasoningUIPart, type ToolUIPart } from "ai";
 
 import { BUCKET_ORDER, bucketFor, filePathOf, type BucketKey } from "./tool/bucket";
 import type { BatchPart } from "./use-tool-batches";
 
-/**
- * Per-bucket counts split by tool state. A bucket appears in the trigger label
- * iff at least one of doneCount / runningCount is > 0.
- *
- * - `doneCount` counts tools whose state is terminal (`output-available` /
- *   `output-error`). Rendered with past tense ("Read 5 files").
- * - `runningCount` counts tools still in flight (`input-streaming` /
- *   `input-available`). Rendered with present tense ("Reading 1 file").
- */
+/** Completed-tool counts per bucket. A bucket appears iff `doneCount` > 0. */
 export type BucketCount = {
   key: BucketKey;
   doneCount: number;
-  runningCount: number;
 };
 
-export type BatchTriggerLabel = {
-  kind: "aggregated";
-  /** Buckets with doneCount + runningCount > 0, in BUCKET_ORDER. */
-  buckets: BucketCount[];
-};
+export type BatchTriggerLabel =
+  | { kind: "running"; action: string }
+  | { kind: "aggregated"; buckets: BucketCount[] };
 
 function isToolRunning(part: ToolUIPart): boolean {
   return part.state === "input-streaming" || part.state === "input-available";
-}
-
-function toToolParts(parts: readonly BatchPart[]): ToolUIPart[] {
-  return parts.filter((p): p is ToolUIPart => !isReasoningUIPart(p) && isToolUIPart(p));
 }
 
 function emptyIdentities() {
@@ -42,23 +27,72 @@ function emptyIdentities() {
   };
 }
 
+interface RunningActionMap {
+  readonly [toolType: string]: { verb: string; field: string };
+}
+
+const RUNNING_ACTIONS: RunningActionMap = {
+  "tool-read": { verb: "Reading", field: "path" },
+  "tool-Read": { verb: "Reading", field: "file_path" },
+  "tool-WebFetch": { verb: "Fetching", field: "url" },
+  "tool-ls": { verb: "Listing", field: "path" },
+  "tool-find": { verb: "Finding", field: "pattern" },
+  "tool-Glob": { verb: "Finding", field: "pattern" },
+  "tool-grep": { verb: "Searching", field: "pattern" },
+  "tool-Grep": { verb: "Searching", field: "pattern" },
+  "tool-WebSearch": { verb: "Searching", field: "query" },
+  "tool-edit": { verb: "Editing", field: "path" },
+  "tool-Edit": { verb: "Editing", field: "file_path" },
+  "tool-write": { verb: "Writing", field: "path" },
+  "tool-Write": { verb: "Writing", field: "file_path" },
+  "tool-NotebookEdit": { verb: "Editing", field: "notebook_path" },
+  "tool-bash": { verb: "Running", field: "command" },
+  "tool-Bash": { verb: "Running", field: "command" },
+  "tool-TaskOutput": { verb: "Running", field: "task_id" },
+};
+
+function isInputRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null;
+}
+
+function inputString(part: ToolUIPart, key: string): string | undefined {
+  if (!isInputRecord(part.input)) return undefined;
+  const value = part.input[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function runningActionOf(part: ToolUIPart): string {
+  const spec = RUNNING_ACTIONS[part.type];
+  if (spec) {
+    const target = inputString(part, spec.field);
+    return target ? `${spec.verb} ${target}` : spec.verb;
+  }
+  if ("toolName" in part && typeof part.toolName === "string") return part.toolName;
+  return part.type.startsWith("tool-") ? part.type.slice("tool-".length) : part.type;
+}
+
 /**
- * Aggregate a batch's tool parts into a bucketed trigger label, splitting each
- * bucket into `doneCount` and `runningCount` based on each individual tool's
- * state. Provider-generic — bucket membership comes from `bucketFor`.
+ * While any tool is in flight, the trigger is that last tool's action.
+ * Only when every tool has settled do we aggregate completed buckets.
  *
- * Dedup rules:
+ * Dedup rules (completed only):
  * - `files` / `edits` dedupe by file path (fallback to `toolCallId` when the
- *   path isn't streamed yet), per state.
+ *   path isn't streamed yet).
  * - `lists` / `searches` / `commands` count by occurrence (per `toolCallId`).
  *
  * Reasoning parts are ignored.
  */
 export function computeBatchTrigger(parts: readonly BatchPart[]): BatchTriggerLabel {
-  const tools = toToolParts(parts);
-  const doneIdentities = emptyIdentities();
-  const runningIdentities = emptyIdentities();
+  const tools: ToolUIPart[] = [];
+  let lastRunning: ToolUIPart | undefined;
+  for (const part of parts) {
+    if (isReasoningUIPart(part)) continue;
+    tools.push(part);
+    if (isToolRunning(part)) lastRunning = part;
+  }
+  if (lastRunning) return { kind: "running", action: runningActionOf(lastRunning) };
 
+  const doneIdentities = emptyIdentities();
   for (const part of tools) {
     const bucket = bucketFor(part);
     if (bucket == null) continue;
@@ -66,14 +100,12 @@ export function computeBatchTrigger(parts: readonly BatchPart[]): BatchTriggerLa
       bucket === "files" || bucket === "edits"
         ? (filePathOf(part) ?? part.toolCallId)
         : part.toolCallId;
-    const target = isToolRunning(part) ? runningIdentities : doneIdentities;
-    target[bucket].add(dedupKey);
+    doneIdentities[bucket].add(dedupKey);
   }
 
   const buckets: BucketCount[] = BUCKET_ORDER.flatMap((key) => {
     const doneCount = doneIdentities[key].size;
-    const runningCount = runningIdentities[key].size;
-    return doneCount + runningCount > 0 ? [{ key, doneCount, runningCount }] : [];
+    return doneCount > 0 ? [{ key, doneCount }] : [];
   });
 
   return { kind: "aggregated", buckets };
