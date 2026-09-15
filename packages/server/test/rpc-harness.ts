@@ -25,7 +25,7 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
-import { TerminalManagerLayer } from "../src/terminal";
+import { NodePtyLayer, TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -42,7 +42,7 @@ rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
   if (msg.type !== "prompt") return;
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
@@ -127,7 +127,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     pullRequestLayer,
-    TerminalManagerLayer,
+    TerminalManagerLayer.pipe(Layer.provide(NodePtyLayer)),
     NodeServices.layer,
     Observability.discard,
   );

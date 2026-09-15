@@ -291,7 +291,7 @@ overrides:
 packageExtensionsChecksum: sha256-3DZUlN3TYCSri1e/lfcGwxJa6gTHjNsTvQKRs+ToIrU=
 
 patchedDependencies:
-  '@earendil-works/pi-coding-agent@0.85.1': cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576
+  '@earendil-works/pi-coding-agent@0.85.1': f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578
   '@shadcn/lint@0.1.0': 273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
@@ -678,7 +678,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -696,7 +696,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -757,7 +757,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -9365,7 +9365,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=cf1793b58b14f5b441e30ffc749124d2984f51e7f38647c8e5de781b6b46f576)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
+  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
     dependencies:
       '@earendil-works/chord': 0.85.1
       '@earendil-works/pi-agent-core': 0.85.1(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)

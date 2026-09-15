@@ -139,7 +139,13 @@ export interface RpcSessionState {
 // Success responses with data
 export type RpcResponse =
   // Prompting (async - events follow)
-  | { id?: string; type: "response"; command: "prompt"; success: true }
+  | {
+      id?: string;
+      type: "response";
+      command: "prompt";
+      success: true;
+      data: { started: boolean };
+    }
   | { id?: string; type: "response"; command: "steer"; success: true }
   | { id?: string; type: "response"; command: "follow_up"; success: true }
   | { id?: string; type: "response"; command: "abort"; success: true }

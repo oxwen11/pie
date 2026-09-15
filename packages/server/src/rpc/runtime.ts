@@ -20,7 +20,7 @@ import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
-import { TerminalManagerLayer } from "../terminal";
+import { BunPtyLayer, NodePtyLayer, TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -89,6 +89,8 @@ const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
 const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
   Layer.provide(ScheduleServiceProvided),
 );
+const PtyLive = "bun" in process.versions ? BunPtyLayer : NodePtyLayer;
+const TerminalManagerProvided = TerminalManagerLayer.pipe(Layer.provide(PtyLive));
 
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
@@ -103,7 +105,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   GitProvided,
   WorktreeProvided,
   PullRequestServiceProvided,
-  TerminalManagerLayer,
+  TerminalManagerProvided,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );
