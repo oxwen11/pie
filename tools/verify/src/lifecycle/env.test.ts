@@ -99,6 +99,7 @@ describe("browserEnvForRun", () => {
         AGENT_BROWSER_EXECUTABLE_PATH: "/tmp/fake-chrome",
         AGENT_BROWSER_ARGS: "--no-sandbox,--disable-dev-shm-usage",
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
+        PIE_VERIFY_RECORDING_PATH: path.join(WEB.skillDir, "evidence/run-1/recording.webm"),
       });
     });
   });
@@ -113,6 +114,7 @@ describe("browserEnvForRun", () => {
         AGENT_BROWSER_NAMESPACE: DESKTOP.browserSession,
         AGENT_BROWSER_CDP: "9223",
         AGENT_BROWSER_PIN_TAB: "true",
+        PIE_VERIFY_RECORDING_PATH: path.join(DESKTOP.skillDir, "evidence/run-2/recording.webm"),
       });
       expect(browserEnvForRun(DESKTOP, dir).AGENT_BROWSER_ARGS).toBeUndefined();
     });
@@ -136,6 +138,7 @@ describe("writeBrowserEnvFile", () => {
         expect(text).toContain(`export AGENT_BROWSER_SESSION='${WEB.browserSession}'`);
         expect(text).toContain(`export AGENT_BROWSER_NAMESPACE='${WEB.browserSession}'`);
         expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
+        expect(text).toContain("export PIE_VERIFY_RECORDING_PATH=");
         expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
         expect(text).toContain("unset AGENT_BROWSER_CDP");
         const config = JSON.parse(
@@ -147,11 +150,14 @@ describe("writeBrowserEnvFile", () => {
         expect(config.session).toBe(WEB.browserSession);
         expect(config.idleTimeout).toBe("0");
         expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
+        expect(fs.existsSync(path.join(WEB.skillDir, "evidence/run-1"))).toBe(true);
         expect(text).toContain(`export AGENT_BROWSER_SOCKET_DIR='${isolation.socketDir}'`);
         expect(isolation.socketDir.startsWith("/tmp/pvs-")).toBe(true);
       });
     } finally {
       fs.rmSync(isolation.socketDir, { recursive: true, force: true });
+      fs.rmSync(path.join(WEB.skillDir, "evidence/run-1"), { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
@@ -216,7 +222,9 @@ describe("writeIsolationShim", () => {
     const dest = path.join(WEB.root, "bin/agent-browser");
     const text = fs.readFileSync(dest, "utf8");
     expect(text).toContain(path.join(WEB.currentLink, "agent-browser.env"));
-    expect(text).toContain('exec "$AGENT_BROWSER" "$@"');
+    expect(text).toContain("export PIE_VERIFY_SURFACE=web");
+    expect(text).toContain('export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"');
+    expect(text).toContain("tools/verify/bin/agent-browser");
     expect(fs.statSync(dest).mode & 0o111).not.toBe(0);
   });
 });

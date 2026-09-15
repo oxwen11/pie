@@ -76,7 +76,19 @@ const args = process.argv.slice(2);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('AGENT_BROWSER_')));
 fs.appendFileSync(process.env.TRACE + '.browser', JSON.stringify({ args, env }) + '\\n');
 const binding = process.env.TRACE + '.binding';
-if (args.includes('--no-pin-tab')) {
+const recording = process.env.TRACE + '.recording';
+if (args.includes('record') && args.includes('start')) {
+  if (fs.existsSync(recording)) {
+    console.error('Recording already active');
+    process.exit(1);
+  }
+  const output = args[args.indexOf('start') + 1];
+  fs.mkdirSync(require('node:path').dirname(output), { recursive: true });
+  fs.writeFileSync(output, 'video');
+  fs.writeFileSync(recording, output);
+} else if (args.includes('record') && args.includes('stop')) {
+  fs.rmSync(recording, { force: true });
+} else if (args.includes('--no-pin-tab')) {
   if (!args.includes('fixture-page')) throw new Error('must select the existing target');
   fs.writeFileSync(binding, 'fixture-page');
 } else {
@@ -225,11 +237,35 @@ describe("desktop launch lifecycle", () => {
       version: 1,
       data: [{ name: "verify-pie-desktop-sample", path: meta.sampleProject }],
     });
+    const captured = await start(env, "evidence", "screenshot", "auto-recording").exited;
+    expect(captured.code).toBe(0);
+    const wrapper = path.join(root, "run/bin/agent-browser");
+    const driven = childProcess.spawnSync(wrapper, ["get", "title"], { env, encoding: "utf8" });
+    expect(driven.status).toBe(0);
+    expect(driven.stdout).toContain("Pie");
     const calls = browserTrace(root);
     expect(calls[0]?.args).toContain("--no-pin-tab");
     expect(calls[0]?.args).toContain("fixture-page");
     expect(calls.slice(1).every((call) => !call.args.includes("--no-pin-tab"))).toBe(true);
+    const recordingStart = [
+      "record",
+      "start",
+      path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId, "recording.webm"),
+      "--fps",
+      "60",
+    ];
+    expect(calls.at(-4)?.args).toEqual(recordingStart);
+    expect(calls.at(-3)?.args).toContain("screenshot");
+    expect(calls.at(-2)?.args).toEqual(recordingStart);
+    expect(calls.at(-1)?.args).toContain("title");
     expect(calls.at(-1)?.env.AGENT_BROWSER_PIN_TAB).toBe("true");
+
+    const cleaned = await start(env, "cleanup").exited;
+    expect(cleaned.code).toBe(0);
+    expect(browserTrace(root).at(-1)?.args).toEqual(["record", "stop"]);
+    const evidence = path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId);
+    expect(fs.existsSync(path.join(evidence, "recording.webm"))).toBe(true);
+    fs.rmSync(evidence, { recursive: true, force: true });
   }, 10_000);
 
   it("leaves the project list empty only when requested", async () => {

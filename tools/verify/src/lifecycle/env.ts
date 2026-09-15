@@ -6,10 +6,13 @@ import { expectMeta, readRunMeta } from "../meta.ts";
 import {
   applyBrowserEnv,
   browserConfigForEnv,
+  browserNeedsIsolation,
   ensureBrowserEnvDirs,
+  ensureAutoRecording,
   formatBrowserEnv,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
+  stopAutoRecording,
   type BrowserEnvVars,
 } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
@@ -46,6 +49,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         appUrl: web.appUrl,
+        recordingPath: path.join(identity.skillDir, "evidence", web.runId, "recording.webm"),
         runDir,
       });
     }
@@ -54,6 +58,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         cdpPort: desktop.cdpPort,
+        recordingPath: path.join(identity.skillDir, "evidence", desktop.runId, "recording.webm"),
         runDir,
       });
     }
@@ -76,11 +81,27 @@ export function writeBrowserEnvFile(identity: SurfaceIdentity, runDir: string): 
   writeIsolationShim(identity);
 }
 
+export function stopAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+  if (identity.id === "cli") return;
+  try {
+    const vars = browserEnvForRun(identity, runDir);
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    applyBrowserEnv(vars, env);
+    const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
+    if (error !== undefined) {
+      console.error(`${identity.logPrefix}: automatic recording stop failed: ${error}`);
+    }
+  } catch (error) {
+    console.error(`${identity.logPrefix}: automatic recording stop failed: ${String(error)}`);
+  }
+}
+
 export function writeIsolationShim(
   identity: Extract<SurfaceIdentity, { id: "web" | "desktop" }>,
 ): void {
   const envFile = path.join(identity.currentLink, "agent-browser.env");
   const dest = path.join(identity.root, "bin/agent-browser");
+  const entry = path.resolve(import.meta.dirname, "../../bin/agent-browser");
   writeText(
     dest,
     `#!/bin/sh
@@ -92,7 +113,9 @@ if [ ! -f "$env_file" ]; then
 fi
 # shellcheck disable=SC1090
 . "$env_file"
-exec "$AGENT_BROWSER" "$@"
+export PIE_VERIFY_SURFACE=${identity.id}
+export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"
+exec ${JSON.stringify(entry)} "$@"
 `,
   );
   fs.chmodSync(dest, 0o755);
@@ -164,6 +187,13 @@ export function execIsolatedAgentBrowser(args: string[]): void {
   if (active !== undefined) {
     ensureBrowserEnvDirs(active);
     applyBrowserEnv(active, env);
+  }
+  if (active !== undefined && browserNeedsIsolation(args[0]) && !args.includes("record")) {
+    if (args.includes("close")) {
+      stopAutoRecording(real, {}, env);
+    } else {
+      ensureAutoRecording(real, {}, env);
+    }
   }
   const status = runCommandInherit(real, args, { env });
   if (status !== 0) {

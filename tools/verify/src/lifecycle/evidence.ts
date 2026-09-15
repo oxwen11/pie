@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { expectMeta, readRunMeta, type RunMeta } from "../meta.ts";
-import { applyBrowserEnv, ensureBrowserEnvDirs } from "../runtime/browser.ts";
+import { applyBrowserEnv, ensureAutoRecording, ensureBrowserEnvDirs } from "../runtime/browser.ts";
 import { daemonPidPath, redactDaemonRecord } from "../runtime/daemon.ts";
 import { appendNote, evidenceDir, stampEvidence } from "../runtime/evidence.ts";
 import { usage } from "../runtime/fail.ts";
@@ -75,6 +75,7 @@ export async function evidence(surface: Surface, args: string[]): Promise<void> 
         const vars = browserEnvForRun(identity, runDir);
         ensureBrowserEnvDirs(vars);
         applyBrowserEnv(vars, process.env);
+        ensureAutoRecording(vars.AGENT_BROWSER, {}, process.env);
       }
       if (!(await dispatchExtra(identity.id, command, rest, dest, meta))) {
         usage(evidenceUsage(identity.id));
