@@ -31,7 +31,9 @@ const pieIgnorePatterns = [
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
- * → remaining pedantic/style → oxfmt 80-col → optional js-plugins.
+ * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint rules
+ * (`no-restyle`, then token rules). The plugin is registered below with
+ * discovery settings only; do not enable `shadcn/*` in this slice.
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -44,6 +46,13 @@ export default defineConfig({
     suspicious: "warn",
   },
   plugins: ["vitest"],
+  settings: {
+    shadcn: {
+      ui: ["@getpie/ui/components", "@getpie/ui/ai-elements"],
+      ignoreImports: ["^@getpie/ui/lib(/|$)", "^@getpie/ui/hooks(/|$)"],
+      note: "See .agents/rules/ui-components.md. Colors and spacing come from theme tokens.",
+    },
+  },
   jsPlugins: [
     {
       name: "pie",
@@ -58,6 +67,7 @@ export default defineConfig({
       specifier: "@getpie/oxlint/pie-query",
     },
     "eslint-plugin-react-you-might-not-need-an-effect",
+    "@shadcn/lint",
     {
       name: "anti-slop",
       specifier: "@getpie/oxlint/anti-slop",
