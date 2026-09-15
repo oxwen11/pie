@@ -195,6 +195,8 @@ export const SessionScopedEventTypes = [
   "session.request.replied",
   "session.request.rejected",
   "session.queue.updated",
+  "session.compaction.started",
+  "session.compaction.ended",
   "session.crashed",
 ] as const;
 export type SessionScopedEventType = (typeof SessionScopedEventTypes)[number];
@@ -208,6 +210,14 @@ export const CollectionEventTypes = [
   "session.closed",
 ] as const;
 export type CollectionEventType = (typeof CollectionEventTypes)[number];
+
+export const CompactionReasonSchema = Schema.Literals(["manual", "threshold", "overflow"]);
+export type CompactionReason = typeof CompactionReasonSchema.Type;
+
+export type CompactionResult =
+  | { readonly outcome: "completed"; readonly messages: ReadonlyArray<UIMessage> }
+  | { readonly outcome: "canceled" }
+  | { readonly outcome: "failed"; readonly error: string };
 
 export type SessionScopedEventBody =
   | {
@@ -253,6 +263,8 @@ export type SessionScopedEventBody =
       readonly steering: ReadonlyArray<string>;
       readonly followUp: ReadonlyArray<string>;
     }
+  | { readonly type: "session.compaction.started"; readonly reason: CompactionReason }
+  | { readonly type: "session.compaction.ended"; readonly result: CompactionResult }
   | { readonly type: "session.crashed"; readonly reason: string };
 
 /** A session-scoped event before the server's `HarnessAgentSession` stamps its `seq`. */
@@ -384,6 +396,13 @@ export type SessionRuntimeSnapshot = {
   readonly pendingPrompt: SessionPendingPrompt;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
+  readonly compaction?: { readonly reason: CompactionReason } | null;
+  // A reset is retained only while its turn is active; chunks then cover only
+  // the continuation after this boundary, never the compacted prefix.
+  readonly transcriptReset?: {
+    readonly seq: number;
+    readonly messages: ReadonlyArray<UIMessage>;
+  } | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
   readonly cursor: number;
 };
