@@ -2,11 +2,12 @@ import type { GitFileDiff, GitReview } from "@getpie/contract/git";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { FileDiffIcon } from "lucide-react";
+import { FileDiffIcon, GitCompareIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
 
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
+
 import { emptyReviewMessage } from "./review-file-status";
-import { ReviewState } from "./review-state";
 
 const ReviewDiffAdapter = lazy(() =>
   import("./review-diff-adapter").then((module) => ({ default: module.ReviewDiffAdapter })),
@@ -25,9 +26,9 @@ export function ReviewDiffPane({
 }) {
   if (review.data?.files.length === 0) {
     return (
-      <ReviewState prominentIcon title="No changes to review">
+      <PanelEmptyState icon={GitCompareIcon} prominentIcon title="No changes to review">
         {emptyReviewMessage(review.data)}
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
 
@@ -53,17 +54,21 @@ export function ReviewDiffPane({
 
   if (loaded.length === 0 && firstError !== undefined) {
     return (
-      <ReviewState title={diffErrorTitle(firstError)} onRetry={() => void review.refetch()}>
+      <PanelEmptyState
+        icon={GitCompareIcon}
+        title={diffErrorTitle(firstError)}
+        onRetry={() => void review.refetch()}
+      >
         {diffErrorMessage(firstError)}
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
 
   if (loaded.length === 0) {
     return (
-      <ReviewState icon={FileDiffIcon} prominentIcon title="Review changes">
+      <PanelEmptyState icon={FileDiffIcon} prominentIcon title="Review changes">
         Select a changed file in the tree to jump to its diff.
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
 
