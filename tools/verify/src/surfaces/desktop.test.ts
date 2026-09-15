@@ -237,8 +237,12 @@ describe("desktop launch lifecycle", () => {
       version: 1,
       data: [{ name: "verify-pie-desktop-sample", path: meta.sampleProject }],
     });
+    const initialized = await start(env, "evidence", "init").exited;
+    expect(initialized.code).toBe(0);
     const captured = await start(env, "evidence", "screenshot", "auto-recording").exited;
     expect(captured.code).toBe(0);
+    const rotated = await start(env, "evidence", "init").exited;
+    expect(rotated.code).toBe(0);
     const wrapper = path.join(root, "run/bin/agent-browser");
     const driven = childProcess.spawnSync(wrapper, ["get", "title"], { env, encoding: "utf8" });
     expect(driven.status).toBe(0);
@@ -247,24 +251,47 @@ describe("desktop launch lifecycle", () => {
     expect(calls[0]?.args).toContain("--no-pin-tab");
     expect(calls[0]?.args).toContain("fixture-page");
     expect(calls.slice(1).every((call) => !call.args.includes("--no-pin-tab"))).toBe(true);
-    const recordingStart = [
-      "record",
-      "start",
-      path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId, "recording.webm"),
-      "--fps",
-      "60",
-    ];
-    expect(calls.at(-4)?.args).toEqual(recordingStart);
-    expect(calls.at(-3)?.args).toContain("screenshot");
-    expect(calls.at(-2)?.args).toEqual(recordingStart);
+    const starts = calls.filter(
+      (call) => call.args.includes("record") && call.args.includes("start"),
+    );
+    expect(starts.map((call) => call.args)).toEqual([
+      [
+        "record",
+        "start",
+        path.join(
+          root,
+          ".agents/skills/verify-pie-desktop/evidence",
+          meta.runId,
+          "recording-001.webm",
+        ),
+        "--fps",
+        "60",
+      ],
+      [
+        "record",
+        "start",
+        path.join(
+          root,
+          ".agents/skills/verify-pie-desktop/evidence",
+          meta.runId,
+          "recording-002.webm",
+        ),
+        "--fps",
+        "60",
+      ],
+    ]);
     expect(calls.at(-1)?.args).toContain("title");
     expect(calls.at(-1)?.env.AGENT_BROWSER_PIN_TAB).toBe("true");
 
     const cleaned = await start(env, "cleanup").exited;
     expect(cleaned.code).toBe(0);
-    expect(browserTrace(root).at(-1)?.args).toEqual(["record", "stop"]);
+    const stopCalls = browserTrace(root).filter(
+      (call) => call.args.includes("record") && call.args.includes("stop"),
+    );
+    expect(stopCalls).toHaveLength(2);
     const evidence = path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId);
-    expect(fs.existsSync(path.join(evidence, "recording.webm"))).toBe(true);
+    expect(fs.existsSync(path.join(evidence, "recording-001.webm"))).toBe(true);
+    expect(fs.existsSync(path.join(evidence, "recording-002.webm"))).toBe(true);
     fs.rmSync(evidence, { recursive: true, force: true });
   }, 10_000);
 

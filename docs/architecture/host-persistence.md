@@ -403,11 +403,13 @@ Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
 before its first browser command and retains the same take for later commands:
 
 ```text
-.agents/skills/verify-pie[-desktop]/evidence/<run-id>/recording.webm
+.agents/skills/verify-pie[-desktop]/evidence/<run-id>/recording-<NNN>.webm
 ```
 
-Verify owns the path and fixed 60 fps policy; agent-browser and ffmpeg own the
-WebM/VP8 bytes. The file follows the process umask and may contain sensitive UI
+`evidence init` stops the current take and advances the run-local
+`agent-browser-recording-sequence` integer before the next browser command.
+Verify owns that ephemeral pointer, the output path, and the fixed 60 fps
+policy; agent-browser and ffmpeg own the WebM/VP8 bytes. The file follows the process umask and may contain sensitive UI
 content, local paths, or typed input, so it is gitignored and must only be
 uploaded as deliberate evidence. Parallel runs write different run-id paths.
 An already-active take is reused rather than replaced.

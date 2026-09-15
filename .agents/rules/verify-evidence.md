@@ -35,14 +35,16 @@ pnpm exec pie-verify web evidence screenshot <feature>-after
 
 **Video** — the Verify `agent-browser` shim automatically records the complete
 drive at 60 fps. The first browser command starts
-`evidence/<run-id>/recording.webm` on the current page; later commands retain the
-same take. Do not call `record start`, `restart`, or `stop`. Normal Verify
-cleanup stops and flushes the recording before removing the run.
+`evidence/<run-id>/recording-001.webm` on the current page; later commands retain
+the same take. Start each additional validation with `evidence init`: it stops
+the current take and advances to `recording-002.webm`, `recording-003.webm`, and
+so on. Do not call `record start`, `restart`, or `stop`. Normal Verify cleanup
+stops and flushes the current recording before removing the run.
 
-Write down what the automatic clip shows:
+Write down what each automatic clip shows:
 
 ```bash
-pnpm exec pie-verify web evidence note "recording.webm: import → dialog → Import this folder → sidebar row"
+pnpm exec pie-verify web evidence note "recording-001.webm: import → dialog → Import this folder → sidebar row"
 ```
 
 Replace `web` with `desktop` for the Electron surface. `pie-verify cli` has no
@@ -57,7 +59,7 @@ browser and no UI evidence requirement.
   `gh pr|issue create|edit|comment --attach <png> --attach <webm>`.
 - Name screenshots after the feature you proved (`import-project-before.png`,
   `import-project-after.png`), not `screen.png`. The automatic video is always
-  `recording.webm`.
+  numbered `recording-<NNN>.webm` files.
 
 ## Non-negotiables
 

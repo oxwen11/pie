@@ -20,6 +20,20 @@ import { currentRun, writeJson, writeText } from "../runtime/fs.ts";
 import { runCommandInherit } from "../runtime/process.ts";
 import type { Surface } from "../surface.ts";
 
+const RECORDING_SEQUENCE_FILE = "agent-browser-recording-sequence";
+
+function recordingSequence(runDir: string): number {
+  const file = path.join(runDir, RECORDING_SEQUENCE_FILE);
+  if (!fs.existsSync(file)) return 1;
+  const value = Number(fs.readFileSync(file, "utf8").trim());
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function recordingPath(skillDir: string, runId: string, runDir: string): string {
+  const sequence = String(recordingSequence(runDir)).padStart(3, "0");
+  return path.join(skillDir, "evidence", runId, `recording-${sequence}.webm`);
+}
+
 export function parseEnvArgs(args: string[]) {
   let exportMode = false;
   for (const arg of args) {
@@ -49,7 +63,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         appUrl: web.appUrl,
-        recordingPath: path.join(identity.skillDir, "evidence", web.runId, "recording.webm"),
+        recordingPath: recordingPath(identity.skillDir, web.runId, runDir),
         runDir,
       });
     }
@@ -58,7 +72,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         cdpPort: desktop.cdpPort,
-        recordingPath: path.join(identity.skillDir, "evidence", desktop.runId, "recording.webm"),
+        recordingPath: recordingPath(identity.skillDir, desktop.runId, runDir),
         runDir,
       });
     }
@@ -79,6 +93,26 @@ export function writeBrowserEnvFile(identity: SurfaceIdentity, runDir: string): 
   writeJson(vars.AGENT_BROWSER_CONFIG, browserConfigForEnv(vars));
   writeText(path.join(runDir, "agent-browser.env"), formatBrowserEnv(vars, "export"));
   writeIsolationShim(identity);
+}
+
+export function rotateAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+  if (identity.id === "cli") return;
+  const vars = browserEnvForRun(identity, runDir);
+  const current = vars.PIE_VERIFY_RECORDING_PATH;
+  if (current === undefined || !fs.existsSync(current)) return;
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  applyBrowserEnv(vars, env);
+  const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
+  if (error !== undefined) throw new Error(`automatic recording stop failed: ${error}`);
+
+  const { runId } = readRunMeta(path.join(runDir, "meta.json"));
+  const dest = path.join(identity.skillDir, "evidence", runId);
+  let sequence = recordingSequence(runDir) + 1;
+  while (fs.existsSync(path.join(dest, `recording-${String(sequence).padStart(3, "0")}.webm`))) {
+    sequence += 1;
+  }
+  writeText(path.join(runDir, RECORDING_SEQUENCE_FILE), `${sequence}\n`);
+  writeBrowserEnvFile(identity, runDir);
 }
 
 export function stopAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
