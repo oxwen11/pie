@@ -10,16 +10,12 @@ import {
   openResourceWriter,
   type ResourceWriter,
 } from "../../../src/observability/resources/writer";
-import { NodeResourceWorkerLayer } from "../../../src/observability/resources/writer-runtime";
 
 const homes: string[] = [];
-const workerEntry = new URL(
-  "../../../src/observability/resources/writer-worker.ts",
-  import.meta.url,
-);
 
 async function temporaryDirectory(): Promise<string> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "pie-resource-writer-"));
+  await fs.chmod(directory, 0o700);
   homes.push(directory);
   return directory;
 }
@@ -49,8 +45,6 @@ describe("resource writer", () => {
           const writer = yield* openResourceWriter({
             directory,
             source: "daemon",
-            workerEntry,
-            workerExecArgv: ["--import", "tsx"],
           });
           yield* Effect.promise(() => waitFor(writer, () => writer.status().state === "available"));
           expect(
@@ -73,7 +67,7 @@ describe("resource writer", () => {
             waitFor(writer, () => writer.status().lastWrittenAt !== undefined),
           );
         }),
-      ).pipe(Effect.provide(NodeResourceWorkerLayer)),
+      ),
     );
 
     const entries = await fs.readdir(directory);
@@ -117,8 +111,6 @@ describe("resource writer", () => {
           const writer = yield* openResourceWriter({
             directory,
             source: "os",
-            workerEntry,
-            workerExecArgv: ["--import", "tsx"],
           });
           yield* Effect.promise(() => waitFor(writer, () => writer.status().state === "available"));
           for (let index = 0; index < 72; index += 1) {
@@ -139,7 +131,7 @@ describe("resource writer", () => {
             );
           }
         }),
-      ).pipe(Effect.provide(NodeResourceWorkerLayer)),
+      ),
     );
 
     const entries = await fs.readdir(directory);

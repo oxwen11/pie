@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import sqlite from "node:sqlite";
-import workerThreads from "node:worker_threads";
 
 import type {
   ResourceFileStartRecord,
+  ResourceSource,
+  ResourceWriterIdentity,
   ResourceWriterStopRecord,
 } from "@getpie/contract/resource-monitoring";
 
@@ -17,36 +18,21 @@ import {
   RESOURCE_SAMPLE_INTERVAL_MS,
   RESOURCE_SOURCE_LIMIT_BYTES,
 } from "./config";
-import type { ResourceWriterWorkerData, WriterStatus } from "./writer";
 
-type WorkerInput =
-  | {
-      readonly type: "configure";
-      readonly data: ResourceWriterWorkerData;
-    }
-  | {
-      readonly type: "write";
-      readonly id: number;
-      readonly payload: Uint8Array;
-      readonly sampledAt: string;
-      readonly droppedRounds: number;
-    }
-  | { readonly type: "stop"; readonly droppedRounds: number };
+export type ResourceFileWriter = {
+  readonly write: (payload: Uint8Array, sampledAt: string) => void;
+  readonly stop: (droppedRounds: number) => void;
+};
 
-type WorkerOutput =
-  | {
-      readonly type: "status";
-      readonly state: WriterStatus["state"];
-      readonly reason?: string;
-    }
-  | {
-      readonly type: "written";
-      readonly id: number;
-      readonly writtenAt: string;
-      readonly droppedRounds: number;
-    }
-  | { readonly type: "failed"; readonly id: number; readonly reason: string }
-  | { readonly type: "stopped" };
+export type ResourceFileWriterOptions = {
+  readonly directory: string;
+  readonly source: ResourceSource;
+  readonly writer: ResourceWriterIdentity;
+  readonly onStatus: (
+    state: "starting" | "waiting-for-lock" | "available" | "paused" | "stopping" | "stopped",
+    reason?: string,
+  ) => void;
+};
 
 type ActiveFile = {
   readonly name: string;
@@ -63,7 +49,7 @@ type JsonlFile = {
   readonly deletable: boolean;
 };
 
-type WorkerState = {
+type FileWriterState = {
   database: sqlite.DatabaseSync | undefined;
   active: ActiveFile | undefined;
   stopped: boolean;
@@ -71,261 +57,286 @@ type WorkerState = {
   maintenanceAt: number;
 };
 
-const nodePort = workerThreads.parentPort;
-const boot = {
-  data:
-    workerThreads.workerData === undefined || workerThreads.workerData === null
-      ? undefined
-      : readWorkerData(workerThreads.workerData),
-};
-const state: WorkerState = {
-  database: undefined,
-  active: undefined,
-  stopped: false,
-  recoveryTimer: undefined,
-  maintenanceAt: 0,
-};
-
-function onMessage(message: WorkerInput): void {
-  if (message.type === "configure") {
-    if (boot.data !== undefined) return;
-    boot.data = readWorkerData(message.data);
-    initialize();
-    return;
-  }
-  if (message.type === "stop") {
-    stop(message.droppedRounds);
-    return;
-  }
-  if (state.database === undefined) {
-    post({ type: "failed", id: message.id, reason: "writer-unavailable" });
-    return;
-  }
-  try {
-    writeRound(Buffer.from(message.payload), message.sampledAt);
-    post({
-      type: "written",
-      id: message.id,
-      writtenAt: new Date().toISOString(),
-      droppedRounds: message.droppedRounds,
-    });
-  } catch {
-    closeActive();
-    post({ type: "failed", id: message.id, reason: "writer-io" });
-    pauseAndRecover();
-  }
-}
-
-if (nodePort !== null) nodePort.on("message", onMessage);
-else {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun Worker global is not in the Node type graph
-  const scope = globalThis as typeof globalThis & {
-    addEventListener(type: "message", listener: (event: { readonly data: unknown }) => void): void;
+export function createResourceFileWriter(options: ResourceFileWriterOptions): ResourceFileWriter {
+  const state: FileWriterState = {
+    database: undefined,
+    active: undefined,
+    stopped: false,
+    recoveryTimer: undefined,
+    maintenanceAt: 0,
   };
-  scope.addEventListener("message", (event) => {
-    const message = readIncoming(event.data);
-    if (message !== undefined) onMessage(message);
-  });
-}
-if (boot.data !== undefined) initialize();
 
-function config(): ResourceWriterWorkerData {
-  if (boot.data === undefined) throw new Error("resource writer worker is not configured");
-  return boot.data;
-}
+  function initialize(): void {
+    if (state.stopped) return;
+    try {
+      ensureDirectory();
+      const next = new sqlite.DatabaseSync(path.join(options.directory, ".writer.lock"), {
+        timeout: 100,
+      });
+      fs.chmodSync(path.join(options.directory, ".writer.lock"), 0o600);
+      next.exec("BEGIN IMMEDIATE");
+      state.database = next;
+      maintain(Date.now());
+      options.onStatus("available");
+    } catch {
+      releaseLock();
+      options.onStatus("waiting-for-lock", "writer-lock-unavailable");
+      state.recoveryTimer = setTimeout(initialize, RESOURCE_SAMPLE_INTERVAL_MS);
+      state.recoveryTimer.unref();
+    }
+  }
 
-function initialize(): void {
-  if (state.stopped) return;
-  try {
-    ensureDirectory();
-    const next = new sqlite.DatabaseSync(path.join(config().directory, ".writer.lock"), {
-      timeout: 100,
-    });
-    fs.chmodSync(path.join(config().directory, ".writer.lock"), 0o600);
-    next.exec("BEGIN IMMEDIATE");
-    state.database = next;
-    maintain(Date.now());
-    post({ type: "status", state: "available" });
-  } catch {
-    releaseLock();
-    post({ type: "status", state: "waiting-for-lock", reason: "writer-lock-unavailable" });
-    state.recoveryTimer = setTimeout(initialize, RESOURCE_SAMPLE_INTERVAL_MS);
+  function ensureDirectory(): void {
+    fs.mkdirSync(options.directory, { recursive: true, mode: 0o700 });
+    const stat = fs.lstatSync(options.directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe resource directory");
+    if (process.platform !== "win32" && (stat.mode & 0o077) !== 0) {
+      throw new Error("resource directory is not owner-only");
+    }
+  }
+
+  function writeRound(payload: Buffer, sampledAt: string): void {
+    const sampledAtMs = Date.parse(sampledAt);
+    if (!Number.isFinite(sampledAtMs)) throw new Error("invalid sample timestamp");
+    if (payload.byteLength > RESOURCE_FILE_LIMIT_BYTES) throw new Error("round exceeds file limit");
+
+    const now = Date.now();
+    if (now >= state.maintenanceAt) maintain(now);
+    if (
+      state.active !== undefined &&
+      (state.active.size + payload.byteLength > RESOURCE_FILE_LIMIT_BYTES ||
+        now - state.active.createdAtMs >= RESOURCE_FILE_OPEN_LIMIT_MS ||
+        sampledAtMs < state.active.retentionStartAtMs ||
+        now >= state.active.retentionStartAtMs + RESOURCE_RETENTION_MS)
+    ) {
+      closeActive();
+    }
+
+    if (state.active === undefined) {
+      openFile(payload.byteLength, sampledAtMs, now);
+    } else if (!reserve(payload.byteLength, false)) {
+      closeActive();
+      openFile(payload.byteLength, sampledAtMs, now);
+    }
+
+    if (state.active === undefined) throw new Error("resource file unavailable");
+    writeAll(state.active.descriptor, payload);
+    state.active.size += payload.byteLength;
+  }
+
+  function openFile(roundBytes: number, sampledAtMs: number, now: number): void {
+    const createdAt = new Date(now).toISOString();
+    const retentionStartAtMs = Math.min(now, sampledAtMs);
+    const header: ResourceFileStartRecord = {
+      schemaVersion: 1,
+      type: "file_start",
+      source: options.source,
+      writer: options.writer,
+      writtenAt: createdAt,
+      createdAt,
+      retentionStartAt: new Date(retentionStartAtMs).toISOString(),
+    };
+    const headerBytes = Buffer.from(`${JSON.stringify(header)}\n`);
+    if (headerBytes.byteLength + roundBytes > RESOURCE_FILE_LIMIT_BYTES) {
+      throw new Error("round does not fit in a new resource file");
+    }
+    if (!reserve(headerBytes.byteLength + roundBytes, true)) {
+      throw new Error("resource source quota unavailable");
+    }
+
+    const { descriptor, name } = createFile(createdAt);
+    try {
+      writeAll(descriptor, headerBytes);
+      state.active = {
+        name,
+        descriptor,
+        createdAtMs: now,
+        retentionStartAtMs,
+        size: headerBytes.byteLength,
+      };
+    } catch (error) {
+      fs.closeSync(descriptor);
+      throw error;
+    }
+  }
+
+  function reserve(additionalBytes: number, needsFile: boolean): boolean {
+    for (;;) {
+      const files = scanFiles(Date.now());
+      const bytes = files.reduce((total, file) => total + file.size, 0);
+      if (
+        bytes + additionalBytes <= RESOURCE_SOURCE_LIMIT_BYTES &&
+        files.length + (needsFile ? 1 : 0) <= RESOURCE_FILE_COUNT_LIMIT
+      ) {
+        return true;
+      }
+      const activeName = state.active?.name;
+      const oldest = files
+        .filter((file) => file.deletable && file.name !== activeName)
+        .sort((left, right) => left.createdAtMs - right.createdAtMs)[0];
+      if (oldest === undefined) return false;
+      fs.unlinkSync(path.join(options.directory, oldest.name));
+    }
+  }
+
+  function maintain(now: number): void {
+    scanFiles(now);
+    state.maintenanceAt = now + RESOURCE_RECOVERY_INTERVAL_MS;
+  }
+
+  function scanFiles(now: number): JsonlFile[] {
+    const files: JsonlFile[] = [];
+    for (const entry of fs.readdirSync(options.directory, { withFileTypes: true })) {
+      if (!entry.name.endsWith(".jsonl")) continue;
+      const pathname = path.join(options.directory, entry.name);
+      if (!entry.isFile() || entry.isSymbolicLink()) throw new Error("unsafe resource log entry");
+      const stat = fs.statSync(pathname);
+      const filenameTime = timeFromFilename(entry.name);
+      if (filenameTime === undefined) {
+        files.push({
+          name: entry.name,
+          size: stat.size,
+          createdAtMs: stat.birthtimeMs,
+          deletable: false,
+        });
+        continue;
+      }
+      if (entry.name === state.active?.name) {
+        files.push({
+          name: entry.name,
+          size: stat.size,
+          createdAtMs: filenameTime,
+          deletable: false,
+        });
+        continue;
+      }
+      const retentionStartAt = retentionFromHeader(pathname, filenameTime, now);
+      if (retentionStartAt === undefined || now >= retentionStartAt + RESOURCE_RETENTION_MS) {
+        fs.unlinkSync(pathname);
+        continue;
+      }
+      files.push({ name: entry.name, size: stat.size, createdAtMs: filenameTime, deletable: true });
+    }
+    return files;
+  }
+
+  function retentionFromHeader(
+    pathname: string,
+    filenameTime: number,
+    now: number,
+  ): number | undefined {
+    const descriptor = fs.openSync(pathname, "r");
+    try {
+      const buffer = Buffer.alloc(64 * 1024);
+      const read = fs.readSync(descriptor, buffer, 0, buffer.byteLength, 0);
+      const newline = buffer.subarray(0, read).indexOf(0x0a);
+      if (newline === -1) return undefined;
+      const header: unknown = JSON.parse(buffer.subarray(0, newline).toString("utf8"));
+      if (!isFileStartHeader(header)) return undefined;
+      const retention = Date.parse(header.retentionStartAt);
+      return header.source === options.source &&
+        Number.isFinite(retention) &&
+        retention <= filenameTime &&
+        retention <= now
+        ? retention
+        : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  }
+
+  function createFile(createdAt: string) {
+    const stem = createdAt.replaceAll(":", "-");
+    for (let suffix = 0; ; suffix += 1) {
+      const name = `${stem}${suffix === 0 ? "" : `-${suffix}`}.jsonl`;
+      try {
+        const descriptor = fs.openSync(path.join(options.directory, name), "wx", 0o600);
+        return { descriptor, name };
+      } catch (error) {
+        if (!isErrno(error) || error.code !== "EEXIST") throw error;
+      }
+    }
+  }
+
+  function pauseAndRecover(): void {
+    if (state.stopped || state.recoveryTimer !== undefined) return;
+    options.onStatus("paused", "writer-io");
+    state.recoveryTimer = setTimeout(() => {
+      state.recoveryTimer = undefined;
+      try {
+        maintain(Date.now());
+        options.onStatus("available");
+      } catch {
+        pauseAndRecover();
+      }
+    }, RESOURCE_RECOVERY_INTERVAL_MS);
     state.recoveryTimer.unref();
   }
-}
 
-function ensureDirectory(): void {
-  fs.mkdirSync(config().directory, { recursive: true, mode: 0o700 });
-  const stat = fs.lstatSync(config().directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe resource directory");
-  if (process.platform !== "win32" && (stat.mode & 0o077) !== 0) {
-    throw new Error("resource directory is not owner-only");
-  }
-}
-
-function writeRound(payload: Buffer, sampledAt: string): void {
-  const sampledAtMs = Date.parse(sampledAt);
-  if (!Number.isFinite(sampledAtMs)) throw new Error("invalid sample timestamp");
-  if (payload.byteLength > RESOURCE_FILE_LIMIT_BYTES) throw new Error("round exceeds file limit");
-
-  const now = Date.now();
-  if (now >= state.maintenanceAt) maintain(now);
-  if (
-    state.active !== undefined &&
-    (state.active.size + payload.byteLength > RESOURCE_FILE_LIMIT_BYTES ||
-      now - state.active.createdAtMs >= RESOURCE_FILE_OPEN_LIMIT_MS ||
-      sampledAtMs < state.active.retentionStartAtMs ||
-      now >= state.active.retentionStartAtMs + RESOURCE_RETENTION_MS)
-  ) {
-    closeActive();
+  function closeActive(): void {
+    if (state.active === undefined) return;
+    fs.closeSync(state.active.descriptor);
+    state.active = undefined;
   }
 
-  if (state.active === undefined) {
-    openFile(payload.byteLength, sampledAtMs, now);
-  } else if (!reserve(payload.byteLength, false)) {
-    closeActive();
-    openFile(payload.byteLength, sampledAtMs, now);
-  }
-
-  if (state.active === undefined) throw new Error("resource file unavailable");
-  writeAll(state.active.descriptor, payload);
-  state.active.size += payload.byteLength;
-}
-
-function openFile(roundBytes: number, sampledAtMs: number, now: number): void {
-  const createdAt = new Date(now).toISOString();
-  const retentionStartAtMs = Math.min(now, sampledAtMs);
-  const header: ResourceFileStartRecord = {
-    schemaVersion: 1,
-    type: "file_start",
-    source: config().source,
-    writer: config().writer,
-    writtenAt: createdAt,
-    createdAt,
-    retentionStartAt: new Date(retentionStartAtMs).toISOString(),
-  };
-  const headerBytes = Buffer.from(`${JSON.stringify(header)}\n`);
-  if (headerBytes.byteLength + roundBytes > RESOURCE_FILE_LIMIT_BYTES) {
-    throw new Error("round does not fit in a new resource file");
-  }
-  if (!reserve(headerBytes.byteLength + roundBytes, true)) {
-    throw new Error("resource source quota unavailable");
-  }
-
-  const { descriptor, name } = createFile(createdAt);
-  try {
-    writeAll(descriptor, headerBytes);
-    state.active = {
-      name,
-      descriptor,
-      createdAtMs: now,
-      retentionStartAtMs,
-      size: headerBytes.byteLength,
-    };
-  } catch (error) {
-    fs.closeSync(descriptor);
-    throw error;
-  }
-}
-
-function reserve(additionalBytes: number, needsFile: boolean): boolean {
-  for (;;) {
-    const files = scanFiles(Date.now());
-    const bytes = files.reduce((total, file) => total + file.size, 0);
-    if (
-      bytes + additionalBytes <= RESOURCE_SOURCE_LIMIT_BYTES &&
-      files.length + (needsFile ? 1 : 0) <= RESOURCE_FILE_COUNT_LIMIT
-    ) {
-      return true;
-    }
-    const activeName = state.active?.name;
-    const oldest = files
-      .filter((file) => file.deletable && file.name !== activeName)
-      .sort((left, right) => left.createdAtMs - right.createdAtMs)[0];
-    if (oldest === undefined) return false;
-    fs.unlinkSync(path.join(config().directory, oldest.name));
-  }
-}
-
-function maintain(now: number): void {
-  scanFiles(now);
-  state.maintenanceAt = now + RESOURCE_RECOVERY_INTERVAL_MS;
-}
-
-function scanFiles(now: number): JsonlFile[] {
-  const files: JsonlFile[] = [];
-  for (const entry of fs.readdirSync(config().directory, { withFileTypes: true })) {
-    if (!entry.name.endsWith(".jsonl")) continue;
-    const pathname = path.join(config().directory, entry.name);
-    if (!entry.isFile() || entry.isSymbolicLink()) throw new Error("unsafe resource log entry");
-    const stat = fs.statSync(pathname);
-    const filenameTime = timeFromFilename(entry.name);
-    if (filenameTime === undefined) {
-      files.push({
-        name: entry.name,
-        size: stat.size,
-        createdAtMs: stat.birthtimeMs,
-        deletable: false,
-      });
-      continue;
-    }
-    if (entry.name === state.active?.name) {
-      files.push({
-        name: entry.name,
-        size: stat.size,
-        createdAtMs: filenameTime,
-        deletable: false,
-      });
-      continue;
-    }
-    const retentionStartAt = retentionFromHeader(pathname, filenameTime, now);
-    if (retentionStartAt === undefined || now >= retentionStartAt + RESOURCE_RETENTION_MS) {
-      fs.unlinkSync(pathname);
-      continue;
-    }
-    files.push({ name: entry.name, size: stat.size, createdAtMs: filenameTime, deletable: true });
-  }
-  return files;
-}
-
-function retentionFromHeader(
-  pathname: string,
-  filenameTime: number,
-  now: number,
-): number | undefined {
-  const descriptor = fs.openSync(pathname, "r");
-  try {
-    const buffer = Buffer.alloc(64 * 1024);
-    const read = fs.readSync(descriptor, buffer, 0, buffer.byteLength, 0);
-    const newline = buffer.subarray(0, read).indexOf(0x0a);
-    if (newline === -1) return undefined;
-    const header: unknown = JSON.parse(buffer.subarray(0, newline).toString("utf8"));
-    if (!isFileStartHeader(header)) return undefined;
-    const retention = Date.parse(header.retentionStartAt);
-    return header.source === config().source &&
-      Number.isFinite(retention) &&
-      retention <= filenameTime &&
-      retention <= now
-      ? retention
-      : undefined;
-  } catch {
-    return undefined;
-  } finally {
-    fs.closeSync(descriptor);
-  }
-}
-
-function createFile(createdAt: string) {
-  const stem = createdAt.replaceAll(":", "-");
-  for (let suffix = 0; ; suffix += 1) {
-    const name = `${stem}${suffix === 0 ? "" : `-${suffix}`}.jsonl`;
+  function releaseLock(): void {
+    if (state.database === undefined) return;
     try {
-      const descriptor = fs.openSync(path.join(config().directory, name), "wx", 0o600);
-      return { descriptor, name };
-    } catch (error) {
-      if (!isErrno(error) || error.code !== "EEXIST") throw error;
+      state.database.exec("COMMIT");
+    } catch {
+      try {
+        state.database.exec("ROLLBACK");
+      } catch {
+        // The transaction may never have started.
+      }
     }
+    state.database.close();
+    state.database = undefined;
   }
+
+  function stop(droppedRounds: number): void {
+    if (state.stopped) return;
+    state.stopped = true;
+    if (state.recoveryTimer !== undefined) clearTimeout(state.recoveryTimer);
+    if (state.active !== undefined) {
+      const writtenAt = new Date().toISOString();
+      const record: ResourceWriterStopRecord = {
+        schemaVersion: 1,
+        type: "writer_stop",
+        source: options.source,
+        writer: options.writer,
+        writtenAt,
+        droppedRounds,
+      };
+      const bytes = Buffer.from(`${JSON.stringify(record)}\n`);
+      if (state.active.size + bytes.byteLength <= RESOURCE_FILE_LIMIT_BYTES) {
+        try {
+          writeAll(state.active.descriptor, bytes);
+        } catch {
+          // The existing complete rounds remain readable without a stop marker.
+        }
+      }
+    }
+    closeActive();
+    releaseLock();
+  }
+
+  initialize();
+  return {
+    write: (payload, sampledAt) => {
+      if (state.database === undefined) throw new Error("writer-unavailable");
+      try {
+        writeRound(Buffer.from(payload), sampledAt);
+      } catch (error) {
+        closeActive();
+        pauseAndRecover();
+        throw error;
+      }
+    },
+    stop,
+  };
 }
 
 function timeFromFilename(name: string): number | undefined {
@@ -342,124 +353,6 @@ function writeAll(descriptor: number, bytes: Buffer): void {
     if (written <= 0) throw new Error("resource log write made no progress");
     offset += written;
   }
-}
-
-function pauseAndRecover(): void {
-  if (state.stopped || state.recoveryTimer !== undefined) return;
-  post({ type: "status", state: "paused", reason: "writer-io" });
-  state.recoveryTimer = setTimeout(() => {
-    state.recoveryTimer = undefined;
-    try {
-      maintain(Date.now());
-      post({ type: "status", state: "available" });
-    } catch {
-      pauseAndRecover();
-    }
-  }, RESOURCE_RECOVERY_INTERVAL_MS);
-  state.recoveryTimer.unref();
-}
-
-function stop(droppedRounds: number): void {
-  if (state.stopped) return;
-  state.stopped = true;
-  if (state.recoveryTimer !== undefined) clearTimeout(state.recoveryTimer);
-  if (state.active !== undefined) {
-    const writtenAt = new Date().toISOString();
-    const record: ResourceWriterStopRecord = {
-      schemaVersion: 1,
-      type: "writer_stop",
-      source: config().source,
-      writer: config().writer,
-      writtenAt,
-      droppedRounds,
-    };
-    const bytes = Buffer.from(`${JSON.stringify(record)}\n`);
-    if (state.active.size + bytes.byteLength <= RESOURCE_FILE_LIMIT_BYTES) {
-      try {
-        writeAll(state.active.descriptor, bytes);
-      } catch {
-        // The existing complete rounds remain readable without a stop marker.
-      }
-    }
-  }
-  closeActive();
-  releaseLock();
-  post({ type: "stopped" });
-  nodePort?.close();
-}
-
-function closeActive(): void {
-  if (state.active === undefined) return;
-  fs.closeSync(state.active.descriptor);
-  state.active = undefined;
-}
-
-function releaseLock(): void {
-  if (state.database === undefined) return;
-  try {
-    state.database.exec("COMMIT");
-  } catch {
-    try {
-      state.database.exec("ROLLBACK");
-    } catch {
-      // The transaction may never have started.
-    }
-  }
-  state.database.close();
-  state.database = undefined;
-}
-
-function post(message: WorkerOutput): void {
-  if (nodePort !== null) {
-    nodePort.postMessage(message, []);
-    return;
-  }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Bun Worker global is not in the Node type graph
-  const scope = globalThis as typeof globalThis & {
-    postMessage(message: unknown): void;
-  };
-  // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Worker.postMessage has no targetOrigin
-  scope.postMessage(message);
-}
-
-function readIncoming(message: unknown): WorkerInput | undefined {
-  if (typeof message !== "object" || message === null || !("type" in message)) return undefined;
-  if (message.type === "configure" || message.type === "write" || message.type === "stop") {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already narrowed to WorkerInput tags
-    return message as WorkerInput;
-  }
-  return undefined;
-}
-
-function readWorkerData(value: unknown): ResourceWriterWorkerData {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("directory" in value) ||
-    typeof value.directory !== "string" ||
-    !("source" in value) ||
-    (value.source !== "os" && value.source !== "daemon" && value.source !== "electron") ||
-    !("writer" in value) ||
-    typeof value.writer !== "object" ||
-    value.writer === null ||
-    !("instanceId" in value.writer) ||
-    typeof value.writer.instanceId !== "string" ||
-    !("process" in value.writer) ||
-    typeof value.writer.process !== "object" ||
-    value.writer.process === null ||
-    !("pid" in value.writer.process) ||
-    typeof value.writer.process.pid !== "number"
-  ) {
-    throw new Error("invalid resource writer worker data");
-  }
-  return {
-    directory: value.directory,
-    source: value.source,
-    writer: {
-      instanceId: value.writer.instanceId,
-      process: { pid: value.writer.process.pid },
-    },
-  };
 }
 
 function isFileStartHeader(value: unknown): value is ResourceFileStartRecord {

@@ -60,19 +60,6 @@ NodeRuntime.runMain(
       },
     });
 
-    yield* fs.makeDirectory(path.join(distDir, "resources"), { recursive: true });
-    yield* build({
-      entrypoints: [
-        url.fileURLToPath(
-          new URL("./src/observability/resources/writer-worker.ts", import.meta.url),
-        ),
-      ],
-      outdir: path.join(distDir, "resources"),
-      naming: "writer-worker.mjs",
-      target: "bun",
-      format: "esm",
-    });
-
     for (const [name, entry] of Object.entries({
       "pi-process": url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url)),
       "image-resize-worker": path.join(piDir, "dist/utils/image-resize-worker.js"),
