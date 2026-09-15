@@ -34,7 +34,7 @@ const pieIgnorePatterns = [
  * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint
  * `no-arbitrary-values`. `no-restyle` and `no-raw-colors` are on
  * below. Vendored UI sources keep `no-restyle` off; `no-raw-colors`
- * stays on there (components must use theme tokens too).
+ * stays on there except three pre-existing presentation sites.
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -383,6 +383,17 @@ export default defineConfig({
         "typescript/no-unsafe-type-assertion": "off",
         // Coss sources and local wrappers own their appearance.
         "shadcn/no-restyle": "off",
+      },
+    },
+    {
+      // Pre-existing palette / SVG literals. Do not restyle in the lint PR.
+      files: [
+        "packages/ui/src/ai-elements/loader.tsx",
+        "packages/ui/src/ai-elements/web-preview.tsx",
+        "packages/ui/src/components/number-field.tsx",
+      ],
+      rules: {
+        "shadcn/no-raw-colors": "off",
       },
     },
     {

@@ -232,7 +232,7 @@ export const WebPreviewConsole = ({
                 className={cn(
                   "text-xs",
                   log.level === "error" && "text-destructive",
-                  log.level === "warn" && "text-warning-foreground",
+                  log.level === "warn" && "text-yellow-600",
                   log.level === "log" && "text-foreground",
                 )}
                 // An append-only log stream: entries never reorder, never filter, and carry
