@@ -138,4 +138,8 @@ patchedDependencies:
   # InteractiveMode and highlight.js; inline builtin theme JSON.
   # On bump: index.js, modes/index.js, theme.js, syntax-highlight.js.
   "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
+  # Theme parser treated `/*` in quoted `@source ".../dist/*.js"` as a
+  # comment and swallowed `@theme`. Strip comments only outside strings.
+  # On bump: dist/index.js `parseDeclarations` / `parseClassSelectors`.
+  "@shadcn/lint@0.1.0": patches/@shadcn__lint@0.1.0.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch
