@@ -95,7 +95,7 @@ export function ScheduleProvider({
   onCloseCreate,
   children,
 }: ScheduleProviderProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils, localEnvironmentId } = useRouteContext({ from: "__root__" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -120,7 +120,7 @@ export function ScheduleProvider({
       onCloseCreate();
       void invalidate();
       if (created.lastSessionId !== undefined) {
-        openScheduleSession(navigate, created.projectId, created.lastSessionId);
+        openScheduleSession(navigate, created.projectId, created.lastSessionId, localEnvironmentId);
         return;
       }
       reportScheduleStart(created);
@@ -157,7 +157,12 @@ export function ScheduleProvider({
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
-        openScheduleSession(navigate, result.ref.projectId, result.ref.sessionId);
+        openScheduleSession(
+          navigate,
+          result.ref.projectId,
+          result.ref.sessionId,
+          localEnvironmentId,
+        );
         return;
       }
       reportScheduleStart(result.schedule);
@@ -210,7 +215,8 @@ export function ScheduleProvider({
         save: (id, form) => update.mutate({ id, ...form }),
         openCreate: onOpenCreate,
         closeCreate: onCloseCreate,
-        openSession: (projectId, sessionId) => openScheduleSession(navigate, projectId, sessionId),
+        openSession: (projectId, sessionId) =>
+          openScheduleSession(navigate, projectId, sessionId, localEnvironmentId),
       },
       meta: {
         items,
@@ -246,6 +252,7 @@ export function ScheduleProvider({
       items,
       listError,
       listPending,
+      localEnvironmentId,
       navigate,
       nowMs,
       onCloseCreate,
@@ -291,11 +298,12 @@ function openScheduleSession(
   navigate: ReturnType<typeof useNavigate>,
   projectId: string,
   sessionId: string,
+  environmentId: string,
 ): void {
   navigate({
     to: "/session/$sessionId",
     params: { sessionId },
-    search: { projectId },
+    search: { projectId, environmentId },
   }).catch((error: unknown) => {
     console.error("Failed to open the schedule session", error);
   });

@@ -1,14 +1,15 @@
 {
   "name": "@getpie/cli",
-  "version": "0.0.1",
-  "description": "Pie CLI — daemon, serve, and pie run for the Pi coding agent",
+  "version": "0.0.2",
+  "description": "Pie CLI — daemon, serve, pie run, and a standalone relay hop for the Pi coding agent",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oxwen11/pie.git",
     "directory": "packages/pie"
   },
   "bin": {
-    "pie": "./dist/cli.mjs"
+    "pie": "./dist/cli.mjs",
+    "pie-relay": "./dist/relay.mjs"
   },
   "files": [
     "dist"
@@ -31,27 +32,27 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
-    "@effect/platform-node": "catalog:effect",
-    "@orpc/client": "catalog:orpc",
-    "@orpc/contract": "catalog:orpc",
-    "@orpc/server": "catalog:orpc",
-    "ai": "catalog:",
-    "effect": "catalog:effect",
-    "node-pty": "1.1.0",
-    "uuid": "catalog:",
-    "ws": "catalog:",
-    "zod": "catalog:"
+    "node-pty": "1.1.0"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@effect/platform-node": "catalog:effect",
     "@effect/vitest": "catalog:effect",
     "@getpie/client": "workspace:*",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/typescript": "workspace:*",
+    "@orpc/client": "catalog:orpc",
+    "@orpc/contract": "catalog:orpc",
+    "@orpc/server": "catalog:orpc",
     "@types/ws": "catalog:",
-    "vitest": "catalog:"
+    "ai": "catalog:",
+    "effect": "catalog:effect",
+    "uuid": "catalog:",
+    "vitest": "catalog:",
+    "ws": "catalog:",
+    "zod": "catalog:"
   },
   "engines": {
     "node": ">=24.0.0 <25"

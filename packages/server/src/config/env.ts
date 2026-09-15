@@ -29,6 +29,8 @@ export const pieAllowedHosts = Config.String("PIE_ALLOWED_HOSTS").pipe(
   Config.map(splitCsv),
 );
 
+export const pieHost = Config.String("PIE_HOST").pipe(Config.option);
+
 export const pieDaemonCompatibilityKey = Config.String("PIE_DAEMON_COMPATIBILITY_KEY").pipe(
   Config.option,
 );

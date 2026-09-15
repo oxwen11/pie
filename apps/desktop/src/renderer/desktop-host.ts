@@ -26,18 +26,13 @@ export function createDesktopHost(
   bootstrap: DesktopBootstrap,
   server: Promise<ServerConnection>,
 ): DesktopHost {
-  // AppInterface reads this promise only after the desktop shell is mounted.
-  // Keep a rejection handler attached before that first read.
   void server.catch((error: unknown) => {
     if (!isAbortError(error)) console.error("Desktop server connection failed", error);
   });
 
-  // The feed's snapshot. Every subscriber advances it, so it is tracked with
-  // its own revision — a subscriber that opened later must not push the
-  // snapshot backwards. Per-subscriber revisions stay local: sharing one would
-  // let the first stream to see an event make the others discard it.
   let status = bootstrap.status;
   let statusRevision = bootstrap.statusRevision;
+  let environments = bootstrap.environments;
 
   return {
     platform: {
@@ -47,6 +42,53 @@ export function createDesktopHost(
         });
       },
       os: bootstrap.os,
+      ssh: {
+        client: bootstrap.sshClient,
+        environments: {
+          getSnapshot: () => environments,
+          subscribe: (listener) => {
+            const controller = new AbortController();
+            let revision = environments.revision;
+            const unsubscribe = consumeEventIterator(
+              client.environments.subscribe({ after: revision }, { signal: controller.signal }),
+              {
+                onEvent: (snapshot) => {
+                  if (snapshot.revision <= revision) return;
+                  revision = snapshot.revision;
+                  environments = snapshot;
+                  listener(snapshot);
+                },
+                onError: (error) => {
+                  if (!controller.signal.aborted && !isAbortError(error)) {
+                    console.error("Desktop environment stream failed", error);
+                  }
+                },
+                onFinish: () => {
+                  /* environment stream close is handled by the abort controller */
+                },
+              },
+            );
+
+            return () => {
+              controller.abort();
+              void unsubscribe().catch((error: unknown) => {
+                if (!isAbortError(error)) {
+                  console.error("Failed to unsubscribe from desktop environments", error);
+                }
+              });
+            };
+          },
+        },
+        discoverHosts: () => client.environments.discoverSshHosts(),
+        connect: (target) => client.environments.connectSsh({ target }),
+        remove: (id) => client.environments.removeSsh({ id }),
+      },
+      tailscale: {
+        client: bootstrap.tailscaleClient,
+        snapshot: () => client.tailscale.snapshot(),
+        enableServe: () => client.tailscale.enableServe(),
+        disableServe: () => client.tailscale.disableServe(),
+      },
     },
     server,
     refreshServer: () => client.server.connection(),

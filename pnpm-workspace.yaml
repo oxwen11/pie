@@ -89,6 +89,9 @@ overrides:
   vite: "catalog:"
   vitest: "catalog:"
   "@types/node": "catalog:"
+  # Two tsx patch versions fork vite, which forks vitest, which splits
+  # @effect/vitest's TestRunner (`layer()` then reads undefined `.config`).
+  tsx: 4.23.12
   react: "catalog:react"
   react-dom: "catalog:react"
   "@effect/platform-node": "catalog:effect"

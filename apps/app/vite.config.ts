@@ -61,7 +61,7 @@ export default defineConfig({
   },
   plugins: [
     themeBootstrapPlugin(),
-    codeInspectorPlugin({ bundler: "vite" }),
+    codeInspectorPlugin({ bundler: "vite", hideConsole: true }),
     tanstackRouter({
       target: "react",
       autoCodeSplitting: true,

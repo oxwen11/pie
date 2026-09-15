@@ -10,6 +10,7 @@ export class DesktopConfig extends Context.Service<
     readonly devUrl: string | undefined;
     readonly serverEntry: string;
     readonly resourcesPath: string;
+    readonly userDataPath: string;
   }
 >()("desktop/DesktopConfig") {}
 
@@ -17,6 +18,7 @@ export type DesktopConfigInputs = {
   readonly isPackaged: boolean;
   readonly resourcesPath: string;
   readonly devUrl: string | undefined;
+  readonly userDataPath: string;
 };
 
 export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): string {
@@ -61,6 +63,7 @@ export function buildDesktopConfig(inputs: DesktopConfigInputs): DesktopConfig["
     devUrl: inputs.devUrl,
     serverEntry: resolveServerEntry(inputs.isPackaged, inputs.resourcesPath),
     resourcesPath: inputs.resourcesPath,
+    userDataPath: inputs.userDataPath,
   };
 }
 

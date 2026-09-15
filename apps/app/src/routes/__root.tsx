@@ -1,5 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  useMatch,
+  useRouteContext,
+  useRouterState,
+} from "@tanstack/react-router";
+import { use, useMemo, type ReactNode } from "react";
 
 import {
   AppShell,
@@ -19,12 +25,16 @@ import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
+import { AppClientsProvider } from "@/lib/app-clients";
 import type { AppClients } from "@/lib/orpc";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   orpcClient: AppClients["orpcClient"];
   orpcQueryUtils: AppClients["orpcQueryUtils"];
   queryClient: QueryClient;
+  localEnvironmentId: string;
+  clientsFor: (environmentId: string) => Promise<AppClients>;
 }
 
 contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
@@ -53,7 +63,14 @@ function RootLayout() {
       from: "/session/$sessionId",
       shouldThrow: false,
     }) ?? null;
-  const sessionRef = sessionRoute?.loaderData?.ref ?? null;
+  const sessionRef =
+    sessionRoute?.loaderData === undefined
+      ? null
+      : {
+          environmentId: sessionRoute.loaderData.environmentId,
+          projectId: sessionRoute.loaderData.ref.projectId,
+          sessionId: sessionRoute.loaderData.ref.sessionId,
+        };
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,
@@ -88,19 +105,44 @@ function RootLayout() {
             <AppSidebar />
           </AppShellSidebar>
           <AppShellMain>
-            <CardPanel
-              heading={
-                cardHeading === false
-                  ? undefined
-                  : (cardHeading ??
-                    (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
-              }
-              hideHeader={cardHeader === false}
-              supportingText={cardHeading !== undefined ? undefined : project?.name}
-            />
+            <SessionBoundMain sessionRef={sessionRef}>
+              <CardPanel
+                heading={
+                  cardHeading === false
+                    ? undefined
+                    : (cardHeading ??
+                      (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
+                }
+                hideHeader={cardHeader === false}
+                supportingText={cardHeading !== undefined ? undefined : project?.name}
+              />
+            </SessionBoundMain>
           </AppShellMain>
         </AppShellBody>
       </ContentPanelSessionProvider>
     </AppShell>
   );
+}
+
+function SessionBoundMain({
+  sessionRef,
+  children,
+}: {
+  sessionRef: EnvironmentSessionRef | null;
+  children: ReactNode;
+}) {
+  const { clientsFor, localEnvironmentId, orpcClient, queryClient, orpcQueryUtils } =
+    useRouteContext({ from: "__root__" });
+  const targetId =
+    sessionRef === null || sessionRef.environmentId === localEnvironmentId
+      ? null
+      : sessionRef.environmentId;
+  const remote = use(
+    useMemo(
+      () => (targetId === null ? Promise.resolve(undefined) : clientsFor(targetId)),
+      [clientsFor, targetId],
+    ),
+  );
+  const clients: AppClients = remote ?? { orpcClient, queryClient, orpcQueryUtils };
+  return <AppClientsProvider clients={clients}>{children}</AppClientsProvider>;
 }

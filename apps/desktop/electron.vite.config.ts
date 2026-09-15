@@ -61,11 +61,13 @@ export default defineConfig({
     build: {
       outDir: "dist/main",
       // electron-vite externalizes every production dependency by default, but
-      // Server source must be compiled into Main. Core's built compatibility
-      // module is bundled too so the define above replaces its environment read
-      // with this artifact's static key rather than consulting runtime env.
+      // server/ssh/tailscale source must be compiled into Main. Core's built
+      // compatibility module is bundled too so the define above replaces its
+      // environment read with this artifact's static key rather than consulting
+      // runtime env. Left external, the packaged app imports TypeScript from
+      // the asar's node_modules, where Node refuses to strip types.
       externalizeDeps: {
-        exclude: ["@getpie/core", "@getpie/server"],
+        exclude: ["@getpie/core", "@getpie/server", "@getpie/ssh", "@getpie/tailscale"],
       },
     },
   },
@@ -100,7 +102,7 @@ export default defineConfig({
     plugins: [
       themeBootstrapPlugin({ csp: true }),
       devOverlayCsp(),
-      codeInspectorPlugin({ bundler: "vite" }),
+      codeInspectorPlugin({ bundler: "vite", hideConsole: true }),
       tanstackRouter({
         target: "react",
         autoCodeSplitting: true,
