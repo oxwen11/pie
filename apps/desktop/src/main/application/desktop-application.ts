@@ -127,7 +127,12 @@ export function makeDesktopApplication({
       };
       yield* updateEnvironments((current) => ({
         connecting: current.connecting.filter((item) => item !== entry),
-        remotes: [...current.remotes.filter((item) => item.id !== remote.id), remote],
+        remotes: [
+          ...current.remotes.filter(
+            (item) => item.id !== remote.id && item.environmentId !== remote.environmentId,
+          ),
+          remote,
+        ],
       }));
       yield* result.closed.pipe(
         Effect.andThen(() => dropRemoteIfCurrent(remote)),
