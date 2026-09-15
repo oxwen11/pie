@@ -28,8 +28,9 @@ export class ChatManager implements ChatManagerApi {
   forgetEnvironment(environmentId: string): void {
     for (const [key, chat] of this.#chats) {
       const parsed: unknown = JSON.parse(key);
-      const id = Array.isArray(parsed) ? parsed[0] : undefined;
-      if (id !== environmentId) continue;
+      if (!Array.isArray(parsed)) continue;
+      const id: unknown = parsed[0];
+      if (typeof id !== "string" || id !== environmentId) continue;
       this.#chats.delete(key);
       chat.dispose();
     }

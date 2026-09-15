@@ -1,5 +1,4 @@
 import net from "node:net";
-import type { AddressInfo } from "node:net";
 
 import {
   pipeSockets,
@@ -19,6 +18,14 @@ export type RelayListenHandle = {
 
 const FIRST_LINE_LIMIT = 1024;
 const DEFAULT_WAITING_TIMEOUT_MS = 10_000;
+
+function boundPort(server: net.Server): number {
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("relay server is not listening");
+  }
+  return address.port;
+}
 
 function listenTcp(port: number, host: string): Promise<net.Server> {
   return new Promise((resolve, reject) => {
@@ -156,7 +163,7 @@ export async function listenRelay(input: {
         if (line === `${RELAY_CONTROL_PREFIX}${input.token}`) {
           if (control !== undefined) {
             socket.destroy();
-            return;
+            return undefined;
           }
           control = socket;
           socket.write(`${RELAY_READY}\n`);
@@ -166,12 +173,12 @@ export async function listenRelay(input: {
           socket.on("error", () => {
             if (control === socket) dropControl();
           });
-          return;
+          return undefined;
         }
 
         if (!line.startsWith(RELAY_DATA_PREFIX)) {
           socket.destroy();
-          return;
+          return undefined;
         }
         const rest = line.slice(RELAY_DATA_PREFIX.length);
         const space = rest.indexOf(" ");
@@ -179,25 +186,26 @@ export async function listenRelay(input: {
         const streamId = space === -1 ? "" : rest.slice(space + 1);
         if (presented !== input.token) {
           socket.destroy();
-          return;
+          return undefined;
         }
         const pending = waiting.get(streamId);
         if (pending === undefined) {
           socket.destroy();
-          return;
+          return undefined;
         }
         waiting.delete(streamId);
         clearTimeout(pending.timer);
         socket.write(`${RELAY_READY}\n`);
         setImmediate(() => pipeSockets(pending.socket, socket));
+        return undefined;
       })
       .catch(() => {
         socket.destroy();
       });
   });
 
-  const port = (publicServer.address() as AddressInfo).port;
-  const controlPort = (controlServer.address() as AddressInfo).port;
+  const port = boundPort(publicServer);
+  const controlPort = boundPort(controlServer);
   return {
     port,
     controlPort,

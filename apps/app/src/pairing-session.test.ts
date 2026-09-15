@@ -9,16 +9,15 @@ import {
 } from "./pairing-session";
 
 function memoryStorage(initial: Record<string, string> = {}) {
-  const data = { ...initial };
+  const data = new Map(Object.entries(initial));
   return {
-    getItem: (key: string) => data[key] ?? null,
+    getItem: (key: string) => data.get(key) ?? null,
     setItem: (key: string, value: string) => {
-      data[key] = value;
+      data.set(key, value);
     },
     removeItem: (key: string) => {
-      delete data[key];
+      data.delete(key);
     },
-    data,
   };
 }
 
@@ -30,7 +29,7 @@ describe("pairing session", () => {
       token: "session-token",
       environmentId: "env-1",
     });
-    expect(storage.data[PAIRING_SESSION_STORAGE_KEY]).not.toContain("daemon");
+    expect(storage.getItem(PAIRING_SESSION_STORAGE_KEY)).not.toContain("daemon");
     const connection = connectionFromOrigin("session-token", "http://192.168.31.135:4180");
     expect(connection).toEqual({
       httpBaseUrl: "http://192.168.31.135:4180",

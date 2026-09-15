@@ -15,7 +15,10 @@ export type TailscaleServeOwnership = "empty" | "ours" | "foreign";
 function proxyTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (typeof value !== "object" || value === null) return [];
-  const record = value as Record<string, unknown>;
+  const record: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    record[key] = entry;
+  }
   const nested: string[] = [];
   const proxy = record["Proxy"];
   if (typeof proxy === "string") nested.push(proxy);
@@ -107,15 +110,16 @@ export const ensureTailscaleServe = (input: {
     });
     if (ownership === "ours") return;
     if (ownership === "foreign") {
-      return yield* new TailscaleCommandError({
+      yield* new TailscaleCommandError({
         message: "Tailscale Serve HTTPS is already in use by another handler",
         command: tailscaleServeEnableArgs(input),
         exitCode: 1,
       });
+    } else {
+      yield* runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
+        env: input.env,
+      });
     }
-    yield* runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
-      env: input.env,
-    });
   });
 
 export const disableTailscaleServe = (

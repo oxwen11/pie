@@ -109,8 +109,9 @@ describe("ConnectionSwitcher", () => {
     expect(trigger).not.toBeNull();
 
     await act(async () => {
-      dispatch(trigger!, "pointerdown");
-      dispatch(trigger!, "mousedown");
+      if (trigger === null) throw new Error("missing menu trigger");
+      dispatch(trigger, "pointerdown");
+      dispatch(trigger, "mousedown");
       await flushFrames();
     });
 
@@ -120,10 +121,11 @@ describe("ConnectionSwitcher", () => {
     expect(addItem).toBeDefined();
 
     await act(async () => {
-      dispatch(addItem!, "pointerdown");
-      dispatch(addItem!, "mousedown");
-      dispatch(addItem!, "mouseup");
-      dispatch(addItem!, "click");
+      if (addItem === undefined) throw new Error("missing add SSH host item");
+      dispatch(addItem, "pointerdown");
+      dispatch(addItem, "mousedown");
+      dispatch(addItem, "mouseup");
+      dispatch(addItem, "click");
       await new Promise((resolve) => {
         window.setTimeout(resolve, 0);
       });

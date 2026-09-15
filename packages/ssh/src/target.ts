@@ -77,8 +77,10 @@ export function parseSshResolveOutput(alias: string, stdout: string): SshTarget 
     values.set(key, rest.join(" ").trim());
   }
 
-  const hostname = values.get("hostname")?.trim() || alias;
-  const username = values.get("user")?.trim() || null;
+  const rawHostname = values.get("hostname")?.trim();
+  const hostname = rawHostname === undefined || rawHostname.length === 0 ? alias : rawHostname;
+  const rawUser = values.get("user")?.trim();
+  const username = rawUser === undefined || rawUser.length === 0 ? null : rawUser;
   const rawPort = values.get("port")?.trim() ?? "";
   const parsedPort = Number.parseInt(rawPort, 10);
 

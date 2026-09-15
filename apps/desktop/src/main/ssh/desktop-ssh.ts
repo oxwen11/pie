@@ -160,29 +160,31 @@ const fetchEnvironmentId = (connection: SshConnection): Effect.Effect<string, Ss
 function parseEnvironments(value: unknown): SavedSshEnvironment[] {
   if (!Array.isArray(value)) return [];
   const environments: SavedSshEnvironment[] = [];
-  for (const entry of value) {
+  for (const raw of value) {
+    const entry: unknown = raw;
     if (typeof entry !== "object" || entry === null) continue;
-    const item = entry as {
-      id?: unknown;
-      alias?: unknown;
-      hostname?: unknown;
-      username?: unknown;
-      port?: unknown;
-    };
-    if (typeof item.id !== "string" || item.id.length === 0) continue;
-    if (typeof item.alias !== "string" || item.alias.length === 0) continue;
-    if (typeof item.hostname !== "string" || item.hostname.length === 0) continue;
-    if (item.username !== null && typeof item.username !== "string") continue;
-    if (item.port !== null && (typeof item.port !== "number" || !Number.isInteger(item.port))) {
+    if (!("id" in entry) || typeof entry.id !== "string" || entry.id.length === 0) continue;
+    if (!("alias" in entry) || typeof entry.alias !== "string" || entry.alias.length === 0) {
       continue;
     }
+    if (
+      !("hostname" in entry) ||
+      typeof entry.hostname !== "string" ||
+      entry.hostname.length === 0
+    ) {
+      continue;
+    }
+    const username = "username" in entry ? entry.username : null;
+    const port = "port" in entry ? entry.port : null;
+    if (username !== null && typeof username !== "string") continue;
+    if (port !== null && (typeof port !== "number" || !Number.isInteger(port))) continue;
     environments.push({
-      id: item.id,
+      id: entry.id,
       target: {
-        alias: item.alias,
-        hostname: item.hostname,
-        username: item.username,
-        port: item.port,
+        alias: entry.alias,
+        hostname: entry.hostname,
+        username,
+        port,
       },
     });
   }
@@ -328,7 +330,7 @@ export function makeDesktopSsh(input: {
     const closeSession = (session: LiveSshSession) => session.connected.close;
 
     const disconnectAll = Effect.gen(function* () {
-      const lives = yield* Ref.getAndSet(liveRef, new Map());
+      const lives = yield* Ref.getAndSet(liveRef, new Map<string, LiveSshSession>());
       for (const live of lives.values()) {
         yield* closeSession(live);
       }

@@ -57,10 +57,12 @@ describe("createServer pairing prompt", () => {
   afterEach(async () => {
     await server?.dispose();
     server = undefined;
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    if (saved.PIE_E2E === undefined) delete process.env.PIE_E2E;
+    else process.env.PIE_E2E = saved.PIE_E2E;
+    if (saved.PIE_E2E_PI_EXECUTABLE === undefined) delete process.env.PIE_E2E_PI_EXECUTABLE;
+    else process.env.PIE_E2E_PI_EXECUTABLE = saved.PIE_E2E_PI_EXECUTABLE;
+    if (saved.PIE_HOME === undefined) delete process.env.PIE_HOME;
+    else process.env.PIE_HOME = saved.PIE_HOME;
   });
 
   it("exchanges a pairing session token and prompts through the shipped WebSocket RPC", async () => {

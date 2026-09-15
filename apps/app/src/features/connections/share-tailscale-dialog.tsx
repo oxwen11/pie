@@ -31,6 +31,7 @@ function ShareTailscaleStatus({
       .then(() => {
         setSnapshotPromise(tailscale.snapshot());
         setPending(false);
+        return undefined;
       })
       .catch((error: unknown) => {
         setPending(false);
