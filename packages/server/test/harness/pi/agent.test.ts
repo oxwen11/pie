@@ -138,8 +138,6 @@ rl.on("line", (line) => {
     entries = [entry("old", null, { role: "user", content: "old", timestamp: 0 }), entry("kept", "old", { role: "user", content: "recent", timestamp: 0 }), compact];
     send({ type: "compaction_start", reason: "overflow" });
     send({ type: "compaction_end", reason: "overflow", result: { summary: compact.summary, firstKeptEntryId: "kept", tokensBefore: 100 }, aborted: false, willRetry: true });
-    // Deliberately append/stream before the get_entries response: reset must
-    // still stop at the compaction entry, not incorporate this future tail.
     entries.push(entry("tail", "compact", assistant({ content: [{ type: "text", text: "after" }] })));
     send({ type: "message_start", message: assistant() });
     upd({ type: "text_start", contentIndex: 0 });
@@ -675,7 +673,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
   );
 
   it.effect(
-    "resets at compaction_end before the same turn continues, excluding future history",
+    "keeps compaction lifecycle ordered while the same turn continues with a new message",
     () =>
       Effect.gen(function* () {
         const executable = fakeExecutable();
@@ -702,13 +700,9 @@ layer(NodeServices.layer)("PiAgent", (it) => {
           ],
         );
         const ended = events.find((e) => e.type === "session.compaction.ended");
-        assert.equal(ended?.type, "session.compaction.ended");
-        if (ended?.type === "session.compaction.ended" && ended.result.outcome === "completed") {
-          assert.deepEqual(
-            ended.result.messages.map((m) => m.id),
-            ["kept", "compact"],
-          );
-        } else assert.fail("missing reset");
+        assert.deepEqual(ended?.type === "session.compaction.ended" ? ended.result : undefined, {
+          outcome: "completed",
+        });
         const starts = events.filter((e) => e.type === "start");
         assert.notEqual(starts[0]?.messageId, starts[1]?.messageId);
         yield* session.close;
