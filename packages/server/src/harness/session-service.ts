@@ -78,7 +78,6 @@ export type PiAgentSessionServiceShape = {
     | StoreWriteError
     | SessionNotResumable
     | AgentOperationError
-    | GitWorktreeFailure
   >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
@@ -112,7 +111,6 @@ export type PiAgentSessionServiceShape = {
     | SessionClosed
     | TurnAlreadyRunning
     | AgentOperationError
-    | GitWorktreeFailure
   >;
   readonly interrupt: (
     ref: SessionRef,
@@ -209,7 +207,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | PiAgentSessionRepository
   | EventBus
   | WorktreeService
-  | ProjectService
   | Crypto.Crypto
   | SessionMetadata
   | SessionMetadataLocks
@@ -221,7 +218,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const repo = yield* PiAgentSessionRepository;
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
-    const projects = yield* ProjectService;
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
@@ -233,24 +229,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       ),
     );
 
-    const ensureWorktree = (
-      metadata: SessionWithCwd,
-    ): Effect.Effect<SessionWithCwd, ProjectNotFound | StoreReadError | GitWorktreeFailure> => {
-      const worktree = metadata.worktree;
-      if (worktree === undefined) return Effect.succeed(metadata);
-      return projects.findById(metadata.projectId).pipe(
-        Effect.map((project) => project.path),
-        Effect.flatMap((repoCwd) =>
-          worktrees.ensure(repoCwd, metadata.cwd, worktree.branch).pipe(Effect.as(metadata)),
-        ),
-      );
-    };
-
     const resolveWorkspace = (ref: SessionRef) =>
-      withMetadataMutation(
-        ref,
-        readMetadata(ref).pipe(Effect.flatMap(ensureCwd), Effect.flatMap(ensureWorktree)),
-      );
+      withMetadataMutation(ref, readMetadata(ref).pipe(Effect.flatMap(ensureCwd)));
 
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
@@ -295,7 +275,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       | SessionNotFound
       | SessionClosed
       | TurnAlreadyRunning
-      | GitWorktreeFailure
     > =>
       Effect.gen(function* () {
         const resolved = yield* resolveWorkspace(ref);
@@ -471,7 +450,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       prompt: (input: PromptInput) =>
         Effect.fn("PiAgentSessionService.prompt")(function* () {
-          const queued = input.delivery !== undefined;
           const userInput = yield* toUserInput(input.parts, input.delivery);
           yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
           const messageId = input.messageId ?? (yield* newSessionId);
@@ -490,19 +468,11 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
               reason,
             });
 
-          // Idle prompts publish the optimistic boundary first, then return the
-          // runtime's real admission receipt. A failure emits the compensating
-          // rejection for every subscriber and still fails the initiating RPC.
-          if (!queued) {
-            yield* submitted();
-            return yield* deliverPrompt(input.ref, userInput).pipe(
-              Effect.tapError((error) =>
-                reject(error instanceof Error ? error.message : String(error)),
-              ),
-            );
-          }
-
-          const receipt = yield* deliverPrompt(input.ref, userInput);
+          const receipt = yield* deliverPrompt(input.ref, userInput).pipe(
+            Effect.tapError((error) =>
+              reject(error instanceof Error ? error.message : String(error)),
+            ),
+          );
           if (receipt.started) yield* submitted();
           return receipt;
         })().pipe(inSession(input.ref)),

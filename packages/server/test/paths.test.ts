@@ -10,6 +10,7 @@ import {
   resolveDaemonDirectory,
   resolvePieHome,
   resolveProjectBrowseRoot,
+  resourceSourceDirectory,
   pieLogPath,
 } from "../src/config/paths";
 
@@ -62,6 +63,21 @@ describe("logsDirectory", () => {
     expect(logsDir).toBe(path.join("/tmp/data", "logs"));
     expect(pieLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "pie.log"));
     expect(daemonStdioLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "daemon-stdio.log"));
+  });
+});
+
+describe("resourceSourceDirectory", () => {
+  it("keeps each source under $PIE_HOME/logs/resources", () => {
+    const logsDir = logsDirectory("/tmp/data");
+    expect(resourceSourceDirectory(logsDir, "os")).toBe(
+      path.join("/tmp/data", "logs", "resources", "os"),
+    );
+    expect(resourceSourceDirectory(logsDir, "daemon")).toBe(
+      path.join("/tmp/data", "logs", "resources", "daemon"),
+    );
+    expect(resourceSourceDirectory(logsDir, "electron")).toBe(
+      path.join("/tmp/data", "logs", "resources", "electron"),
+    );
   });
 });
 

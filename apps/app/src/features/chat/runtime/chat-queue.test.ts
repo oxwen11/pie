@@ -71,6 +71,16 @@ describe("Chat pending prompt", () => {
     expect(chat.store.getState().pendingPrompt.followUp).toEqual(["held"]);
   });
 
+  it("removes an optimistic bubble when Pi queues an idle-looking prompt", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({});
+    transport.promptStarted = false;
+
+    await chat.prompt("raced into the queue");
+
+    expect(chat.store.getState().messages).toEqual([]);
+  });
+
   it("keeps the queue empty when a follow-up races to a real prompt", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});

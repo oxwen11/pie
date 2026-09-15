@@ -33,7 +33,7 @@ Ready when all of these hold:
 What launch also does:
 
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
-- Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
+- Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main launches it as `bun --no-install packages/server/dist/server.mjs`; packaged builds use `Contents/Resources/vendor/bun` and `Contents/Resources/server/server.mjs`.
 - Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
 - Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
 - Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
