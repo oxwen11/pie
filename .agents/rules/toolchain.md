@@ -21,7 +21,9 @@
   plugins plus `oxlint.deferred.mts` (Ultracite rules not yet adopted).
   `@shadcn/lint` is registered in `jsPlugins` with `settings.shadcn` pointing
   at `@getpie/ui/components` and `@getpie/ui/ai-elements`; no `shadcn/*`
-  rules are on yet. Do not
+  rules are on yet. Both `components.json` files use those `@getpie/ui`
+  aliases so discovery does not look for a missing `@/components/ui`.
+  Do not
   run `ultracite init` — it would overwrite AGENTS.md, editor settings, and
   oxfmt options. Plugin
   sources including vendored anti-slop are linted and formatted; `dist/` is
