@@ -10,6 +10,7 @@ import {
 import { logsDirectory, resourceSourceDirectory } from "@getpie/server/config/paths";
 import { resolvePieHome } from "@getpie/server/daemon";
 import {
+  NodeResourceWorkerLayer,
   openResourceWriter,
   resolveResourceArtifacts,
   resolveResourceLoggingSetting,
@@ -134,7 +135,7 @@ export const DesktopResourceMonitoringLive = Layer.effectDiscard(
       ),
     ),
   ),
-);
+).pipe(Layer.provide(NodeResourceWorkerLayer));
 
 function sampleFromMetric(metric: Electron.ProcessMetric, windowMs: number): RuntimeSample {
   const role = roleFromMetric(metric);
