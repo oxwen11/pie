@@ -251,8 +251,11 @@ describe("DesktopSsh saved hosts", () => {
           persistPath: file,
           resolveInput: (raw) => Effect.succeed(parseSshInput(raw)),
           connectEnvironment: (target) =>
-            Effect.sleep("30 millis").pipe(Effect.as(fakeConnected(target))),
-          loadEnvironmentId: () => Effect.succeed("env-1"),
+            Effect.sleep("30 millis").pipe(
+              Effect.as({ ...fakeConnected(target), token: target.username ?? "tok" }),
+            ),
+          loadEnvironmentId: (connection) =>
+            Effect.succeed(connection.token === "alice" ? "env-alice" : "env-bob"),
         });
         yield* Effect.all([ssh.connect("alice@one.example"), ssh.connect("bob@two.example")], {
           concurrency: 2,
@@ -280,6 +283,38 @@ describe("DesktopSsh saved hosts", () => {
         : [];
     expect(ids).toHaveLength(2);
     expect(new Set(ids).size).toBe(2);
+  });
+
+  it("reuses one live environment when two hostnames reach the same daemon", async () => {
+    const closed: string[] = [];
+    const result = await withSsh((dir) =>
+      Effect.gen(function* () {
+        const file = path.join(dir, "ssh-environments.json");
+        const ssh = yield* makeDesktopSsh({
+          persistPath: file,
+          resolveInput: (raw) => Effect.succeed(parseSshInput(raw)),
+          connectEnvironment: (target) =>
+            Effect.succeed({
+              ...fakeConnected(target),
+              httpBaseUrl: `http://127.0.0.1:${target.username === "alice" ? "1" : "2"}`,
+              close: Effect.sync(() => {
+                closed.push(target.username ?? target.alias);
+              }),
+            }),
+          loadEnvironmentId: () => Effect.succeed("env-shared"),
+        });
+        const first = yield* ssh.connect("alice@one.example");
+        const second = yield* ssh.connect("bob@two.example");
+        return { first, second, list: yield* ssh.listSaved };
+      }),
+    );
+    expect(result.first.environmentId).toBe("env-shared");
+    expect(result.second.environmentId).toBe("env-shared");
+    expect(result.second.id).toBe(result.first.id);
+    expect(result.second.connection).toEqual(result.first.connection);
+    expect(result.list).toHaveLength(1);
+    expect(result.list[0]?.target.username).toBe("alice");
+    expect(closed).toEqual(["bob"]);
   });
 
   it("returns the environment id from one GET after the tunnel is up", async () => {
