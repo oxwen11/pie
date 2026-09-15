@@ -12,6 +12,7 @@ import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { setBedrockProviderModule } from "@earendil-works/pi-ai/compat";
 import {
   applyHttpProxySettings,
+  builtInExtensions,
   configureHttpDispatcher,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -63,7 +64,7 @@ const start = async (): Promise<void> => {
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       resourceLoaderOptions: {
-        extensionFactories: [piBashExtension(options.cwd)],
+        extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
       },
     });
     const resolved = resolveCliModel({
