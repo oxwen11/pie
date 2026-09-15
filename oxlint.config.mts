@@ -31,10 +31,10 @@ const pieIgnorePatterns = [
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
- * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint token
- * rules (`no-raw-colors`, `no-arbitrary-values`). `no-restyle` is on
- * below with `allow: ["layout"]` plus slot-primitive contracts; vendored
- * UI sources keep it off.
+ * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint
+ * `no-arbitrary-values`. `no-restyle` and `no-raw-colors` are on
+ * below. Vendored UI sources keep `no-restyle` off; `no-raw-colors`
+ * stays on there (components must use theme tokens too).
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -139,6 +139,7 @@ export default defineConfig({
         ],
       },
     ],
+    "shadcn/no-raw-colors": "error",
     "import/no-unassigned-import": [
       "error",
       {
@@ -294,6 +295,7 @@ export default defineConfig({
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-type-assertion": "off",
         "shadcn/no-restyle": "off",
+        "shadcn/no-raw-colors": "off",
       },
     },
     {
