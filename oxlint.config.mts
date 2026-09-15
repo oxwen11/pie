@@ -35,7 +35,8 @@ const pieIgnorePatterns = [
  * `no-unknown-classes` / `require-static-classes`. `no-restyle`,
  * `no-raw-colors`, and `no-arbitrary-values` are on below. Vendored
  * UI sources keep `no-restyle` and `no-arbitrary-values` off;
- * `no-raw-colors` stays on there (components must use theme tokens too).
+ * `no-raw-colors` stays on there except three pre-existing
+ * presentation sites.
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -402,6 +403,17 @@ export default defineConfig({
         // structural values such as ring-[3px].
         "shadcn/no-restyle": "off",
         "shadcn/no-arbitrary-values": "off",
+      },
+    },
+    {
+      // Pre-existing palette / SVG literals. Do not restyle in the lint PR.
+      files: [
+        "packages/ui/src/ai-elements/loader.tsx",
+        "packages/ui/src/ai-elements/web-preview.tsx",
+        "packages/ui/src/components/number-field.tsx",
+      ],
+      rules: {
+        "shadcn/no-raw-colors": "off",
       },
     },
     {
