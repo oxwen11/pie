@@ -12,12 +12,14 @@ import {
   browserConfigForEnv,
   browserNeedsIsolation,
   buildAgentBrowserArgv,
+  ensureAutoRecording,
   formatBrowserEnv,
   isManagedAgentBrowserSocketDir,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   resolveIsolatedChromeExecutable,
   shortAgentBrowserSocketDir,
+  stopAutoRecording,
 } from "./browser.ts";
 
 describe("buildAgentBrowserArgv", () => {
@@ -58,6 +60,39 @@ describe("buildAgentBrowserArgv", () => {
     expect(buildAgentBrowserArgv(["skills", "get", "core"], { session: "pie-verify-web" })).toEqual(
       ["skills", "get", "core"],
     );
+  });
+});
+
+describe("automatic recording", () => {
+  it("starts at 60 fps, tolerates an active take, and stops it", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-recording-"));
+    const command = path.join(dir, "agent-browser");
+    const trace = path.join(dir, "trace");
+    const output = path.join(dir, "recording.webm");
+    fs.writeFileSync(
+      command,
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$TRACE"
+if [ "$FAIL_ACTIVE" = 1 ]; then
+  echo 'Recording already active' >&2
+  exit 1
+fi
+`,
+      { mode: 0o755 },
+    );
+    const env = { ...process.env, TRACE: trace, PIE_VERIFY_RECORDING_PATH: output };
+    const target = { session: "pie-verify-desktop", cdpPort: 9223 };
+
+    ensureAutoRecording(command, target, env);
+    ensureAutoRecording(command, target, { ...env, FAIL_ACTIVE: "1" });
+    fs.writeFileSync(output, "video");
+    expect(stopAutoRecording(command, target, env)).toBeUndefined();
+
+    expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual([
+      `--session pie-verify-desktop --cdp 9223 record start ${output} --fps 60`,
+      `--session pie-verify-desktop --cdp 9223 record start ${output} --fps 60`,
+      "--session pie-verify-desktop --cdp 9223 record stop",
+    ]);
   });
 });
 
@@ -135,6 +170,7 @@ describe("resolveBrowserEnv", () => {
       const resolved = resolveBrowserEnv({
         session: "pie-verify-web",
         appUrl: "http://localhost:4190/",
+        recordingPath: path.join(runDir, "recording.webm"),
         runDir,
       });
       expect(resolved).toEqual({
@@ -150,6 +186,7 @@ describe("resolveBrowserEnv", () => {
         AGENT_BROWSER_IDLE_TIMEOUT_MS: "0",
         AGENT_BROWSER_DEFAULT_TIMEOUT: "40000",
         PIE_VERIFY_APP_URL: "http://localhost:4190/",
+        PIE_VERIFY_RECORDING_PATH: path.join(runDir, "recording.webm"),
       });
       expect(resolved.AGENT_BROWSER_SOCKET_DIR.startsWith(runDir)).toBe(false);
       expect(resolved.AGENT_BROWSER_SCREENSHOT_DIR.startsWith(runDir)).toBe(true);

@@ -28,7 +28,7 @@ Ready when all of these hold:
 - Electron (or electron-vite) pid from the run is alive.
 - `$PIE_HOME/daemon/daemon.pid` exists; `GET $address/api/health` is `ok`.
 - CDP is listening on `PIE_REMOTE_DEBUG_PORT` (default **9223**), and both that listener and the renderer's HTTP origin belong to the recorded launch process tree.
-- The run's agent-browser session has selected the existing renderer target and enabled its sticky pin. Initialization selects that target before pinning: agent-browser 0.36 otherwise tries to create a tab, which Electron does not support.
+- The run's agent-browser session has selected the existing renderer target and enabled its sticky pin. Initialization selects that target before pinning and never creates a replacement Electron tab.
 
 What launch also does:
 
@@ -96,21 +96,20 @@ Desktop is a UI surface, so `.agents/rules/verify-evidence.md` applies: every pr
 
 ```bash
 pnpm exec pie-verify desktop evidence init
-EVIDENCE="$(pnpm exec pie-verify desktop evidence path)"
+agent-browser get title # starts recording-001.webm automatically at 60 fps
 pnpm exec pie-verify desktop evidence screenshot <feature>-before
 pnpm exec pie-verify desktop evidence snapshot <feature>-before
-agent-browser record restart "$EVIDENCE/<feature>.webm"
-# …drive…
-agent-browser record stop
+# …drive; do not call agent-browser record…
 pnpm exec pie-verify desktop evidence screenshot <feature>-after
 pnpm exec pie-verify desktop evidence snapshot <feature>-after
 pnpm exec pie-verify desktop evidence curl
 pnpm exec pie-verify desktop evidence side-effects
+pnpm exec pie-verify desktop evidence pack-video <feature>
 pnpm exec pie-verify desktop evidence note "<feature>.webm: what the clip shows"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`record restart` captures the existing pinned page, including when no recording has started yet. `record start` creates a fresh context, so it is not part of this bound-window workflow. Recording frame rate is unchanged. If it refuses on that attach, record the launcher's display instead — `ffmpeg -f x11grab -i "$DISPLAY" "$EVIDENCE/<feature>.mp4"` on the `$DISPLAY` / Xvfb launch used — and say so in `evidence note`. A green Playwright e2e run is not a substitute for the screenshots and video.
+agent-browser 0.37.1 records the existing pinned renderer in place. The Verify shim starts numbered 60 fps recordings on the first browser command. Run `evidence init` before each validation to stop the current take and select the next number; do not call `record start`, `restart`, or `stop`. After the final action, `evidence pack-video <feature>` packs the current validation and compresses near-static spans. Cleanup flushes the current take before Electron exits. A green Playwright e2e run is not a substitute for the screenshots and video.
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
@@ -120,7 +119,7 @@ pnpm exec pie-verify desktop evidence path
 pnpm exec pie-verify desktop cleanup
 ```
 
-1. Stop the recorded desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
+1. Stop and flush the automatic recording, then stop the Desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
 2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
@@ -136,8 +135,9 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify desktop doctor` | Read-only worth-driving check (attaches CDP). |
 | `pnpm exec pie-verify desktop env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
-| `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
-| `agent-browser record restart <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
+| `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `pack-video` / `path`. |
+| `recording-<NNN>.webm` | Raw automatic 60 fps videos under `evidence path`; each `evidence init` advances the number. |
+| `<feature>.webm` | Packed review video; numbered inputs remain unchanged. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate

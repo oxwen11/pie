@@ -16,7 +16,7 @@ import {
   useComboboxFilter,
 } from "@getpie/ui/components/combobox";
 import { cn } from "@getpie/ui/lib/utils";
-import { ChevronsUpDownIcon, SearchIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { type ComponentProps, useCallback, useMemo } from "react";
 
 /** Combobox-backed model picker. Same compound surface as AI Elements, without a dialog. */
@@ -195,24 +195,14 @@ export function ModelSelectorPicker({
     >
       <ModelSelectorTrigger
         aria-label={ariaLabel}
-        className="data-placeholder:text-muted-foreground min-w-0"
+        className="data-placeholder:text-muted-foreground hover:bg-accent min-w-0 transition-colors"
         render={<Button aria-label={ariaLabel} size="sm" variant="ghost" />}
       >
         <ModelSelectorValue placeholder="Default">
           {(option: ModelSelectorOption | null) => (
-            <span className="flex min-w-0 items-center gap-2">
-              {option ? (
-                <>
-                  <ModelSelectorLogo provider={option.provider} />
-                  <ModelSelectorName>{option.label}</ModelSelectorName>
-                </>
-              ) : (
-                <ModelSelectorName>Default</ModelSelectorName>
-              )}
-            </span>
+            <ModelSelectorName>{option?.label ?? "Default"}</ModelSelectorName>
           )}
         </ModelSelectorValue>
-        <ChevronsUpDownIcon />
       </ModelSelectorTrigger>
       <ModelSelectorPopup>
         <div className="border-b px-2 py-1.5">

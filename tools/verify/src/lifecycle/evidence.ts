@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { expectMeta, readRunMeta, type RunMeta } from "../meta.ts";
-import { applyBrowserEnv, ensureBrowserEnvDirs } from "../runtime/browser.ts";
+import { applyBrowserEnv, ensureAutoRecording, ensureBrowserEnvDirs } from "../runtime/browser.ts";
 import { daemonPidPath, redactDaemonRecord } from "../runtime/daemon.ts";
-import { appendNote, evidenceDir, stampEvidence } from "../runtime/evidence.ts";
+import { appendNote, evidenceDir, packEvidenceVideo, stampEvidence } from "../runtime/evidence.ts";
 import { usage } from "../runtime/fail.ts";
 import { currentRun } from "../runtime/fs.ts";
 import type { Surface } from "../surface.ts";
@@ -12,7 +12,12 @@ import { extraEvidence as cliExtra } from "../surfaces/cli.ts";
 import { extraEvidence as desktopExtra } from "../surfaces/desktop.ts";
 import { extraEvidence as webExtra } from "../surfaces/web.ts";
 import { doctorReport } from "./doctor.ts";
-import { browserEnvForRun } from "./env.ts";
+import {
+  advanceAutoRecordingForRun,
+  browserEnvForRun,
+  finishAutoRecordingForRun,
+  rotateAutoRecordingForRun,
+} from "./env.ts";
 
 /** Evidence subcommands that shell out to agent-browser. */
 const BROWSER_EVIDENCE_COMMANDS: ReadonlySet<string> = new Set(["screenshot", "snapshot", "url"]);
@@ -58,6 +63,7 @@ export async function evidence(surface: Surface, args: string[]): Promise<void> 
       console.log(dest);
       return;
     case "init":
+      rotateAutoRecordingForRun(identity, runDir);
       stampEvidence(dest, runDir, await doctorReport(surface));
       if (meta.surface === "cli" || meta.surface === "desktop") {
         const record = daemonPidPath(meta.pieHome);
@@ -70,11 +76,24 @@ export async function evidence(surface: Surface, args: string[]): Promise<void> 
     case "note":
       appendNote(dest, rest.join(" "));
       return;
+    case "pack-video": {
+      const name = rest[0];
+      if (identity.id === "cli" || name === undefined || rest.length !== 1) {
+        usage(evidenceUsage(identity.id));
+      }
+      const input = finishAutoRecordingForRun(identity, runDir);
+      if (input === undefined) throw new Error("no completed automatic recording to pack");
+      const output = packEvidenceVideo(input, dest, name);
+      advanceAutoRecordingForRun(identity, runDir);
+      console.log(output);
+      return;
+    }
     default:
       if (evidenceNeedsBrowser(identity.id, command)) {
         const vars = browserEnvForRun(identity, runDir);
         ensureBrowserEnvDirs(vars);
         applyBrowserEnv(vars, process.env);
+        ensureAutoRecording(vars.AGENT_BROWSER, {}, process.env);
       }
       if (!(await dispatchExtra(identity.id, command, rest, dest, meta))) {
         usage(evidenceUsage(identity.id));
@@ -114,7 +133,8 @@ function evidenceUsage(id: Surface["identity"]["id"]): string {
   pie-verify web evidence snapshot <name>
   pie-verify web evidence url
   pie-verify web evidence side-effects
-  pie-verify web evidence note <text>`;
+  pie-verify web evidence note <text>
+  pie-verify web evidence pack-video <name>`;
     case "cli":
       return `Usage:
   pie-verify cli evidence path
@@ -129,7 +149,8 @@ function evidenceUsage(id: Surface["identity"]["id"]): string {
   pie-verify desktop evidence snapshot <name>
   pie-verify desktop evidence curl
   pie-verify desktop evidence side-effects
-  pie-verify desktop evidence note <text>`;
+  pie-verify desktop evidence note <text>
+  pie-verify desktop evidence pack-video <name>`;
     default: {
       const exhaustive: never = id;
       void exhaustive;
