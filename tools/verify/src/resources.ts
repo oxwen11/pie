@@ -11,12 +11,14 @@ import {
 import { Schema } from "effect";
 
 import { readRunMeta } from "./meta.ts";
+import { daemonPidPath, readDaemonRecord } from "./runtime/daemon.ts";
 import { evidenceDir } from "./runtime/evidence.ts";
 import { currentRun } from "./runtime/fs.ts";
 import { pidAlive, readPidFile, sleep } from "./runtime/process.ts";
 import type { Surface } from "./surface.ts";
 
 const RESOURCE_WAIT_MS = 25_000;
+const SAMPLE_INTERVAL_MS = 5_000;
 const STALL_MS = 16_000;
 const SOURCE_LIMIT_BYTES = 64 * 1024 * 1024;
 const FIXTURE_FILE_BYTES = 16 * 1024 * 1024 - 1024;
@@ -46,13 +48,13 @@ export async function verifyResources(surface: Surface, args: string[]): Promise
   const testCase = args[0] ?? "live";
   const result =
     testCase === "disabled"
-      ? verifyDisabled(meta.pieHome, daemonPid(meta, runDir))
+      ? await verifyDisabled(meta.pieHome, daemonPid(meta, runDir))
       : testCase === "live"
         ? await verifyLive(meta.pieHome, daemonPid(meta, runDir), meta.surface === "desktop")
         : testCase === "stall"
-          ? await verifyStall(meta.pieHome, daemonPid(meta, runDir))
+          ? await verifyStall(meta.pieHome, daemonPid(meta, runDir), meta.surface === "desktop")
           : testCase === "restart"
-            ? await verifyRestart(meta.pieHome, daemonPid(meta, runDir))
+            ? await verifyRestart(meta.pieHome, daemonPid(meta, runDir), meta.surface === "desktop")
             : testCase === "storage"
               ? await verifyStorage(meta.pieHome, daemonPid(meta, runDir))
               : undefined;
@@ -83,53 +85,58 @@ async function verifyLive(pieHome: string, processId: number, desktop: boolean) 
   }
   if (desktop) {
     const electron = snapshots.find((snapshot) => snapshot.source === "electron");
-    if (
-      !electron?.complete.some((round) => round.rows.some((row) => row.role === "electron-main"))
-    ) {
-      throw new Error("Electron samples do not contain electron-main");
+    const electronPid =
+      electron === undefined ? undefined : latestRolePid(electron, "electron-main");
+    if (electronPid === undefined || !pidAlive(electronPid)) {
+      throw new Error("Electron samples do not contain a live electron-main");
     }
+    requireRole(os, "electron-main", electronPid);
   }
   for (const snapshot of snapshots) validateMetrics(snapshot);
   return { case: "live", processId, sources: snapshots.map(summarize) };
 }
 
-async function verifyStall(pieHome: string, processId: number) {
+async function verifyStall(pieHome: string, processId: number, desktop: boolean) {
   if (process.platform === "win32") throw new Error("stall verification requires SIGSTOP");
-  const before = await waitForSources(
-    pieHome,
-    ["os", "daemon"],
-    (source) => source.complete.length > 0,
-  );
+  const required: Source[] = desktop ? ["os", "daemon", "electron"] : ["os", "daemon"];
+  const before = await waitForSources(pieHome, required, (source) => source.complete.length > 0);
   const beforeOs = count(before, "os");
   const beforeDaemon = count(before, "daemon");
+  const beforeElectron = count(before, "electron");
   process.kill(processId, "SIGSTOP");
   let during: SourceSnapshot[];
   try {
     await sleep(STALL_MS);
-    during = readSources(pieHome, ["os", "daemon"]);
+    during = readSources(pieHome, required);
   } finally {
     process.kill(processId, "SIGCONT");
   }
   const duringOs = count(during, "os");
   const duringDaemon = count(during, "daemon");
+  const duringElectron = count(during, "electron");
   if (duringOs <= beforeOs) throw new Error("OS samples did not continue while daemon was stopped");
   if (duringDaemon !== beforeDaemon)
     throw new Error("daemon runtime samples changed during SIGSTOP");
-  const after = await waitForSources(
-    pieHome,
-    ["os", "daemon"],
-    (source) => source.source !== "daemon" || source.complete.length > duringDaemon,
+  if (desktop && duringElectron <= beforeElectron) {
+    throw new Error("Electron samples did not continue while daemon was stopped");
+  }
+  const after = await waitForSources(pieHome, required, (source) =>
+    source.source === "daemon" ? source.complete.length > duringDaemon : true,
   );
   return {
     case: "stall",
     processId,
-    before: { os: beforeOs, daemon: beforeDaemon },
-    during: { os: duringOs, daemon: duringDaemon },
-    after: { os: count(after, "os"), daemon: count(after, "daemon") },
+    before: { os: beforeOs, daemon: beforeDaemon, electron: beforeElectron },
+    during: { os: duringOs, daemon: duringDaemon, electron: duringElectron },
+    after: {
+      os: count(after, "os"),
+      daemon: count(after, "daemon"),
+      electron: count(after, "electron"),
+    },
   };
 }
 
-async function verifyRestart(pieHome: string, processId: number) {
+async function verifyRestart(pieHome: string, processId: number, desktop: boolean) {
   const before = expectSource(
     await waitForSources(pieHome, ["os"], (source) => source.complete.length > 0),
     "os",
@@ -152,6 +159,12 @@ async function verifyRestart(pieHome: string, processId: number) {
   );
   const replacement = latestRolePid(after, "sidecar");
   requireRole(after, "daemon", processId);
+  if (desktop) {
+    const electron = expectSource(readSources(pieHome, ["electron"]), "electron");
+    const electronPid = latestRolePid(electron, "electron-main");
+    if (electronPid === undefined) throw new Error("Electron main pid not found after restart");
+    requireRole(after, "electron-main", electronPid);
+  }
   return {
     case: "restart",
     processId,
@@ -210,10 +223,47 @@ async function verifyStorage(pieHome: string, processId: number) {
   }
 }
 
-function verifyDisabled(pieHome: string, processId: number) {
+async function verifyDisabled(pieHome: string, processId: number) {
   const directory = path.join(pieHome, "logs", "resources");
   if (fs.existsSync(directory))
     throw new Error(`resource directory exists while disabled: ${directory}`);
+  requireNoSidecar(processId);
+
+  const sources: Source[] = ["os", "daemon", "electron"];
+  const fixtures = sources.map((source) => {
+    const sourceDirectory = path.join(directory, source);
+    fs.mkdirSync(sourceDirectory, { recursive: true, mode: 0o700 });
+    return writeHistoricalFixture(sourceDirectory, 6, 4 * 1024, source);
+  });
+  const before = fixtures.map((fixture) => ({
+    path: fixture,
+    bytes: fs.statSync(fixture).size,
+    modifiedAt: fs.statSync(fixture).mtimeMs,
+  }));
+  await sleep(SAMPLE_INTERVAL_MS + 1_000);
+  requireNoSidecar(processId);
+  for (const fixture of before) {
+    const current = fs.statSync(fixture.path);
+    if (current.size !== fixture.bytes || current.mtimeMs !== fixture.modifiedAt) {
+      throw new Error(`disabled monitoring changed historical fixture: ${fixture.path}`);
+    }
+  }
+  const files = sources.flatMap((source) =>
+    fs.readdirSync(path.join(directory, source)).map((name) => path.join(directory, source, name)),
+  );
+  const unexpected = files.filter((file) => !fixtures.includes(file));
+  if (unexpected.length > 0) {
+    throw new Error(`disabled monitoring created resource files: ${unexpected.join(", ")}`);
+  }
+  return {
+    case: "disabled",
+    processId,
+    freshHome: { resourceDirectory: "absent", sidecar: "absent" },
+    historicalHome: { fixtures: before, unchanged: true, sidecar: "absent" },
+  };
+}
+
+function requireNoSidecar(processId: number): void {
   const descendants = childProcess.spawnSync("pgrep", ["-P", String(processId)], {
     encoding: "utf8",
   });
@@ -226,7 +276,6 @@ function verifyDisabled(pieHome: string, processId: number) {
     if (command.includes("resource-monitor"))
       throw new Error(`sidecar ${pid} exists while disabled`);
   }
-  return { case: "disabled", processId, resourceDirectory: "absent", sidecar: "absent" };
 }
 
 async function waitForSources(
@@ -246,13 +295,18 @@ async function waitForSources(
   );
 }
 
-function writeHistoricalFixture(directory: string, daysAgo: number, targetBytes: number): string {
+function writeHistoricalFixture(
+  directory: string,
+  daysAgo: number,
+  targetBytes: number,
+  source: Source = "os",
+): string {
   const timestamp = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1_000).toISOString();
   const writer = { instanceId: crypto.randomUUID(), process: { pid: 1 } };
   const header = `${JSON.stringify({
     schemaVersion: 1,
     type: "file_start",
-    source: "os",
+    source,
     writer,
     writtenAt: timestamp,
     createdAt: timestamp,
@@ -261,7 +315,7 @@ function writeHistoricalFixture(directory: string, daysAgo: number, targetBytes:
   const status = `${JSON.stringify({
     schemaVersion: 1,
     type: "collector_status",
-    source: "os",
+    source,
     writer,
     writtenAt: timestamp,
     status: "stopped",
@@ -387,9 +441,9 @@ function validateMetrics(snapshot: SourceSnapshot): void {
           throw new Error(`invalid OS CPU for pid ${row.process.pid}`);
         }
       } else {
-        const rss = row.metrics.memory?.rssBytes;
-        if (rss === undefined || !Number.isFinite(rss) || rss <= 0) {
-          throw new Error(`invalid runtime RSS for pid ${row.process.pid}`);
+        const residentBytes = row.metrics.memory?.rssBytes ?? row.metrics.memory?.workingSetBytes;
+        if (residentBytes === undefined || !Number.isFinite(residentBytes) || residentBytes <= 0) {
+          throw new Error(`invalid runtime resident memory for pid ${row.process.pid}`);
         }
         if (row.metrics.cpu !== undefined && !Number.isFinite(row.metrics.cpu.percent)) {
           throw new Error(`invalid runtime CPU for pid ${row.process.pid}`);
@@ -447,7 +501,7 @@ function daemonPid(meta: ReturnType<typeof readRunMeta>, runDir: string): number
       ? readPidFile(path.join(runDir, "pids", "serve.pid"))
       : meta.surface === "web"
         ? readPidFile(path.join(runDir, "pids", "server.pid"))
-        : meta.daemonPid;
+        : readDaemonRecord(daemonPidPath(meta.pieHome)).pid;
   if (pid === undefined || !pidAlive(pid)) throw new Error("live server pid not found");
   return pid;
 }
