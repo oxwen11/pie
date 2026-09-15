@@ -17,6 +17,7 @@ import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
 import { ThemeProvider, useTheme } from "./theme-provider";
+import { useStable } from "./use-stable";
 
 declare global {
   interface ImportMetaEnv {
@@ -129,7 +130,7 @@ function ResolveLocalEnvironment({
   server?: ServerConnection;
   tokenHolder?: { current: string };
 }): ReactElement {
-  const [promise, _setPromise] = useState(() => loadEnvironmentId(server));
+  const promise = useStable(() => loadEnvironmentId(server));
   const environmentId = use(promise);
   return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }

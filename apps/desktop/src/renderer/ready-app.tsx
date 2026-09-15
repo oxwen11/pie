@@ -32,8 +32,12 @@ function KeyedApp({
   onReady: () => void;
 }): ReactElement {
   // One promise per mount. A new promise every render would re-suspend `use`.
-  const [promise, _setPromise] = useState(() => load());
-  const initial = use(promise);
+  const promise = useRef<Promise<ServerConnection> | null>(null);
+  /* oxlint-disable react/refs */
+  // react-doctor-disable-next-line no-ref-current-in-render
+  promise.current ??= load();
+  const initial = use(promise.current);
+  /* oxlint-enable react/refs */
   const [connection, setConnection] = useState(initial);
   const tokenHolder = useRef(initial.token);
 

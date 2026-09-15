@@ -178,13 +178,14 @@ export function makeDesktopApplication({
       const connection = yield* server.connection;
       const localPort = portFromHttpBaseUrl(connection.httpBaseUrl);
       if (localPort === null) {
-        return yield* new TailscaleCommandError({
+        yield* new TailscaleCommandError({
           command: ["tailscale", "serve"],
           exitCode: null,
           message: "The local pie daemon has no port to share over Tailscale.",
         });
+      } else {
+        yield* tailscale.enableServe(localPort);
       }
-      yield* tailscale.enableServe(localPort);
     }),
     disableTailscaleServe: tailscale.disableServe,
     quit,

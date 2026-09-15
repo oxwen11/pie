@@ -285,11 +285,11 @@ describe("DesktopSsh saved hosts", () => {
   it("returns the environment id from one GET after the tunnel is up", async () => {
     const originalFetch = globalThis.fetch;
     const calls: string[] = [];
-    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
+    globalThis.fetch = async (input: Parameters<typeof fetch>[0]) => {
       const url = String(input instanceof Request ? input.url : input);
       calls.push(url);
       return Response.json({ id: "env-from-get" });
-    }) as typeof fetch;
+    };
     try {
       const result = await withSsh((dir) =>
         Effect.gen(function* () {

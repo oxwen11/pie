@@ -41,7 +41,11 @@ export type TailscaleStatus = {
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  const record: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    record[key] = entry;
+  }
+  return record;
 }
 
 function stringField(record: Record<string, unknown>, key: string): string | null {

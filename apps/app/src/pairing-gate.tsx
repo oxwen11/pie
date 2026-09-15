@@ -12,6 +12,7 @@ import {
   writePairingSession,
   type StoredPairingSession,
 } from "./pairing-session";
+import { useStable } from "./use-stable";
 
 async function probeAccess(): Promise<{
   readonly mode: Awaited<ReturnType<typeof probePairingMode>>;
@@ -25,7 +26,7 @@ async function probeAccess(): Promise<{
 }
 
 export function PairingGate(): ReactElement {
-  const [probe, _setProbe] = useState(probeAccess);
+  const probe = useStable(() => probeAccess());
   const probed = use(probe);
   const [session, setSession] = useState(probed.session);
   const access = resolvePairingAccess(probed.mode, session);
