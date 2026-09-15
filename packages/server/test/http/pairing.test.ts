@@ -153,7 +153,7 @@ describe("createServer pairing absent", () => {
     const response = await fetch(`http://127.0.0.1:${String(port)}/api/pairing/exchange`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: "probe" }),
+      body: JSON.stringify({ code: "expired-code" }),
     });
     expect(response.status).toBe(404);
   });
