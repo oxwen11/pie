@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import path from "node:path";
 
 import {
   MAX_RESOURCE_CONTROL_ENTRIES,
@@ -10,16 +9,13 @@ import {
 import { logsDirectory, resourceSourceDirectory } from "@getpie/server/config/paths";
 import { resolvePieHome } from "@getpie/server/daemon";
 import {
-  NodeResourceWorkerLayer,
   openResourceWriter,
-  resolveResourceArtifacts,
   resolveResourceLoggingSetting,
   RESOURCE_SAMPLE_INTERVAL_MS,
 } from "@getpie/server/observability/resources";
 import { Effect, Layer, Ref } from "effect";
 import { app } from "electron";
 
-import { DesktopConfig } from "../desktop-config";
 import { LocalServer } from "../server/local-server";
 
 export const DesktopResourceMonitoringLive = Layer.effectDiscard(
@@ -34,24 +30,10 @@ export const DesktopResourceMonitoringLive = Layer.effectDiscard(
       return;
     }
 
-    const config = yield* DesktopConfig;
-    const artifacts = resolveResourceArtifacts({
-      fallbackDirectory: config.isPackaged
-        ? path.join(config.resourcesPath, "resources")
-        : undefined,
-    });
-    if (artifacts === undefined) {
-      yield* Effect.logWarning("Electron resource monitoring artifacts unavailable").pipe(
-        Effect.annotateLogs({ event: "resources.electron.artifacts_unavailable" }),
-      );
-      return;
-    }
-
     const server = yield* LocalServer;
     const writer = yield* openResourceWriter({
       directory: resourceSourceDirectory(logsDirectory(resolvePieHome()), "electron"),
       source: "electron",
-      workerEntry: artifacts.workerEntry,
     });
     const instanceId = crypto.randomUUID();
     const latestRegistration = yield* Ref.make<ElectronRegistration | undefined>(undefined);
@@ -135,7 +117,7 @@ export const DesktopResourceMonitoringLive = Layer.effectDiscard(
       ),
     ),
   ),
-).pipe(Layer.provide(NodeResourceWorkerLayer));
+);
 
 function sampleFromMetric(metric: Electron.ProcessMetric, windowMs: number): RuntimeSample {
   const role = roleFromMetric(metric);
