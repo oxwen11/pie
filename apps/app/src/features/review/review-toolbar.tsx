@@ -27,13 +27,10 @@ function GhostSelectTrigger({
     <SelectTrigger
       {...props}
       render={({ children: _children, className: _className, ...triggerProps }) => (
-        <Button
-          {...triggerProps}
-          className={cn("min-w-0 gap-1 px-2 font-normal", className)}
-          size="sm"
-          variant="ghost"
-        >
-          <SelectValue placeholder={placeholder} />
+        <Button {...triggerProps} className={cn("min-w-0", className)} size="sm" variant="ghost">
+          <span className="min-w-0 truncate font-normal">
+            <SelectValue placeholder={placeholder} />
+          </span>
           <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-70" />
         </Button>
       )}
