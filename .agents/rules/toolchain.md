@@ -20,9 +20,15 @@
   That file extends `ultracite/oxlint/{core,react,vitest}` and overlays pie
   plugins plus `oxlint.deferred.mts` (Ultracite rules not yet adopted).
   `@shadcn/lint` is registered in `jsPlugins` with `settings.shadcn` pointing
-  at `@getpie/ui/components` and `@getpie/ui/ai-elements`; no `shadcn/*`
-  rules are on yet. Both `components.json` files use those `@getpie/ui`
-  aliases so discovery does not look for a missing `@/components/ui`.
+  at `@getpie/ui/components` and `@getpie/ui/ai-elements`. `shadcn/no-restyle`
+  is `error` with `allow: ["layout"]` plus contracts for slot/chrome
+  primitives (Separator, Sidebar*, Collapsible*, …). CVA appearance
+  components (Button, Input, Textarea, …) stay on the default — use
+  `size`/`variant`, not padding or color classes. Tests and
+  `packages/ui` sources keep the rule off. Token rules
+  (`no-raw-colors`, `no-arbitrary-values`) are still off. Both
+  `components.json` files use those `@getpie/ui` aliases so discovery
+  does not look for a missing `@/components/ui`.
   Do not
   run `ultracite init` — it would overwrite AGENTS.md, editor settings, and
   oxfmt options. Plugin
