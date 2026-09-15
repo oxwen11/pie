@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import workerThreads from "node:worker_threads";
 
 import type {
   ResourceSampleRound,
@@ -9,6 +8,11 @@ import type {
 import { Effect, Scope } from "effect";
 
 import { RESOURCE_LINE_LIMIT_BYTES, RESOURCE_ROUND_LIMIT_BYTES } from "./config";
+import {
+  spawnResourceWorker,
+  type ResourceWorker,
+  type ResourceWorkerHandle,
+} from "./writer-runtime";
 
 export type WriterStatus = {
   readonly state: "starting" | "waiting-for-lock" | "available" | "paused" | "stopping" | "stopped";
@@ -65,32 +69,34 @@ export type OpenResourceWriterOptions = {
 
 export function openResourceWriter(
   options: OpenResourceWriterOptions,
-): Effect.Effect<ResourceWriter, Error, Scope.Scope> {
+): Effect.Effect<ResourceWriter, Error, Scope.Scope | ResourceWorker> {
   return Effect.acquireRelease(
-    Effect.try({
-      try: () => makeResourceWriter(options),
-      catch: (cause) => new Error("failed to start resource writer", { cause }),
+    Effect.gen(function* () {
+      const writerIdentity: ResourceWriterIdentity = {
+        instanceId: crypto.randomUUID(),
+        process: { pid: process.pid },
+      };
+      const worker = yield* spawnResourceWorker({
+        entry: options.workerEntry,
+        data: {
+          directory: options.directory,
+          source: options.source,
+          writer: writerIdentity,
+        },
+        execArgv: options.workerExecArgv,
+      });
+      return makeResourceWriter(worker, writerIdentity);
     }),
     ({ close }) => Effect.promise(close).pipe(Effect.ignore),
   );
 }
 
-function makeResourceWriter(options: OpenResourceWriterOptions): ResourceWriter & {
+function makeResourceWriter(
+  worker: ResourceWorkerHandle,
+  writerIdentity: ResourceWriterIdentity,
+): ResourceWriter & {
   readonly close: () => Promise<void>;
 } {
-  const writerIdentity: ResourceWriterIdentity = {
-    instanceId: crypto.randomUUID(),
-    process: { pid: process.pid },
-  };
-  const worker = new workerThreads.Worker(options.workerEntry, {
-    workerData: {
-      directory: options.directory,
-      source: options.source,
-      writer: writerIdentity,
-    } satisfies ResourceWriterWorkerData,
-    execArgv: options.workerExecArgv === undefined ? undefined : [...options.workerExecArgv],
-  });
-
   let state: WriterStatus["state"] = "starting";
   let reason: string | undefined;
   let sampleSequence = 0;
@@ -101,21 +107,23 @@ function makeResourceWriter(options: OpenResourceWriterOptions): ResourceWriter 
   let closePromise: Promise<void> | undefined;
   let resolveClose: (() => void) | undefined;
 
-  worker.on("message", (message: WorkerOutput) => {
-    switch (message.type) {
+  worker.onMessage((message) => {
+    const output = readWorkerOutput(message);
+    if (output === undefined) return;
+    switch (output.type) {
       case "status":
-        state = message.state;
-        reason = message.reason;
+        state = output.state;
+        reason = output.reason;
         break;
       case "written":
         inFlight = false;
-        lastWrittenAt = message.writtenAt;
-        droppedRounds -= message.droppedRounds;
+        lastWrittenAt = output.writtenAt;
+        droppedRounds -= output.droppedRounds;
         break;
       case "failed":
         inFlight = false;
         state = "paused";
-        reason = message.reason;
+        reason = output.reason;
         break;
       case "stopped":
         state = "stopped";
@@ -123,12 +131,12 @@ function makeResourceWriter(options: OpenResourceWriterOptions): ResourceWriter 
         break;
     }
   });
-  worker.on("error", () => {
+  worker.onError(() => {
     state = "paused";
     reason = "worker-error";
     inFlight = false;
   });
-  worker.on("exit", () => {
+  worker.onExit(() => {
     if (state !== "stopped") {
       state = "stopped";
       reason ??= "worker-exited";
@@ -160,7 +168,7 @@ function makeResourceWriter(options: OpenResourceWriterOptions): ResourceWriter 
         sampledAt: sample.sampledAt,
         droppedRounds: submittedDrops,
       };
-      worker.postMessage(message, []);
+      worker.post(message);
       return true;
     },
     status: () =>
@@ -177,12 +185,26 @@ function makeResourceWriter(options: OpenResourceWriterOptions): ResourceWriter 
         resolveClose = resolve;
         const timeout = setTimeout(() => void worker.terminate().then(() => resolve()), 5_000);
         timeout.unref();
-        worker.once("exit", () => clearTimeout(timeout));
-        worker.postMessage({ type: "stop", droppedRounds } satisfies WorkerInput, []);
+        worker.onExit(() => clearTimeout(timeout));
+        worker.post({ type: "stop", droppedRounds } satisfies WorkerInput);
       });
       return closePromise;
     },
   };
+}
+
+function readWorkerOutput(message: unknown): WorkerOutput | undefined {
+  if (typeof message !== "object" || message === null || !("type" in message)) return undefined;
+  if (
+    message.type === "status" ||
+    message.type === "written" ||
+    message.type === "failed" ||
+    message.type === "stopped"
+  ) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- type already narrowed to WorkerOutput tags
+    return message as WorkerOutput;
+  }
+  return undefined;
 }
 
 function encodeRound(

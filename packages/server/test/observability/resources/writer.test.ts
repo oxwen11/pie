@@ -10,6 +10,7 @@ import {
   openResourceWriter,
   type ResourceWriter,
 } from "../../../src/observability/resources/writer";
+import { NodeResourceWorkerLayer } from "../../../src/observability/resources/writer-runtime";
 
 const homes: string[] = [];
 const workerEntry = new URL(
@@ -72,7 +73,7 @@ describe("resource writer", () => {
             waitFor(writer, () => writer.status().lastWrittenAt !== undefined),
           );
         }),
-      ),
+      ).pipe(Effect.provide(NodeResourceWorkerLayer)),
     );
 
     const entries = await fs.readdir(directory);
@@ -138,7 +139,7 @@ describe("resource writer", () => {
             );
           }
         }),
-      ),
+      ).pipe(Effect.provide(NodeResourceWorkerLayer)),
     );
 
     const entries = await fs.readdir(directory);
