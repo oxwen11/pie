@@ -783,55 +783,53 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
-  it.effect(
-    "compensates a harness-rejected prompt: rejected event follows, no retained phantom",
-    () =>
-      Effect.gen(function* () {
-        const result = yield* run({ turn: "open", promptFails: true }, (fixture) =>
-          Effect.gen(function* () {
-            const { ref } = yield* fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-            });
-            return yield* Effect.scoped(
-              Effect.gen(function* () {
-                const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
-                const prompt = yield* Effect.exit(
-                  fixture.service.prompt({
-                    ref,
-                    parts: [{ type: "text", text: "loser prompt" }],
-                    messageId: "loser-msg",
-                  }),
-                );
-                yield* Effect.yieldNow;
-                const items = yield* Stream.runCollect(
-                  Stream.take(
-                    Stream.filter(
-                      stream,
-                      (item) =>
-                        item.type === "event" &&
-                        (item.event.type === "session.prompt.submitted" ||
-                          item.event.type === "session.prompt.rejected"),
-                    ),
-                    2,
+  it.effect("broadcasts only rejection when the harness rejects before starting", () =>
+    Effect.gen(function* () {
+      const result = yield* run({ turn: "open", promptFails: true }, (fixture) =>
+        Effect.gen(function* () {
+          const { ref } = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: "/tmp/pie-app",
+          });
+          return yield* Effect.scoped(
+            Effect.gen(function* () {
+              const stream = yield* fixture.bus.subscribe({ kind: "session", ref });
+              const prompt = yield* Effect.exit(
+                fixture.service.prompt({
+                  ref,
+                  parts: [{ type: "text", text: "loser prompt" }],
+                  messageId: "loser-msg",
+                }),
+              );
+              yield* Effect.yieldNow;
+              const items = yield* Stream.runCollect(
+                Stream.take(
+                  Stream.filter(
+                    stream,
+                    (item) =>
+                      item.type === "event" &&
+                      (item.event.type === "session.prompt.submitted" ||
+                        item.event.type === "session.prompt.rejected"),
                   ),
-                );
-                const snapshot = yield* fixture.service.getSnapshot(ref);
-                return {
-                  prompt,
-                  broadcast: Array.from(items).map((item) =>
-                    item.type === "event" ? item.event.type : item.type,
-                  ),
-                  activePrompt: snapshot.activePrompt,
-                };
-              }),
-            );
-          }),
-        );
-        assert.equal(result.prompt._tag, "Failure");
-        assert.deepEqual(result.broadcast, ["session.prompt.submitted", "session.prompt.rejected"]);
-        assert.equal(result.activePrompt, null);
-      }),
+                  1,
+                ),
+              );
+              const snapshot = yield* fixture.service.getSnapshot(ref);
+              return {
+                prompt,
+                broadcast: Array.from(items).map((item) =>
+                  item.type === "event" ? item.event.type : item.type,
+                ),
+                activePrompt: snapshot.activePrompt,
+              };
+            }),
+          );
+        }),
+      );
+      assert.equal(result.prompt._tag, "Failure");
+      assert.deepEqual(result.broadcast, ["session.prompt.rejected"]);
+      assert.equal(result.activePrompt, null);
+    }),
   );
 
   it.effect("mints a messageId when the prompt carries none", () =>

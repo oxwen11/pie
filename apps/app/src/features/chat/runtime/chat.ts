@@ -178,8 +178,8 @@ export class Chat {
           this.#state.error = undefined;
         }
         break;
-      // The server rejected a prompt whose submitted event already broadcast:
-      // drop the phantom user message (the sender's optimistic copy included).
+      // The server rejected the prompt before it started: drop the sender's
+      // optimistic user message. Other clients normally never saw it.
       case "session.prompt.rejected":
         this.#state.messages = this.#state.messages.filter(
           (message) => message.id !== event.messageId,
@@ -625,10 +625,13 @@ export class Chat {
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
-      await this.#transport.prompt({
+      const receipt = await this.#transport.prompt({
         messageId,
         parts,
       });
+      if (!receipt.started) {
+        this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      }
     } catch (promptError) {
       this.#state.error =
         promptError instanceof Error ? promptError : new Error(String(promptError));
