@@ -435,7 +435,10 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       Effect.map((status) => {
                         if (status.activeTurnId === undefined) return messages;
                         for (let index = messages.length - 1; index >= 0; index -= 1) {
-                          if (messages[index]?.role === "user") return messages.slice(0, index);
+                          const message = messages[index];
+                          if (message?.parts.some((part) => part.type === "data-compaction"))
+                            return messages.slice(0, index + 1);
+                          if (message?.role === "user") return messages.slice(0, index);
                         }
                         return messages;
                       }),

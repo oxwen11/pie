@@ -300,6 +300,9 @@ export const makePiProcessWithDependencies = <R>(
               );
             if (compacted && history) {
               session.entryCursor = compacted.id;
+              // Apply the same boundary to the live transform before routing
+              // any later native event (the generator has no output here).
+              Array.from(session.transform(event));
               result = {
                 outcome: "completed",
                 messages: entriesToUIMessages(history.entries, compacted.id, session.sessionId),

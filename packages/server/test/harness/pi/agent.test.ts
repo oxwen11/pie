@@ -25,6 +25,7 @@ const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", pr
 const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
+let entries = [];
 let steering = [];
 let followUp = [];
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
@@ -45,7 +46,7 @@ if (providerFlag !== -1 && modelFlag !== -1) {
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
-  if (msg.type === "get_entries") { send({ id: msg.id, type: "response", command: "get_entries", success: true, data: { entries: [], leafId: null } }); return; }
+  if (msg.type === "get_entries") { send({ id: msg.id, type: "response", command: "get_entries", success: true, data: { entries, leafId: entries.at(-1)?.id ?? null } }); return; }
   if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: availableModels } }); return; }
   if (msg.type === "set_model") {
     const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);
@@ -131,6 +132,22 @@ rl.on("line", (line) => {
     return;
   }
   if (text === "confirm") { holding = true; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
+  if (text === "compact") {
+    const entry = (id, parentId, message) => ({ type: "message", id, parentId, timestamp: "t", message });
+    const compact = { type: "compaction", id: "compact", parentId: "kept", timestamp: "t", summary: "earlier work", firstKeptEntryId: "kept", tokensBefore: 100 };
+    entries = [entry("old", null, { role: "user", content: "old", timestamp: 0 }), entry("kept", "old", { role: "user", content: "recent", timestamp: 0 }), compact];
+    send({ type: "compaction_start", reason: "overflow" });
+    send({ type: "compaction_end", reason: "overflow", result: { summary: compact.summary, firstKeptEntryId: "kept", tokensBefore: 100 }, aborted: false, willRetry: true });
+    // Deliberately append/stream before the get_entries response: reset must
+    // still stop at the compaction entry, not incorporate this future tail.
+    entries.push(entry("tail", "compact", assistant({ content: [{ type: "text", text: "after" }] })));
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "after" });
+    upd({ type: "text_end", contentIndex: 0, content: "after" });
+    holding = true;
+    return;
+  }
   if (text === "tool") {
     send({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls" } });
     send({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", result: { content: [{ type: "text", text: "ok" }] }, isError: false });
@@ -655,6 +672,47 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       });
       yield* session.close;
     }),
+  );
+
+  it.effect(
+    "resets at compaction_end before the same turn continues, excluding future history",
+    () =>
+      Effect.gen(function* () {
+        const executable = fakeExecutable();
+        const agent = yield* makePiProcess({ executable });
+        const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+        const collected = yield* Effect.forkChild(
+          Stream.runCollect(
+            session.events.pipe(Stream.takeUntil((event) => event.body.type === "text-end")),
+          ),
+        );
+        yield* session.prompt({ parts: [{ type: "text", text: "compact" }] });
+        const events = Array.from(yield* Fiber.join(collected), (e) => e.body);
+        assert.deepEqual(
+          events.map((e) => e.type),
+          [
+            "session.turn.started",
+            "start",
+            "session.compaction.started",
+            "session.compaction.ended",
+            "start",
+            "text-start",
+            "text-delta",
+            "text-end",
+          ],
+        );
+        const ended = events.find((e) => e.type === "session.compaction.ended");
+        assert.equal(ended?.type, "session.compaction.ended");
+        if (ended?.type === "session.compaction.ended" && ended.result.outcome === "completed") {
+          assert.deepEqual(
+            ended.result.messages.map((m) => m.id),
+            ["kept", "compact"],
+          );
+        } else assert.fail("missing reset");
+        const starts = events.filter((e) => e.type === "start");
+        assert.notEqual(starts[0]?.messageId, starts[1]?.messageId);
+        yield* session.close;
+      }),
   );
 
   it.effect("reports a child crash while the adapter session is idle", () =>
