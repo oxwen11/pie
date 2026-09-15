@@ -24,14 +24,18 @@
   is `error` with `allow: ["layout"]` plus contracts for slot/chrome
   primitives (Separator, Sidebar*, Collapsible*, …). CVA appearance
   components (Button, Input, Textarea, …) stay on the default — use
-  `size`/`variant`, not padding or color classes.   `shadcn/no-raw-colors`
+  `size`/`variant`, not padding or color classes. `shadcn/no-raw-colors`
   is `error` everywhere except tests (keep it on in `packages/ui`,
   with three pre-existing presentation files off). Theme discovery
   follows `@import` from `apps/app/src/index.css` into
   `packages/ui/src/globals.css`. `@shadcn/lint@0.1.0` is patched
   (`patches/@shadcn__lint@0.1.0.patch`) so quoted `@source
-  ".../dist/*.js"` globs are not treated as CSS comments. `no-arbitrary-values`
-  is still off. Both `components.json` files use those `@getpie/ui`
+  ".../dist/*.js"` globs are not treated as CSS comments.
+  `shadcn/no-arbitrary-values` is `error` with `allow: ["layout"]`
+  plus exact chrome exceptions (shell card elevation, separator
+  `transition-[opacity,width]`). Off in tests and `packages/ui`
+  (structural values such as `ring-[3px]`). Both `components.json`
+  files use those `@getpie/ui`
   aliases so discovery does not look for a missing `@/components/ui`.
   Do not
   run `ultracite init` — it would overwrite AGENTS.md, editor settings, and
