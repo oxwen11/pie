@@ -12,7 +12,7 @@ import { extraEvidence as cliExtra } from "../surfaces/cli.ts";
 import { extraEvidence as desktopExtra } from "../surfaces/desktop.ts";
 import { extraEvidence as webExtra } from "../surfaces/web.ts";
 import { doctorReport } from "./doctor.ts";
-import { browserEnvForRun } from "./env.ts";
+import { browserEnvForRun, rotateAutoRecordingForRun } from "./env.ts";
 
 /** Evidence subcommands that shell out to agent-browser. */
 const BROWSER_EVIDENCE_COMMANDS: ReadonlySet<string> = new Set(["screenshot", "snapshot", "url"]);
@@ -58,6 +58,7 @@ export async function evidence(surface: Surface, args: string[]): Promise<void> 
       console.log(dest);
       return;
     case "init":
+      rotateAutoRecordingForRun(identity, runDir);
       stampEvidence(dest, runDir, await doctorReport(surface));
       if (meta.surface === "cli" || meta.surface === "desktop") {
         const record = daemonPidPath(meta.pieHome);

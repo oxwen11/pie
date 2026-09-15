@@ -129,7 +129,7 @@ Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof 
 
 ```bash
 pnpm exec pie-verify web evidence init
-agent-browser open http://localhost:4190/ # starts recording.webm automatically at 60 fps
+agent-browser open http://localhost:4190/ # starts recording-001.webm automatically at 60 fps
 pnpm exec pie-verify web evidence snapshot before
 pnpm exec pie-verify web evidence screenshot before
 # …drive; do not call agent-browser record…
@@ -137,12 +137,12 @@ pnpm exec pie-verify web evidence snapshot after
 pnpm exec pie-verify web evidence screenshot after
 pnpm exec pie-verify web evidence url
 pnpm exec pie-verify web evidence side-effects
-pnpm exec pie-verify web evidence note "recording.webm: what the clip shows"
+pnpm exec pie-verify web evidence note "recording-001.webm: what the clip shows"
 ```
 
 Standards:
 
-- **Screenshots and video are both mandatory** (UI rule). Name screenshots after the feature. The Verify shim owns one automatic `recording.webm` at 60 fps; do not manage recording commands yourself.
+- **Screenshots and video are both mandatory** (UI rule). Name screenshots after the feature. The Verify shim owns numbered 60 fps recordings; run `evidence init` before each validation to finish the current clip and select the next. Do not manage recording commands yourself.
 - Exercise the real user path (sidebar / empty state / composer), not a test-only HTTP method and not a hand-edited `projects.json`.
 - Capture **the action and the resulting state**, not only the last screenshot.
 - Confirm side effects on disk:
@@ -172,7 +172,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
-| `recording.webm` | Automatic 60 fps video under `evidence path`; cleanup stops and flushes it. |
+| `recording-<NNN>.webm` | Automatic 60 fps videos under `evidence path`; each `evidence init` advances the number. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 
 ## Isolate

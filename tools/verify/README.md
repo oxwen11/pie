@@ -37,9 +37,10 @@ After launch, **drive with `agent-browser`**. Launch writes a native env file
 (`session`, `namespace`, sockets, screenshots/downloads, idle timeout off,
 plus Chrome args for web or CDP + `PIN_TAB` for desktop). The repo shim
 (`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads that
-env, ensures one run-local `recording.webm` is active at 60 fps, then forwards
-your command unchanged to the mise-managed agent-browser 0.37.1. Cleanup stops
-and flushes the recording. Always pass an explicit `open` URL. `web env` / `desktop env` remain an
+env, ensures one numbered run-local recording is active at 60 fps, then
+forwards your command unchanged to the mise-managed agent-browser 0.37.1.
+Each `evidence init` stops the current clip and selects the next number; cleanup
+stops and flushes the current recording. Always pass an explicit `open` URL. `web env` / `desktop env` remain an
 optional dump. `cli` has no page.
 
 Cold-start recipes and feature maps stay in the skill trees

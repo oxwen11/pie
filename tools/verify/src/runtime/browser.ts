@@ -152,7 +152,9 @@ export function stopAutoRecording(
   if (output === undefined || !fs.existsSync(output)) return undefined;
   const result = runCommand(command, buildAgentBrowserArgv(["record", "stop"], target), { env });
   const message = `${result.stderr}\n${result.stdout}`.trim();
-  return result.status === 0 || message.includes("No recording in progress")
+  return result.status === 0 ||
+    message.includes("No recording in progress") ||
+    message.includes("No frames captured")
     ? undefined
     : message || `automatic agent-browser recording stop exited ${result.status}`;
 }
