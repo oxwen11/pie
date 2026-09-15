@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  probePairingMode,
+  readPairingMode,
   resolvePairingAccess,
   validateStoredPairingSession,
 } from "./pairing-mode";
@@ -23,7 +23,7 @@ describe("resolvePairingAccess", () => {
   });
 });
 
-describe("probePairingMode", () => {
+describe("readPairingMode", () => {
   it("treats GET /api/environment 200 as unauthenticated serve", async () => {
     const calls: Array<{ url: string; method: string }> = [];
     const fetchImpl: typeof fetch = async (input, init) => {
@@ -34,13 +34,13 @@ describe("probePairingMode", () => {
       });
       return Response.json({ id: "env-1" });
     };
-    await expect(probePairingMode(fetchImpl)).resolves.toBe("open");
+    await expect(readPairingMode(fetchImpl)).resolves.toBe("open");
     expect(calls).toEqual([{ url: "/api/environment", method: "GET" }]);
   });
 
   it("treats GET /api/environment 401 as pairing required", async () => {
     const required: typeof fetch = async () => new Response("Unauthorized", { status: 401 });
-    await expect(probePairingMode(required)).resolves.toBe("required");
+    await expect(readPairingMode(required)).resolves.toBe("required");
   });
 });
 
