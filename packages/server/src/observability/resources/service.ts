@@ -62,7 +62,6 @@ export const ResourceMonitoringLayer = Layer.effect(
     const writer = yield* openResourceWriter({
       directory: resourceSourceDirectory(paths.logsDir, "daemon"),
       source: "daemon",
-      workerEntry: artifacts.workerEntry,
     });
     const monitor = yield* openResourceMonitor({
       command: artifacts.monitorCommand,
