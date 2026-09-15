@@ -7,9 +7,11 @@ import { layer } from "@effect/vitest";
 import { Effect, FileSystem, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-const bundle = url.fileURLToPath(new URL("../../../dist/pi-rpc/pi-rpc.js", import.meta.url));
+const bundle = url.fileURLToPath(
+  new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
+);
 
-layer(NodeServices.layer)("Pi RPC bundle", (it) => {
+layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) => {
   for (const provider of ["xai", "amazon-bedrock"]) {
     it.effect(`loads the bundled ${provider} authentication and model implementation`, () =>
       Effect.gen(function* () {
