@@ -1,5 +1,6 @@
 "use client";
 
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { Button } from "@getpie/ui/components/button";
 import {
   Combobox,
@@ -8,7 +9,6 @@ import {
   ComboboxGroup,
   ComboboxGroupLabel,
   ComboboxInput,
-  ComboboxItem,
   ComboboxList,
   ComboboxPopup,
   ComboboxTrigger,
@@ -74,19 +74,19 @@ export const ModelSelectorCollection = ComboboxCollection;
 
 export const ModelSelectorValue = ComboboxValue;
 
-export type ModelSelectorItemProps = ComponentProps<typeof ComboboxItem>;
+export type ModelSelectorItemProps = ComboboxPrimitive.Item.Props;
 
 export const ModelSelectorItem = ({ className, children, ...props }: ModelSelectorItemProps) => (
-  <ComboboxItem
+  <ComboboxPrimitive.Item
     className={cn(
-      "data-selected:bg-accent data-selected:text-accent-foreground grid-cols-1 [&>:first-child]:hidden [&>:last-child]:col-start-1",
+      "data-highlighted:bg-accent data-highlighted:text-accent-foreground data-selected:bg-accent data-selected:text-accent-foreground flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-base outline-none in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
       className,
     )}
     data-slot="model-selector-item"
     {...props}
   >
     <span className="flex min-w-0 items-center gap-2">{children}</span>
-  </ComboboxItem>
+  </ComboboxPrimitive.Item>
 );
 
 export type ModelSelectorLogoProps = Omit<ComponentProps<"img">, "src" | "alt"> & {
