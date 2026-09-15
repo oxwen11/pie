@@ -9,7 +9,7 @@ import type { AppClients } from "./lib/orpc";
 import { routeTree } from "./routeTree.gen";
 
 /** TanStack installs a CatchBoundary on every match when this is set. Re-throw
- *  so child-route errors surface on the root error page instead of the stock
+ *  so route errors reach AppInterface's ErrorBoundary instead of the stock
  *  "Something went wrong!" fallback. */
 function BubbleRouteError({ error }: ErrorComponentProps): ReactNode {
   throw error;
