@@ -8,6 +8,7 @@ import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useMemo } from "react";
 
 import { AssistantMessage } from "./assistant-message";
+import { CompactionMarker } from "./compaction-marker";
 import { isChildToolPart } from "./tool/bucket";
 import { UserMessage } from "./user-message";
 
@@ -20,6 +21,17 @@ export function MessageView({
   message: UIMessage;
   isStreaming: boolean;
 }) {
+  const compaction = message.parts.find((part) => part.type === "data-compaction");
+  if (
+    compaction &&
+    "data" in compaction &&
+    typeof compaction.data === "object" &&
+    compaction.data !== null &&
+    "summary" in compaction.data &&
+    typeof compaction.data.summary === "string"
+  ) {
+    return <CompactionMarker summary={compaction.data.summary} />;
+  }
   if (message.role === "assistant") {
     return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
   }
