@@ -75,7 +75,7 @@ export function PlanRequestView({
         <pre className="text-foreground text-sm whitespace-pre-wrap">{request.plan}</pre>
       </div>
 
-      <div className="border-border/50 space-y-3 border-t px-3 py-3">
+      <div className="border-border/50 space-y-3 border-t p-3">
         <p className="text-foreground text-sm font-medium">Ready to implement?</p>
 
         <RadioGroup
@@ -121,7 +121,7 @@ export function PlanRequestView({
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="What should change?"
-            className="min-h-16 text-sm"
+            className="min-h-16"
           />
         )}
 

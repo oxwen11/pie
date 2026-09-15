@@ -1,5 +1,4 @@
 import { Button } from "@getpie/ui/components/button";
-import { cn } from "@getpie/ui/lib/utils";
 import { PanelRightIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
@@ -25,7 +24,8 @@ export function ContentPanelToggle({ className, ...props }: ContentPanelTogglePr
       size="icon-xs"
       aria-label="Toggle content panel"
       aria-pressed={presentation !== "hidden"}
-      className={cn(presentation !== "hidden" && "bg-accent", className)}
+      data-pressed={presentation !== "hidden" ? "" : undefined}
+      className={className}
       onClick={() => session.toggleVisibility()}
       {...props}
     >

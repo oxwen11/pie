@@ -13,8 +13,8 @@ export default defineConfig({
       rename: "client",
     },
     {
-      from: "../server/dist/pi-rpc",
-      to: "dist/pi-rpc",
+      from: "../server/dist/pi-process/pi-process.js",
+      to: "dist/pi-process",
     },
   ],
   deps: {
@@ -25,7 +25,7 @@ export default defineConfig({
       "effect",
       "@effect/platform-node-shared",
       "@effect/platform-node",
-      "@standardserver/shared",
+      "@standard-server/shared",
       "@orpc/experimental-effect",
       "simple-git",
       /^@simple-git\//,

@@ -49,10 +49,10 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
       assert.deepEqual(bases, ["main"]);
       assert.deepEqual(result.created.workspace, {
         cwd: "/tmp/pie-worktree",
-        gitBranch: "pie/abcd1234",
+        worktree: { branch: "pie/abcd1234" },
       });
       assert.equal(result.afterCreate.cwd, "/tmp/pie-worktree");
-      assert.equal(result.afterCreate.gitBranch, "pie/abcd1234");
+      assert.deepEqual(result.afterCreate.worktree, { branch: "pie/abcd1234" });
       assert.deepEqual(result.open, [{ cwd: "/tmp/pie-worktree" }]);
     }),
   );
@@ -104,7 +104,30 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
       );
       assert.deepEqual(stored.created.workspace, { cwd: "/tmp/pie-app" });
       assert.equal(stored.afterPrompt.cwd, "/tmp/pie-app");
-      assert.equal(stored.afterPrompt.gitBranch, undefined);
+      assert.equal(stored.afterPrompt.worktree, undefined);
+    }),
+  );
+
+  it.effect("prepare returns the stored worktree workspace without recreating it", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          worktreeCreate: () =>
+            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            });
+            yield* fixture.service.archive(created.ref, true);
+            const workspace = yield* fixture.service.prepare(created.ref);
+            return { created, workspace };
+          }),
+      );
+      assert.deepEqual(result.workspace, result.created.workspace);
     }),
   );
 

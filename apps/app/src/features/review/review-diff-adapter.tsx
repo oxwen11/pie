@@ -73,7 +73,7 @@ export function ReviewDiffAdapter({
     getAppThemeType,
     () => "light" as const,
   );
-  const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
+  const codeViewRef = useRef<CodeViewHandle<undefined, undefined>>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [appliedLocate, setAppliedLocate] = useState(locateRequest);
   if (locateRequest !== appliedLocate) {
@@ -89,7 +89,7 @@ export function ReviewDiffAdapter({
     [diffs],
   );
 
-  const items = useMemo<ReadonlyArray<CodeViewItem>>(
+  const items = useMemo<ReadonlyArray<CodeViewItem<undefined>>>(
     () =>
       fileDiffs.map(({ path, fileDiff }) => ({
         id: path,
@@ -100,7 +100,7 @@ export function ReviewDiffAdapter({
     [collapsed, fileDiffs],
   );
 
-  const options = useMemo<CodeViewReactOptions>(
+  const options = useMemo<CodeViewReactOptions<undefined, undefined>>(
     () => ({
       overflow: "scroll",
       stickyHeaders: true,

@@ -1,6 +1,6 @@
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
 import { isDynamicPiTool } from "./tools";
-import { toolResultText } from "./transform";
+import { stripReadDetailsContent, toolResultText } from "./transform";
 import type { PiMetadata, PiUIMessage } from "./ui-message";
 
 // Pi session-file entries → final-form UIMessages, the history counterpart of
@@ -114,17 +114,22 @@ function callPart(call: PendingCall): PiUIMessagePart {
 }
 
 function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessagePart {
-  // isError lives in the part state, mirroring the live path where it is a
-  // sibling of `tool_execution_end.result` — the output stays result-shaped.
-  // oxlint-disable-next-line typescript/no-unsafe-assignment -- Pi toolResult content/details are untyped JSON
-  const output = { content: result.content, details: result.details };
+  const details: unknown = result.details;
+  const output =
+    call.toolName === "read" && !result.isError
+      ? { content: [], details: stripReadDetailsContent(details) }
+      : { content: result.content, details };
   const settled = result.isError
     ? {
         state: "output-error" as const,
         input: call.input,
         errorText: toolResultText(output) || "Tool execution failed",
       }
-    : { state: "output-available" as const, input: call.input, output };
+    : {
+        state: "output-available" as const,
+        input: call.input,
+        output,
+      };
   if (isDynamicPiTool(call.toolName)) {
     return {
       type: "dynamic-tool",

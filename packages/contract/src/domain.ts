@@ -488,7 +488,7 @@ export const SessionCapabilitiesSchema = Schema.Struct({
 export type SessionCapabilities = typeof SessionCapabilitiesSchema.Type;
 
 // ---------------------------------------------------------------------------
-// Agent model (owned by Pi; queried via the live RPC child)
+// Agent model (owned by Pi; queried via live pie-pi-process)
 // ---------------------------------------------------------------------------
 
 export const AgentModelSchema = Schema.Struct({
@@ -575,7 +575,7 @@ export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 /** Absolute directory Pi runs in for one session. */
 export const SessionWorkspaceSchema = Schema.Struct({
   cwd: Schema.String,
-  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
+  worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.NonEmptyString })),
 });
 export type SessionWorkspace = typeof SessionWorkspaceSchema.Type;
 

@@ -1,7 +1,6 @@
 import path from "node:path";
 
 import { Context, Crypto, Effect, Encoding, FileSystem, Layer } from "effect";
-import { simpleGit } from "simple-git";
 
 import { Paths } from "../config/paths";
 import {
@@ -64,7 +63,7 @@ export const WorktreeServiceLayer: Layer.Layer<
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Paths;
     const crypto = yield* Crypto.Crypto;
-    const { readError, gitError, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
+    const { readError, raw, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
 
     const generateWorktreeKey = (): Effect.Effect<string> =>
       Effect.gen(function* () {
@@ -133,12 +132,12 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
         yield* fs
           .makeDirectory(path.dirname(worktreePath), { recursive: true })
-          .pipe(Effect.mapError(readError(worktreePath)));
-        yield* Effect.tryPromise({
-          try: () =>
-            simpleGit(repoRoot).raw(["worktree", "add", "-b", branch, worktreePath, startPoint]),
-          catch: gitError(realRoot),
-        });
+          .pipe(
+            Effect.mapError(readError(worktreePath)),
+            Effect.andThen(
+              raw(repoRoot, ["worktree", "add", "-b", branch, worktreePath, startPoint]),
+            ),
+          );
         return { path: worktreePath, branch };
       }),
 
@@ -154,10 +153,7 @@ export const WorktreeServiceLayer: Layer.Layer<
           return yield* new WorkspacePathEscape({ cwd: paths.worktreesDir, path: worktreePath });
         }
         const repoRoot = yield* resolveRepoRoot(realPath);
-        yield* Effect.tryPromise({
-          try: () => simpleGit(repoRoot).raw(["worktree", "remove", "--force", realPath]),
-          catch: gitError(realPath),
-        });
+        yield* raw(repoRoot, ["worktree", "remove", "--force", realPath]);
         return undefined;
       }),
     };

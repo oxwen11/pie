@@ -6,18 +6,18 @@ import { Effect, FileSystem } from "effect";
 
 import { findExecutable, type FindExecutableDeps } from "../executable";
 
-/** How the server spawns the Pi RPC child. */
+/** How the server spawns pie-pi-process. */
 export type PiExecutable = {
   readonly command: string;
   readonly prefixArgs: ReadonlyArray<string>;
 };
 
 export type ResolvePiExecutableOptions = {
-  /** Test seam — production uses {@link resolvePiRpcEntry}. */
+  /** Test seam — production uses {@link resolvePiePiProcessEntry}. */
   readonly resolveBundledCli?: () => string | undefined;
 };
 
-const JS_CLI_ENTRY = /\.[cm]?js$/i;
+const JS_PROCESS_ENTRY = /\.[cm]?js$/i;
 
 const ASAR_SEGMENT = `${path.sep}app.asar${path.sep}`;
 const ASAR_UNPACKED_SEGMENT = `${path.sep}app.asar.unpacked${path.sep}`;
@@ -53,11 +53,14 @@ const resolvedPackageFile = (specifier: string): string | undefined => {
 };
 
 /**
- * Pie-owned RPC child via package exports only: workspace/desktop
- * `@getpie/server/pi-rpc`, published CLI `@getpie/cli/pi-rpc`.
+ * Resolve pie-pi-process via package exports only: workspace/desktop
+ * `@getpie/server/pi-process`, published CLI `@getpie/cli/pi-process`.
  */
-export function resolvePiRpcEntry(): string | undefined {
-  return resolvedPackageFile("@getpie/server/pi-rpc") ?? resolvedPackageFile("@getpie/cli/pi-rpc");
+export function resolvePiePiProcessEntry(): string | undefined {
+  return (
+    resolvedPackageFile("@getpie/server/pi-process") ??
+    resolvedPackageFile("@getpie/cli/pi-process")
+  );
 }
 
 export function isBunCommand(command: string): boolean {
@@ -65,17 +68,17 @@ export function isBunCommand(command: string): boolean {
   return base === "bun" || base === "bun.exe";
 }
 
-function resolvePiCliScript(
+function resolvePiProcessScript(
   env: NodeJS.ProcessEnv,
   resolveBundled: () => string | undefined,
 ): string | undefined {
   const explicit = env.PIE_PI_EXECUTABLE?.trim();
-  if (explicit && JS_CLI_ENTRY.test(explicit)) return explicit;
+  if (explicit && JS_PROCESS_ENTRY.test(explicit)) return explicit;
   return resolveBundled();
 }
 
 /**
- * Pick the Pi RPC child. Priority:
+ * Pick pie-pi-process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1`
  * 2. `bun <entry>` — `PIE_BUN` if that path exists, else PATH `bun`. Entry is
  *    a `.js` / `.mjs` / `.cjs` `PIE_PI_EXECUTABLE` or the pie-owned bun-build.
@@ -92,7 +95,7 @@ export function resolvePiExecutable(
     return { command: env.PIE_E2E_PI_EXECUTABLE, prefixArgs: [] };
   }
 
-  const script = resolvePiCliScript(env, options.resolveBundledCli ?? resolvePiRpcEntry);
+  const script = resolvePiProcessScript(env, options.resolveBundledCli ?? resolvePiePiProcessEntry);
   return {
     command: existingFile(env.PIE_BUN?.trim()) ?? "bun",
     prefixArgs: script === undefined ? [] : [asarUnpackedPath(script)],
@@ -105,7 +108,7 @@ export function piAvailabilityTarget(executable: PiExecutable): string {
 }
 
 const BUN_MISSING_REASON = "Bun was not found. Install Bun.";
-const BUN_CLI_MISSING_REASON = "Pi RPC entry was not found.";
+const BUN_PROCESS_MISSING_REASON = "pie-pi-process entry was not found.";
 
 export const checkPiAvailability = (
   executable: PiExecutable,
@@ -123,14 +126,14 @@ export const checkPiAvailability = (
       }
       const script = executable.prefixArgs[0];
       if (script === undefined) {
-        return { available: false, reason: BUN_CLI_MISSING_REASON };
+        return { available: false, reason: BUN_PROCESS_MISSING_REASON };
       }
       const fileSystem = yield* FileSystem.FileSystem;
       const info = yield* fileSystem.stat(script).pipe(Effect.option);
       if (info._tag === "Some" && info.value.type === "File") {
         return { available: true };
       }
-      return { available: false, reason: BUN_CLI_MISSING_REASON };
+      return { available: false, reason: BUN_PROCESS_MISSING_REASON };
     }
 
     const found = yield* findExecutable(executable.command, deps);

@@ -8,7 +8,7 @@ import { isAbortError, sleep } from "@/lib/utils";
 
 import { subscribeToAppTheme, xtermThemeFromElement } from "./theme";
 
-export interface TerminalSurface {
+interface TerminalSurface {
   readonly detach: () => void;
 }
 

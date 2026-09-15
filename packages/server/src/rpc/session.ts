@@ -211,6 +211,7 @@ export const sessionRouter = orpc.router({
           ),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
       }),
+      mapGitWorktreeErrors(errors),
     );
   }),
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {

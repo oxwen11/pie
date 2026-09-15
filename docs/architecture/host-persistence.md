@@ -109,7 +109,7 @@ $PIE_HOME/
 | Owner         | `PiAgentSessionRepository`                                                                                                           |
 | Data          | One record per session, addressed by the same project/session ids carried in the body                                                |
 | Write points  | Create, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, and remembered pull-request refs |
-| Compatibility | No envelope migration chain or pre-envelope adoption is currently configured                                                         |
+| Compatibility | No envelope migration chain. A legacy `gitBranch` string is lifted to `worktree: { branch }` on read and is never written back       |
 | Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration  |
 | Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything         |
 
@@ -122,7 +122,7 @@ Current record fields:
   agentSessionId?: string;
   createdAt: string;
   cwd?: string;
-  gitBranch?: string;
+  worktree?: { branch: string };
   pullRequestRefs?: Array<{ host; owner; repository; number }>;
   provider?: string;
   modelId?: string;
@@ -172,8 +172,11 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
-The session record persists the resulting `cwd` and `gitBranch`; there is no
-separate worktree manifest.
+The session record persists the resulting `cwd` and `worktree: { branch }` so a
+worktree session can still be opened after that checkout is gone. There is no
+separate worktree manifest. Checkouts must stay under `$PIE_HOME/worktrees/`.
+`prepare` and prompt do not re-create the checkout or require `HEAD` to match
+the stored branch.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and
@@ -211,6 +214,54 @@ The daemon directory itself uses normal mkdir/umask behavior.
 
 Stopping Desktop does not stop or delete the detached daemon, its state, or its
 logs.
+
+## Proposed resource diagnostics (not implemented)
+
+[Resource monitoring design](../design/resource-monitoring.md) proposes independent
+sidecar OS sampling and separate runtime writers. This is a **pending host-write
+review**, not a change to the current log inventory above. The user has confirmed
+**default-on at process startup**: an unset `PIE_RESOURCE_LOGGING` or `1` enables
+monitoring; `0` disables it. Module imports and unit-test construction do not
+implicitly start writers. The [code architecture proposal](../design/resource-monitoring-code-architecture.md)
+locates the process composition and shared writer modules.
+
+| Proposed path                                                     | Owner / scope                                                                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `$PIE_HOME/logs/resources/os/<UTC-created-at>.jsonl`              | Sidecar; relevant local process OS samples                                                                                                                               |
+| `$PIE_HOME/logs/resources/daemon/<UTC-created-at>.jsonl`          | Daemon or foreground server; its runtime memory and event-loop samples                                                                                                   |
+| `$PIE_HOME/logs/resources/electron/<UTC-created-at>.jsonl`        | Electron main; runtime memory and Electron process metrics                                                                                                               |
+| `$PIE_HOME/logs/resources/{os,daemon,electron}/.writer.lock`      | Proposed per-source exclusive writer/cleanup ownership: Rust platform file lock for os, SQLite BEGIN IMMEDIATE in each TS file worker for daemon/electron; not telemetry |
+| `$PIE_HOME/logs/resources/{daemon,electron}/.writer.lock-journal` | Possible bounded SQLite rollback-journal metadata; same owner-only permissions as the lock; no WAL or metric database                                                    |
+
+Roots would be derived only from `config/paths.ts` / `Paths.logsDir`, retaining
+existing `PIE_HOME` override rules. The proposal uses date-named JSONL, no runId
+subdirectories, exclusive file creation, owner-only directory/file permissions,
+versioned numeric/process-identity records, per-file retention headers and
+sample-completeness markers, and no commands, content, paths, or credentials.
+The optimized proposal admits at most one sample round in flight (1 MiB encoded),
+keeps the whole round in one JSONL file, and skips new rounds while busy instead
+of queuing history. Explicit partial coverage and end markers remain necessary:
+one submission is not an atomic disk transaction. Business logs remain unchanged.
+
+The user has confirmed seven-day maximum retention with expiry deletion and
+rolling logs: 16 MiB per file, 64 MiB per source (192 MiB total JSONL). Writers
+evict the oldest closed files and continue writing; normal budget exhaustion
+must not disable logging. File headers track the earliest permitted sample time,
+not mtime, so appends/touch cannot extend retention. Known-name files with invalid
+retention headers are conservatively evicted. Writer errors retry automatically;
+external files, lock metadata and filesystem overhead are not a disk-wide quota.
+Whole-round rotation can leave less than 1 MiB unused at the end of a file;
+this trades packing efficiency for simpler retention and reading.
+
+Cleanup runs only while the source is enabled and owns its lock, with startup
+cleanup before new writes; it cannot delete on schedule during shutdown, sleep,
+logging disablement or I/O failure. The proposed timing defaults, per-source lock
+backends/metadata, non-owner behavior, permissions, compatibility, corrupt/newer-data
+handling, shutdown behavior and uninstall policy are specified in design sections
+3–9 and require confirmation under section 12 before implementation. Older
+releases ignore this new subtree; no business-data or Pi-transcript migration is
+proposed. Inventory status changes to shipped only in the slice that actually
+enables the corresponding verified host writes, not in the contracts-only slice.
 
 ## Browser-owned state
 
@@ -278,6 +329,34 @@ controls are delegated to the rendering library and browser download handling;
 they are user-initiated output, not Pie application state, and have no Pie-owned
 migration or retention policy.
 
+## Verify project picker isolation
+
+Web and Desktop Verify runs create one disposable sample workspace beneath the
+run's only `$PIE_HOME`:
+
+```text
+$PIE_HOME/workspace/verify-pie[-desktop]-sample/
+├── .verify-pie[-desktop]-scaffold
+└── README.md
+```
+
+Verify owns these non-sensitive, umask-permissioned files and sets
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` for the run's server. When this
+environment value is set, the project picker starts at that directory, reports
+no parent there, and resolves real paths before rejecting traversal or symlinks
+outside it. An unset or blank value preserves the production default of the
+operator's home directory. Verify overwrites an inherited value with its own
+run path; parallel runs therefore do not share this boundary.
+
+The sample has no independent schema or migration. Its marker retains the
+existing cleanup compatibility check. Fresh Web and Desktop runs also seed the
+normal version-1 `$PIE_HOME/storage/projects.json` envelope with this sample;
+the server remains the schema owner. `launch --empty-projects` skips that file
+only for import-flow verification. Normal cleanup removes the sample and then
+the whole run; it no longer probes the operator's home for a same-named legacy
+sample. Interrupted runs are retained with the rest of `$PIE_HOME` until normal
+Verify cleanup. Uninstall behavior is unchanged.
+
 ## Development Electron installation
 
 Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
@@ -289,6 +368,34 @@ format, version checks, extraction permissions and retry behavior. Pie adds no
 storage schema, migration or concurrent-install lock. Verification cleanup
 leaves the installed binary and shared download cache intact; packaged startup
 is unchanged.
+
+Verify prepares Electron before starting its service-readiness timeout. Both
+preparation and Desktop append to the existing run-local `logs/electron-vite.log`.
+The existing decimal `pids/electron-vite.pid` tracks the active launch phase:
+installer first, removed on successful installation, then replaced by the Desktop
+launcher pid. Paths, permissions and file formats are unchanged; older cleanup
+code can still stop the recorded process. Installation/startup failure or
+SIGINT/SIGTERM uses the normal run cleanup and failure-log retention, without
+removing Electron's dependency-owned binary or download cache.
+
+## Verify Desktop browser binding
+
+Verify uses agent-browser's existing native binding, not a second lock or target
+store. Fresh Desktop launch selects the existing renderer and then pins it;
+Doctor, reuse and evidence retain that binding. Runs without a usable binding
+must be cleaned up and relaunched, not automatically rebound.
+
+The native owner writes `{ targetId, url, pinned }` to
+`<socketDir>/namespaces/<session>/run/<session>.target`. The socket directory is
+normally `/tmp/pvs-<run-hash>`, derived from the run's real path; the existing
+`VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override remains caller-owned configuration
+and must not be shared by parallel runs. Agent-browser strips URL credentials,
+query and fragment, writes mode `0600` via a synced temporary file and rename,
+and restores the binding across its daemon restarts. Corrupt or unreadable
+bindings fail closed. Native format evolution and backward compatibility remain
+agent-browser-owned; Verify does not read or rewrite this file. Run metadata,
+browser config formats and permissions are unchanged. Existing cleanup removes
+managed socket trees with the run; no migration or separate uninstall is added.
 
 ## Electron profile storage
 
@@ -312,8 +419,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches a pie-owned Pi RPC child (`dist/pi-rpc/pi-rpc.js`, Bun) with the session cwd
-and optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)
+with the session cwd and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie

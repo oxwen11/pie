@@ -229,6 +229,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       ),
     );
 
+    const resolveWorkspace = (ref: SessionRef) =>
+      withMetadataMutation(ref, readMetadata(ref).pipe(Effect.flatMap(ensureCwd)));
+
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
       metadata: SessionWithCwd,
@@ -274,7 +277,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       | TurnAlreadyRunning
     > =>
       Effect.gen(function* () {
-        const resolved = yield* readMetadata(ref).pipe(Effect.flatMap(ensureCwd));
+        const resolved = yield* resolveWorkspace(ref);
         const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
         return yield* runtime.prompt(userInput);
       });
@@ -323,7 +326,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     .pipe(
                       Effect.map((created) => ({
                         cwd: created.path,
-                        gitBranch: created.branch,
+                        worktree: { branch: created.branch },
                       })),
                     );
             return materializeWorkspace.pipe(
@@ -333,8 +336,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   projectId: input.projectId,
                   createdAt: new Date().toISOString(),
                   cwd: sessionWorkspace.cwd,
-                  ...(sessionWorkspace.gitBranch !== undefined
-                    ? { gitBranch: sessionWorkspace.gitBranch }
+                  ...(sessionWorkspace.worktree !== undefined
+                    ? { worktree: sessionWorkspace.worktree }
                     : undefined),
                   ...(input.model !== undefined
                     ? { provider: input.model.provider, modelId: input.model.modelId }
@@ -344,7 +347,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                 };
                 return repo.write(metadata).pipe(
                   Effect.tapError(() =>
-                    sessionWorkspace.gitBranch === undefined
+                    sessionWorkspace.worktree === undefined
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
@@ -368,10 +371,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         ),
 
       prepare: (ref) =>
-        withMetadataMutation(
-          ref,
-          readMetadata(ref).pipe(Effect.flatMap((metadata) => ensureCwd(metadata))),
-        ).pipe(
+        resolveWorkspace(ref).pipe(
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
               return Effect.succeed(toSessionWorkspace(metadata));

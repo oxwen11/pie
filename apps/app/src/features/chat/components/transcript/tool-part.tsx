@@ -1,6 +1,8 @@
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
+import { FileTextIcon } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { filePathOf } from "./tool/bucket";
 import { DynamicToolPart } from "./tool/dynamic-tool-part";
 
 type AnyToolPart = ToolUIPart | DynamicToolUIPart;
@@ -17,7 +19,7 @@ export function ToolPart({ part }: { part: AnyToolPart }) {
   if (part.state === "input-streaming") return null;
   return (
     <ErrorBoundary
-      fallback={<div className="text-destructive text-xs">Failed to render tool output</div>}
+      fallback={<div className="text-destructive text-xs">Failed to render tool call</div>}
       resetKeys={[part.type, part.toolCallId, part.state]}
     >
       <ToolPartContent part={part} />
@@ -26,5 +28,15 @@ export function ToolPart({ part }: { part: AnyToolPart }) {
 }
 
 function ToolPartContent({ part }: { part: AnyToolPart }) {
-  return <DynamicToolPart part={part} name={genericToolName(part)} />;
+  const name = genericToolName(part);
+  if (part.type === "tool-read" || part.type === "tool-Read") {
+    const path = filePathOf(part);
+    return (
+      <div className="text-muted-foreground flex w-full items-center gap-2 overflow-hidden py-1">
+        <FileTextIcon className="size-4 shrink-0" />
+        <span className="truncate text-sm">{path == null ? name : `${name} ${path}`}</span>
+      </div>
+    );
+  }
+  return <DynamicToolPart part={part} name={name} />;
 }

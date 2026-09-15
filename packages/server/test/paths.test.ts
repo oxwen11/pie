@@ -9,6 +9,7 @@ import {
   logsDirectory,
   resolveDaemonDirectory,
   resolvePieHome,
+  resolveProjectBrowseRoot,
   pieLogPath,
 } from "../src/config/paths";
 
@@ -36,6 +37,16 @@ describe("resolvePieHome", () => {
   it("treats an empty PIE_HOME as unset", () => {
     expect(resolvePieHome({ PIE_HOME: "" })).toBe(resolvePieHome({}));
     expect(resolvePieHome({ PIE_HOME: "   " })).toBe(resolvePieHome({}));
+  });
+});
+
+describe("resolveProjectBrowseRoot", () => {
+  it("uses only an explicit non-empty project picker root", () => {
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: "/tmp/picker" })).toBe(
+      "/tmp/picker",
+    );
+    expect(resolveProjectBrowseRoot({})).toBeUndefined();
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: " " })).toBeUndefined();
   });
 });
 

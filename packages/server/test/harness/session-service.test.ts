@@ -166,14 +166,17 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
               cwd: "/tmp/pie-worktree",
             });
             const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-            yield* fixture.repo.write({ ...stored, gitBranch: "pie/test" });
+            yield* fixture.repo.write({ ...stored, worktree: { branch: "pie/test" } });
             yield* fixture.service.close(ref);
             const workspace = yield* fixture.service.prepare(ref);
             const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
             return { workspace, cwd: after.cwd };
           }),
         );
-        assert.deepEqual(result.workspace, { cwd: "/tmp/pie-worktree", gitBranch: "pie/test" });
+        assert.deepEqual(result.workspace, {
+          cwd: "/tmp/pie-worktree",
+          worktree: { branch: "pie/test" },
+        });
         assert.equal(result.cwd, "/tmp/pie-worktree");
       }),
   );
@@ -190,7 +193,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
           yield* fixture.repo.write({
             ...stored,
-            gitBranch: "pie/test",
+            worktree: { branch: "pie/test" },
             agentSessionId: "native-1",
           });
           yield* fixture.service.close(ref);
@@ -199,7 +202,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           return { workspace, messages };
         }),
       );
-      assert.deepEqual(result.workspace, { cwd: "/tmp/pie-worktree", gitBranch: "pie/test" });
+      assert.deepEqual(result.workspace, {
+        cwd: "/tmp/pie-worktree",
+        worktree: { branch: "pie/test" },
+      });
       assert.deepEqual(result.messages, history);
     }),
   );

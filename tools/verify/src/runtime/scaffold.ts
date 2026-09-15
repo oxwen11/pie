@@ -1,7 +1,8 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { ensureDir, removePath, writeText } from "./fs.ts";
+import { ensureDir, removePath, writeJson, writeText } from "./fs.ts";
 
 export type SampleProjectOptions = {
   home: string;
@@ -32,6 +33,20 @@ export function ensureSampleProject(options: SampleProjectOptions): SampleProjec
     return { path: dir, created: false };
   }
   return { path: dir, created: false };
+}
+
+export function seedSampleProject(pieHome: string, sample: SampleProject): void {
+  writeJson(path.join(pieHome, "storage/projects.json"), {
+    version: 1,
+    data: [
+      {
+        id: crypto.randomUUID(),
+        name: path.basename(sample.path),
+        path: sample.path,
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  });
 }
 
 export function removeScaffold(
