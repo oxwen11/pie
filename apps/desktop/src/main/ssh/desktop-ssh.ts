@@ -68,6 +68,7 @@ export type DesktopSshConnectResult = {
     readonly wsBaseUrl: string;
     readonly token: string;
   };
+  readonly reportedHostname?: string;
   /** Completes when the live local forward ends. */
   readonly closed: Effect.Effect<void>;
 };
@@ -308,6 +309,7 @@ export function makeDesktopSsh(input: {
         wsBaseUrl: live.connected.wsBaseUrl,
         token: live.connected.token,
       },
+      reportedHostname: live.connected.reportedHostname,
       closed: live.connected.closed,
     });
 

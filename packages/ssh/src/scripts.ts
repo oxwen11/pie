@@ -216,6 +216,7 @@ if ! "$RUNNER_FILE" daemon start >>"$LOG_FILE" 2>&1; then
 fi
 node - "$DAEMON_RECORD" <<'NODE'
 const fs = require("node:fs");
+const os = require("node:os");
 const recordPath = process.argv[2] ?? "";
 try {
   const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
@@ -231,7 +232,7 @@ try {
     process.stderr.write("Remote pie daemon is not bound to loopback.\\n");
     process.exit(1);
   }
-  process.stdout.write(JSON.stringify({ remotePort: port, token: token }) + "\\n");
+  process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname() }) + "\\n");
 } catch (cause) {
   process.stderr.write("Remote pie daemon did not write a valid discovery record at " + recordPath + ".\\n");
   process.exit(1);
