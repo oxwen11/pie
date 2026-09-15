@@ -16,7 +16,7 @@
   "type": "module",
   "exports": {
     "./pi-process": "./dist/pi-process/pi-process.js",
-    "./resource-writer": "./dist/resources/writer-worker.mjs"
+    "./resource-monitor": "./dist/resources/resource-monitor"
   },
   "publishConfig": {
     "access": "public"
