@@ -353,6 +353,7 @@ export const connectSshEnvironment = (
       wsBaseUrl: forwardedConnection(tunnel.localPort, launch.token).wsBaseUrl,
       token: launch.token,
       remotePort: launch.remotePort,
+      reportedHostname: launch.hostname,
       close: tunnel.close,
       closed: tunnel.closed,
       alive: tunnel.alive,

@@ -121,7 +121,7 @@ export function makeDesktopApplication({
       const remote: SshRemoteEnvironment = {
         id: result.id,
         environmentId: result.environmentId,
-        label: environmentLabel(result.target),
+        label: environmentLabel(result.target, result.reportedHostname),
         alias: formatSshInput(result.target),
         connection: result.connection,
       };
