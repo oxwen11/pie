@@ -40,7 +40,12 @@
   can read class values. Off in tests and `packages/ui` (own cva/tv
   call sites cannot be resolved). Imported class constants on
   recognized components are unreadable — author the string at the
-  call site or in a same-file wrapper. Both `components.json`
+  call site or in a same-file wrapper.
+  `shadcn/no-unknown-classes` is `error` (stays on in `packages/ui`).
+  Exact `allow` names cover classes from stylesheets the theme parser
+  does not load (`tw-shimmer`, streamdown `not-prose` / `is-user`,
+  tiptap, desktop startup CSS) plus the vendored `transition-shadows`
+  typo. Both `components.json`
   files use those `@getpie/ui`
   aliases so discovery does not look for a missing `@/components/ui`.
   Do not
