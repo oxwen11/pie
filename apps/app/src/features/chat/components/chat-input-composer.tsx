@@ -9,8 +9,8 @@ import {
 import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { GitBranchIcon, NavigationIcon, SquareIcon } from "lucide-react";
-import { useRef, type ReactNode, type RefObject } from "react";
+import { GitBranchIcon, SquareIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
@@ -18,7 +18,6 @@ import { useLatestRef } from "@/hooks/use-latest-ref";
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
 import { ChatInput } from "./input/chat-input";
-import type { ChatInputController } from "./input/chat-input-controller";
 import { ChatInputProvider } from "./input/chat-input-provider";
 import { createChatBaseExtensions } from "./input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "./input/extensions/keymaps";
@@ -28,11 +27,10 @@ import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
 // handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
 // turn queues Send as a Pi follow-up — Send only appears once the draft has
-// content (empty streaming shows Stop in the primary slot). Steer submits
-// the same draft as a steer (inject before the next LLM call) — one shot,
-// not a mode. prompt comes from ChatSessionProvider — not props. The
-// CardFrame header lists queued prompts as editable rows (steering first);
-// the footer shows the session workspace's git availability and current branch.
+// content (empty streaming shows Stop in the primary slot). prompt comes from
+// ChatSessionProvider — not props. The CardFrame header lists queued prompts
+// as editable rows (steering first); the footer shows the session workspace's
+// git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -51,9 +49,6 @@ export function ChatInputComposer({
   const canInterrupt = status === "streaming";
   const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
-  // One-shot: Steer sets this, then submit() consumes it. Send / Enter leave
-  // it unset so a busy submit stays follow-up.
-  const nextDeliveryRef = useRef<"steer" | undefined>(undefined);
 
   const controller = useChatInputController({
     // Order is a hard constraint: base extensions first, submit keymap last —
@@ -65,11 +60,9 @@ export function ChatInputComposer({
     ],
     onSubmit: (text) => {
       // Missing workspace: don't send, don't clear. A running turn still
-      // accepts the send — follow-up unless Steer just requested otherwise.
+      // accepts the send as a follow-up.
       if (workspaceUnavailableRef.current) return false;
-      const steer = nextDeliveryRef.current === "steer";
-      nextDeliveryRef.current = undefined;
-      prompt(text, canInterrupt ? (steer ? "steer" : "followUp") : undefined);
+      prompt(text, canInterrupt ? "followUp" : undefined);
       return undefined;
     },
   });
@@ -99,10 +92,8 @@ export function ChatInputComposer({
             <PromptInputTools>{toolbar}</PromptInputTools>
             <ChatComposerActions
               canInterrupt={canInterrupt}
-              controller={controller}
               hasContent={hasContent}
               interrupt={interrupt}
-              nextDeliveryRef={nextDeliveryRef}
               workspaceUnavailable={workspaceUnavailable}
             />
           </PromptInputToolbar>
@@ -122,47 +113,25 @@ export function ChatInputComposer({
 
 function ChatComposerActions({
   canInterrupt,
-  controller,
   hasContent,
   interrupt,
-  nextDeliveryRef,
   workspaceUnavailable,
 }: {
   canInterrupt: boolean;
-  controller: ChatInputController | null;
   hasContent: boolean;
   interrupt: () => Promise<void>;
-  nextDeliveryRef: RefObject<"steer" | undefined>;
   workspaceUnavailable: boolean;
 }) {
   return (
     <div className="flex items-center gap-1">
       {canInterrupt ? (
-        <>
-          <PromptInputButton
-            aria-label="Steer message"
-            disabled={!hasContent || workspaceUnavailable}
-            onClick={() => {
-              if (!controller) return;
-              nextDeliveryRef.current = "steer";
-              void controller.submit().then(() => {
-                // Empty / already-submitting submit never reaches onSubmit.
-                nextDeliveryRef.current = undefined;
-                return undefined;
-              });
-            }}
-          >
-            <NavigationIcon className="size-4" />
-            Steer
-          </PromptInputButton>
-          <PromptInputButton
-            aria-label="Stop generating"
-            onClick={() => void interrupt()}
-            variant={hasContent ? "ghost" : "default"}
-          >
-            <SquareIcon className="size-4" />
-          </PromptInputButton>
-        </>
+        <PromptInputButton
+          aria-label="Stop generating"
+          onClick={() => void interrupt()}
+          variant={hasContent ? "ghost" : "default"}
+        >
+          <SquareIcon className="size-4" />
+        </PromptInputButton>
       ) : null}
       {!canInterrupt || hasContent ? (
         <PromptInputSubmit

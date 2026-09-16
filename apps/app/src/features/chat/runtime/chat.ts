@@ -597,7 +597,7 @@ export class Chat {
   // Fire-and-forget: idle prompts push an optimistic user message; a turn
   // already in flight is a Pi queue write (no transcript bubble — only
   // `session.queue.updated` updates `pendingPrompt`). Default delivery is
-  // follow-up; the composer passes `steer` when the user clicks Steer.
+  // follow-up; queue-row promote is the UI that passes `steer`.
   prompt = async (text: string, delivery?: "steer" | "followUp"): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
