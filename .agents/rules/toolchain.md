@@ -34,7 +34,12 @@
   `shadcn/no-arbitrary-values` is `error` with `allow: ["layout"]`
   plus exact chrome exceptions (shell card elevation, separator
   `transition-[opacity,width]`). Off in tests and `packages/ui`
-  (structural values such as `ring-[3px]`). Both `components.json`
+  (structural values such as `ring-[3px]`).
+  `shadcn/require-static-classes` is `error` so other shadcn rules
+  can read class values. Off in tests and `packages/ui` (own cva/tv
+  call sites cannot be resolved). Imported class constants on
+  recognized components are unreadable — author the string at the
+  call site or in a same-file wrapper. Both `components.json`
   files use those `@getpie/ui`
   aliases so discovery does not look for a missing `@/components/ui`.
   Do not

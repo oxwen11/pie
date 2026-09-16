@@ -33,8 +33,9 @@ const pieIgnorePatterns = [
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
  * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint
  * `no-unknown-classes` / `require-static-classes`. `no-restyle`,
- * `no-raw-colors`, and `no-arbitrary-values` are on below. Vendored
- * UI sources keep `no-restyle` and `no-arbitrary-values` off;
+ * `no-raw-colors`, `no-arbitrary-values`, and `require-static-classes`
+ * are on below. Vendored UI sources keep `no-restyle`,
+ * `no-arbitrary-values`, and `require-static-classes` off;
  * `no-raw-colors` stays on there except three pre-existing
  * presentation sites.
  */
@@ -154,9 +155,14 @@ export default defineConfig({
           "shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
           // Property lists, not off-scale lengths. Variants (`after:`) inherit.
           "transition-[opacity,width]",
+          "transition-[opacity,translate]",
         ],
       },
     ],
+    // Unreadable class values hide the other shadcn rules. Off in
+    // packages/ui: call sites of the component's own cva/tv factories
+    // cannot be resolved.
+    "shadcn/require-static-classes": "error",
     "import/no-unassigned-import": [
       "error",
       {
@@ -316,6 +322,7 @@ export default defineConfig({
         "shadcn/no-restyle": "off",
         "shadcn/no-raw-colors": "off",
         "shadcn/no-arbitrary-values": "off",
+        "shadcn/require-static-classes": "off",
       },
     },
     {
@@ -402,9 +409,11 @@ export default defineConfig({
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-type-assertion": "off",
         // Coss sources and local wrappers own their appearance and
-        // structural values such as ring-[3px].
+        // structural values such as ring-[3px]. Own cva/tv call sites
+        // cannot be resolved, so require-static-classes stays off.
         "shadcn/no-restyle": "off",
         "shadcn/no-arbitrary-values": "off",
+        "shadcn/require-static-classes": "off",
       },
     },
     {
