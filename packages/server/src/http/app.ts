@@ -16,7 +16,8 @@ export type RequestAppOptions = {
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
   readonly corsOrigins: readonly string[];
-  readonly allowedHosts: readonly string[];
+  /** Mutable: Share/Serve/relay attach append Hosts for this process. */
+  readonly allowedHosts: string[];
   readonly tickets: TicketStore;
   /** Pairing codes → process-lifetime session tokens. Unset when auth is off. */
   readonly pairing: PairingStore | undefined;
@@ -32,6 +33,23 @@ const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
 const unauthorized = HttpServerResponse.text("Unauthorized", { status: 401 });
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 const badRequest = HttpServerResponse.text("Bad Request", { status: 400 });
+
+export function parseAllowHost(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  try {
+    const url = trimmed.includes("://") ? new URL(trimmed) : new URL(`http://${trimmed}`);
+    const host = url.hostname.toLowerCase();
+    return host.length > 0 ? host : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberAllowedHost(hosts: string[], host: string): void {
+  if (hosts.some((entry) => entry.toLowerCase() === host)) return;
+  hosts.push(host);
+}
 
 function isAuthorized(options: RequestAppOptions, header: string | undefined): boolean {
   if (options.authToken === undefined) return true;
@@ -180,6 +198,29 @@ const route = (
         return withCors(unauthorized);
       }
       return withCors(HttpServerResponse.jsonUnsafe(options.pairing.mint()));
+    }
+
+    if (request.method === "POST" && pathname === "/api/allow-host") {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
+      const raw = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
+      let body: unknown;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        return withCors(badRequest);
+      }
+      const host =
+        typeof body === "object" && body !== null && "host" in body && typeof body.host === "string"
+          ? parseAllowHost(body.host)
+          : null;
+      if (host === null) return withCors(badRequest);
+      rememberAllowedHost(options.allowedHosts, host);
+      return withCors(HttpServerResponse.jsonUnsafe({ host }));
     }
 
     if (

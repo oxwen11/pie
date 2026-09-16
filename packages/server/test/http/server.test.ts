@@ -274,6 +274,48 @@ describe("createServer WebSocket ticket", () => {
   });
 });
 
+describe("createServer allow-host", () => {
+  it("lets the operator trust a published Host without restarting", async () => {
+    const base = await start({ authToken: TOKEN });
+    if (server === undefined) throw new Error("expected server");
+    const { port } = server.address() as AddressInfo;
+    const health = (host: string) =>
+      new Promise<number>((resolve) => {
+        const req = http.request(
+          { host: "127.0.0.1", port, path: "/api/health", headers: { host } },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on("error", () => resolve(0));
+        req.end();
+      });
+    await expect(health("box.ts.net")).resolves.toBe(403);
+    const allow = await fetch(`${base}/api/allow-host`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ host: "https://box.ts.net:8443" }),
+    });
+    expect(allow.status).toBe(200);
+    await expect(allow.json()).resolves.toEqual({ host: "box.ts.net" });
+    await expect(health("box.ts.net")).resolves.toBe(200);
+  });
+
+  it("rejects allow-host without the daemon token", async () => {
+    const base = await start({ authToken: TOKEN });
+    const response = await fetch(`${base}/api/allow-host`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ host: "box.ts.net" }),
+    });
+    expect(response.status).toBe(401);
+  });
+});
+
 describe("createServer staged startup", () => {
   const ui: UIApp = Effect.succeed(HttpServerResponse.text("ok"));
 

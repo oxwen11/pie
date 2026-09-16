@@ -190,6 +190,33 @@ export function makeDesktopApplication({
         });
       } else {
         yield* tailscale.enableServe(localPort);
+        const snapshot = yield* tailscale.snapshot;
+        if (snapshot.magicDnsName !== null) {
+          const allowed = yield* Effect.tryPromise({
+            try: () =>
+              fetch(new URL("/api/allow-host", connection.httpBaseUrl), {
+                method: "POST",
+                headers: {
+                  authorization: `Bearer ${connection.token}`,
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify({ host: snapshot.magicDnsName }),
+              }),
+            catch: (cause) =>
+              new TailscaleCommandError({
+                command: ["tailscale", "serve"],
+                exitCode: null,
+                message: `Enabled Serve but could not trust ${snapshot.magicDnsName}: ${String(cause)}`,
+              }),
+          });
+          if (!allowed.ok) {
+            yield* new TailscaleCommandError({
+              command: ["tailscale", "serve"],
+              exitCode: null,
+              message: `Enabled Serve but could not trust ${snapshot.magicDnsName} (${String(allowed.status)})`,
+            });
+          }
+        }
       }
     }),
     disableTailscaleServe: tailscale.disableServe,
