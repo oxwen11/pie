@@ -18,7 +18,7 @@
     "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "bun --no-install build.ts",
+    "build": "tsdown && bun --no-install build-pi-process.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
