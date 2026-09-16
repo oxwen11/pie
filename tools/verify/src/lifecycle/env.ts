@@ -95,23 +95,16 @@ export function writeBrowserEnvFile(identity: SurfaceIdentity, runDir: string): 
   writeIsolationShim(identity);
 }
 
-export function finishAutoRecordingForRun(
-  identity: SurfaceIdentity,
-  runDir: string,
-): string | undefined {
-  if (identity.id === "cli") return undefined;
+export function rotateAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+  if (identity.id === "cli") return;
   const vars = browserEnvForRun(identity, runDir);
   const current = vars.PIE_VERIFY_RECORDING_PATH;
-  if (current === undefined || !fs.existsSync(current)) return undefined;
+  if (current === undefined || !fs.existsSync(current)) return;
   const env: NodeJS.ProcessEnv = { ...process.env };
   applyBrowserEnv(vars, env);
   const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
   if (error !== undefined) throw new Error(`automatic recording stop failed: ${error}`);
-  return current;
-}
 
-export function advanceAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
-  if (identity.id === "cli") return;
   const { runId } = readRunMeta(path.join(runDir, "meta.json"));
   const dest = path.join(identity.skillDir, "evidence", runId);
   let sequence = recordingSequence(runDir) + 1;
@@ -122,14 +115,16 @@ export function advanceAutoRecordingForRun(identity: SurfaceIdentity, runDir: st
   writeBrowserEnvFile(identity, runDir);
 }
 
-export function rotateAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
-  if (finishAutoRecordingForRun(identity, runDir) === undefined) return;
-  advanceAutoRecordingForRun(identity, runDir);
-}
-
 export function stopAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+  if (identity.id === "cli") return;
   try {
-    finishAutoRecordingForRun(identity, runDir);
+    const vars = browserEnvForRun(identity, runDir);
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    applyBrowserEnv(vars, env);
+    const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
+    if (error !== undefined) {
+      console.error(`${identity.logPrefix}: automatic recording stop failed: ${error}`);
+    }
   } catch (error) {
     console.error(`${identity.logPrefix}: automatic recording stop failed: ${String(error)}`);
   }

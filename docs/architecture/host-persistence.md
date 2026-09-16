@@ -414,11 +414,6 @@ content, local paths, or typed input, so it is gitignored and must only be
 uploaded as deliberate evidence. Parallel runs write different run-id paths.
 An already-active take is reused rather than replaced.
 
-`evidence pack-video <name>` stops the active take and uses ffmpeg's bounded
-near-duplicate removal to compress that current validation's near-static spans
-by up to 8×. It writes `<name>.webm` beside the unchanged numbered raw clip; a
-failed encode does not replace an existing packed file.
-
 Normal cleanup asks agent-browser to stop and flush the file before terminating
 the browser or Electron, then retains it with the other evidence. A crash may
 leave an incomplete WebM. There is no Pie schema, migration, retention limit, or

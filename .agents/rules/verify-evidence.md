@@ -41,14 +41,10 @@ the current take and advances to `recording-002.webm`, `recording-003.webm`, and
 so on. Do not call `record start`, `restart`, or `stop`. Normal Verify cleanup
 stops and flushes the current recording before removing the run.
 
-After the final action, pack that validation's current raw clip into the review
-artifact. Packing compresses near-static spans by up to 8×: it removes at most
-seven consecutive near-duplicate frames and leaves distinct action frames in
-order. The numbered raw recording remains unchanged.
+Write down what each automatic clip shows:
 
 ```bash
-pnpm exec pie-verify web evidence pack-video import-project
-pnpm exec pie-verify web evidence note "import-project.webm: import → dialog → Import this folder → sidebar row"
+pnpm exec pie-verify web evidence note "recording-001.webm: import → dialog → Import this folder → sidebar row"
 ```
 
 Replace `web` with `desktop` for the Electron surface. `pie-verify cli` has no
@@ -59,9 +55,8 @@ browser and no UI evidence requirement.
 - Evidence directory: `.agents/skills/verify-pie{,-desktop}/evidence/<run-id>/`
   (`pnpm exec pie-verify web|desktop evidence path`). It survives `cleanup` and is
   gitignored — never commit screenshots or videos.
-- A UI PR, issue, or comment must carry the image(s) **and** the packed video:
-  `gh pr|issue create|edit|comment --attach <png> --attach <feature>.webm`.
-  Attach raw numbered recordings only when they help diagnose a failure.
+- A UI PR, issue, or comment must carry the image(s) **and** the video:
+  `gh pr|issue create|edit|comment --attach <png> --attach <webm>`.
 - Name screenshots after the feature you proved (`import-project-before.png`,
   `import-project-after.png`), not `screen.png`. The automatic video is always
   numbered `recording-<NNN>.webm` files.
@@ -73,7 +68,5 @@ browser and no UI evidence requirement.
   Import project, launch with `--replace --empty-projects` and drive the real
   import path (see the Evidence standards in each `verify-pie*` skill).
 - Do not swap the video for a snapshot series or a description of what happened.
-  Packing may remove near-duplicate frames, but it must still show the action and
-  resulting state.
 - A green Playwright e2e run (`apps/desktop/e2e/`, test mode) does not replace
   this evidence for a UI change.

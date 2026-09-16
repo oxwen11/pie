@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { copyDirContents, ensureDir, isoNow, readText, removePath, writeText } from "./fs.ts";
-import { commandOnPath, runCommand } from "./process.ts";
+import { copyDirContents, ensureDir, isoNow, readText, writeText } from "./fs.ts";
 
 export function evidenceDir(skillDir: string, runId: string): string {
   return path.join(skillDir, "evidence", runId);
@@ -24,48 +23,6 @@ export function appendNote(dest: string, text: string): void {
   const notePath = path.join(dest, "notes.txt");
   const previous = fs.existsSync(notePath) ? readText(notePath) : "";
   writeText(notePath, `${previous}${text}\n`);
-}
-
-const IDLE_VIDEO_FILTER = "mpdecimate=max=7,setpts=N/FRAME_RATE/TB";
-
-export function packEvidenceVideo(input: string, dest: string, name: string): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name) || /^recording-\d+$/.test(name)) {
-    throw new Error(`invalid packed video name: ${name}`);
-  }
-  if (!fs.existsSync(input) || fs.statSync(input).size === 0) {
-    throw new Error(`no completed recording at ${input}`);
-  }
-  const ffmpeg = commandOnPath("ffmpeg");
-  if (ffmpeg === undefined) throw new Error("ffmpeg is required to pack evidence video");
-
-  const output = path.join(dest, `${name}.webm`);
-  const temporary = path.join(dest, `.${name}.${process.pid}.webm`);
-  const result = runCommand(ffmpeg, [
-    "-y",
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-i",
-    input,
-    "-vf",
-    IDLE_VIDEO_FILTER,
-    "-an",
-    "-c:v",
-    "libvpx",
-    "-crf",
-    "30",
-    "-b:v",
-    "2000k",
-    "-pix_fmt",
-    "yuv420p",
-    temporary,
-  ]);
-  if (result.status !== 0) {
-    removePath(temporary);
-    throw new Error(result.stderr.trim() || `ffmpeg exited ${result.status}`);
-  }
-  fs.renameSync(temporary, output);
-  return output;
 }
 
 export function copySideEffects(pieHome: string, dest: string, copySessionBodies: boolean): void {
