@@ -53,11 +53,31 @@ function ShareTailscaleStatus({
         )}
         <p className="text-muted-foreground">
           {snapshot.serveEnabled
-            ? "HTTPS Serve is enabled for the local daemon port."
-            : "HTTPS Serve is off."}
+            ? "Open that URL on another device, then pair with a code from pie pairing mint. No environment variables."
+            : "Turn on HTTPS Serve. Pie will trust this machine's Tailscale name automatically."}
         </p>
       </div>
       <DialogFooter>
+        {snapshot.httpsBaseUrl ? (
+          <Button
+            disabled={pending}
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void navigator.clipboard.writeText(snapshot.httpsBaseUrl ?? "").then(
+                () => {
+                  toast.success("Copied share URL");
+                  return undefined;
+                },
+                () => {
+                  toast.error("Could not copy the URL");
+                },
+              );
+            }}
+          >
+            Copy URL
+          </Button>
+        ) : null}
         <Button disabled={pending} type="button" variant="outline" onClick={onClose}>
           Close
         </Button>
@@ -97,9 +117,9 @@ export function ShareTailscaleDialog({ onClose }: { onClose: () => void }): Reac
         <DialogHeader>
           <DialogTitle>Share this computer</DialogTitle>
           <DialogDescription>
-            Tailscale Serve publishes this machine&apos;s pie daemon at your MagicDNS name. Other
-            devices still need the daemon token — this is not pairing. To open another machine on
-            the tailnet, add it as an SSH host.
+            Publishes this computer at your Tailscale HTTPS name. Open the URL on another device and
+            pair with a code from pie pairing mint. To open a different machine, add it as an SSH
+            host.
           </DialogDescription>
         </DialogHeader>
         <Suspense

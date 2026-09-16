@@ -138,44 +138,64 @@ const relayAttachFlags = {
 
 const relayAttach = Command.make("attach", relayAttachFlags, (input) =>
   Effect.gen(function* () {
-    const token = takeRelayToken();
+    const relayToken = takeRelayToken();
     const hop = parseHostPort(input.to);
     relayPublicBaseUrl({ host: hop.host, port: hop.port });
     const control = parseHostPort(input.control);
     const localFlag = Option.getOrUndefined(input.local);
-    let localHost: string;
-    let localPort: number;
-    if (localFlag !== undefined) {
-      const parsed = parseHostPort(localFlag);
-      localHost = parsed.host;
-      localPort = parsed.port;
-    } else {
-      const status = yield* statusDaemon(resolveDaemonDirectory());
-      if (!status.running) {
-        return yield* Effect.fail(new Error("pie daemon is not running"));
-      }
-      const local = new URL(status.record.address);
-      localHost = local.hostname;
-      localPort = Number(local.port);
-    }
-    const allowed = (process.env.PIE_ALLOWED_HOSTS ?? "")
-      .split(",")
-      .map((entry) => entry.trim().toLowerCase())
-      .filter((entry) => entry.length > 0);
-    if (!allowed.includes(hop.host.toLowerCase())) {
+    const local = yield* localFlag === undefined
+      ? statusDaemon(resolveDaemonDirectory()).pipe(
+          Effect.flatMap((status) => {
+            if (!status.running) {
+              return Effect.fail(new Error("pie daemon is not running"));
+            }
+            const address = new URL(status.record.address);
+            return Effect.succeed({
+              host: address.hostname,
+              port: Number(address.port),
+              httpBase: status.record.address,
+              daemonToken: status.record.token,
+            });
+          }),
+        )
+      : Effect.sync(() => {
+          const parsed = parseHostPort(localFlag);
+          return {
+            host: parsed.host,
+            port: parsed.port,
+            httpBase: `http://${parsed.host}:${String(parsed.port)}`,
+            daemonToken: process.env.PIE_AUTH_TOKEN ?? "",
+          };
+        });
+    if (local.daemonToken.length === 0) {
       return yield* Effect.fail(
-        new Error(
-          `relay public Host ${hop.host} is not in PIE_ALLOWED_HOSTS. Restart the daemon with --allowed-host ${hop.host}`,
-        ),
+        new Error("relay attach needs the daemon token to trust the public Host"),
+      );
+    }
+    const allowed = yield* Effect.tryPromise({
+      try: () =>
+        fetch(new URL("/api/allow-host", local.httpBase), {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${local.daemonToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ host: hop.host }),
+        }),
+      catch: (cause) => new Error(`failed to trust relay Host ${hop.host}: ${String(cause)}`),
+    });
+    if (!allowed.ok) {
+      return yield* Effect.fail(
+        new Error(`failed to trust relay Host ${hop.host} (${String(allowed.status)})`),
       );
     }
     const handle = yield* Effect.tryPromise(() =>
       attachRelay({
         relayHost: control.host,
         relayPort: control.port,
-        token,
-        localHost,
-        localPort,
+        token: relayToken,
+        localHost: local.host,
+        localPort: local.port,
       }),
     );
     console.log(`pie relay attached to ${input.to} via ${input.control}`);
