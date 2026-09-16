@@ -17,13 +17,11 @@ export type SessionPullRequest = {
 export function ProjectSessionRow({
   active,
   createdBySchedule = false,
-  isActive,
   pullRequest,
   session,
 }: {
   readonly active: boolean;
   readonly createdBySchedule?: boolean;
-  readonly isActive: () => boolean;
   readonly pullRequest: SessionPullRequest | undefined;
   readonly session: SessionSummary;
 }) {
@@ -32,7 +30,6 @@ export function ProjectSessionRow({
   return (
     <SidebarMenuItem>
       <SessionActionsMenu
-        isActive={isActive}
         session={session}
         render={
           <SidebarMenuButton
