@@ -64,12 +64,14 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** Vitest 5 (catalog pin). `pnpm test` is two Vitest processes:
+- **Tests:** Vitest 5 (catalog pin).   `pnpm test` is two Vitest processes:
   `vitest run` (node packages via root `vitest.config.mts`, which excludes
   `packages/ui`) then `vitest run --config vitest.browser.config.mts` (`ui`,
-  `app-browser`, `app-e2e`). One process cannot host `@vitest/browser-playwright`
-  next to `@effect/vitest` `layer` / `it.effect` — the browser config load
-  leaves those files as Failed Suites after every test passed.
+  `app-browser`, `app-e2e`). Browser stays in its own process so Playwright
+  Chromium does not load next to node `@effect/vitest`. A second vitest
+  copy (forked peer graph: `@types/node` or `tsx` via `@vitest/mocker`)
+  still makes `it.effect` / `layer` report Failed Suites (`failed to find
+  the current suite`) even in the node process — keep those pins singular.
   One package uses that package's `test` script:
   `pnpm --filter @getpie/server test`. Prefer those over `turbo run test`
   — turbo still discovers every package `test` script and would spawn 12

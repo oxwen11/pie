@@ -35,6 +35,10 @@ catalog:
   # Same major as vitest — the browser provider package is versioned with the
   # runner. Catalog + override keep app / ui / root on one copy.
   "@vitest/browser-playwright": 5.0.0
+  # Exact pin: `@vitest/mocker` peers tsx. Root `tsx: latest` vs a transitive
+  # 4.23.12 forks mocker, then vitest, then `@effect/vitest` talks to a
+  # different TestRunner (`failed to find the current suite`).
+  tsx: 4.23.13
   ws: ^8.21.3
   zod: ^4.6.5
   zustand: ^5.0.15
@@ -87,11 +91,13 @@ overrides:
   # e.g. @effect/platform-node-shared@rc.112 peer-wants effect@^4.0.0-rc.112,
   # which without the override would auto-install a second effect runtime;
   # electron-vite/vite-plus would similarly resolve their own vite/vitest.
-  # @types/node must stay singular too — a second copy forks vitest's peer
-  # graph and @effect/vitest then talks to a different TestRunner singleton.
+  # @types/node and tsx must stay singular too — a second copy forks
+  # vitest's peer graph (`@vitest/mocker` peers tsx) and @effect/vitest
+  # then talks to a different TestRunner singleton.
   vite: "catalog:"
   vitest: "catalog:"
   "@vitest/browser-playwright": "catalog:"
+  tsx: "catalog:"
   "@types/node": "catalog:"
   react: "catalog:react"
   react-dom: "catalog:react"

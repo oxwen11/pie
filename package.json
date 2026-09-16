@@ -41,7 +41,7 @@
     "simple-git-hooks": "^2.14.0",
     "taze": "^19.17.2",
     "tsdown": "catalog:",
-    "tsx": "latest",
+    "tsx": "catalog:",
     "turbo": "^2.10.12",
     "typescript": "catalog:",
     "ultracite": "^7.11.1",
