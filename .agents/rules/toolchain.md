@@ -33,7 +33,8 @@
   ".../dist/*.js"` globs are not treated as CSS comments.
   `shadcn/no-arbitrary-values` is `error` with `allow: ["layout"]`
   plus exact chrome exceptions (shell card elevation, separator
-  `transition-[opacity,width]`). Off in tests and `packages/ui`
+  `transition-[opacity,width]`, sidebar panel
+  `transition-[opacity,translate]`). Off in tests and `packages/ui`
   (structural values such as `ring-[3px]`).
   `shadcn/require-static-classes` is `error` so other shadcn rules
   can read class values. Off in tests and `packages/ui` (own cva/tv
