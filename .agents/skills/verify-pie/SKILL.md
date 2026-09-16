@@ -104,7 +104,7 @@ Stable handles (from source, not guesses):
 | Sidebar new draft | **New chat** |
 | Sidebar import | button name **Import project** (plus-folder on the Projects group) |
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
-| Draft project picker | combobox / button **New folder** until a project is chosen; first option is **New folder**, then folder basenames |
+| Draft project picker | combobox / button **New folder** until a project is chosen; first option is **New folder**, then folder basenames. After a project is chosen: trigger shows the name plus button **Clear project**; first option becomes **Don't work in a project** |
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while New folder) |

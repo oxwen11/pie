@@ -5,7 +5,7 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 ## Sub-features
 
 - **Centered composer** always: project picker, optional git workspace/worktree controls, model select, TipTap input, submit. Zero projects is not an empty state — the picker stays on **New folder**. Import remains on the sidebar.
-- **Project picker** — default **New folder** (no `?projectId=`). Choosing a project writes `?projectId=` (replace). Choosing **New folder** again clears it. The New folder row subtitle is the allocate root (`PIE_NEW_PROJECT_ROOT` or `~/Pie`).
+- **Project picker** — default **New folder** (no `?projectId=`). Choosing a project writes `?projectId=` (replace). With a project selected, the trigger shows a **Clear project** (X) control, and the first dropdown row becomes **Don't work in a project** (same allocate sentinel). Either one clears `?projectId=` back to New folder. The folder-row subtitle is the allocate root (`PIE_NEW_PROJECT_ROOT` or `~/Pie`).
 - **New folder send** — `project.allocate` creates `<root>/<YYYY-MM-DD>/<slug>/` from the first prompt (`chat` when there is no slug), registers it as a Project, then `session.create`. Sidebar lists the new project by the leaf name.
 - **Workspace mode** (git repos only, after a real Project is selected): **Current directory** vs **New worktree**. Worktree requires a **base branch** (`aria-label="Base branch for worktree"`). Non-git shows **Not a Git repository**. Missing folder shows **Workspace unavailable** and blocks send.
 - **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**. Hidden when the model list is empty (`models.length === 0`). Default model is written into `?provider=&modelId=` once.
@@ -26,7 +26,7 @@ agent-browser open http://localhost:4190/draft
 agent-browser wait --text "Ask Pi anything..."
 ```
 
-1. Confirm the project picker. Default without `?projectId=` is **New folder**. Open it and choose **verify-pie-sample** for the imported-project path.
+1. Confirm the project picker. Default without `?projectId=` is **New folder**. Open it and choose **verify-pie-sample** for the imported-project path. Re-open: first option is **Don't work in a project**, and **Clear project** (X) is next to the trigger. Either clears back to **New folder**.
 2. Click the contenteditable (placeholder **Ask Pi anything...**). `keyboard type` a distinctive prompt, e.g. `verify-pie ping`.
 3. Snapshot: submit is now enabled. **Click it** — do not press Enter.
 4. Wait for the URL to become `/session/<uuid>?projectId=<uuid>`.
