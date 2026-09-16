@@ -64,19 +64,23 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** Vitest 5 (catalog pin). Root `vitest.config.mts` lists every
-  package config as a project; `pnpm test` is `vitest run` (one process).
+- **Tests:** Vitest 5 (catalog pin). `pnpm test` is two Vitest processes:
+  `vitest run` (node packages via root `vitest.config.mts`, which excludes
+  `packages/ui`) then `vitest run --config vitest.browser.config.mts` (`ui`,
+  `app-browser`, `app-e2e`). One process cannot host `@vitest/browser-playwright`
+  next to `@effect/vitest` `layer` / `it.effect` — the browser config load
+  leaves those files as Failed Suites after every test passed.
   One package uses that package's `test` script:
   `pnpm --filter @getpie/server test`. Prefer those over `turbo run test`
   — turbo still discovers every package `test` script and would spawn 12
   Vitest processes.   Each package keeps its own `vitest.config.ts` for
   environment, include, and timeouts — referenced projects do not inherit
   those. UI tests (`packages/ui`, `apps/app` component/DOM files) run in
-  Vitest browser mode (`@vitest/browser-playwright`, Chromium, headless).
-  `apps/app` splits into three projects in that config: node unit tests,
-  browser component tests, and `e2e/**/*.e2e.test.tsx` against an isolated
-  `pie serve` + `tools/testing/fake-pi.mjs`. Do not add a second UI runner
-  (no jsdom, no new Playwright suite). The pie artifact test reads
+  Vitest browser mode (`@vitest/browser-playwright`, Chromium, headless)
+  via `vitest.browser.config.mts`. `apps/app/vitest.config.ts` is node-only;
+  `apps/app/vitest.browser.config.ts` has `app-browser` plus `e2e/**/*.e2e.test.tsx`
+  against isolated `pie serve` + `tools/testing/fake-pi.mjs` + `fake-gh.mjs`.
+  Do not add a second UI runner (no jsdom, no new Playwright suite). The pie artifact test reads
   `@getpie/cli` / `@getpie/app` `dist/`;
   CI runs `turbo run build` before `pnpm test`. Configs turn on `fsModuleCache`
   (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
