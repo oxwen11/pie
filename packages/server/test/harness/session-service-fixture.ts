@@ -1,9 +1,10 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import type { PieUIMessage } from "@getpie/contract";
 import { Context, Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "effect";
 
-import { ProjectNotFound, StoreWriteError, type WorkspaceReadError } from "../../src/errors";
+import { ProjectNotFound, StoreWriteError } from "../../src/errors";
 import { EventBus, type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type { GitFailure } from "../../src/git/service";
 import {
@@ -94,9 +95,20 @@ export type SessionServiceRunOpts = {
     worktreePath: string,
     branch: string,
   ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-  worktreeCheckoutMissing?: (worktreePath: string) => Effect.Effect<boolean, WorkspaceReadError>;
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
+
+/** Mock worktree create that also creates the checkout path on disk for prepare(). */
+export const stubWorktreeCreate =
+  (
+    worktreePath = "/tmp/pie-worktree",
+    branch = "pie/abcd1234",
+  ): NonNullable<SessionServiceRunOpts["worktreeCreate"]> =>
+  () =>
+    Effect.sync(() => {
+      fs.mkdirSync(worktreePath, { recursive: true });
+      return { path: worktreePath, branch };
+    });
 
 const testProjectService = ProjectService.of({
   list: () => Effect.succeed([]),
@@ -121,8 +133,8 @@ export const run = <A, E>(
   ) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>,
 ) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-svc-" });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-svc-" });
     const spy: Spy = { open: [], resume: [], close: [], prompts: [] };
     let opened = 0;
     const turnEvents = (sessionId: string) => {
@@ -258,7 +270,6 @@ export const run = <A, E>(
         restore:
           opts.worktreeRestore ??
           (() => Effect.die(new Error("unexpected worktreeRestore in unit test"))),
-        checkoutMissing: opts.worktreeCheckoutMissing ?? (() => Effect.succeed(false)),
         remove:
           opts.worktreeRemove ??
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
@@ -273,6 +284,7 @@ export const run = <A, E>(
         Layer.provide(Layer.succeed(EventBus, bus)),
         Layer.provide(Layer.succeed(ProjectService, testProjectService)),
         Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+        Layer.provide(Layer.succeed(FileSystem.FileSystem, fileSystem)),
         Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
       );
       const context = yield* Layer.build(graph);

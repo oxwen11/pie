@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
 import { isSessionScopedEvent, type SessionRef, type PieUIMessage } from "@getpie/contract";
-import { Effect, Fiber, Layer, Logger, References, Stream } from "effect";
+import { Effect, Fiber, FileSystem, Layer, Logger, References, Stream } from "effect";
 
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
@@ -165,6 +165,8 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       Effect.gen(function* () {
         const result = yield* run({}, (fixture) =>
           Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            yield* fs.makeDirectory("/tmp/pie-worktree", { recursive: true }).pipe(Effect.orDie);
             const { ref } = yield* fixture.service.create({
               projectId: "proj-a",
               cwd: "/tmp/pie-worktree",
