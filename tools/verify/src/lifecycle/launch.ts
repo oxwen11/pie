@@ -180,12 +180,17 @@ function toLaunchCtx(
   switch (identity.id) {
     case "web": {
       const projectBrowseRoot = path.join(base.pieHome, "workspace");
+      const newProjectRoot = path.join(base.pieHome, "new-projects");
       return {
         ...base,
         surface: "web",
         vitePort: identity.vitePort,
         sample: scaffold(identity, projectBrowseRoot),
-        env: { ...base.env, PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot },
+        env: {
+          ...base.env,
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
+          PIE_NEW_PROJECT_ROOT: newProjectRoot,
+        },
       };
     }
     case "cli": {
@@ -197,6 +202,7 @@ function toLaunchCtx(
     case "desktop": {
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
       const projectBrowseRoot = path.join(base.pieHome, "workspace");
+      const newProjectRoot = path.join(base.pieHome, "new-projects");
       return {
         ...base,
         surface: "desktop",
@@ -205,6 +211,7 @@ function toLaunchCtx(
         env: {
           ...base.env,
           PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
+          PIE_NEW_PROJECT_ROOT: newProjectRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };

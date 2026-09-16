@@ -6,7 +6,7 @@ Primary surface: Vite app at `http://localhost:4190/`. After `pie-verify web lau
 
 | Feature | File | User entry |
 | --- | --- | --- |
-| Import a local folder as a Project | [import-project.md](import-project.md) | `launch --replace --empty-projects` → empty `/draft`, or sidebar **Import project** |
+| Import a local folder as a Project | [import-project.md](import-project.md) | `launch --replace --empty-projects` → `/draft` composer + sidebar **Import project** |
 | Start a new chat | [draft-new-chat.md](draft-new-chat.md) | `/` → `/draft`, **New chat**, or per-project compose |
 | Talk in a session | [session-chat.md](session-chat.md) | After send, or a sidebar session row. Streaming: Send queues a follow-up; **Steer** submits this draft; queue rows above the composer can be edited or removed |
 | Find and manage sessions | [sidebar-sessions.md](sidebar-sessions.md) | Left **Projects** list |

@@ -11,13 +11,13 @@ pnpm exec pie-verify desktop launch --replace --empty-projects
 pnpm exec pie-verify desktop doctor
 ```
 
-`--empty-projects` is reserved for this import proof. It shows heading **Import your first project** and button **Import project** while still creating `$PIE_HOME/workspace/verify-pie-desktop-sample`; the picker is confined to `$PIE_HOME/workspace`.
+`--empty-projects` is reserved for this import proof. `/draft` shows the composer with **New folder** while still creating `$PIE_HOME/workspace/verify-pie-desktop-sample`; import is the sidebar **Import project** action. The picker is confined to `$PIE_HOME/workspace`. Allocate uses `$PIE_HOME/new-projects`.
 
 ## Driving it
 
 ```bash
 # doctor already attached; if not: agent-browser connect 9223
-agent-browser wait --text "Import your first project"
+agent-browser wait --text "Ask Pi anything..."
 agent-browser find role button --name "Import project" click
 ```
 

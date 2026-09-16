@@ -40,7 +40,7 @@ What launch also does:
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and New folder proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `PIE_NEW_PROJECT_ROOT=$PIE_HOME/new-projects` so allocate never writes to the operator's `~/pie`.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
@@ -92,7 +92,7 @@ Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use
 ### UI rules
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `New folder`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
 3. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
 4. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
@@ -100,14 +100,14 @@ Stable handles (from source, not guesses):
 
 | UI | How it appears |
 | --- | --- |
-| Empty draft (no projects) | Heading **Import your first project**; button **Import project** |
+| Empty draft (no projects) | Composer with picker **New folder**; sidebar **Import project**. No **Import your first project** heading |
 | Sidebar new draft | **New chat** |
 | Sidebar import | button name **Import project** (plus-folder on the Projects group) |
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
-| Draft project picker | combobox / button **Select a project** until a project is chosen; options are folder basenames |
+| Draft project picker | combobox / button **New folder** until a project is chosen; first option is **New folder**, then folder basenames |
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
-| Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
+| Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while New folder) |
 | Session send | button **Send message**; while streaming with an empty draft: **Steer message** (disabled) and **Stop generating**; typing lights **Send message** (queue follow-up) and keeps Stop as a ghost action |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |

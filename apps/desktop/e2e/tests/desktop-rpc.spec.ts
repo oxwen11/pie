@@ -220,11 +220,10 @@ test("chats through Claude Agent SDK and the fake Claude executable", async ({
 }) => {
   // The app lands on /draft, the new-session surface: picking the seeded
   // project and typing the first message creates the session and navigates
-  // into it. There is no default project — the composer blocks until one is
-  // chosen.
+  // into it. The picker defaults to New folder until a project is chosen.
   await waitForConnectedUi(window);
 
-  await window.getByRole("combobox").filter({ hasText: "Select a project" }).click();
+  await window.getByRole("combobox").filter({ hasText: "New folder" }).click();
   await window.getByRole("option", { name: /e2e-workspace/ }).click();
 
   const input = window.locator("[contenteditable='true']");

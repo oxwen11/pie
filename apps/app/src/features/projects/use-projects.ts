@@ -4,8 +4,8 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 /**
- * Shared `project.list` readers. The import dialog's create mutation is the
- * only writer and invalidates on success.
+ * Shared `project.list` readers. Writers are the import dialog and draft
+ * allocate (both update this cache on success).
  */
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,
@@ -23,8 +23,8 @@ const selectOrdered = (projects: ReadonlyArray<Project>): ReadonlyArray<Project>
   Array.from(projects).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
 /**
- * Every imported project, oldest-first. Returns the query, not just the data:
- * empty is "no projects yet" (the import flow), which is not `isError`.
+ * Every registered project, oldest-first. Returns the query, not just the data:
+ * empty is "no projects yet", which is not `isError`.
  */
 export function useProjects(): UseQueryResult<ReadonlyArray<Project>> {
   return useProjectListQuery(selectOrdered);

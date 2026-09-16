@@ -30,7 +30,9 @@ const http = require('node:http');
 const cp = require('node:child_process');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.TRACE, JSON.stringify({
-  args, pid: process.pid, projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
+  args, pid: process.pid,
+  projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT,
+  newProjectRoot: process.env.PIE_NEW_PROJECT_ROOT
 }) + '\\n');
 if (args.join(' ') === 'exec install-electron') {
   if (process.env.INSTALL_CHILD === '1') {
@@ -149,6 +151,7 @@ function trace(root: string): Array<{
   args: string[];
   pid: number;
   projectBrowseRoot?: string;
+  newProjectRoot?: string;
 }> {
   const file = path.join(root, "trace");
   return fs.existsSync(file)
@@ -228,6 +231,11 @@ describe("desktop launch lifecycle", () => {
     expect(
       trace(root).every(
         (entry) => entry.projectBrowseRoot === path.join(meta.pieHome, "workspace"),
+      ),
+    ).toBe(true);
+    expect(
+      trace(root).every(
+        (entry) => entry.newProjectRoot === path.join(meta.pieHome, "new-projects"),
       ),
     ).toBe(true);
     expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
