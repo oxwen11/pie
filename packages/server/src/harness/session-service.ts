@@ -18,6 +18,7 @@ import { Paths } from "../config/paths";
 import {
   type ProjectNotFound,
   type SessionNotFound,
+  SessionNotWorktree,
   type SessionRefNotFound,
   type StoreReadError,
   type StoreWriteError,
@@ -29,7 +30,6 @@ import { EventBus } from "../events/event-bus";
 import { WorktreeService, type GitWorktreeFailure } from "../git/worktree-service";
 import { ProjectService } from "../project/service";
 import type { Session } from "../types";
-import { workspaceReadError } from "../workspace-root";
 import {
   AgentRequestUnavailable,
   type AgentOperationError,
@@ -89,7 +89,13 @@ export type PiAgentSessionServiceShape = {
     ref: SessionRef,
   ) => Effect.Effect<
     SessionWorkspace,
-    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
+    | SessionNotFound
+    | ProjectNotFound
+    | SessionNotWorktree
+    | StoreReadError
+    | StoreWriteError
+    | WorkspaceReadError
+    | GitWorktreeFailure
   >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
@@ -220,7 +226,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | EventBus
   | WorktreeService
   | ProjectService
-  | FileSystem.FileSystem
   | Crypto.Crypto
   | SessionMetadata
   | SessionMetadataLocks
@@ -233,7 +238,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
     const projects = yield* ProjectService;
-    const fs = yield* FileSystem.FileSystem;
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
@@ -247,6 +251,36 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
     const resolveWorkspace = (ref: SessionRef) =>
       withMetadataMutation(ref, readMetadata(ref).pipe(Effect.flatMap(ensureCwd)));
+
+    const ensureWorktreeCheckout = (ref: SessionRef, metadata: SessionWithCwd) =>
+      metadata.worktree === undefined
+        ? Effect.void
+        : worktrees.checkoutPresent(metadata.cwd).pipe(
+            Effect.flatMap((present) =>
+              present
+                ? Effect.void
+                : Effect.fail(
+                    new WorktreeCheckoutMissing({
+                      sessionId: ref.sessionId,
+                      projectId: ref.projectId,
+                      branch: metadata.worktree?.branch,
+                    }),
+                  ),
+            ),
+          );
+
+    const toPreparedWorkspace = (ref: SessionRef, metadata: SessionWithCwd) =>
+      Effect.gen(function* () {
+        yield* ensureWorktreeCheckout(ref, metadata);
+        if (metadata.agentSessionId === undefined) {
+          return toSessionWorkspace(metadata);
+        }
+        const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
+        if (info._tag === "missing") {
+          return yield* Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
+        }
+        return toSessionWorkspace(metadata);
+      });
 
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
@@ -408,48 +442,24 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       prepare: (ref) =>
         resolveWorkspace(ref).pipe(
-          Effect.flatMap((metadata) =>
-            Effect.gen(function* () {
-              if (metadata.worktree !== undefined) {
-                const exists = yield* fs
-                  .exists(metadata.cwd)
-                  .pipe(Effect.mapError(workspaceReadError(metadata.cwd)));
-                if (!exists) {
-                  return yield* new WorktreeCheckoutMissing({
-                    sessionId: ref.sessionId,
-                    projectId: ref.projectId,
-                    branch: metadata.worktree.branch,
-                  });
-                }
-              }
-              if (metadata.agentSessionId === undefined) {
-                return toSessionWorkspace(metadata);
-              }
-              const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
-              if (info._tag === "missing") {
-                return yield* Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
-              }
-              return toSessionWorkspace(metadata);
-            }),
-          ),
+          Effect.flatMap((metadata) => toPreparedWorkspace(ref, metadata)),
           inSession(ref),
         ),
 
       restoreWorktree: (ref) =>
-        readMetadata(ref).pipe(
-          Effect.flatMap(ensureCwd),
-          Effect.flatMap((metadata) => {
-            const worktree = metadata.worktree;
-            if (worktree === undefined) {
-              return Effect.succeed(toSessionWorkspace(metadata));
-            }
-            return projects.findById(metadata.projectId).pipe(
-              Effect.flatMap((project) =>
-                worktrees.restore(project.path, metadata.cwd, worktree.branch),
-              ),
-              Effect.as(toSessionWorkspace(metadata)),
-            );
-          }),
+        resolveWorkspace(ref).pipe(
+          Effect.flatMap((metadata) =>
+            Effect.gen(function* () {
+              if (metadata.worktree === undefined) {
+                return yield* Effect.fail(
+                  new SessionNotWorktree({ sessionId: ref.sessionId, projectId: ref.projectId }),
+                );
+              }
+              const project = yield* projects.findById(metadata.projectId);
+              yield* worktrees.restore(project.path, metadata.cwd, metadata.worktree.branch);
+              return toSessionWorkspace(metadata);
+            }),
+          ),
           inSession(ref),
         ),
 

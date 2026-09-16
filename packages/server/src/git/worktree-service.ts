@@ -10,6 +10,7 @@ import {
   GitRefNotFound,
   GitWorktreePathExists,
   WorkspacePathEscape,
+  type WorkspaceReadError,
 } from "../errors";
 import { contains } from "../path-safety";
 import type { GitFailure } from "./service";
@@ -49,6 +50,7 @@ export class WorktreeService extends Context.Service<
       cwd: string,
       input?: { readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    readonly checkoutPresent: (worktreePath: string) => Effect.Effect<boolean, WorkspaceReadError>;
     /** Re-create a pie worktree at `worktreePath` from an existing `branch`. */
     readonly restore: (
       repoCwd: string,
@@ -98,7 +100,7 @@ export const WorktreeServiceLayer: Layer.Layer<
           Effect.catchTag("PlatformError", dieRng("worktree branch")),
         );
 
-    const rejectEscape = (cwd: string, candidate: string) =>
+    const validateWorktreePath = (cwd: string, candidate: string) =>
       Effect.gen(function* () {
         const exists = yield* fs.exists(candidate).pipe(Effect.mapError(readError(candidate)));
         if (exists) {
@@ -149,9 +151,7 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
 
         const worktreePath = worktreeDirectory(paths.worktreesDir, repoRoot, worktreeKey);
-        if (!contains(paths.worktreesDir, worktreePath)) {
-          return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
-        }
+        yield* validateWorktreePath(realRoot, worktreePath);
         const exists = yield* fs
           .exists(worktreePath)
           .pipe(Effect.mapError(readError(worktreePath)));
@@ -167,6 +167,12 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
         yield* addCheckout(repoRoot, worktreePath, ["-b", branch, worktreePath, startPoint]);
         return { path: worktreePath, branch };
+      }),
+
+      checkoutPresent: Effect.fn("WorktreeService.checkoutPresent")(function* (
+        worktreePath: string,
+      ) {
+        return yield* fs.exists(worktreePath).pipe(Effect.mapError(readError(worktreePath)));
       }),
 
       restore: Effect.fn("WorktreeService.restore")(function* (
@@ -185,14 +191,14 @@ export const WorktreeServiceLayer: Layer.Layer<
           .exists(worktreePath)
           .pipe(Effect.mapError(readError(worktreePath)));
         if (exists) {
-          const realPath = yield* rejectEscape(realRoot, worktreePath);
+          const realPath = yield* validateWorktreePath(realRoot, worktreePath);
           const info = yield* fs.stat(realPath).pipe(Effect.mapError(readError(worktreePath)));
           if (info.type !== "Directory") {
             return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
           }
           return { path: worktreePath, branch };
         }
-        yield* rejectEscape(realRoot, worktreePath);
+        yield* validateWorktreePath(realRoot, worktreePath);
         const repoRoot = yield* resolveRepoRoot(realRoot);
         const refs = yield* listRefs(realRoot);
         if (!refs.all.includes(branch)) {
