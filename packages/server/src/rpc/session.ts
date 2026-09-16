@@ -85,9 +85,9 @@ export const sessionRouter = orpc.router({
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     const preparedWorkspace = yield* sessions.prepare(input.ref).pipe(
-      Effect.map((prepared) => ({
+      Effect.map((sessionWorkspace) => ({
         ref: input.ref,
-        ...prepared,
+        workspace: sessionWorkspace,
       })),
       Effect.catchTags({
         SessionNotFound: (e) =>
@@ -98,6 +98,16 @@ export const sessionRouter = orpc.router({
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         WorkspaceReadError: (e) =>
           Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
+        WorktreeCheckoutMissing: (e) =>
+          Effect.fail(
+            errors.WORKTREE_MISSING({
+              data: {
+                sessionId: e.sessionId,
+                projectId: e.projectId,
+                ...(e.branch !== undefined ? { branch: e.branch } : undefined),
+              },
+            }),
+          ),
       }),
     );
     return preparedWorkspace;

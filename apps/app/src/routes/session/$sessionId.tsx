@@ -1,4 +1,5 @@
 import type { PrepareSessionOutput, SessionRef } from "@getpie/contract";
+import { ORPCError } from "@orpc/client";
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -11,6 +12,28 @@ type SessionSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const throwIfWorktreeMissing = (error: unknown): void => {
+  if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return;
+  const data: unknown = error.data;
+  if (!isRecord(data)) return;
+  const sessionId = asText(data.sessionId);
+  const projectId = asText(data.projectId);
+  if (sessionId === undefined || projectId === undefined) return;
+  const branch = asText(data.branch);
+  throw redirect({
+    to: "/session/fallback",
+    search: {
+      sessionId,
+      projectId,
+      reason: "missing-worktree",
+      ...(branch !== undefined ? { branch } : undefined),
+    },
+  });
+};
+
 export const Route = createFileRoute("/session/$sessionId")({
   validateSearch: (search: Record<string, unknown>): SessionSearch => {
     const projectId = asText(search.projectId);
@@ -21,19 +44,6 @@ export const Route = createFileRoute("/session/$sessionId")({
     const { session } = context.orpcQueryUtils.agent;
     const prepareSession = async (ref: SessionRef) => {
       const prepared = await session.prepare.call({ ref });
-      if (prepared.missingWorktree === true) {
-        throw redirect({
-          to: "/session/fallback",
-          search: {
-            sessionId: prepared.ref.sessionId,
-            projectId: prepared.ref.projectId,
-            reason: "missing-worktree",
-            ...(prepared.workspace.worktree?.branch !== undefined
-              ? { branch: prepared.workspace.worktree.branch }
-              : undefined),
-          },
-        });
-      }
       void context.queryClient.prefetchQuery(
         context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
       );
@@ -47,6 +57,7 @@ export const Route = createFileRoute("/session/$sessionId")({
       };
       const prepared = await prepareSession(hinted).catch((error: unknown) => {
         if (isRedirect(error)) throw error;
+        throwIfWorktreeMissing(error);
         console.warn("Preparing the URL's ref failed, falling back to lookup", error);
         return undefined;
       });
@@ -62,6 +73,7 @@ export const Route = createFileRoute("/session/$sessionId")({
       });
     return prepareSession(ref).catch((error: unknown) => {
       if (isRedirect(error)) throw error;
+      throwIfWorktreeMissing(error);
       console.error("Failed to prepare session", error);
       toast.error(
         `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,

@@ -213,7 +213,7 @@ The session record persists the resulting `cwd` and `worktree: { branch }` so a
 removed checkout can be restored at that path. There is no separate worktree
 manifest. Checkouts must stay under `$PIE_HOME/worktrees/`. `prepare` and prompt
 do not re-create the checkout or require `HEAD` to match the stored branch;
-`prepare` reports `missingWorktree` when the directory is gone.
+`prepare` fails with `WORKTREE_MISSING` when the directory is gone.
 `session.restoreWorktree` is the explicit write: `git worktree prune` then
 `git worktree add <cwd> <branch>` at the stored path. It does not mint a new
 key or branch. If the directory already exists it is a no-op.

@@ -1,4 +1,5 @@
 import { eventIterator, type } from "@orpc/contract";
+import { Schema } from "effect";
 
 import {
   AgentModelStateSchema,
@@ -24,13 +25,24 @@ import {
   SubscribeInputSchema,
   type SubscribeStreamEvent,
 } from "./domain";
-import { oc } from "./orpc";
+import { oc, toStandardSchema } from "./orpc";
 
 const base = oc.errors(serverErrors);
 
+const worktreeMissingData = toStandardSchema(
+  Schema.Struct({
+    sessionId: Schema.String,
+    projectId: Schema.String,
+    branch: Schema.optionalKey(Schema.NonEmptyString),
+  }),
+);
+
 export const sessionContract = {
   create: base.input(CreateSessionInputSchema).output(CreateSessionOutputSchema),
-  prepare: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
+  prepare: base
+    .errors({ WORKTREE_MISSING: { data: worktreeMissingData } })
+    .input(RefInputSchema)
+    .output(PrepareSessionOutputSchema),
   restoreWorktree: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
   close: base.input(RefInputSchema),
 
