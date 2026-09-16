@@ -101,6 +101,27 @@ $PIE_HOME/
 `path` is an absolute registered workspace path and is the only persisted
 `projectId -> path` mapping.
 
+### Allocated project folders
+
+A draft send with no selected Project calls `project.allocate`, which creates
+an empty folder and then registers it through `ProjectService.create` (the
+same `projects.json` write as import).
+
+| Property      | Current contract                                                                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `<new-project-root>/<YYYY-MM-DD>[-<slug>][-n]/`                                                                                                                                                                |
+| Owner         | The user. Pie creates the directory; Pi and agent tools write inside it afterwards. `ProjectRepository` only stores the registered `path`                                                                      |
+| Root          | `PIE_NEW_PROJECT_ROOT` when non-empty, otherwise `~/pie` (`DEFAULT_NEW_PROJECT_DIR`). Resolved in `packages/server/src/project/allocate-folder.ts`, not `config/paths.ts` — this is user data, not `$PIE_HOME` |
+| Name          | Local-calendar `YYYY-MM-DD`, plus a sanitized slug from the optional allocate `title` (first prompt, max 40 `[a-z0-9-]` characters). Exclusive mkdir; collision suffix starts at `-2`. At most 100 attempts    |
+| Write points  | `ProjectService.allocate` mkdir of the root (recursive, first use) and of the leaf (exclusive). No files are placed in the new folder                                                                          |
+| Permissions   | Umask, same as imported project folders. No owner-only mode is pinned                                                                                                                                          |
+| Compatibility | New folders only. Existing Projects and imported paths are unchanged                                                                                                                                           |
+| Extension     | Change the resolver or the basename helper; do not add a second parent or a caller-supplied allocate path on the wire                                                                                          |
+| Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/pie` or `PIE_NEW_PROJECT_ROOT`                                                                                        |
+
+Verify and tests must set `PIE_NEW_PROJECT_ROOT` under the run's `$PIE_HOME`
+so they never write into the operator's `~/pie`.
+
 ### Session metadata
 
 | Property      | Current contract                                                                                                                     |
@@ -341,11 +362,13 @@ $PIE_HOME/workspace/verify-pie[-desktop]-sample/
 ```
 
 Verify owns these non-sensitive, umask-permissioned files and sets
-`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` for the run's server. When this
-environment value is set, the project picker starts at that directory, reports
-no parent there, and resolves real paths before rejecting traversal or symlinks
-outside it. An unset or blank value preserves the production default of the
-operator's home directory. Verify overwrites an inherited value with its own
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and
+`PIE_NEW_PROJECT_ROOT=$PIE_HOME/new-projects` for the run's server. When
+`PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
+reports no parent there, and resolves real paths before rejecting traversal or
+symlinks outside it. An unset or blank browse root preserves the production
+default of the operator's home directory. An unset new-project root would
+default to the operator's `~/pie`; Verify always overrides it. Verify overwrites an inherited value with its own
 run path; parallel runs therefore do not share this boundary.
 
 The sample has no independent schema or migration. Its marker retains the

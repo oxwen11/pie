@@ -81,6 +81,8 @@ const stubProjects = (missingProject: boolean): ProjectService["Service"] => ({
         }),
   findByPath: unused,
   create: unused,
+  allocate: unused,
+  allocateRoot: unused,
   remove: unused,
 });
 

@@ -540,6 +540,21 @@ export const CreateProjectInputSchema = Schema.Struct({
   path: Schema.String,
 });
 
+/**
+ * Optional naming hint for `project.allocate`. The server slugs this into the
+ * new folder's basename; it is not a path and never chooses the parent directory.
+ */
+export const AllocateProjectInputSchema = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+});
+export type AllocateProjectInput = typeof AllocateProjectInputSchema.Type;
+
+/** Absolute parent under which `project.allocate` creates a folder. */
+export const NewProjectRootSchema = Schema.Struct({
+  path: Schema.String,
+});
+export type NewProjectRoot = typeof NewProjectRootSchema.Type;
+
 export const DirectoryEntrySchema = Schema.Struct({
   name: Schema.String,
   path: Schema.String,

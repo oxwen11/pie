@@ -23,4 +23,24 @@ describe("project router", () => {
       await h.dispose();
     }
   });
+
+  it("allocates a folder under PIE_NEW_PROJECT_ROOT and lists the project", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-new-proj-"));
+    const previous = process.env.PIE_NEW_PROJECT_ROOT;
+    process.env.PIE_NEW_PROJECT_ROOT = root;
+    const h = await makeRpcTestHarness(home);
+    try {
+      await expect(h.client.project.allocateRoot()).resolves.toEqual({ path: root });
+      const created = await h.client.project.allocate({ title: "hello world" });
+      expect(created.path.startsWith(root + path.sep)).toBe(true);
+      expect(created.name).toMatch(/^\d{4}-\d{2}-\d{2}-hello-world$/);
+      expect(fs.existsSync(created.path)).toBe(true);
+      await expect(h.client.project.list()).resolves.toEqual([created]);
+    } finally {
+      if (previous === undefined) delete process.env.PIE_NEW_PROJECT_ROOT;
+      else process.env.PIE_NEW_PROJECT_ROOT = previous;
+      await h.dispose();
+    }
+  });
 });

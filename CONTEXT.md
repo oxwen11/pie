@@ -5,8 +5,12 @@ Glossary of project-specific terms. pie integrates the Pi coding agent into the 
 ## Session Domain
 
 **Project**:
-A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path.
+A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocate` creates a folder under the **new-project root** and registers it, then `session.create` uses that id as usual.
 _Avoid_: workspace, repo, cwd (for the Project field)
+
+**New-project root**:
+The parent directory where `project.allocate` mints a new folder and registers it as a Project. Default `~/pie`. Override with `PIE_NEW_PROJECT_ROOT` (tests and Verify must set this under their isolated `$PIE_HOME`). Folder names are `<YYYY-MM-DD>` or `<YYYY-MM-DD>-<slug>` from the first prompt, with a `-2`, `-3`, … suffix on collision. The root is user data, not `$PIE_HOME`.
+_Avoid_: scratch, inbox, workspace root, cwd, putting allocated folders under `$PIE_HOME` in production
 
 **SessionRef**:
 The composite identity `{ projectId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.

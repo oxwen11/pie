@@ -125,6 +125,18 @@ export class WorkspaceReadError extends Data.TaggedError("WorkspaceReadError")<{
   readonly cause: unknown;
 }> {}
 
+/** Creating a new project folder failed (mkdir of the root or the leaf). */
+export class ProjectFolderCreateError extends Data.TaggedError("ProjectFolderCreateError")<{
+  readonly path: string;
+  readonly cause: unknown;
+}> {}
+
+/** Every generated folder name under the new-project root was already taken. */
+export class ProjectFolderConflict extends Data.TaggedError("ProjectFolderConflict")<{
+  readonly root: string;
+  readonly name: string;
+}> {}
+
 /** No live PTY for this session-scoped terminal id. */
 export class TerminalNotRunning extends Data.TaggedError("TerminalNotRunning")<{
   readonly projectId: string;
