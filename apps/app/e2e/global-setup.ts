@@ -10,6 +10,7 @@ const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
 const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
 const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
+const fakeGh = path.join(repoRoot, "tools/testing/fake-gh.mjs");
 
 const SAMPLE = "sample";
 const SAMPLE_GIT = "sample-git";
@@ -66,12 +67,18 @@ export default async function setup({
 }): Promise<() => void> {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-app-e2e-"));
   const workspace = path.join(home, "workspace");
+  const bin = path.join(home, "bin");
   fs.mkdirSync(workspace, { recursive: true });
+  fs.mkdirSync(bin, { recursive: true });
   writeSample(workspace);
   writeGitSample(workspace);
+  const gh = path.join(bin, "gh");
+  fs.copyFileSync(fakeGh, gh);
+  fs.chmodSync(gh, 0o755);
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
     PIE_HOME: home,
     PIE_PORT: "0",
     PIE_E2E: "1",
