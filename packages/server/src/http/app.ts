@@ -3,7 +3,7 @@ import {
   ElectronRegistrationSchema,
   type ElectronRegistration,
 } from "@getpie/contract/resource-monitoring";
-import { Effect, FileSystem } from "effect";
+import { ByteSize, Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
@@ -158,7 +158,7 @@ const route = (
       options.registerElectron !== undefined
     ) {
       const registration = yield* HttpServerRequest.schemaBodyJson(ElectronRegistrationSchema).pipe(
-        Effect.provideService(HttpServerRequest.MaxBodySize, FileSystem.Size(64 * 1024)),
+        Effect.provideService(HttpServerRequest.MaxBodySize, ByteSize.bytes(64 * 1024)),
         Effect.catch(() => Effect.succeed(undefined)),
       );
       if (registration === undefined) return withCors(badRequest);

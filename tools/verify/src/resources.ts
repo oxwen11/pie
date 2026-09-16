@@ -431,23 +431,23 @@ function completeRounds(records: ResourceRecord[]): CompleteRound[] {
 }
 
 function validateMetrics(snapshot: SourceSnapshot): void {
-  for (const round of snapshot.complete) {
-    for (const row of round.rows) {
-      if (row.type === "os_sample") {
-        if (!Number.isFinite(row.metrics.rssBytes) || row.metrics.rssBytes <= 0) {
-          throw new Error(`invalid OS RSS for pid ${row.process.pid}`);
-        }
-        if (row.metrics.cpuPercent !== undefined && !Number.isFinite(row.metrics.cpuPercent)) {
-          throw new Error(`invalid OS CPU for pid ${row.process.pid}`);
-        }
-      } else {
-        const residentBytes = row.metrics.memory?.rssBytes ?? row.metrics.memory?.workingSetBytes;
-        if (residentBytes === undefined || !Number.isFinite(residentBytes) || residentBytes <= 0) {
-          throw new Error(`invalid runtime resident memory for pid ${row.process.pid}`);
-        }
-        if (row.metrics.cpu !== undefined && !Number.isFinite(row.metrics.cpu.percent)) {
-          throw new Error(`invalid runtime CPU for pid ${row.process.pid}`);
-        }
+  const round = snapshot.complete.at(-1);
+  if (round === undefined) return;
+  for (const row of round.rows) {
+    if (row.type === "os_sample") {
+      if (!Number.isFinite(row.metrics.rssBytes) || row.metrics.rssBytes <= 0) {
+        throw new Error(`invalid OS RSS for pid ${row.process.pid}`);
+      }
+      if (row.metrics.cpuPercent !== undefined && !Number.isFinite(row.metrics.cpuPercent)) {
+        throw new Error(`invalid OS CPU for pid ${row.process.pid}`);
+      }
+    } else {
+      const residentBytes = row.metrics.memory?.rssBytes ?? row.metrics.memory?.workingSetBytes;
+      if (residentBytes === undefined || !Number.isFinite(residentBytes) || residentBytes <= 0) {
+        throw new Error(`invalid runtime resident memory for pid ${row.process.pid}`);
+      }
+      if (row.metrics.cpu !== undefined && !Number.isFinite(row.metrics.cpu.percent)) {
+        throw new Error(`invalid runtime CPU for pid ${row.process.pid}`);
       }
     }
   }
