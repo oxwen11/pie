@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "doctor": "react-doctor --yes --blocking warning",
     "clean": "git clean -xdf node_modules dist .turbo"
@@ -51,6 +52,7 @@
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",
     "@types/react": "catalog:",

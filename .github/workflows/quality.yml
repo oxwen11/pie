@@ -96,6 +96,21 @@ jobs:
           exit 1
         shell: bash
 
+      - name: Ensure xvfb (desktop e2e)
+        run: |
+          # Electron Playwright needs a display on the Linux runner.
+          if command -v xvfb-run >/dev/null; then
+            exit 0
+          fi
+          if command -v apt-get >/dev/null && command -v sudo >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends xvfb
+            exit 0
+          fi
+          echo "desktop e2e needs xvfb-run on PATH." >&2
+          exit 1
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       - name: Install Playwright Chromium
@@ -112,9 +127,9 @@ jobs:
       # `@getpie/app#build` and replaces `apps/app/dist` while
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
-      # root Vitest workspace (`pnpm test`) after that graph so cli/app
-      # dist is stable. Format only needs node_modules and stays parallel
-      # with the turbo graph.
+      # root Vitest workspace (`pnpm test`) then Playwright e2e
+      # (`pnpm e2e`: web + Desktop) after that graph so cli/app
+      # dist is stable. Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail
@@ -127,4 +142,9 @@ jobs:
 
           wait "$turbo_pid"
           pnpm test
+          if command -v xvfb-run >/dev/null; then
+            xvfb-run --auto-servernum pnpm e2e
+          else
+            pnpm e2e
+          fi
           wait "$format_pid"
