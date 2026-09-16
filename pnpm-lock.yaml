@@ -292,6 +292,7 @@ packageExtensionsChecksum: sha256-3DZUlN3TYCSri1e/lfcGwxJa6gTHjNsTvQKRs+ToIrU=
 
 patchedDependencies:
   '@earendil-works/pi-coding-agent@0.85.1': f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578
+  '@shadcn/lint@0.1.0': 273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
 importers:
@@ -312,7 +313,7 @@ importers:
         version: 1.82.0
       '@shadcn/lint':
         specifier: ^0.1.0
-        version: 0.1.0(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+        version: 0.1.0(patch_hash=273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
       '@types/node':
         specifier: ^24.13.4
         version: 24.13.4
@@ -10946,7 +10947,7 @@ snapshots:
 
   '@shaderfrog/glsl-parser@7.0.1': {}
 
-  '@shadcn/lint@0.1.0(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@shadcn/lint@0.1.0(patch_hash=273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf)(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@eslint/core': 0.17.0
       '@typescript-eslint/parser': 8.70.0(eslint@10.7.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)

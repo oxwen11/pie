@@ -1,0 +1,54 @@
+diff --git a/dist/index.js b/dist/index.js
+index 7c65ec3711599964699c9c8b121b72213f4e427a..75c055d9094267e39e7cd23d3607356292c468b1 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1915,11 +1915,39 @@ function applyTokenDeclarations(declarations, tokens) {
+ 	}
+ }
+ const DARK_PRELUDE = /\.dark(?![\w-])|prefers-color-scheme\s*:\s*dark|data-(?:theme|mode)=["']?dark|@variant\s+dark\b/;
++// pie: do not treat `/*` inside quotes as a comment (`@source ".../dist/*.js"`).
++function stripCssComments(css) {
++	let out = "";
++	let quote = "";
++	for (let i = 0; i < css.length; i++) {
++		const char = css[i];
++		if (quote) {
++			out += char;
++			if (char === "\\") {
++				if (i + 1 < css.length) out += css[++i];
++			} else if (char === quote) quote = "";
++			continue;
++		}
++		if (char === "\"" || char === "'") {
++			quote = char;
++			out += char;
++			continue;
++		}
++		if (char === "/" && css[i + 1] === "*") {
++			const end = css.indexOf("*/", i + 2);
++			i = end === -1 ? css.length : end + 1;
++			out += " ";
++			continue;
++		}
++		out += char;
++	}
++	return out;
++}
+ function parseDeclarations(css) {
+ 	const values = /* @__PURE__ */ new Map();
+ 	const themeNames = /* @__PURE__ */ new Set();
+ 	const declarations = [];
+-	const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
++	const stripped = stripCssComments(css);
+ 	const stack = [];
+ 	let start = 0;
+ 	for (let i = 0; i < stripped.length; i++) {
+@@ -1982,7 +2010,7 @@ function parseUtilities(css) {
+ }
+ function parseClassSelectors(css) {
+ 	const out = /* @__PURE__ */ new Set();
+-	const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
++	const stripped = stripCssComments(css);
+ 	for (const match of stripped.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) out.add(match[1]);
+ 	return out;
+ }
