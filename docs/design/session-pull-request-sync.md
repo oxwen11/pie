@@ -329,5 +329,5 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 ### 尚未完成的验收与限制
 
 - 物理最小化 / 恢复、多窗口和断线恢复的完整运行时矩阵仍需补验，不能用单元测试冒充这部分证明。
-- Native Stack 写操作只做了确定性命令测试，未在 GitHub 执行。**Stack merge 保持禁用**：当前 host API 不能原子保护所有受影响层的 head；不降级为连续单 PR merge。Rebase 仍要求新预览、确认与逐层校验，部分完成或未知结果不会自动重试。
+- Native Stack 写操作只做了确定性命令测试，未在 GitHub 执行。Stack merge 走 GitHub `merge-async`：确认后带所选层 head SHA 提交，再轮询结果；不降级为连续单 PR merge，超时或未知结果不重试。Rebase 仍要求新预览、确认与逐层校验。
 - 尚未向 GitHub 上传截图、推送分支或创建 PR；本次没有远端写入授权。

@@ -143,7 +143,7 @@ function ConfirmStackAction({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {preview.action === "merge"
-              ? "Merge the selected layer and affected lower layers using the selected strategy."
+              ? "GitHub will merge this layer and the layers below it as one stack merge. This does not change the local checkout."
               : "Rebase rewrites remote branch history from bottom to top. Partial completion is possible; this does not change the local checkout."}{" "}
             All members and heads will be checked again before the action.
           </AlertDialogDescription>

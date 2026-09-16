@@ -313,7 +313,8 @@ export const makeGitHubCliAdapter = (
       }),
     stack: (cwd, ref) => stackFor(cwd).stack(ref),
     stackPreview: (cwd, ref, action) => stackFor(cwd).preview(ref, action),
-    runStackAction: (cwd, ref, action, expected) => stackFor(cwd).run(ref, action, expected),
+    runStackAction: (cwd, ref, action, expected, method) =>
+      stackFor(cwd).run(ref, action, expected, method),
     current: (cwd, pullRequest) =>
       executeGitHubCommand(spawner, cwd, currentPullRequestArgs(pullRequest)).pipe(
         Effect.mapError(mapExecutionReadError),

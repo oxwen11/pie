@@ -1,5 +1,6 @@
 import {
   pullRequestKey,
+  type PullRequestMergeMethod,
   type PullRequestRef,
   type PullRequestStack,
   type PullRequestStackAction,
@@ -10,6 +11,8 @@ import {
 import { Effect, Schema } from "effect";
 
 import {
+  PullRequestActionOutcomeUnknown,
+  PullRequestHostRejected,
   PullRequestInvalidResponse,
   PullRequestStaleContext,
   PullRequestUnsupportedAction,
@@ -51,6 +54,25 @@ const AccessJson = Schema.Struct({
   }),
 });
 
+const MERGE_METHODS = [
+  "merge",
+  "squash",
+  "rebase",
+] as const satisfies readonly PullRequestMergeMethod[];
+const AsyncMergeAccepted = Schema.Struct({
+  uuid: Schema.optional(Schema.String),
+  status: Schema.optional(Schema.String),
+  details: Schema.optional(Schema.Struct({ sha: Schema.optional(Schema.String) })),
+});
+const AsyncMergeResult = Schema.Struct({
+  status: Schema.optional(Schema.String),
+  details: Schema.optional(
+    Schema.Struct({
+      message: Schema.optional(Schema.String),
+      sha: Schema.optional(Schema.String),
+    }),
+  ),
+});
 const Updated = Schema.Struct({
   data: Schema.Struct({
     updatePullRequestBranch: Schema.Struct({
@@ -179,10 +201,8 @@ export const makeGitHubStack = (read: Read, write: Write) => {
         action === "merge" ? data.stack.layers.slice(0, index + 1) : data.stack.layers
       ).filter((layer) => layer.lifecycle?.type !== "merged");
       let reason: string | undefined;
-      if (action === "merge")
-        reason =
-          "The native merge API cannot protect every Stack member's expected head. Merge this PR separately.";
-      else if (index !== data.stack.layers.length - 1)
+      let methods: PullRequestMergeMethod[] = [];
+      if (action === "rebase" && index !== data.stack.layers.length - 1)
         reason = "Select the top layer to rebase the Stack.";
       else if (affected.length === 0 || affected.some((layer) => layer.lifecycle?.type !== "open"))
         reason = "Every affected layer must be open.";
@@ -190,7 +210,7 @@ export const makeGitHubStack = (read: Read, write: Write) => {
         reason = "GitHub did not return every member's head commit.";
       else {
         const permissions = yield* access(ref, data.stack);
-        if (!permissions.supported)
+        if (action === "rebase" && !permissions.supported)
           reason = "This host cannot safely rebase branches with expected heads.";
         else if (!permissions.permitted) reason = "You cannot update every affected branch.";
         else if (
@@ -199,13 +219,14 @@ export const makeGitHubStack = (read: Read, write: Write) => {
           )
         )
           reason = "The Stack changed. Refresh before confirming.";
+        else if (action === "merge") methods = [...MERGE_METHODS];
       }
       return {
         pullRequest: ref,
         action,
         ...data,
         affected: affected.map((layer) => layer.ref),
-        methods: [],
+        methods,
         allowed: reason === undefined,
         ...(reason ? { reason } : undefined),
       };
@@ -226,10 +247,70 @@ export const makeGitHubStack = (read: Read, write: Write) => {
       );
     });
 
+  const merge = (
+    ref: PullRequestRef,
+    expected: PullRequestStackExpected,
+    method: PullRequestMergeMethod,
+    fresh: PullRequestStackPreview,
+  ) =>
+    Effect.gen(function* () {
+      const sha = expected.members.find(
+        (member) => pullRequestKey(member.pullRequest) === pullRequestKey(ref),
+      )?.headSha;
+      if (!sha || !fresh.methods.includes(method)) return yield* new PullRequestUnsupportedAction();
+      let submitted = false;
+      const step = yield* Effect.result(
+        Effect.gen(function* () {
+          submitted = true;
+          const acceptedRaw = yield* write(
+            api(ref, [
+              "--method",
+              "PUT",
+              `${repoPath(ref)}/pulls/${ref.number}/merge-async`,
+              "-f",
+              `sha=${sha}`,
+              "-f",
+              `merge_method=${method}`,
+            ]),
+          );
+          const accepted = yield* parse(() =>
+            Schema.decodeUnknownSync(AsyncMergeAccepted)(acceptedRaw),
+          );
+          if (accepted.status === "merged" || accepted.details?.sha) return;
+          if (!accepted.uuid) return yield* new PullRequestInvalidResponse();
+          for (let attempt = 0; attempt < 30; attempt++) {
+            const polledRaw = yield* read(
+              api(ref, [`${repoPath(ref)}/pulls/${ref.number}/merge-async/${accepted.uuid}`]),
+            );
+            const polled = yield* parse(() =>
+              Schema.decodeUnknownSync(AsyncMergeResult)(polledRaw),
+            );
+            if (polled.status === "merged" || polled.details?.sha) return;
+            if (polled.status === "failed" || polled.status === "error")
+              return yield* new PullRequestHostRejected();
+            yield* Effect.sleep("1 second");
+          }
+          return yield* new PullRequestActionOutcomeUnknown();
+        }),
+      );
+      if (step._tag === "Failure") {
+        if (!submitted) return yield* step.failure;
+        if (step.failure._tag === "PullRequestHostRejected") return yield* step.failure;
+        return {
+          action: "merge" as const,
+          completed: [],
+          outcome: "unknown" as const,
+          message: "The stack merge result is unknown. Check GitHub before retrying.",
+        };
+      }
+      return { action: "merge" as const, completed: fresh.affected, outcome: "applied" as const };
+    });
+
   const run = (
     ref: PullRequestRef,
     action: PullRequestStackAction,
     expected: PullRequestStackExpected,
+    method?: PullRequestMergeMethod,
   ): Effect.Effect<
     PullRequestStackActionResult,
     PullRequestReadFailure | PullRequestCliActionFailure
@@ -237,7 +318,11 @@ export const makeGitHubStack = (read: Read, write: Write) => {
     Effect.gen(function* () {
       const fresh = yield* preview(ref, action);
       if (!matches(fresh.expected, expected)) return yield* new PullRequestStaleContext();
-      if (!fresh.allowed || action !== "rebase") return yield* new PullRequestUnsupportedAction();
+      if (!fresh.allowed) return yield* new PullRequestUnsupportedAction();
+      if (action === "merge") {
+        if (!method) return yield* new PullRequestUnsupportedAction();
+        return yield* merge(ref, expected, method, fresh);
+      }
       const completed: PullRequestRef[] = [];
       const observed = { ...expected };
       for (const target of fresh.affected) {

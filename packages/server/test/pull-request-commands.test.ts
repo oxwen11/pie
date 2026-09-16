@@ -278,23 +278,78 @@ it.effect(
     }),
 );
 
-it.effect(
-  "merge preview names only selected and lower layers but refuses unguarded native merge",
-  () =>
-    Effect.gen(function* () {
-      const fake = scripted([{ output: stack() }, { output: stack() }]);
-      const preview = yield* fake.cli.stackPreview("/workspace", lower, "merge");
-      assert.deepEqual(preview.affected, [lower]);
-      assert.equal(preview.allowed, false);
-      assert.match(preview.reason ?? "", /every Stack member/);
-      assert.equal(
-        (yield* Effect.flip(
-          fake.cli.runStackAction("/workspace", lower, "merge", expected, "squash"),
-        ))._tag,
-        "PullRequestUnsupportedAction",
-      );
-      assert.equal(fake.writes().length, 0);
-    }),
+it.effect("merge preview names selected and lower layers and offers merge-async methods", () =>
+  Effect.gen(function* () {
+    const fake = scripted([
+      { output: stack() },
+      { output: access() },
+      { output: stack() },
+      { output: access() },
+    ]);
+    const preview = yield* fake.cli.stackPreview("/workspace", lower, "merge");
+    assert.deepEqual(preview.affected, [lower]);
+    assert.equal(preview.allowed, true);
+    assert.deepEqual(preview.methods, ["merge", "squash", "rebase"]);
+    assert.equal(fake.writes().length, 0);
+    assert.equal(
+      (yield* Effect.flip(fake.cli.runStackAction("/workspace", lower, "merge", expected)))._tag,
+      "PullRequestUnsupportedAction",
+    );
+  }),
+);
+
+it.effect("confirmed merge uses merge-async with the selected head and does not retry", () =>
+  Effect.gen(function* () {
+    const fake = scripted([
+      { output: stack() },
+      { output: access() },
+      { output: { uuid: "merge-1" } },
+      { output: { status: "merged", details: { sha: "merge-commit" } } },
+    ]);
+    assert.deepEqual(
+      yield* fake.cli.runStackAction("/workspace", lower, "merge", expected, "squash"),
+      {
+        action: "merge",
+        completed: [lower],
+        outcome: "applied",
+      },
+    );
+    const put = fake.calls.find((call) => call.args.includes("PUT"));
+    assert.deepEqual(put?.args.slice(put.args.indexOf("--method")), [
+      "--method",
+      "PUT",
+      "repos/getpie/pie/pulls/41/merge-async",
+      "-f",
+      "sha=lower-head",
+      "-f",
+      "merge_method=squash",
+    ]);
+    assert.equal(fake.calls.filter((call) => call.args.includes("PUT")).length, 1);
+    assert.ok(
+      fake.calls.some((call) =>
+        call.args.includes("repos/getpie/pie/pulls/41/merge-async/merge-1"),
+      ),
+    );
+  }),
+);
+
+it.effect("a timed-out merge-async poll is unknown and never submits a second merge", () =>
+  Effect.gen(function* () {
+    const fake = scripted([
+      { output: stack() },
+      { output: access() },
+      { output: { uuid: "merge-1" } },
+      { hang: true },
+    ]);
+    const fiber = yield* fake.cli
+      .runStackAction("/workspace", lower, "merge", expected, "squash")
+      .pipe(Effect.forkChild);
+    yield* TestClock.adjust("30 seconds");
+    const result = yield* Fiber.join(fiber);
+    assert.equal(result.outcome, "unknown");
+    assert.deepEqual(result.completed, []);
+    assert.equal(fake.calls.filter((call) => call.args.includes("PUT")).length, 1);
+  }),
 );
 
 it.effect(
