@@ -3,7 +3,7 @@ import path from "node:path";
 import type { PieUIMessage } from "@getpie/contract";
 import { Context, Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "effect";
 
-import { ProjectNotFound, StoreWriteError } from "../../src/errors";
+import { ProjectNotFound, StoreWriteError, type WorkspaceReadError } from "../../src/errors";
 import { EventBus, type EventBusShape, makeEventBus } from "../../src/events/event-bus";
 import type { GitFailure } from "../../src/git/service";
 import {
@@ -94,6 +94,12 @@ export type SessionServiceRunOpts = {
     cwd: string,
     input?: { readonly base?: string },
   ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+  worktreeRestore?: (
+    repoCwd: string,
+    worktreePath: string,
+    branch: string,
+  ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+  worktreeCheckoutMissing?: (worktreePath: string) => Effect.Effect<boolean, WorkspaceReadError>;
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
 
@@ -260,6 +266,10 @@ export const run = <A, E>(
         create:
           opts.worktreeCreate ??
           (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
+        restore:
+          opts.worktreeRestore ??
+          (() => Effect.die(new Error("unexpected worktreeRestore in unit test"))),
+        checkoutMissing: opts.worktreeCheckoutMissing ?? (() => Effect.succeed(false)),
         remove:
           opts.worktreeRemove ??
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),

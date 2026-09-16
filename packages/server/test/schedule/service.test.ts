@@ -140,6 +140,7 @@ const stubSessions = (opts: {
           .map(summary),
       ),
     prepare: unused,
+    restoreWorktree: unused,
     workspaceFor: unused,
     close: unused,
     delete: unused,

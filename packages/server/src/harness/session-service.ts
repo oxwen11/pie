@@ -3,6 +3,7 @@ import type {
   AgentResponse,
   CreateSessionOutput,
   CreateWorktreeInput,
+  PrepareSessionOutput,
   PromptInput,
   ReplaceQueueInput,
   SessionCapabilities,
@@ -21,6 +22,7 @@ import {
   type SessionRefNotFound,
   type StoreReadError,
   type StoreWriteError,
+  type WorkspaceReadError,
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus } from "../events/event-bus";
@@ -65,6 +67,8 @@ export type CreatePiSessionInput = {
   readonly title?: string;
 };
 
+type PreparedWorkspace = Omit<PrepareSessionOutput, "ref">;
+
 export type PiAgentSessionServiceShape = {
   readonly create: (
     input: CreatePiSessionInput,
@@ -72,13 +76,20 @@ export type PiAgentSessionServiceShape = {
   readonly prepare: (
     ref: SessionRef,
   ) => Effect.Effect<
-    SessionWorkspace,
+    PreparedWorkspace,
     | SessionNotFound
     | ProjectNotFound
     | StoreReadError
     | StoreWriteError
+    | WorkspaceReadError
     | SessionNotResumable
     | AgentOperationError
+  >;
+  readonly restoreWorktree: (
+    ref: SessionRef,
+  ) => Effect.Effect<
+    SessionWorkspace,
+    SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure
   >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
@@ -208,6 +219,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | PiAgentSessionRepository
   | EventBus
   | WorktreeService
+  | ProjectService
   | Crypto.Crypto
   | SessionMetadata
   | SessionMetadataLocks
@@ -219,6 +231,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const repo = yield* PiAgentSessionRepository;
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
+    const projects = yield* ProjectService;
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
@@ -393,22 +406,43 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       prepare: (ref) =>
         resolveWorkspace(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed(toSessionWorkspace(metadata));
-            }
-            return pi
-              .getSessionInfo(metadata.agentSessionId, metadata.cwd)
-              .pipe(
-                Effect.flatMap((info) =>
-                  info._tag === "missing"
-                    ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-                    : Effect.succeed(toSessionWorkspace(metadata)),
-                ),
-              );
-          }),
+          Effect.flatMap((metadata) =>
+            Effect.gen(function* () {
+              const workspace = toSessionWorkspace(metadata);
+              if (metadata.worktree !== undefined) {
+                const missing = yield* worktrees.checkoutMissing(metadata.cwd);
+                if (missing) return { workspace, missingWorktree: true as const };
+              }
+              if (metadata.agentSessionId === undefined) return { workspace };
+              const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
+              if (info._tag === "missing") {
+                return yield* Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
+              }
+              return { workspace };
+            }),
+          ),
           inSession(ref),
         ),
+
+      restoreWorktree: (ref) =>
+        withMetadataMutation(
+          ref,
+          readMetadata(ref).pipe(
+            Effect.flatMap(ensureCwd),
+            Effect.flatMap((metadata) => {
+              const worktree = metadata.worktree;
+              if (worktree === undefined) {
+                return Effect.succeed(toSessionWorkspace(metadata));
+              }
+              return projects.findById(metadata.projectId).pipe(
+                Effect.flatMap((project) =>
+                  worktrees.restore(project.path, metadata.cwd, worktree.branch),
+                ),
+                Effect.as(toSessionWorkspace(metadata)),
+              );
+            }),
+          ),
+        ).pipe(inSession(ref)),
 
       close: (ref) =>
         readMetadata(ref).pipe(

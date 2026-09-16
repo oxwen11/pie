@@ -588,7 +588,12 @@ export const CreateSessionOutputSchema = Schema.Struct({
 });
 export type CreateSessionOutput = typeof CreateSessionOutputSchema.Type;
 
-export const PrepareSessionOutputSchema = CreateSessionOutputSchema;
+export const PrepareSessionOutputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  workspace: SessionWorkspaceSchema,
+  // Pie worktree checkout is gone. Chat must not start until restoreWorktree.
+  missingWorktree: Schema.optionalKey(Schema.Literal(true)),
+});
 export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
 
 export const ListSessionsInputSchema = Schema.Struct({
