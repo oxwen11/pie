@@ -59,7 +59,7 @@ export const serveFlags = {
   ),
   host: Flag.String("host").pipe(
     Flag.withDescription(
-      "bind this address (default 127.0.0.1; a LAN IP is auto-allowlisted as Host/Origin; 0.0.0.0 still needs --allowed-host)",
+      "bind this address (default 127.0.0.1; a LAN IP is trusted automatically)",
     ),
     Flag.optional,
   ),
@@ -69,7 +69,7 @@ export const serveFlags = {
   ),
   allowedHost: Flag.String("allowed-host").pipe(
     Flag.withDescription(
-      "Extra Host header accepted besides loopback, for a trusted reverse proxy; repeatable",
+      "Extra Host for a reverse proxy. Prefer --host, Tailscale Serve, or pie relay attach — they trust the published name themselves",
     ),
     Flag.atLeast(0),
   ),

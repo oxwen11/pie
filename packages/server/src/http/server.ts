@@ -239,7 +239,7 @@ const buildServer = (
     const {
       authToken,
       corsOrigins = [],
-      allowedHosts = [],
+      allowedHosts: allowedHostsOption = [],
       effectContext = Context.empty(),
       shutdown,
       environmentId,
@@ -253,6 +253,7 @@ const buildServer = (
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
     const tickets = createTicketStore();
+    const allowedHosts = [...allowedHostsOption];
     const resolvedEnvironmentId = environmentId ?? crypto.randomUUID();
     const pairing: PairingStore | undefined =
       authToken === undefined ? undefined : createPairingStore();
