@@ -5,7 +5,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser.mts";
+import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser";
 
 const src = url.fileURLToPath(new URL("./src", import.meta.url));
 const appDir = import.meta.dirname;

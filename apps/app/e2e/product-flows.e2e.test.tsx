@@ -134,7 +134,7 @@ describe("sidebar and content panel", () => {
     const treeToggle =
       page.getByRole("button", { name: /Open file tree/ }).query() ??
       document.querySelector('[aria-label*="file tree"]');
-    if (treeToggle !== null) {
+    if (treeToggle instanceof HTMLElement) {
       treeToggle.click();
     }
     await vi.waitFor(

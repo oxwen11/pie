@@ -9,5 +9,5 @@
       "@getpie/ui/*": ["./src/*"]
     }
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", "vitest.config.ts", "../../tools/testing/vitest-browser.ts"]
 }
