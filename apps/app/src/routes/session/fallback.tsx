@@ -7,7 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -74,18 +74,24 @@ function MissingWorktree({
   readonly branch?: string;
 }) {
   const { orpcQueryUtils } = Route.useRouteContext();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const ref = { projectId, sessionId };
   const restore = useMutation({
-    mutationFn: () =>
-      orpcQueryUtils.agent.session.restoreWorktree.call({
-        ref: { projectId, sessionId },
-      }),
-    onSuccess: () =>
-      navigate({
+    mutationFn: () => orpcQueryUtils.agent.session.restoreWorktree.call({ ref }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.git.branch.queryOptions({ input: { ref } }).queryKey,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.fs.readTree.queryOptions({ input: { ref } }).queryKey,
+      });
+      return navigate({
         to: "/session/$sessionId",
         params: { sessionId },
         search: { projectId },
-      }),
+      });
+    },
     onError: (error) => toast.error(`Failed to restore worktree: ${error.message}`),
   });
 
@@ -95,7 +101,7 @@ function MissingWorktree({
         <EmptyMedia variant="icon">
           <TriangleAlertIcon />
         </EmptyMedia>
-        <EmptyTitle>Can't open session</EmptyTitle>
+        <EmptyTitle>Can&apos;t open session</EmptyTitle>
         <EmptyDescription>
           {branch === undefined
             ? "This session's checkout was removed."
@@ -119,8 +125,8 @@ function UnknownFallback() {
         <EmptyMedia variant="icon">
           <TriangleAlertIcon />
         </EmptyMedia>
-        <EmptyTitle>Can't open session</EmptyTitle>
-        <EmptyDescription>This session can't be opened.</EmptyDescription>
+        <EmptyTitle>Can&apos;t open session</EmptyTitle>
+        <EmptyDescription>This session can&apos;t be opened.</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button onClick={() => void navigate({ to: "/draft" })} variant="outline">
