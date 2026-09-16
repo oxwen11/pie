@@ -18,7 +18,6 @@ import {
 } from "@/components/layout/workspace-layout";
 
 import { filePanel } from "./file-panel";
-import { FileState } from "./file-state";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export const filesPanel = definePanel({
@@ -82,9 +81,9 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     <WorkspaceLayout>
       <WorkspaceLayoutBody>
         <WorkspaceLayoutPreview>
-          <FileState icon={FileTextIcon} prominentIcon title="打开文件">
+          <PanelEmptyState icon={FileTextIcon} prominentIcon title="打开文件">
             从工作区目录树中选择文件
-          </FileState>
+          </PanelEmptyState>
         </WorkspaceLayoutPreview>
         <WorkspaceLayoutTreeTrigger
           className="absolute end-11 top-1.5 z-10"

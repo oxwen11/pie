@@ -17,6 +17,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 import {
   WorkspaceLayout,
   WorkspaceLayoutBody,
@@ -29,7 +30,6 @@ import {
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
-import { ReviewState } from "./review-state";
 import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
 
@@ -160,9 +160,9 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
 
   if (panel === null) {
     return (
-      <ReviewState title="Workspace unavailable">
+      <PanelEmptyState icon={GitCompareIcon} title="Workspace unavailable">
         This session no longer resolves to an imported project.
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
 
@@ -251,30 +251,34 @@ function reviewPanelPlaceholder(
   if (branch.isPending && branch.data === undefined) return <ReviewSpinner />;
   if (branch.isError && branch.data === undefined) {
     return (
-      <ReviewState onRetry={() => void branch.refetch()} title="Unable to inspect repository">
+      <PanelEmptyState
+        icon={GitCompareIcon}
+        onRetry={() => void branch.refetch()}
+        title="Unable to inspect repository"
+      >
         {branch.error.message}
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
   if (branch.data?.kind === "not-repository") {
     return (
-      <ReviewState title="Not a Git repository">
+      <PanelEmptyState icon={GitCompareIcon} title="Not a Git repository">
         Open a Git project to review uncommitted work, commits, or another branch.
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
   if (branch.data?.kind === "workspace-unavailable") {
     return (
-      <ReviewState title="Workspace unavailable">
+      <PanelEmptyState icon={GitCompareIcon} title="Workspace unavailable">
         This session&apos;s workspace folder no longer exists or cannot be read.
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
   if (mode === "branch" && other === undefined && !branch.isPending) {
     return (
-      <ReviewState title="Compare branch not found">
+      <PanelEmptyState icon={GitCompareIcon} title="Compare branch not found">
         This repository has no local default branch or remote-tracking ref to compare against.
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
   if (
@@ -285,9 +289,13 @@ function reviewPanelPlaceholder(
   }
   if (review.isError && review.data === undefined && review.error !== null) {
     return (
-      <ReviewState onRetry={() => void review.refetch()} title={reviewErrorTitle(review.error)}>
+      <PanelEmptyState
+        icon={GitCompareIcon}
+        onRetry={() => void review.refetch()}
+        title={reviewErrorTitle(review.error)}
+      >
         {reviewErrorMessage(review.error)}
-      </ReviewState>
+      </PanelEmptyState>
     );
   }
   return null;
