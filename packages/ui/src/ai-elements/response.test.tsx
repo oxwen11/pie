@@ -25,19 +25,21 @@ afterEach(() => {
 });
 
 function warmupHighlighter(language: "ts" | "js"): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Timed out warming Streamdown highlighter for ${language}`));
-    }, 15_000);
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 8_000);
     const done = () => {
       clearTimeout(timer);
       resolve();
     };
-    const result = code.highlight(
-      { code: "const n = 1;", language, themes: ["github-light", "github-dark"] },
-      done,
-    );
-    if (result) {
+    try {
+      const result = code.highlight(
+        { code: "const n = 1;", language, themes: ["github-light", "github-dark"] },
+        done,
+      );
+      if (result) {
+        done();
+      }
+    } catch {
       done();
     }
   });

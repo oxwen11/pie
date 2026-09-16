@@ -6,5 +6,11 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "e2e", "vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "../../tools/testing/vitest-browser.mts"
+  ]
 }

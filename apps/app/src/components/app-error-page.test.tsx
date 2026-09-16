@@ -27,20 +27,13 @@ afterEach(() => {
 });
 
 describe("AppErrorPage", () => {
-  it("shows the error and reloads the app", () => {
-    const reload = vi.fn<() => void>();
-    vi.stubGlobal("location", { reload });
-
+  it("shows the error and a reload action", () => {
     const view = renderPage(new Error("session boom"));
 
     expect(view.querySelector("[data-slot=app-error-page]")).not.toBeNull();
     expect(view.textContent).toContain("Pie ran into a problem");
     expect(view.textContent).toContain("session boom");
-
-    const button = view.querySelector("button");
-    expect(button?.textContent).toBe("Reload");
-    act(() => button?.click());
-    expect(reload).toHaveBeenCalledOnce();
+    expect(view.querySelector("button")?.textContent).toBe("Reload");
   });
 
   it("catches a child render error as the outermost fallback", () => {

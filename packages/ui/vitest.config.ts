@@ -1,12 +1,15 @@
 import { defineConfig } from "vitest/config";
 
-import { pieBrowser } from "../../tools/testing/vitest-browser";
+import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser.mts";
 
 export default defineConfig({
   oxc: {
     jsx: {
       runtime: "automatic",
     },
+  },
+  optimizeDeps: {
+    include: [...pieBrowserOptimizeDeps.include, "streamdown", "@streamdown/code", "shiki"],
   },
   resolve: {
     tsconfigPaths: true,
