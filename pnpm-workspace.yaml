@@ -32,6 +32,9 @@ catalog:
   # artifact root). Catalog + override keep every workspace package and
   # electron-vite/vite-plus on one copy.
   vitest: 5.0.0
+  # Same major as vitest — the browser provider package is versioned with the
+  # runner. Catalog + override keep app / ui / root on one copy.
+  "@vitest/browser-playwright": 5.0.0
   ws: ^8.21.3
   zod: ^4.6.5
   zustand: ^5.0.15
@@ -88,6 +91,7 @@ overrides:
   # graph and @effect/vitest then talks to a different TestRunner singleton.
   vite: "catalog:"
   vitest: "catalog:"
+  "@vitest/browser-playwright": "catalog:"
   "@types/node": "catalog:"
   react: "catalog:react"
   react-dom: "catalog:react"

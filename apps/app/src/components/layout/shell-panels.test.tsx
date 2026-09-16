@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { SidebarProvider } from "@getpie/ui/components/sidebar";
 import { domAnimation, LazyMotion } from "motion/react";
 import { act } from "react";
@@ -12,17 +11,6 @@ import { notifyUserLayoutListeners, resolveSidebarUserLayout } from "./shell-use
 
 Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
-  ResizeObserver: class {
-    disconnect(): void {
-      /* jsdom has no layout */
-    }
-    observe(): void {
-      /* jsdom has no layout */
-    }
-    unobserve(): void {
-      /* jsdom has no layout */
-    }
-  },
 });
 
 window.matchMedia = (query) => ({

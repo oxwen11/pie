@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 // Plain `.ts` + createElement keeps this one-element probe simpler than JSX.
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

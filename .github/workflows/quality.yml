@@ -98,6 +98,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
+      - name: Install Playwright Chromium
+        run: |
+          browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"
+          mkdir -p "$browsers"
+          echo "PLAYWRIGHT_BROWSERS_PATH=${browsers}" >> "$GITHUB_ENV"
+          PLAYWRIGHT_BROWSERS_PATH="$browsers" pnpm exec playwright install chromium
+        shell: bash
+
       # `build` / `typecheck` / `lint:check` go through turbo in one graph
       # so `@getpie/app#build` is not restored a second time. A follow-up
       # `turbo run typecheck` hits `@getpie/desktop` → `^build` →

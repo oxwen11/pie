@@ -1,5 +1,4 @@
 import type { SessionRef, SessionSummary } from "@getpie/contract";
-// @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";

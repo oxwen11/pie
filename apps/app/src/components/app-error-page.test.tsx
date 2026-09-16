@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ErrorBoundary } from "react-error-boundary";
