@@ -190,14 +190,17 @@ describe("writeBrowserEnvFile", () => {
         expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
         expect(text).toContain("export PIE_VERIFY_RECORDING_PATH=");
         expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
+        expect(text).toContain("unset AGENT_BROWSER_HEADED");
         expect(text).toContain("unset AGENT_BROWSER_CDP");
         const config = JSON.parse(
           fs.readFileSync(path.join(dir, "agent-browser.json"), "utf8"),
         ) as {
           session: string;
+          headed: boolean;
           idleTimeout: string;
         };
         expect(config.session).toBe(WEB.browserSession);
+        expect(config.headed).toBe(false);
         expect(config.idleTimeout).toBe("0");
         expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
         expect(fs.existsSync(path.join(WEB.skillDir, "evidence/run-1"))).toBe(true);

@@ -19,6 +19,7 @@ Isolated `$PIE_HOME` (daemon is `$PIE_HOME/daemon`). First spawn prefers **4000*
 pnpm exec pie-verify desktop launch
 # pnpm exec pie-verify desktop launch --replace
 # pnpm exec pie-verify desktop launch --replace --empty-projects  # import-flow proof only
+# PIE_DESKTOP_BACKGROUND=0 pnpm exec pie-verify desktop launch --replace  # visible opt-in
 ```
 
 A Desktop process that exits before readiness fails launch immediately, including exit code zero; its exit status and log path are reported instead of waiting for the readiness timeout.
@@ -36,7 +37,7 @@ What launch also does:
 - Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main launches it as `bun --no-install packages/server/dist/server.mjs`; packaged builds use `Contents/Resources/vendor/bun` and `Contents/Resources/server/server.mjs`.
 - Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
 - Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
-- Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
+- Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, `PIE_DESKTOP_BACKGROUND=1`, and `NODE_ENV=development`. Background mode keeps the BrowserWindow hidden, disables renderer throttling, and uses macOS's accessory activation policy so launch and drive do not take focus. Set `PIE_DESKTOP_BACKGROUND=0` with `--replace` only when a visible window is explicitly needed. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
 - Creates and registers `$PIE_HOME/workspace/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
 

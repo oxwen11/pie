@@ -35,7 +35,10 @@ Use `launch --replace --empty-projects` only when proving the first-import flow.
 
 After launch, **drive with `agent-browser`**. Launch writes a native env file
 (`session`, `namespace`, sockets, screenshots/downloads, idle timeout off,
-plus Chrome args for web or CDP + `PIN_TAB` for desktop). The repo shim
+plus forced headless Chrome for web or CDP + `PIN_TAB` for desktop). Use
+`PIE_VERIFY_BROWSER_HEADED=1` on Web `launch --replace` for an explicit visible
+browser. Desktop Verify sets `PIE_DESKTOP_BACKGROUND=1`, keeping Electron hidden
+and non-activating; set it to `0` with `launch --replace` for a visible run. The repo shim
 (`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads that
 env, ensures one numbered run-local recording is active at 60 fps, then
 forwards your command unchanged to the mise-managed agent-browser 0.37.1.

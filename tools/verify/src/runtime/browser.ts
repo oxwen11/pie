@@ -62,6 +62,7 @@ export const BROWSER_ENV_KEYS = [
 /** Parent-shell leaks that break isolated launch or CDP attach. */
 export const BROWSER_ENV_UNSET = [
   "AGENT_BROWSER_AUTO_CONNECT",
+  "AGENT_BROWSER_HEADED",
   "AGENT_BROWSER_PROFILE",
   "AGENT_BROWSER_RESTORE",
   "AGENT_BROWSER_STATE",
@@ -283,6 +284,7 @@ export function resolveBrowserEnv(input: BrowserEnvInput): BrowserEnvVars {
 export type AgentBrowserConfig = {
   session: string;
   namespace: string;
+  headed: boolean;
   socketDir: string;
   idleTimeout: string;
   timeout: string;
@@ -298,6 +300,7 @@ export function browserConfigForEnv(vars: BrowserEnvVars): AgentBrowserConfig {
   const config: AgentBrowserConfig = {
     session: vars.AGENT_BROWSER_SESSION,
     namespace: vars.AGENT_BROWSER_NAMESPACE,
+    headed: process.env.PIE_VERIFY_BROWSER_HEADED === "1",
     socketDir: vars.AGENT_BROWSER_SOCKET_DIR,
     idleTimeout: vars.AGENT_BROWSER_IDLE_TIMEOUT_MS,
     timeout: vars.AGENT_BROWSER_DEFAULT_TIMEOUT,

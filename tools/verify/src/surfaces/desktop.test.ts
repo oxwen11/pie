@@ -30,7 +30,10 @@ const http = require('node:http');
 const cp = require('node:child_process');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.TRACE, JSON.stringify({
-  args, pid: process.pid, projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
+  args,
+  pid: process.pid,
+  desktopBackground: process.env.PIE_DESKTOP_BACKGROUND,
+  projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
 }) + '\\n');
 if (args.join(' ') === 'exec install-electron') {
   if (process.env.INSTALL_CHILD === '1') {
@@ -148,6 +151,7 @@ function start(env: NodeJS.ProcessEnv, ...args: string[]) {
 function trace(root: string): Array<{
   args: string[];
   pid: number;
+  desktopBackground?: string;
   projectBrowseRoot?: string;
 }> {
   const file = path.join(root, "trace");
@@ -230,6 +234,7 @@ describe("desktop launch lifecycle", () => {
         (entry) => entry.projectBrowseRoot === path.join(meta.pieHome, "workspace"),
       ),
     ).toBe(true);
+    expect(trace(root).every((entry) => entry.desktopBackground === "1")).toBe(true);
     expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
     expect(
       JSON.parse(fs.readFileSync(path.join(meta.pieHome, "storage/projects.json"), "utf8")),
@@ -296,11 +301,12 @@ describe("desktop launch lifecycle", () => {
   }, 10_000);
 
   it("leaves the project list empty only when requested", async () => {
-    const { root, env } = await fixture();
+    const { root, env } = await fixture({ PIE_DESKTOP_BACKGROUND: "0" });
     const result = await start(env, "launch", "--empty-projects").exited;
     expect(result.code).toBe(0);
     const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
     expect(fs.existsSync(path.join(meta.pieHome, "storage/projects.json"))).toBe(false);
+    expect(trace(root).every((entry) => entry.desktopBackground === "0")).toBe(true);
   }, 10_000);
 
   it("reports installation failure without starting Desktop and preserves the log", async () => {
