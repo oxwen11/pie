@@ -70,6 +70,13 @@ export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly sessionId: string;
 }> {}
 
+/** A pie worktree session whose checkout directory is gone. */
+export class WorktreeCheckoutMissing extends Data.TaggedError("WorktreeCheckoutMissing")<{
+  readonly sessionId: string;
+  readonly projectId: string;
+  readonly branch?: string;
+}> {}
+
 /** A SessionRef's projectId disagrees with the stored session metadata. */
 export class SessionRefMismatch extends Data.TaggedError("SessionRefMismatch")<{
   readonly projectId: string;

@@ -123,15 +123,15 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
               worktree: {},
             });
             yield* fixture.service.archive(created.ref, true);
-            const prepared = yield* fixture.service.prepare(created.ref);
-            return { created, workspace: prepared.workspace };
+            const workspace = yield* fixture.service.prepare(created.ref);
+            return { created, workspace };
           }),
       );
       assert.deepEqual(result.workspace, result.created.workspace);
     }),
   );
 
-  it.effect("prepare reports a missing worktree checkout without recreating it", () =>
+  it.effect("prepare fails when the worktree checkout is gone", () =>
     Effect.gen(function* () {
       const result = yield* run(
         {
@@ -146,14 +146,15 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
               cwd: "/tmp/pie-app",
               worktree: {},
             });
-            return yield* fixture.service.prepare(created.ref);
+            const error = yield* Effect.flip(fixture.service.prepare(created.ref));
+            return { created, error };
           }),
       );
-      assert.equal(result.missingWorktree, true);
-      assert.deepEqual(result.workspace, {
-        cwd: "/tmp/pie-worktree",
-        worktree: { branch: "pie/abcd1234" },
-      });
+      assert.equal(result.error._tag, "WorktreeCheckoutMissing");
+      if (result.error._tag !== "WorktreeCheckoutMissing") return;
+      assert.equal(result.error.sessionId, result.created.ref.sessionId);
+      assert.equal(result.error.projectId, "proj-a");
+      assert.equal(result.error.branch, "pie/abcd1234");
     }),
   );
 

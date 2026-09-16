@@ -3,7 +3,6 @@ import type {
   AgentResponse,
   CreateSessionOutput,
   CreateWorktreeInput,
-  PrepareSessionOutput,
   PromptInput,
   ReplaceQueueInput,
   SessionCapabilities,
@@ -23,6 +22,7 @@ import {
   type StoreReadError,
   type StoreWriteError,
   type WorkspaceReadError,
+  WorktreeCheckoutMissing,
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus } from "../events/event-bus";
@@ -66,8 +66,6 @@ export type CreatePiSessionInput = {
   readonly title?: string;
 };
 
-type PreparedWorkspace = Omit<PrepareSessionOutput, "ref">;
-
 export type PiAgentSessionServiceShape = {
   readonly create: (
     input: CreatePiSessionInput,
@@ -75,12 +73,13 @@ export type PiAgentSessionServiceShape = {
   readonly prepare: (
     ref: SessionRef,
   ) => Effect.Effect<
-    PreparedWorkspace,
+    SessionWorkspace,
     | SessionNotFound
     | ProjectNotFound
     | StoreReadError
     | StoreWriteError
     | WorkspaceReadError
+    | WorktreeCheckoutMissing
     | SessionNotResumable
     | AgentOperationError
   >;
@@ -387,17 +386,24 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         resolveWorkspace(ref).pipe(
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
-              const workspace = toSessionWorkspace(metadata);
               if (metadata.worktree !== undefined) {
                 const missing = yield* worktrees.checkoutMissing(metadata.cwd);
-                if (missing) return { workspace, missingWorktree: true as const };
+                if (missing) {
+                  return yield* new WorktreeCheckoutMissing({
+                    sessionId: ref.sessionId,
+                    projectId: ref.projectId,
+                    branch: metadata.worktree.branch,
+                  });
+                }
               }
-              if (metadata.agentSessionId === undefined) return { workspace };
+              if (metadata.agentSessionId === undefined) {
+                return toSessionWorkspace(metadata);
+              }
               const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
               if (info._tag === "missing") {
                 return yield* Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
               }
-              return { workspace };
+              return toSessionWorkspace(metadata);
             }),
           ),
           inSession(ref),
