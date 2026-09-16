@@ -19,6 +19,10 @@ export type DesktopConfigInputs = {
   readonly devUrl: string | undefined;
 };
 
+export function startsDesktopInBackground(env: NodeJS.ProcessEnv): boolean {
+  return env["PIE_E2E"] === "1" || env["PIE_DESKTOP_BACKGROUND"] === "1";
+}
+
 export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): string {
   if (isPackaged) return path.join(resourcesPath, "server", "server.mjs");
   return url.fileURLToPath(new URL("../../../../packages/server/dist/server.mjs", import.meta.url));

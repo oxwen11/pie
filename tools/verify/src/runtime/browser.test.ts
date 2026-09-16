@@ -248,11 +248,29 @@ describe("browserConfigForEnv", () => {
         resolveBrowserEnv({ session: "pie-verify-desktop", cdpPort: 9223, runDir }),
       );
       expect(config.cdp).toBe("9223");
+      expect(config.headed).toBe(false);
       expect(config.idleTimeout).toBe("0");
       expect(config.timeout).toBe("40000");
       expect(config.pinTab).toBe(true);
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previous);
+    }
+  });
+
+  it("requires a Verify-specific opt-in for a visible browser", () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-browser-"));
+    const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
+    const previousHeaded = process.env.PIE_VERIFY_BROWSER_HEADED;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    process.env.PIE_VERIFY_BROWSER_HEADED = "1";
+    try {
+      const config = browserConfigForEnv(
+        resolveBrowserEnv({ session: "pie-verify-web", appUrl: "http://localhost:4190/", runDir }),
+      );
+      expect(config.headed).toBe(true);
+    } finally {
+      restoreEnv("VERIFY_PIE_AGENT_BROWSER", previousBin);
+      restoreEnv("PIE_VERIFY_BROWSER_HEADED", previousHeaded);
     }
   });
 });
@@ -267,6 +285,7 @@ describe("applyBrowserEnv", () => {
         AGENT_BROWSER_CDP: "9223",
         AGENT_BROWSER_PIN_TAB: "true",
         AGENT_BROWSER_AUTO_CONNECT: "1",
+        AGENT_BROWSER_HEADED: "1",
         AGENT_BROWSER_PROFILE: "/tmp/user-chrome",
       };
       applyBrowserEnv(
@@ -277,6 +296,7 @@ describe("applyBrowserEnv", () => {
       expect(env.AGENT_BROWSER_CDP).toBeUndefined();
       expect(env.AGENT_BROWSER_PIN_TAB).toBeUndefined();
       expect(env.AGENT_BROWSER_AUTO_CONNECT).toBeUndefined();
+      expect(env.AGENT_BROWSER_HEADED).toBeUndefined();
       expect(env.AGENT_BROWSER_PROFILE).toBeUndefined();
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previous);

@@ -18,6 +18,7 @@ pnpm exec pie-verify web launch
 # idempotent if the current run is healthy
 # pnpm exec pie-verify web launch --replace   # stop ours, then start
 # pnpm exec pie-verify web launch --replace --empty-projects  # import-flow proof only
+# PIE_VERIFY_BROWSER_HEADED=1 pnpm exec pie-verify web launch --replace  # visible opt-in
 ```
 
 Ready when both answer `ok`:
@@ -70,7 +71,7 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 `pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with `agent-browser`.** After launch you do **not** `eval` env or pass `--session` on every command.
 
-Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, screenshots / downloads under `$runDir/agent-browser/`, daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` is ~103 bytes and agent-browser appends `namespaces/<session>/run/<session>.sock`), idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
+Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, screenshots / downloads under `$runDir/agent-browser/`, daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` is ~103 bytes and agent-browser appends `namespaces/<session>/run/<session>.sock`), idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). Verify forces this owned Chrome headless and unsets inherited `AGENT_BROWSER_HEADED`, so browser drive and evidence do not open or focus a host window. Set `PIE_VERIFY_BROWSER_HEADED=1` on `launch --replace` only when a visible browser is explicitly needed. The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
 First machine only: `pnpm exec agent-browser install` if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
 
