@@ -7,11 +7,18 @@ import { useCallback, useSyncExternalStore } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
+import {
+  WorkspaceLayout,
+  WorkspaceLayoutBody,
+  WorkspaceLayoutPreview,
+  WorkspaceLayoutSeparator,
+  WorkspaceLayoutTree,
+  WorkspaceLayoutTreeTrigger,
+} from "@/components/layout/workspace-layout";
 
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
 import { FileState } from "./file-state";
-import { FileWorkspaceLayout } from "./file-workspace-layout";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export interface FilePayload {
@@ -121,5 +128,14 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     />
   );
 
-  return <FileWorkspaceLayout preview={preview} tree={treePane} treeLabel={path} />;
+  return (
+    <WorkspaceLayout>
+      <WorkspaceLayoutBody>
+        <WorkspaceLayoutPreview>{preview}</WorkspaceLayoutPreview>
+        <WorkspaceLayoutTreeTrigger className="absolute end-11 top-1.5 z-10" label={path} />
+        <WorkspaceLayoutSeparator />
+        <WorkspaceLayoutTree>{treePane}</WorkspaceLayoutTree>
+      </WorkspaceLayoutBody>
+    </WorkspaceLayout>
+  );
 }
