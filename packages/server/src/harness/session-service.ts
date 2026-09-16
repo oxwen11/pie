@@ -29,6 +29,7 @@ import { EventBus } from "../events/event-bus";
 import { WorktreeService, type GitWorktreeFailure } from "../git/worktree-service";
 import { ProjectService } from "../project/service";
 import type { Session } from "../types";
+import { workspaceReadError } from "../workspace-root";
 import {
   AgentRequestUnavailable,
   type AgentOperationError,
@@ -219,6 +220,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | EventBus
   | WorktreeService
   | ProjectService
+  | FileSystem.FileSystem
   | Crypto.Crypto
   | SessionMetadata
   | SessionMetadataLocks
@@ -231,6 +233,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
     const projects = yield* ProjectService;
+    const fs = yield* FileSystem.FileSystem;
     const crypto = yield* Crypto.Crypto;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
@@ -408,8 +411,10 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
               if (metadata.worktree !== undefined) {
-                const missing = yield* worktrees.checkoutMissing(metadata.cwd);
-                if (missing) {
+                const exists = yield* fs
+                  .exists(metadata.cwd)
+                  .pipe(Effect.mapError(workspaceReadError(metadata.cwd)));
+                if (!exists) {
                   return yield* new WorktreeCheckoutMissing({
                     sessionId: ref.sessionId,
                     projectId: ref.projectId,
@@ -431,24 +436,22 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         ),
 
       restoreWorktree: (ref) =>
-        withMetadataMutation(
-          ref,
-          readMetadata(ref).pipe(
-            Effect.flatMap(ensureCwd),
-            Effect.flatMap((metadata) => {
-              const worktree = metadata.worktree;
-              if (worktree === undefined) {
-                return Effect.succeed(toSessionWorkspace(metadata));
-              }
-              return projects.findById(metadata.projectId).pipe(
-                Effect.flatMap((project) =>
-                  worktrees.restore(project.path, metadata.cwd, worktree.branch),
-                ),
-                Effect.as(toSessionWorkspace(metadata)),
-              );
-            }),
-          ),
-        ).pipe(inSession(ref)),
+        readMetadata(ref).pipe(
+          Effect.flatMap(ensureCwd),
+          Effect.flatMap((metadata) => {
+            const worktree = metadata.worktree;
+            if (worktree === undefined) {
+              return Effect.succeed(toSessionWorkspace(metadata));
+            }
+            return projects.findById(metadata.projectId).pipe(
+              Effect.flatMap((project) =>
+                worktrees.restore(project.path, metadata.cwd, worktree.branch),
+              ),
+              Effect.as(toSessionWorkspace(metadata)),
+            );
+          }),
+          inSession(ref),
+        ),
 
       close: (ref) =>
         readMetadata(ref).pipe(

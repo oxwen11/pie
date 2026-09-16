@@ -10,7 +10,6 @@ import {
   GitRefNotFound,
   GitWorktreePathExists,
   WorkspacePathEscape,
-  type WorkspaceReadError,
 } from "../errors";
 import { contains } from "../path-safety";
 import type { GitFailure } from "./service";
@@ -56,7 +55,6 @@ export class WorktreeService extends Context.Service<
       worktreePath: string,
       branch: string,
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-    readonly checkoutMissing: (worktreePath: string) => Effect.Effect<boolean, WorkspaceReadError>;
     readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
   }
 >()("WorktreeService") {}
@@ -203,15 +201,6 @@ export const WorktreeServiceLayer: Layer.Layer<
         yield* raw(repoRoot, ["worktree", "prune"]);
         yield* addCheckout(repoRoot, worktreePath, [worktreePath, branch]);
         return { path: worktreePath, branch };
-      }),
-
-      checkoutMissing: Effect.fn("WorktreeService.checkoutMissing")(function* (
-        worktreePath: string,
-      ) {
-        const exists = yield* fs
-          .exists(worktreePath)
-          .pipe(Effect.mapError(readError(worktreePath)));
-        return !exists;
       }),
 
       remove: Effect.fn("WorktreeService.remove")(function* (worktreePath: string) {

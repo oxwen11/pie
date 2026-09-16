@@ -5,7 +5,7 @@ import { Effect } from "effect";
 
 import { GitNotRepository } from "../../src/errors";
 import { NodePlatformLayer } from "../platform";
-import { run } from "./session-service-fixture";
+import { run, stubWorktreeCreate } from "./session-service-fixture";
 
 layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
   it.effect("creates a worktree at create and does not recreate it on prompt", () =>
@@ -17,10 +17,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
           worktreeCreate: (_cwd, input) => {
             creates += 1;
             bases.push(input?.base);
-            return Effect.succeed({
-              path: "/tmp/pie-worktree",
-              branch: "pie/abcd1234",
-            });
+            return stubWorktreeCreate()(_cwd, input);
           },
         },
         (fixture) =>
@@ -112,8 +109,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
     Effect.gen(function* () {
       const result = yield* run(
         {
-          worktreeCreate: () =>
-            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+          worktreeCreate: stubWorktreeCreate(),
         },
         (fixture) =>
           Effect.gen(function* () {
@@ -133,11 +129,10 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
 
   it.effect("prepare fails when the worktree checkout is gone", () =>
     Effect.gen(function* () {
+      const missingPath = `/tmp/pie-worktree-gone-${Date.now()}`;
       const result = yield* run(
         {
-          worktreeCreate: () =>
-            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
-          worktreeCheckoutMissing: () => Effect.succeed(true),
+          worktreeCreate: () => Effect.succeed({ path: missingPath, branch: "pie/abcd1234" }),
         },
         (fixture) =>
           Effect.gen(function* () {
@@ -163,8 +158,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
       const restored: Array<readonly [string, string, string]> = [];
       const result = yield* run(
         {
-          worktreeCreate: () =>
-            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+          worktreeCreate: stubWorktreeCreate(),
           worktreeRestore: (repoCwd, worktreePath, branch) => {
             restored.push([repoCwd, worktreePath, branch]);
             return Effect.succeed({ path: worktreePath, branch });
@@ -192,11 +186,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
       const result = yield* run(
         {
           failWrite: true,
-          worktreeCreate: () =>
-            Effect.succeed({
-              path: "/tmp/pie-worktree",
-              branch: "pie/abcd1234",
-            }),
+          worktreeCreate: stubWorktreeCreate(),
           worktreeRemove: (worktreePath) => {
             removed.push(worktreePath);
             return Effect.void;

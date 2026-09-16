@@ -9,29 +9,39 @@ type SessionSearch = {
   readonly projectId?: string;
 };
 
+type WorktreeMissingData = {
+  readonly sessionId?: unknown;
+  readonly projectId?: unknown;
+  readonly branch?: unknown;
+};
+
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+const isWorktreeMissingData = (value: unknown): value is WorktreeMissingData =>
   typeof value === "object" && value !== null;
 
 const throwIfWorktreeMissing = (error: unknown): void => {
   if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return;
-  const data: unknown = error.data;
-  if (!isRecord(data)) return;
-  const sessionId = asText(data.sessionId);
-  const projectId = asText(data.projectId);
+  if (!isWorktreeMissingData(error.data)) return;
+  const sessionId = asText(error.data.sessionId);
+  const projectId = asText(error.data.projectId);
   if (sessionId === undefined || projectId === undefined) return;
-  const branch = asText(data.branch);
+  const branch = asText(error.data.branch);
   throw redirect({
     to: "/session/fallback",
     search: {
       sessionId,
       projectId,
-      reason: "missing-worktree",
       ...(branch !== undefined ? { branch } : undefined),
     },
   });
+};
+
+const catchPrepareError = <T,>(error: unknown, onOther: (error: unknown) => T): T => {
+  if (isRedirect(error)) throw error;
+  throwIfWorktreeMissing(error);
+  return onOther(error);
 };
 
 export const Route = createFileRoute("/session/$sessionId")({
@@ -55,12 +65,12 @@ export const Route = createFileRoute("/session/$sessionId")({
         projectId: deps.projectId,
         sessionId: params.sessionId,
       };
-      const prepared = await prepareSession(hinted).catch((error: unknown) => {
-        if (isRedirect(error)) throw error;
-        throwIfWorktreeMissing(error);
-        console.warn("Preparing the URL's ref failed, falling back to lookup", error);
-        return undefined;
-      });
+      const prepared = await prepareSession(hinted).catch((error: unknown) =>
+        catchPrepareError(error, (err) => {
+          console.warn("Preparing the URL's ref failed, falling back to lookup", err);
+          return undefined;
+        }),
+      );
       if (prepared) return prepared;
     }
 
@@ -71,15 +81,15 @@ export const Route = createFileRoute("/session/$sessionId")({
         toast.error(`Session ${params.sessionId} could not be found.`);
         throw redirect({ to: "/draft" });
       });
-    return prepareSession(ref).catch((error: unknown) => {
-      if (isRedirect(error)) throw error;
-      throwIfWorktreeMissing(error);
-      console.error("Failed to prepare session", error);
-      toast.error(
-        `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw error;
-    });
+    return prepareSession(ref).catch((error: unknown) =>
+      catchPrepareError(error, (err) => {
+        console.error("Failed to prepare session", err);
+        toast.error(
+          `Failed to prepare session: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        throw err;
+      }),
+    );
   },
   component: Component,
 });
