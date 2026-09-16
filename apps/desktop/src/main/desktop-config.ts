@@ -24,11 +24,24 @@ export function startsDesktopInBackground(env: NodeJS.ProcessEnv): boolean {
 }
 
 export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): string {
-  if (isPackaged) return path.join(resourcesPath, "server", "server.mjs");
+  if (isPackaged) {
+    return path.join(
+      resourcesPath,
+      "app.asar",
+      "node_modules",
+      "@getpie",
+      "server",
+      "dist",
+      "server.mjs",
+    );
+  }
   return url.fileURLToPath(new URL("../../../../packages/server/dist/server.mjs", import.meta.url));
 }
 
-/** Desktop always runs its daemon with Bun; packaged builds prefer the shipped binary. */
+/**
+ * Desktop daemon is Node (Electron helper). Packaged builds still ship Bun for
+ * pie-pi-process only (`PIE_BUN` / `PIE_PI_EXECUTABLE`); launch-time PIE_* wins.
+ */
 export function applyDesktopRuntime(
   env: NodeJS.ProcessEnv,
   options: {
@@ -37,7 +50,7 @@ export function applyDesktopRuntime(
     readonly bundledPiProcess: string | undefined;
   },
 ): NodeJS.ProcessEnv {
-  const next: NodeJS.ProcessEnv = { ...env, PIE_DAEMON_RUNTIME: "bun" };
+  const next: NodeJS.ProcessEnv = { ...env, PIE_DAEMON_RUNTIME: "node" };
   if (!options.isPackaged || options.bundledBun === undefined) return next;
 
   next.PIE_BUN = env.PIE_BUN ?? options.bundledBun;
