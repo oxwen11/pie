@@ -141,9 +141,14 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           const { cwd: _dropped, ...withoutCwd } = stored;
           yield* fixture.repo.write(withoutCwd);
 
-          const workspace = yield* fixture.service.prepare(ref);
+          const prepared = yield* fixture.service.prepare(ref);
           const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-          return { workspace, cwd: after.cwd, resume: fixture.spy.resume, open: fixture.spy.open };
+          return {
+            workspace: prepared.workspace,
+            cwd: after.cwd,
+            resume: fixture.spy.resume,
+            open: fixture.spy.open,
+          };
         }),
       );
       assert.deepEqual(result.workspace, { cwd: "/tmp/pie-app" });
@@ -167,9 +172,9 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
             yield* fixture.repo.write({ ...stored, worktree: { branch: "pie/test" } });
             yield* fixture.service.close(ref);
-            const workspace = yield* fixture.service.prepare(ref);
+            const prepared = yield* fixture.service.prepare(ref);
             const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-            return { workspace, cwd: after.cwd };
+            return { workspace: prepared.workspace, cwd: after.cwd };
           }),
         );
         assert.deepEqual(result.workspace, {

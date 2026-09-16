@@ -123,10 +123,64 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
               worktree: {},
             });
             yield* fixture.service.archive(created.ref, true);
-            const workspace = yield* fixture.service.prepare(created.ref);
+            const prepared = yield* fixture.service.prepare(created.ref);
+            return { created, workspace: prepared.workspace };
+          }),
+      );
+      assert.deepEqual(result.workspace, result.created.workspace);
+    }),
+  );
+
+  it.effect("prepare reports a missing worktree checkout without recreating it", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          worktreeCreate: () =>
+            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+          worktreeCheckoutMissing: () => Effect.succeed(true),
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            });
+            return yield* fixture.service.prepare(created.ref);
+          }),
+      );
+      assert.equal(result.missingWorktree, true);
+      assert.deepEqual(result.workspace, {
+        cwd: "/tmp/pie-worktree",
+        worktree: { branch: "pie/abcd1234" },
+      });
+    }),
+  );
+
+  it.effect("restoreWorktree re-creates the stored checkout", () =>
+    Effect.gen(function* () {
+      const restored: Array<readonly [string, string, string]> = [];
+      const result = yield* run(
+        {
+          worktreeCreate: () =>
+            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+          worktreeRestore: (repoCwd, worktreePath, branch) => {
+            restored.push([repoCwd, worktreePath, branch]);
+            return Effect.succeed({ path: worktreePath, branch });
+          },
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            });
+            const workspace = yield* fixture.service.restoreWorktree(created.ref);
             return { created, workspace };
           }),
       );
+      assert.deepEqual(restored, [["/tmp/pie-app", "/tmp/pie-worktree", "pie/abcd1234"]]);
       assert.deepEqual(result.workspace, result.created.workspace);
     }),
   );

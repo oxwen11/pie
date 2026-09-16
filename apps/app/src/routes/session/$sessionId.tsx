@@ -1,5 +1,5 @@
 import type { PrepareSessionOutput, SessionRef } from "@getpie/contract";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
@@ -19,11 +19,25 @@ export const Route = createFileRoute("/session/$sessionId")({
   loaderDeps: ({ search }) => search,
   loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
     const { session } = context.orpcQueryUtils.agent;
-    const prepareWithBranch = (ref: SessionRef) => {
+    const prepareSession = async (ref: SessionRef) => {
+      const prepared = await session.prepare.call({ ref });
+      if (prepared.missingWorktree === true) {
+        throw redirect({
+          to: "/session/fallback",
+          search: {
+            sessionId: prepared.ref.sessionId,
+            projectId: prepared.ref.projectId,
+            reason: "missing-worktree",
+            ...(prepared.workspace.worktree?.branch !== undefined
+              ? { branch: prepared.workspace.worktree.branch }
+              : undefined),
+          },
+        });
+      }
       void context.queryClient.prefetchQuery(
         context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
       );
-      return session.prepare.call({ ref });
+      return prepared;
     };
 
     if (deps.projectId !== undefined) {
@@ -31,7 +45,8 @@ export const Route = createFileRoute("/session/$sessionId")({
         projectId: deps.projectId,
         sessionId: params.sessionId,
       };
-      const prepared = await prepareWithBranch(hinted).catch((error: unknown) => {
+      const prepared = await prepareSession(hinted).catch((error: unknown) => {
+        if (isRedirect(error)) throw error;
         console.warn("Preparing the URL's ref failed, falling back to lookup", error);
         return undefined;
       });
@@ -45,7 +60,8 @@ export const Route = createFileRoute("/session/$sessionId")({
         toast.error(`Session ${params.sessionId} could not be found.`);
         throw redirect({ to: "/draft" });
       });
-    return prepareWithBranch(ref).catch((error: unknown) => {
+    return prepareSession(ref).catch((error: unknown) => {
+      if (isRedirect(error)) throw error;
       console.error("Failed to prepare session", error);
       toast.error(
         `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,

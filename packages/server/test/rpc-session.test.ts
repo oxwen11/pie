@@ -328,7 +328,16 @@ describe("agent.session router", () => {
 
       const prepared = await client.agent.session.prepare({ ref: created.ref });
       expect(prepared.workspace).toEqual(created.workspace);
+      expect(prepared.missingWorktree).toBe(true);
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
+
+      const restored = await client.agent.session.restoreWorktree({ ref: created.ref });
+      expect(restored.workspace).toEqual(created.workspace);
+      expect(restored.missingWorktree).toBeUndefined();
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const ready = await client.agent.session.prepare({ ref: created.ref });
+      expect(ready.missingWorktree).toBeUndefined();
 
       await client.agent.session.close({ ref: created.ref });
     } finally {
