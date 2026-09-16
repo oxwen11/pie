@@ -1,3 +1,4 @@
+import type { SessionRef, SessionWorkspace } from "@getpie/contract";
 import { sessionContract } from "@getpie/contract/session";
 import { Effect } from "effect";
 
@@ -9,12 +10,17 @@ import {
   GitNotRepository,
   GitRefNotFound,
   GitWorktreePathExists,
+  ProjectNotFound,
+  SessionNotFound,
+  SessionNotWorktree,
   WorkspaceNotDirectory,
   WorkspacePathEscape,
   WorkspaceReadError,
+  WorktreeCheckoutMissing,
 } from "../errors";
 import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
+import { AgentOperationError, SessionNotResumable } from "../harness/errors";
 import { ProjectService } from "../project";
 import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
@@ -23,6 +29,11 @@ import { openScopedSubscription } from "./session-stream";
 import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
+
+const preparedSessionOutput = (ref: SessionRef, workspace: SessionWorkspace) => ({
+  ref,
+  workspace,
+});
 
 const mapGitWorktreeErrors = <
   E extends {
@@ -84,21 +95,20 @@ export const sessionRouter = orpc.router({
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
-    const preparedWorkspace = yield* sessions.prepare(input.ref).pipe(
-      Effect.map((sessionWorkspace) => ({
-        ref: input.ref,
-        workspace: sessionWorkspace,
-      })),
+    return yield* sessions.prepare(input.ref).pipe(
+      Effect.map((workspace) => preparedSessionOutput(input.ref, workspace)),
       Effect.catchTags({
-        SessionNotFound: (e) =>
+        SessionNotFound: (e: SessionNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
+        ProjectNotFound: (e: ProjectNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        WorkspaceReadError: (e) =>
+        SessionNotResumable: (e: SessionNotResumable) =>
+          Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOperationError: (e: AgentOperationError) =>
+          Effect.fail(errors.INTERNAL({ message: e.message })),
+        WorkspaceReadError: (e: WorkspaceReadError) =>
           Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
-        WorktreeCheckoutMissing: (e) =>
+        WorktreeCheckoutMissing: (e: WorktreeCheckoutMissing) =>
           Effect.fail(
             errors.WORKTREE_MISSING({
               data: {
@@ -110,17 +120,22 @@ export const sessionRouter = orpc.router({
           ),
       }),
     );
-    return preparedWorkspace;
   }),
   restoreWorktree: orpc.restoreWorktree.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.restoreWorktree(input.ref).pipe(
-      Effect.map((workspace) => ({ ref: input.ref, workspace })),
+      Effect.map((workspace) => preparedSessionOutput(input.ref, workspace)),
       Effect.catchTags({
-        SessionNotFound: (e) =>
+        SessionNotFound: (e: SessionNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
+        ProjectNotFound: (e: ProjectNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotWorktree: (e: SessionNotWorktree) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({
+              message: `session ${e.sessionId} is not a worktree session`,
+            }),
+          ),
       }),
       mapGitWorktreeErrors(errors),
     );

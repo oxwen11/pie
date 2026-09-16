@@ -1,46 +1,32 @@
 import type { PrepareSessionOutput, SessionRef } from "@getpie/contract";
-import { ORPCError } from "@orpc/client";
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
+import { parseWorktreeMissingError } from "@/features/session/worktree-missing";
 
 type SessionSearch = {
   readonly projectId?: string;
 };
 
-type WorktreeMissingData = {
-  readonly sessionId?: unknown;
-  readonly projectId?: unknown;
-  readonly branch?: unknown;
-};
-
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const isWorktreeMissingData = (value: unknown): value is WorktreeMissingData =>
-  typeof value === "object" && value !== null;
-
-const throwIfWorktreeMissing = (error: unknown): void => {
-  if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return;
-  if (!isWorktreeMissingData(error.data)) return;
-  const sessionId = asText(error.data.sessionId);
-  const projectId = asText(error.data.projectId);
-  if (sessionId === undefined || projectId === undefined) return;
-  const branch = asText(error.data.branch);
+const redirectForWorktreeMissing = (error: unknown): void => {
+  const missing = parseWorktreeMissingError(error);
+  if (missing === undefined) return;
   throw redirect({
     to: "/session/fallback",
     search: {
-      sessionId,
-      projectId,
-      ...(branch !== undefined ? { branch } : undefined),
+      sessionId: missing.sessionId,
+      projectId: missing.projectId,
     },
   });
 };
 
 const catchPrepareError = <T,>(error: unknown, onOther: (error: unknown) => T): T => {
   if (isRedirect(error)) throw error;
-  throwIfWorktreeMissing(error);
+  redirectForWorktreeMissing(error);
   return onOther(error);
 };
 

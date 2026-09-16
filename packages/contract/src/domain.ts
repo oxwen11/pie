@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Exit, Schema } from "effect";
 
 import type { PieUIMessage, PieUIMessageChunk } from "./pi-tools";
 
@@ -588,6 +588,21 @@ export type CreateSessionOutput = typeof CreateSessionOutputSchema.Type;
 
 export const PrepareSessionOutputSchema = CreateSessionOutputSchema;
 export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
+
+/** Payload for the `WORKTREE_MISSING` prepare error. */
+export const WorktreeMissingErrorDataSchema = Schema.Struct({
+  sessionId: Schema.String,
+  projectId: Schema.String,
+  branch: Schema.optionalKey(Schema.NonEmptyString),
+});
+export type WorktreeMissingErrorData = typeof WorktreeMissingErrorDataSchema.Type;
+
+export const decodeWorktreeMissingErrorData = (
+  value: unknown,
+): WorktreeMissingErrorData | undefined => {
+  const exit = Schema.decodeUnknownExit(WorktreeMissingErrorDataSchema)(value);
+  return Exit.isSuccess(exit) ? exit.value : undefined;
+};
 
 export const ListSessionsInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),

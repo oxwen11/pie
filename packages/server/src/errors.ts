@@ -77,6 +77,12 @@ export class WorktreeCheckoutMissing extends Data.TaggedError("WorktreeCheckoutM
   readonly branch?: string;
 }> {}
 
+/** Session metadata has no worktree branch to restore. */
+export class SessionNotWorktree extends Data.TaggedError("SessionNotWorktree")<{
+  readonly sessionId: string;
+  readonly projectId: string;
+}> {}
+
 /** A SessionRef's projectId disagrees with the stored session metadata. */
 export class SessionRefMismatch extends Data.TaggedError("SessionRefMismatch")<{
   readonly projectId: string;

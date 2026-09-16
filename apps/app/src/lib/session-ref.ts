@@ -11,11 +11,27 @@ export const sameSessionRef = (left: SessionRef, right: SessionRef | null | unde
   left.projectId === right.projectId &&
   left.sessionId === right.sessionId;
 
+const hasSessionLoaderRef = (data: unknown): data is { readonly ref: SessionRef } => {
+  if (data === null || typeof data !== "object" || !("ref" in data)) return false;
+  const ref = data.ref;
+  return (
+    typeof ref === "object" &&
+    ref !== null &&
+    "projectId" in ref &&
+    "sessionId" in ref &&
+    typeof ref.projectId === "string" &&
+    typeof ref.sessionId === "string"
+  );
+};
+
 /** The session-route loader ref on live router matches. Read at call time. */
 export const sessionRefFromRouterMatches = (
   matches: ReadonlyArray<{
     readonly routeId: string;
-    readonly loaderData?: { readonly ref?: SessionRef };
+    readonly loaderData?: unknown;
   }>,
-): SessionRef | undefined =>
-  matches.find((match) => match.routeId === "/session/$sessionId")?.loaderData?.ref;
+): SessionRef | undefined => {
+  const data = matches.find((match) => match.routeId === "/session/$sessionId")?.loaderData;
+  if (!hasSessionLoaderRef(data)) return undefined;
+  return data.ref;
+};
