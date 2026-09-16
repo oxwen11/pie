@@ -34,7 +34,9 @@ describe("project router", () => {
       await expect(h.client.project.allocateRoot()).resolves.toEqual({ path: root });
       const created = await h.client.project.allocate({ title: "hello world" });
       expect(created.path.startsWith(root + path.sep)).toBe(true);
-      expect(created.name).toMatch(/^\d{4}-\d{2}-\d{2}-hello-world$/);
+      expect(created.name).toBe("hello-world");
+      expect(path.basename(created.path)).toBe("hello-world");
+      expect(path.basename(path.dirname(created.path))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(fs.existsSync(created.path)).toBe(true);
       await expect(h.client.project.list()).resolves.toEqual([created]);
     } finally {

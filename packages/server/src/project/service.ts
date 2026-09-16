@@ -155,10 +155,18 @@ export const ProjectServiceLayer: Layer.Layer<
         const now = input?.now ?? new Date();
         for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
           const name = allocateProjectFolderName(now, input?.title, attempt);
-          const folder = path.join(root, name);
-          if (path.dirname(folder) !== root || !contains(root, folder)) {
+          const folder = path.resolve(root, name);
+          if (path.relative(root, folder) !== name || !contains(root, folder)) {
             return yield* new WorkspacePathEscape({ cwd: root, path: folder });
           }
+          const parent = path.dirname(folder);
+          if (!contains(root, parent)) {
+            return yield* new WorkspacePathEscape({ cwd: root, path: parent });
+          }
+          yield* fs.makeDirectory(parent, { recursive: true }).pipe(
+            Effect.catchIf(isAlreadyExists, () => Effect.void),
+            Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),
+          );
           if (yield* tryCreateFolder(folder)) {
             return yield* create({ path: folder });
           }

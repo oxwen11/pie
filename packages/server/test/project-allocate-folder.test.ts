@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  ALLOCATE_FALLBACK_SLUG,
   allocateProjectFolderName,
+  allocateProjectLeafName,
   DEFAULT_NEW_PROJECT_DIR,
   formatAllocateDate,
   resolveNewProjectRoot,
@@ -24,11 +26,11 @@ describe("resolveNewProjectRoot", () => {
     );
   });
 
-  it("defaults to ~/pie", () => {
+  it("defaults to ~/Pie", () => {
     expect(resolveNewProjectRoot({}, () => "/home/user")).toBe(
       path.join("/home/user", DEFAULT_NEW_PROJECT_DIR),
     );
-    expect(DEFAULT_NEW_PROJECT_DIR).toBe("pie");
+    expect(DEFAULT_NEW_PROJECT_DIR).toBe("Pie");
   });
 });
 
@@ -53,20 +55,25 @@ describe("slugifyProjectTitle", () => {
 describe("allocateProjectFolderName", () => {
   const noon = new Date(2026, 8, 16, 12, 0, 0);
 
-  it("uses the local calendar date when there is no slug", () => {
+  it("nests a fallback slug under the local calendar date", () => {
     expect(formatAllocateDate(noon)).toBe("2026-09-16");
-    expect(allocateProjectFolderName(noon, undefined, 1)).toBe("2026-09-16");
-  });
-
-  it("appends a slug from the title", () => {
-    expect(allocateProjectFolderName(noon, "Ask Pi anything", 1)).toBe(
-      "2026-09-16-ask-pi-anything",
+    expect(allocateProjectLeafName(undefined, 1)).toBe(ALLOCATE_FALLBACK_SLUG);
+    expect(allocateProjectFolderName(noon, undefined, 1)).toBe(
+      path.join("2026-09-16", ALLOCATE_FALLBACK_SLUG),
     );
   });
 
-  it("suffixes from -2 on later attempts", () => {
-    expect(allocateProjectFolderName(noon, undefined, 2)).toBe("2026-09-16-2");
-    expect(allocateProjectFolderName(noon, "hello", 3)).toBe("2026-09-16-hello-3");
+  it("nests a slug from the title under the date", () => {
+    expect(allocateProjectFolderName(noon, "Ask Pi anything", 1)).toBe(
+      path.join("2026-09-16", "ask-pi-anything"),
+    );
+  });
+
+  it("suffixes the leaf from -2 on later attempts", () => {
+    expect(allocateProjectFolderName(noon, undefined, 2)).toBe(
+      path.join("2026-09-16", `${ALLOCATE_FALLBACK_SLUG}-2`),
+    );
+    expect(allocateProjectFolderName(noon, "hello", 3)).toBe(path.join("2026-09-16", "hello-3"));
   });
 });
 

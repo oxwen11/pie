@@ -5,8 +5,8 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 ## Sub-features
 
 - **Centered composer** always: project picker, optional git workspace/worktree controls, model select, TipTap input, submit. Zero projects is not an empty state — the picker stays on **New folder**. Import remains on the sidebar.
-- **Project picker** — default **New folder** (no `?projectId=`). Choosing a project writes `?projectId=` (replace). Choosing **New folder** again clears it. The New folder row subtitle is the allocate root (`PIE_NEW_PROJECT_ROOT` or `~/pie`).
-- **New folder send** — `project.allocate` creates `<root>/<YYYY-MM-DD>[-slug]/` from the first prompt, registers it as a Project, then `session.create`. Sidebar lists the new project.
+- **Project picker** — default **New folder** (no `?projectId=`). Choosing a project writes `?projectId=` (replace). Choosing **New folder** again clears it. The New folder row subtitle is the allocate root (`PIE_NEW_PROJECT_ROOT` or `~/Pie`).
+- **New folder send** — `project.allocate` creates `<root>/<YYYY-MM-DD>/<slug>/` from the first prompt (`chat` when there is no slug), registers it as a Project, then `session.create`. Sidebar lists the new project by the leaf name.
 - **Workspace mode** (git repos only, after a real Project is selected): **Current directory** vs **New worktree**. Worktree requires a **base branch** (`aria-label="Base branch for worktree"`). Non-git shows **Not a Git repository**. Missing folder shows **Workspace unavailable** and blocks send.
 - **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**. Hidden when the model list is empty (`models.length === 0`). Default model is written into `?provider=&modelId=` once.
 - **Send** — creates the session (cwd persisted, worktree materialized if requested), then `prompt(text)` without waiting for Pi to spawn, then navigates. Enabled with content even when no project is selected.
@@ -43,8 +43,8 @@ New folder path (`launch --replace --empty-projects`, or leave the picker on **N
 1. Confirm **New folder** and the subtitle `$PIE_HOME/new-projects`.
 2. Type `allocate ping` and click submit.
 3. URL becomes `/session/<uuid>?projectId=<uuid>`.
-4. Sidebar **Projects** lists a dated folder (`YYYY-MM-DD-allocate-ping` or a `-n` suffix).
-5. That directory exists under `$PIE_HOME/new-projects/`. Session `cwd` is that path. `verify-pie evidence side-effects`.
+4. Sidebar **Projects** lists the leaf (`allocate-ping` or a `-n` suffix).
+5. That directory exists under `$PIE_HOME/new-projects/<YYYY-MM-DD>/`. Session `cwd` is that path. `verify-pie evidence side-effects`.
 
 Worktree path (only if the imported folder is a git repo): switch the workspace select to **New worktree**, pick a base branch, send. Create must fail closed on git errors (no session file). Success writes `cwd` under `$PIE_HOME/worktrees/<repo>/<key>/`.
 
@@ -54,4 +54,4 @@ Worktree path (only if the imported folder is a git repo): switch the workspace 
 - Send is disabled when: input empty, workspace unavailable, create in flight, or worktree mode with no base branch. It is **not** disabled for New folder.
 - Model select missing ≠ broken draft. Pi unavailable ⇒ empty list ⇒ component returns `null`.
 - After adding/renaming routes, load `/` through Vite before typechecking (`routeTree.gen.ts` is plugin-generated).
-- Verify sets `PIE_NEW_PROJECT_ROOT=$PIE_HOME/new-projects`. Do not expect folders under `~/pie` in an isolated run.
+- Verify sets `PIE_NEW_PROJECT_ROOT=$PIE_HOME/new-projects`. Do not expect folders under `~/Pie` in an isolated run.

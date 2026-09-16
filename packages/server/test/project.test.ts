@@ -132,9 +132,9 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
         const svc = yield* projects;
         const now = new Date(2026, 8, 16, 12, 0, 0);
         const created = yield* svc.allocate({ title: "Ask Pi anything", now });
-        const expected = path.join(root, "2026-09-16-ask-pi-anything");
+        const expected = path.join(root, "2026-09-16", "ask-pi-anything");
         assert.equal(created.path, expected);
-        assert.equal(created.name, "2026-09-16-ask-pi-anything");
+        assert.equal(created.name, "ask-pi-anything");
         assert.equal(yield* fs.exists(expected), true);
         assert.deepEqual(yield* svc.allocateRoot(), { path: root });
       } finally {
@@ -144,19 +144,20 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
     }),
   );
 
-  it.effect("allocates a numeric suffix when the dated folder already exists", () =>
+  it.effect("allocates a numeric suffix when the slug leaf already exists", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "pie-new-proj-" });
       const now = new Date(2026, 8, 16, 12, 0, 0);
-      yield* fs.makeDirectory(path.join(root, "2026-09-16"));
+      yield* fs.makeDirectory(path.join(root, "2026-09-16", "chat"), { recursive: true });
       const previous = process.env.PIE_NEW_PROJECT_ROOT;
       process.env.PIE_NEW_PROJECT_ROOT = root;
       try {
         const svc = yield* projects;
         const created = yield* svc.allocate({ now });
-        assert.equal(created.path, path.join(root, "2026-09-16-2"));
-        assert.equal(yield* fs.exists(path.join(root, "2026-09-16-2")), true);
+        assert.equal(created.path, path.join(root, "2026-09-16", "chat-2"));
+        assert.equal(created.name, "chat-2");
+        assert.equal(yield* fs.exists(path.join(root, "2026-09-16", "chat-2")), true);
       } finally {
         if (previous === undefined) delete process.env.PIE_NEW_PROJECT_ROOT;
         else process.env.PIE_NEW_PROJECT_ROOT = previous;

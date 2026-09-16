@@ -1,6 +1,8 @@
 export {
+  ALLOCATE_FALLBACK_SLUG,
   ALLOCATE_FOLDER_ATTEMPTS,
   allocateProjectFolderName,
+  allocateProjectLeafName,
   DEFAULT_NEW_PROJECT_DIR,
   formatAllocateDate,
   resolveNewProjectRoot,

@@ -125,7 +125,7 @@ export class WorkspaceReadError extends Data.TaggedError("WorkspaceReadError")<{
   readonly cause: unknown;
 }> {}
 
-/** Creating a new project folder failed (mkdir of the root or the leaf). */
+/** Creating a new project folder failed (mkdir of the root, date parent, or leaf). */
 export class ProjectFolderCreateError extends Data.TaggedError("ProjectFolderCreateError")<{
   readonly path: string;
   readonly cause: unknown;

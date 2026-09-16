@@ -9,8 +9,8 @@ A working directory the user has registered with the server, identified by a ser
 _Avoid_: workspace, repo, cwd (for the Project field)
 
 **New-project root**:
-The parent directory where `project.allocate` mints a new folder and registers it as a Project. Default `~/pie`. Override with `PIE_NEW_PROJECT_ROOT` (tests and Verify must set this under their isolated `$PIE_HOME`). Folder names are `<YYYY-MM-DD>` or `<YYYY-MM-DD>-<slug>` from the first prompt, with a `-2`, `-3`, … suffix on collision. The root is user data, not `$PIE_HOME`.
-_Avoid_: scratch, inbox, workspace root, cwd, putting allocated folders under `$PIE_HOME` in production
+The parent directory where `project.allocate` mints a new folder and registers it as a Project. Default `~/Pie`. Override with `PIE_NEW_PROJECT_ROOT` (tests and Verify must set this under their isolated `$PIE_HOME`). Folders are `<YYYY-MM-DD>/<slug>` from the first prompt (`chat` when the title has no slug), with a `-2`, `-3`, … suffix on the leaf on collision. `Project.name` is the leaf basename. The root is user data, not `$PIE_HOME`.
+_Avoid_: scratch, inbox, workspace root, cwd, `~/Documents`, putting allocated folders under `$PIE_HOME` in production
 
 **SessionRef**:
 The composite identity `{ projectId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.
