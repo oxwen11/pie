@@ -81,10 +81,12 @@ export function ensureCoreBuilt(repo: string): void {
 }
 
 export function ensureServerBuilt(repo: string): void {
-  if (fs.existsSync(path.join(repo, "packages/server/dist/server.mjs"))) {
+  const server = path.join(repo, "packages/server/dist/server.mjs");
+  const piProcess = path.join(repo, "packages/server/dist/pi-process/pi-process.js");
+  if (fs.existsSync(server) && fs.existsSync(piProcess)) {
     return;
   }
-  console.log("building @getpie/server (packages/server/dist/server.mjs missing)");
+  console.log("building @getpie/server (packages/server/dist missing pie-pi-process)");
   const result = runCommand("pnpm", ["turbo", "run", "build", "--filter=@getpie/server"], {
     cwd: repo,
     stdio: "inherit",

@@ -45,6 +45,9 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   switch (identity.build) {
     case "core":
       ensureCoreBuilt(repo);
+      // pie serve loads TypeScript, but availability stats the bun-built
+      // pie-pi-process entry under @getpie/server/pi-process.
+      ensureServerBuilt(repo);
       break;
     case "server":
       ensureServerBuilt(repo);

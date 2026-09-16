@@ -36,7 +36,7 @@ Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http:
 What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
-- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
+- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Also builds `@getpie/server` when `dist/pi-process/pi-process.js` is missing — `pie serve` loads TypeScript, but availability still stats that bun-built entry. Other workspace packages export `src/*.ts`.
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
