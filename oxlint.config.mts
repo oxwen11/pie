@@ -31,13 +31,11 @@ const pieIgnorePatterns = [
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
- * → remaining pedantic/style → oxfmt 80-col → @shadcn/lint
- * `no-unknown-classes` / `require-static-classes`. `no-restyle`,
- * `no-raw-colors`, `no-arbitrary-values`, and `require-static-classes`
- * are on below. Vendored UI sources keep `no-restyle`,
+ * → remaining pedantic/style → oxfmt 80-col. `@shadcn/lint` core
+ * rules are on below. Vendored UI sources keep `no-restyle`,
  * `no-arbitrary-values`, and `require-static-classes` off;
- * `no-raw-colors` stays on there except three pre-existing
- * presentation sites.
+ * `no-raw-colors` and `no-unknown-classes` stay on there except
+ * three pre-existing raw-color presentation sites.
  */
 export default defineConfig({
   extends: [core, react, vitest],
@@ -163,6 +161,26 @@ export default defineConfig({
     // packages/ui: call sites of the component's own cva/tv factories
     // cannot be resolved.
     "shadcn/require-static-classes": "error",
+    // Classes Tailwind cannot generate. Keep on in packages/ui.
+    // `allow` is exact names from stylesheets outside the discovered
+    // theme graph (tw-shimmer, streamdown, tiptap, desktop startup).
+    "shadcn/no-unknown-classes": [
+      "error",
+      {
+        allow: [
+          "not-prose",
+          "shimmer",
+          "shimmer-invert",
+          "is-user",
+          "is-assistant",
+          "tiptap-suggestion-menu",
+          "pie-startup-logo",
+          "pie-startup-logo-shimmer",
+          // Vendored typo in scroll-area; generates no CSS. Do not restyle here.
+          "transition-shadows",
+        ],
+      },
+    ],
     "import/no-unassigned-import": [
       "error",
       {
@@ -323,6 +341,7 @@ export default defineConfig({
         "shadcn/no-raw-colors": "off",
         "shadcn/no-arbitrary-values": "off",
         "shadcn/require-static-classes": "off",
+        "shadcn/no-unknown-classes": "off",
       },
     },
     {
