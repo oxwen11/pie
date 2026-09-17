@@ -8,6 +8,8 @@
  * Bundled `@ff-labs/pi-fff` is an additionalExtensionPath — never a static
  * import — so bun-build does not inline the native FFI graph.
  */
+import fs from "node:fs";
+
 import {
   applyHttpProxySettings,
   builtInExtensions,
@@ -25,12 +27,16 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { piBashExtension } from "../bash";
-import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionPath } from "../fff";
+import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../fff";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
+const bundledFff = fffExtensionEntry(import.meta.filename);
+if (!fs.existsSync(bundledFff)) {
+  throw new Error(`bundled fff island missing: ${bundledFff}`);
+}
 applyFffNodePath(process.env, import.meta.filename);
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {
@@ -52,17 +58,15 @@ export const main = async (): Promise<void> => {
   configureHttpDispatcher();
   const sessionManager = await openSessionManager(parsed.sessionId, cwd);
 
-  const bundledFff = fffExtensionPath(import.meta.filename);
-
   const createRuntime: CreateAgentSessionRuntimeFactory = async (options) => {
     const services = await createAgentSessionServices({
       cwd: options.cwd,
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
-      ...(bundledFff === undefined ? undefined : { extensionFlagValues: FFF_OVERRIDE_FLAGS }),
+      extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
         extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
-        ...(bundledFff === undefined ? undefined : { additionalExtensionPaths: [bundledFff] }),
+        additionalExtensionPaths: [bundledFff],
       },
     });
     const resolved = resolveCliModel({

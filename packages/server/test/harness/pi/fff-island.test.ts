@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 import { copyFffIsland } from "../../../scripts/copy-fff";
 import { fffNodePathEnv } from "../../../src/harness/pi/fff";
@@ -14,15 +14,7 @@ const processBundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
 );
 const builtIsland = url.fileURLToPath(new URL("../../../dist/fff", import.meta.url));
-
-const resolveBun = (): string | undefined => {
-  const explicit = process.env.PIE_BUN?.trim();
-  if (explicit && fs.existsSync(explicit)) return explicit;
-  const probe = childProcess.spawnSync("bun", ["--version"], { encoding: "utf8" });
-  return probe.status === 0 ? "bun" : undefined;
-};
-
-const bun = resolveBun();
+const bun = process.env.PIE_BUN?.trim() ?? "bun";
 
 const readJsonl = (text: string): Array<Record<string, unknown>> => {
   const frames: Array<Record<string, unknown>> = [];
@@ -40,16 +32,16 @@ const readJsonl = (text: string): Array<Record<string, unknown>> => {
   return frames;
 };
 
-describe.skipIf(bun === undefined)("bundled fff island", () => {
+describe("bundled fff island", () => {
   it("copies pi-fff and one platform bin, then overrides find/grep under Bun", () => {
     const dest = fs.mkdtempSync(path.join(os.tmpdir(), "pie-fff-island-"));
     copyFffIsland(dest);
     const island = path.join(dest, "node_modules");
-    expect(fs.existsSync(path.join(island, "@ff-labs", "pi-fff", "src", "index.ts"))).toBe(true);
+    assert.equal(fs.existsSync(path.join(island, "@ff-labs", "pi-fff", "src", "index.ts")), true);
     const bins = fs
       .readdirSync(path.join(island, "@ff-labs"))
       .filter((name) => name.startsWith("fff-bin-"));
-    expect(bins).toHaveLength(1);
+    assert.equal(bins.length, 1);
 
     const home = path.join(dest, "home");
     const cwd = path.join(dest, "workspace");
@@ -69,7 +61,6 @@ const { default: fffExtension } = await import(
   path.join(island, "@ff-labs", "pi-fff", "src", "index.ts")
 );
 const registeredTools = [];
-const registeredCommands = [];
 const flags = new Map([
   ["fff-mode", "override"],
   ["fff-follow-symlinks", false],
@@ -80,7 +71,7 @@ const pi = {
   registerFlag() {},
   getFlag(name) { return flags.get(name); },
   registerTool(tool) { registeredTools.push(tool); },
-  registerCommand(name, spec) { registeredCommands.push({ name, ...spec }); },
+  registerCommand() {},
   getActiveTools() { return registeredTools.map((tool) => tool.name); },
   setActiveTools() {},
   appendEntry() {},
@@ -104,7 +95,7 @@ console.log("PI_FFF_OVERRIDE_OK");
 `,
     );
 
-    const run = childProcess.spawnSync(bun ?? "bun", ["--no-install", script], {
+    const run = childProcess.spawnSync(bun, ["--no-install", script], {
       encoding: "utf8",
       timeout: 20_000,
       env: {
@@ -114,20 +105,21 @@ console.log("PI_FFF_OVERRIDE_OK");
       },
     });
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
-    expect(run.stdout).toContain("PI_FFF_OVERRIDE_OK");
+    assert.match(run.stdout, /PI_FFF_OVERRIDE_OK/);
   }, 30_000);
 
   it("loads the sibling island from pie-pi-process without inlining fff-bun", async () => {
-    expect(fs.existsSync(processBundle)).toBe(true);
+    assert.equal(fs.existsSync(processBundle), true);
     const processJs = fs.readFileSync(processBundle, "utf8");
-    expect(processJs).not.toContain("@ff-labs/fff-bun");
-    expect(processJs).not.toContain("bun:ffi");
-    expect(processJs).not.toContain("fffFileAnnotation");
-    expect(
+    assert.ok(!processJs.includes("@ff-labs/fff-bun"));
+    assert.ok(!processJs.includes("bun:ffi"));
+    assert.ok(!processJs.includes("fffFileAnnotation"));
+    assert.equal(
       fs.existsSync(
         path.join(builtIsland, "node_modules", "@ff-labs", "pi-fff", "src", "index.ts"),
       ),
-    ).toBe(true);
+      true,
+    );
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-fff-session-"));
     const runtimeDir = path.join(root, "pi-process");
@@ -157,7 +149,7 @@ export default function (pi) {
     );
 
     const script = path.join(runtimeDir, "pi-process.js");
-    const child = childProcess.spawn(bun ?? "bun", ["--no-install", script, "--mode", "rpc"], {
+    const child = childProcess.spawn(bun, ["--no-install", script, "--mode", "rpc"], {
       cwd: workspace,
       env: {
         PATH: process.env.PATH,
@@ -224,7 +216,32 @@ export default function (pi) {
     child.kill("SIGTERM");
 
     assert.ok(dumped, `fff tools dump missing\n${stdout}\n${stderr}`);
-    expect(dumped.tools).toEqual(expect.arrayContaining(["find", "grep"]));
-    expect(dumped.tools).not.toContain("fffind");
+    assert.ok(dumped.tools.includes("find"));
+    assert.ok(dumped.tools.includes("grep"));
+    assert.ok(!dumped.tools.includes("fffind"));
   }, 30_000);
+
+  it("exits when the sibling island is missing", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-fff-missing-"));
+    const runtimeDir = path.join(root, "pi-process");
+    fs.cpSync(path.dirname(processBundle), runtimeDir, { recursive: true });
+    const run = childProcess.spawnSync(
+      bun,
+      ["--no-install", path.join(runtimeDir, "pi-process.js"), "--mode", "rpc"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 10_000,
+        env: {
+          PATH: process.env.PATH,
+          HOME: root,
+          PI_CODING_AGENT_DIR: root,
+          PI_OFFLINE: "1",
+        },
+        input: '{"id":"1","type":"get_commands"}\n',
+      },
+    );
+    assert.notEqual(run.status, 0);
+    assert.match(`${run.stdout}\n${run.stderr}`, /bundled fff island missing/);
+  }, 15_000);
 });

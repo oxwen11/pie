@@ -10,6 +10,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 const bundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
 );
+const builtIsland = url.fileURLToPath(new URL("../../../dist/fff", import.meta.url));
 
 layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) => {
   for (const provider of ["xai", "amazon-bedrock"]) {
@@ -20,6 +21,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
         const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-oauth-bundle-" });
         const runtimeDir = path.join(cwd, "runtime");
         yield* fs.copy(path.dirname(bundle), runtimeDir);
+        yield* fs.copy(builtIsland, path.join(cwd, "fff"));
         const turnEnded = yield* Deferred.make<void>();
         const authPath = path.join(cwd, "auth.json");
         const preload = path.join(cwd, "fetch.mjs");
