@@ -83,7 +83,7 @@ function resolvePiProcessScript(
  * 2. `bun --no-install <entry>` — `PIE_BUN` if that path exists, else PATH `bun`. Entry is
  *    a `.js` / `.mjs` / `.cjs` `PIE_PI_EXECUTABLE` or the pie-owned bun-build.
  *    Packaged desktop rewrites `app.asar` → `app.asar.unpacked` because Bun
- *    cannot read an asar; extraResources copies sit outside asar.
+ *    cannot read an asar.
  *
  * There is no Node spawn path and no PATH `pi` fallback.
  */

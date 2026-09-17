@@ -39,24 +39,22 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
 }
 
 /**
- * Packaged builds ship Bun for pie-pi-process only (`PIE_BUN` /
- * `PIE_PI_EXECUTABLE`); launch-time PIE_* wins. The daemon is always Node.
+ * Packaged builds put shipped Bun on PATH so pie-pi-process is `bun
+ * --no-install <package export>`. The daemon is always Node.
  */
 export function applyDesktopRuntime(
   env: NodeJS.ProcessEnv,
   options: {
     readonly isPackaged: boolean;
     readonly bundledBun: string | undefined;
-    readonly bundledPiProcess: string | undefined;
   },
 ): NodeJS.ProcessEnv {
   const next: NodeJS.ProcessEnv = { ...env };
   if (!options.isPackaged || options.bundledBun === undefined) return next;
 
-  next.PIE_BUN = env.PIE_BUN ?? options.bundledBun;
-  if (options.bundledPiProcess !== undefined) {
-    next.PIE_PI_EXECUTABLE = env.PIE_PI_EXECUTABLE ?? options.bundledPiProcess;
-  }
+  const vendorDir = path.dirname(options.bundledBun);
+  const current = next.PATH?.trim();
+  next.PATH = current ? `${vendorDir}${path.delimiter}${current}` : vendorDir;
   return next;
 }
 

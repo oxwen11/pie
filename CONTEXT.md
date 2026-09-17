@@ -48,10 +48,10 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **pie-pi-process**:
-Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
+Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
 
 **Daemon**:
-Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (`PIE_BUN` / `PIE_PI_EXECUTABLE`).
+Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
 _Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
 **Private modules** (no Context tags, never wired directly):
