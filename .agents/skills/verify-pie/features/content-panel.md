@@ -11,11 +11,12 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
 - **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
 - **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). **Address** and **Reload**. Do not treat its output as a real network.
+- **Demo plugin** — left activity rail (`data-slot="plugin-activity-bar"`), session routes only. Button **Demo**. Opens the `plugin-iframe` ContentPanel with `/plugin-demo/index.html` bound to the current SessionRef.
 
 ## How to get to it (user POV)
 
 1. Open any `/session/<id>`.
-2. Click **Toggle content panel**.
+2. Click **Demo** on the left activity rail — ContentPanel docks with the dogfood iframe. Or click **Toggle content panel**.
 3. Pick **Files** / **Review** / **Terminal** / **Browser**, or use **Open a panel** after the first tab exists.
 
 ## Driving it with agent-browser
