@@ -53,13 +53,4 @@ function copyFffIslandIntoApp(context, source = builtFffIsland()) {
   assertFffIsland(dest, "packed @getpie/server/dist/fff");
 }
 
-module.exports = {
-  FFF_ENTRY,
-  assertBuiltFffIsland,
-  assertFffIsland,
-  builtFffIsland,
-  copyFffIslandIntoApp,
-  fffEntry,
-  packResourcesDir,
-  packedFffIsland,
-};
+module.exports = { assertBuiltFffIsland, copyFffIslandIntoApp };

@@ -5,6 +5,6 @@ export default defineConfig({
     name: "desktop",
     environment: "node",
     fsModuleCache: true,
-    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+    include: ["src/**/*.test.ts"],
   },
 });
