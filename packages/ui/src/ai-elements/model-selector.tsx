@@ -1,5 +1,6 @@
 "use client";
 
+import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { Button } from "@getpie/ui/components/button";
 import {
   Combobox,
@@ -8,7 +9,6 @@ import {
   ComboboxGroup,
   ComboboxGroupLabel,
   ComboboxInput,
-  ComboboxItem,
   ComboboxList,
   ComboboxPopup,
   ComboboxTrigger,
@@ -18,6 +18,8 @@ import {
 import { cn } from "@getpie/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 import { type ComponentProps, useCallback, useMemo } from "react";
+
+import { providerLogoSrc } from "./provider-logo";
 
 /** Combobox-backed model picker. Same compound surface as AI Elements, without a dialog. */
 export const ModelSelector = Combobox;
@@ -72,32 +74,53 @@ export const ModelSelectorCollection = ComboboxCollection;
 
 export const ModelSelectorValue = ComboboxValue;
 
-export type ModelSelectorItemProps = ComponentProps<typeof ComboboxItem>;
+export type ModelSelectorItemProps = ComboboxPrimitive.Item.Props;
 
 export const ModelSelectorItem = ({ className, children, ...props }: ModelSelectorItemProps) => (
-  <ComboboxItem className={className} data-slot="model-selector-item" {...props}>
+  <ComboboxPrimitive.Item
+    className={cn(
+      "data-highlighted:bg-accent data-highlighted:text-accent-foreground data-selected:bg-accent data-selected:text-accent-foreground flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-base outline-none in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
+      className,
+    )}
+    data-slot="model-selector-item"
+    {...props}
+  >
     <span className="flex min-w-0 items-center gap-2">{children}</span>
-  </ComboboxItem>
+  </ComboboxPrimitive.Item>
 );
 
 export type ModelSelectorLogoProps = Omit<ComponentProps<"img">, "src" | "alt"> & {
   provider: string;
 };
 
-export const ModelSelectorLogo = ({ provider, className, ...props }: ModelSelectorLogoProps) => (
-  <img
-    alt={`${provider} logo`}
-    className={cn("size-3 shrink-0 dark:invert", className)}
-    data-slot="model-selector-logo"
-    height={12}
-    onError={(event) => {
-      event.currentTarget.style.visibility = "hidden";
-    }}
-    src={`https://models.dev/logos/${provider}.svg`}
-    width={12}
-    {...props}
-  />
-);
+export const ModelSelectorLogo = ({ provider, className, ...props }: ModelSelectorLogoProps) => {
+  const src = providerLogoSrc(provider);
+  if (src === undefined) {
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          "bg-muted text-muted-foreground flex size-3 shrink-0 items-center justify-center rounded-[2px] text-[8px] font-medium uppercase",
+          className,
+        )}
+        data-slot="model-selector-logo"
+      >
+        {provider.slice(0, 1)}
+      </span>
+    );
+  }
+  return (
+    <img
+      alt={`${provider} logo`}
+      className={cn("size-3 shrink-0 dark:invert", className)}
+      data-slot="model-selector-logo"
+      height={12}
+      src={src}
+      width={12}
+      {...props}
+    />
+  );
+};
 
 export type ModelSelectorLogoGroupProps = ComponentProps<"div">;
 
