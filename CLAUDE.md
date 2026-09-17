@@ -10,21 +10,20 @@ Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
 `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing turbo
 skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
 is two Vitest processes: node packages (`vitest.config.mts`, excludes `ui`)
-then browser component tests (`vitest.browser.config.mts`). `pnpm e2e` is
-Playwright (`@playwright/test`): web vs isolated `pie serve`, and Desktop via
-Electron.
+then browser (`vitest.browser.config.mts`: UI components + app product flows
+mounted in Chromium). `pnpm e2e` is Playwright Desktop (Electron).
 
-|                                 |                                                                                         |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| `pnpm test`                     | node Vitest + browser component tests; one package: `pnpm --filter @getpie/server test` |
-| `pnpm e2e`                      | Playwright web (`pie serve`) + Desktop (Electron)                                       |
-| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                |
-| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                    |
-| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                        |
+|                                 |                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm test`                     | node Vitest + browser (components + app e2e); one package: `pnpm --filter @getpie/server test` |
+| `pnpm e2e`                      | Playwright Desktop (Electron)                                                                  |
+| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                       |
+| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                           |
+| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                               |
 
 `format` is root-only (oxfmt) and not a turbo task. `test` is two root
-Vitest processes, not a turbo task. `e2e` is Playwright through turbo
-(`@getpie/app` then `@getpie/desktop`, each `dependsOn: ["build"]`).
+Vitest processes, not a turbo task. `e2e` is Playwright Electron through turbo
+(`@getpie/desktop`, `dependsOn: ["build"]`).
 `lint` / `lint:check` go through turbo
 so they wait on `@getpie/oxlint#build` (the oxlint tsdown plugins).
 `typecheck` is cached, so re-run with `--force` after changing something

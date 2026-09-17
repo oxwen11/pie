@@ -127,8 +127,8 @@ jobs:
       # `@getpie/app#build` and replaces `apps/app/dist` while
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
-      # root Vitest workspace (`pnpm test`) then Playwright e2e
-      # (`pnpm e2e`: web + Desktop) after that graph so cli/app
+      # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e)
+      # then Playwright Desktop (`pnpm e2e`) after that graph so cli/app
       # dist is stable. Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |

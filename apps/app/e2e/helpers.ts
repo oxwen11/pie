@@ -1,65 +1,83 @@
-import { type Page, expect } from "@playwright/test";
+import { expect, vi } from "vitest";
+import { page } from "vitest/browser";
 
-import { pieE2E } from "./fixtures.js";
-
-export async function openApp(page: Page): Promise<void> {
-  await page.goto(pieE2E().httpBaseUrl);
+export async function waitForText(text: string | RegExp, timeout = 15_000): Promise<void> {
+  await vi.waitFor(
+    () => {
+      expect(page.getByText(text).first().query()).not.toBeNull();
+    },
+    { timeout },
+  );
 }
 
-export async function waitForText(
-  page: Page,
-  text: string | RegExp,
-  timeout = 15_000,
-): Promise<void> {
-  await expect(page.getByText(text).first()).toBeVisible({ timeout });
+export function composer(): HTMLElement | null {
+  return document.querySelector('[contenteditable="true"]');
 }
 
-export async function waitForComposer(page: Page): Promise<void> {
-  await expect(page.locator('[contenteditable="true"]')).toBeVisible({ timeout: 15_000 });
+export async function waitForComposer(): Promise<void> {
+  await vi.waitFor(
+    () => {
+      expect(composer()).not.toBeNull();
+    },
+    { timeout: 15_000 },
+  );
 }
 
-export async function clickText(page: Page, text: string): Promise<void> {
+export async function clickText(text: string): Promise<void> {
   await page.getByText(text, { exact: true }).first().click();
 }
 
-export async function openImportDialog(page: Page, from: "empty" | "sidebar"): Promise<void> {
+export async function openImportDialog(from: "empty" | "sidebar"): Promise<void> {
   if (from === "empty") {
     await page.getByTestId("main").getByRole("button", { name: "Import project" }).click();
   } else {
     await page.getByTestId("sidebar").getByTitle("Import project").click();
   }
-  await expect(page.getByPlaceholder("Search folders or enter a full path...")).toBeVisible({
-    timeout: 10_000,
-  });
+  await vi.waitFor(
+    () => {
+      expect(
+        page.getByPlaceholder("Search folders or enter a full path...").query(),
+      ).not.toBeNull();
+    },
+    { timeout: 10_000 },
+  );
 }
 
-export async function importFolder(page: Page, name: string): Promise<void> {
+export async function importFolder(name: string): Promise<void> {
   await page.getByText(name, { exact: true }).click();
   const importButton = page.getByRole("button", { name: "Import this folder" });
-  await expect(importButton).toBeEnabled({ timeout: 10_000 });
+  await vi.waitFor(
+    () => {
+      expect(importButton.query()).not.toBeNull();
+      expect(importButton.element().hasAttribute("disabled")).toBe(false);
+    },
+    { timeout: 10_000 },
+  );
   await importButton.click();
 }
 
-export async function openDraftForProject(page: Page, name: string): Promise<void> {
+export async function openDraftForProject(name: string): Promise<void> {
   await page.getByTitle(`New chat in ${name}`).click();
-  await waitForComposer(page);
+  await waitForComposer();
 }
 
-export async function fillComposer(page: Page, text: string): Promise<void> {
-  await waitForComposer(page);
+export async function fillComposer(text: string): Promise<void> {
+  await waitForComposer();
   const editor = page.getByRole("textbox").first();
   await editor.click();
   await editor.fill(text);
 }
 
-export async function submitDraftComposer(page: Page): Promise<void> {
-  await page.locator('form button[type="submit"]').click();
+export async function submitDraftComposer(): Promise<void> {
+  const send = document.querySelector<HTMLButtonElement>('form button[type="submit"]');
+  expect(send).not.toBeNull();
+  send?.click();
 }
 
-export async function sendSessionMessage(page: Page): Promise<void> {
+export async function sendSessionMessage(): Promise<void> {
   await page.getByRole("button", { name: "Send message" }).click();
 }
 
-export function pathname(page: Page): string {
-  return new URL(page.url()).pathname;
+export function modelPickerTrigger(): HTMLElement | null {
+  return document.querySelector('[data-slot="model-selector-trigger"]');
 }

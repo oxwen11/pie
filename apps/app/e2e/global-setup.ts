@@ -60,16 +60,11 @@ function waitReady(child: childProcess.ChildProcess, timeoutMs = 45_000): Promis
   });
 }
 
-async function assertUiBuilt(httpBaseUrl: string): Promise<void> {
-  const response = await fetch(httpBaseUrl, { redirect: "manual" });
-  if (response.status === 503) {
-    throw new Error(
-      "Web UI not built. Run `pnpm exec turbo run build --filter=@getpie/app` first.",
-    );
-  }
-}
-
-export default async function globalSetup(): Promise<() => void> {
+export default async function setup({
+  provide,
+}: {
+  provide: (key: string, value: unknown) => void;
+}): Promise<() => void> {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-app-e2e-"));
   const workspace = path.join(home, "workspace");
   const bin = path.join(home, "bin");
@@ -98,14 +93,33 @@ export default async function globalSetup(): Promise<() => void> {
     stdio: ["ignore", "pipe", "pipe"],
   });
   const httpBaseUrl = await waitReady(serve);
-  await assertUiBuilt(httpBaseUrl);
+  const wsBaseUrl = httpBaseUrl.replace(/^http/, "ws");
 
-  process.env.PIE_E2E_BASE_URL = httpBaseUrl;
-  process.env.PIE_E2E_SAMPLE = SAMPLE;
-  process.env.PIE_E2E_SAMPLE_GIT = SAMPLE_GIT;
-  process.env.PIE_E2E_FAKE_REPLY = FAKE_REPLY;
+  provide("pieE2E", {
+    httpBaseUrl,
+    wsBaseUrl,
+    home,
+    workspace,
+    sample: SAMPLE,
+    sampleGit: SAMPLE_GIT,
+    fakeReply: FAKE_REPLY,
+  });
 
   return () => {
     serve.kill("SIGTERM");
   };
+}
+
+declare module "vitest" {
+  export interface ProvidedContext {
+    pieE2E: {
+      httpBaseUrl: string;
+      wsBaseUrl: string;
+      home: string;
+      workspace: string;
+      sample: string;
+      sampleGit: string;
+      fakeReply: string;
+    };
+  }
 }

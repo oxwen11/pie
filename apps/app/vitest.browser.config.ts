@@ -24,12 +24,34 @@ const appVite = {
 };
 
 export default defineConfig({
-  ...appVite,
+  ...appAlias,
   test: {
-    name: "app-browser",
-    dir: appDir,
     fsModuleCache: true,
-    include: ["src/**/*.test.tsx", ...browserTsTests],
-    browser: pieBrowser(),
+    projects: [
+      {
+        ...appVite,
+        test: {
+          name: "app-browser",
+          dir: appDir,
+          include: ["src/**/*.test.tsx", ...browserTsTests],
+          browser: pieBrowser(),
+        },
+      },
+      {
+        ...appVite,
+        test: {
+          name: "app-e2e",
+          dir: appDir,
+          include: ["e2e/**/*.e2e.test.tsx"],
+          globalSetup: ["./e2e/global-setup.ts"],
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
+          fileParallelism: false,
+          maxWorkers: 1,
+          sequence: { concurrent: false },
+          browser: pieBrowser({ viewport: { width: 1280, height: 800 } }),
+        },
+      },
+    ],
   },
 });
