@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -45,7 +47,6 @@ describe("applyDesktopRuntime", () => {
   const bundled = {
     isPackaged: true,
     bundledBun: "/Resources/vendor/bun",
-    bundledPiProcess: "/Resources/pi-process/pi-process.js",
   } as const;
 
   it("leaves unpackaged env unchanged", () => {
@@ -55,29 +56,25 @@ describe("applyDesktopRuntime", () => {
     });
   });
 
-  it("points packaged desktop at the shipped bun and pie-pi-process", () => {
-    expect(applyDesktopRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
-      PATH: "/usr/bin",
-      PIE_BUN: "/Resources/vendor/bun",
-      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
-    });
-  });
-
-  it("keeps a launch-time PIE_BUN override", () => {
-    expect(applyDesktopRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled)).toEqual({
-      PIE_BUN: "/custom/bun",
+  it("prepends vendor to PATH so packaged desktop finds shipped bun", () => {
+    expect(applyDesktopRuntime({ PATH: "/usr/bin", PIE_HOME: "/tmp/pie" }, bundled)).toEqual({
+      PATH: `/Resources/vendor${path.delimiter}/usr/bin`,
       PIE_HOME: "/tmp/pie",
-      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 
-  it("does not invent PIE_BUN when the binary is missing", () => {
+  it("sets PATH to vendor when packaged env has no PATH", () => {
+    expect(applyDesktopRuntime({}, bundled)).toEqual({
+      PATH: "/Resources/vendor",
+    });
+  });
+
+  it("does not change PATH when the bundled bun is missing", () => {
     const env = { PATH: "/usr/bin" };
     expect(
       applyDesktopRuntime(env, {
         isPackaged: true,
         bundledBun: undefined,
-        bundledPiProcess: undefined,
       }),
     ).toEqual({ PATH: "/usr/bin" });
   });
