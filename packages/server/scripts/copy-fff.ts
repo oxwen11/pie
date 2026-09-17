@@ -64,12 +64,17 @@ export function copyFffIsland(dest: string): void {
     bunManifest.optionalDependencies !== null
       ? bunManifest.optionalDependencies
       : {};
+  let copied = 0;
   for (const name of Object.keys(optional)) {
     if (!name.startsWith("@ff-labs/fff-bin-")) continue;
     try {
       copyPackage(name, destNodeModules);
+      copied += 1;
     } catch {
       /* other platforms are not installed */
     }
+  }
+  if (copied === 0) {
+    throw new Error("copy-fff: no fff-bin-* installed for this platform");
   }
 }

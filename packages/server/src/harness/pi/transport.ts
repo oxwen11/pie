@@ -75,12 +75,11 @@ export const makePiTransport = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
     const executable = options.executable ?? { command: process.execPath, prefixArgs: [] };
-    let processEntry: string | undefined;
-    for (const arg of executable.prefixArgs) {
-      if (/\.[cm]?js$/i.test(arg)) processEntry = arg;
-    }
+    const lastArg = executable.prefixArgs.at(-1);
     const fffEnv =
-      processEntry === undefined ? undefined : fffNodePathEnv(process.env, processEntry);
+      lastArg !== undefined && /\.[cm]?js$/i.test(lastArg)
+        ? fffNodePathEnv(process.env, lastArg)
+        : undefined;
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
