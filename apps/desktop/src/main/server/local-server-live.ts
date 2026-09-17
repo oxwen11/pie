@@ -32,9 +32,6 @@ export const LocalServerLive = Layer.effect(
               process.platform === "win32" ? "bun.exe" : "bun",
             ),
           ),
-          bundledPiProcess: existingFile(
-            path.join(config.resourcesPath, "pi-process", "pi-process.js"),
-          ),
         }),
       ),
     );

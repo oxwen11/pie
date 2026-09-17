@@ -15,21 +15,23 @@ files:
   # binary. We do not ship it: the server execs the user's own Claude Code
   # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
-  # Native fff lives in extraResources/fff (real files for Bun dlopen).
+  # Hoisted fff-bin packages are huge. Bun dlopen uses the copied island under
+  # @getpie/server/dist/fff (re-included below, then asarUnpack).
   - "!**/node_modules/@ff-labs/fff-bin-*/**"
+  - from: ../../packages/server/dist/fff
+    to: node_modules/@getpie/server/dist/fff
 asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
+  # Bun cannot read asar. pie-pi-process and its sibling fff island must be real
+  # files; resolve-executable rewrites app.asar → app.asar.unpacked.
+  - "**/node_modules/@getpie/server/dist/pi-process/**"
+  - "**/node_modules/@getpie/server/dist/fff/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
-# pi-process.js comes from @getpie/server#build (bun-build, outside asar).
-# The Node daemon + node-pty live in asar (node-pty unpacked).
+# The Node daemon lives in asar; node-pty, pie-pi-process, and fff are unpacked.
 beforePack: scripts/before-pack.cjs
 extraResources:
   - vendor
-  - from: ../../packages/server/dist/pi-process
-    to: pi-process
-  - from: ../../packages/server/dist/fff
-    to: fff
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns
