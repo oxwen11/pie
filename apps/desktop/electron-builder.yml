@@ -15,6 +15,8 @@ files:
   # binary. We do not ship it: the server execs the user's own Claude Code
   # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # Native fff lives in extraResources/fff (real files for Bun dlopen).
+  - "!**/node_modules/@ff-labs/fff-bin-*/**"
 asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
@@ -26,6 +28,8 @@ extraResources:
   - vendor
   - from: ../../packages/server/dist/pi-process
     to: pi-process
+  - from: ../../packages/server/dist/fff
+    to: fff
 icon: resources/icon.png
 mac:
   icon: resources/icon.icns
