@@ -50,9 +50,9 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 **pie-pi-process**:
 Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
 
-**PIE_DAEMON_RUNTIME**:
-Desktop-only switch for the _daemon_ (not the Pi child). Unset / `node` (default) keeps Electron-as-Node (`Pie Helper` + `server.mjs`). `bun` spawns `PIE_BUN` or PATH `bun` + `server.mjs` and does not set `ELECTRON_RUN_AS_NODE`. Restart the app and stop any existing daemon (`pie daemon stop`) after flipping — attach would otherwise reuse the previous runtime. Use this to A/B daemon RSS.
-_Avoid_: spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for this process; leaving a Node daemon running when measuring the bun switch
+**Daemon**:
+Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (`PIE_BUN` / `PIE_PI_EXECUTABLE`).
+_Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
