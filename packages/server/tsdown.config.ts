@@ -23,4 +23,11 @@ export default defineConfig({
     NODE_ENV: "production",
     PIE_DAEMON_COMPATIBILITY_KEY: resolveDaemonCompatibilityKey(),
   },
+  // Pi's extension loader uses VIRTUAL_MODULES only when this is true.
+  // listAvailablePiModels runs in the daemon (server.mjs), not pie-pi-process;
+  // without it, user packages such as pi-cursor fail to import @earendil-works/pi-ai
+  // and never appear in the model picker.
+  define: {
+    PI_BUNDLED_NODE: "true",
+  },
 });
