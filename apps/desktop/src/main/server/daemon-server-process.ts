@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -55,43 +54,6 @@ export function resolveServerRuntimeExecutable(
   return path.join(contentsDir, "Frameworks", `${helperName}.app`, "Contents", "MacOS", helperName);
 }
 
-export type DaemonRuntime = "bun" | "node";
-
-/** `PIE_DAEMON_RUNTIME=bun` runs the daemon under Bun; anything else keeps Electron/Node. */
-export function parseDaemonRuntime(value: string | undefined): DaemonRuntime {
-  return value?.trim().toLowerCase() === "bun" ? "bun" : "node";
-}
-
-const existingFile = (pathname: string | undefined): string | undefined =>
-  pathname !== undefined && fs.existsSync(pathname) ? pathname : undefined;
-
-export type DaemonServerArgv = {
-  readonly argv: readonly string[];
-  readonly electronAsNode: boolean;
-};
-
-/**
- * Daemon argv. Default is the Electron helper as Node. `PIE_DAEMON_RUNTIME=bun`
- * uses `PIE_BUN` when that path exists, otherwise PATH `bun`, with installs disabled.
- */
-export function resolveDaemonServerArgv(
-  env: NodeJS.ProcessEnv,
-  entry: string,
-  platform: NodeJS.Platform = process.platform,
-  execPath: string = process.execPath,
-): DaemonServerArgv {
-  if (parseDaemonRuntime(env.PIE_DAEMON_RUNTIME) === "bun") {
-    return {
-      argv: [existingFile(env.PIE_BUN?.trim()) ?? "bun", "--no-install", entry],
-      electronAsNode: false,
-    };
-  }
-  return {
-    argv: [resolveServerRuntimeExecutable(platform, execPath), entry],
-    electronAsNode: true,
-  };
-}
-
 /**
  * The daemon-backed `SpawnServer`: instead of forking a die-with-app child,
  * attach the daemon under `$PIE_HOME` via the shared launcher — the same
@@ -122,18 +84,12 @@ export function makeDaemonServerProcess(
 
     return (config, port) =>
       Effect.gen(function* () {
-        const { argv, electronAsNode } = resolveDaemonServerArgv(config.environment, config.entry);
-        const environment = { ...config.environment };
-        if (electronAsNode) {
-          environment.ELECTRON_RUN_AS_NODE = "1";
-        } else {
-          delete environment.ELECTRON_RUN_AS_NODE;
-        }
+        const environment = { ...config.environment, ELECTRON_RUN_AS_NODE: "1" };
 
         const handle = yield* resolveOrSpawnDaemon({
           home: resolvePieHome(config.environment),
           requiredCompatibilityKey,
-          serverArgv: argv,
+          serverArgv: [resolveServerRuntimeExecutable(), config.entry],
           // 0 means "no preference" on the first attempt; afterwards the
           // supervisor pins the port it saw, which we pass as preferred.
           port: port === 0 ? undefined : port,

@@ -48,11 +48,10 @@ describe("applyDesktopRuntime", () => {
     bundledPiProcess: "/Resources/pi-process/pi-process.js",
   } as const;
 
-  it("runs the unpackaged Desktop daemon with Node", () => {
+  it("leaves unpackaged env unchanged", () => {
     const env = { PATH: "/usr/bin" };
     expect(applyDesktopRuntime(env, { ...bundled, isPackaged: false })).toEqual({
       PATH: "/usr/bin",
-      PIE_DAEMON_RUNTIME: "node",
     });
   });
 
@@ -60,7 +59,6 @@ describe("applyDesktopRuntime", () => {
     expect(applyDesktopRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
       PATH: "/usr/bin",
       PIE_BUN: "/Resources/vendor/bun",
-      PIE_DAEMON_RUNTIME: "node",
       PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
@@ -68,7 +66,6 @@ describe("applyDesktopRuntime", () => {
   it("keeps a launch-time PIE_BUN override", () => {
     expect(applyDesktopRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled)).toEqual({
       PIE_BUN: "/custom/bun",
-      PIE_DAEMON_RUNTIME: "node",
       PIE_HOME: "/tmp/pie",
       PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
@@ -82,6 +79,6 @@ describe("applyDesktopRuntime", () => {
         bundledBun: undefined,
         bundledPiProcess: undefined,
       }),
-    ).toEqual({ PATH: "/usr/bin", PIE_DAEMON_RUNTIME: "node" });
+    ).toEqual({ PATH: "/usr/bin" });
   });
 });
