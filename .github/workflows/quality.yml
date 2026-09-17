@@ -118,7 +118,7 @@ jobs:
           browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"
           mkdir -p "$browsers"
           echo "PLAYWRIGHT_BROWSERS_PATH=${browsers}" >> "$GITHUB_ENV"
-          PLAYWRIGHT_BROWSERS_PATH="$browsers" pnpm exec playwright install chromium
+          PLAYWRIGHT_BROWSERS_PATH="$browsers" pnpm exec playwright install chromium chromium-headless-shell
         shell: bash
 
       # `build` / `typecheck` / `lint:check` go through turbo in one graph
