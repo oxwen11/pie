@@ -80,10 +80,10 @@ function resolvePiProcessScript(
 /**
  * Pick pie-pi-process. Priority:
  * 1. `PIE_E2E_PI_EXECUTABLE` when `PIE_E2E=1`
- * 2. `bun <entry>` — `PIE_BUN` if that path exists, else PATH `bun`. Entry is
+ * 2. `bun --no-install <entry>` — `PIE_BUN` if that path exists, else PATH `bun`. Entry is
  *    a `.js` / `.mjs` / `.cjs` `PIE_PI_EXECUTABLE` or the pie-owned bun-build.
  *    Packaged desktop rewrites `app.asar` → `app.asar.unpacked` because Bun
- *    cannot read an asar; extraResources copies sit outside asar.
+ *    cannot read an asar.
  *
  * There is no Node spawn path and no PATH `pi` fallback.
  */
@@ -98,13 +98,13 @@ export function resolvePiExecutable(
   const script = resolvePiProcessScript(env, options.resolveBundledCli ?? resolvePiePiProcessEntry);
   return {
     command: existingFile(env.PIE_BUN?.trim()) ?? "bun",
-    prefixArgs: script === undefined ? [] : [asarUnpackedPath(script)],
+    prefixArgs: script === undefined ? [] : ["--no-install", asarUnpackedPath(script)],
   };
 }
 
 /** What `availability` should stat or PATH-search. */
 export function piAvailabilityTarget(executable: PiExecutable): string {
-  return executable.prefixArgs[0] ?? executable.command;
+  return executable.prefixArgs.at(-1) ?? executable.command;
 }
 
 const BUN_MISSING_REASON = "Bun was not found. Install Bun.";
@@ -124,7 +124,7 @@ export const checkPiAvailability = (
       if (!bun) {
         return { available: false, reason: BUN_MISSING_REASON };
       }
-      const script = executable.prefixArgs[0];
+      const script = executable.prefixArgs.at(-1);
       if (script === undefined) {
         return { available: false, reason: BUN_PROCESS_MISSING_REASON };
       }

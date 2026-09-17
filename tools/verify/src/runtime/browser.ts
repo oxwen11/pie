@@ -19,6 +19,7 @@ export type AgentBrowserOptions = AgentBrowserTarget & {
 
 export type BrowserEnvInput = AgentBrowserTarget & {
   appUrl?: string;
+  recordingPath?: string;
   runDir: string;
 };
 
@@ -37,6 +38,7 @@ export type BrowserEnvVars = {
   AGENT_BROWSER_EXECUTABLE_PATH?: string;
   AGENT_BROWSER_ARGS?: string;
   PIE_VERIFY_APP_URL?: string;
+  PIE_VERIFY_RECORDING_PATH?: string;
 };
 
 export const BROWSER_ENV_KEYS = [
@@ -54,11 +56,13 @@ export const BROWSER_ENV_KEYS = [
   "AGENT_BROWSER_IDLE_TIMEOUT_MS",
   "AGENT_BROWSER_DEFAULT_TIMEOUT",
   "PIE_VERIFY_APP_URL",
+  "PIE_VERIFY_RECORDING_PATH",
 ] as const;
 
 /** Parent-shell leaks that break isolated launch or CDP attach. */
 export const BROWSER_ENV_UNSET = [
   "AGENT_BROWSER_AUTO_CONNECT",
+  "AGENT_BROWSER_HEADED",
   "AGENT_BROWSER_PROFILE",
   "AGENT_BROWSER_RESTORE",
   "AGENT_BROWSER_STATE",
@@ -122,8 +126,42 @@ export function buildAgentBrowserArgv(args: string[], target: AgentBrowserTarget
   return argv;
 }
 
+export function ensureAutoRecording(
+  command: string,
+  target: AgentBrowserTarget,
+  env: NodeJS.ProcessEnv,
+): void {
+  const output = env.PIE_VERIFY_RECORDING_PATH;
+  if (output === undefined || output === "") return;
+  const result = runCommand(
+    command,
+    buildAgentBrowserArgv(["record", "start", output, "--fps", "60"], target),
+    { env },
+  );
+  const message = `${result.stderr}\n${result.stdout}`;
+  if (result.status !== 0 && !message.includes("Recording already active")) {
+    throw new Error(message.trim() || `automatic agent-browser recording exited ${result.status}`);
+  }
+}
+
+export function stopAutoRecording(
+  command: string,
+  target: AgentBrowserTarget,
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  const output = env.PIE_VERIFY_RECORDING_PATH;
+  if (output === undefined || !fs.existsSync(output)) return undefined;
+  const result = runCommand(command, buildAgentBrowserArgv(["record", "stop"], target), { env });
+  const message = `${result.stderr}\n${result.stdout}`.trim();
+  return result.status === 0 ||
+    message.includes("No recording in progress") ||
+    message.includes("No frames captured")
+    ? undefined
+    : message || `automatic agent-browser recording stop exited ${result.status}`;
+}
+
 /**
- * agent-browser 0.36 binds `{socketDir}/namespaces/{namespace}/run/{session}.sock`.
+ * agent-browser 0.37 binds `{socketDir}/namespaces/{namespace}/run/{session}.sock`.
  * A run-scoped dir such as
  * `/tmp/pie-verify-web/runs/<stamp>-<pid>/agent-browser/sockets` plus that
  * suffix is already ~120 bytes — over the Unix `sun_path` limit — so the
@@ -236,6 +274,9 @@ export function resolveBrowserEnv(input: BrowserEnvInput): BrowserEnvVars {
   if (input.appUrl !== undefined && input.appUrl !== "") {
     env.PIE_VERIFY_APP_URL = input.appUrl;
   }
+  if (input.recordingPath !== undefined && input.recordingPath !== "") {
+    env.PIE_VERIFY_RECORDING_PATH = input.recordingPath;
+  }
   assertAgentBrowserSocketFits(env.AGENT_BROWSER_SOCKET_DIR, session);
   return env;
 }
@@ -243,6 +284,7 @@ export function resolveBrowserEnv(input: BrowserEnvInput): BrowserEnvVars {
 export type AgentBrowserConfig = {
   session: string;
   namespace: string;
+  headed: boolean;
   socketDir: string;
   idleTimeout: string;
   timeout: string;
@@ -258,6 +300,7 @@ export function browserConfigForEnv(vars: BrowserEnvVars): AgentBrowserConfig {
   const config: AgentBrowserConfig = {
     session: vars.AGENT_BROWSER_SESSION,
     namespace: vars.AGENT_BROWSER_NAMESPACE,
+    headed: process.env.PIE_VERIFY_BROWSER_HEADED === "1",
     socketDir: vars.AGENT_BROWSER_SOCKET_DIR,
     idleTimeout: vars.AGENT_BROWSER_IDLE_TIMEOUT_MS,
     timeout: vars.AGENT_BROWSER_DEFAULT_TIMEOUT,
@@ -281,6 +324,9 @@ export function ensureBrowserEnvDirs(vars: BrowserEnvVars): void {
   ensureDir(vars.AGENT_BROWSER_SOCKET_DIR);
   ensureDir(vars.AGENT_BROWSER_SCREENSHOT_DIR);
   ensureDir(vars.AGENT_BROWSER_DOWNLOAD_PATH);
+  if (vars.PIE_VERIFY_RECORDING_PATH !== undefined) {
+    ensureDir(path.dirname(vars.PIE_VERIFY_RECORDING_PATH));
+  }
 }
 
 export function applyBrowserEnv(vars: BrowserEnvVars, env: NodeJS.ProcessEnv): void {

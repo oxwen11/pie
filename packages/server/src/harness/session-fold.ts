@@ -107,6 +107,12 @@ export const toWireBody = (
   }
   const event = body;
   switch (event.type) {
+    case "session.prompt.submitted":
+      return {
+        type: "session.prompt.submitted",
+        messageId: event.messageId,
+        parts: event.parts,
+      };
     case "session.turn.started":
       return { type: "session.turn.started", turnId: event.turnId };
     case "session.turn.ended":

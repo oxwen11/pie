@@ -29,7 +29,12 @@ const path = require('node:path');
 const http = require('node:http');
 const cp = require('node:child_process');
 const args = process.argv.slice(2);
-fs.appendFileSync(process.env.TRACE, JSON.stringify({ args, pid: process.pid }) + '\\n');
+fs.appendFileSync(process.env.TRACE, JSON.stringify({
+  args,
+  pid: process.pid,
+  desktopBackground: process.env.PIE_DESKTOP_BACKGROUND,
+  projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
+}) + '\\n');
 if (args.join(' ') === 'exec install-electron') {
   if (process.env.INSTALL_CHILD === '1') {
     const child = cp.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
@@ -74,7 +79,19 @@ const args = process.argv.slice(2);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('AGENT_BROWSER_')));
 fs.appendFileSync(process.env.TRACE + '.browser', JSON.stringify({ args, env }) + '\\n');
 const binding = process.env.TRACE + '.binding';
-if (args.includes('--no-pin-tab')) {
+const recording = process.env.TRACE + '.recording';
+if (args.includes('record') && args.includes('start')) {
+  if (fs.existsSync(recording)) {
+    console.error('Recording already active');
+    process.exit(1);
+  }
+  const output = args[args.indexOf('start') + 1];
+  fs.mkdirSync(require('node:path').dirname(output), { recursive: true });
+  fs.writeFileSync(output, 'video');
+  fs.writeFileSync(recording, output);
+} else if (args.includes('record') && args.includes('stop')) {
+  fs.rmSync(recording, { force: true });
+} else if (args.includes('--no-pin-tab')) {
   if (!args.includes('fixture-page')) throw new Error('must select the existing target');
   fs.writeFileSync(binding, 'fixture-page');
 } else {
@@ -131,7 +148,12 @@ function start(env: NodeJS.ProcessEnv, ...args: string[]) {
   return { child, exited };
 }
 
-function trace(root: string): Array<{ args: string[]; pid: number }> {
+function trace(root: string): Array<{
+  args: string[];
+  pid: number;
+  desktopBackground?: string;
+  projectBrowseRoot?: string;
+}> {
   const file = path.join(root, "trace");
   return fs.existsSync(file)
     ? fs
@@ -205,11 +227,86 @@ describe("desktop launch lifecycle", () => {
       ["run", "dev"],
     ]);
     expect(Number(fs.readFileSync(pidPath, "utf8"))).toBe(trace(root)[1]?.pid);
+    const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
+    expect(meta.sampleProject).toBe(path.join(meta.pieHome, "workspace/verify-pie-desktop-sample"));
+    expect(
+      trace(root).every(
+        (entry) => entry.projectBrowseRoot === path.join(meta.pieHome, "workspace"),
+      ),
+    ).toBe(true);
+    expect(trace(root).every((entry) => entry.desktopBackground === "1")).toBe(true);
+    expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(meta.pieHome, "storage/projects.json"), "utf8")),
+    ).toMatchObject({
+      version: 1,
+      data: [{ name: "verify-pie-desktop-sample", path: meta.sampleProject }],
+    });
+    const initialized = await start(env, "evidence", "init").exited;
+    expect(initialized.code).toBe(0);
+    const captured = await start(env, "evidence", "screenshot", "auto-recording").exited;
+    expect(captured.code).toBe(0);
+    const rotated = await start(env, "evidence", "init").exited;
+    expect(rotated.code).toBe(0);
+    const wrapper = path.join(root, "run/bin/agent-browser");
+    const driven = childProcess.spawnSync(wrapper, ["get", "title"], { env, encoding: "utf8" });
+    expect(driven.status).toBe(0);
+    expect(driven.stdout).toContain("Pie");
     const calls = browserTrace(root);
     expect(calls[0]?.args).toContain("--no-pin-tab");
     expect(calls[0]?.args).toContain("fixture-page");
     expect(calls.slice(1).every((call) => !call.args.includes("--no-pin-tab"))).toBe(true);
+    const starts = calls.filter(
+      (call) => call.args.includes("record") && call.args.includes("start"),
+    );
+    expect(starts.map((call) => call.args)).toEqual([
+      [
+        "record",
+        "start",
+        path.join(
+          root,
+          ".agents/skills/verify-pie-desktop/evidence",
+          meta.runId,
+          "recording-001.webm",
+        ),
+        "--fps",
+        "60",
+      ],
+      [
+        "record",
+        "start",
+        path.join(
+          root,
+          ".agents/skills/verify-pie-desktop/evidence",
+          meta.runId,
+          "recording-002.webm",
+        ),
+        "--fps",
+        "60",
+      ],
+    ]);
+    expect(calls.at(-1)?.args).toContain("title");
     expect(calls.at(-1)?.env.AGENT_BROWSER_PIN_TAB).toBe("true");
+
+    const cleaned = await start(env, "cleanup").exited;
+    expect(cleaned.code).toBe(0);
+    const stopCalls = browserTrace(root).filter(
+      (call) => call.args.includes("record") && call.args.includes("stop"),
+    );
+    expect(stopCalls).toHaveLength(2);
+    const evidence = path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId);
+    expect(fs.existsSync(path.join(evidence, "recording-001.webm"))).toBe(true);
+    expect(fs.existsSync(path.join(evidence, "recording-002.webm"))).toBe(true);
+    fs.rmSync(evidence, { recursive: true, force: true });
+  }, 10_000);
+
+  it("leaves the project list empty only when requested", async () => {
+    const { root, env } = await fixture({ PIE_DESKTOP_BACKGROUND: "0" });
+    const result = await start(env, "launch", "--empty-projects").exited;
+    expect(result.code).toBe(0);
+    const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
+    expect(fs.existsSync(path.join(meta.pieHome, "storage/projects.json"))).toBe(false);
+    expect(trace(root).every((entry) => entry.desktopBackground === "0")).toBe(true);
   }, 10_000);
 
   it("reports installation failure without starting Desktop and preserves the log", async () => {

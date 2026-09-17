@@ -9,17 +9,22 @@ Turborepo, TypeScript everywhere.
 Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
 `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing turbo
 skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
-is the root Vitest workspace (`vitest.config.mts` → each package config).
+is two Vitest processes: node packages (`vitest.config.mts`, excludes `ui`)
+then browser (`vitest.browser.config.mts`: UI components + app product flows
+mounted in Chromium). `pnpm e2e` is Playwright Desktop (Electron).
 
-|                                 |                                                                         |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm test`                     | root Vitest workspace; one package: `pnpm --filter @getpie/server test` |
-| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                |
-| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                    |
-| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                        |
+|                                 |                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm test`                     | node Vitest + browser (components + app e2e); one package: `pnpm --filter @getpie/server test` |
+| `pnpm e2e`                      | Playwright Desktop (Electron)                                                                  |
+| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                       |
+| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                           |
+| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                               |
 
-`format` is root-only (oxfmt) and not a turbo task. `test` is the root
-Vitest workspace, not a turbo task. `lint` / `lint:check` go through turbo
+`format` is root-only (oxfmt) and not a turbo task. `test` is two root
+Vitest processes, not a turbo task. `e2e` is Playwright Electron through turbo
+(`@getpie/desktop`, `dependsOn: ["build"]`).
+`lint` / `lint:check` go through turbo
 so they wait on `@getpie/oxlint#build` (the oxlint tsdown plugins).
 `typecheck` is cached, so re-run with `--force` after changing something
 outside its hash inputs. `pnpm clean` runs `turbo run clean` then
@@ -101,4 +106,5 @@ not 4000 (daemon). See `.agents/skills/verify`.
 - `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
 - `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
 - `.agents/skills/react-doctor` — React health check; `doctor.config.json` enables every 0.9.14 rule at error (three stack mismatches off); CI fails on warning and error. Sibling skills: `performance` (`scan` on `:4190`), `improve-react` (read-only audit/plans)
+- `.agents/skills/prune-tests` — recurring playbook for deleting meaningless tests; user-invoked only
 - `todos/` — numbered security/perf remediation tickets

@@ -30,7 +30,7 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
   return (
     <SidebarInset
       className={cn(
-        "bg-card flex min-h-0 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-[16px] md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:border-white/8",
+        "bg-card flex min-h-0 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-2xl md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:border-white/8",
         // Drop the top border when collapsed so the card header lines up with
         // the viewport-fixed titlebar row.
         collapsedDesktop && desktop && "border-t-0",
@@ -90,8 +90,8 @@ function CardPanelHeader({
       className={cn(
         SHELL_TITLEBAR_HEADER_CLASS,
         "[-webkit-app-region:drag]",
-        !hideHeader && "shadow-[inset_0_-1px_0_var(--color-border)]",
-        desktop && collapsedDesktop && "ps-[var(--shell-titlebar-content-left)]",
+        !hideHeader && "border-b",
+        desktop && collapsedDesktop && "ps-(--shell-titlebar-content-left)",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center">

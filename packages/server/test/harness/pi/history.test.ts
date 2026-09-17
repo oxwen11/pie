@@ -18,12 +18,12 @@ const usage = {
   cost: { input: 0.1, output: 0.2, cacheRead: 0, cacheWrite: 0, total: 0.3 },
 };
 
-const userEntry = (id: string, parentId: string | null, content: unknown) =>
+const userEntry = (id: string, parentId: string | null, content: unknown, timestamp = "t") =>
   entry({
     type: "message",
     id,
     parentId,
-    timestamp: "t",
+    timestamp,
     message: { role: "user", content, timestamp: 0 },
   });
 
@@ -44,21 +44,27 @@ const assistantEntry = (
   parentId: string | null,
   content: unknown[],
   over: Record<string, unknown> = {},
+  timestamp = "t",
 ) =>
   entry({
     type: "message",
     id,
     parentId,
-    timestamp: "t",
+    timestamp,
     message: assistantMessage(content, over),
   });
 
-const toolResultEntry = (id: string, parentId: string, over: Record<string, unknown>) =>
+const toolResultEntry = (
+  id: string,
+  parentId: string,
+  over: Record<string, unknown>,
+  timestamp = "t",
+) =>
   entry({
     type: "message",
     id,
     parentId,
-    timestamp: "t",
+    timestamp,
     message: {
       role: "toolResult",
       toolCallId: "c1",
@@ -101,13 +107,20 @@ describe("entriesToUIMessages", () => {
     expect(messages[0]).toEqual({
       id: "u1",
       role: "user",
-      metadata: { sessionId: "s1" },
+      metadata: { sessionId: "s1", timestamp: "t" },
       parts: [{ type: "text", text: "hi" }],
     });
     expect(messages[1]).toEqual({
       id: "a1",
       role: "assistant",
-      metadata: { sessionId: "s1", model: "m1", provider: "anthropic", stopReason: "stop", usage },
+      metadata: {
+        sessionId: "s1",
+        model: "m1",
+        provider: "anthropic",
+        stopReason: "stop",
+        usage,
+        timestamp: "t",
+      },
       parts: [{ type: "text", text: "hello", state: "done" }],
     });
   });
@@ -335,6 +348,38 @@ describe("entriesToUIMessages", () => {
     ]);
   });
 
+  it("forwards jsonl entry timestamps onto assistant metadata", () => {
+    const messages = entriesToUIMessages(
+      [
+        userEntry("u1", null, "go", "2026-07-26T11:45:17.114Z"),
+        assistantEntry(
+          "a1",
+          "u1",
+          [toolCall("c1", "bash", { command: "ls" })],
+          {},
+          "2026-07-26T11:45:24.683Z",
+        ),
+        toolResultEntry(
+          "tr1",
+          "a1",
+          { content: [{ type: "text", text: "ok" }] },
+          "2026-07-26T11:45:24.709Z",
+        ),
+        assistantEntry(
+          "a2",
+          "tr1",
+          [{ type: "text", text: "done" }],
+          { model: "m2" },
+          "2026-07-26T11:45:28.158Z",
+        ),
+      ],
+      "a2",
+      "s1",
+    );
+    expect(messages[0]?.metadata?.timestamp).toBe("2026-07-26T11:45:17.114Z");
+    expect(messages[1]?.metadata?.timestamp).toBe("2026-07-26T11:45:28.158Z");
+  });
+
   it("folds a run of assistant and toolResult entries into one message", () => {
     const messages = entriesToUIMessages(
       [
@@ -470,7 +515,9 @@ describe("entriesToUIMessages", () => {
       update({ type: "text_end", contentIndex: 0, content: "done" }),
       event({ type: "agent_settled" }),
     ];
-    const chunks: PiUIMessageChunk[] = liveEvents.flatMap((liveEvent) => [...transform(liveEvent)]);
+    const chunks = liveEvents
+      .flatMap((liveEvent) => [...transform(liveEvent)])
+      .filter((item): item is PiUIMessageChunk => item.type !== "session.prompt.submitted");
     const stream = new ReadableStream<UIMessageChunk>({
       start(controller) {
         for (const chunk of chunks) controller.enqueue(chunk);

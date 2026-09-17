@@ -17,6 +17,8 @@ Two processes, **isolated `$PIE_HOME`**, default ports. Vite is hardcoded to **4
 pnpm exec pie-verify web launch
 # idempotent if the current run is healthy
 # pnpm exec pie-verify web launch --replace   # stop ours, then start
+# pnpm exec pie-verify web launch --replace --empty-projects  # import-flow proof only
+# PIE_VERIFY_BROWSER_HEADED=1 pnpm exec pie-verify web launch --replace  # visible opt-in
 ```
 
 Ready when both answer `ok`:
@@ -39,7 +41,7 @@ What launch also does:
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates `$HOME/verify-pie-sample` (marked `.verify-pie-scaffold`) so Import project can pick a folder that is already in the home listing. That folder is verification scaffolding.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
@@ -69,7 +71,7 @@ If the app loads but shows no projects / never connects: `lsof -nP -iTCP:4180 -s
 
 `pie-verify` owns isolation (ports, `$PIE_HOME`, session name). **Drive the page with `agent-browser`.** After launch you do **not** `eval` env or pass `--session` on every command.
 
-Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, screenshots / downloads under `$runDir/agent-browser/`, daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` is ~103 bytes and agent-browser appends `namespaces/<session>/run/<session>.sock`), idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
+Launch writes a native agent-browser env into the current run so the CLI can run without `--session` / `--cdp` flags: session + namespace `pie-verify-web`, screenshots / downloads under `$runDir/agent-browser/`, daemon sockets under a short `/tmp/pvs-<hash>` path (Unix `sun_path` is ~103 bytes and agent-browser appends `namespaces/<session>/run/<session>.sock`), idle timeout off, 40s action timeout, and a Chrome binary that is **not** the `/usr/local/bin/google-chrome` debug wrapper (plus `--no-sandbox,--disable-dev-shm-usage`). Verify forces this owned Chrome headless and unsets inherited `AGENT_BROWSER_HEADED`, so browser drive and evidence do not open or focus a host window. Set `PIE_VERIFY_BROWSER_HEADED=1` on `launch --replace` only when a visible browser is explicitly needed. The repo shim (`tools/verify/bin/agent-browser`, on PATH via `mise.toml` `[env] _.path` and as `pnpm exec agent-browser`) loads that env and execs the mise binary with your argv unchanged. Do not `npm i -g agent-browser`.
 
 First machine only: `pnpm exec agent-browser install` if the packaged CLI says no browser is available. The aqua install has no skills directory — skip `skills get` unless `AGENT_BROWSER_SKILLS_DIR` is set.
 
@@ -77,9 +79,7 @@ First machine only: `pnpm exec agent-browser install` if the packaged CLI says n
 pnpm exec pie-verify web launch
 pnpm exec pie-verify web doctor   # if launch reused an existing run
 agent-browser open http://localhost:4190/
-agent-browser wait --text "Import your first project"
-agent-browser find role button --name "Import project" click
-agent-browser wait --text "Import this folder"
+agent-browser wait --text "verify-pie-sample"
 ```
 
 `agent-browser session` must print `pie-verify-web`. If it prints `default`, you hit the raw mise binary — use `pnpm exec agent-browser` or `/tmp/pie-verify-web/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=web` (or clean up one).
@@ -109,7 +109,7 @@ Stable handles (from source, not guesses):
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
-| Session send | button **Send message**; while streaming with an empty draft: **Steer message** (disabled) and **Stop generating**; typing lights **Send message** (queue follow-up) and keeps Stop as a ghost action |
+| Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing lights **Send message** (queue follow-up) and keeps Stop as a ghost action |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
@@ -130,23 +130,20 @@ Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof 
 
 ```bash
 pnpm exec pie-verify web evidence init
-EVIDENCE="$(pnpm exec pie-verify web evidence path)"
-agent-browser open http://localhost:4190/            # settle the page first
+agent-browser open http://localhost:4190/ # starts recording-001.webm automatically at 60 fps
 pnpm exec pie-verify web evidence snapshot before
 pnpm exec pie-verify web evidence screenshot before
-agent-browser record start "$EVIDENCE/<feature>.webm" # fresh context on the current URL
-# …drive…
-agent-browser record stop
+# …drive; do not call agent-browser record…
 pnpm exec pie-verify web evidence snapshot after
 pnpm exec pie-verify web evidence screenshot after
 pnpm exec pie-verify web evidence url
 pnpm exec pie-verify web evidence side-effects
-pnpm exec pie-verify web evidence note "<feature>.webm: what the clip shows"
+pnpm exec pie-verify web evidence note "recording-001.webm: what the clip shows"
 ```
 
 Standards:
 
-- **Screenshots and video are both mandatory** (UI rule). Name them after the feature (`import-project-before.png`, `import-project.webm`). `record start` reopens the current URL in a fresh context, so open and settle the page before starting it; use `record restart <path>` to split long drives.
+- **Screenshots and video are both mandatory** (UI rule). Name screenshots after the feature. The Verify shim owns numbered 60 fps recordings; run `evidence init` before each validation to finish the current clip and select the next. Do not manage recording commands yourself.
 - Exercise the real user path (sidebar / empty state / composer), not a test-only HTTP method and not a hand-edited `projects.json`.
 - Capture **the action and the resulting state**, not only the last screenshot.
 - Confirm side effects on disk:
@@ -161,7 +158,7 @@ Standards:
 pnpm exec pie-verify web cleanup
 ```
 
-Stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>` and `$HOME/verify-pie-sample` when that folder carries `.verify-pie-scaffold`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops and flushes the automatic recording, then stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
 
 After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web evidence path` printed before teardown (or `.agents/skills/verify-pie/evidence/<run-id>/`).
 
@@ -176,7 +173,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify web evidence` | `init` / `snapshot` / `screenshot` / `url` / `side-effects` / `note` / `path`. |
-| `agent-browser record start <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
+| `recording-<NNN>.webm` | Automatic 60 fps videos under `evidence path`; each `evidence init` advances the number. |
 | `pnpm exec pie-verify web cleanup` | Kill what we started; keep evidence. |
 
 ## Isolate
@@ -186,7 +183,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | Vite 4190 | **No.** `strictPort`, IPv6 `[::1]` only. One web instance. Open `http://localhost:4190/`. |
 | Server 4180 | Movable via `PIE_PORT` (both processes). Launch still refuses a taken 4180. |
 | `$PIE_HOME` | Isolated per run under `/tmp/pie-verify-web/runs/<id>/pie-home`. |
-| `$HOME/verify-pie-sample` | One scaffold folder; only removed if we created it. |
+| `$PIE_HOME/workspace/verify-pie-sample` | Run-local scaffold, registered by default; removed with the run. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 
 If the user already has `pnpm dev` on 4180/4190 against `~/.pie` / `~/.pie_*`, **stop and tell them**. Do not point this skill at that pair.

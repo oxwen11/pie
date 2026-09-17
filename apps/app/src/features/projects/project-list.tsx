@@ -1,8 +1,4 @@
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@getpie/ui/components/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -13,7 +9,7 @@ import { ChevronRight, FolderPlus } from "lucide-react";
 import { useState } from "react";
 
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
-import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group";
 import { useProjects } from "@/features/projects/use-projects";
 
@@ -40,14 +36,14 @@ export function ProjectList() {
             <span className="sr-only">Import project</span>
           </SidebarGroupAction>
           {/* keepMounted: rebuilding every project's rows on each expand is a long
-            task once the sidebar is real-sized — see panel-motion.ts. */}
-          <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
+            task once the sidebar is real-sized — see panel-motion.tsx. */}
+          <KeepMountedCollapsiblePanel>
             <SidebarGroupContent className="flex flex-col gap-2">
               {(projects.data ?? []).map((project) => (
                 <ProjectSessionsGroup key={project.id} project={project} />
               ))}
             </SidebarGroupContent>
-          </CollapsiblePanel>
+          </KeepMountedCollapsiblePanel>
         </SidebarGroup>
       </Collapsible>
       {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}

@@ -89,7 +89,6 @@ const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
 const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
   Layer.provide(ScheduleServiceProvided),
 );
-
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   PiAgentServiceProvided,

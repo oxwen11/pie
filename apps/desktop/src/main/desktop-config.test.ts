@@ -1,6 +1,12 @@
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { applyPackagedPiRuntime, buildDesktopConfig } from "./desktop-config";
+import {
+  applyDesktopRuntime,
+  buildDesktopConfig,
+  startsDesktopInBackground,
+} from "./desktop-config";
 
 describe("buildDesktopConfig", () => {
   it("resolves the packaged server entry under resourcesPath", () => {
@@ -28,44 +34,48 @@ describe("buildDesktopConfig", () => {
   });
 });
 
-describe("applyPackagedPiRuntime", () => {
+describe("startsDesktopInBackground", () => {
+  it("enables background mode for E2E and explicit background launches", () => {
+    expect(startsDesktopInBackground({ PIE_E2E: "1" })).toBe(true);
+    expect(startsDesktopInBackground({ PIE_DESKTOP_BACKGROUND: "1" })).toBe(true);
+    expect(startsDesktopInBackground({ PIE_DESKTOP_BACKGROUND: "0" })).toBe(false);
+    expect(startsDesktopInBackground({})).toBe(false);
+  });
+});
+
+describe("applyDesktopRuntime", () => {
   const bundled = {
     isPackaged: true,
     bundledBun: "/Resources/vendor/bun",
-    bundledPiProcess: "/Resources/pi-process/pi-process.js",
   } as const;
 
   it("leaves unpackaged env unchanged", () => {
     const env = { PATH: "/usr/bin" };
-    expect(applyPackagedPiRuntime(env, { ...bundled, isPackaged: false })).toEqual(env);
-  });
-
-  it("points packaged desktop at the shipped bun and pie-pi-process", () => {
-    expect(applyPackagedPiRuntime({ PATH: "/usr/bin" }, bundled)).toEqual({
+    expect(applyDesktopRuntime(env, { ...bundled, isPackaged: false })).toEqual({
       PATH: "/usr/bin",
-      PIE_BUN: "/Resources/vendor/bun",
-      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 
-  it("keeps a launch-time PIE_BUN override", () => {
-    expect(
-      applyPackagedPiRuntime({ PIE_BUN: "/custom/bun", PIE_HOME: "/tmp/pie" }, bundled),
-    ).toEqual({
-      PIE_BUN: "/custom/bun",
+  it("prepends vendor to PATH so packaged desktop finds shipped bun", () => {
+    expect(applyDesktopRuntime({ PATH: "/usr/bin", PIE_HOME: "/tmp/pie" }, bundled)).toEqual({
+      PATH: `/Resources/vendor${path.delimiter}/usr/bin`,
       PIE_HOME: "/tmp/pie",
-      PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
   });
 
-  it("does not invent PIE_BUN when the binary is missing", () => {
+  it("sets PATH to vendor when packaged env has no PATH", () => {
+    expect(applyDesktopRuntime({}, bundled)).toEqual({
+      PATH: "/Resources/vendor",
+    });
+  });
+
+  it("does not change PATH when the bundled bun is missing", () => {
     const env = { PATH: "/usr/bin" };
     expect(
-      applyPackagedPiRuntime(env, {
+      applyDesktopRuntime(env, {
         isPackaged: true,
         bundledBun: undefined,
-        bundledPiProcess: undefined,
       }),
-    ).toEqual(env);
+    ).toEqual({ PATH: "/usr/bin" });
   });
 });

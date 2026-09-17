@@ -9,26 +9,18 @@ import {
 
 const presentations = {
   open: {
-    color:
-      "text-pull-request-open hover:text-pull-request-open peer-hover/menu-button:text-pull-request-open",
     Icon: GitPullRequestIcon,
     label: "Open pull request",
   },
   draft: {
-    color:
-      "text-pull-request-draft hover:text-pull-request-draft peer-hover/menu-button:text-pull-request-draft",
     Icon: GitPullRequestDraftIcon,
     label: "Draft pull request",
   },
   closed: {
-    color:
-      "text-pull-request-closed hover:text-pull-request-closed peer-hover/menu-button:text-pull-request-closed",
     Icon: GitPullRequestClosedIcon,
     label: "Closed pull request",
   },
   merged: {
-    color:
-      "text-pull-request-merged hover:text-pull-request-merged peer-hover/menu-button:text-pull-request-merged",
     Icon: GitMergeIcon,
     label: "Pull request merged",
   },
@@ -45,7 +37,16 @@ export function SessionPullRequestIndicator({
   if (lifecycle === undefined || url === undefined) return null;
 
   const state = lifecycle.type === "open" && lifecycle.draft ? "draft" : lifecycle.type;
-  const { color, Icon, label } = presentations[state];
+  const { Icon, label } = presentations[state];
+  // Complete literals — a computed `presentations[state].color` looks dynamic.
+  const color =
+    state === "open"
+      ? "text-pull-request-open hover:text-pull-request-open peer-hover/menu-button:text-pull-request-open"
+      : state === "draft"
+        ? "text-pull-request-draft hover:text-pull-request-draft peer-hover/menu-button:text-pull-request-draft"
+        : state === "closed"
+          ? "text-pull-request-closed hover:text-pull-request-closed peer-hover/menu-button:text-pull-request-closed"
+          : "text-pull-request-merged hover:text-pull-request-merged peer-hover/menu-button:text-pull-request-merged";
 
   return (
     <SidebarMenuAction

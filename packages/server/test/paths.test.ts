@@ -9,6 +9,8 @@ import {
   logsDirectory,
   resolveDaemonDirectory,
   resolvePieHome,
+  resolveProjectBrowseRoot,
+  resourceSourceDirectory,
   pieLogPath,
 } from "../src/config/paths";
 
@@ -39,6 +41,16 @@ describe("resolvePieHome", () => {
   });
 });
 
+describe("resolveProjectBrowseRoot", () => {
+  it("uses only an explicit non-empty project picker root", () => {
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: "/tmp/picker" })).toBe(
+      "/tmp/picker",
+    );
+    expect(resolveProjectBrowseRoot({})).toBeUndefined();
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: " " })).toBeUndefined();
+  });
+});
+
 describe("daemonDirectory", () => {
   it("is always $PIE_HOME/daemon", () => {
     expect(daemonDirectory("/tmp/data")).toBe(path.join("/tmp/data", "daemon"));
@@ -51,6 +63,21 @@ describe("logsDirectory", () => {
     expect(logsDir).toBe(path.join("/tmp/data", "logs"));
     expect(pieLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "pie.log"));
     expect(daemonStdioLogPath(logsDir)).toBe(path.join("/tmp/data", "logs", "daemon-stdio.log"));
+  });
+});
+
+describe("resourceSourceDirectory", () => {
+  it("keeps each source under $PIE_HOME/logs/resources", () => {
+    const logsDir = logsDirectory("/tmp/data");
+    expect(resourceSourceDirectory(logsDir, "os")).toBe(
+      path.join("/tmp/data", "logs", "resources", "os"),
+    );
+    expect(resourceSourceDirectory(logsDir, "daemon")).toBe(
+      path.join("/tmp/data", "logs", "resources", "daemon"),
+    );
+    expect(resourceSourceDirectory(logsDir, "electron")).toBe(
+      path.join("/tmp/data", "logs", "resources", "electron"),
+    );
   });
 });
 

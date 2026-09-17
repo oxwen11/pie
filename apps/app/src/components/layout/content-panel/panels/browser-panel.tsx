@@ -85,12 +85,7 @@ function BrowserPanelView({ instance }: { instance: BrowserInstance }) {
           if (typeof draft === "string") instance.navigate(draft);
         }}
       >
-        <Input
-          name="url"
-          defaultValue={instance.payload.url}
-          className="h-7 text-xs"
-          aria-label="Address"
-        />
+        <Input name="url" defaultValue={instance.payload.url} size="sm" aria-label="Address" />
         <Button type="submit" variant="ghost" size="icon-xs" aria-label="Reload">
           <RotateCwIcon className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
         </Button>

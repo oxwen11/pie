@@ -19,6 +19,10 @@ export type DesktopConfigInputs = {
   readonly devUrl: string | undefined;
 };
 
+export function startsDesktopInBackground(env: NodeJS.ProcessEnv): boolean {
+  return env["PIE_E2E"] === "1" || env["PIE_DESKTOP_BACKGROUND"] === "1";
+}
+
 export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): string {
   if (isPackaged) {
     return path.join(
@@ -35,23 +39,22 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
 }
 
 /**
- * Packaged desktop ships Bun and a bun-build of pie-pi-process in extraResources.
- * Point the Pi child at that pair; launch-time PIE_* wins.
+ * Packaged builds put shipped Bun on PATH so pie-pi-process is `bun
+ * --no-install <package export>`. The daemon is always Node.
  */
-export function applyPackagedPiRuntime(
+export function applyDesktopRuntime(
   env: NodeJS.ProcessEnv,
   options: {
     readonly isPackaged: boolean;
     readonly bundledBun: string | undefined;
-    readonly bundledPiProcess: string | undefined;
   },
 ): NodeJS.ProcessEnv {
-  if (!options.isPackaged || options.bundledBun === undefined) return env;
+  const next: NodeJS.ProcessEnv = { ...env };
+  if (!options.isPackaged || options.bundledBun === undefined) return next;
 
-  const next: NodeJS.ProcessEnv = { ...env, PIE_BUN: env.PIE_BUN ?? options.bundledBun };
-  if (options.bundledPiProcess !== undefined) {
-    next.PIE_PI_EXECUTABLE = env.PIE_PI_EXECUTABLE ?? options.bundledPiProcess;
-  }
+  const vendorDir = path.dirname(options.bundledBun);
+  const current = next.PATH?.trim();
+  next.PATH = current ? `${vendorDir}${path.delimiter}${current}` : vendorDir;
   return next;
 }
 

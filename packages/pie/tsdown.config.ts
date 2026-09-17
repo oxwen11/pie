@@ -13,8 +13,14 @@ export default defineConfig({
       rename: "client",
     },
     {
-      from: "../server/dist/pi-process/pi-process.js",
-      to: "dist/pi-process",
+      from: "../server/dist/pi-process",
+      to: "dist",
+      rename: "pi-process",
+    },
+    {
+      from: "../server/dist/fff",
+      to: "dist",
+      rename: "fff",
     },
   ],
   deps: {

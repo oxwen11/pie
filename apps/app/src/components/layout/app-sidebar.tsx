@@ -15,7 +15,6 @@ import { Link, useMatch } from "@tanstack/react-router";
 import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
@@ -80,7 +79,13 @@ export function AppSidebar() {
     >
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
       <SidebarHeader
-        className={cn(SHELL_TITLEBAR_HEADER_CLASS, desktop && "px-0", "[-webkit-app-region:drag]")}
+        className={cn(
+          // Same string as SHELL_TITLEBAR_HEADER_CLASS — imported
+          // constants are unreadable to require-static-classes.
+          "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
+          desktop && "px-0",
+          "[-webkit-app-region:drag]",
+        )}
       >
         {isDesktopMacosHost(platform) ? null : (
           <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />

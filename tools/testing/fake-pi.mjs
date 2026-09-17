@@ -59,6 +59,20 @@ rl.on("line", (line) => {
     return;
   }
 
+  // Instant turns never persist a session file. An empty tree is still a
+  // finished read — without this reply, attach waits forever on get_entries
+  // and live events stay queued behind the history floor.
+  if (msg.type === "get_entries") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "get_entries",
+      success: true,
+      data: { entries: [], leafId: null },
+    });
+    return;
+  }
+
   if (msg.type === "clear_queue") {
     send({
       id: msg.id,
@@ -85,7 +99,13 @@ rl.on("line", (line) => {
 
   if (msg.type !== "prompt") return;
 
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({
+    id: msg.id,
+    type: "response",
+    command: "prompt",
+    success: true,
+    data: { started: true },
+  });
   send({ type: "agent_start" });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });

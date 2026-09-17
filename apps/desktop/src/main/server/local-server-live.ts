@@ -4,7 +4,7 @@ import path from "node:path";
 import { Effect, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
-import { applyPackagedPiRuntime, DesktopConfig } from "../desktop-config";
+import { applyDesktopRuntime, DesktopConfig } from "../desktop-config";
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import { LocalServer, makeLocalServer } from "./local-server";
 import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
@@ -23,7 +23,7 @@ export const LocalServerLive = Layer.effect(
         : Effect.sync(() => ({ ...process.env }))
     ).pipe(
       Effect.map((env) =>
-        applyPackagedPiRuntime(env, {
+        applyDesktopRuntime(env, {
           isPackaged: config.isPackaged,
           bundledBun: existingFile(
             path.join(
@@ -31,9 +31,6 @@ export const LocalServerLive = Layer.effect(
               "vendor",
               process.platform === "win32" ? "bun.exe" : "bun",
             ),
-          ),
-          bundledPiProcess: existingFile(
-            path.join(config.resourcesPath, "pi-process", "pi-process.js"),
           ),
         }),
       ),

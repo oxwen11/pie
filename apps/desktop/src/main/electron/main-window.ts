@@ -5,7 +5,7 @@ import { Context, Effect, Layer, Scope } from "effect";
 import { BrowserWindow, nativeTheme, shell, type WebContents } from "electron";
 
 import icon from "../../../resources/icon.png?asset";
-import { DesktopConfig } from "../desktop-config";
+import { DesktopConfig, startsDesktopInBackground } from "../desktop-config";
 import { APP_ORIGIN, registerAppProtocol } from "./app-protocol";
 import { RendererChannel } from "./renderer-channel";
 
@@ -37,7 +37,7 @@ export function makeMainWindow(
   return Effect.gen(function* () {
     let mainWindow: BrowserWindow | undefined;
     let disconnectRenderer: (() => Promise<void>) | undefined;
-    const isE2E = process.env["PIE_E2E"] === "1";
+    const background = startsDesktopInBackground(process.env);
 
     const disconnectCurrentRenderer = (): void => {
       const disconnect = disconnectRenderer;
@@ -66,13 +66,13 @@ export function makeMainWindow(
           sandbox: true,
           contextIsolation: true,
           nodeIntegration: false,
-          backgroundThrottling: !isE2E,
+          backgroundThrottling: !background,
         },
       });
       mainWindow = window;
 
       window.on("ready-to-show", () => {
-        if (!isE2E) window.show();
+        if (!background) window.show();
       });
       window.webContents.on("did-finish-load", () => {
         disconnectCurrentRenderer();
@@ -128,7 +128,7 @@ export function makeMainWindow(
         yield* loadRenderer(createWindow());
       }),
       focus: Effect.sync(() => {
-        if (isE2E) return;
+        if (background) return;
         const window = mainWindow;
         if (!window || window.isDestroyed()) return;
         if (window.isMinimized()) window.restore();

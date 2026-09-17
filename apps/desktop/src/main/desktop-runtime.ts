@@ -10,7 +10,7 @@ import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { app, dialog } from "electron";
 
 import icon from "../../resources/icon.png?asset";
-import { makeDesktopConfigLive } from "./desktop-config";
+import { makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
@@ -49,8 +49,8 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
-  const isE2E = process.env["PIE_E2E"] === "1";
-  if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
+  const background = startsDesktopInBackground(process.env);
+  if (background && process.platform === "darwin") app.setActivationPolicy("accessory");
 
   // Opt-in CDP remote debugging (agent-browser); isolated userData avoids the
   // single-instance lock.
@@ -58,7 +58,7 @@ export function startDesktopRuntime(): void {
   if (remoteDebugPort) {
     app.commandLine.appendSwitch("remote-debugging-port", remoteDebugPort);
     app.setPath("userData", pieTempPath(`remote-debugging-${remoteDebugPort}`));
-  } else if (is.dev && !isE2E) {
+  } else if (is.dev && process.env["PIE_E2E"] !== "1") {
     // Give dev its own userData so its single-instance lock is independent of an
     // installed build. Key it on the canonical Git checkout identity so
     // parallel worktrees do not share the single-instance lock. E2E is excluded

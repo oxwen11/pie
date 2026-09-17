@@ -12,28 +12,10 @@ import { Clock } from "lucide-react";
 
 import { projectNameOf } from "./format";
 import { ScheduleCard } from "./schedule-card";
+import { useSchedule } from "./schedule-context";
 
-export function SchedulePageList({
-  items,
-  projects,
-  canCreate,
-  atLimit,
-  selectedId,
-  updating,
-  onOpenCreate,
-  onSelect,
-  onToggle,
-}: {
-  readonly items: ReadonlyArray<Schedule>;
-  readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
-  readonly canCreate: boolean;
-  readonly atLimit: boolean;
-  readonly selectedId: string | null;
-  readonly updating: boolean;
-  readonly onOpenCreate: () => void;
-  readonly onSelect: (scheduleId: string) => void;
-  readonly onToggle: (scheduleId: string, enabled: boolean) => void;
-}) {
+export function SchedulePageList() {
+  const { actions, meta } = useSchedule();
   return (
     <>
       <div className="flex items-start justify-between gap-3 px-6 py-4">
@@ -41,21 +23,14 @@ export function SchedulePageList({
           Create a session on a cadence. These live on the server, not inside a chat.
         </p>
         <Button
-          disabled={!canCreate}
-          onClick={onOpenCreate}
-          title={scheduleCreateTitle(projects.length === 0, atLimit)}
+          disabled={!meta.canCreate}
+          onClick={() => actions.openCreate()}
+          title={scheduleCreateTitle(meta.projects.length === 0, meta.atLimit)}
         >
           New schedule
         </Button>
       </div>
-      <SchedulePageItems
-        items={items}
-        onSelect={onSelect}
-        onToggle={onToggle}
-        projects={projects}
-        selectedId={selectedId}
-        updating={updating}
-      />
+      <SchedulePageItems items={meta.items} projects={meta.projects} />
     </>
   );
 }
@@ -69,17 +44,9 @@ function scheduleCreateTitle(noProjects: boolean, atLimit: boolean): string | un
 function SchedulePageItems({
   items,
   projects,
-  selectedId,
-  updating,
-  onSelect,
-  onToggle,
 }: {
   readonly items: ReadonlyArray<Schedule>;
   readonly projects: ReadonlyArray<Pick<Project, "id" | "name">>;
-  readonly selectedId: string | null;
-  readonly updating: boolean;
-  readonly onSelect: (scheduleId: string) => void;
-  readonly onToggle: (scheduleId: string, enabled: boolean) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -103,12 +70,8 @@ function SchedulePageItems({
       {items.map((schedule) => (
         <ScheduleCard
           key={schedule.id}
-          onSelect={() => onSelect(schedule.id)}
-          onToggle={(enabled) => onToggle(schedule.id, enabled)}
           projectName={projectNameOf(projects, schedule.projectId)}
           schedule={schedule}
-          selected={schedule.id === selectedId}
-          updating={updating}
         />
       ))}
     </ul>

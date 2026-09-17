@@ -1,3 +1,6 @@
+import { CollapsiblePanel } from "@getpie/ui/components/collapsible";
+import type { ReactNode } from "react";
+
 /**
  * How both sidebar collapsibles animate — the Projects group and each project
  * inside it. Pair it with `keepMounted` on the same panel; the two fix
@@ -32,8 +35,17 @@
  *
  * Keep this a transition, never a keyframe animation: base-ui's
  * `getAnimationType` warns when a panel has both, and silently picks one.
+ *
+ * The class string is authored here (not imported at the call site) so
+ * `require-static-classes` can read it.
  */
-export const COLLAPSIBLE_PANEL_MOTION: string =
-  "transition-[opacity,translate] duration-150 ease-out " +
-  "data-starting-style:-translate-y-1 data-starting-style:opacity-0 " +
-  "data-ending-style:-translate-y-1 data-ending-style:opacity-0";
+export function KeepMountedCollapsiblePanel({ children }: { readonly children: ReactNode }) {
+  return (
+    <CollapsiblePanel
+      className="transition-[opacity,translate] duration-150 ease-out data-ending-style:-translate-y-1 data-ending-style:opacity-0 data-starting-style:-translate-y-1 data-starting-style:opacity-0"
+      keepMounted
+    >
+      {children}
+    </CollapsiblePanel>
+  );
+}

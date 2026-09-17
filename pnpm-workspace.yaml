@@ -32,6 +32,15 @@ catalog:
   # artifact root). Catalog + override keep every workspace package and
   # electron-vite/vite-plus on one copy.
   vitest: 5.0.0
+  # Same major as vitest — the browser provider package is versioned with the
+  # runner. Catalog + override keep app / ui / root on one copy.
+  "@vitest/browser-playwright": 5.0.0
+  # Official React renderer for Vitest browser mode (locators + expect.element).
+  "vitest-browser-react": 2.3.0
+  # Exact pin: `@vitest/mocker` peers tsx. Root `tsx: latest` vs a transitive
+  # 4.23.12 forks mocker, then vitest, then `@effect/vitest` talks to a
+  # different TestRunner (`failed to find the current suite`).
+  tsx: 4.23.13
   ws: ^8.21.3
   zod: ^4.6.5
   zustand: ^5.0.15
@@ -84,10 +93,13 @@ overrides:
   # e.g. @effect/platform-node-shared@rc.112 peer-wants effect@^4.0.0-rc.112,
   # which without the override would auto-install a second effect runtime;
   # electron-vite/vite-plus would similarly resolve their own vite/vitest.
-  # @types/node must stay singular too — a second copy forks vitest's peer
-  # graph and @effect/vitest then talks to a different TestRunner singleton.
+  # @types/node and tsx must stay singular too — a second copy forks
+  # vitest's peer graph (`@vitest/mocker` peers tsx) and @effect/vitest
+  # then talks to a different TestRunner singleton.
   vite: "catalog:"
   vitest: "catalog:"
+  "@vitest/browser-playwright": "catalog:"
+  tsx: "catalog:"
   "@types/node": "catalog:"
   react: "catalog:react"
   react-dom: "catalog:react"
@@ -105,6 +117,11 @@ packageExtensions:
   "@effect/vitest":
     peerDependencies:
       vitest: ">=4.1.0"
+  "@ff-labs/pi-fff":
+    dependencies:
+      "@sinclair/typebox": "*"
+      "@earendil-works/pi-tui": "0.85.1"
+      "@earendil-works/pi-coding-agent": "0.85.1"
 # pnpm 11+ defaults minimumReleaseAge to 24h; disable it — the same-day
 # dependency bumps this repo does (e.g. claude-agent-sdk) would be blocked.
 minimumReleaseAge: 0
@@ -136,6 +153,12 @@ patchedDependencies:
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
   # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
   # InteractiveMode and highlight.js; inline builtin theme JSON.
-  # On bump: index.js, modes/index.js, theme.js, syntax-highlight.js.
+  # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
+  # relocatable image worker/WASM paths. On bump, re-check every patched file
+  # and run the isolated server RPC bundle tests after rebuilding.
   "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
+  # Theme parser treated `/*` in quoted `@source ".../dist/*.js"` as a
+  # comment and swallowed `@theme`. Strip comments only outside strings.
+  # On bump: dist/index.js `parseDeclarations` / `parseClassSelectors`.
+  "@shadcn/lint@0.1.0": patches/@shadcn__lint@0.1.0.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

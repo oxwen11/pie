@@ -77,8 +77,9 @@ agent-browser find role button --name "Import project" click
 ```
 
 The repo shim (`tools/verify/bin/agent-browser`) loads the current run's native
-agent-browser env (session, namespace, sockets, Chrome) and execs the mise
-binary. Always pass an explicit `open` URL. Prefer `find` / `wait` over
+agent-browser env (session, namespace, sockets, Chrome), starts the automatic
+60 fps `recording-001.webm`, and execs the mise binary. Always pass an explicit
+`open` URL. Prefer `find` / `wait` over
 `snapshot` + `@eN`.
 
 CDP-synthesized Enter does **not** submit TipTap — click the send button.
@@ -86,6 +87,6 @@ CDP-synthesized Enter does **not** submit TipTap — click the send button.
 ## Evidence
 
 The web app is a UI surface: every proof needs before/after screenshots
-(`pnpm exec pie-verify web evidence screenshot <name>`) **and** a video of the
-drive (`agent-browser record start "$(pnpm exec pie-verify web evidence path)/<feature>.webm"`
-… `agent-browser record stop`). See `.agents/rules/verify-evidence.md`.
+(`pnpm exec pie-verify web evidence screenshot <name>`) **and** the automatic
+numbered 60 fps recording. Run `evidence init` before each validation to rotate clips; normal cleanup stops and flushes the current video. See
+`.agents/rules/verify-evidence.md`.

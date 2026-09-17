@@ -14,7 +14,7 @@ import type { PiMetadata, PiUIMessage } from "./ui-message";
 //   • Segmentation is by user entry: a `user` message entry opens a new
 //     message, and the following run of `assistant` / `toolResult` entries
 //     folds into ONE assistant message (steer/follow-up injections open new
-//     segments — see ADR 0003 for the resulting live/history asymmetry).
+//     segments — see ADR 0003; the live transform uses the same boundary).
 //   • messageId: the user entry's id, or the segment's first assistant entry
 //     id — pi entry ids are stable across reads, so refreshes reconcile.
 //   • Trimming the active turn is the caller's job (the facade folds the
@@ -170,7 +170,7 @@ export function entriesToUIMessages(
     messages.push({
       id: entry.id,
       role: "user",
-      metadata: { sessionId },
+      metadata: { sessionId, timestamp: entry.timestamp },
       parts: userParts(message),
     });
   };
@@ -184,6 +184,7 @@ export function entriesToUIMessages(
     // stopReason; usage follows pi's own getLastAssistantUsage semantics).
     assistant.metadata = {
       sessionId,
+      timestamp: entry.timestamp,
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
@@ -228,7 +229,7 @@ export function entriesToUIMessages(
     }
   };
 
-  const onToolResult = (message: PiToolResultMessage) => {
+  const onToolResult = (entry: SessionMessageEntry, message: PiToolResultMessage) => {
     // Paired by id across the whole branch, not just the open segment: a
     // result landing after a steer-injected user entry still completes its
     // call. Results without a matching call (corruption) are dropped.
@@ -236,6 +237,12 @@ export function entriesToUIMessages(
     if (call === undefined) return;
     pendingCalls.delete(message.toolCallId);
     call.parts[call.index] = resultPart(call, message);
+    if (assistant === null) return;
+    assistant.metadata = {
+      ...assistant.metadata,
+      sessionId,
+      timestamp: entry.timestamp,
+    };
   };
 
   for (const entry of rebuildBranch(entries, leafId)) {
@@ -264,7 +271,7 @@ export function entriesToUIMessages(
         onAssistant(entry, message);
         break;
       case "toolResult":
-        onToolResult(message);
+        onToolResult(entry, message);
         break;
       default:
         // Custom message roles stay off the transcript this phase (§5).

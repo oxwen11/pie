@@ -178,8 +178,8 @@ export class Chat {
           this.#state.error = undefined;
         }
         break;
-      // The server rejected a prompt whose submitted event already broadcast:
-      // drop the phantom user message (the sender's optimistic copy included).
+      // The server rejected the prompt before it started: drop the sender's
+      // optimistic user message. Other clients normally never saw it.
       case "session.prompt.rejected":
         this.#state.messages = this.#state.messages.filter(
           (message) => message.id !== event.messageId,
@@ -597,7 +597,7 @@ export class Chat {
   // Fire-and-forget: idle prompts push an optimistic user message; a turn
   // already in flight is a Pi queue write (no transcript bubble — only
   // `session.queue.updated` updates `pendingPrompt`). Default delivery is
-  // follow-up; the composer passes `steer` when the user clicks Steer.
+  // follow-up; queue-row promote is the UI that passes `steer`.
   prompt = async (text: string, delivery?: "steer" | "followUp"): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
@@ -625,10 +625,13 @@ export class Chat {
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
-      await this.#transport.prompt({
+      const receipt = await this.#transport.prompt({
         messageId,
         parts,
       });
+      if (!receipt.started) {
+        this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      }
     } catch (promptError) {
       this.#state.error =
         promptError instanceof Error ? promptError : new Error(String(promptError));

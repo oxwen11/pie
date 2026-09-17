@@ -25,7 +25,10 @@ pnpm dev --filter=@getpie/desktop
 Desktop `dev` and `preview` run Electron's official installer before launching.
 Electron 44 no longer downloads its binary during `pnpm install`; the first
 launch downloads it if needed, and later launches reuse it. Installer failures
-stop the launch. `pie-verify desktop launch` uses the same `dev` script.
+stop the launch. `pie-verify desktop launch` uses the same `dev` script and sets
+`PIE_DESKTOP_BACKGROUND=1` so its automated BrowserWindow stays hidden and does
+not activate the app. Ordinary Desktop launches remain visible; Verify can opt
+back in with `PIE_DESKTOP_BACKGROUND=0 … launch --replace`.
 
 ### Build
 

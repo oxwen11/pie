@@ -18,6 +18,8 @@ Isolated `$PIE_HOME` (daemon is `$PIE_HOME/daemon`). First spawn prefers **4000*
 ```bash
 pnpm exec pie-verify desktop launch
 # pnpm exec pie-verify desktop launch --replace
+# pnpm exec pie-verify desktop launch --replace --empty-projects  # import-flow proof only
+# PIE_DESKTOP_BACKGROUND=0 pnpm exec pie-verify desktop launch --replace  # visible opt-in
 ```
 
 A Desktop process that exits before readiness fails launch immediately, including exit code zero; its exit status and log path are reported instead of waiting for the readiness timeout.
@@ -27,17 +29,17 @@ Ready when all of these hold:
 - Electron (or electron-vite) pid from the run is alive.
 - `$PIE_HOME/daemon/daemon.pid` exists; `GET $address/api/health` is `ok`.
 - CDP is listening on `PIE_REMOTE_DEBUG_PORT` (default **9223**), and both that listener and the renderer's HTTP origin belong to the recorded launch process tree.
-- The run's agent-browser session has selected the existing renderer target and enabled its sticky pin. Initialization selects that target before pinning: agent-browser 0.36 otherwise tries to create a tab, which Electron does not support.
+- The run's agent-browser session has selected the existing renderer target and enabled its sticky pin. Initialization selects that target before pinning and never creates a replacement Electron tab.
 
 What launch also does:
 
 - Requires **Node >= 24** for the helpers and any CLI stop. Prepends `NVM_BIN` when nvm is present.
-- Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main's `serverArgv` is `[electron, packages/server/dist/server.mjs]` with `ELECTRON_RUN_AS_NODE=1`.
+- Builds `@getpie/server` (and thus `@getpie/core`) when `packages/server/dist/server.mjs` is missing. Desktop `dev` depends on that artifact (`apps/desktop/turbo.json`). Main launches the daemon as Electron-as-Node on `packages/server/dist/server.mjs`; packaged builds use the asar `server.mjs`, put `Contents/Resources/vendor` on PATH for `bun`, and run pie-pi-process from the unpacked `@getpie/server/pi-process` export.
 - Sets `PIE_HOME=/tmp/pie-verify-desktop/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
 - Runs `pnpm exec install-electron` in `apps/desktop` and waits for it to finish **before** starting the 90-second `daemon.pid` wait. Installer output appends to the run's `logs/electron-vite.log`. Installation failure stops launch immediately; SIGINT/SIGTERM during installation or startup enters normal failure cleanup.
-- Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, and `NODE_ENV=development`. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
+- Starts `cd apps/desktop && pnpm run dev` with `PIE_PORT`, `PIE_REMOTE_DEBUG_PORT`, `PIE_DESKTOP_BACKGROUND=1`, and `NODE_ENV=development`. Background mode keeps the BrowserWindow hidden, disables renderer throttling, and uses macOS's accessory activation policy so launch and drive do not take focus. Set `PIE_DESKTOP_BACKGROUND=0` with `--replace` only when a visible window is explicitly needed. The desktop script runs Electron's official `install-electron` first (downloads only when needed), then electron-vite, which injects `ELECTRON_RENDERER_URL` (renderer is often **5173**). Use this script rather than invoking electron-vite directly: Electron 44 no longer downloads its binary during dependency installation.
 - Needs a display. Uses `$DISPLAY` if set; otherwise `xvfb-run` when that binary exists. Headless Linux without either **refuses**.
-- Creates `$HOME/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) for Import project.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-desktop-sample` (marked `.verify-pie-desktop-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
 
 If **4000** is already taken, the launcher falls back to an ephemeral port — still isolated because `$PIE_HOME` is ours. Launch **refuses** a taken **9223** (CDP). Never point this run at `~/.pie` or `~/.pie_*`. Never use web 4180/4190 or CLI-verify 4182 as *this* home's ports.
 
@@ -75,8 +77,7 @@ For a **real** isolated window (import, overlay, attach), drive **`agent-browser
 pnpm exec pie-verify desktop launch
 pnpm exec pie-verify desktop doctor   # verifies the existing pinned renderer
 agent-browser get title
-agent-browser wait --text "Import your first project"
-agent-browser find role button --name "Import project" click
+agent-browser wait --text "verify-pie-desktop-sample"
 ```
 
 `agent-browser session` must print `pie-verify-desktop`. If it prints `default`, use `pnpm exec agent-browser` or `/tmp/pie-verify-desktop/bin/agent-browser`. If both web and desktop runs are current, set `PIE_VERIFY_SURFACE=desktop`. `agent-browser skills get electron` is the install-versioned attach recipe.
@@ -96,21 +97,19 @@ Desktop is a UI surface, so `.agents/rules/verify-evidence.md` applies: every pr
 
 ```bash
 pnpm exec pie-verify desktop evidence init
-EVIDENCE="$(pnpm exec pie-verify desktop evidence path)"
+agent-browser get title # starts recording-001.webm automatically at 60 fps
 pnpm exec pie-verify desktop evidence screenshot <feature>-before
 pnpm exec pie-verify desktop evidence snapshot <feature>-before
-agent-browser record restart "$EVIDENCE/<feature>.webm"
-# …drive…
-agent-browser record stop
+# …drive; do not call agent-browser record…
 pnpm exec pie-verify desktop evidence screenshot <feature>-after
 pnpm exec pie-verify desktop evidence snapshot <feature>-after
 pnpm exec pie-verify desktop evidence curl
 pnpm exec pie-verify desktop evidence side-effects
-pnpm exec pie-verify desktop evidence note "<feature>.webm: what the clip shows"
+pnpm exec pie-verify desktop evidence note "recording-001.webm: what the clip shows"
 pnpm exec pie-verify desktop evidence path
 ```
 
-`record restart` captures the existing pinned page, including when no recording has started yet. `record start` creates a fresh context, so it is not part of this bound-window workflow. Recording frame rate is unchanged. If it refuses on that attach, record the launcher's display instead — `ffmpeg -f x11grab -i "$DISPLAY" "$EVIDENCE/<feature>.mp4"` on the `$DISPLAY` / Xvfb launch used — and say so in `evidence note`. A green Playwright e2e run is not a substitute for the screenshots and video.
+agent-browser 0.37.1 records the existing pinned renderer in place. The Verify shim starts numbered 60 fps recordings on the first browser command. Run `evidence init` before each validation to stop the current take and select the next number; do not call `record start`, `restart`, or `stop`. Cleanup flushes the current take before Electron exits. A green Playwright e2e run is not a substitute for the screenshots and video.
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
@@ -120,7 +119,7 @@ pnpm exec pie-verify desktop evidence path
 pnpm exec pie-verify desktop cleanup
 ```
 
-1. Stop the recorded desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
+1. Stop and flush the automatic recording, then stop the Desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
 2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
@@ -137,7 +136,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | `pnpm exec pie-verify desktop env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
 | `pnpm exec pie-verify desktop evidence` | `init` / `screenshot` / `snapshot` / `curl` / `side-effects` / `note` / `path`. |
-| `agent-browser record restart <path.webm>` / `record stop` | Video of the drive, saved under `evidence path`. Required for UI proofs. |
+| `recording-<NNN>.webm` | Automatic 60 fps videos under `evidence path`; each `evidence init` advances the number. |
 | `pnpm exec pie-verify desktop cleanup` | Stop Electron, then the daemon; keep evidence. |
 
 ## Isolate
