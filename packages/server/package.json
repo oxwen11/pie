@@ -27,6 +27,7 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
+    "@ff-labs/pi-fff": "0.10.6",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",
