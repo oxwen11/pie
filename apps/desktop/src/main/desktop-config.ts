@@ -39,8 +39,8 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
 }
 
 /**
- * Desktop daemon is Node (Electron helper). Packaged builds still ship Bun for
- * pie-pi-process only (`PIE_BUN` / `PIE_PI_EXECUTABLE`); launch-time PIE_* wins.
+ * Packaged builds ship Bun for pie-pi-process only (`PIE_BUN` /
+ * `PIE_PI_EXECUTABLE`); launch-time PIE_* wins. The daemon is always Node.
  */
 export function applyDesktopRuntime(
   env: NodeJS.ProcessEnv,
@@ -50,7 +50,7 @@ export function applyDesktopRuntime(
     readonly bundledPiProcess: string | undefined;
   },
 ): NodeJS.ProcessEnv {
-  const next: NodeJS.ProcessEnv = { ...env, PIE_DAEMON_RUNTIME: "node" };
+  const next: NodeJS.ProcessEnv = { ...env };
   if (!options.isPackaged || options.bundledBun === undefined) return next;
 
   next.PIE_BUN = env.PIE_BUN ?? options.bundledBun;
