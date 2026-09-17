@@ -5,6 +5,8 @@
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
  * extension bind/UI/protocol here, and extension loading via
  * `createAgentSessionServices` (`resourceLoaderOptions.extensionFactories`).
+ * Bundled `@ff-labs/pi-fff` is an additionalExtensionPath — never a static
+ * import — so bun-build does not inline the native FFI graph.
  */
 import {
   applyHttpProxySettings,
@@ -23,11 +25,13 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { piBashExtension } from "../bash";
+import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionPath } from "../fff";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
 process.env.PI_CODING_AGENT = "true";
 process.env.AI_AGENT = "pi";
+applyFffNodePath(process.env, import.meta.filename);
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {
   if (sessionId !== undefined) {
@@ -48,13 +52,17 @@ export const main = async (): Promise<void> => {
   configureHttpDispatcher();
   const sessionManager = await openSessionManager(parsed.sessionId, cwd);
 
+  const bundledFff = fffExtensionPath(import.meta.filename);
+
   const createRuntime: CreateAgentSessionRuntimeFactory = async (options) => {
     const services = await createAgentSessionServices({
       cwd: options.cwd,
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
+      ...(bundledFff === undefined ? undefined : { extensionFlagValues: FFF_OVERRIDE_FLAGS }),
       resourceLoaderOptions: {
         extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
+        ...(bundledFff === undefined ? undefined : { additionalExtensionPaths: [bundledFff] }),
       },
     });
     const resolved = resolveCliModel({
