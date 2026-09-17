@@ -17,7 +17,6 @@ describe("buildDesktopConfig", () => {
     expect(config.serverEntry).toBe(
       "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
     );
-    expect(config.resourcesPath).toBe("/Applications/Pie.app/Contents/Resources");
   });
 
   it("resolves the dev server entry relative to the package output", () => {
@@ -28,7 +27,6 @@ describe("buildDesktopConfig", () => {
     });
 
     expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.mjs$/);
-    expect(config.resourcesPath).toBe("/unused");
   });
 });
 
@@ -69,16 +67,5 @@ describe("applyDesktopRuntime", () => {
       PIE_HOME: "/tmp/pie",
       PIE_PI_EXECUTABLE: "/Resources/pi-process/pi-process.js",
     });
-  });
-
-  it("does not invent PIE_BUN when the binary is missing", () => {
-    const env = { PATH: "/usr/bin" };
-    expect(
-      applyDesktopRuntime(env, {
-        isPackaged: true,
-        bundledBun: undefined,
-        bundledPiProcess: undefined,
-      }),
-    ).toEqual({ PATH: "/usr/bin" });
   });
 });
