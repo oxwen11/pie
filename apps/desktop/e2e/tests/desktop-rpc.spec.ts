@@ -13,27 +13,15 @@ function appPid(electronApp: ElectronApplication): number {
   return pid;
 }
 
-function findServerPid(parentPid: number): number | undefined {
-  const processes = childProcess.execFileSync("ps", ["-axo", "pid=,ppid=,command="], {
-    encoding: "utf8",
-  });
-  for (const line of processes.split("\n")) {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const [, pid, ppid, command] = match;
-    // Must track apps/desktop/src/main/desktop-config.ts's serverEntry: the
-    // child is the built @getpie/server, not the CLI it used to be.
-    if (Number(ppid) === parentPid && command.includes("packages/server/dist/server.mjs")) {
-      return Number(pid);
-    }
+function readDaemonPid(pieHome: string): number | undefined {
+  try {
+    const record = JSON.parse(
+      fs.readFileSync(path.join(pieHome, "daemon", "daemon.pid"), "utf8"),
+    ) as { pid?: number };
+    return typeof record.pid === "number" && record.pid > 0 ? record.pid : undefined;
+  } catch {
+    return undefined;
   }
-  return undefined;
-}
-
-function serverPid(parentPid: number): number {
-  const pid = findServerPid(parentPid);
-  if (pid === undefined) throw new Error(`Server child of Electron ${parentPid} was not found`);
-  return pid;
 }
 
 function processExists(pid: number): boolean {
@@ -61,22 +49,11 @@ function frontmostApplicationPid(): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
-async function waitForServer(parentPid: number): Promise<number> {
-  await expect.poll(() => findServerPid(parentPid), { timeout: 30_000 }).toBeTruthy();
-  return serverPid(parentPid);
-}
-
-async function waitForDifferentServer(parentPid: number, previousPid: number): Promise<number> {
-  await expect
-    .poll(
-      () => {
-        const pid = findServerPid(parentPid);
-        return pid === undefined || pid === previousPid ? previousPid : pid;
-      },
-      { timeout: 15_000 },
-    )
-    .not.toBe(previousPid);
-  return serverPid(parentPid);
+async function waitForDaemon(pieHome: string): Promise<number> {
+  await expect.poll(() => readDaemonPid(pieHome), { timeout: 30_000 }).toBeTruthy();
+  const pid = readDaemonPid(pieHome);
+  if (pid === undefined) throw new Error(`Daemon for ${pieHome} was not found`);
+  return pid;
 }
 
 /**
@@ -93,13 +70,11 @@ async function waitForConnectedUi(window: Page): Promise<void> {
   });
 }
 
-async function driveServerToFailed(window: Page, parentPid: number): Promise<void> {
+async function driveServerToFailed(window: Page, pieHome: string): Promise<void> {
   await waitForConnectedUi(window);
-  let currentPid = await waitForServer(parentPid);
-  for (let failure = 0; failure < 6; failure += 1) {
-    process.kill(currentPid, "SIGKILL");
-    if (failure < 5) currentPid = await waitForDifferentServer(parentPid, currentPid);
-  }
+  const pid = await waitForDaemon(pieHome);
+  process.kill(pid, "SIGKILL");
+  await expect(window.getByText("The local server stopped")).toBeVisible({ timeout: 15_000 });
 }
 
 test("renders in the background without taking focus and connects to the server", async ({
@@ -139,14 +114,14 @@ test("renders in the background without taking focus and connects to the server"
   ).resolves.toEqual({ pie: "undefined", require: "undefined", process: "undefined" });
 });
 
-test("gives a reloaded renderer document a new MessagePort", async ({ electronApp, window }) => {
-  const pid = await waitForServer(appPid(electronApp));
+test("gives a reloaded renderer document a new MessagePort", async ({ window, e2ePaths }) => {
+  const pid = await waitForDaemon(e2ePaths.pieHome);
 
   await window.reload();
   await expect(window).toHaveTitle("Pie");
   await expect(window.locator("#root")).toBeVisible();
   await expect(window.getByText("Pie could not start")).toHaveCount(0);
-  expect(serverPid(appPid(electronApp))).toBe(pid);
+  expect(readDaemonPid(e2ePaths.pieHome)).toBe(pid);
 });
 
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
@@ -214,10 +189,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
   }
 });
 
-test("chats through Claude Agent SDK and the fake Claude executable", async ({
-  e2ePaths,
-  window,
-}) => {
+test("chats through the fake Pi executable", async ({ e2ePaths, window }) => {
   // The app lands on /draft, the new-session surface: picking the seeded
   // project and typing the first message creates the session and navigates
   // into it. There is no default project — the composer blocks until one is
@@ -229,41 +201,46 @@ test("chats through Claude Agent SDK and the fake Claude executable", async ({
 
   const input = window.locator("[contenteditable='true']");
   await input.fill("Desktop SDK E2E");
-  await input.press("Enter");
+  await window.locator('form button[type="submit"]').click();
 
   await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
   // Scoped to the transcript: the prompt text also becomes the session's
   // optimistic title in the sidebar.
   const transcript = window.getByRole("log");
   await expect(transcript.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
-  await expect(transcript.getByText("Desktop fake Claude reply", { exact: true })).toBeVisible();
+  await expect(transcript.getByText("Desktop fake Pi reply", { exact: true })).toBeVisible();
   await expect
     .poll(() =>
-      fs.existsSync(e2ePaths.fakeClaudeLog) ? fs.readFileSync(e2ePaths.fakeClaudeLog, "utf8") : "",
+      fs.existsSync(e2ePaths.fakePiLog) ? fs.readFileSync(e2ePaths.fakePiLog, "utf8") : "",
     )
-    .toContain('"type":"user","text":"Desktop SDK E2E"');
+    .toContain('"type":"prompt","message":"Desktop SDK E2E"');
 });
 
 test("reports a server crash and recovers on the pinned connection", async ({
-  electronApp,
   window,
+  e2ePaths,
 }) => {
   await waitForConnectedUi(window);
-  const initialPid = await waitForServer(appPid(electronApp));
+  const initialPid = await waitForDaemon(e2ePaths.pieHome);
   process.kill(initialPid, "SIGKILL");
 
-  const reconnecting = window.getByText("Reconnecting…");
-  await expect(reconnecting).toBeVisible({ timeout: 10_000 });
-  await expect(reconnecting).toBeHidden({ timeout: 15_000 });
+  await expect(window.getByText("The local server stopped")).toBeVisible({ timeout: 15_000 });
+  await window.getByRole("button", { name: "Retry" }).click();
+  await expect(window.getByText("The local server stopped")).toBeHidden({ timeout: 15_000 });
+  await waitForConnectedUi(window);
 
-  const restartedPid = serverPid(appPid(electronApp));
+  const restartedPid = readDaemonPid(e2ePaths.pieHome);
   expect(restartedPid).not.toBe(initialPid);
   await expect(window.getByText("Pie could not start")).toHaveCount(0);
 });
 
-test("leaves the daemon running through Electron shutdown", async ({ electronApp, window }) => {
+test("leaves the daemon running through Electron shutdown", async ({
+  electronApp,
+  window,
+  e2ePaths,
+}) => {
   await expect(window).toHaveTitle("Pie");
-  const pid = await waitForServer(appPid(electronApp));
+  const pid = await waitForDaemon(e2ePaths.pieHome);
 
   await electronApp.close();
 
@@ -277,14 +254,13 @@ test("leaves the daemon running through Electron shutdown", async ({ electronApp
   expect(processExists(pid)).toBe(true);
 });
 
-test("offers Retry after repeated server failures", async ({ electronApp, window }) => {
+test("offers Retry after repeated server failures", async ({ window, e2ePaths }) => {
   test.setTimeout(60_000);
-  const parentPid = appPid(electronApp);
-  await driveServerToFailed(window, parentPid);
+  await driveServerToFailed(window, e2ePaths.pieHome);
 
   await expect(window.getByText("The local server stopped")).toBeVisible({ timeout: 10_000 });
   await window.getByRole("button", { name: "Retry" }).click();
-  await expect.poll(() => findServerPid(parentPid), { timeout: 10_000 }).toBeTruthy();
+  await expect.poll(() => readDaemonPid(e2ePaths.pieHome), { timeout: 10_000 }).toBeTruthy();
   await expect(window.getByText("The local server stopped")).toBeHidden({ timeout: 10_000 });
   // Wait for the recovery to complete, not just the respawn to appear: quitting
   // while the replacement server is still booting can hang the app shutdown
@@ -295,10 +271,11 @@ test("offers Retry after repeated server failures", async ({ electronApp, window
 test("quits through Desktop RPC from the terminal failure state", async ({
   electronApp,
   window,
+  e2ePaths,
 }) => {
   test.setTimeout(60_000);
   const parentPid = appPid(electronApp);
-  await driveServerToFailed(window, parentPid);
+  await driveServerToFailed(window, e2ePaths.pieHome);
   await expect(window.getByText("The local server stopped")).toBeVisible({ timeout: 10_000 });
 
   await window.getByRole("button", { name: "Quit" }).click();

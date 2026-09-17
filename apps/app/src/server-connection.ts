@@ -4,6 +4,6 @@ export type ServerConnection = {
   httpBaseUrl: string;
   /** e.g. "ws://127.0.0.1:41234" */
   wsBaseUrl: string;
-  /** Per-launch bearer token. Never persisted. */
-  token: string;
+  /** Per-launch bearer token. Omitted for unauthenticated `pie serve`. */
+  token?: string;
 };

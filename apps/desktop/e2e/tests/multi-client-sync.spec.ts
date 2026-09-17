@@ -117,6 +117,10 @@ const joinSession = async (browser: Browser, sessionUrl: string): Promise<Page> 
   const page = await context.newPage();
   await page.goto(sessionUrl);
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
+  // Floor must settle before live assertions: events queue while get_entries
+  // is in flight. Fake-pi returns an empty tree, so this is "attached", not
+  // "history backfilled".
+  await expect(page.getByText("Loading earlier messages…")).toBeHidden({ timeout: 20_000 });
   return page;
 };
 
