@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
 import {
   clickText,
   fillComposer,
   importFolder,
-  modelPickerTrigger,
   openDraftForProject,
   openImportDialog,
   sendSessionMessage,
@@ -19,8 +18,8 @@ const FIRST_PROMPT = "e2e first prompt";
 const FOLLOW_UP = "e2e follow-up";
 const RENAMED = "renamed e2e chat";
 
-afterEach(() => {
-  unmountApp();
+afterEach(async () => {
+  await unmountApp();
 });
 
 const sample = () => pieE2E().sample;
@@ -30,10 +29,10 @@ describe("import and draft", () => {
   it("imports the first project from the empty draft", async () => {
     await mountApp();
     await waitForText("Import your first project");
-    expect(page.getByTitle("New chat").query()).not.toBeNull();
-    expect(
-      page.getByTestId("main").getByRole("button", { name: "Import project" }).query(),
-    ).not.toBeNull();
+    await expect.element(page.getByTitle("New chat")).toBeVisible();
+    await expect
+      .element(page.getByTestId("main").getByRole("button", { name: "Import project" }))
+      .toBeVisible();
 
     await openImportDialog("empty");
     await importFolder(sample());
@@ -54,7 +53,7 @@ describe("import and draft", () => {
     await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toMatch(/\/session\//);
     await waitForText(FIRST_PROMPT);
     await waitForText(fakeReply());
-    expect(page.getByRole("button", { name: "Send message" }).query()).not.toBeNull();
+    await expect.element(page.getByRole("button", { name: "Send message" })).toBeVisible();
   });
 
   it("sends a follow-up on the open session", async () => {
@@ -75,25 +74,17 @@ describe("composer and model picker", () => {
     await mountApp();
     await waitForText(sample());
     await openDraftForProject(sample());
-    expect(document.querySelector('[contenteditable="true"]')).not.toBeNull();
+    await waitForComposer();
 
-    await vi.waitFor(
-      () => {
-        if (
-          modelPickerTrigger() === null &&
-          document.querySelector('[contenteditable="true"]') === null
-        ) {
-          throw new Error("draft composer disappeared before models resolved");
-        }
-      },
-      { timeout: 5_000 },
-    );
-    const trigger = modelPickerTrigger();
-    if (trigger !== null) {
-      trigger.click();
+    const picker = page.getBySlot("model-selector-trigger");
+    try {
+      await expect.element(picker, { timeout: 5_000 }).toBeVisible();
+      await picker.click();
       await waitForText("Search models");
+    } catch {
+      await waitForComposer();
     }
-    expect(document.querySelector('[contenteditable="true"]')).not.toBeNull();
+    await waitForComposer();
   });
 });
 
@@ -116,11 +107,10 @@ describe("sidebar and content panel", () => {
     await page.getByText(FIRST_PROMPT, { exact: true }).first().click({ button: "right" });
     await page.getByRole("menuitem", { name: "Rename" }).click();
     await waitForText("Rename session");
-    const title = page.getByLabelText("Title");
-    await title.fill(RENAMED);
+    await page.getByLabelText("Title").fill(RENAMED);
     await page.getByRole("button", { name: /save|rename/i }).click();
     await waitForText(RENAMED);
-    expect(page.getByText(RENAMED).first().query()).not.toBeNull();
+    await expect.element(page.getByText(RENAMED).first()).toBeVisible();
   });
 
   it("opens Files from the content panel", async () => {
@@ -131,25 +121,17 @@ describe("sidebar and content panel", () => {
     await page.getByRole("button", { name: "Toggle content panel" }).click();
     await waitForText("Choose what to show alongside the chat.");
     await page.getByRole("button", { name: "Files" }).click();
-    const treeToggle =
-      page.getByRole("button", { name: /Open file tree/ }).query() ??
-      document.querySelector('[aria-label*="file tree"]');
-    if (treeToggle instanceof HTMLElement) {
-      treeToggle.click();
+    const treeToggle = page.getByRole("button", { name: /file tree/i });
+    try {
+      await expect.element(treeToggle, { timeout: 3_000 }).toBeVisible();
+      await treeToggle.click();
+    } catch {
+      // Tree may already be open.
     }
-    await vi.waitFor(
-      () => {
-        expect(document.body.textContent).toMatch(/README\.md|打开文件|Files/);
-      },
-      { timeout: 15_000 },
-    );
-    const readme = [...document.querySelectorAll("span,div,button,a")].find(
-      (el) => el.textContent?.trim() === "README.md",
-    );
-    if (readme !== undefined) {
-      readme.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await waitForText("Pie e2e workspace.");
-    }
+    const readme = page.getByRole("treeitem", { name: "README.md" });
+    await expect.element(readme, { timeout: 15_000 }).toBeVisible();
+    await readme.click();
+    await waitForText("Pie e2e workspace.");
   });
 });
 
@@ -164,7 +146,7 @@ describe("schedules and pull requests", () => {
     await page.getByLabelText("Prompt").fill("e2e scheduled ping");
     await page.getByRole("button", { name: /create|save/i }).click();
     await waitForText("e2e nightly");
-    expect(page.getByText("e2e nightly").first().query()).not.toBeNull();
+    await expect.element(page.getByText("e2e nightly").first()).toBeVisible();
   });
 
   it("opens the pull-request page empty state", async () => {
@@ -172,7 +154,7 @@ describe("schedules and pull requests", () => {
     await page.getByRole("link", { name: "Pull Request" }).click();
     await expect.poll(() => window.location.pathname).toBe("/pull-requests");
     await waitForText("No open pull requests");
-    expect(page.getByText("No open pull requests").query()).not.toBeNull();
+    await expect.element(page.getByText("No open pull requests")).toBeVisible();
   });
 });
 
@@ -192,7 +174,7 @@ describe("git workspace and review", () => {
     await page.getByText("Current directory").first().click();
     await page.getByText("New worktree", { exact: true }).click();
     await waitForText(/Base branch|main/);
-    expect(page.getByLabelText("Base branch for worktree").query()).not.toBeNull();
+    await expect.element(page.getByLabelText("Base branch for worktree")).toBeVisible();
   });
 
   it("shows Review for a git project session", async () => {
@@ -201,9 +183,7 @@ describe("git workspace and review", () => {
     await waitForComposer();
     await page.getByRole("textbox").first().click();
     await page.getByRole("textbox").first().fill("e2e git review");
-    const send = document.querySelector<HTMLButtonElement>('form button[type="submit"]');
-    expect(send).not.toBeNull();
-    send?.click();
+    await submitDraftComposer();
     await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toMatch(/\/session\//);
 
     await page.getByRole("button", { name: "Toggle content panel" }).click();

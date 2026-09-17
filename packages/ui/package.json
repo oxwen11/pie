@@ -47,6 +47,7 @@
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:",
     "use-stick-to-bottom": "^1.1.6",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
   }
 }

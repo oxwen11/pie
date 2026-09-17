@@ -2,7 +2,13 @@ import { playwright } from "@vitest/browser-playwright";
 
 /** Pre-bundle React so Vite does not reload mid-test after first optimize. */
 export const pieBrowserOptimizeDeps = {
-  include: ["react", "react/jsx-dev-runtime", "react-dom", "react-dom/client"],
+  include: [
+    "react",
+    "react/jsx-dev-runtime",
+    "react-dom",
+    "react-dom/client",
+    "vitest-browser-react",
+  ],
 };
 
 /** Shared Chromium provider for package UI tests and app e2e. */

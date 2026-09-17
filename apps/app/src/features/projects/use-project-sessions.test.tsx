@@ -1,8 +1,8 @@
 import type { SessionRef, SessionSummary } from "@getpie/contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { render } from "vitest-browser-react";
+import { page } from "vitest/browser";
 
 const mocks = vi.hoisted(() => ({
   queryOptions: vi.fn<
@@ -22,8 +22,6 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { selectProjectSessionTitle, useProjectSessionTitle } from "./use-project-sessions";
 
-Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-
 const session = (
   sessionId: string,
   title: string | undefined,
@@ -37,9 +35,6 @@ const session = (
   historyAvailable: true,
 });
 
-let root: Root | undefined;
-let host: HTMLDivElement | undefined;
-
 const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
   projectId: "project-1",
   sessionId,
@@ -48,7 +43,7 @@ const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): Session
 
 function Probe({ sessionId }: { sessionId: string }) {
   const title = useProjectSessionTitle(refFor(sessionId));
-  return createElement("span", null, title ?? "missing");
+  return <span>{title ?? "missing"}</span>;
 }
 
 const renderSession = async (
@@ -57,7 +52,7 @@ const renderSession = async (
   archived: ReadonlyArray<SessionSummary> = [],
   fetches: boolean[] = [],
   waitForTitle = true,
-): Promise<string> => {
+): Promise<void> => {
   mocks.queryOptions.mockImplementation(
     ({ input }: { input: { projectId: string; archived: boolean } }) => ({
       queryKey: ["session.list", input],
@@ -67,37 +62,20 @@ const renderSession = async (
       },
     }),
   );
-  if (!host) {
-    host = document.createElement("div");
-    document.body.append(host);
-    root = createRoot(host);
-  }
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  act(() =>
-    root?.render(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(Probe, { sessionId }),
-      ),
-    ),
+  await render(
+    <QueryClientProvider client={queryClient}>
+      <Probe sessionId={sessionId} />
+    </QueryClientProvider>,
   );
-  await act(async () => {
-    await vi.waitFor(() =>
-      waitForTitle
-        ? expect(host?.textContent).not.toBe("missing")
-        : expect(fetches).toHaveLength(1),
-    );
-  });
-  return host.textContent ?? "";
+  if (waitForTitle) {
+    await expect.element(page.getByText("missing")).not.toBeInTheDocument();
+  } else {
+    await expect.poll(() => fetches.length).toBe(1);
+  }
 };
 
 afterEach(() => {
-  const mounted = root;
-  act(() => mounted?.unmount());
-  host?.remove();
-  root = undefined;
-  host = undefined;
   mocks.queryOptions.mockReset();
 });
 
@@ -119,34 +97,31 @@ describe("selectProjectSessionTitle", () => {
 describe("useProjectSessionTitle", () => {
   it("reads an active title without fetching the archived list", async () => {
     const fetches: boolean[] = [];
-    await expect(
-      renderSession(
-        "session-2",
-        [session("session-1", "First chat"), session("session-2", "Second chat")],
-        [],
-        fetches,
-      ),
-    ).resolves.toBe("Second chat");
+    await renderSession(
+      "session-2",
+      [session("session-1", "First chat"), session("session-2", "Second chat")],
+      [],
+      fetches,
+    );
+    await expect.element(page.getByText("Second chat")).toBeVisible();
     expect(fetches).toEqual([false]);
   });
 
   it("does not query archived sessions when the active session exists without a title", async () => {
     const fetches: boolean[] = [];
-    await expect(
-      renderSession(
-        "untitled",
-        [session("untitled", undefined)],
-        [session("untitled", "stale archived title", true)],
-        fetches,
-        false,
-      ),
-    ).resolves.toBe("missing");
+    await renderSession(
+      "untitled",
+      [session("untitled", undefined)],
+      [session("untitled", "stale archived title", true)],
+      fetches,
+      false,
+    );
+    await expect.element(page.getByText("missing")).toBeVisible();
     expect(fetches).toEqual([false]);
   });
 
   it("falls back to the archived list for a valid archived-session route", async () => {
-    await expect(
-      renderSession("session-3", [], [session("session-3", "Archived chat", true)]),
-    ).resolves.toBe("Archived chat");
+    await renderSession("session-3", [], [session("session-3", "Archived chat", true)]);
+    await expect.element(page.getByText("Archived chat")).toBeVisible();
   });
 });

@@ -35,6 +35,8 @@ catalog:
   # Same major as vitest — the browser provider package is versioned with the
   # runner. Catalog + override keep app / ui / root on one copy.
   "@vitest/browser-playwright": 5.0.0
+  # Official React renderer for Vitest browser mode (locators + expect.element).
+  "vitest-browser-react": 2.3.0
   # Exact pin: `@vitest/mocker` peers tsx. Root `tsx: latest` vs a transitive
   # 4.23.12 forks mocker, then vitest, then `@effect/vitest` talks to a
   # different TestRunner (`failed to find the current suite`).
