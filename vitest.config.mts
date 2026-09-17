@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     fsModuleCache: true,
     projects: [
-      "packages/*/vitest.config.ts",
+      "packages/!(ui)/vitest.config.ts",
       "apps/*/vitest.config.ts",
       "tools/*/vitest.config.ts",
     ],

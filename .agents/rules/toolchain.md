@@ -64,15 +64,30 @@
   no tests. `SKIP_SIMPLE_GIT_HOOKS=1` skips it. Hooks only exist after
   `pnpm install` — `prepare` sets `core.hooksPath`, which is also what makes
   them fire inside worktrees.
-- **Tests:** Vitest 5 (catalog pin). Root `vitest.config.mts` lists every
-  package config as a project; `pnpm test` is `vitest run` (one process).
+- **Tests:** Vitest 5 (catalog pin).   `pnpm test` is two Vitest processes:
+  `vitest run` (node packages via root `vitest.config.mts`, which excludes
+  `packages/ui`) then `vitest run --config vitest.browser.config.mts` (`ui`,
+  `app-browser`, `app-e2e`). Browser stays in its own process so Playwright
+  Chromium does not load next to node `@effect/vitest`. A second vitest
+  copy (forked peer graph: `@types/node` or `tsx` via `@vitest/mocker`)
+  still makes `it.effect` / `layer` report Failed Suites (`failed to find
+  the current suite`) even in the node process — keep those pins singular.
   One package uses that package's `test` script:
   `pnpm --filter @getpie/server test`. Prefer those over `turbo run test`
   — turbo still discovers every package `test` script and would spawn 12
-  Vitest processes. Each package keeps its own `vitest.config.ts` for
+  Vitest processes.   Each package keeps its own `vitest.config.ts` for
   environment, include, and timeouts — referenced projects do not inherit
-  those. The pie artifact test reads `@getpie/cli` / `@getpie/app` `dist/`;
-  CI runs `turbo run build` before `pnpm test`. Configs turn on `fsModuleCache`
+  those. UI tests (`packages/ui`, `apps/app` component/DOM files) run in
+  Vitest browser mode (`@vitest/browser-playwright`, Chromium, headless)
+  via `vitest.browser.config.mts`. `apps/app/vitest.config.ts` is node-only;
+  `apps/app/vitest.browser.config.ts` has `app-browser` plus `e2e/**/*.e2e.test.tsx`
+  (Vitest browser mode: tests run in a Chromium iframe, `mountApp` renders
+  `AppInterface` against isolated `pie serve` + fake-pi + fake-gh). Playwright
+  (`@playwright/test`) is Desktop Electron only — `pnpm e2e` / `turbo run e2e`.
+  Vitest browser mode is not `@playwright/test` and cannot launch Electron.
+  Do not add jsdom. The pie artifact test reads
+  `@getpie/cli` / `@getpie/app` `dist/`;
+  CI runs `turbo run build` before `pnpm test` and `pnpm e2e`. Configs turn on `fsModuleCache`
   (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
   (gitignored). Layout is inconsistent — `server`/`contract`/`effect-json-store`
   use `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
@@ -82,8 +97,8 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  and not in CI. `tools/testing/fake-claude.mjs` is referenced by relative
-  path from both server tests and desktop e2e. `@effect/vitest` still peers
+  Electron — `turbo run e2e` builds Desktop then launches it (CI wraps `xvfb-run`). `tools/testing/fake-pi.mjs` is referenced by relative
+  path from server tests, CLI tests, desktop e2e, and app e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root

@@ -342,6 +342,9 @@ export default defineConfig({
         "shadcn/no-arbitrary-values": "off",
         "shadcn/require-static-classes": "off",
         "shadcn/no-unknown-classes": "off",
+        // `expect.element` is `Assertion<Promise<void>>`. tsgolint does not
+        // treat that as thenable even though `await` is the documented API.
+        "typescript/await-thenable": "off",
       },
     },
     {

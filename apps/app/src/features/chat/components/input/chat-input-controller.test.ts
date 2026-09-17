@@ -1,6 +1,4 @@
-// @vitest-environment jsdom
-// Tiptap builds its document through `elementFromString`, so these need a DOM;
-// the rest of this package's tests are node-env, hence the per-file override.
+// Tiptap builds its document through `elementFromString`, so these need a DOM.
 import { describe, expect, it, vi } from "vitest";
 
 import { ChatInputController } from "./chat-input-controller";
