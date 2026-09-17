@@ -15,20 +15,20 @@ files:
   # binary. We do not ship it: the server execs the user's own Claude Code
   # install instead, so they can update it independently of pie.
   - "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
-  # Hoisted fff-bin packages are huge. Bun dlopen uses the copied island under
-  # @getpie/server/dist/fff (re-included below, then asarUnpack).
+  # Hoisted fff-bin packages are huge. The island is copied in afterPack —
+  # FileSet files/extraResources drop nested node_modules, so listing dist/fff
+  # here would ship an empty tree (and this glob would also strip the island's
+  # own fff-bin).
   - "!**/node_modules/@ff-labs/fff-bin-*/**"
-  - from: ../../packages/server/dist/fff
-    to: node_modules/@getpie/server/dist/fff
 asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
-  # Bun cannot read asar. pie-pi-process and its sibling fff island must be real
-  # files; resolve-executable rewrites app.asar → app.asar.unpacked.
+  # Bun cannot read asar. pie-pi-process must be real files; resolve-executable
+  # rewrites app.asar → app.asar.unpacked. The sibling fff island is copied
+  # into that unpacked tree in afterPack.
   - "**/node_modules/@getpie/server/dist/pi-process/**"
-  - "**/node_modules/@getpie/server/dist/fff/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
-# The Node daemon lives in asar; node-pty, pie-pi-process, and fff are unpacked.
+# The Node daemon lives in asar; node-pty and pie-pi-process are unpacked.
 beforePack: scripts/before-pack.cjs
 extraResources:
   - vendor
@@ -51,4 +51,4 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
-afterPack: scripts/ad-hoc-sign.cjs
+afterPack: scripts/after-pack.cjs
