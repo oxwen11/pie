@@ -1,10 +1,10 @@
-import type { SessionToolPart, PieUIMessage } from "@getpie/contract";
+import type { PieToolUIPart, PieUIMessage } from "@getpie/contract";
 import { isDataUIPart, isReasoningUIPart, isToolUIPart, type ReasoningUIPart } from "ai";
 import { useMemo } from "react";
 
 type Part = PieUIMessage["parts"][number];
 
-export type BatchPart = SessionToolPart | ReasoningUIPart;
+export type BatchPart = PieToolUIPart | ReasoningUIPart;
 
 export type IndexedBatchPart = { part: BatchPart; index: number };
 

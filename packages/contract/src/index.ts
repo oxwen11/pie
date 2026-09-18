@@ -9,7 +9,7 @@ import { terminalContract } from "./terminal";
 
 export * from "./domain";
 export { toStandardSchema } from "./orpc";
-export type { PiTools, SessionToolPart, PieUIMessage, PieUIMessageChunk } from "./pi-tools";
+export type { PiTools, PieToolUIPart, PieUIMessage, PieUIMessageChunk } from "./pi-tools";
 export * from "./project";
 export * from "./schedule";
 export * from "./terminal";

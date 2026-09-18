@@ -1,4 +1,4 @@
-import type { SessionToolPart } from "@getpie/contract";
+import type { PieToolUIPart } from "@getpie/contract";
 import { isReasoningUIPart } from "ai";
 
 import { BUCKET_ORDER, bucketFor, filePathOf, type BucketKey } from "./tool/bucket";
@@ -14,7 +14,7 @@ export type BatchTriggerLabel =
   | { kind: "running"; action: string }
   | { kind: "aggregated"; buckets: BucketCount[] };
 
-function isToolRunning(part: SessionToolPart): boolean {
+function isToolRunning(part: PieToolUIPart): boolean {
   return part.state === "input-streaming" || part.state === "input-available";
 }
 
@@ -46,13 +46,13 @@ function isInputRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null;
 }
 
-function inputString(part: SessionToolPart, key: string): string | undefined {
+function inputString(part: PieToolUIPart, key: string): string | undefined {
   if (!isInputRecord(part.input)) return undefined;
   const value = part.input[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function runningActionOf(part: SessionToolPart): string {
+function runningActionOf(part: PieToolUIPart): string {
   const spec = RUNNING_ACTIONS[part.type];
   if (spec) {
     const target = inputString(part, spec.field);
@@ -74,8 +74,8 @@ function runningActionOf(part: SessionToolPart): string {
  * Reasoning parts are ignored.
  */
 export function computeBatchTrigger(parts: readonly BatchPart[]): BatchTriggerLabel {
-  const tools: SessionToolPart[] = [];
-  let lastRunning: SessionToolPart | undefined;
+  const tools: PieToolUIPart[] = [];
+  let lastRunning: PieToolUIPart | undefined;
   for (const part of parts) {
     if (isReasoningUIPart(part)) continue;
     tools.push(part);

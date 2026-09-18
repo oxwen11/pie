@@ -1,4 +1,4 @@
-import type { SessionToolPart } from "@getpie/contract";
+import type { PieToolUIPart } from "@getpie/contract";
 
 // The five aggregation buckets. Order here is the order rendered in the
 // trigger phrase (files → lists → searches → edits → commands).
@@ -30,13 +30,13 @@ const TOOL_BUCKETS: ToolBucketMap = {
   "tool-bash": "commands",
 };
 
-export function bucketFor(part: SessionToolPart): BucketKey | null {
+export function bucketFor(part: PieToolUIPart): BucketKey | null {
   return TOOL_BUCKETS[part.type] ?? null;
 }
 
 // The file identity a `files`/`edits` tool dedupes on. Typed off the wire
 // generic — `input` is `DeepPartial` while streaming, hence the optional chain.
-export function filePathOf(part: SessionToolPart): string | undefined {
+export function filePathOf(part: PieToolUIPart): string | undefined {
   switch (part.type) {
     case "tool-read":
     case "tool-edit":

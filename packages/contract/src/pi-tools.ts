@@ -52,4 +52,4 @@ export type PieUIMessage = UIMessage<unknown, UIDataTypes, PiTools>;
 export type PieUIMessageChunk = InferUIMessageChunk<PieUIMessage>;
 
 /** Pi's seven static tool parts plus extension/custom dynamic tools. */
-export type SessionToolPart = ToolUIPart<PiTools> | DynamicToolUIPart;
+export type PieToolUIPart = ToolUIPart<PiTools> | DynamicToolUIPart;
