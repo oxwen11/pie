@@ -14,7 +14,7 @@ import { readRunMeta } from "./meta.ts";
 import { daemonPidPath, readDaemonRecord } from "./runtime/daemon.ts";
 import { evidenceDir } from "./runtime/evidence.ts";
 import { currentRun } from "./runtime/fs.ts";
-import { pidAlive, readPidFile, sleep } from "./runtime/process.ts";
+import { listenPids, parentPid, pidAlive, readPidFile, sleep } from "./runtime/process.ts";
 import type { Surface } from "./surface.ts";
 
 const RESOURCE_WAIT_MS = 25_000;
@@ -496,12 +496,33 @@ function summarize(snapshot: SourceSnapshot) {
 }
 
 function daemonPid(meta: ReturnType<typeof readRunMeta>, runDir: string): number {
-  const pid =
-    meta.surface === "cli" && meta.mode === "serve"
-      ? readPidFile(path.join(runDir, "pids", "serve.pid"))
-      : meta.surface === "web"
-        ? readPidFile(path.join(runDir, "pids", "server.pid"))
-        : readDaemonRecord(daemonPidPath(meta.pieHome)).pid;
+  if (meta.surface === "cli" && meta.mode === "serve") {
+    return runtimeListenPid(meta.piePort, readPidFile(path.join(runDir, "pids", "serve.pid")));
+  }
+  if (meta.surface === "web") {
+    return runtimeListenPid(meta.piePort, readPidFile(path.join(runDir, "pids", "server.pid")));
+  }
+  const pid = readDaemonRecord(daemonPidPath(meta.pieHome)).pid;
   if (pid === undefined || !pidAlive(pid)) throw new Error("live server pid not found");
   return pid;
+}
+
+/** pnpm/tsx launcher PID is not the process that samples or binds the port. */
+function runtimeListenPid(port: number, launcher: number | undefined): number {
+  for (const pid of listenPids(port)) {
+    if (!pidAlive(pid)) continue;
+    if (launcher === undefined || pid === launcher || descendantOf(pid, launcher)) return pid;
+  }
+  if (launcher !== undefined && pidAlive(launcher)) return launcher;
+  throw new Error("live server pid not found");
+}
+
+function descendantOf(pid: number, ancestor: number): boolean {
+  let walk: number | undefined = pid;
+  for (let i = 0; i < 8 && walk !== undefined; i++) {
+    if (walk === ancestor) return true;
+    if (walk === 1) break;
+    walk = parentPid(walk);
+  }
+  return false;
 }
