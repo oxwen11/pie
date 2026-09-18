@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
-import { isSessionScopedEvent, type SessionRef, type SessionUIMessage } from "@getpie/contract";
+import { isSessionScopedEvent, type SessionRef, type PieUIMessage } from "@getpie/contract";
 import { Effect, Fiber, Layer, Logger, References, Stream } from "effect";
 
 import { structured, type LogRecord } from "../log-record";
@@ -182,7 +182,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
 
   it.effect("getMessages reads history through the persisted worktree cwd", () =>
     Effect.gen(function* () {
-      const history: SessionUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+      const history: PieUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
       const result = yield* run({ coldHistory: history }, (fixture) =>
         Effect.gen(function* () {
           const { ref } = yield* fixture.service.create({
@@ -350,7 +350,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
 
   it.effect("getMessages reopens a closed session and reads through the live instance", () =>
     Effect.gen(function* () {
-      const history: SessionUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+      const history: PieUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
       const result = yield* run({ history }, (fixture) =>
         Effect.gen(function* () {
           const { ref } = yield* fixture.service.create({
@@ -369,7 +369,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
-  const fourTurnHistory: SessionUIMessage[] = [
+  const fourTurnHistory: PieUIMessage[] = [
     { id: "u1", role: "user", parts: [] },
     { id: "a1", role: "assistant", parts: [] },
     { id: "u2", role: "user", parts: [] },
@@ -471,7 +471,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
 
   it.effect("getMessages reads cold through the adapter without starting anything", () =>
     Effect.gen(function* () {
-      const history: SessionUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
+      const history: PieUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
       const result = yield* run({ coldHistory: history }, (fixture) =>
         Effect.gen(function* () {
           const { ref } = yield* fixture.service.create({

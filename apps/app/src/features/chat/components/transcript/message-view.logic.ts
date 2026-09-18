@@ -1,7 +1,7 @@
-import type { SessionUIMessage } from "@getpie/contract";
+import type { PieUIMessage } from "@getpie/contract";
 import { isToolUIPart } from "ai";
 
-type Part = SessionUIMessage["parts"][number];
+type Part = PieUIMessage["parts"][number];
 
 export function isVisibleWorkPart(part: Part): boolean {
   if (isToolUIPart(part)) return true;

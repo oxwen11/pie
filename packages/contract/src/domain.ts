@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import type { SessionUIMessage, SessionUIMessageChunk } from "./pi-tools";
+import type { PieUIMessage, PieUIMessageChunk } from "./pi-tools";
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -214,7 +214,7 @@ export type SessionScopedEventBody =
   | {
       readonly type: "session.message.chunk";
       readonly turnId: string;
-      readonly chunk: SessionUIMessageChunk;
+      readonly chunk: PieUIMessageChunk;
     }
   // A user prompt entered the transcript. For a new turn, `messageId` echoes
   // the client-supplied id (or a server-minted one); queued prompts emit this
@@ -394,7 +394,7 @@ export type SessionRuntimeSnapshot = {
 // ---------------------------------------------------------------------------
 
 export type SessionMessages = {
-  readonly messages: ReadonlyArray<SessionUIMessage>;
+  readonly messages: ReadonlyArray<PieUIMessage>;
 };
 
 // ---------------------------------------------------------------------------

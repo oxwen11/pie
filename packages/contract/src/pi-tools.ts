@@ -48,8 +48,8 @@ export type PiTools = {
 // The message shapes that carry typed tool parts on the session wire (history
 // reads and `session.message.chunk` events). Metadata stays loose: the server
 // stamps richer PiMetadata and clients read it defensively.
-export type SessionUIMessage = UIMessage<unknown, UIDataTypes, PiTools>;
-export type SessionUIMessageChunk = InferUIMessageChunk<SessionUIMessage>;
+export type PieUIMessage = UIMessage<unknown, UIDataTypes, PiTools>;
+export type PieUIMessageChunk = InferUIMessageChunk<PieUIMessage>;
 
 /** Pi's seven static tool parts plus extension/custom dynamic tools. */
 export type SessionToolPart = ToolUIPart<PiTools> | DynamicToolUIPart;

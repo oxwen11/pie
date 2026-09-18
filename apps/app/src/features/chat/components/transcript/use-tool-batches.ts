@@ -1,8 +1,8 @@
-import type { SessionToolPart, SessionUIMessage } from "@getpie/contract";
+import type { SessionToolPart, PieUIMessage } from "@getpie/contract";
 import { isDataUIPart, isReasoningUIPart, isToolUIPart, type ReasoningUIPart } from "ai";
 import { useMemo } from "react";
 
-type Part = SessionUIMessage["parts"][number];
+type Part = PieUIMessage["parts"][number];
 
 export type BatchPart = SessionToolPart | ReasoningUIPart;
 

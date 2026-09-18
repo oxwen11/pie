@@ -1,4 +1,4 @@
-import type { SessionUIMessage } from "@getpie/contract";
+import type { PieUIMessage } from "@getpie/contract";
 import { Action, Actions } from "@getpie/ui/ai-elements/actions";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import { Response } from "@getpie/ui/ai-elements/response";
@@ -11,7 +11,7 @@ import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
 import { useToolBatches } from "./use-tool-batches";
 
-type Part = SessionUIMessage["parts"][number];
+type Part = PieUIMessage["parts"][number];
 
 // Renders an assistant turn's parts: tool/reasoning runs as collapsible
 // batches and text as markdown. The copy action only appears on the last text

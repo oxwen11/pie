@@ -1,4 +1,4 @@
-import type { SessionUIMessageChunk } from "@getpie/contract";
+import type { PieUIMessageChunk } from "@getpie/contract";
 
 // Stream chunks are paired sequences — text-start → text-delta* → text-end,
 // tool-input-start → tool-input-delta* → tool-output-available — and the
@@ -14,13 +14,11 @@ import type { SessionUIMessageChunk } from "@getpie/contract";
 // up (so they orphan without their opener). Chunk kinds with no pairing
 // (start/finish, steps, data-*, file, source-*, error, message metadata) pass
 // through untouched.
-export function sanitizeTail(
-  chunks: ReadonlyArray<SessionUIMessageChunk>,
-): SessionUIMessageChunk[] {
+export function sanitizeTail(chunks: ReadonlyArray<PieUIMessageChunk>): PieUIMessageChunk[] {
   const openPartIds = new Set<string>();
   const openToolIds = new Set<string>();
   const openApprovalIds = new Set<string>();
-  const kept: SessionUIMessageChunk[] = [];
+  const kept: PieUIMessageChunk[] = [];
   for (const chunk of chunks) {
     switch (chunk.type) {
       case "text-start":

@@ -4,7 +4,7 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
-  SessionUIMessage,
+  PieUIMessage,
 } from "@getpie/contract";
 
 import type { AgentResponse } from "./agent-requests";
@@ -77,7 +77,7 @@ export interface ChatSessionTransport {
    * serves no history for this session — capability absence is a normal outcome
    * here, not an error.
    */
-  getMessages(): Promise<readonly SessionUIMessage[] | null>;
+  getMessages(): Promise<readonly PieUIMessage[] | null>;
   /**
    * Resolves normally when the request is no longer pending — including when
    * another client answered it first (the server's "not pending" is an

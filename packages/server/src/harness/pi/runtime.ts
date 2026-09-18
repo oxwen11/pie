@@ -4,7 +4,7 @@ import {
   type AgentResponse,
   type SessionCapabilities,
   type SessionPendingPrompt,
-  type SessionUIMessage,
+  type PieUIMessage,
 } from "@getpie/contract";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
@@ -79,7 +79,7 @@ export type PiAgentRuntime = {
     CapabilityUnsupported | AgentOperationError
   >;
   readonly getMessages: Effect.Effect<
-    ReadonlyArray<SessionUIMessage>,
+    ReadonlyArray<PieUIMessage>,
     SessionClosed | AgentOperationError
   >;
   readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;

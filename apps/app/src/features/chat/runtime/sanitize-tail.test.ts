@@ -1,11 +1,11 @@
-import type { SessionUIMessageChunk } from "@getpie/contract";
+import type { PieUIMessageChunk } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import { sanitizeTail } from "./sanitize-tail";
 
 describe("sanitizeTail", () => {
   it("drops text/reasoning continuations whose opener was evicted", () => {
-    const chunks: SessionUIMessageChunk[] = [
+    const chunks: PieUIMessageChunk[] = [
       { type: "text-delta", id: "lost", delta: "orphan" },
       { type: "text-end", id: "lost" },
       { type: "reasoning-delta", id: "lost-r", delta: "orphan" },
@@ -17,18 +17,18 @@ describe("sanitizeTail", () => {
   });
 
   it("treats tool-input chunks as openers but drops orphaned outputs", () => {
-    const orphanOutput: SessionUIMessageChunk = {
+    const orphanOutput: PieUIMessageChunk = {
       type: "tool-output-available",
       toolCallId: "lost",
       output: { ok: true },
     };
-    const opener: SessionUIMessageChunk = {
+    const opener: PieUIMessageChunk = {
       type: "tool-input-available",
       toolCallId: "kept",
       toolName: "Bash",
       input: { command: "pwd" },
     };
-    const output: SessionUIMessageChunk = {
+    const output: PieUIMessageChunk = {
       type: "tool-output-available",
       toolCallId: "kept",
       output: { ok: true },
@@ -37,12 +37,12 @@ describe("sanitizeTail", () => {
   });
 
   it("drops orphan tool-input deltas but keeps standalone chunk kinds", () => {
-    const orphanDelta: SessionUIMessageChunk = {
+    const orphanDelta: PieUIMessageChunk = {
       type: "tool-input-delta",
       toolCallId: "lost",
       inputTextDelta: "{",
     };
-    const standalone: SessionUIMessageChunk[] = [
+    const standalone: PieUIMessageChunk[] = [
       { type: "error", errorText: "boom" },
       { type: "start-step" },
     ];

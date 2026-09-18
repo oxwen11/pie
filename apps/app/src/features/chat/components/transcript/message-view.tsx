@@ -1,4 +1,4 @@
-import type { SessionUIMessage } from "@getpie/contract";
+import type { PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,7 +20,7 @@ export function MessageView({
   isStreaming,
   previousTimestamp,
 }: {
-  message: SessionUIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
   previousTimestamp?: string;
 }) {
@@ -41,7 +41,7 @@ function CollapsibleAssistantMessage({
   isStreaming,
   previousTimestamp,
 }: {
-  message: SessionUIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
   previousTimestamp?: string;
 }) {
