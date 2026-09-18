@@ -6,8 +6,9 @@ import type {
   SessionPhase,
   SessionRuntimeSnapshot,
   SessionScopedEventBody,
+  SessionUIMessage,
+  SessionUIMessageChunk,
 } from "@getpie/contract";
-import type { UIMessage, UIMessageChunk } from "ai";
 
 import type { AgentResponse } from "./agent-requests";
 import { Chat } from "./chat";
@@ -31,7 +32,7 @@ export const settle = async () => {
 export class FakeTransport implements ChatSessionTransport {
   onEvent: ((event: ChatTransportEvent) => void) | null = null;
   disposed = 0;
-  history: readonly UIMessage[] | null = null;
+  history: readonly SessionUIMessage[] | null = null;
   // When set, getMessages blocks on it — for tests that race the history
   // floor against live traffic.
   historyGate: Promise<void> | null = null;
@@ -114,7 +115,7 @@ export const makeChat = (options?: { onTerminated?: () => void }) => {
 export const chunkEvent = (
   seq: number,
   turnId: string,
-  chunk: UIMessageChunk,
+  chunk: SessionUIMessageChunk,
 ): SessionMessageChunkEvent => ({ seq, ref, type: "session.message.chunk", turnId, chunk });
 
 type ActiveTurnInit = Partial<NonNullable<SessionRuntimeSnapshot["activeTurn"]>> & {
@@ -141,19 +142,19 @@ export function defined<T>(value: T | undefined | null): T {
 export const textChunks = (
   id: string,
   text: string,
-): [UIMessageChunk, UIMessageChunk, UIMessageChunk] => [
+): [SessionUIMessageChunk, SessionUIMessageChunk, SessionUIMessageChunk] => [
   { type: "text-start", id },
   { type: "text-delta", id, delta: text },
   { type: "text-end", id },
 ];
 
-export const userMessage = (id: string, text: string): UIMessage => ({
+export const userMessage = (id: string, text: string): SessionUIMessage => ({
   id,
   role: "user",
   parts: [{ type: "text", text }],
 });
 
-export const assistantText = (message: UIMessage): string =>
+export const assistantText = (message: SessionUIMessage): string =>
   message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
 
 export const toolRequest: AgentRequest = {

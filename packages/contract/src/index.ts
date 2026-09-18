@@ -9,6 +9,7 @@ import { terminalContract } from "./terminal";
 
 export * from "./domain";
 export { toStandardSchema } from "./orpc";
+export type { PiTools, SessionToolPart, SessionUIMessage, SessionUIMessageChunk } from "./pi-tools";
 export * from "./project";
 export * from "./schedule";
 export * from "./terminal";

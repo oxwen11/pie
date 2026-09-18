@@ -3,10 +3,10 @@ import type {
   PromptPart,
   SessionPendingPrompt,
   SessionRef,
+  SessionUIMessage,
   SubscribeStreamEvent,
 } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
-import type { UIMessage } from "ai";
 
 import { exponentialBackoffMs } from "@/lib/utils";
 
@@ -88,7 +88,7 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
     await this.client.session.replaceQueue({ ref: this.#ref, ...pending });
   };
 
-  getMessages = async (): Promise<readonly UIMessage[] | null> => {
+  getMessages = async (): Promise<readonly SessionUIMessage[] | null> => {
     try {
       const result = await this.client.session.getMessages({ ref: this.#ref });
       return result.messages;

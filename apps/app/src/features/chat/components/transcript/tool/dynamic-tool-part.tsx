@@ -1,13 +1,12 @@
 import { CodeBlock } from "@getpie/ui/ai-elements/code-block";
 import { Tool, ToolContent, ToolHeader } from "@getpie/ui/ai-elements/tool";
-import type { DynamicToolUIPart, ToolUIPart } from "ai";
+import type { DynamicToolUIPart } from "ai";
 import { WrenchIcon } from "lucide-react";
 
-type AnyToolPart = ToolUIPart | DynamicToolUIPart;
-
-// Dynamic-tool input shapes are unconstrained (any MCP server can feed them);
-// JSON.stringify can throw on cycles — fall back to a placeholder instead of
-// letting the card crash.
+// Generic card for `dynamic-tool` parts — extension/custom tools outside pi's
+// built-in set. Their input shapes are unconstrained (any extension can feed
+// them); JSON.stringify can throw on cycles — fall back to a placeholder
+// instead of letting the card crash.
 function serialize(value: unknown): string {
   if (typeof value === "string") return value;
   try {
@@ -17,11 +16,7 @@ function serialize(value: unknown): string {
   }
 }
 
-// Fallback tool card for any tool-* / dynamic-tool part with no dedicated
-// component (unknown MCP tools). Purely presentational and name-agnostic —
-// `name` is injected by the caller; provider-specific display-name derivation
-// stays in each provider dir.
-export function DynamicToolPart({ part, name }: { part: AnyToolPart; name: string }) {
+export function DynamicToolPart({ part, name }: { part: DynamicToolUIPart; name: string }) {
   const input = typeof part.input === "object" && part.input !== null ? part.input : undefined;
   return (
     <Tool>

@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { SessionUIMessage } from "@getpie/contract";
 import { Context, Effect, type FileSystem, type Scope } from "effect";
 
 import {
@@ -35,7 +35,7 @@ export type PiAgentShape = {
   readonly getMessages?: (
     agentSessionId: string,
     cwd?: string,
-  ) => Effect.Effect<ReadonlyArray<UIMessage>, AgentOperationError>;
+  ) => Effect.Effect<ReadonlyArray<SessionUIMessage>, AgentOperationError>;
   readonly getSessionInfo: (
     agentSessionId: string,
     cwd?: string,

@@ -9,9 +9,9 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
+  SessionUIMessage,
   SessionWorkspace,
 } from "@getpie/contract";
-import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer } from "effect";
 
 import { Paths } from "../config/paths";
@@ -89,7 +89,7 @@ export type PiAgentSessionServiceShape = {
   readonly getMessages: (
     ref: SessionRef,
   ) => Effect.Effect<
-    ReadonlyArray<UIMessage>,
+    ReadonlyArray<SessionUIMessage>,
     | SessionNotFound
     | ProjectNotFound
     | StoreReadError
@@ -287,7 +287,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       agentSessionId: string,
       cwd: string,
     ): Effect.Effect<
-      ReadonlyArray<UIMessage>,
+      ReadonlyArray<SessionUIMessage>,
       ResumeSessionError | SessionClosed | AgentOperationError
     > => {
       const cold = pi.getMessages;
@@ -424,7 +424,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
-              return Effect.succeed<ReadonlyArray<UIMessage>>([]);
+              return Effect.succeed<ReadonlyArray<SessionUIMessage>>([]);
             }
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(

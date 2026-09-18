@@ -1,5 +1,4 @@
-import type { AgentRequest } from "@getpie/contract";
-import type { UIMessageChunk } from "ai";
+import type { AgentRequest, SessionUIMessageChunk } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -735,7 +734,7 @@ describe("Chat truncated buffers", () => {
   it("fresh joiner renders the sanitized tail live and backfills at turn end", async () => {
     const { chat, transport, attach, live } = makeChat();
     // Orphan continuation from the evicted head, then a clean part.
-    const orphan: UIMessageChunk = { type: "text-delta", id: "lost", delta: "GARBAGE" };
+    const orphan: SessionUIMessageChunk = { type: "text-delta", id: "lost", delta: "GARBAGE" };
     const [start, delta] = textChunks("kept", "tail");
     await attach({
       status: { phase: "running" },

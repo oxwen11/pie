@@ -1,5 +1,4 @@
-import type { ToolUIPart, UIMessage } from "ai";
-import { isToolUIPart } from "ai";
+import type { SessionToolPart } from "@getpie/contract";
 
 // The five aggregation buckets. Order here is the order rendered in the
 // trigger phrase (files → lists → searches → edits → commands).
@@ -13,91 +12,37 @@ export const BUCKET_ORDER: readonly BucketKey[] = [
   "commands",
 ] as const;
 
-// Provider-generic `part.type` → bucket, keyed by the AI-SDK tool-part type
-// string. Tools NOT in this map still enter the accordion (see
-// use-tool-batches) but stay silent in the trigger phrase. Subagent
-// invocations opt out of batching entirely via `isStandalone`.
+// `part.type` → bucket, keyed by the AI-SDK tool-part type string. Covers
+// pi's built-in tools (contract piTools); extension tools arrive as
+// `dynamic-tool` and stay silent in the trigger phrase while still entering
+// the accordion (see use-tool-batches).
 interface ToolBucketMap {
   readonly [toolType: string]: BucketKey;
 }
 
 const TOOL_BUCKETS: ToolBucketMap = {
   "tool-read": "files",
-  "tool-Read": "files",
-  "tool-WebFetch": "files",
   "tool-ls": "lists",
   "tool-find": "lists",
-  "tool-Glob": "lists",
   "tool-grep": "searches",
-  "tool-Grep": "searches",
-  "tool-WebSearch": "searches",
   "tool-edit": "edits",
-  "tool-Edit": "edits",
   "tool-write": "edits",
-  "tool-Write": "edits",
-  "tool-NotebookEdit": "edits",
   "tool-bash": "commands",
-  "tool-Bash": "commands",
-  "tool-TaskOutput": "commands",
 };
 
-// Tools that opt OUT of batching and render as their own item. Subagent
-// invocations carry a description and a nested message tree; collapsing them
-// into a bucket count flattens that hierarchy.
-// `tool-Agent` is the current subagent wire name; `tool-Task` is its legacy
-// alias on replayed transcripts. Both opt out of batching.
-const STANDALONE_TOOL_TYPES = new Set<string>(["tool-Agent", "tool-Task"]);
-
-export function bucketFor(part: ToolUIPart): BucketKey | null {
+export function bucketFor(part: SessionToolPart): BucketKey | null {
   return TOOL_BUCKETS[part.type] ?? null;
 }
 
-export function isStandalone(type: string): boolean {
-  return STANDALONE_TOOL_TYPES.has(type);
-}
-
-// The file identity a `files`/`edits` tool dedupes on. Reads the provider's
-// typed `input` field; a single trust-boundary cast to the shape we read.
-function isInputRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null;
-}
-
-function toolInputRecord(input: unknown): Record<string, unknown> | undefined {
-  return isInputRecord(input) ? input : undefined;
-}
-
-export function filePathOf(part: ToolUIPart): string | undefined {
-  const input = toolInputRecord(part.input);
+// The file identity a `files`/`edits` tool dedupes on. Typed off the wire
+// generic — `input` is `DeepPartial` while streaming, hence the optional chain.
+export function filePathOf(part: SessionToolPart): string | undefined {
   switch (part.type) {
     case "tool-read":
     case "tool-edit":
-    case "tool-write": {
-      const path = input?.path;
-      return typeof path === "string" ? path : undefined;
-    }
-    case "tool-Read":
-    case "tool-Edit":
-    case "tool-Write": {
-      const fp = input?.file_path;
-      return typeof fp === "string" ? fp : undefined;
-    }
-    case "tool-NotebookEdit": {
-      const np = input?.notebook_path;
-      return typeof np === "string" ? np : undefined;
-    }
+    case "tool-write":
+      return part.input?.path;
     default:
       return undefined;
   }
-}
-
-// Claude Code streams a Task subagent's child tool calls as top-level parts
-// tagged with the parent's toolUseId; they render inside the Task card, so the
-// batching layer treats them as transparent. Provider knowledge kept at this
-// trust boundary, not in the generic batcher.
-export function isChildToolPart(part: UIMessage["parts"][number]): boolean {
-  return (
-    isToolUIPart(part) &&
-    typeof (part.callProviderMetadata as { claudeCode?: { parentToolUseId?: unknown } } | undefined)
-      ?.claudeCode?.parentToolUseId === "string"
-  );
 }

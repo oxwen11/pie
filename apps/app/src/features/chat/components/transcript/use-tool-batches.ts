@@ -1,18 +1,10 @@
-import {
-  isDataUIPart,
-  isReasoningUIPart,
-  isToolUIPart,
-  type ReasoningUIPart,
-  type ToolUIPart,
-  type UIMessage,
-} from "ai";
+import type { SessionToolPart, SessionUIMessage } from "@getpie/contract";
+import { isDataUIPart, isReasoningUIPart, isToolUIPart, type ReasoningUIPart } from "ai";
 import { useMemo } from "react";
 
-import { isChildToolPart, isStandalone } from "./tool/bucket";
+type Part = SessionUIMessage["parts"][number];
 
-type Part = UIMessage["parts"][number];
-
-export type BatchPart = ToolUIPart | ReasoningUIPart;
+export type BatchPart = SessionToolPart | ReasoningUIPart;
 
 export type IndexedBatchPart = { part: BatchPart; index: number };
 
@@ -40,10 +32,6 @@ function isTransparentControlPart(part: Part): boolean {
   return "type" in part && TRANSPARENT_CONTROL_TYPES.has(part.type);
 }
 
-function isStandaloneToolPart(part: Part): boolean {
-  return "type" in part && isStandalone(part.type);
-}
-
 function isBatchPart(part: Part): part is BatchPart {
   return isToolUIPart(part) || isReasoningUIPart(part);
 }
@@ -62,15 +50,11 @@ function isBlankTextPart(part: Part): boolean {
  * Batch rules:
  * - Consecutive tools (typed tool-*, dynamic-tool, unknown tools) and
  *   reasoning merge into one tool-batch.
- * - Exception: `isStandalone` tools (subagent invocations) flush the pending
- *   batch and render as their own passthrough.
- * - Subagent child tool calls (rendered inside their parent's card) are
- *   transparent.
  * - System data events (`data-*`), stream control markers
  *   (`step-start`/`step-finish`), and blank text parts are transparent —
  *   neither joining nor breaking the pending batch.
- * - Only visible, non-batchable parts (real text / file / standalone tool)
- *   break the batch, flushing it and appending a passthrough.
+ * - Only visible, non-batchable parts (real text / file) break the batch,
+ *   flushing it and appending a passthrough.
  */
 export function batchToolParts(parts: readonly Part[]): RenderItem[] {
   const items: RenderItem[] = [];
@@ -90,19 +74,7 @@ export function batchToolParts(parts: readonly Part[]): RenderItem[] {
   };
 
   for (const [index, part] of parts.entries()) {
-    // Subagent child parts render inside the parent Task card, not here.
-    if (isChildToolPart(part)) {
-      continue;
-    }
-    // Standalone tool (subagent): seal the current batch and emit this tool as
-    // its own passthrough. Checked before the generic tool branch because
-    // these tools are still `isToolUIPart`-true.
-    if (isStandaloneToolPart(part)) {
-      flushPending(false);
-      items.push({ kind: "passthrough", part, index });
-      continue;
-    }
-    // Every other tool participates in batching, including dynamic-tool and
+    // Every tool participates in batching, including dynamic-tool and
     // tools with no bucket mapping. Bucket-vs-no-bucket is purely a
     // trigger-phrase concern handled in compute-batch-trigger.ts.
     if (isBatchPart(part)) {

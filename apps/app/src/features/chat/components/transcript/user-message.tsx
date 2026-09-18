@@ -1,8 +1,8 @@
+import type { SessionUIMessage } from "@getpie/contract";
 import { CollapsibleUserText } from "@getpie/ui/ai-elements/collapsible-user-text";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
-import type { UIMessage } from "ai";
 
-export function UserMessage({ message }: { message: UIMessage }) {
+export function UserMessage({ message }: { message: SessionUIMessage }) {
   return (
     <>
       {message.parts.map((part, index) =>

@@ -1,7 +1,8 @@
+import type { SessionUIMessage } from "@getpie/contract";
 import { Action, Actions } from "@getpie/ui/ai-elements/actions";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import { Response } from "@getpie/ui/ai-elements/response";
-import { isReasoningUIPart, isToolUIPart, type UIMessage } from "ai";
+import { isReasoningUIPart, isToolUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -10,11 +11,11 @@ import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
 import { useToolBatches } from "./use-tool-batches";
 
-type Part = UIMessage["parts"][number];
+type Part = SessionUIMessage["parts"][number];
 
 // Renders an assistant turn's parts: tool/reasoning runs as collapsible
-// batches, standalone tools (Task) as full cards, text as markdown. The copy
-// action only appears on the last text once streaming has settled.
+// batches and text as markdown. The copy action only appears on the last text
+// once streaming has settled.
 export function AssistantMessage({
   parts,
   isStreaming,
