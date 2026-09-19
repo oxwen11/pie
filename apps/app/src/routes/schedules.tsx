@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { useProjects } from "@/features/projects/use-projects";
+import { useImportedProjects } from "@/features/projects/use-projects";
 import { SchedulePage } from "@/features/schedules/schedule-page";
 
 type SchedulesSearch = {
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/schedules")({
 });
 
 function SchedulesRoute() {
-  const projects = useProjects();
+  const projects = useImportedProjects();
   const search = Route.useSearch();
   const navigate = useNavigate();
   return (

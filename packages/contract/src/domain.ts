@@ -532,22 +532,17 @@ export const ProjectSchema = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   createdAt: Schema.String,
+  /** Only `"chat"` is set today; omitted means a normal imported folder. */
+  type: Schema.optionalKey(Schema.Literal("chat")),
 });
 export type Project = typeof ProjectSchema.Type;
+
+export const isChatProject = (project: Project): boolean => project.type === "chat";
 
 /** The project name is derived server-side from the folder's basename. */
 export const CreateProjectInputSchema = Schema.Struct({
   path: Schema.String,
 });
-
-/**
- * Optional naming hint for `project.allocate`. The server slugs this into the
- * new folder's basename; it is not a path and never chooses the parent directory.
- */
-export const AllocateProjectInputSchema = Schema.Struct({
-  title: Schema.optionalKey(Schema.String),
-});
-export type AllocateProjectInput = typeof AllocateProjectInputSchema.Type;
 
 /** Absolute parent under which `project.allocate` creates a folder. */
 export const NewProjectRootSchema = Schema.Struct({

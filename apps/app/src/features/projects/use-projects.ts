@@ -1,4 +1,4 @@
-import type { Project } from "@getpie/contract";
+import { isChatProject, type Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -19,15 +19,24 @@ function useProjectListQuery<TData>(
 
 // Oldest-first, so importing a project appends to the bottom of the sidebar.
 // Module scope: an inline closure would re-run `select` every render.
-const selectOrdered = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
-  Array.from(projects).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+const selectImported = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
+  Array.from(projects)
+    .filter((project) => !isChatProject(project))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-/**
- * Every registered project, oldest-first. Returns the query, not just the data:
- * empty is "no projects yet", which is not `isError`.
- */
-export function useProjects(): UseQueryResult<ReadonlyArray<Project>> {
-  return useProjectListQuery(selectOrdered);
+const selectChatNewestFirst = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
+  Array.from(projects)
+    .filter(isChatProject)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+/** Imported folders only — the Projects picker and sidebar group. */
+export function useImportedProjects(): UseQueryResult<ReadonlyArray<Project>> {
+  return useProjectListQuery(selectImported);
+}
+
+/** Chat projects (`type: "chat"`), newest first — the Recent sidebar group. */
+export function useChatProjects(): UseQueryResult<ReadonlyArray<Project>> {
+  return useProjectListQuery(selectChatNewestFirst);
 }
 
 /**

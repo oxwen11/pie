@@ -1,7 +1,6 @@
 import { Schema } from "effect";
 
 import {
-  AllocateProjectInputSchema,
   CreateProjectInputSchema,
   NewProjectRootSchema,
   ProjectSchema,
@@ -15,6 +14,6 @@ export const projectContract = {
   list: oc.output(Schema.Array(ProjectSchema)),
   create: oc.input(CreateProjectInputSchema).output(ProjectSchema),
   /** Create an empty folder under the new-project root and register it as a Project. */
-  allocate: base.input(AllocateProjectInputSchema).output(ProjectSchema),
+  allocate: base.output(ProjectSchema),
   allocateRoot: oc.output(NewProjectRootSchema),
 };

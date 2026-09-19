@@ -131,10 +131,11 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
       try {
         const svc = yield* projects;
         const now = new Date(2026, 8, 16, 12, 0, 0);
-        const created = yield* svc.allocate({ title: "Ask Pi anything", now });
-        const expected = path.join(root, "2026-09-16", "ask-pi-anything");
+        const created = yield* svc.allocate({ now });
+        const expected = path.join(root, "2026-09-16", "Chat-1");
         assert.equal(created.path, expected);
-        assert.equal(created.name, "ask-pi-anything");
+        assert.equal(created.name, "Chat-1");
+        assert.equal(created.type, "chat");
         assert.equal(yield* fs.exists(expected), true);
         assert.deepEqual(yield* svc.allocateRoot(), { path: root });
       } finally {
@@ -144,20 +145,42 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
     }),
   );
 
-  it.effect("allocates a numeric suffix when the slug leaf already exists", () =>
+  it.effect("allocates a numeric suffix when the leaf already exists", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "pie-new-proj-" });
       const now = new Date(2026, 8, 16, 12, 0, 0);
-      yield* fs.makeDirectory(path.join(root, "2026-09-16", "chat"), { recursive: true });
+      yield* fs.makeDirectory(path.join(root, "2026-09-16", "Chat-1"), { recursive: true });
       const previous = process.env.PIE_NEW_PROJECT_ROOT;
       process.env.PIE_NEW_PROJECT_ROOT = root;
       try {
         const svc = yield* projects;
         const created = yield* svc.allocate({ now });
-        assert.equal(created.path, path.join(root, "2026-09-16", "chat-2"));
-        assert.equal(created.name, "chat-2");
-        assert.equal(yield* fs.exists(path.join(root, "2026-09-16", "chat-2")), true);
+        assert.equal(created.path, path.join(root, "2026-09-16", "Chat-2"));
+        assert.equal(created.name, "Chat-2");
+        assert.equal(yield* fs.exists(path.join(root, "2026-09-16", "Chat-2")), true);
+      } finally {
+        if (previous === undefined) delete process.env.PIE_NEW_PROJECT_ROOT;
+        else process.env.PIE_NEW_PROJECT_ROOT = previous;
+      }
+    }),
+  );
+
+  it.effect("import under the new-project root stays without type chat", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "pie-new-proj-" });
+      const folder = path.join(root, "my-repo");
+      yield* fs.makeDirectory(folder, { recursive: true });
+      const previous = process.env.PIE_NEW_PROJECT_ROOT;
+      process.env.PIE_NEW_PROJECT_ROOT = root;
+      try {
+        const svc = yield* projects;
+        const imported = yield* svc.create({ path: folder });
+        assert.equal(imported.type, undefined);
+        const listed = yield* svc.list();
+        assert.equal(listed.find((p) => p.id === imported.id)?.type, undefined);
+        assert.equal((yield* svc.findById(imported.id)).type, undefined);
       } finally {
         if (previous === undefined) delete process.env.PIE_NEW_PROJECT_ROOT;
         else process.env.PIE_NEW_PROJECT_ROOT = previous;

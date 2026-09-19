@@ -102,6 +102,7 @@ Stable handles (from source, not guesses):
 | --- | --- |
 | Empty draft (no projects) | Composer with picker **Choose project**; sidebar **Import project**. No **Import your first project** heading |
 | Sidebar new draft | **New chat** |
+| Sidebar Recent | session rows from **Choose project** / allocate sends (prompt title). Not under **Projects** |
 | Sidebar import | button name **Import project** (plus-folder on the Projects group) |
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
 | Draft project picker | one combobox: folder icon then **Choose project** until a project is chosen. Open list: folder basenames, then button **Don't work in a project**. After a project is chosen: trigger shows the name; hovering the picker shows **X** (**Clear project**) |

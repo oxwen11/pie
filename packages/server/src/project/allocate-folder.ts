@@ -4,9 +4,6 @@ import path from "node:path";
 /** Default directory name under the user home when `PIE_NEW_PROJECT_ROOT` is unset. */
 export const DEFAULT_NEW_PROJECT_DIR = "Pie";
 
-/** Leaf name when the allocate title does not yield a slug. */
-export const ALLOCATE_FALLBACK_SLUG = "chat";
-
 /** How many exclusive-mkdir attempts after the first name before failing. */
 export const ALLOCATE_FOLDER_ATTEMPTS = 100;
 
@@ -32,37 +29,7 @@ export function formatAllocateDate(now: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * First-prompt hint → a single path segment. Empty after sanitizing means
- * the caller should use `ALLOCATE_FALLBACK_SLUG`.
- */
-export function slugifyProjectTitle(title: string | undefined): string | undefined {
-  if (title === undefined) return undefined;
-  const slug = title
-    .normalize("NFKD")
-    .replaceAll(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "")
-    .slice(0, 40)
-    .replaceAll(/-+$/g, "");
-  return slug.length > 0 ? slug : undefined;
-}
-
-/** Leaf basename under the date folder. Attempt 1 is the slug; later attempts append `-<n>`. */
-export function allocateProjectLeafName(title: string | undefined, attempt: number): string {
-  const slug = slugifyProjectTitle(title) ?? ALLOCATE_FALLBACK_SLUG;
-  return attempt <= 1 ? slug : `${slug}-${attempt}`;
-}
-
-/**
- * Relative path for one allocate attempt: `<YYYY-MM-DD>/<slug>`.
- * Attempt 1 is the slug (or `chat`); later attempts append `-<n>` on the leaf.
- */
-export function allocateProjectFolderName(
-  now: Date,
-  title: string | undefined,
-  attempt: number,
-): string {
-  return path.join(formatAllocateDate(now), allocateProjectLeafName(title, attempt));
+/** Relative path for one allocate attempt: `<YYYY-MM-DD>/Chat-<n>`. */
+export function allocateProjectFolderName(now: Date, attempt: number): string {
+  return path.join(formatAllocateDate(now), `Chat-${attempt}`);
 }

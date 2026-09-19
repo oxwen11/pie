@@ -15,11 +15,11 @@ import { useState } from "react";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
 import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group";
-import { useProjects } from "@/features/projects/use-projects";
+import { useImportedProjects } from "@/features/projects/use-projects";
 
 /** Every imported project, each rendering its own session list. */
 export function ProjectList() {
-  const projects = useProjects();
+  const projects = useImportedProjects();
   const [importOpen, setImportOpen] = useState(false);
 
   return (

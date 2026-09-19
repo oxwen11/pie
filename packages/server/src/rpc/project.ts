@@ -20,9 +20,9 @@ export const projectRouter = orpc.router({
     const projects = yield* ProjectService;
     return yield* projects.allocateRoot();
   }),
-  allocate: orpc.allocate.effect(function* ({ input, errors }) {
+  allocate: orpc.allocate.effect(function* ({ errors }) {
     const projects = yield* ProjectService;
-    return yield* projects.allocate(input).pipe(
+    return yield* projects.allocate().pipe(
       Effect.catchTags({
         WorkspaceNotDirectory: (e) =>
           Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),

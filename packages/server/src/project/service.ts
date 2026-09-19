@@ -47,14 +47,14 @@ export class ProjectService extends Context.Service<
     /** `name` defaults to the folder's basename. */
     readonly create: (input: {
       readonly name?: string;
+      readonly type?: Project["type"];
       readonly path: string;
     }) => Effect.Effect<Project, StoreReadError | StoreWriteError>;
     /**
-     * Mint an empty folder under the new-project root and register it.
-     * `now` is for tests; the RPC always uses the clock at the call.
+     * Mint an empty folder under the new-project root and register it as
+     * `type: "chat"`. `now` is for tests; the RPC always uses the clock at the call.
      */
     readonly allocate: (input?: {
-      readonly title?: string;
       readonly now?: Date;
     }) => Effect.Effect<Project, AllocateProjectError>;
     /** Resolved parent directory; does not create it. */
@@ -86,6 +86,7 @@ export const ProjectServiceLayer: Layer.Layer<
 
     const create = Effect.fn("ProjectService.create")(function* (input: {
       readonly name?: string;
+      readonly type?: Project["type"];
       readonly path: string;
     }) {
       const normalized = path.resolve(input.path);
@@ -100,6 +101,7 @@ export const ProjectServiceLayer: Layer.Layer<
         path: normalized,
         createdAt: new Date().toISOString(),
       };
+      if (input.type === "chat") project.type = "chat";
       yield* repo.save([...projects, project]);
       return project;
     });
@@ -126,9 +128,7 @@ export const ProjectServiceLayer: Layer.Layer<
       );
 
     return {
-      list: Effect.fn("ProjectService.list")(function* () {
-        return yield* repo.list();
-      }),
+      list: () => repo.list(),
 
       findById: Effect.fn("ProjectService.findById")(function* (id: string) {
         const projects = yield* repo.list();
@@ -147,14 +147,11 @@ export const ProjectServiceLayer: Layer.Layer<
 
       create,
 
-      allocate: Effect.fn("ProjectService.allocate")(function* (input?: {
-        readonly title?: string;
-        readonly now?: Date;
-      }) {
+      allocate: Effect.fn("ProjectService.allocate")(function* (input?: { readonly now?: Date }) {
         const root = yield* ensureRoot(resolveNewProjectRoot());
         const now = input?.now ?? new Date();
         for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
-          const name = allocateProjectFolderName(now, input?.title, attempt);
+          const name = allocateProjectFolderName(now, attempt);
           const folder = path.resolve(root, name);
           if (path.relative(root, folder) !== name || !contains(root, folder)) {
             return yield* new WorkspacePathEscape({ cwd: root, path: folder });
@@ -168,12 +165,12 @@ export const ProjectServiceLayer: Layer.Layer<
             Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),
           );
           if (yield* tryCreateFolder(folder)) {
-            return yield* create({ path: folder });
+            return yield* create({ type: "chat", path: folder });
           }
         }
         return yield* new ProjectFolderConflict({
           root,
-          name: allocateProjectFolderName(now, input?.title, ALLOCATE_FOLDER_ATTEMPTS),
+          name: allocateProjectFolderName(now, ALLOCATE_FOLDER_ATTEMPTS),
         });
       }),
 

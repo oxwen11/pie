@@ -30,7 +30,7 @@ import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
-import { useProject, useProjects } from "@/features/projects/use-projects";
+import { useImportedProjects, useProject } from "@/features/projects/use-projects";
 
 type DraftSearch = {
   readonly projectId?: string;
@@ -66,7 +66,7 @@ function DraftRoute() {
   const chats = useChatManager();
   const queryClient = useQueryClient();
 
-  const projects = useProjects();
+  const projects = useImportedProjects();
   const selected = useProject(search.projectId) ?? null;
   const allocateRoot = useQuery(orpcQueryUtils.project.allocateRoot.queryOptions());
   const draftWorktree = useDraftWorktree(selected);
@@ -85,7 +85,7 @@ function DraftRoute() {
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.id;
       if (projectId === undefined) {
-        const allocated = await orpcQueryUtils.project.allocate.call({ title: text });
+        const allocated = await orpcQueryUtils.project.allocate.call();
         const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
         queryClient.setQueryData<ReadonlyArray<Project>>(projectListKey, (prev) => {
           if (prev?.some((project) => project.id === allocated.id)) return prev;
@@ -266,7 +266,7 @@ function DraftComposer({
   onModelChange: (provider: string, modelId: string) => void;
   onProjectChange: (next: string | null) => void;
   onSchedule: () => void;
-  projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
+  projects: NonNullable<ReturnType<typeof useImportedProjects>["data"]>;
   selectedId: string | null;
   startPending: boolean;
 }) {

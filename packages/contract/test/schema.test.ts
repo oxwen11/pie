@@ -2,7 +2,6 @@ import { Exit, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
-  AllocateProjectInputSchema,
   ArchiveSessionInputSchema,
   CollectionEventTypes,
   CreateSessionInputSchema,
@@ -78,13 +77,6 @@ describe("ListSessionsInput", () => {
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: false })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID, archived: true })).toBe(true);
     expect(accepts(ListSessionsInputSchema, { projectId: UUID })).toBe(true);
-  });
-});
-
-describe("AllocateProjectInput", () => {
-  it("accepts an omitted or present title", () => {
-    expect(accepts(AllocateProjectInputSchema, {})).toBe(true);
-    expect(accepts(AllocateProjectInputSchema, { title: "Ask Pi anything" })).toBe(true);
   });
 });
 
