@@ -28,7 +28,7 @@ export const ToolHeader = ({ className, icon: Icon, children, ...props }: ToolHe
     className={cn("group", className)}
     render={
       <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
-        <span className="relative">
+        <span className="relative shrink-0">
           {Icon && (
             <Icon className="size-4 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
           )}
@@ -37,7 +37,7 @@ export const ToolHeader = ({ className, icon: Icon, children, ...props }: ToolHe
             <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
           </div>
         </span>
-        <span className="truncate text-sm">{children}</span>
+        <span className="min-w-0 truncate text-sm">{children}</span>
       </div>
     }
     {...props}

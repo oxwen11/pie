@@ -117,4 +117,29 @@ describe("ToolBatch", () => {
     );
     await expect.element(trigger).toHaveTextContent("Ran 1 command");
   });
+
+  it("keeps a long running action truncatable in the trigger", async () => {
+    const longPath = `/tmp/${"a".repeat(200)}/file.ts`;
+    const { trigger } = await renderBatch(
+      [
+        {
+          index: 0,
+          part: {
+            type: "tool-read",
+            toolCallId: "long",
+            state: "input-available",
+            input: { path: longPath },
+          },
+        },
+      ],
+      true,
+    );
+    await expect.element(trigger).toHaveTextContent(`Reading ${longPath}`);
+    const label = trigger.element().querySelector(".truncate");
+    expect(label).not.toBeNull();
+    expect(label?.className).toMatch(/min-w-0/);
+    const shimmer = trigger.element().querySelector(".shimmer");
+    expect(shimmer?.className).toMatch(/truncate/);
+    expect(shimmer?.className).toMatch(/max-w-full/);
+  });
 });
