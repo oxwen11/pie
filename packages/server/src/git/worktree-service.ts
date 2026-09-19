@@ -111,12 +111,12 @@ export const WorktreeServiceLayer: Layer.Layer<
           if (!contains(realHome, realPath)) {
             return yield* new WorkspacePathEscape({ cwd, path: candidate });
           }
-          return { path: realPath, exists: true as const };
+          return true;
         }
         if (!contains(paths.worktreesDir, candidate)) {
           return yield* new WorkspacePathEscape({ cwd, path: candidate });
         }
-        return { path: candidate, exists: false as const };
+        return false;
       });
 
     const addCheckout = (repoRoot: string, worktreePath: string, argv: readonly string[]) =>
@@ -181,8 +181,9 @@ export const WorktreeServiceLayer: Layer.Layer<
           return yield* new WorkspacePathEscape({ cwd: repoCwd, path: worktreePath });
         }
         const realRoot = yield* resolveRoot(repoCwd);
-        const checked = yield* validateWorktreePath(realRoot, worktreePath);
-        if (checked.exists) return { path: worktreePath, branch };
+        if (yield* validateWorktreePath(realRoot, worktreePath)) {
+          return { path: worktreePath, branch };
+        }
         const repoRoot = yield* resolveRepoRoot(realRoot);
         const refs = yield* listRefs(realRoot);
         if (!refs.all.includes(branch)) {
