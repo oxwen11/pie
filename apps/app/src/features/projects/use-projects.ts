@@ -19,7 +19,7 @@ function useProjectListQuery<TData>(
 
 // Oldest-first, so importing a project appends to the bottom of the sidebar.
 // Module scope: an inline closure would re-run `select` every render.
-const selectImported = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
+const selectProjects = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
   Array.from(projects)
     .filter((project) => !isChatProject(project))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -30,8 +30,8 @@ const selectChatNewestFirst = (projects: ReadonlyArray<Project>): ReadonlyArray<
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 /** Imported folders only — the Projects picker and sidebar group. */
-export function useImportedProjects(): UseQueryResult<ReadonlyArray<Project>> {
-  return useProjectListQuery(selectImported);
+export function useProjects(): UseQueryResult<ReadonlyArray<Project>> {
+  return useProjectListQuery(selectProjects);
 }
 
 /** Chat projects (`type: "chat"`), newest first — the Recent sidebar group. */

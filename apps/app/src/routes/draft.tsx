@@ -30,7 +30,7 @@ import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
-import { useImportedProjects, useProject } from "@/features/projects/use-projects";
+import { useProject, useProjects } from "@/features/projects/use-projects";
 
 type DraftSearch = {
   readonly projectId?: string;
@@ -66,7 +66,7 @@ function DraftRoute() {
   const chats = useChatManager();
   const queryClient = useQueryClient();
 
-  const projects = useImportedProjects();
+  const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
   const allocateRoot = useQuery(orpcQueryUtils.project.allocateRoot.queryOptions());
   const draftWorktree = useDraftWorktree(selected);
@@ -266,7 +266,7 @@ function DraftComposer({
   onModelChange: (provider: string, modelId: string) => void;
   onProjectChange: (next: string | null) => void;
   onSchedule: () => void;
-  projects: NonNullable<ReturnType<typeof useImportedProjects>["data"]>;
+  projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
   selectedId: string | null;
   startPending: boolean;
 }) {
