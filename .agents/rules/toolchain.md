@@ -87,7 +87,7 @@
   Vitest browser mode is not `@playwright/test` and cannot launch Electron.
   Do not add jsdom. The pie artifact test reads
   `@getpie/cli` / `@getpie/app` `dist/`;
-  CI runs `turbo run build` before `pnpm test` and `pnpm e2e`. Configs turn on `fsModuleCache`
+  CI runs `turbo run build` before `pnpm test`. Configs turn on `fsModuleCache`
   (`node_modules/.vitest-cache`). Reporters write under `.vitest/`
   (gitignored). Layout is inconsistent — `server`/`contract`/`effect-json-store`
   use `test/`, everyone else colocates `src/**/*.test.ts` behind an explicit
@@ -97,7 +97,7 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  Electron — `turbo run e2e` builds Desktop then launches it (CI wraps `xvfb-run`). `tools/testing/fake-pi.mjs` is referenced by relative
+  Electron — local `pnpm e2e` / `turbo run e2e` only, not CI. `tools/testing/fake-pi.mjs` is referenced by relative
   path from server tests, CLI tests, desktop e2e, and app e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.

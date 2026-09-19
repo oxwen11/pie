@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import type { UIMessage } from "ai";
+import type { PieUIMessage } from "@getpie/contract";
 import { Context, Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "effect";
 
 import { ProjectNotFound, StoreWriteError } from "../../src/errors";
@@ -68,9 +68,9 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 
 export type SessionServiceRunOpts = {
   unavailable?: string;
-  history?: ReadonlyArray<UIMessage>;
+  history?: ReadonlyArray<PieUIMessage>;
   // The adapter reads history cold, off disk — no runtime involved.
-  coldHistory?: ReadonlyArray<UIMessage>;
+  coldHistory?: ReadonlyArray<PieUIMessage>;
   // Feed the projection a turn: "open" leaves it in flight, "finished"
   // ends it (the runtime retains the completed buffer until the next turn).
   turn?: "open" | "finished";

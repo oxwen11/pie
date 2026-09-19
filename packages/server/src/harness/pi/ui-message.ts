@@ -1,7 +1,7 @@
+import type { PiTools } from "@getpie/contract";
 import type { InferUIMessageChunk, UIMessage } from "ai";
 
 import type { SessionMessageEntry } from "./protocol";
-import type { PiTools } from "./tools";
 
 type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role: "assistant" }>;
 
