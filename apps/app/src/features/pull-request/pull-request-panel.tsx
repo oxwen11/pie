@@ -28,14 +28,15 @@ export const pullRequestPanel = definePanel({
 
 function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
   const { orpcQueryUtils, queryClient } = useAppClients();
+  const sessionRef = instance.sessionRef.ref;
   const options = orpcQueryUtils.pullRequest.current.queryOptions({
-    input: { ref: instance.sessionRef },
+    input: { ref: sessionRef },
   });
   const pullRequest = useQuery(options);
   const snapshot = pullRequest.data;
   const diff = useQuery(
     orpcQueryUtils.pullRequest.diff.queryOptions({
-      input: snapshot === null || snapshot === undefined ? skipToken : { ref: instance.sessionRef },
+      input: snapshot === null || snapshot === undefined ? skipToken : { ref: sessionRef },
     }),
   );
   const [intent, setIntent] = useState<PullRequestActionInput | null>(null);
@@ -97,7 +98,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
   }
 
   const beginAction = (next: PullRequestAction): void => {
-    setIntent(pullRequestActionInput(instance.sessionRef, snapshot, next));
+    setIntent(pullRequestActionInput(sessionRef, snapshot, next));
   };
 
   return (

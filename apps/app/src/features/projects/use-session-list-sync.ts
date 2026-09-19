@@ -1,6 +1,6 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { useLocalAppClients } from "@/lib/app-clients";
 import { isAbortError, sleep } from "@/lib/utils";
 
 import { applySessionListEvent } from "./session-list-cache";
@@ -12,7 +12,7 @@ const RESUBSCRIBE_DELAY_MS = 1000;
 // so events arriving during that refresh wait in the stream instead of falling
 // into an uncovered reconnect gap.
 export function useSessionListSync(): void {
-  const { orpcClient, orpcQueryUtils, queryClient } = useRouteContext({ from: "__root__" });
+  const { orpcClient, orpcQueryUtils, queryClient } = useLocalAppClients();
   // The cleanup below does own every allocation, but the rule only recognizes
   // teardown it can name (`unsubscribe()`, `clearTimeout`, `socket.close`) and
   // can't follow an AbortController: aborting the signal cancels the in-flight

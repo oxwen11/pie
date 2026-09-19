@@ -37,7 +37,7 @@ import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
-import { toEnvironmentSessionRef } from "@/lib/session-ref";
+import { useLocalAppClients } from "@/lib/app-clients";
 
 type DraftSearch = {
   readonly projectId?: string;
@@ -67,7 +67,8 @@ export const Route = createFileRoute("/draft")({
 });
 
 function DraftRoute() {
-  const { orpcQueryUtils, localEnvironmentId } = Route.useRouteContext();
+  const { localEnvironmentId } = Route.useRouteContext();
+  const { orpcQueryUtils } = useLocalAppClients();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const chats = useChatManager();
@@ -121,7 +122,7 @@ function DraftRoute() {
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
-        .chatFor(toEnvironmentSessionRef(localEnvironmentId, created.ref))
+        .chatFor({ environmentId: localEnvironmentId, ref: created.ref })
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
