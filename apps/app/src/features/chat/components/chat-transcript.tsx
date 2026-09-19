@@ -13,6 +13,7 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
+import { CompactionStatus } from "./transcript/compaction-marker";
 import { MessageView } from "./transcript/message-view";
 import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
@@ -67,11 +68,14 @@ function ChatTranscriptView({
           <MessageView
             key={message.id}
             message={message}
-            isStreaming={turnInProgress && index === lastIndex}
+            isStreaming={
+              turnInProgress && snapshot.compaction?.phase !== "running" && index === lastIndex
+            }
             previousTimestamp={timestampOf(snapshot.messages[index - 1]?.metadata)}
           />
         ))}
-        {snapshot.status === "submitted" && (
+        <CompactionStatus state={snapshot.compaction} />
+        {snapshot.status === "submitted" && snapshot.compaction?.phase !== "running" && (
           <div
             role="status"
             aria-live="polite"
