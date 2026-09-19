@@ -7,26 +7,28 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts",
     "./project": "./src/project/index.ts",
-    "./provider": "./src/provider/index.ts",
-    "./mcp": "./src/mcp/index.ts",
     "./events": "./src/events/index.ts",
     "./fs": "./src/fs/index.ts",
     "./git": "./src/git/index.ts",
     "./rpc": "./src/rpc/index.ts",
     "./http": "./src/http/index.ts",
     "./daemon": "./src/daemon/index.ts",
-    "./observability": "./src/observability/index.ts"
+    "./observability": "./src/observability/index.ts",
+    "./observability/resources": "./src/observability/resources/index.ts",
+    "./resource-monitor": "./dist/resources/resource-monitor",
+    "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && bun --no-install build-pi-process.ts && node scripts/build-resource-monitor.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
+    "@ff-labs/pi-fff": "0.10.6",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",
@@ -35,6 +37,7 @@
     "ai": "catalog:",
     "effect": "catalog:effect",
     "mdast-util-from-markdown": "2.0.2",
+    "node-pty": "1.1.0",
     "simple-git": "catalog:",
     "uuid": "catalog:",
     "ws": "catalog:",
@@ -43,6 +46,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@getpie/typescript": "workspace:*",
-    "@types/ws": "catalog:"
+    "@types/ws": "catalog:",
+    "vitest": "catalog:"
   }
 }

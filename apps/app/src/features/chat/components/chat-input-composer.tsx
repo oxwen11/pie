@@ -1,19 +1,21 @@
 import type { SessionRef } from "@getpie/contract";
 import {
   PromptInput,
+  PromptInputButton,
   PromptInputSubmit,
   PromptInputToolbar,
   PromptInputTools,
 } from "@getpie/ui/ai-elements/prompt-input";
-import { Card, CardFrame, CardFrameFooter } from "@getpie/ui/components/card";
+import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
-import { GitBranchIcon } from "lucide-react";
+import { GitBranchIcon, SquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
 
+import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
 import { ChatInput } from "./input/chat-input";
 import { ChatInputProvider } from "./input/chat-input-provider";
@@ -22,8 +24,13 @@ import { createSubmitKeymap } from "./input/extensions/keymaps";
 import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
-// Live-session input bar: Enter sends (submit keymap), Shift+Enter breaks the
-// line. The CardFrame footer shows the session workspace's current git branch.
+// Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
+// handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
+// turn queues Send as a Pi follow-up — Send only appears once the draft has
+// content (empty streaming shows Stop in the primary slot). prompt comes from
+// ChatSessionProvider — not props. The CardFrame header lists queued prompts
+// as editable rows (steering first); the footer shows the session workspace's
+// git availability and current branch.
 export function ChatInputComposer({
   sessionRef,
   toolbar,
@@ -33,12 +40,14 @@ export function ChatInputComposer({
 }) {
   const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
-  const currentBranch = branch.data?.kind === "repository" ? branch.data.current : undefined;
-  const { prompt, interrupt, turnInProgress, store } = useChatSession();
+  const currentBranch =
+    branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
+  const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
+  const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const canInterrupt = status === "streaming";
-  const turnInProgressRef = useLatestRef(turnInProgress);
+  const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
@@ -50,9 +59,10 @@ export function ChatInputComposer({
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      // Turn in progress or missing workspace: don't send, don't clear.
-      if (turnInProgressRef.current || workspaceUnavailableRef.current) return false;
-      prompt(text);
+      // Missing workspace: don't send, don't clear. A running turn still
+      // accepts the send as a follow-up.
+      if (workspaceUnavailableRef.current) return false;
+      prompt(text, canInterrupt ? "followUp" : undefined);
       return undefined;
     },
   });
@@ -61,6 +71,11 @@ export function ChatInputComposer({
 
   return (
     <CardFrame>
+      {hasQueued ? (
+        <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
+          <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
+        </CardFrameHeader>
+      ) : null}
       <Card
         render={
           <PromptInput
@@ -75,35 +90,109 @@ export function ChatInputComposer({
           <ChatInput />
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
-            <PromptInputSubmit
-              aria-label={canInterrupt ? "Stop generating" : "Send message"}
-              disabled={!canInterrupt && (!hasContent || turnInProgress || workspaceUnavailable)}
-              onClick={canInterrupt ? () => void interrupt() : undefined}
-              status={status}
-              type={canInterrupt ? "button" : "submit"}
+            <ChatComposerActions
+              canInterrupt={canInterrupt}
+              hasContent={hasContent}
+              interrupt={interrupt}
+              workspaceUnavailable={workspaceUnavailable}
             />
           </PromptInputToolbar>
         </ChatInputProvider>
       </Card>
       <CardFrameFooter className="px-3 py-2">
-        <span className="flex h-4 min-w-0 items-center text-xs">
-          {branch.isPending ? (
-            <span aria-hidden="true" className="bg-muted h-2 w-24 animate-pulse rounded-sm" />
-          ) : currentBranch ? (
-            <span
-              className="text-muted-foreground flex min-w-0 items-center gap-1.5"
-              title="Current git branch"
-            >
-              <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
-              <span className="truncate">{currentBranch}</span>
-            </span>
-          ) : branch.data?.kind === "not-repository" ? (
-            <span className="text-muted-foreground">Not a Git repository</span>
-          ) : workspaceUnavailable ? (
-            <span className="text-destructive">Workspace unavailable</span>
-          ) : null}
-        </span>
+        <ChatComposerGitStatus
+          currentBranch={currentBranch}
+          isPending={branch.isPending}
+          kind={branch.data?.kind}
+          workspaceUnavailable={workspaceUnavailable}
+        />
       </CardFrameFooter>
     </CardFrame>
   );
+}
+
+function ChatComposerActions({
+  canInterrupt,
+  hasContent,
+  interrupt,
+  workspaceUnavailable,
+}: {
+  canInterrupt: boolean;
+  hasContent: boolean;
+  interrupt: () => Promise<void>;
+  workspaceUnavailable: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {canInterrupt ? (
+        <PromptInputButton
+          aria-label="Stop generating"
+          onClick={() => void interrupt()}
+          variant={hasContent ? "ghost" : "default"}
+        >
+          <SquareIcon className="size-4" />
+        </PromptInputButton>
+      ) : null}
+      {!canInterrupt || hasContent ? (
+        <PromptInputSubmit
+          aria-label="Send message"
+          disabled={!hasContent || workspaceUnavailable}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ChatComposerGitStatus({
+  currentBranch,
+  isPending,
+  kind,
+  workspaceUnavailable,
+}: {
+  currentBranch: string | undefined;
+  isPending: boolean;
+  kind: "repository" | "not-repository" | "workspace-unavailable" | undefined;
+  workspaceUnavailable: boolean;
+}) {
+  return (
+    <span className="flex h-4 min-w-0 items-center text-xs">
+      {gitStatusLabel({ currentBranch, isPending, kind, workspaceUnavailable })}
+    </span>
+  );
+}
+
+function gitStatusLabel({
+  currentBranch,
+  isPending,
+  kind,
+  workspaceUnavailable,
+}: {
+  currentBranch: string | undefined;
+  isPending: boolean;
+  kind: "repository" | "not-repository" | "workspace-unavailable" | undefined;
+  workspaceUnavailable: boolean;
+}): ReactNode {
+  if (isPending) {
+    return (
+      <span aria-hidden="true" className="bg-muted h-2 w-24 rounded-sm motion-safe:animate-pulse" />
+    );
+  }
+  if (currentBranch) {
+    return (
+      <span
+        className="text-muted-foreground flex min-w-0 items-center gap-1.5"
+        title="Current git branch"
+      >
+        <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0" />
+        <span className="truncate">{currentBranch}</span>
+      </span>
+    );
+  }
+  if (kind === "not-repository") {
+    return <span className="text-muted-foreground">Not a Git repository</span>;
+  }
+  if (workspaceUnavailable) {
+    return <span className="text-destructive">Workspace unavailable</span>;
+  }
+  return null;
 }

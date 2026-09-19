@@ -6,11 +6,28 @@ export default defineConfig({
   platform: "node",
   // `@getpie/cli#build` waits for `@getpie/app#build`; ship that complete
   // artifact beside the final CLI so runtime lookup never depends on a repo.
-  copy: {
-    from: "../../apps/app/dist",
-    to: "dist",
-    rename: "client",
-  },
+  copy: [
+    {
+      from: "../../apps/app/dist",
+      to: "dist",
+      rename: "client",
+    },
+    {
+      from: "../server/dist/pi-process",
+      to: "dist",
+      rename: "pi-process",
+    },
+    {
+      from: "../server/dist/fff",
+      to: "dist",
+      rename: "fff",
+    },
+    {
+      from: "../server/dist/resources",
+      to: "dist",
+      rename: "resources",
+    },
+  ],
   deps: {
     // The private server/harness/contract packages are compiled into the CLI.
     // Whitelist their bundled runtime dependencies so additions fail closed.
@@ -19,7 +36,7 @@ export default defineConfig({
       "effect",
       "@effect/platform-node-shared",
       "@effect/platform-node",
-      "@standardserver/shared",
+      "@standard-server/shared",
       "@orpc/experimental-effect",
       "simple-git",
       /^@simple-git\//,

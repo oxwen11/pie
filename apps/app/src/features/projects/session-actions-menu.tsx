@@ -5,9 +5,10 @@ import {
   ContextMenuPopup,
   ContextMenuTrigger,
 } from "@getpie/ui/components/context-menu";
+import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -15,7 +16,8 @@ import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
- *  children render inside it. */
+ *  children render inside it. A hover `SidebarMenuAction` archives (or restores)
+ *  without opening the menu. */
 export function SessionActionsMenu({
   children,
   isActive,
@@ -63,6 +65,9 @@ export function SessionActionsMenu({
     onError: (error) => toast.error(`Failed to update session: ${error.message}`),
   });
 
+  const archiveLabel = session.archived ? "Restore" : "Archive";
+  const ArchiveIcon = session.archived ? ArchiveRestore : Archive;
+
   return (
     <>
       <ContextMenu>
@@ -75,15 +80,45 @@ export function SessionActionsMenu({
             <Pencil />
             Rename
           </ContextMenuItem>
+          {session.archived ? null : (
+            <ContextMenuItem
+              onClick={() => {
+                navigate({
+                  to: "/schedules",
+                  search: {
+                    create: true,
+                    projectId: session.projectId,
+                    sessionId: session.sessionId,
+                  },
+                }).catch((error: unknown) => {
+                  console.error("Failed to open the schedule editor", error);
+                });
+              }}
+            >
+              <Clock />
+              Schedule…
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             disabled={setArchived.isPending}
             onClick={() => setArchived.mutate(!session.archived)}
           >
-            {session.archived ? <ArchiveRestore /> : <Archive />}
-            {session.archived ? "Restore" : "Archive"}
+            <ArchiveIcon />
+            {archiveLabel}
           </ContextMenuItem>
         </ContextMenuPopup>
       </ContextMenu>
+      {/* Float over the row (and a trailing PR icon) instead of shifting into a second slot. */}
+      <SidebarMenuAction
+        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent z-10"
+        disabled={setArchived.isPending}
+        onClick={() => setArchived.mutate(!session.archived)}
+        showOnHover
+        title={archiveLabel}
+      >
+        <ArchiveIcon />
+        <span className="sr-only">{archiveLabel}</span>
+      </SidebarMenuAction>
       {/* Mounted only while open so the draft title starts from the current
           title every time, and unmounted before the menu's own exit animation
           has anywhere to put focus back. */}

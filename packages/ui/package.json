@@ -17,8 +17,8 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@ark-ui/react": "^5.38.1",
-    "@base-ui/react": "^1.7.0",
+    "@ark-ui/react": "^5.39.2",
+    "@base-ui/react": "^1.8.0",
     "@floating-ui/react": "^0.27.20",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
@@ -27,6 +27,7 @@
     "@tiptap/pm": "catalog:tiptap",
     "@tiptap/react": "catalog:tiptap",
     "@tiptap/suggestion": "catalog:tiptap",
+    "cn": "catalog:",
     "react-day-picker": "9.14.0",
     "streamdown": "^2.6.0"
   },
@@ -34,21 +35,19 @@
     "@getpie/typescript": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitest/browser-playwright": "catalog:",
     "ai": "catalog:",
     "class-variance-authority": "^0.7.1",
-    "clsx": "catalog:",
     "embla-carousel-react": "^8.6.0",
     "hast-util-to-jsx-runtime": "^2.3.6",
-    "jsdom": "^26.1.0",
     "lucide-react": "catalog:",
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "shiki": "4.4.3",
-    "tailwind-merge": "catalog:",
     "tailwindcss": "catalog:tailwind",
     "tw-animate-css": "catalog:",
     "use-stick-to-bottom": "^1.1.6",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
   }
 }

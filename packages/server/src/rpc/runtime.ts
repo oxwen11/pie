@@ -20,6 +20,8 @@ import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
+import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
+import { TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
@@ -80,21 +82,32 @@ const SessionImageAssetsProvided = SessionImageAssetsLayer.pipe(
 );
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
+const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
+  Layer.provide(ScheduleRepositoryLayer),
+  Layer.provide(ProjectServiceProvided),
+  Layer.provide(PiAgentSessionServiceProvided),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+);
+
+const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
+  Layer.provide(ScheduleServiceProvided),
+);
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
   SessionImageAssetsProvided,
   ProjectServiceProvided,
+  ScheduleServiceProvided,
+  ScheduleDaemonLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
   GitProvided,
   WorktreeProvided,
   PullRequestServiceProvided,
+  TerminalManagerLayer,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );
-
-// Re-export for tests that cached availability on a shape.
-export const cacheAvailability = cachePiAgentAvailability;

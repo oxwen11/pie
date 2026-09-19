@@ -55,6 +55,32 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
+  it("round-trips pull request refs and omits an empty list", async () => {
+    const pullRequestRefs = [
+      { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
+      { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+    ];
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequestRefs });
+        return yield* repo.read("proj-a", "sess-1");
+      }),
+    );
+    expect(read.pullRequestRefs).toEqual(pullRequestRefs);
+
+    await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        yield* repo.write({ ...read, pullRequestRefs: [] });
+      }),
+    );
+    const raw = JSON.parse(
+      await fs.readFile(path.join(home, "storage", "sessions", "proj-a", "sess-1.json"), "utf8"),
+    ) as { readonly data: Record<string, unknown> };
+    expect(raw.data).not.toHaveProperty("pullRequestRefs");
+  });
+
   it("strips unknown extra fields on read and never writes them back", async () => {
     const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy.json");
     await fs.mkdir(path.dirname(file), { recursive: true });
@@ -87,6 +113,41 @@ describe("SessionRepository", () => {
       readonly data: Record<string, unknown>;
     };
     expect(raw.data).not.toHaveProperty("pendingWorktree");
+  });
+
+  it("lifts a legacy gitBranch into worktree and never writes gitBranch back", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "sess-legacy-wt.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "sess-legacy-wt",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+          cwd: "/tmp/pie-worktree",
+          gitBranch: "pie/abcd1234",
+        },
+      }),
+    );
+
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        const loaded = yield* repo.read("proj-a", "sess-legacy-wt");
+        yield* repo.write(loaded);
+        return loaded;
+      }),
+    );
+    expect(read.worktree).toEqual({ branch: "pie/abcd1234" });
+    expect(read).not.toHaveProperty("gitBranch");
+
+    const raw = JSON.parse(await fs.readFile(file, "utf8")) as {
+      readonly data: Record<string, unknown>;
+    };
+    expect(raw.data.worktree).toEqual({ branch: "pie/abcd1234" });
+    expect(raw.data).not.toHaveProperty("gitBranch");
   });
 
   it("omits agentSessionId until Pi has opened, and drops the old sentinel on read", async () => {

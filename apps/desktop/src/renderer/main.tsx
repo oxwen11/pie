@@ -1,3 +1,4 @@
+import { ThemeProvider } from "@getpie/app";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ErrorBoundary } from "react-error-boundary";
@@ -8,7 +9,7 @@ import { waitForDesktopPort } from "./desktop-port";
 import { DesktopRoot } from "./desktop-root";
 import { StartupFailure } from "./startup-failure";
 
-const rootElement = document.getElementById("root")!;
+const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 
 const host = waitForDesktopPort().then(async (port) => {
@@ -19,8 +20,10 @@ const host = waitForDesktopPort().then(async (port) => {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ErrorBoundary FallbackComponent={StartupFailure}>
-      <DesktopRoot host={host} />
-    </ErrorBoundary>
+    <ThemeProvider>
+      <ErrorBoundary FallbackComponent={StartupFailure}>
+        <DesktopRoot host={host} />
+      </ErrorBoundary>
+    </ThemeProvider>
   </StrictMode>,
 );

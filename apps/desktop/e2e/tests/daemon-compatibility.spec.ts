@@ -53,7 +53,6 @@ async function waitForConnectedUi(
       PIE_E2E: "1",
       PIE_E2E_PI_EXECUTABLE: fakePiPath,
       PIE_HOME: pieHome,
-      PIE_DAEMON_DIR: path.join(pieHome, "daemon"),
     },
   });
   try {

@@ -1,4 +1,3 @@
-import type { SessionRef } from "@getpie/contract";
 import {
   Sidebar,
   SidebarContent,
@@ -12,24 +11,60 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { SquarePen } from "lucide-react";
-import { useState } from "react";
+import { Link, useMatch } from "@tanstack/react-router";
+import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
-import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectList } from "@/features/projects/project-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
-export function AppSidebar({
-  isSessionActive,
-  onNewChat,
-}: {
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly onNewChat: () => void;
-}) {
-  const [importOpen, setImportOpen] = useState(false);
+function NewChatNavItem() {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton render={<Link to="/draft" />}>
+        <SquarePen />
+        <span>New chat</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PullRequestsNavItem() {
+  const active =
+    useMatch({
+      from: "/pull-requests",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
+        <GitPullRequestIcon />
+        <span>Pull Request</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function SchedulesNavItem() {
+  const active =
+    useMatch({
+      from: "/schedules",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link search={{}} to="/schedules" />}>
+        <Clock />
+        <span>Scheduled</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+export function AppSidebar() {
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
   const { isMobile, state } = useSidebar();
@@ -44,7 +79,13 @@ export function AppSidebar({
     >
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
       <SidebarHeader
-        className={cn(SHELL_TITLEBAR_HEADER_CLASS, desktop && "px-0", "[-webkit-app-region:drag]")}
+        className={cn(
+          // Same string as SHELL_TITLEBAR_HEADER_CLASS — imported
+          // constants are unreadable to require-static-classes.
+          "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
+          desktop && "px-0",
+          "[-webkit-app-region:drag]",
+        )}
       >
         {isDesktopMacosHost(platform) ? null : (
           <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
@@ -56,20 +97,15 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={onNewChat}>
-                  <SquarePen />
-                  <span>New chat</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <NewChatNavItem />
+              <SchedulesNavItem />
+              <PullRequestsNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <ProjectList isSessionActive={isSessionActive} onImport={() => setImportOpen(true)} />
+        <ProjectList />
       </SidebarContent>
-
-      {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}
     </Sidebar>
   );
 }

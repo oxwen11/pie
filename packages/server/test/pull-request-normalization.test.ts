@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   InvalidPullRequestJsonError,
   normalizeGitHubPullRequestJson,
+  normalizeGitHubViewerPullRequestsJson,
 } from "../src/pull-request/normalization";
 
 const openFixture = {
@@ -107,5 +108,66 @@ describe("normalizeGitHubPullRequestJson", () => {
         url: "https://github.com/getpie/pie/pull/99",
       }),
     ).toThrow(InvalidPullRequestJsonError);
+  });
+});
+
+describe("pull request body", () => {
+  it("treats a missing body as empty", () => {
+    expect(normalizeGitHubPullRequestJson({ ...openFixture, body: "## Summary" }).body).toBe(
+      "## Summary",
+    );
+    expect(normalizeGitHubPullRequestJson({ ...openFixture, body: null }).body).toBe("");
+  });
+});
+
+describe("normalizeGitHubViewerPullRequestsJson", () => {
+  const node = {
+    additions: 12,
+    author: { login: "oxwen11" },
+    baseRefName: "main",
+    deletions: 3,
+    headRefName: "feat/list",
+    isDraft: false,
+    number: 42,
+    state: "OPEN",
+    title: "Add a pull request list",
+    updatedAt: "2026-09-03T00:00:00Z",
+    url: "https://github.com/getpie/pie/pull/42",
+  };
+
+  it("reads the viewer's open pull requests from a GraphQL envelope", () => {
+    expect(
+      normalizeGitHubViewerPullRequestsJson({
+        data: { viewer: { pullRequests: { nodes: [node, null] } } },
+      }),
+    ).toEqual([
+      {
+        ref: { host: "github.com", owner: "getpie", repository: "pie", number: 42 },
+        title: "Add a pull request list",
+        url: "https://github.com/getpie/pie/pull/42",
+        authorLogin: "oxwen11",
+        headBranch: "feat/list",
+        baseBranch: "main",
+        lifecycle: { type: "open", draft: false },
+        additions: 12,
+        deletions: 3,
+        updatedAt: "2026-09-03T00:00:00Z",
+      },
+    ]);
+  });
+
+  it("accepts a deleted head branch and a missing author", () => {
+    const [item] = normalizeGitHubViewerPullRequestsJson({
+      data: {
+        viewer: {
+          pullRequests: {
+            nodes: [{ ...node, author: null, headRefName: null, additions: 0, deletions: 0 }],
+          },
+        },
+      },
+    });
+    expect(item?.authorLogin).toBe("");
+    expect(item?.headBranch).toBe("");
+    expect(item?.additions).toBe(0);
   });
 });

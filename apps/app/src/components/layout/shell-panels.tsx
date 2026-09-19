@@ -22,7 +22,6 @@ import {
 } from "react";
 import {
   Group,
-  type LayoutChangedMeta,
   type OnPanelResize,
   type PanelImperativeHandle,
   Separator,
@@ -32,6 +31,11 @@ import {
 } from "react-resizable-panels";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
+import {
+  notifyUserLayoutListeners,
+  resolveSidebarUserLayout,
+  type UserLayoutListener,
+} from "@/components/layout/shell-user-layout";
 
 /** Resizable sidebar | chat | content-panel columns. */
 
@@ -45,32 +49,7 @@ const PANEL_IDS = {
   sidebar: "sidebar",
 } as const;
 
-type UserLayoutListener = () => void;
 type SubscribeToUserLayout = (listener: UserLayoutListener) => () => void;
-
-export function notifyUserLayoutListeners(
-  meta: LayoutChangedMeta,
-  listeners: ReadonlySet<UserLayoutListener>,
-): void {
-  if (!meta.isUserInteraction) return;
-  for (const listener of listeners) listener();
-}
-
-export interface SidebarUserLayout {
-  expandedWidth?: number;
-  open?: boolean;
-}
-
-export function resolveSidebarUserLayout(
-  open: boolean,
-  collapsed: boolean,
-  width: number | undefined,
-): SidebarUserLayout {
-  const layout: SidebarUserLayout = {};
-  if (collapsed === open) layout.open = !collapsed;
-  if (!collapsed && width !== undefined && width > 0) layout.expandedWidth = width;
-  return layout;
-}
 
 const ShellLayoutContext = createContext<SubscribeToUserLayout | null>(null);
 
@@ -151,7 +130,7 @@ export function ShellSeparator({
         locked && "pointer-events-none",
         className,
       )}
-      disabled={disabled || locked}
+      disabled={disabled === true || locked}
       {...props}
     />
   );
@@ -238,12 +217,12 @@ function useSidebarDrawer(
 
   useEffect(() => {
     const panel = panelRef.current;
-    if (panel === null || !laidOut.current) return;
+    if (panel === null || !laidOut.current) return undefined;
 
     if (skipNextAnimation.current) {
       skipNextAnimation.current = false;
       animatedWidth.jump(open ? expandedWidth.get() : 0);
-      return;
+      return undefined;
     }
 
     if (reduceMotion) {
@@ -254,7 +233,7 @@ function useSidebarDrawer(
       } else if (!panel.isCollapsed()) {
         panel.collapse();
       }
-      return;
+      return undefined;
     }
 
     const controls = animate(animatedWidth, open ? expandedWidth.get() : 0, {
@@ -326,6 +305,7 @@ export function ShellSidebarPanel({
   const panelRef = usePanelRef();
   const panelElementRef = useRef<HTMLDivElement>(null);
   const drawer = useSidebarDrawer(open, setOpen, panelRef, panelElementRef);
+  const handleSidebarResize = drawer.onResize;
 
   return (
     <>
@@ -339,7 +319,7 @@ export function ShellSidebarPanel({
         id={PANEL_IDS.sidebar}
         maxSize="30rem"
         minSize={drawer.minSize}
-        onResize={drawer.onResize}
+        onResize={handleSidebarResize}
         panelRef={panelRef}
       >
         <m.div

@@ -17,8 +17,7 @@ function log(value) {
 
 const rl = readline.createInterface({ input: process.stdin });
 const entries = [];
-let leafId = null;
-let nextEntry = 1;
+const state = { leafId: null, nextEntry: 1 };
 
 process.stdout.write("pi startup banner (not json)\n");
 send({
@@ -43,7 +42,7 @@ const assistant = (over = {}) => ({
 const upd = (ev) =>
   send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
 const settle = (last) => {
-  send({ type: "agent_end", messages: [last || assistant()], willRetry: false });
+  send({ type: "agent_end", messages: [last ?? assistant()], willRetry: false });
   send({ type: "agent_settled" });
 };
 
@@ -62,26 +61,52 @@ rl.on("line", (line) => {
     return;
   }
 
+  // Persist entries so history reload after a live turn can decode Markdown
+  // images. An empty tree is still a finished read on first attach.
   if (msg.type === "get_entries") {
     send({
       id: msg.id,
       type: "response",
       command: "get_entries",
       success: true,
-      data: { entries, leafId },
+      data: { entries, leafId: state.leafId },
     });
+    return;
+  }
+
+  if (msg.type === "clear_queue") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "clear_queue",
+      success: true,
+      data: { steering: [], followUp: [] },
+    });
+    send({ type: "queue_update", steering: [], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "steer") {
+    send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering: [msg.message], followUp: [] });
+    return;
+  }
+
+  if (msg.type === "follow_up") {
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering: [], followUp: [msg.message] });
     return;
   }
 
   if (msg.type !== "prompt") return;
 
   const now = Date.now();
-  const userId = `fake-user-${nextEntry++}`;
-  const assistantId = `fake-assistant-${nextEntry++}`;
+  const userId = `fake-user-${state.nextEntry++}`;
+  const assistantId = `fake-assistant-${state.nextEntry++}`;
   entries.push({
     type: "message",
     id: userId,
-    parentId: leafId,
+    parentId: state.leafId,
     timestamp: new Date(now).toISOString(),
     message: { role: "user", content: msg.message, timestamp: now },
   });
@@ -96,9 +121,15 @@ rl.on("line", (line) => {
     timestamp: new Date(now + 1).toISOString(),
     message: finalAssistant,
   });
-  leafId = assistantId;
+  state.leafId = assistantId;
 
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({
+    id: msg.id,
+    type: "response",
+    command: "prompt",
+    success: true,
+    data: { started: true },
+  });
   send({ type: "agent_start" });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });

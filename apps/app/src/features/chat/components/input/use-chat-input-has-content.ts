@@ -2,7 +2,9 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import type { ChatInputController } from "./chat-input-controller";
 
-const NO_UNSUBSCRIBE = () => {};
+const NO_UNSUBSCRIBE = () => {
+  /* useSyncExternalStore requires an unsubscribe even when the store has none. */
+};
 
 /**
  * Whether the composer holds something submittable — subscribed to the

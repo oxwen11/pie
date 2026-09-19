@@ -1,10 +1,11 @@
 import type {
   PromptPart,
+  SessionPendingPrompt,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
+  PieUIMessage,
 } from "@getpie/contract";
-import type { UIMessage } from "ai";
 
 import type { AgentResponse } from "./agent-requests";
 
@@ -53,23 +54,30 @@ export interface ChatSessionTransport {
    */
   subscribe(onEvent: (event: ChatTransportEvent) => void): () => void;
   /**
-   * Submit a prompt: fire-and-forget at the wire level. The returned receipt
-   * only acknowledges acceptance — the turn's content arrives through the
-   * subscription like everyone else's. `messageId` is the optimistic user
-   * message's id; the server echoes it on `session.prompt.submitted` (dedupe).
+   * Submit a prompt and wait for the runtime's admission receipt; the turn's
+   * content still arrives through the subscription like everyone else's.
+   * `messageId` is the optimistic user message's id; the server echoes it on
+   * `session.prompt.submitted` so the sender can dedupe its local copy.
    */
   prompt(input: {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
-  }): Promise<{ readonly turnId: string }>;
+    readonly delivery?: "steer" | "followUp";
+  }): Promise<{ readonly turnId: string; readonly started: boolean }>;
   /** Interrupt the active turn. Idle, repeated, and late calls are safe no-ops server-side. */
   interrupt(): Promise<void>;
   /**
-   * The session's native history as final-form UIMessages, or `null` when Pi
+   * Replace Pi's native queue (clear, then steer / follow-up the remaining
+   * lines). Empty arrays clear the queue. Items have no ids — address them
+   * by index in `steering` / `followUp`.
+   */
+  replaceQueue(pending: SessionPendingPrompt): Promise<void>;
+  /**
+   * The session's native history as final-form session UI messages, or `null` when Pi
    * serves no history for this session — capability absence is a normal outcome
    * here, not an error.
    */
-  getMessages(): Promise<readonly UIMessage[] | null>;
+  getMessages(): Promise<readonly PieUIMessage[] | null>;
   /**
    * Resolves normally when the request is no longer pending — including when
    * another client answered it first (the server's "not pending" is an

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import url from "node:url";
 
 import type { SessionRef } from "@getpie/contract";
 import { Effect, Layer } from "effect";
@@ -62,7 +63,8 @@ describe("SessionImageAssets", () => {
     const created = await Effect.runPromise(assets.createUrl(ref, "image.png"));
     const token = created.relativeUrl.split("/")[3];
     expect(token).toBeDefined();
-    const content = await Effect.runPromise(assets.contentForToken(token!));
+    if (token === undefined) throw new Error("expected capability token");
+    const content = await Effect.runPromise(assets.contentForToken(token));
 
     expect(content?.mediaType).toBe("image/png");
     expect(content?.bytes).toEqual(new Uint8Array(PNG_1X1));
@@ -103,5 +105,20 @@ describe("SessionImageAssets", () => {
     await expect(Effect.runPromise(assets.createUrl(ref, "image.png"))).rejects.toBeInstanceOf(
       AssetNotImage,
     );
+  });
+
+  it("accepts FILE:// destinations case-insensitively", async () => {
+    const cwd = await makeWorkspace();
+    const imagePath = path.join(cwd, "image.png");
+    await fs.writeFile(imagePath, PNG_1X1);
+    const destination = url.pathToFileURL(imagePath).href.replace(/^file:/, "FILE:");
+    const assets = await makeAssets(cwd, `![Result](${destination})`);
+
+    const created = await Effect.runPromise(assets.createUrl(ref, destination));
+    const token = created.relativeUrl.split("/")[3];
+    expect(token).toBeDefined();
+    if (token === undefined) throw new Error("expected capability token");
+    const content = await Effect.runPromise(assets.contentForToken(token));
+    expect(content?.mediaType).toBe("image/png");
   });
 });

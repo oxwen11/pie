@@ -22,11 +22,15 @@ describe("fs router", () => {
 
     const harness = await makeRpcTestHarness(home);
     try {
-      await expect(harness.client.fs.readFileString({ cwd, path: "README.md" })).resolves.toBe(
-        "# Hello",
-      );
-      await expect(harness.client.fs.readFileString({ cwd, path: "readme-link" })).resolves.toBe(
-        "# Hello",
+      await expect(harness.client.fs.readFileString({ cwd, path: "README.md" })).resolves.toEqual({
+        kind: "text",
+        content: "# Hello",
+      });
+      await expect(harness.client.fs.readFileString({ cwd, path: "readme-link" })).resolves.toEqual(
+        {
+          kind: "text",
+          content: "# Hello",
+        },
       );
       const tree = await harness.client.fs.readTree({ cwd });
       expect(tree.entries).toEqual(
@@ -52,6 +56,23 @@ describe("fs router", () => {
         code: "NOT_FOUND",
         data: { path: "missing.txt" },
       });
+      fs.writeFileSync(
+        path.join(cwd, "dot.png"),
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
+      );
+      fs.writeFileSync(path.join(cwd, "note.pdf"), "%PDF-1.4\n");
+      await expect(
+        harness.client.fs.readFileString({ cwd, path: "dot.png" }),
+      ).resolves.toMatchObject({
+        kind: "image",
+        mimeType: "image/png",
+      });
+      await expect(
+        harness.client.fs.readFileString({ cwd, path: "note.pdf" }),
+      ).rejects.toMatchObject({
+        code: "BINARY_FILE",
+        data: { path: "note.pdf" },
+      });
       await expect(harness.client.fs.readTree({ cwd: "relative/workspace" })).rejects.toMatchObject(
         {
           code: "PATH_ESCAPE",
@@ -74,11 +95,48 @@ describe("fs router", () => {
       const tree = await harness.client.fs.readTree({ ref });
       expect(tree.cwd).toBe(cwd);
       expect(tree.entries).toEqual(expect.arrayContaining([{ path: "README.md", type: "file" }]));
-      await expect(harness.client.fs.readFileString({ ref, path: "README.md" })).resolves.toBe(
-        "# Hello",
-      );
+      await expect(harness.client.fs.readFileString({ ref, path: "README.md" })).resolves.toEqual({
+        kind: "text",
+        content: "# Hello",
+      });
     } finally {
       await harness.dispose();
+    }
+  });
+
+  it("confines an isolated project picker to its configured root", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-root-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "pie-browse-outside-"));
+    fs.mkdirSync(path.join(root, "sample"));
+    fs.symlinkSync(outside, path.join(root, "outside-link"));
+    const previousRoot = process.env.PIE_PROJECT_BROWSE_ROOT;
+    process.env.PIE_PROJECT_BROWSE_ROOT = root;
+    const harness = await makeRpcTestHarness(home);
+    try {
+      await expect(harness.client.fs.browse({})).resolves.toEqual({
+        path: root,
+        parent: null,
+        directories: [
+          { name: "outside-link", path: path.join(root, "outside-link") },
+          { name: "sample", path: path.join(root, "sample") },
+        ],
+      });
+      await expect(harness.client.fs.browse({ path: path.join(root, "sample") })).resolves.toEqual({
+        path: path.join(root, "sample"),
+        parent: root,
+        directories: [],
+      });
+      await expect(harness.client.fs.browse({ path: outside })).rejects.toMatchObject({
+        code: "READ_FAILED",
+      });
+      await expect(
+        harness.client.fs.browse({ path: path.join(root, "outside-link") }),
+      ).rejects.toMatchObject({ code: "READ_FAILED" });
+    } finally {
+      await harness.dispose();
+      if (previousRoot === undefined) delete process.env.PIE_PROJECT_BROWSE_ROOT;
+      else process.env.PIE_PROJECT_BROWSE_ROOT = previousRoot;
     }
   });
 

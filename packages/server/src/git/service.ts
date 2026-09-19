@@ -25,7 +25,9 @@ import {
   WorkspaceReadError,
 } from "../errors";
 import { FileSystemService } from "../fs";
+import { contains, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
 import { parseNameStatus, parseNulPaths } from "./name-status";
+import { isUnsafeRef, makeGitHelpers, parseRefNames } from "./shared";
 
 /** GitService always runs against a resolved absolute cwd — not a session ref. */
 export type GitReviewCwdQuery = {
@@ -43,39 +45,7 @@ export type GitDiffCwdQuery = {
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const NUL_BYTE = 0;
-const BINARY_MAGIC_PREFIXES: ReadonlyArray<ReadonlyArray<number>> = [
-  [0x25, 0x50, 0x44, 0x46, 0x2d],
-  [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-  [0xff, 0xd8, 0xff],
-  [0x47, 0x49, 0x46, 0x38, 0x37, 0x61],
-  [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
-  [0x50, 0x4b, 0x03, 0x04],
-  [0x50, 0x4b, 0x05, 0x06],
-  [0x1f, 0x8b],
-  [0x7f, 0x45, 0x4c, 0x46],
-];
 const DEFAULT_BRANCH_NAMES = ["main", "master", "trunk"] as const;
-
-const contains = (parent: string, child: string): boolean => {
-  const relative = path.relative(parent, child);
-  return (
-    relative === "" ||
-    (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
-  );
-};
-
-const toPosixPath = (value: string): string => value.split(path.sep).join("/");
-
-const hasBinaryMagicPrefix = (bytes: Uint8Array): boolean =>
-  BINARY_MAGIC_PREFIXES.some(
-    (prefix) =>
-      bytes.byteLength >= prefix.length && prefix.every((byte, index) => bytes[index] === byte),
-  );
-
-const isNotRepositoryMessage = (cause: unknown): boolean => {
-  const message = cause instanceof Error ? cause.message : String(cause);
-  return /not a git repository/i.test(message);
-};
 
 const decodeText = (
   bytes: Uint8Array,
@@ -90,17 +60,6 @@ const decodeText = (
     return Effect.fail(new WorkspaceBinaryFile({ path: relativePath }));
   }
 };
-
-/** Reject anything that is not a listed ref name — no `../`, flags, or rev magic. */
-const isUnsafeRef = (ref: string): boolean =>
-  ref === "" ||
-  ref.startsWith("-") ||
-  ref.includes("..") ||
-  ref.includes("\\") ||
-  ref.includes("\0") ||
-  ref.includes(":") ||
-  ref.includes("@{") ||
-  /\s/.test(ref);
 
 export type GitFailure =
   | WorkspacePathEscape
@@ -153,41 +112,7 @@ export const GitServiceLayer: Layer.Layer<
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const workspace = yield* FileSystemService;
-
-    const readError = (relativePath: string) => (cause: unknown) =>
-      new WorkspaceReadError({ path: relativePath, cause });
-
-    const resolveRoot = (cwd: string) =>
-      Effect.gen(function* () {
-        if (!path.isAbsolute(cwd)) {
-          return yield* new WorkspacePathEscape({ cwd, path: "." });
-        }
-        const realRoot = yield* fs.realPath(cwd).pipe(Effect.mapError(readError(".")));
-        const info = yield* fs.stat(realRoot).pipe(Effect.mapError(readError(".")));
-        if (info.type !== "Directory") {
-          return yield* new WorkspaceNotDirectory({ path: "." });
-        }
-        return realRoot;
-      });
-
-    const gitError = (cwd: string) => (cause: unknown) =>
-      isNotRepositoryMessage(cause) ? new GitNotRepository({ cwd }) : new GitError({ cwd, cause });
-
-    const raw = (cwd: string, args: readonly string[]) =>
-      Effect.tryPromise({
-        try: () => simpleGit(cwd).raw([...args]),
-        catch: gitError(cwd),
-      });
-
-    const resolveRepoRoot = (cwd: string) =>
-      raw(cwd, ["rev-parse", "--show-toplevel"]).pipe(
-        Effect.map((value) => value.trim()),
-        Effect.flatMap((toplevel) =>
-          toplevel === ""
-            ? Effect.fail(new GitNotRepository({ cwd }))
-            : Effect.succeed(path.resolve(toplevel)),
-        ),
-      );
+    const { gitError, raw, resolveRoot, resolveRepoRoot, listRefs } = makeGitHelpers(fs);
 
     const toWorkspacePath = (cwd: string, repoRoot: string, gitPath: string): string | null => {
       if (path.isAbsolute(gitPath) || gitPath.split(/[\\/]/).includes("..")) return null;
@@ -205,36 +130,6 @@ export const GitServiceLayer: Layer.Layer<
       return { path: nextPath, status: file.status, oldPath };
     };
 
-    const parseRefNames = (output: string): string[] => {
-      const names: string[] = [];
-      for (const line of output.split("\n")) {
-        const ref = line.trim();
-        if (ref.startsWith("refs/heads/")) {
-          names.push(ref.slice("refs/heads/".length));
-        } else if (ref.startsWith("refs/remotes/")) {
-          names.push(ref.slice("refs/remotes/".length));
-        }
-      }
-      return names;
-    };
-
-    const listRefs = (cwd: string) =>
-      raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"]).pipe(
-        Effect.map((output) => {
-          const local: string[] = [];
-          const remotes: string[] = [];
-          for (const line of output.split("\n")) {
-            const ref = line.trim();
-            if (ref.startsWith("refs/heads/")) {
-              local.push(ref.slice("refs/heads/".length));
-            } else if (ref.startsWith("refs/remotes/")) {
-              remotes.push(ref.slice("refs/remotes/".length));
-            }
-          }
-          return { local, remotes, all: [...local, ...remotes] };
-        }),
-      );
-
     const resolvePreferredCompareRef = (cwd: string) =>
       Effect.gen(function* () {
         const remoteHead = yield* raw(cwd, [
@@ -249,7 +144,7 @@ export const GitServiceLayer: Layer.Layer<
           return remoteHead.slice("refs/remotes/".length);
         }
         const local = yield* raw(cwd, ["for-each-ref", "--format=%(refname)", "refs/heads"]);
-        const names = new Set(parseRefNames(local));
+        const names = new Set(parseRefNames(local).all);
         for (const name of DEFAULT_BRANCH_NAMES) {
           if (names.has(name)) return name;
         }
@@ -359,7 +254,15 @@ export const GitServiceLayer: Layer.Layer<
       });
 
     const readWorktreeText = (cwd: string, relativePath: string) =>
-      workspace.readFileString(cwd, relativePath);
+      workspace
+        .readFileString(cwd, relativePath)
+        .pipe(
+          Effect.flatMap((preview) =>
+            preview.kind === "text"
+              ? Effect.succeed(preview.content)
+              : Effect.fail(new WorkspaceBinaryFile({ path: relativePath })),
+          ),
+        );
 
     const toBlobPath = (cwd: string, repoRoot: string, relativePath: string): string =>
       toPosixPath(path.relative(repoRoot, path.resolve(cwd, relativePath)));
@@ -391,38 +294,35 @@ export const GitServiceLayer: Layer.Layer<
       });
 
     return {
-      status: (cwd) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const result = yield* Effect.tryPromise({
-            try: () => simpleGit(realRoot).status(),
-            catch: gitError(realRoot),
+      status: Effect.fn("GitService.status")(function* (cwd: string) {
+        const realRoot = yield* resolveRoot(cwd);
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const result = yield* Effect.tryPromise({
+          try: () => simpleGit(realRoot).status(),
+          catch: gitError(realRoot),
+        });
+        const files: GitStatusFile[] = [];
+        for (const file of result.files) {
+          const nextPath = toWorkspacePath(realRoot, repoRoot, file.path);
+          if (nextPath === null) continue;
+          const renameFrom =
+            "from" in file && typeof file.from === "string" ? file.from : undefined;
+          const relocatedFrom =
+            renameFrom === undefined ? undefined : toWorkspacePath(realRoot, repoRoot, renameFrom);
+          files.push({
+            path: nextPath,
+            index: file.index,
+            worktree: file.working_dir,
+            ...(relocatedFrom === undefined || relocatedFrom === null
+              ? undefined
+              : { oldPath: relocatedFrom }),
           });
-          const files: GitStatusFile[] = [];
-          for (const file of result.files) {
-            const nextPath = toWorkspacePath(realRoot, repoRoot, file.path);
-            if (nextPath === null) continue;
-            const renameFrom =
-              "from" in file && typeof file.from === "string" ? file.from : undefined;
-            const relocatedFrom =
-              renameFrom === undefined
-                ? undefined
-                : toWorkspacePath(realRoot, repoRoot, renameFrom);
-            files.push({
-              path: nextPath,
-              index: file.index,
-              worktree: file.working_dir,
-              ...(relocatedFrom === undefined || relocatedFrom === null
-                ? undefined
-                : { oldPath: relocatedFrom }),
-            });
-          }
-          return { branch: result.current ?? null, files };
-        }),
+        }
+        return { branch: result.current ?? null, files };
+      }),
 
-      branch: (cwd) =>
-        Effect.gen(function* () {
+      branch: Effect.fn("GitService.branch")(
+        function* (cwd: string) {
           const realRoot = yield* resolveRoot(cwd);
           const current = yield* currentBranch(realRoot);
           const defaultBranch = yield* resolvePreferredCompareRef(realRoot);
@@ -434,63 +334,61 @@ export const GitServiceLayer: Layer.Layer<
             branches: listed.all,
             remotes: listed.remotes,
           };
-        }).pipe(
-          Effect.catchTags({
-            GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
-            WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
-            WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
-          }),
-        ),
-
-      review: (query) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(query.cwd);
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const branch = yield* currentBranch(realRoot);
-          const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
-          return {
-            mode: plan.mode,
-            other: plan.other,
-            branch,
-            base: plan.base,
-            baseBranch: plan.baseBranch,
-            files,
-          };
+        },
+        Effect.catchTags({
+          GitNotRepository: () => Effect.succeed({ kind: "not-repository" as const }),
+          WorkspaceNotDirectory: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
+          WorkspaceReadError: () => Effect.succeed({ kind: "workspace-unavailable" as const }),
         }),
+      ),
 
-      diff: (query) =>
-        Effect.gen(function* () {
-          const realRoot = yield* resolveRoot(query.cwd);
-          if (path.isAbsolute(query.path) || query.path.split(/[\\/]/).includes("..")) {
-            return yield* new WorkspacePathEscape({ cwd: realRoot, path: query.path });
-          }
-          const repoRoot = yield* resolveRepoRoot(realRoot);
-          const plan = yield* resolveCompare(realRoot, query);
-          const files = yield* reviewFiles(realRoot, repoRoot, plan);
-          const file = files.find((entry) => entry.path === query.path);
-          if (file === undefined) {
-            return yield* new WorkspaceFileNotFound({ path: query.path });
-          }
-          const oldBlobPath = toBlobPath(realRoot, repoRoot, file.oldPath ?? file.path);
-          const newBlobPath = toBlobPath(realRoot, repoRoot, file.path);
-          const oldContents =
-            file.status === "added" ? null : yield* readBlobText(realRoot, plan.base, oldBlobPath);
-          const newContents =
-            file.status === "deleted"
-              ? null
-              : plan.head === null
-                ? yield* readWorktreeText(realRoot, file.path)
-                : yield* readBlobText(realRoot, plan.head, newBlobPath);
-          return {
-            path: file.path,
-            status: file.status,
-            ...(file.oldPath === undefined ? undefined : { oldPath: file.oldPath }),
-            oldContents,
-            newContents,
-            binary: false,
-          };
-        }),
+      review: Effect.fn("GitService.review")(function* (query: GitReviewCwdQuery) {
+        const realRoot = yield* resolveRoot(query.cwd);
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const branch = yield* currentBranch(realRoot);
+        const plan = yield* resolveCompare(realRoot, query);
+        const files = yield* reviewFiles(realRoot, repoRoot, plan);
+        return {
+          mode: plan.mode,
+          other: plan.other,
+          branch,
+          base: plan.base,
+          baseBranch: plan.baseBranch,
+          files,
+        };
+      }),
+
+      diff: Effect.fn("GitService.diff")(function* (query: GitDiffCwdQuery) {
+        const realRoot = yield* resolveRoot(query.cwd);
+        if (path.isAbsolute(query.path) || query.path.split(/[\\/]/).includes("..")) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: query.path });
+        }
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const plan = yield* resolveCompare(realRoot, query);
+        const files = yield* reviewFiles(realRoot, repoRoot, plan);
+        const file = files.find((entry) => entry.path === query.path);
+        if (file === undefined) {
+          return yield* new WorkspaceFileNotFound({ path: query.path });
+        }
+        const oldBlobPath = toBlobPath(realRoot, repoRoot, file.oldPath ?? file.path);
+        const newBlobPath = toBlobPath(realRoot, repoRoot, file.path);
+        const oldContents =
+          file.status === "added" ? null : yield* readBlobText(realRoot, plan.base, oldBlobPath);
+        const newContents =
+          file.status === "deleted"
+            ? null
+            : plan.head === null
+              ? yield* readWorktreeText(realRoot, file.path)
+              : yield* readBlobText(realRoot, plan.head, newBlobPath);
+        return {
+          path: file.path,
+          status: file.status,
+          ...(file.oldPath === undefined ? undefined : { oldPath: file.oldPath }),
+          oldContents,
+          newContents,
+          binary: false,
+        };
+      }),
     };
   }),
 );

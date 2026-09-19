@@ -32,19 +32,28 @@ const COMPATIBILITY_INPUTS = [
   "tools",
 ] as const;
 
+const GIT_HASH_KEY = /^githash:[0-9a-f]{8}$/;
+
+function isGitHashDaemonCompatibilityKey(value: string): value is GitHashDaemonCompatibilityKey {
+  return GIT_HASH_KEY.test(value);
+}
+
 /** Normalize a full or abbreviated Git hash to an eight-character namespaced key. */
 export function makeGitHashDaemonCompatibilityKey(gitHash: string): GitHashDaemonCompatibilityKey {
   const normalized = gitHash.trim().toLowerCase();
   if (!/^[0-9a-f]{8,40}$/.test(normalized)) {
     throw new RangeError("Daemon Git hash must contain 8 to 40 hexadecimal characters");
   }
-  return `githash:${normalized.slice(0, 8)}` as GitHashDaemonCompatibilityKey;
+  const key = `githash:${normalized.slice(0, 8)}`;
+  if (!isGitHashDaemonCompatibilityKey(key)) {
+    throw new RangeError("Daemon Git hash must contain 8 to 40 hexadecimal characters");
+  }
+  return key;
 }
 
 /** Decode persisted JSON without trusting a TypeScript cast. */
 export function decodeDaemonCompatibilityKey(value: unknown): DaemonCompatibilityKey | undefined {
-  if (typeof value !== "string" || !/^githash:[0-9a-f]{8}$/.test(value)) return undefined;
-  return value as GitHashDaemonCompatibilityKey;
+  return typeof value === "string" && isGitHashDaemonCompatibilityKey(value) ? value : undefined;
 }
 
 /** Read the statically embedded key; source entry points must inject it too. */

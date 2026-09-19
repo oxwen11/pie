@@ -1,6 +1,8 @@
+import { PullRequestRefSchema } from "@getpie/contract/pull-request";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
-import { Effect, Option, Schema } from "effect";
+import { Context, Effect, FileSystem, Layer, Option, Schema } from "effect";
 
+import { Paths } from "../config/paths";
 import { SessionNotFound, SessionRefNotFound, StoreReadError, StoreWriteError } from "../errors";
 import type { Session } from "../types";
 
@@ -11,6 +13,8 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.String })),
+  pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -21,14 +25,17 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, ...rest } = parsed;
+  const { agentSessionId, gitBranch, worktree, ...rest } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
       : undefined;
+  const resolvedWorktree =
+    worktree ?? (gitBranch !== undefined ? { branch: gitBranch } : undefined);
   return {
     ...rest,
     ...(opened !== undefined ? { agentSessionId: opened } : undefined),
+    ...(resolvedWorktree !== undefined ? { worktree: resolvedWorktree } : undefined),
   };
 };
 
@@ -40,7 +47,10 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
     ? { agentSessionId: metadata.agentSessionId }
     : undefined),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
-  ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
+  ...(metadata.worktree !== undefined ? { worktree: metadata.worktree } : undefined),
+  ...(metadata.pullRequestRefs !== undefined && metadata.pullRequestRefs.length > 0
+    ? { pullRequestRefs: metadata.pullRequestRefs }
+    : undefined),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
@@ -54,9 +64,8 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
 /**
  * Data access for `storage/sessions/<projectId>/<sessionId>.json`. The filename
  * mirrors {@link Session.sessionId}, which the body also carries. No business
- * rules — orchestration (id generation, projectId resolution) lives in
- * {@link PiAgentSessionService}, whose internal collaborator this is; it
- * has no Context tag of its own.
+ * rules — orchestration (id generation, projectId resolution) lives in the
+ * session domain services. Same role as {@link ProjectRepository}.
  */
 export type PiAgentSessionRepositoryShape = {
   /** All session metadata under a project; empty if the project dir is absent. */
@@ -76,6 +85,11 @@ export type PiAgentSessionRepositoryShape = {
   /** Idempotent: removing an absent file succeeds. */
   readonly remove: (projectId: string, sessionId: string) => Effect.Effect<void, StoreWriteError>;
 };
+
+export class PiAgentSessionRepository extends Context.Service<
+  PiAgentSessionRepository,
+  PiAgentSessionRepositoryShape
+>()("PiAgentSessionRepository") {}
 
 /**
  * Ids reach this repository from RPC input, so they must be sanitized before
@@ -146,3 +160,15 @@ export const makePiAgentSessionRepository = (sessionsDir: string) =>
           : sessions.remove(entryId(projectId, sessionId)).pipe(Effect.mapError(asWriteError)),
     } satisfies PiAgentSessionRepositoryShape;
   });
+
+export const PiAgentSessionRepositoryLayer: Layer.Layer<
+  PiAgentSessionRepository,
+  never,
+  Paths | FileSystem.FileSystem
+> = Layer.effect(
+  PiAgentSessionRepository,
+  Effect.gen(function* () {
+    const paths = yield* Paths;
+    return yield* makePiAgentSessionRepository(paths.sessionsDir);
+  }),
+);

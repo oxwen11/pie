@@ -1,16 +1,17 @@
-import type { SessionRef } from "@getpie/contract";
+import type { SessionPendingPrompt, SessionRef } from "@getpie/contract";
 import { createContext, useContext } from "react";
 import type { StoreApi } from "zustand/vanilla";
 
-import type { AgentRequest, AgentResponse } from "@/features/chat/runtime/agent-requests";
+import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
 import type { ChatStoreState } from "@/features/chat/runtime/chat-state";
 
 export type ChatSessionValue = {
   sessionRef: SessionRef;
   sessionId: string;
   store: StoreApi<ChatStoreState>;
-  prompt: (text: string) => void;
+  prompt: (text: string, delivery?: "steer" | "followUp") => void;
   interrupt: () => Promise<void>;
+  replaceQueue: (pending: SessionPendingPrompt) => void;
   respondToRequest: (requestId: string, response: AgentResponse) => void;
   turnInProgress: boolean;
 };
@@ -22,5 +23,3 @@ export function useChatSession(): ChatSessionValue {
   if (!ctx) throw new Error("useChatSession must be used within <ChatSessionProvider>");
   return ctx;
 }
-
-export type { AgentRequest };

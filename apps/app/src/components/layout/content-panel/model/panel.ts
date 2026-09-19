@@ -33,7 +33,10 @@ export interface PanelHandle<Payload> {
    * in `create` to reveal a line, steal focus, or refetch.
    */
   reopen(payload: Payload): void;
-  /** Called once, when the panel is really closed. The default handle has none. */
+  /**
+   * Called once on a live instance when the panel is really closed. Never-
+   * activated tabs never get this — use `onClose` for payload-only cleanup.
+   */
   dispose?(): void;
 }
 
@@ -79,6 +82,11 @@ export interface PanelDefinition<
    * handle, so `handle` is here only to be captured, never to be copied.
    */
   readonly create?: (handle: PanelHandle<Payload>) => Extra;
+  /**
+   * Close, replace, and forget call this with the persisted payload even if
+   * the instance was never materialized. Live resources still go on `dispose`.
+   */
+  readonly onClose?: (sessionRef: SessionRef, payload: Payload) => void;
   /** The host never reads this; the React layer narrows it to `PanelView`. */
   readonly view: View;
 }
@@ -136,12 +144,16 @@ export function definePanelFamily<
   return definition;
 }
 
+function isRecord(raw: unknown): raw is Record<string, unknown> {
+  return typeof raw === "object" && raw !== null;
+}
+
 /**
  * The half of every `parse` that is the same everywhere: narrow a value read
  * back from storage to something whose fields can be checked.
  */
 export const asRecord = (raw: unknown): Record<string, unknown> | null =>
-  typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : null;
+  isRecord(raw) ? raw : null;
 
 /** Singleton and family collapse to this one line. */
 export function panelId<Payload>(

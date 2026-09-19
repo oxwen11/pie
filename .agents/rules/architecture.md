@@ -13,6 +13,35 @@
 | `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
 | `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
 | `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
+| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run's native env). Not the product CLI. |
+
+`tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
+
+## Host-write design gate
+
+Treat every design that adds or changes writes on the user's host as a
+Developer decision, including application data, browser storage/cookies,
+Electron profiles/caches, logs and lifecycle files, worktrees/repository state,
+and writes delegated to child processes or agent tools.
+
+Before proposing the design or implementation plan, read
+`docs/architecture/host-persistence.md` and confirm all of these with the
+Developer:
+
+1. the owner, exact location, scope, and override rules;
+2. the persisted data structure, sensitivity, permissions, atomicity, and
+   concurrency model;
+3. how the structure can be extended while preserving backward and rollback
+   compatibility;
+4. migration/adoption behavior, corrupt/newer-data behavior, retention,
+   cleanup, and uninstall semantics.
+
+Do not choose these silently or defer them to implementation. A change to any
+host write must update the inventory document in the same slice.
+
+Repo skills live in `.agents/skills/<name>`. `.cursor/skills`, `.claude/skills`,
+and `.codex/skills` hold relative symlinks to that tree so each client discovers
+the same files. Do not copy a skill into `.cursor/skills` as a second original.
 
 ## Boundaries
 
@@ -28,7 +57,11 @@
   live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
   and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
   translation, metadata persistence, wire vocabulary validation, collection
-  events). `session.ts`, `session-fold.ts` and `session-repository.ts` are
+  events). Persistable session state is `PiAgentSessionRepository` (disk) plus
+  `SessionMetadata` (record CRUD) and `SessionMetadataLocks` (per-ref
+  semaphore); those three are Context services like `ProjectRepository`.
+  Orchestration stays on `PiAgentSessionService` — not a `SessionLifecycle` /
+  `SessionTurn` split. `session.ts` and `session-fold.ts` stay
   private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
   optionally owns a runtime: observing a session costs no process until a prompt
   or history read acquires one. The RPC router contributes only `projectId →
@@ -50,10 +83,10 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   `src/preload/`). Read it before touching `apps/desktop/src`.
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
-  persistent roots: `resolvePieHome` for Projects and Sessions,
-  `resolveDaemonDirectory` for lifecycle state, and `logsDirectory` for
-  `$PIE_HOME/logs`. The daemon directory holds only `daemon.pid`, `.lock`, and
-  `.stopped`. `Paths` includes `logsDir`; directory `0700` and files `0600` are
+  persistent roots: `resolvePieHome` for server data, `resolveDaemonDirectory`
+  for `$PIE_HOME/daemon` lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`.
+  The daemon directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
+  `Paths` includes `logsDir`; directory `0700` and files `0600` are
   part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
   The process-owned observability Layer appends to `logsDir/pie.log` and
   requires FileSystem, Crypto, and Paths — bound at `runServe` / `NodeServices.layer`.
@@ -62,7 +95,9 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   the process context captured after that provide; `mergeAll` leaves fibers forked
   during `AgentRuntimeLayer` construction on Effect's default logger. Tests that
   do not write a log file provide `Observability.discard` so `Effect.log*` does
-  not leak to stdout. The single-daemon invariant is keyed on the daemon
-  directory, so every front door resolves it there and passes it down —
+  not leak to stdout. The single-daemon invariant is keyed on `$PIE_HOME/daemon`,
+  so every front door resolves the home and derives the directory —
   `packages/server/src/daemon/paths.ts` names files inside a directory it is
-  handed and deliberately has no default of its own.
+  handed and deliberately has no default of its own. Tests and verify runs set
+  their own `$PIE_HOME`; they must not use `~/.pie`, `~/.pie_dev`, or
+  `~/.pie_<branch>`.

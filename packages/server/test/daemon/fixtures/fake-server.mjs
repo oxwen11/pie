@@ -6,7 +6,11 @@ const port = Number(process.env.PIE_PORT ?? 0);
 const token = process.env.PIE_AUTH_TOKEN;
 const shutdownDelayMs = Number(process.env.PIE_TEST_SHUTDOWN_DELAY_MS ?? 0);
 const startupDelayMs = Number(process.env.PIE_TEST_STARTUP_DELAY_MS ?? 0);
-if (shutdownDelayMs > 0) process.on("SIGTERM", () => {});
+if (shutdownDelayMs > 0) {
+  process.on("SIGTERM", () => {
+    /* hold the process so the launcher can observe a delayed shutdown */
+  });
+}
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {

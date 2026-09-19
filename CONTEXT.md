@@ -17,14 +17,18 @@ The Pi-native session identity held in the session's metadata. Internal plumbing
 _Avoid_: harnessSessionId (removed — no migration), native id
 
 **Attach**:
-A client connecting to a session's live event stream — `agent.session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `agent.session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts nothing); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
-_Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`agent.session.prepare` starts nothing — only a prompt does)
+A client connecting to a session's live event stream — `agent.session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `agent.session.prepare` (validate the ref, backfill cwd, restore a missing worktree checkout, check whether Pi still knows the native session — starts no Pi process); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
+_Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`agent.session.prepare` starts no Pi process — only a prompt does)
 
 **Session metadata**:
-The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), and whether the session is archived. Distinct from conversation history, which stays in Pi's native storage.
+The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), whether the session is archived, and for a worktree session `worktree: { branch }` plus the checkout `cwd`. Distinct from conversation history, which stays in Pi's native storage.
+
+**Schedule**:
+An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When a Schedule is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. The session file is an ordinary session record — origin is not stored there. The schedule keeps the session ids it created (`lastSessionId`, `session.sessionId` when bound, `runs[].sessionId`). Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Optional `trigger` (`local` default, `github` or later `hub` when a Hub relationship exists) chooses who may fire the row; Hub must not copy this store. Optional `expiresAt`, `maxRuns` (pauses with `max_runs` after that many fired runs; `firedCount` is the durable counter, `missed`/`skipped` do not count), `session` (`{ policy: "isolated" }` | `{ policy: "owned", sessionId? }` | `{ policy: "existing", sessionId }`), and a failure circuit after three consecutive settle failures. Create may pass `runNow` to fire immediately; it is not stored. Operator signal is structured `event=schedule.*` lines in `$PIE_HOME/logs/pie.log`; the Schedule page keeps the last 20 runs and refreshes while that route is open. There is no EventBus collection event for schedules in v1.
+_Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, cron (as the domain noun — it is one spec kind), automation / automations (the old domain name), outputMode / sessionMode / independent / merged / session.type (session policy is `isolated` | `owned` | `existing`), a second schedule store on Hub. The product and code noun is **Schedule** (sidebar: **Scheduled**).
 
 **Workspace path**:
-The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. The session layer only deals in `cwd`; worktree creation runs inside create (not a git RPC, not the first prompt) and is never stored as a pending flag. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
+The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. Worktree creation runs inside create (not a git RPC) and is never stored as a pending flag. A worktree session stores `worktree: { branch }` so the session can still be opened after that checkout is gone; `prepare` and prompt do not re-create it or require `HEAD` to match. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
 _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
@@ -41,7 +45,14 @@ The sole owner of live session state: the table of sessions keyed by ref (each `
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
-`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying `pi --mode rpc` child.
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
+
+**pie-pi-process**:
+Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
+
+**Daemon**:
+Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
+_Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
@@ -85,3 +96,21 @@ _Avoid_: panel object, panel controller
 **Tab strip**:
 The host's row of open panels — the only place a tab is drawn. A panel that wants several of something opens several panels rather than growing tabs of its own.
 _Avoid_: inner tabs, sub-tabs, splits
+
+## Hub Domain
+
+**Hub**:
+A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives external events and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. V1 GitHub is a Schedule **trigger** (`trigger.kind: "github"`), not an ad-hoc session with no Schedule row. Design: `docs/design/pie-hub.md`.
+_Avoid_: treating Hub as a second daemon; `pie hub serve`; exposing the local serve/UI process as the webhook target; a Hub-owned Schedule store; creating Hub sessions that bypass Schedule; `.pie/workflows` / YAML orchestration / multi-step Hub routing (closed — later sources are more Schedule `trigger` kinds); treating `hub.hello` as once-at-connect (Schedule create/update/delete of Hub-facing rows re-sends the full snapshot)
+
+**Relationship**:
+The daemon's long-lived Hub identity after `pie hub connect`. The daemon generates and stores the credential; the human CLI login is a different secret used only to mint a one-time enrollment token.
+_Avoid_: reusing the local UI bearer token or WebSocket ticket on the Hub socket
+
+**Hub execution**:
+Hub-minted work identified by `executionId`. The daemon fires the matching Schedule (`ScheduleService.fire`) and maps `executionId → SessionRef`. Idempotent on retry. Offline daemon is `daemon_not_connected` — V1 does not queue.
+_Avoid_: using `executionId` as a SessionRef or wire session identity; calling Hub work a harness job; creating a session that is not a Schedule fire
+
+**Session source**:
+Optional floor field on session metadata, `{ kind: "hub", executionId }`, written only when Hub created the session. Absence means a human-created session. The channel (`github`, later others) lives on the create frame's `trigger`, not on `kind`.
+_Avoid_: storing GitHub issue numbers on the session record; overlaying `source` from Pi

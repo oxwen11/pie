@@ -126,7 +126,7 @@ function SessionMarkdownImage({
     meta: { errorMode: "inline" },
   });
 
-  if (turnInProgress || imageUrl.isPending || recovering) {
+  if ((turnInProgress && imageUrl.data === undefined) || imageUrl.isPending || recovering) {
     return (
       <span aria-label={alt ?? "Image"} className="text-muted-foreground text-xs" role="img">
         Loading image…
@@ -155,6 +155,7 @@ function SessionMarkdownImage({
           .refetch()
           .then((result) => {
             if (result.isError) setUnavailable(true);
+            return undefined;
           })
           .finally(() => setRecovering(false));
       }}

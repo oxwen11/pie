@@ -5,7 +5,7 @@ import path from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Stream } from "effect";
+import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 
 import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
@@ -25,11 +25,23 @@ const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", pr
 const upd = (ev) => send({ type: "message_update", usage: assistant().usage, assistantMessageEvent: ev });
 const settle = (last) => { send({ type: "agent_end", messages: [last || assistant()], willRetry: false }); send({ type: "agent_settled" }); };
 let holding = false;
+let steering = [];
+let followUp = [];
 let currentModel = { provider: "p", modelId: "m1", name: "Model 1" };
 const availableModels = [
   { id: "m1", name: "Model 1", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
   { id: "m2", name: "Model 2", api: "a", provider: "p", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 },
 ];
+const providerFlag = process.argv.indexOf("--provider");
+const modelFlag = process.argv.indexOf("--model");
+if (providerFlag !== -1 && modelFlag !== -1) {
+  const provider = process.argv[providerFlag + 1];
+  const modelId = process.argv[modelFlag + 1];
+  const named = availableModels.find((m) => m.provider === provider && m.id === modelId);
+  currentModel = named
+    ? { provider: named.provider, modelId: named.id, name: named.name }
+    : { provider, modelId, name: modelId };
+}
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId, model: { id: currentModel.modelId, name: currentModel.name, api: "a", provider: currentModel.provider, baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 } } }); return; }
@@ -37,8 +49,12 @@ rl.on("line", (line) => {
   if (msg.type === "set_model") {
     const next = availableModels.find((m) => m.provider === msg.provider && m.id === msg.modelId);
     if (!next) { send({ id: msg.id, type: "response", command: "set_model", success: false, error: "unknown model" }); return; }
-    currentModel = { provider: next.provider, modelId: next.id, name: next.name };
-    send({ id: msg.id, type: "response", command: "set_model", success: true, data: next });
+    const apply = () => {
+      currentModel = { provider: next.provider, modelId: next.id, name: next.name };
+      send({ id: msg.id, type: "response", command: "set_model", success: true, data: next });
+    };
+    if (next.id === "m2") setTimeout(apply, 50);
+    else apply();
     return;
   }
   if (msg.type === "extension_ui_response") {
@@ -51,8 +67,23 @@ rl.on("line", (line) => {
     return;
   }
   if (msg.type === "steer") {
+    steering.push(msg.message);
     send({ id: msg.id, type: "response", command: "steer", success: true });
+    send({ type: "queue_update", steering, followUp });
     if (holding) { holding = false; settle(); }
+    return;
+  }
+  if (msg.type === "follow_up") {
+    followUp.push(msg.message);
+    send({ id: msg.id, type: "response", command: "follow_up", success: true });
+    send({ type: "queue_update", steering, followUp });
+    return;
+  }
+  if (msg.type === "clear_queue") {
+    steering = [];
+    followUp = [];
+    send({ id: msg.id, type: "response", command: "clear_queue", success: true, data: { steering, followUp } });
+    send({ type: "queue_update", steering, followUp });
     return;
   }
   if (msg.type === "abort") {
@@ -63,9 +94,41 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   const text = msg.message;
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  if (holding && !msg.streamingBehavior) {
+    send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
+    return;
+  }
+  const started = !holding;
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started } });
+  if (!started) {
+    const queue = msg.streamingBehavior === "followUp" ? followUp : steering;
+    queue.push(text);
+    send({ type: "queue_update", steering, followUp });
+    if (msg.streamingBehavior === "followUp") return;
+
+    queue.splice(queue.indexOf(text), 1);
+    send({ type: "queue_update", steering, followUp });
+    send({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } });
+    if (text === "split") {
+      send({ type: "message_start", message: assistant() });
+      upd({ type: "text_start", contentIndex: 0 });
+      upd({ type: "text_delta", contentIndex: 0, delta: "after split" });
+      upd({ type: "text_end", contentIndex: 0, content: "after split" });
+      return;
+    }
+    holding = false;
+    settle();
+    return;
+  }
   send({ type: "agent_start" });
-  if (text === "hold") { holding = true; return; }
+  if (text === "hold") {
+    holding = true;
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "before split" });
+    upd({ type: "text_end", contentIndex: 0, content: "before split" });
+    return;
+  }
   if (text === "confirm") { holding = true; send({ type: "extension_ui_request", id: "ui1", method: "confirm", title: "Run?", message: "Run the tool?" }); return; }
   if (text === "tool") {
     send({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "ls" } });
@@ -84,7 +147,7 @@ rl.on("line", (line) => {
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });
-  upd({ type: "text_delta", contentIndex: 0, delta: "pong" });
+  upd({ type: "text_delta", contentIndex: 0, delta: text === "which model" ? currentModel.modelId : "pong" });
   upd({ type: "text_end", contentIndex: 0, content: "pong" });
   send({ type: "message_end", message: assistant() });
   settle();
@@ -97,6 +160,10 @@ function makeFake(): string {
   fs.writeFileSync(file, FAKE);
   fs.chmodSync(file, 0o755);
   return file;
+}
+
+function fakeExecutable() {
+  return { command: makeFake(), prefixArgs: [] as const };
 }
 
 layer(NodeServices.layer)("PiAgent", (it) => {
@@ -232,12 +299,165 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const first = yield* agent.session.prompt({ sessionId, text: "hold" });
       assert.equal(first.started, true);
 
-      const second = yield* agent.session.prompt({ sessionId, text: "also do this" });
+      const second = yield* agent.session.prompt({
+        sessionId,
+        text: "also do this",
+        delivery: "steer",
+      });
       assert.equal(second.started, false);
       assert.equal(second.turnId, first.turnId);
 
       const chunks = yield* Stream.runCollect(first.output);
-      assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+      assert.deepEqual(
+        Array.from(chunks, (chunk) => chunk.type),
+        ["start", "text-start", "text-delta", "text-end", "finish", "session.prompt.submitted"],
+      );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("keeps a steered turn active across a model switch", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold" });
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
+      const queueUpdated = yield* Effect.forkChild(
+        Stream.runHead(agent.session.queueUpdates(sessionId)),
+      );
+
+      const split = yield* agent.session.prompt({ sessionId, text: "split", delivery: "steer" });
+      assert.equal(split.started, false);
+      yield* Fiber.join(queueUpdated);
+      yield* Effect.yieldNow;
+      yield* agent.session.setModel(sessionId, { provider: "p", modelId: "m2" });
+
+      const steered = yield* agent.session.prompt({
+        sessionId,
+        text: "replace this",
+        delivery: "steer",
+      });
+      assert.equal(steered.started, false);
+      assert.equal(steered.turnId, first.turnId);
+
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.equal(chunks.filter((chunk) => chunk.type === "start").length, 2);
+      assert.equal(chunks.filter((chunk) => chunk.type === "finish").length, 2);
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("ends one runtime turn after all steered message segments", () =>
+    Effect.gen(function* () {
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      let finishCount = 0;
+      const collected = yield* Effect.forkChild(
+        Stream.runCollect(
+          session.events.pipe(
+            Stream.takeUntil((event) => {
+              if (event.body.type === "finish") finishCount += 1;
+              return event.body.type === "session.turn.ended" && finishCount === 2;
+            }),
+          ),
+        ),
+      );
+
+      yield* session.prompt({ parts: [{ type: "text", text: "hold" }] });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "split" }],
+        delivery: "steer",
+      });
+      yield* session.setModel({ provider: "p", modelId: "m2" });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "replace this" }],
+        delivery: "steer",
+      });
+
+      const bodies = Array.from(yield* Fiber.join(collected), (event) => event.body);
+      const types = bodies.map((body) => body.type);
+      assert.equal(types.filter((type) => type === "finish").length, 2);
+      assert.equal(types.filter((type) => type === "session.turn.ended").length, 1);
+      assert.deepEqual(
+        bodies.filter((body) => body.type === "session.prompt.submitted").map((body) => body.parts),
+        [[{ type: "text", text: "split" }], [{ type: "text", text: "replace this" }]],
+      );
+      yield* session.close;
+    }),
+  );
+
+  it.effect("queues a follow-up on an active turn instead of starting a new one", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const first = yield* agent.session.prompt({ sessionId, text: "hold" });
+      assert.equal(first.started, true);
+      const collected = yield* Effect.forkChild(Stream.runCollect(first.output));
+      const queued = yield* Effect.forkChild(Stream.runHead(agent.session.queueUpdates(sessionId)));
+
+      const second = yield* agent.session.prompt({
+        sessionId,
+        text: "later",
+        delivery: "followUp",
+      });
+      assert.equal(second.started, false);
+      assert.equal(second.turnId, first.turnId);
+      assert.deepEqual(Option.getOrThrow(yield* Fiber.join(queued)), {
+        steering: [],
+        followUp: ["later"],
+      });
+
+      yield* agent.session.interrupt(sessionId);
+      const chunks = Array.from(yield* Fiber.join(collected));
+      assert.equal(chunks.at(-1)?.type, "finish");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("PiAgent projects queue_update as session.queue.updated", () =>
+    Effect.gen(function* () {
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const queued = yield* Effect.forkChild(
+        Stream.runHead(
+          session.events.pipe(
+            Stream.filter((event) => event.body.type === "session.queue.updated"),
+          ),
+        ),
+      );
+      yield* session.prompt({ parts: [{ type: "text", text: "hold" }] });
+      yield* session.prompt({
+        parts: [{ type: "text", text: "later" }],
+        delivery: "followUp",
+      });
+      const event = Option.getOrUndefined(yield* Fiber.join(queued));
+      assert.ok(event);
+      assert.equal(event.body.type, "session.queue.updated");
+      if (event.body.type === "session.queue.updated") {
+        assert.deepEqual(event.body.followUp, ["later"]);
+      }
+      yield* session.close;
+    }),
+  );
+
+  it.effect("rewrites the native queue via replaceQueue", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      yield* agent.session.prompt({ sessionId, text: "hold" });
+      const collected = yield* Effect.forkChild(
+        Stream.runCollect(Stream.take(agent.session.queueUpdates(sessionId), 4)),
+      );
+      yield* agent.session.prompt({ sessionId, text: "one", delivery: "followUp" });
+      yield* agent.session.prompt({ sessionId, text: "two", delivery: "followUp" });
+      yield* agent.session.replaceQueue(sessionId, { steering: [], followUp: ["kept"] });
+      const updates = Array.from(yield* Fiber.join(collected));
+      assert.deepEqual(updates.at(-1), { steering: [], followUp: ["kept"] });
+      assert.ok(
+        updates.some((queue) => queue.steering.length === 0 && queue.followUp.length === 0),
+      );
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -330,10 +550,51 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("PiAgent interrupt ends the runtime turn as canceled", () =>
+  it.effect("orders a prompt after an in-flight model switch", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+
+      const switching = yield* agent.session
+        .setModel(sessionId, { provider: "p", modelId: "m2" })
+        .pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      const prompting = yield* agent.session
+        .prompt({ sessionId, text: "which model" })
+        .pipe(Effect.forkChild);
+      yield* Fiber.join(switching);
+      const prompt = yield* Fiber.join(prompting);
+      const chunks = Array.from(yield* Stream.runCollect(prompt.output));
+
+      assert.ok(
+        chunks.some((chunk) => chunk.type === "text-delta" && chunk.delta === "m2"),
+        "the prompt ran before the requested model switch completed",
+      );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("create starts Pi on the requested model", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({
+        cwd: "/tmp",
+        provider: "p",
+        modelId: "m2",
+      });
+
+      const state = yield* agent.session.getModelState(sessionId);
+      assert.deepEqual(state, { provider: "p", modelId: "m2", name: "Model 2" });
+
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("PiAgent interrupt ends the runtime turn as canceled", () =>
+    Effect.gen(function* () {
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -357,8 +618,9 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("PiAgent create exposes prompt output on the PiAgentRuntime event stream", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -396,8 +658,9 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 
   it.effect("reports a child crash while the adapter session is idle", () =>
     Effect.gen(function* () {
-      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const session = yield* makePiAgent(agent).create({ cwd: "/tmp" });
+      const executable = fakeExecutable();
+      const agent = yield* makePiProcess({ executable });
+      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

@@ -45,3 +45,10 @@ export const catchWorkspaceResolveErrors = <
         }),
       ),
   });
+
+export const resolveWorkspaceCwdOrFail = <
+  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
+>(
+  input: WorkspaceQuery,
+  errors: E,
+) => resolveWorkspaceCwd(input).pipe(catchWorkspaceResolveErrors(errors));

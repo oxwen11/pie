@@ -1,140 +1,17 @@
-import type {
-  AgentRequest,
-  PromptPart,
-  SessionMessageChunkEvent,
-  SessionPhase,
-  SessionRuntimeSnapshot,
-  SessionScopedEvent,
-  SessionScopedEventBody,
-} from "@getpie/contract";
-import type { UIMessage, UIMessageChunk } from "ai";
+import type { AgentRequest, PieUIMessageChunk } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
-import type { AgentResponse } from "./agent-requests";
-import { Chat } from "./chat";
-import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-port";
-
-const ref = {
-  projectId: "project-1",
-  sessionId: "session-1",
-} as const;
-
-// Chunk folds run on microtasks (ReadableStream consumers): settle before
-// asserting on folded messages.
-const settle = async () => {
-  for (let i = 0; i < 3; i += 1) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-  }
-};
-
-class FakeTransport implements ChatSessionTransport {
-  onEvent: ((event: ChatTransportEvent) => void) | null = null;
-  disposed = 0;
-  history: readonly UIMessage[] | null = null;
-  // When set, getMessages blocks on it — for tests that race the history
-  // floor against live traffic.
-  historyGate: Promise<void> | null = null;
-  getMessagesCalls = 0;
-  promptCalls: Array<{
-    messageId: string;
-    parts: ReadonlyArray<PromptPart>;
-  }> = [];
-  promptError: Error | null = null;
-  // When set, prompt blocks on it — for tests where the RPC is still in flight
-  // (a dropped socket queues it until the link reconnects).
-  promptGate: Promise<void> | null = null;
-  responded: Array<{ requestId: string; response: AgentResponse }> = [];
-  interruptCalls = 0;
-
-  subscribe(onEvent: (event: ChatTransportEvent) => void): () => void {
-    this.onEvent = onEvent;
-    return () => {
-      this.disposed += 1;
-    };
-  }
-  prompt = async (input: { messageId: string; parts: ReadonlyArray<PromptPart> }) => {
-    this.promptCalls.push(input);
-    if (this.promptGate) await this.promptGate;
-    if (this.promptError) throw this.promptError;
-    return { turnId: "turn-receipt" };
-  };
-  getMessages = async () => {
-    this.getMessagesCalls += 1;
-    if (this.historyGate) await this.historyGate;
-    return this.history;
-  };
-  respondToAgentRequest = async (requestId: string, response: AgentResponse) => {
-    this.responded.push({ requestId, response });
-  };
-  interrupt = async () => {
-    this.interruptCalls += 1;
-  };
-}
-
-const makeChat = (options?: { onTerminated?: () => void }) => {
-  const transport = new FakeTransport();
-  const chat = new Chat({ sessionRef: ref, transport, onTerminated: options?.onTerminated });
-  const emit = (event: ChatTransportEvent) => transport.onEvent?.(event);
-  const attach = async (snapshot: Partial<SessionRuntimeSnapshot>) => {
-    emit({
-      type: "attached",
-      snapshot: {
-        ref,
-        status: { phase: "idle" },
-        activeTurn: null,
-        activePrompt: null,
-        pendingRequests: [],
-        cursor: 0,
-        ...snapshot,
-      },
-    });
-    await settle();
-  };
-  const live = (seq: number, body: SessionScopedEventBody & { phase?: SessionPhase }) =>
-    emit({ seq, ref, ...body } as SessionScopedEvent);
-  return { chat, transport, attach, live, emit };
-};
-
-const chunkEvent = (seq: number, turnId: string, chunk: UIMessageChunk): SessionMessageChunkEvent =>
-  ({ seq, ref, type: "session.message.chunk", turnId, chunk }) as SessionMessageChunkEvent;
-
-type ActiveTurnInit = Partial<NonNullable<SessionRuntimeSnapshot["activeTurn"]>> & {
-  turnId: string;
-  chunks: SessionMessageChunkEvent[];
-};
-
-const activeTurn = (init: ActiveTurnInit): NonNullable<SessionRuntimeSnapshot["activeTurn"]> => ({
-  messageId: null,
-  complete: false,
-  truncated: false,
-  ...init,
-});
-
-const textChunks = (id: string, text: string): UIMessageChunk[] => [
-  { type: "text-start", id },
-  { type: "text-delta", id, delta: text },
-  { type: "text-end", id },
-];
-
-const userMessage = (id: string, text: string): UIMessage => ({
-  id,
-  role: "user",
-  parts: [{ type: "text", text }],
-});
-
-const assistantText = (message: UIMessage): string =>
-  message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
-
-const toolRequest: AgentRequest = {
-  type: "tool",
-  id: "request-1",
-  toolName: "Bash",
-  input: { command: "pwd" },
-  actions: [{ id: "allow", label: "Allow", behavior: "allow" }],
-  native: null,
-};
+import {
+  activeTurn,
+  assistantText,
+  chunkEvent,
+  defined,
+  makeChat,
+  settle,
+  textChunks,
+  toolRequest,
+  userMessage,
+} from "./chat-test-helpers";
 
 describe("Chat hydration", () => {
   // Reattaching across a server restart: the session's seq counter is rebuilt
@@ -151,12 +28,12 @@ describe("Chat hydration", () => {
     await attach({ cursor: 0 });
 
     const [start, delta, end] = textChunks("t", "after the restart");
-    for (const [seq, chunk] of [start!, delta!, end!].entries()) {
+    for (const [seq, chunk] of [start, delta, end].entries()) {
       live(seq + 1, { type: "session.message.chunk", turnId: "turn-1", chunk });
     }
     await settle();
 
-    const last = chat.store.getState().messages.at(-1)!;
+    const last = defined(chat.store.getState().messages.at(-1));
     expect(last.role).toBe("assistant");
     expect(assistantText(last)).toBe("after the restart");
   });
@@ -242,7 +119,7 @@ describe("Chat hydration", () => {
       status: { phase: "running" },
       activeTurn: activeTurn({
         turnId: "turn-1",
-        chunks: [chunkEvent(1, "turn-1", start!), chunkEvent(2, "turn-1", delta!)],
+        chunks: [chunkEvent(1, "turn-1", start), chunkEvent(2, "turn-1", delta)],
         complete: false,
         truncated: false,
       }),
@@ -256,7 +133,7 @@ describe("Chat hydration", () => {
     await settle();
     const messages = chat.store.getState().messages;
     expect(messages.map((message) => message.role)).toEqual(["user", "assistant"]);
-    expect(assistantText(messages[1]!)).toBe("buffered");
+    expect(assistantText(defined(messages[1]))).toBe("buffered");
     expect(chat.store.getState().status).toBe("streaming");
   });
 
@@ -267,21 +144,21 @@ describe("Chat hydration", () => {
       status: { phase: "running" },
       activeTurn: activeTurn({
         turnId: "turn-1",
-        chunks: [chunkEvent(1, "turn-1", start!), chunkEvent(2, "turn-1", delta!)],
+        chunks: [chunkEvent(1, "turn-1", start), chunkEvent(2, "turn-1", delta)],
         complete: false,
         truncated: false,
       }),
       cursor: 2,
     });
     // The same delta redelivered at its already-folded seq must be dropped.
-    live(2, { type: "session.message.chunk", turnId: "turn-1", chunk: delta! });
+    live(2, { type: "session.message.chunk", turnId: "turn-1", chunk: delta });
     live(3, {
       type: "session.message.chunk",
       turnId: "turn-1",
       chunk: { type: "text-end", id: "t" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = defined(chat.store.getState().messages.at(-1));
     expect(assistantText(assistant)).toBe("once");
   });
 
@@ -293,9 +170,9 @@ describe("Chat hydration", () => {
       activeTurn: activeTurn({
         turnId: "turn-old",
         chunks: [
-          chunkEvent(1, "turn-old", start!),
-          chunkEvent(2, "turn-old", delta!),
-          chunkEvent(3, "turn-old", end!),
+          chunkEvent(1, "turn-old", start),
+          chunkEvent(2, "turn-old", delta),
+          chunkEvent(3, "turn-old", end),
         ],
         complete: true,
         truncated: false,
@@ -346,7 +223,7 @@ describe("Chat hydration", () => {
     await attach({
       status: { phase: "running" },
       activePrompt: { messageId: "m2", parts: [{ type: "text", text: "second" }], seq: 10 },
-      activeTurn: activeTurn({ turnId: "turn-2", chunks: [chunkEvent(12, "turn-2", start!)] }),
+      activeTurn: activeTurn({ turnId: "turn-2", chunks: [chunkEvent(12, "turn-2", start)] }),
       cursor: 12,
     });
     await settle();
@@ -372,15 +249,15 @@ describe("Chat hydration", () => {
       activePrompt: { messageId: "prompt-1", parts: [{ type: "text", text: "run it" }], seq: 1 },
       activeTurn: activeTurn({
         turnId: "turn-1",
-        chunks: [chunkEvent(2, "turn-1", start!)],
+        chunks: [chunkEvent(2, "turn-1", start)],
         complete: false,
         truncated: false,
       }),
       cursor: 2,
     });
     const messages = chat.store.getState().messages;
-    expect(messages[0]!.role).toBe("user");
-    expect(messages[0]!.id).toBe("prompt-1");
+    expect(defined(messages[0]).role).toBe("user");
+    expect(defined(messages[0]).id).toBe("prompt-1");
   });
 });
 
@@ -455,7 +332,7 @@ describe("Chat prompting", () => {
     await attach({});
     await chat.prompt("hello there");
     expect(transport.promptCalls).toHaveLength(1);
-    const { messageId } = transport.promptCalls[0]!;
+    const { messageId } = defined(transport.promptCalls[0]);
     expect(chat.store.getState().status).toBe("submitted");
     // The echo carries the pre-turn idle phase — it must not clear the
     // sender's optimistic "submitted".
@@ -482,14 +359,14 @@ describe("Chat prompting", () => {
     });
     const messages = chat.store.getState().messages;
     expect(messages).toHaveLength(1);
-    expect(messages[0]!.id).toBe("other-1");
+    expect(defined(messages[0]).id).toBe("other-1");
   });
 
   it("drops the phantom message when the server rejects a broadcast prompt", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     await chat.prompt("loser");
-    const { messageId } = transport.promptCalls[0]!;
+    const { messageId } = defined(transport.promptCalls[0]);
     live(1, {
       type: "session.prompt.submitted",
       messageId,
@@ -507,7 +384,7 @@ describe("Chat prompting", () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     await chat.prompt("go");
-    const { messageId } = transport.promptCalls[0]!;
+    const { messageId } = defined(transport.promptCalls[0]);
     live(1, {
       type: "session.prompt.submitted",
       messageId,
@@ -522,7 +399,7 @@ describe("Chat prompting", () => {
     await settle();
     const messages = chat.store.getState().messages;
     expect(messages).toHaveLength(2);
-    expect(assistantText(messages[1]!)).toBe("reply");
+    expect(assistantText(defined(messages[1]))).toBe("reply");
     expect(chat.store.getState().status).toBe("ready");
   });
 });
@@ -747,7 +624,7 @@ describe("Chat stream errors", () => {
     transport.promptError = promptError;
 
     await expect(chat.prompt("go")).rejects.toThrow(promptError);
-    const { messageId, parts } = transport.promptCalls[0]!;
+    const { messageId, parts } = defined(transport.promptCalls[0]);
     expect(chat.store.getState().error?.message).toBe(promptError.message);
 
     live(1, { type: "session.prompt.submitted", messageId, parts, phase: "idle" });
@@ -857,7 +734,7 @@ describe("Chat truncated buffers", () => {
   it("fresh joiner renders the sanitized tail live and backfills at turn end", async () => {
     const { chat, transport, attach, live } = makeChat();
     // Orphan continuation from the evicted head, then a clean part.
-    const orphan: UIMessageChunk = { type: "text-delta", id: "lost", delta: "GARBAGE" };
+    const orphan: PieUIMessageChunk = { type: "text-delta", id: "lost", delta: "GARBAGE" };
     const [start, delta] = textChunks("kept", "tail");
     await attach({
       status: { phase: "running" },
@@ -865,8 +742,8 @@ describe("Chat truncated buffers", () => {
         turnId: "turn-1",
         chunks: [
           chunkEvent(50, "turn-1", orphan),
-          chunkEvent(51, "turn-1", start!),
-          chunkEvent(52, "turn-1", delta!),
+          chunkEvent(51, "turn-1", start),
+          chunkEvent(52, "turn-1", delta),
         ],
         complete: false,
         truncated: true,
@@ -879,7 +756,7 @@ describe("Chat truncated buffers", () => {
       chunk: { type: "text-end", id: "kept" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = defined(chat.store.getState().messages.at(-1));
     expect(assistantText(assistant)).toBe("tail");
     // Turn end: the full turn (including the evicted head) comes back from
     // history.
@@ -897,7 +774,7 @@ describe("Chat truncated buffers", () => {
       status: { phase: "running" },
       activeTurn: activeTurn({
         turnId: "turn-1",
-        chunks: [chunkEvent(1, "turn-1", start!), chunkEvent(2, "turn-1", delta!)],
+        chunks: [chunkEvent(1, "turn-1", start), chunkEvent(2, "turn-1", delta)],
         complete: false,
         truncated: false,
       }),
@@ -923,7 +800,7 @@ describe("Chat truncated buffers", () => {
       chunk: { type: "text-delta", id: "t", delta: "MORE" },
     });
     await settle();
-    const assistant = chat.store.getState().messages.at(-1)!;
+    const assistant = defined(chat.store.getState().messages.at(-1));
     expect(assistantText(assistant)).toBe("seen");
     transport.history = [userMessage("assistant-1", "whole turn")];
     live(12, { type: "session.turn.ended", turnId: "turn-1", outcome: "completed", phase: "idle" });
@@ -938,7 +815,7 @@ describe("Chat truncated buffers", () => {
       status: { phase: "running" },
       activeTurn: activeTurn({
         turnId: "turn-1",
-        chunks: [chunkEvent(1, "turn-1", start!), chunkEvent(2, "turn-1", delta!)],
+        chunks: [chunkEvent(1, "turn-1", start), chunkEvent(2, "turn-1", delta)],
         complete: false,
         truncated: false,
       }),

@@ -2,6 +2,7 @@ import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from 
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
+import { fffNodePathEnv } from "./fff";
 import {
   isBlockingUiRequest,
   type AgentSessionEvent,
@@ -9,13 +10,12 @@ import {
   type RpcCommand,
   type RpcExtensionUIResponse,
 } from "./protocol";
+import type { PiExecutable } from "./resolve-executable";
 
 const DEFAULT_QUEUE_CAPACITY = 256;
 const DEFAULT_FORCE_KILL_AFTER = "2 seconds";
 
 export type PiTransportFailure = PiTransportError | PiRpcError | AgentProcessExited;
-
-import type { PiExecutable } from "./resolve-executable";
 
 export interface PiTransportOptions {
   readonly executable?: PiExecutable;
@@ -36,7 +36,6 @@ export interface PiTransport {
   /** Blocking extension-UI requests (confirm/select/input/editor). Single-consumer. */
   readonly uiRequests: Stream.Stream<PiUiRequest, PiTransportFailure>;
   readonly respondUi: (response: RpcExtensionUIResponse) => Effect.Effect<void, PiTransportError>;
-  readonly isTerminated: Effect.Effect<boolean>;
   readonly awaitTermination: Effect.Effect<never, PiTransportFailure>;
 }
 
@@ -58,6 +57,7 @@ const normalizeFailure = (operation: string, error: unknown): PiTransportFailure
       case "PiTransportError":
       case "PiRpcError":
       case "AgentProcessExited":
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- _tag already matched a PiTransportFailure
         return error as PiTransportFailure;
     }
   }
@@ -74,7 +74,12 @@ export const makePiTransport = (
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
-    const executable = options.executable ?? { command: "pi", prefixArgs: [] };
+    const executable = options.executable ?? { command: process.execPath, prefixArgs: [] };
+    const lastArg = executable.prefixArgs.at(-1);
+    const fffEnv =
+      lastArg !== undefined && /\.[cm]?js$/i.test(lastArg)
+        ? fffNodePathEnv(process.env, lastArg)
+        : undefined;
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
@@ -88,6 +93,7 @@ export const makePiTransport = (
           ],
           {
             ...(options.cwd ? { cwd: options.cwd } : undefined),
+            ...(fffEnv === undefined ? undefined : { env: fffEnv, extendEnv: true }),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),
@@ -136,6 +142,7 @@ export const makePiTransport = (
         if (!accepted) {
           return yield* transportError("write-closed", new Error("Pi transport is closed"));
         }
+        return undefined;
       });
 
     const removePending = (id: string) =>
@@ -176,6 +183,7 @@ export const makePiTransport = (
         if (typeof frame.type !== "string") return;
 
         if (frame.type === "response") {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL response frame after type === "response"
           const response = frame as {
             id?: string;
             command: string;
@@ -208,6 +216,7 @@ export const makePiTransport = (
 
         if (frame.type === "extension_error") return;
 
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- remaining JSONL frames are AgentSessionEvent
         yield* Queue.offer(events, decoded as AgentSessionEvent);
       });
 
@@ -275,11 +284,13 @@ export const makePiTransport = (
         });
         if (terminalFailure) return yield* terminalFailure;
 
-        return (yield* offerOutgoing({ ...input, id }).pipe(
+        const data = yield* offerOutgoing({ ...input, id }).pipe(
           Effect.tapError(() => removePending(id)),
           Effect.andThen(Deferred.await(deferred)),
           Effect.onInterrupt(() => removePending(id)),
-        )) as A;
+        );
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- RPC data is untyped JSON; caller chooses A
+        return data as A;
       });
 
     return {
@@ -287,7 +298,6 @@ export const makePiTransport = (
       events: Stream.fromQueue(events),
       uiRequests: Stream.fromQueue(uiRequests),
       respondUi: (response) => offerOutgoing({ ...response }),
-      isTerminated: Ref.get(commandState).pipe(Effect.map((state) => state._tag === "Terminated")),
       awaitTermination: Deferred.await(termination),
     } satisfies PiTransport;
   });

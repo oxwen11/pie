@@ -1,13 +1,5 @@
-import type { SessionRef } from "@getpie/contract";
-import { skipToken, useQuery, type QueryClient } from "@tanstack/react-query";
-import {
-  createRootRouteWithContext,
-  useMatch,
-  useNavigate,
-  useRouteContext,
-  useRouter,
-} from "@tanstack/react-router";
-import { useCallback } from "react";
+import type { QueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
 
 import {
   AppShell,
@@ -18,7 +10,6 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
-import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
@@ -27,10 +18,8 @@ import { useProjectSessionTitle } from "@/features/projects/use-project-sessions
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
-import { pullRequestHeaderStatus } from "@/features/pull-request/pull-request-presentation";
 import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
-import { sameSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   httpBaseUrl: string;
@@ -39,14 +28,7 @@ export interface RouterAppContext {
   queryClient: QueryClient;
 }
 
-contentPanel.registerAll([
-  filesPanel,
-  filePanel,
-  reviewPanel,
-  pullRequestPanel,
-  terminalPanel,
-  browserPanel,
-]);
+contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
@@ -57,13 +39,10 @@ function RootLayout() {
   // Keeps every `session.list` cache converged from the server's events
   // (multi-tab / desktop), independent of which route is mounted.
   useSessionListSync();
-  const navigate = useNavigate();
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
 
-  // This is the shell's one route-identity seam: the content panel, active
-  // sidebar row, and card heading all derive from the same authoritative ref.
-  // The content panel is bound here rather than in the session route because it
-  // is a peer card whose maximized state controls the whole shell.
+  // This is the shell's one route-identity seam for the card: the content
+  // panel and heading derive from the same authoritative session-route ref.
+  // Sidebar modules read the route themselves and jump without callbacks.
   //
   // A named match, not `useParams({ strict: false })`: this component *is* the
   // root route's, so the nearest match is always the root — which has no params
@@ -76,50 +55,49 @@ function RootLayout() {
       shouldThrow: false,
     }) ?? null;
   const sessionRef = sessionRoute?.loaderData?.ref ?? null;
-  const pullRequestStatus = useQuery({
-    ...orpcQueryUtils.pullRequest.current.queryOptions({
-      input: sessionRef === null ? skipToken : { ref: sessionRef },
-    }),
-    select: pullRequestHeaderStatus,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-  }).data;
   const draftProjectId = useMatch({
     from: "/draft",
     shouldThrow: false,
     select: (match) => match.search.projectId ?? null,
   });
+  const cardHeading = useRouterState({
+    select: (state): string | false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const heading = state.matches[index]?.staticData.cardHeading;
+        if (heading !== undefined) return heading;
+      }
+      return undefined;
+    },
+  });
+  const cardHeader = useRouterState({
+    select: (state): false | undefined => {
+      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
+        const header = state.matches[index]?.staticData.cardHeader;
+        if (header !== undefined) return header;
+      }
+      return undefined;
+    },
+  });
   const project = useProject(sessionRef?.projectId ?? draftProjectId);
   const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
-  // Mutations can settle after navigation. Read the router's current match at
-  // call time instead of capturing a render-time `active` boolean.
-  const router = useRouter();
-  const isSessionActive = useCallback(
-    (candidate: SessionRef) => {
-      const current = router.state.matches.find((match) => match.routeId === "/session/$sessionId")
-        ?.loaderData?.ref;
-      return sameSessionRef(candidate, current);
-    },
-    [router],
-  );
-  const handleNewChat = () => {
-    navigate({ to: "/draft" }).catch((error: unknown) => {
-      console.error("Failed to open a new chat", error);
-    });
-  };
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar isSessionActive={isSessionActive} onNewChat={handleNewChat} />
+            <AppSidebar />
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel
-              heading={sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")}
-              supportingText={project?.name}
-              status={pullRequestStatus}
+              heading={
+                cardHeading === false
+                  ? undefined
+                  : (cardHeading ??
+                    (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
+              }
+              hideHeader={cardHeader === false}
+              supportingText={cardHeading !== undefined ? undefined : project?.name}
             />
           </AppShellMain>
         </AppShellBody>

@@ -15,9 +15,10 @@ describe("Effect Schema oRPC integration", () => {
   it("accepts Effect Schema on .input/.output without a local wrapper", async () => {
     const procedure = oc.input(GreetingInput).output(Schema.Struct({ greeting: Schema.String }));
     const [inputSchema] = procedure["~orpc"].inputSchemas;
-
-    expect(inputSchema).toBeDefined();
-    const validation = await inputSchema!["~standard"].validate({ name: "Ada" });
+    if (inputSchema === undefined) {
+      throw new Error("expected input schema");
+    }
+    const validation = await inputSchema["~standard"].validate({ name: "Ada" });
     expect("issues" in validation).toBe(false);
   });
 
@@ -49,14 +50,20 @@ describe("Effect Schema oRPC integration", () => {
     expect(router.events["~orpc"].outputSchemas).toHaveLength(1);
 
     const [zodInput] = router.zod["~orpc"].inputSchemas;
-    const validation = await zodInput!["~standard"].validate({ id: "ada" });
+    if (zodInput === undefined) {
+      throw new Error("expected zod input schema");
+    }
+    const validation = await zodInput["~standard"].validate({ id: "ada" });
     expect("issues" in validation).toBe(false);
   });
 
   it("returns Standard Schema issues for invalid input", async () => {
     const procedure = oc.input(GreetingInput);
     const [inputSchema] = procedure["~orpc"].inputSchemas;
-    const validation = await inputSchema!["~standard"].validate({ name: 42 });
+    if (inputSchema === undefined) {
+      throw new Error("expected input schema");
+    }
+    const validation = await inputSchema["~standard"].validate({ name: 42 });
 
     expect("issues" in validation).toBe(true);
   });

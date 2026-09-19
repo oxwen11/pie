@@ -90,7 +90,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
     const workspace = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-desktop-" });
-      const daemonDir = path.join(home, "isolated-daemon");
+      const daemonDir = path.join(home, "daemon");
       const entry = path.join(home, "fake-server.mjs");
       const wedgeFile = path.join(home, "wedge-health");
       yield* fs.writeFileString(entry, FAKE_SERVER);
@@ -100,7 +100,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         environment: {
           ...process.env,
           PIE_HOME: home,
-          PIE_DAEMON_DIR: daemonDir,
           PIE_TEST_WEDGE_FILE: wedgeFile,
         },
       };
@@ -149,7 +148,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
               const spawn = yield* makeDaemonServerProcess({ requiredCompatibilityKey });
               const running = yield* spawn(config, 0);
               yield* running.ready;
-              return (yield* readRecord(daemonDir))!;
+              const record = yield* readRecord(daemonDir);
+              assert.ok(record);
+              return record;
             }),
           );
 

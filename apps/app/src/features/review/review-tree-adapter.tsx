@@ -65,7 +65,7 @@ export function ReviewTreeAdapter({
   useEffect(() => {
     const host = containerRef.current?.querySelector("file-tree-container");
     const shadowRoot = host?.shadowRoot;
-    if (shadowRoot === undefined || shadowRoot === null) return;
+    if (shadowRoot === undefined || shadowRoot === null) return undefined;
 
     const annotateRows = (): void => {
       for (const row of shadowRoot.querySelectorAll<HTMLElement>("[data-item-path]")) {
@@ -102,7 +102,7 @@ export function ReviewTreeAdapter({
     onSelectFile(path);
   };
 
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+  const handleSelectFile = (event: MouseEvent<HTMLElement>): void => {
     openPath(pathFromComposedEvent(event));
   };
 
@@ -123,7 +123,7 @@ export function ReviewTreeAdapter({
       <PierreFileTree
         aria-label="Project files"
         model={state.model}
-        onClick={handleClick}
+        onClick={handleSelectFile}
         onKeyDown={handleKeyDown}
         style={TREE_STYLE}
       />

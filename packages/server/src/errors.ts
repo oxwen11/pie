@@ -6,6 +6,18 @@ export class ProjectNotFound extends Data.TaggedError("ProjectNotFound")<{
   readonly projectId: string;
 }> {}
 
+export class ScheduleNotFound extends Data.TaggedError("ScheduleNotFound")<{
+  readonly scheduleId: string;
+}> {}
+
+export class ScheduleLimitReached extends Data.TaggedError("ScheduleLimitReached")<{
+  readonly limit: number;
+}> {}
+
+export class InvalidSchedule extends Data.TaggedError("InvalidSchedule")<{
+  readonly reason: string;
+}> {}
+
 export class StoreReadError extends Data.TaggedError("StoreReadError")<{
   readonly file: string;
   readonly cause: unknown;
@@ -110,5 +122,18 @@ export class WorkspaceBinaryFile extends Data.TaggedError("WorkspaceBinaryFile")
 /** An underlying `FileSystem` read failed (missing, permission, etc.). */
 export class WorkspaceReadError extends Data.TaggedError("WorkspaceReadError")<{
   readonly path: string;
+  readonly cause: unknown;
+}> {}
+
+/** No live PTY for this session-scoped terminal id. */
+export class TerminalNotRunning extends Data.TaggedError("TerminalNotRunning")<{
+  readonly projectId: string;
+  readonly sessionId: string;
+  readonly terminalId: string;
+}> {}
+
+/** node-pty failed to spawn a shell in the session workspace. */
+export class TerminalSpawnFailed extends Data.TaggedError("TerminalSpawnFailed")<{
+  readonly cwd: string;
   readonly cause: unknown;
 }> {}

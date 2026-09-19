@@ -1,10 +1,12 @@
-import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestListItem, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { describe, expect, it } from "vitest";
 
 import {
+  countDiffFiles,
+  filterPullRequestItems,
   pullRequestActionInput,
-  pullRequestHeaderStatus,
   pullRequestSessionState,
+  selectedPullRequest,
 } from "./pull-request-presentation";
 
 const snapshot: PullRequestSnapshot = {
@@ -20,23 +22,45 @@ const snapshot: PullRequestSnapshot = {
   autoMerge: null,
   offeredActions: [],
   updatedAt: "2026-08-30T00:00:00Z",
+  body: "",
+};
+
+const listItem: PullRequestListItem = {
+  ref: snapshot.ref,
+  title: snapshot.title,
+  url: snapshot.url,
+  authorLogin: "getpie",
+  headBranch: snapshot.head.branch,
+  baseBranch: snapshot.baseBranch,
+  lifecycle: snapshot.lifecycle,
+  additions: 4,
+  deletions: 1,
+  updatedAt: snapshot.updatedAt,
 };
 
 describe("pull request presentation", () => {
-  it("prioritizes lifecycle and conflict states over check summaries", () => {
-    expect(pullRequestHeaderStatus(snapshot)).toEqual({
-      label: "Checks passing",
-      tone: "positive",
-    });
-    expect(pullRequestHeaderStatus({ ...snapshot, mergeability: "conflicting" })).toEqual({
-      label: "Conflicts",
-      tone: "negative",
-    });
-    expect(pullRequestHeaderStatus({ ...snapshot, lifecycle: { type: "merged" } })).toEqual({
-      label: "Merged",
-      tone: "accent",
-    });
-    expect(pullRequestHeaderStatus(null)).toBeUndefined();
+  it("filters the viewer list by title, repo, branch, and number", () => {
+    const other: PullRequestListItem = {
+      ...listItem,
+      ref: { ...listItem.ref, number: 7, repository: "server" },
+      title: "Fix the daemon",
+      url: "https://github.com/getpie/server/pull/7",
+      headBranch: "fix/daemon",
+    };
+    expect(filterPullRequestItems([listItem, other], "  #42 ")).toEqual([listItem]);
+    expect(filterPullRequestItems([listItem, other], "server")).toEqual([other]);
+    expect(filterPullRequestItems([listItem, other], "feature/pr-status")).toEqual([listItem]);
+  });
+
+  it("keeps an explicit selection even when the search hides it", () => {
+    const other: PullRequestListItem = {
+      ...listItem,
+      ref: { ...listItem.ref, number: 7 },
+      title: "Fix the daemon",
+      url: "https://github.com/getpie/pie/pull/7",
+    };
+    expect(selectedPullRequest([listItem, other], [other], listItem.ref)).toBe(listItem);
+    expect(selectedPullRequest([listItem, other], [other], null)).toBe(other);
   });
 
   it("reduces snapshots to the lifecycle shown in a session row", () => {
@@ -58,6 +82,22 @@ describe("pull request presentation", () => {
       expected: { pullRequest: snapshot.ref, headSha: "head-a" },
       action: { type: "merge", method: "squash" },
     });
+    expect(
+      pullRequestActionInput(snapshot.ref, snapshot, { type: "merge", method: "squash" }),
+    ).toEqual({
+      ref: snapshot.ref,
+      expected: { pullRequest: snapshot.ref, headSha: "head-a" },
+      action: { type: "merge", method: "squash" },
+    });
+  });
+
+  it("counts files in a git patch", () => {
+    expect(countDiffFiles("")).toBe(0);
+    expect(
+      countDiffFiles(
+        "diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\ndiff --git a/b.ts b/b.ts\n",
+      ),
+    ).toBe(2);
   });
 
   it("does not require a head commit to disable auto-merge", () => {

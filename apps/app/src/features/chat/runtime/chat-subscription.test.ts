@@ -12,6 +12,7 @@ const snapshot: SessionRuntimeSnapshot = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: [],
+  pendingPrompt: { steering: [], followUp: [] },
   cursor: 0,
 };
 

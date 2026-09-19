@@ -125,7 +125,13 @@ function destinationIsReferenced(
 }
 
 function decodeLocalDestination(destination: string): string {
-  if (destination.startsWith("file://")) return url.fileURLToPath(destination);
+  if (/^file:/i.test(destination)) {
+    try {
+      return url.fileURLToPath(destination);
+    } catch {
+      throw new AssetPathNotAllowed({ destination });
+    }
+  }
   if (destination.startsWith("~/") || destination.startsWith("~\\")) {
     throw new AssetPathNotAllowed({ destination });
   }
@@ -167,12 +173,17 @@ function decodeClaims(
     return null;
   }
   try {
-    const value = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      assetId?: unknown;
-      contentHash?: unknown;
-      expiresAt?: unknown;
-      version?: unknown;
-    };
+    const value: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("version" in value) ||
+      !("assetId" in value) ||
+      !("contentHash" in value) ||
+      !("expiresAt" in value)
+    ) {
+      return null;
+    }
     return value.version === 1 &&
       typeof value.assetId === "string" &&
       typeof value.contentHash === "string" &&
@@ -229,7 +240,7 @@ export const SessionImageAssetsLayer: Layer.Layer<
         cacheBytes -= asset.bytes.byteLength;
       }
       while (cacheBytes > MAX_CACHE_BYTES) {
-        const oldest = cache.entries().next().value as [string, CachedAsset] | undefined;
+        const oldest = cache.entries().next().value;
         if (!oldest) break;
         cache.delete(oldest[0]);
         cacheBytes -= oldest[1].bytes.byteLength;
@@ -265,6 +276,7 @@ export const SessionImageAssetsLayer: Layer.Layer<
             try {
               canonical = await fsPromises.realpath(requested);
             } catch (cause) {
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Node fs errors expose errno codes on ErrnoException
               const code = (cause as NodeJS.ErrnoException).code;
               if (code === "ENOENT") throw new AssetNotFound({ destination });
               throw cause;
@@ -323,6 +335,7 @@ export const SessionImageAssetsLayer: Layer.Layer<
             }
           },
           catch: (cause) => {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Node fs errors expose errno codes on ErrnoException
             if ((cause as NodeJS.ErrnoException).code === "ELOOP") {
               return new AssetPathNotAllowed({ destination });
             }

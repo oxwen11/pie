@@ -7,22 +7,32 @@ Turborepo, TypeScript everywhere.
 ## Commands
 
 Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
-`test`, `typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing
-turbo skips the upstream tsdown build (including the oxlint plugins).
+`typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing turbo
+skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
+is two Vitest processes: node packages (`vitest.config.mts`, excludes `ui`)
+then browser (`vitest.browser.config.mts`: UI components + app product flows
+mounted in Chromium). `pnpm e2e` is Playwright Desktop (Electron).
 
-|                                               |                                                      |
-| --------------------------------------------- | ---------------------------------------------------- |
-| `pnpm test` / `pnpm typecheck` / `pnpm build` | scope with `turbo run test --filter=@getpie/server`  |
-| `pnpm check`                                  | lint:check + format:check + typecheck — **no tests** |
-| `pnpm lint` / `pnpm format`                   | rewrite files; the `:check` variants only report     |
+|                                 |                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm test`                     | node Vitest + browser (components + app e2e); one package: `pnpm --filter @getpie/server test` |
+| `pnpm e2e`                      | Playwright Desktop (Electron)                                                                  |
+| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                       |
+| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                           |
+| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                               |
 
-`format` is root-only (oxfmt) and not a turbo task. `lint` / `lint:check` go
-through turbo so they wait on `@getpie/oxlint#build` (the oxlint tsdown
-plugins). `test` and `typecheck` are cached, so re-run with `--force` after
-changing something outside their hash inputs. `pnpm clean` runs `turbo run clean` then
+`format` is root-only (oxfmt) and not a turbo task. `test` is two root
+Vitest processes, not a turbo task. `e2e` is Playwright Electron through turbo
+(`@getpie/desktop`, `dependsOn: ["build"]`).
+`lint` / `lint:check` go through turbo
+so they wait on `@getpie/oxlint#build` (the oxlint tsdown plugins).
+`typecheck` is cached, so re-run with `--force` after changing something
+outside its hash inputs. `pnpm clean` runs `turbo run clean` then
 `git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.
-Runtime UI checks use `.agents/skills/verify` (launch the vite app plus server,
-then drive the page).
+Runtime UI checks use `pnpm exec pie-verify web|cli|desktop` (`@getpie/verify`).
+Skill recipes live in `.agents/skills/verify-pie{,-cli,-desktop}`
+(`.cursor/skills/…` are symlinks). `.agents/skills/verify` is the short
+two-process note.
 
 ## Rules
 
@@ -31,16 +41,55 @@ then drive the page).
 @.agents/rules/frontend-state.md
 @.agents/rules/ui-components.md
 @.agents/rules/toolchain.md
+@.agents/rules/verify-evidence.md
 
 `apps/desktop/src` has its own layering contract in `apps/desktop/AGENTS.md` —
 read it before touching that app.
 
 ## Pull requests
 
-Use **squash merge** — one commit per PR keeps `main` readable. Don't mix
-merge-commit / rebase merges in the repo. Squash rewrites the branch tip out
-of `main`'s history, so deleting the local feature branch needs `git branch -D`
-— the changes are already on `main`, so it's safe.
+Split large changes and requirements into small slices **before coding**.
+Name the slices and their order first. One concern per PR — a reviewer
+should not need the rest of the feature in their head. Typical seams:
+contract/types → server → UI; extract → rewire → delete. Don't mix
+unrelated fixes, refactors, or docs. A one-line bugfix stays one PR.
+
+For anything that needs more than one slice, land it as a **stack** with
+`gh stack` — not one giant PR, and not disconnected `gh pr create` calls.
+
+```bash
+gh stack init feat/thing       # first slice, based on main
+# commit that slice
+gh stack add feat/thing-ui     # next branch on top
+# commit the next slice
+gh stack submit --auto         # push and open/update the stacked PRs
+```
+
+`gh stack submit` is the create/update step (`--auto` when unattended).
+After trunk moves: `gh stack sync` or `gh stack rebase`. Inspect with
+`gh stack view`.
+
+Use **squash merge** — one commit per PR keeps `main` readable. Merge a
+stack with `gh stack merge --squash` (`--yes` unattended). Don't mix
+merge-commit / rebase merges in the repo. Squash rewrites the branch tip
+out of `main`'s history, so deleting the local feature branch needs
+`git branch -D` — the changes are already on `main`, so it's safe.
+
+A UI change or UI bug needs screenshots **and** a short video on the GitHub
+issue, PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh`
+≥ 2.99.0). Capture with `pie-verify web|desktop evidence screenshot` and
+`agent-browser record start|stop` per `.agents/rules/verify-evidence.md`; do
+not commit the files.
+
+## Cursor Cloud specific instructions
+
+Repo-managed Cloud Agent setup lives in `.cursor/environment.json` and
+overrides any dashboard personal/team environment. `install` is mise (Node
+24 + pnpm from `mise.toml`) then `pnpm install --frozen-lockfile`.
+
+The environment starts two terminals: pie server on `:4180` and Vite on
+`:4190`. Drive `http://localhost:4190/` — not 4180 (built bundle / 503) and
+not 4000 (daemon). See `.agents/skills/verify`.
 
 ## Going deeper
 
@@ -51,6 +100,11 @@ of `main`'s history, so deleting the local feature branch needs `git branch -D`
 - `docs/design/`, `docs/2026-*.md` — designs in flight
 - `docs/wayfinder/session-streaming-refactor/map.md` — streaming decisions that
   are closed for debate
-- `.agents/skills/verify` — build, launch, and drive the app at runtime
-- `.agents/skills/react-doctor` — React health check; CI fails on error-level only
+- `.agents/skills/verify` — short build/launch notes for the two-process web dev pair
+- `.agents/skills/verify-pie` — web recipe; invoke `pnpm exec pie-verify web`
+- `.agents/skills/verify-pie-cli` — `pie` / `pie daemon` / `pie serve` recipe; invoke `pnpm exec pie-verify cli`
+- `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
+- `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
+- `.agents/skills/react-doctor` — React health check; `doctor.config.json` enables every 0.9.14 rule at error (three stack mismatches off); CI fails on warning and error. Sibling skills: `performance` (`scan` on `:4190`), `improve-react` (read-only audit/plans)
+- `.agents/skills/prune-tests` — recurring playbook for deleting meaningless tests; user-invoked only
 - `todos/` — numbered security/perf remediation tickets

@@ -1,7 +1,8 @@
+import type { PieUIMessage } from "@getpie/contract";
 import { Action, Actions } from "@getpie/ui/ai-elements/actions";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import { Response } from "@getpie/ui/ai-elements/response";
-import { isReasoningUIPart, isToolUIPart, type FileUIPart, type UIMessage } from "ai";
+import { isReasoningUIPart, isToolUIPart, type FileUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -11,7 +12,7 @@ import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
 import { useToolBatches } from "./use-tool-batches";
 
-type Part = UIMessage["parts"][number];
+type Part = PieUIMessage["parts"][number];
 
 const RASTER_IMAGE_MEDIA_TYPES = new Set([
   "image/bmp",
@@ -22,15 +23,13 @@ const RASTER_IMAGE_MEDIA_TYPES = new Set([
 ]);
 
 // Renders an assistant turn's parts: tool/reasoning runs as collapsible
-// batches, standalone tools (Task) as full cards, text as markdown. The copy
-// action only appears on the last text once streaming has settled.
+// batches and text as markdown. The copy action only appears on the last text
+// once streaming has settled.
 export function AssistantMessage({
-  message,
   parts,
   isStreaming,
   showActions = true,
 }: {
-  message: UIMessage;
   parts: readonly Part[];
   isStreaming: boolean;
   showActions?: boolean;
@@ -47,7 +46,6 @@ export function AssistantMessage({
           return (
             <ToolBatch
               key={`batch-${item.parts[0]?.index ?? 0}`}
-              message={message}
               parts={item.parts}
               shouldShimmer={isStreaming && item.isTrailing}
             />
@@ -55,7 +53,7 @@ export function AssistantMessage({
         }
         const { part, index } = item;
         if (isToolUIPart(part)) {
-          return <ToolPart key={part.toolCallId} message={message} part={part} />;
+          return <ToolPart key={part.toolCallId} part={part} />;
         }
         if (isReasoningUIPart(part)) {
           return (

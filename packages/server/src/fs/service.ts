@@ -1,3 +1,4 @@
+import buffer from "node:buffer";
 import path from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Stream, type PlatformError } from "effect";
@@ -11,22 +12,13 @@ import {
   WorkspacePathEscape,
   WorkspaceReadError,
 } from "../errors";
+import { contains, detectImageMimeType, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
+import { resolveWorkspaceRoot, workspaceReadError } from "../workspace-root";
 
 /** Largest file we will render as text; larger files are rejected, not truncated. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const SCAN_CONCURRENCY = 32;
 const NUL_BYTE = 0;
-const BINARY_MAGIC_PREFIXES: ReadonlyArray<ReadonlyArray<number>> = [
-  [0x25, 0x50, 0x44, 0x46, 0x2d], // PDF
-  [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], // PNG
-  [0xff, 0xd8, 0xff], // JPEG
-  [0x47, 0x49, 0x46, 0x38, 0x37, 0x61], // GIF87a
-  [0x47, 0x49, 0x46, 0x38, 0x39, 0x61], // GIF89a
-  [0x50, 0x4b, 0x03, 0x04], // ZIP
-  [0x50, 0x4b, 0x05, 0x06], // Empty ZIP
-  [0x1f, 0x8b], // Gzip
-  [0x7f, 0x45, 0x4c, 0x46], // ELF
-];
 
 const EXCLUDED_DIRECTORY_NAMES = new Set([
   ".git",
@@ -44,25 +36,8 @@ const EXCLUDED_DIRECTORY_SEQUENCES = [
   ["vendor", "bundle"],
 ] as const;
 
-/** Is `child` at or beneath `parent`? */
-const contains = (parent: string, child: string): boolean => {
-  const relative = path.relative(parent, child);
-  return (
-    relative === "" ||
-    (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
-  );
-};
-
-const toPosixPath = (value: string): string => value.split(path.sep).join("/");
-
 const isNotFound = (cause: PlatformError.PlatformError): boolean =>
   cause.reason._tag === "NotFound";
-
-const hasBinaryMagicPrefix = (bytes: Uint8Array): boolean =>
-  BINARY_MAGIC_PREFIXES.some(
-    (prefix) =>
-      bytes.byteLength >= prefix.length && prefix.every((byte, index) => bytes[index] === byte),
-  );
 
 const shouldExcludeDirectory = (relativePath: string, name: string): boolean => {
   if (EXCLUDED_DIRECTORY_NAMES.has(name)) return true;
@@ -81,6 +56,10 @@ type ReadFileError =
   | WorkspaceFileTooLarge
   | WorkspaceBinaryFile
   | WorkspaceReadError;
+
+export type WorkspaceFilePreview =
+  | { readonly kind: "text"; readonly content: string }
+  | { readonly kind: "image"; readonly mimeType: string; readonly data: string };
 
 type ReadTreeError = WorkspacePathEscape | WorkspaceNotDirectory | WorkspaceReadError;
 
@@ -112,7 +91,10 @@ interface ScanCandidate {
 export class FileSystemService extends Context.Service<
   FileSystemService,
   {
-    readonly readFileString: (cwd: string, path: string) => Effect.Effect<string, ReadFileError>;
+    readonly readFileString: (
+      cwd: string,
+      path: string,
+    ) => Effect.Effect<WorkspaceFilePreview, ReadFileError>;
     readonly readTree: (cwd: string) => Effect.Effect<WorkspaceTreeResult, ReadTreeError>;
   }
 >()("FileSystemService") {}
@@ -123,26 +105,14 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
 
-      const readError = (relativePath: string) => (cause: unknown) =>
-        new WorkspaceReadError({ path: relativePath, cause });
+      const readError = workspaceReadError;
 
       const fileReadError = (relativePath: string) => (cause: PlatformError.PlatformError) =>
         isNotFound(cause)
           ? new WorkspaceFileNotFound({ path: relativePath })
           : new WorkspaceReadError({ path: relativePath, cause });
 
-      const resolveRoot = (cwd: string) =>
-        Effect.gen(function* () {
-          if (!path.isAbsolute(cwd)) {
-            return yield* new WorkspacePathEscape({ cwd, path: "." });
-          }
-          const realRoot = yield* fs.realPath(cwd).pipe(Effect.mapError(readError(".")));
-          const info = yield* fs.stat(realRoot).pipe(Effect.mapError(readError(".")));
-          if (info.type !== "Directory") {
-            return yield* new WorkspaceNotDirectory({ path: "." });
-          }
-          return realRoot;
-        });
+      const resolveRoot = resolveWorkspaceRoot(fs);
 
       const resolveFileWithin = (cwd: string, relativePath: string) =>
         Effect.gen(function* () {
@@ -194,7 +164,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
 
           while (pendingDirectories.length > 0) {
             const currentDirectories = pendingDirectories;
-            pendingDirectories = [];
+            const nextPending: string[] = [];
 
             const directoryCandidates = yield* Effect.forEach(
               currentDirectories,
@@ -246,7 +216,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
                       if (shouldExcludeDirectory(candidate.relativePath, candidate.name)) {
                         return undefined;
                       }
-                      pendingDirectories.push(candidate.relativePath);
+                      nextPending.push(candidate.relativePath);
                       return { path: candidate.relativePath, type: "directory" };
                     }
                     if (info.type === "File") {
@@ -278,6 +248,7 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
             entries.push(
               ...classified.filter((entry): entry is WorkspaceTreeEntry => entry !== undefined),
             );
+            pendingDirectories = nextPending;
           }
 
           entries.sort((left, right) =>
@@ -289,51 +260,74 @@ export const FileSystemServiceLayer: Layer.Layer<FileSystemService, never, FileS
           return { entries };
         });
 
+      const previewFromBytes = (
+        bytes: Uint8Array,
+        relativePath: string,
+      ): Effect.Effect<WorkspaceFilePreview, WorkspaceBinaryFile> => {
+        const mimeType = detectImageMimeType(bytes);
+        if (mimeType !== undefined) {
+          return Effect.succeed({
+            kind: "image",
+            mimeType,
+            data: buffer.Buffer.from(bytes).toString("base64"),
+          });
+        }
+        if (bytes.includes(NUL_BYTE) || hasBinaryMagicPrefix(bytes)) {
+          return Effect.fail(new WorkspaceBinaryFile({ path: relativePath }));
+        }
+        try {
+          return Effect.succeed({
+            kind: "text",
+            content: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+          });
+        } catch {
+          return Effect.fail(new WorkspaceBinaryFile({ path: relativePath }));
+        }
+      };
+
+      const readFileString = (
+        cwd: string,
+        relativePath: string,
+      ): Effect.Effect<WorkspaceFilePreview, ReadFileError> =>
+        Effect.gen(function* () {
+          const realTarget = yield* resolveFileWithin(cwd, relativePath);
+          const info = yield* fs
+            .stat(realTarget)
+            .pipe(Effect.mapError(fileReadError(relativePath)));
+          if (info.type !== "File") {
+            return yield* new WorkspaceNotFile({ path: relativePath });
+          }
+          const size = Number(info.size);
+          if (size > MAX_FILE_BYTES) {
+            return yield* new WorkspaceFileTooLarge({
+              path: relativePath,
+              size,
+              limit: MAX_FILE_BYTES,
+            });
+          }
+          const chunks = yield* fs
+            .stream(realTarget, { bytesToRead: MAX_FILE_BYTES + 1 })
+            .pipe(Stream.runCollect, Effect.mapError(fileReadError(relativePath)));
+          const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+          if (byteLength > MAX_FILE_BYTES) {
+            return yield* new WorkspaceFileTooLarge({
+              path: relativePath,
+              size: Math.max(size, byteLength),
+              limit: MAX_FILE_BYTES,
+            });
+          }
+          const bytes = new Uint8Array(byteLength);
+          let offset = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          return yield* previewFromBytes(bytes, relativePath);
+        });
+
       return {
-        readFileString: (cwd, relativePath) =>
-          Effect.gen(function* () {
-            const realTarget = yield* resolveFileWithin(cwd, relativePath);
-            const info = yield* fs
-              .stat(realTarget)
-              .pipe(Effect.mapError(fileReadError(relativePath)));
-            if (info.type !== "File") {
-              return yield* new WorkspaceNotFile({ path: relativePath });
-            }
-            const size = Number(info.size);
-            if (size > MAX_FILE_BYTES) {
-              return yield* new WorkspaceFileTooLarge({
-                path: relativePath,
-                size,
-                limit: MAX_FILE_BYTES,
-              });
-            }
-            const chunks = yield* fs
-              .stream(realTarget, { bytesToRead: MAX_FILE_BYTES + 1 })
-              .pipe(Stream.runCollect, Effect.mapError(fileReadError(relativePath)));
-            const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-            if (byteLength > MAX_FILE_BYTES) {
-              return yield* new WorkspaceFileTooLarge({
-                path: relativePath,
-                size: Math.max(size, byteLength),
-                limit: MAX_FILE_BYTES,
-              });
-            }
-            const bytes = new Uint8Array(byteLength);
-            let offset = 0;
-            for (const chunk of chunks) {
-              bytes.set(chunk, offset);
-              offset += chunk.byteLength;
-            }
-            if (bytes.includes(NUL_BYTE) || hasBinaryMagicPrefix(bytes)) {
-              return yield* new WorkspaceBinaryFile({ path: relativePath });
-            }
-            try {
-              return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-            } catch {
-              return yield* new WorkspaceBinaryFile({ path: relativePath });
-            }
-          }),
-        readTree,
+        readFileString: Effect.fn("FileSystemService.readFileString")(readFileString),
+        readTree: Effect.fn("FileSystemService.readTree")(readTree),
       };
     }),
   );

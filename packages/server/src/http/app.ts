@@ -9,8 +9,9 @@ import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` and signed asset GETs
-   * must present `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
+   * When set, every `/api/*` request except `/api/health`, signed asset GETs,
+   * and the same-origin browser bootstrap must present
+   * `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
    */
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
@@ -145,6 +146,17 @@ const route = (
       );
     }
 
+    // The daemon-served SPA has no native bridge from which to receive the
+    // token. Expose it only on the loopback, same-origin HTTP surface and omit
+    // CORS headers, so cross-origin browser clients cannot read the response.
+    if (
+      request.method === "GET" &&
+      pathname === "/api/bootstrap" &&
+      isLoopbackHost(request.headers.host)
+    ) {
+      return HttpServerResponse.jsonUnsafe({ token: options.authToken ?? null });
+    }
+
     if (
       options.authToken !== undefined &&
       pathname.startsWith("/api/") &&
@@ -170,10 +182,11 @@ const route = (
       return withCors(notFound);
     }
 
-    // The dev branch of the UI app writes its own bytes to the raw response, so
-    // a header added to the value it returns would never reach the socket. Set
-    // them on the socket as well; node merges `setHeader` into `writeHead`, so
-    // the static branch below still ends up with exactly one of each.
+    // `options.ui` serves the prebuilt bundle (or a 503) and returns an
+    // `HttpServerResponse`, so `withCors` below is what reaches the socket. The
+    // headers are also stamped on the node response as a belt-and-braces for
+    // any write-through; node merges `setHeader` into `writeHead`, so the
+    // static path still ends up with exactly one of each.
     if (headers) {
       const nodeResponse = NodeHttpServerRequest.toServerResponse(request);
       for (const [name, value] of Object.entries(headers)) {
