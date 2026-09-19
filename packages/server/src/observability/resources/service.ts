@@ -1,6 +1,11 @@
 import perfHooks from "node:perf_hooks";
 
-import type { ResourceProcessIdentity, ResourceRoot } from "@getpie/contract/resource-monitoring";
+import {
+  MAX_RESOURCE_CONTROL_ENTRIES,
+  type ElectronRegistration,
+  type ResourceProcessIdentity,
+  type ResourceRoot,
+} from "@getpie/contract/resource-monitoring";
 import { Context, Effect, Layer } from "effect";
 
 import { Paths, resourceSourceDirectory } from "../../config/paths";
@@ -13,6 +18,7 @@ export type ResourceMonitoringService = {
   readonly enabled: boolean;
   readonly registerPi: (sessionId: string, process: ResourceProcessIdentity) => void;
   readonly unregisterPi: (sessionId: string, process: ResourceProcessIdentity) => void;
+  readonly registerElectron: (registration: ElectronRegistration) => void;
   readonly status: () => {
     readonly writer?: WriterStatus;
     readonly monitor?: ResourceMonitorStatus;
@@ -28,6 +34,7 @@ export const ResourceMonitoringDisabled: ResourceMonitoringService = {
   enabled: false,
   registerPi: () => undefined,
   unregisterPi: () => undefined,
+  registerElectron: () => undefined,
   status: () => ({}),
 };
 
@@ -144,7 +151,8 @@ export const ResourceMonitoringLayer = Layer.effect(
       Effect.forever(Effect.sleep(RESOURCE_SAMPLE_INTERVAL_MS).pipe(Effect.andThen(sampleRuntime))),
     );
 
-    const updateRoots = () => monitor.replaceRoots([...roots.values()]);
+    const updateRoots = () =>
+      monitor.replaceRoots([...roots.values()].slice(0, MAX_RESOURCE_CONTROL_ENTRIES));
     return {
       enabled: true,
       registerPi: (sessionId, identity) => {
@@ -155,6 +163,24 @@ export const ResourceMonitoringLayer = Layer.effect(
         const key = `pi:${sessionId}`;
         if (roots.get(key)?.process.pid !== identity.pid) return;
         roots.delete(key);
+        updateRoots();
+      },
+      registerElectron: (registration) => {
+        for (const key of roots.keys()) {
+          if (key.startsWith("electron:")) roots.delete(key);
+        }
+        roots.set(`electron:${registration.instanceId}:main`, {
+          process: registration.root,
+          role: "electron-main",
+        });
+        for (const processEntry of registration.processes
+          .filter((candidate) => candidate.process.pid !== registration.root.pid)
+          .slice(0, 255)) {
+          roots.set(
+            `electron:${registration.instanceId}:${processEntry.process.pid}`,
+            processEntry,
+          );
+        }
         updateRoots();
       },
       status: () => ({ writer: writer.status(), monitor: monitor.status() }),

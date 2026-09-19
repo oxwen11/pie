@@ -17,6 +17,7 @@ import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-g
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
+import { DesktopResourceMonitoringLive } from "./resources/resource-monitoring-live";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
 import { readThemePreference, windowBackgroundColor } from "./window-background";
@@ -52,6 +53,7 @@ function makeRuntime(devUrl: string | undefined) {
     MainWindowLive.pipe(
       Layer.provide(RendererChannelLive),
       Layer.provide(DesktopApplicationLive),
+      Layer.provideMerge(DesktopResourceMonitoringLive),
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
