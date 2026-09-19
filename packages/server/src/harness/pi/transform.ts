@@ -2,6 +2,7 @@ import { v7 as uuid } from "uuid";
 
 import type { SessionEvent } from "../events/framework";
 import type { AgentSessionEvent } from "./protocol";
+import { adaptPiToolResult } from "./tool-result";
 import { isDynamicPiTool } from "./tools";
 import type { PiUIMessageChunk } from "./ui-message";
 
@@ -30,8 +31,8 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //     user UIMessage, then start a fresh assistant UIMessage. The echo of the
 //     *prompting* input arrives before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
-//     Successful read output drops file content because the UI only renders
-//     its input path; other tool results forward whole.
+//     Successful read text is dropped because the UI only renders the input
+//     path; raster images still become AI SDK file parts.
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
@@ -188,30 +189,32 @@ export function createPiTransform(
         break;
 
       case "tool_execution_end": {
-        const result =
-          event.toolName === "read" && !event.isError
-            ? {
-                ...event.result,
-                content: [],
-                details: stripReadDetailsContent(event.result.details),
-              }
-            : event.result;
         if (event.isError) {
           yield {
             type: "tool-output-error",
             toolCallId: event.toolCallId,
-            errorText: toolResultText(result) || "Tool execution failed",
+            errorText: toolResultText(event.result) || "Tool execution failed",
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
         } else {
+          const { output: adapted, files } = adaptPiToolResult(event.result);
+          const output =
+            event.toolName === "read"
+              ? {
+                  ...adapted,
+                  content: [],
+                  details: stripReadDetailsContent(adapted.details),
+                }
+              : adapted;
           yield {
             type: "tool-output-available",
             toolCallId: event.toolCallId,
-            output: result,
+            output,
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
+          yield* files;
         }
         break;
       }

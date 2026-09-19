@@ -15,14 +15,22 @@ function BubbleRouteError({ error }: ErrorComponentProps): ReactNode {
   throw error;
 }
 
-type RouterDependencies = Pick<AppClients, "orpcClient" | "orpcQueryUtils" | "queryClient">;
+type RouterDependencies = Pick<
+  AppClients,
+  "httpBaseUrl" | "orpcClient" | "orpcQueryUtils" | "queryClient"
+>;
 
-export const createRouter = ({ orpcClient, orpcQueryUtils, queryClient }: RouterDependencies) => {
+export const createRouter = ({
+  httpBaseUrl,
+  orpcClient,
+  orpcQueryUtils,
+  queryClient,
+}: RouterDependencies) => {
   const router = createTanStackRouter({
     routeTree,
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    context: { orpcClient, orpcQueryUtils, queryClient },
+    context: { httpBaseUrl, orpcClient, orpcQueryUtils, queryClient },
     defaultPendingComponent: () => <Loader />,
     defaultErrorComponent: BubbleRouteError,
     defaultNotFoundComponent: () => <div>Not Found</div>,

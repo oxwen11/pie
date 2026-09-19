@@ -22,6 +22,7 @@ import { reviewPanel } from "@/features/review/review-panel";
 import type { AppClients } from "@/lib/orpc";
 
 export interface RouterAppContext {
+  httpBaseUrl: string;
   orpcClient: AppClients["orpcClient"];
   orpcQueryUtils: AppClients["orpcQueryUtils"];
   queryClient: QueryClient;

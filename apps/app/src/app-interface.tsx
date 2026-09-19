@@ -78,12 +78,22 @@ export function AppInterface({ server }: { server?: ServerConnection }): ReactEl
 function AppHost({ server }: { server?: ServerConnection }): ReactElement {
   usePlatform();
   const clients = useStable(() => createAppClients(server));
-  return <AppRuntime {...clients} />;
+  const connectionKey = server
+    ? `${server.httpBaseUrl}\u0000${server.wsBaseUrl}\u0000${server.token}`
+    : "browser";
+  return <AppRuntime key={connectionKey} {...clients} />;
 }
 
 /** Explicit stable application dependencies, with no host knowledge. */
-function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
-  const router = useStable(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
+function AppRuntime({
+  httpBaseUrl,
+  orpcClient,
+  queryClient,
+  orpcQueryUtils,
+}: AppClients): ReactElement {
+  const router = useStable(() =>
+    createRouter({ httpBaseUrl, orpcClient, queryClient, orpcQueryUtils }),
+  );
   useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
   const chatManager = useStable(
