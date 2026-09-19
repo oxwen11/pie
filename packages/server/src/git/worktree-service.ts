@@ -98,27 +98,6 @@ export const WorktreeServiceLayer: Layer.Layer<
           Effect.catchTag("PlatformError", dieRng("worktree branch")),
         );
 
-    const validateWorktreePath = (cwd: string, candidate: string) =>
-      Effect.gen(function* () {
-        const exists = yield* fs.exists(candidate).pipe(Effect.mapError(readError(candidate)));
-        if (exists) {
-          const realPath = yield* fs
-            .realPath(candidate)
-            .pipe(Effect.mapError(readError(candidate)));
-          const realHome = yield* fs
-            .realPath(paths.worktreesDir)
-            .pipe(Effect.mapError(readError(".")));
-          if (!contains(realHome, realPath)) {
-            return yield* new WorkspacePathEscape({ cwd, path: candidate });
-          }
-          return true;
-        }
-        if (!contains(paths.worktreesDir, candidate)) {
-          return yield* new WorkspacePathEscape({ cwd, path: candidate });
-        }
-        return false;
-      });
-
     const addCheckout = (repoRoot: string, worktreePath: string, argv: readonly string[]) =>
       fs
         .makeDirectory(path.dirname(worktreePath), { recursive: true })
@@ -181,8 +160,23 @@ export const WorktreeServiceLayer: Layer.Layer<
           return yield* new WorkspacePathEscape({ cwd: repoCwd, path: worktreePath });
         }
         const realRoot = yield* resolveRoot(repoCwd);
-        if (yield* validateWorktreePath(realRoot, worktreePath)) {
+        const exists = yield* fs
+          .exists(worktreePath)
+          .pipe(Effect.mapError(readError(worktreePath)));
+        if (exists) {
+          const realPath = yield* fs
+            .realPath(worktreePath)
+            .pipe(Effect.mapError(readError(worktreePath)));
+          const realHome = yield* fs
+            .realPath(paths.worktreesDir)
+            .pipe(Effect.mapError(readError(".")));
+          if (!contains(realHome, realPath)) {
+            return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+          }
           return { path: worktreePath, branch };
+        }
+        if (!contains(paths.worktreesDir, worktreePath)) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
         }
         const repoRoot = yield* resolveRepoRoot(realRoot);
         const refs = yield* listRefs(realRoot);
