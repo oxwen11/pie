@@ -26,9 +26,9 @@ import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
-// handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
-// turn queues Send as a Pi follow-up — Send only appears once the draft has
-// content (empty streaming shows Stop in the primary slot). prompt comes from
+// handled by the submit keymap) / Shift+Enter breaks the line. Stop and Send
+// are mutually exclusive: empty streaming → Stop; any draft (or idle) → Send
+// (queues a follow-up while a turn is in flight). prompt comes from
 // ChatSessionProvider — not props. The CardFrame header lists queued prompts
 // as editable rows (steering first); the footer shows the session workspace's
 // git availability and current branch.
@@ -129,24 +129,22 @@ function ChatComposerActions({
   interrupt: () => Promise<void>;
   workspaceUnavailable: boolean;
 }) {
+  // Exactly one primary action: Stop while streaming with an empty draft,
+  // otherwise Send (disabled when empty / workspace missing).
+  if (canInterrupt && !hasContent) {
+    return (
+      <PromptInputButton
+        aria-label="Stop generating"
+        onClick={() => void interrupt()}
+        variant="default"
+      >
+        <SquareIcon className="size-4" />
+      </PromptInputButton>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      {canInterrupt ? (
-        <PromptInputButton
-          aria-label="Stop generating"
-          onClick={() => void interrupt()}
-          variant={hasContent ? "ghost" : "default"}
-        >
-          <SquareIcon className="size-4" />
-        </PromptInputButton>
-      ) : null}
-      {!canInterrupt || hasContent ? (
-        <PromptInputSubmit
-          aria-label="Send message"
-          disabled={!hasContent || workspaceUnavailable}
-        />
-      ) : null}
-    </div>
+    <PromptInputSubmit aria-label="Send message" disabled={!hasContent || workspaceUnavailable} />
   );
 }
 
