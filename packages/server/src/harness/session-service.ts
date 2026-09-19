@@ -395,35 +395,27 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         resolveWorkspace(ref).pipe(
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
-              const present = yield* fs
-                .exists(metadata.cwd)
-                .pipe(
-                  Effect.mapError((cause) => new WorkspaceReadError({ path: metadata.cwd, cause })),
-                );
+              const cwdError = (cause: unknown) =>
+                new WorkspaceReadError({ path: metadata.cwd, cause });
+              const present = yield* fs.exists(metadata.cwd).pipe(Effect.mapError(cwdError));
               if (!present) {
                 if (metadata.worktree !== undefined) {
-                  return yield* Effect.fail(
-                    new WorktreeCheckoutMissing({
-                      sessionId: ref.sessionId,
-                      projectId: ref.projectId,
-                      branch: metadata.worktree.branch,
-                    }),
-                  );
+                  return yield* new WorktreeCheckoutMissing({
+                    sessionId: ref.sessionId,
+                    projectId: ref.projectId,
+                    branch: metadata.worktree.branch,
+                  });
                 }
                 yield* fs
                   .makeDirectory(metadata.cwd, { recursive: true })
-                  .pipe(
-                    Effect.mapError(
-                      (cause) => new WorkspaceReadError({ path: metadata.cwd, cause }),
-                    ),
-                  );
+                  .pipe(Effect.mapError(cwdError));
               }
               if (metadata.agentSessionId === undefined) {
                 return toSessionWorkspace(metadata);
               }
               const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
               if (info._tag === "missing") {
-                return yield* Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
+                return yield* new SessionNotResumable({ sessionId: ref.sessionId });
               }
               return toSessionWorkspace(metadata);
             }),
@@ -436,9 +428,10 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
               if (metadata.worktree === undefined) {
-                return yield* Effect.fail(
-                  new SessionNotWorktree({ sessionId: ref.sessionId, projectId: ref.projectId }),
-                );
+                return yield* new SessionNotWorktree({
+                  sessionId: ref.sessionId,
+                  projectId: ref.projectId,
+                });
               }
               const project = yield* projects.findById(metadata.projectId);
               yield* worktrees.restore(project.path, metadata.cwd, metadata.worktree.branch);
