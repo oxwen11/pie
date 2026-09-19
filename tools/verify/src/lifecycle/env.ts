@@ -13,6 +13,7 @@ import {
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   stopAutoRecording,
+  teardownOwnedBrowser,
   type BrowserEnvVars,
 } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
@@ -115,18 +116,24 @@ export function rotateAutoRecordingForRun(identity: SurfaceIdentity, runDir: str
   writeBrowserEnvFile(identity, runDir);
 }
 
-export function stopAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+/** Always tear down the owned agent-browser session for this run. */
+export async function teardownOwnedBrowserForRun(
+  identity: SurfaceIdentity,
+  runDir: string,
+): Promise<void> {
   if (identity.id === "cli") return;
   try {
     const vars = browserEnvForRun(identity, runDir);
     const env: NodeJS.ProcessEnv = { ...process.env };
     applyBrowserEnv(vars, env);
-    const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
-    if (error !== undefined) {
-      console.error(`${identity.logPrefix}: automatic recording stop failed: ${error}`);
+    for (const error of await teardownOwnedBrowser(vars.AGENT_BROWSER, env, {
+      socketDir: vars.AGENT_BROWSER_SOCKET_DIR,
+      session: vars.AGENT_BROWSER_SESSION,
+    })) {
+      console.error(`${identity.logPrefix}: owned browser teardown: ${error}`);
     }
   } catch (error) {
-    console.error(`${identity.logPrefix}: automatic recording stop failed: ${String(error)}`);
+    console.error(`${identity.logPrefix}: owned browser teardown failed: ${String(error)}`);
   }
 }
 

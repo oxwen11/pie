@@ -49,7 +49,7 @@ export function ToolBatch({
     <Tool open={isOpen} onOpenChange={setIsOpen} className={className}>
       <ToolHeader icon={ChevronDownIcon}>
         {shouldShimmer ? (
-          <Shimmer duration={2} as="span">
+          <Shimmer duration={2} as="span" className="max-w-full truncate">
             {phrase}
           </Shimmer>
         ) : (
