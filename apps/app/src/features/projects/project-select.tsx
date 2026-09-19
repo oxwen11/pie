@@ -8,15 +8,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@getpie/ui/components/select";
-import { XIcon } from "lucide-react";
+import { FolderIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 
 /** Sentinel that is not a project UUID — allocate a folder on send. */
 export const NEW_FOLDER_VALUE = "new-folder";
 
-const NEW_FOLDER_LABEL = "New folder";
+const CHOOSE_PROJECT_LABEL = "Choose project";
 const CLEAR_PROJECT_LABEL = "Don't work in a project";
 
-// Project picker for the draft surface. `null` means New folder: send allocates
+// Project picker for the draft surface. `null` means Choose project: send allocates
 // a directory under the new-project root and registers it as a Project.
 export function ProjectSelect({
   newFolderRoot,
@@ -29,21 +30,34 @@ export function ProjectSelect({
   projects: ReadonlyArray<Project>;
   value: string | null;
 }) {
+  const [hovered, setHovered] = useState(false);
+  const [open, setOpen] = useState(false);
   const selected = projects.find((project) => project.id === value);
   const hasProject = value !== null;
-  const folderItemLabel = hasProject ? CLEAR_PROJECT_LABEL : NEW_FOLDER_LABEL;
+  const projectItems = projects.map((project) => ({ label: project.name, value: project.id }));
 
   return (
-    <div className="flex min-w-0 items-center" data-slot="project-select">
+    <div
+      className="flex min-w-0 items-center"
+      data-slot="project-select"
+      onPointerDownCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element) || !target.closest("[data-slot=project-select-clear]")) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        onChange(null);
+      }}
+    >
       <Select
-        items={[
-          { label: folderItemLabel, value: NEW_FOLDER_VALUE },
-          ...projects.map((project) => ({ label: project.name, value: project.id })),
-        ]}
+        items={[{ label: CHOOSE_PROJECT_LABEL, value: NEW_FOLDER_VALUE }, ...projectItems]}
+        onOpenChange={setOpen}
         onValueChange={(next) => {
           if (next === NEW_FOLDER_VALUE) onChange(null);
           else if (typeof next === "string") onChange(next);
         }}
+        open={open}
         value={value ?? NEW_FOLDER_VALUE}
       >
         {/* The name is only the folder's basename, so two projects can share one —
@@ -51,22 +65,30 @@ export function ProjectSelect({
         {/* The draft header row owns the edge bleed (-mx-4) for every pick; a
           trigger-level margin would stack with it and poke past the card. */}
         <SelectTrigger
-          className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent"
+          className="hover:bg-accent w-auto max-w-56 min-w-0 justify-self-start border-transparent bg-transparent shadow-none before:hidden dark:bg-transparent [&_[data-slot=select-icon]]:hidden"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           size="sm"
           title={selected?.path ?? newFolderRoot}
         >
-          <SelectValue placeholder={NEW_FOLDER_LABEL} />
+          {hasProject ? (
+            <span
+              aria-label="Clear project"
+              className={
+                hovered
+                  ? "bg-muted relative z-10 inline-flex size-4 items-center justify-center rounded-full"
+                  : "relative z-10 inline-flex size-4 items-center justify-center"
+              }
+              data-slot="project-select-clear"
+            >
+              {hovered ? <XIcon className="size-2.5" /> : <FolderIcon />}
+            </span>
+          ) : (
+            <FolderIcon data-slot="project-select-folder" />
+          )}
+          <SelectValue placeholder={CHOOSE_PROJECT_LABEL} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={NEW_FOLDER_VALUE}>
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate">{folderItemLabel}</span>
-              {newFolderRoot !== undefined ? (
-                <span className="text-muted-foreground truncate text-xs">{newFolderRoot}</span>
-              ) : null}
-            </span>
-          </SelectItem>
-          {hasProject && projects.length > 0 ? <SelectSeparator /> : null}
           {projects.map((project) => (
             <SelectItem key={project.id} value={project.id}>
               <span className="flex min-w-0 flex-col">
@@ -75,21 +97,20 @@ export function ProjectSelect({
               </span>
             </SelectItem>
           ))}
+          {projects.length > 0 ? <SelectSeparator /> : null}
+          <Button
+            className="w-full justify-start"
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            {CLEAR_PROJECT_LABEL}
+          </Button>
         </SelectContent>
       </Select>
-      {hasProject ? (
-        <Button
-          aria-label="Clear project"
-          data-slot="project-select-clear"
-          onClick={() => {
-            onChange(null);
-          }}
-          size="icon-xs"
-          variant="ghost"
-        >
-          <XIcon />
-        </Button>
-      ) : null}
     </div>
   );
 }

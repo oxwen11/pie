@@ -58,7 +58,7 @@ async function waitForConnectedUi(
   try {
     const window = await app.firstWindow({ timeout: 30_000 });
     await expect(window.locator("#root")).toBeVisible({ timeout: 30_000 });
-    await expect(window.getByRole("combobox").filter({ hasText: "New folder" })).toBeVisible({
+    await expect(window.getByRole("combobox").filter({ hasText: "Choose project" })).toBeVisible({
       timeout: 30_000,
     });
     await expect(window.getByText("Pie could not start")).toHaveCount(0);

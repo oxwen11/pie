@@ -11,7 +11,7 @@ pnpm exec pie-verify desktop launch --replace --empty-projects
 pnpm exec pie-verify desktop doctor
 ```
 
-`--empty-projects` is reserved for this import proof. `/draft` shows the composer with **New folder** while still creating `$PIE_HOME/workspace/verify-pie-desktop-sample`; import is the sidebar **Import project** action. The picker is confined to `$PIE_HOME/workspace`. Allocate uses `$PIE_HOME/new-projects`.
+`--empty-projects` is reserved for this import proof. `/draft` shows the composer with **Choose project** while still creating `$PIE_HOME/workspace/verify-pie-desktop-sample`; import is the sidebar **Import project** action. The picker is confined to `$PIE_HOME/workspace`. Allocate uses `$PIE_HOME/new-projects`.
 
 ## Driving it
 
