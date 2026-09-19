@@ -1,5 +1,5 @@
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
-import { sessionRefKey, toSessionRef } from "@/lib/session-ref";
+import { parseSessionRefKey, sessionRefKey } from "@/lib/session-ref";
 
 import { Chat } from "./chat";
 import type { ChatSessionTransportFactory } from "./chat-transport-port";
@@ -27,10 +27,8 @@ export class ChatManager implements ChatManagerApi {
   // Chat for that ref.
   forgetEnvironment(environmentId: string): void {
     for (const [key, chat] of this.#chats) {
-      const parsed: unknown = JSON.parse(key);
-      if (!Array.isArray(parsed)) continue;
-      const id: unknown = parsed[0];
-      if (typeof id !== "string" || id !== environmentId) continue;
+      const parsed = parseSessionRefKey(key);
+      if (parsed === null || parsed.environmentId !== environmentId) continue;
       this.#chats.delete(key);
       chat.dispose();
     }
@@ -41,7 +39,7 @@ export class ChatManager implements ChatManagerApi {
     const existing = this.#chats.get(key);
     if (existing) return existing;
     const chat = new Chat({
-      sessionRef: toSessionRef(sessionRef),
+      sessionRef: sessionRef.ref,
       transport: this.createTransport(sessionRef),
       onTerminated: () => this.#evict(key),
     });

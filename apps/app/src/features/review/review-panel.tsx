@@ -74,7 +74,7 @@ export const reviewPanel = definePanel({
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
   const { orpcQueryUtils } = useAppClients();
-  const projectId = instance.sessionRef.projectId;
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -84,7 +84,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
       [projectId],
     ),
   });
-  const gitWorkspace = { ref: instance.sessionRef };
+  const gitWorkspace = { ref: instance.sessionRef.ref };
   const panel = useContentPanel();
   const mode = instance.payload.mode ?? "uncommitted";
   const branch = useQuery({

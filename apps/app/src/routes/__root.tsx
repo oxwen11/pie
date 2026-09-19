@@ -1,16 +1,16 @@
-import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   useMatch,
   useRouteContext,
   useRouterState,
 } from "@tanstack/react-router";
-import { use, useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import {
   AppShell,
   AppShellBody,
   AppShellMain,
+  AppShellSessionPanel,
   AppShellSidebar,
 } from "@/components/layout/app-shell";
 import { AppSidebar } from "@/components/layout/app-sidebar";
@@ -26,15 +26,12 @@ import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import { AppClientsProvider } from "@/lib/app-clients";
-import type { AppClients } from "@/lib/orpc";
+import type { EnvironmentClients } from "@/lib/environment-clients";
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
-  orpcClient: AppClients["orpcClient"];
-  orpcQueryUtils: AppClients["orpcQueryUtils"];
-  queryClient: QueryClient;
   localEnvironmentId: string;
-  clientsFor: (environmentId: string) => Promise<AppClients>;
+  environmentClients: EnvironmentClients;
 }
 
 contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
@@ -68,8 +65,7 @@ function RootLayout() {
       ? null
       : {
           environmentId: sessionRoute.loaderData.environmentId,
-          projectId: sessionRoute.loaderData.ref.projectId,
-          sessionId: sessionRoute.loaderData.ref.sessionId,
+          ref: sessionRoute.loaderData.ref,
         };
   const draftProjectId = useMatch({
     from: "/draft",
@@ -94,18 +90,22 @@ function RootLayout() {
       return undefined;
     },
   });
-  const project = useProject(sessionRef?.projectId ?? draftProjectId);
-  const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
+  const project = useProject(sessionRef?.ref.projectId ?? draftProjectId);
+  const sessionTitle = useProjectSessionTitle(sessionRef?.ref);
 
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+        {/*
+         * One AppClientsProvider for chat + content panel. Sidebar stays on the
+         * outer local QueryClient above the router.
+         */}
         <AppShellBody>
           <AppShellSidebar>
             <AppSidebar />
           </AppShellSidebar>
-          <AppShellMain>
-            <SessionBoundMain sessionRef={sessionRef}>
+          <SessionBound sessionRef={sessionRef}>
+            <AppShellMain>
               <CardPanel
                 heading={
                   cardHeading === false
@@ -116,33 +116,24 @@ function RootLayout() {
                 hideHeader={cardHeader === false}
                 supportingText={cardHeading !== undefined ? undefined : project?.name}
               />
-            </SessionBoundMain>
-          </AppShellMain>
+            </AppShellMain>
+            <AppShellSessionPanel />
+          </SessionBound>
         </AppShellBody>
       </ContentPanelSessionProvider>
     </AppShell>
   );
 }
 
-function SessionBoundMain({
+function SessionBound({
   sessionRef,
   children,
 }: {
   sessionRef: EnvironmentSessionRef | null;
   children: ReactNode;
 }) {
-  const { clientsFor, localEnvironmentId, orpcClient, queryClient, orpcQueryUtils } =
-    useRouteContext({ from: "__root__" });
-  const targetId =
-    sessionRef === null || sessionRef.environmentId === localEnvironmentId
-      ? null
-      : sessionRef.environmentId;
-  const remote = use(
-    useMemo(
-      () => (targetId === null ? Promise.resolve(undefined) : clientsFor(targetId)),
-      [clientsFor, targetId],
-    ),
-  );
-  const clients: AppClients = remote ?? { orpcClient, queryClient, orpcQueryUtils };
+  const { localEnvironmentId, environmentClients } = useRouteContext({ from: "__root__" });
+  const environmentId = sessionRef?.environmentId ?? localEnvironmentId;
+  const clients = environmentClients.get(environmentId);
   return <AppClientsProvider clients={clients}>{children}</AppClientsProvider>;
 }

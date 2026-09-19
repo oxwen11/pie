@@ -1,14 +1,15 @@
 import type { CreateWorktreeInput, Project } from "@getpie/contract";
 import { isGitRepositoryBranch } from "@getpie/contract/git";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { useLocalAppClients } from "@/lib/app-clients";
 
 import type { DraftWorkspaceMode } from "./draft-workspace-select";
 import { defaultWorktreeBase } from "./draft-worktree-base";
 
 export function useDraftWorktree(selected: Project | null) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const projectId = selected?.id ?? null;
   const [draft, setDraft] = useState<{
     projectId: string | null;

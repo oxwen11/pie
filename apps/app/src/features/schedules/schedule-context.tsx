@@ -5,6 +5,8 @@ import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { useLocalAppClients } from "@/lib/app-clients";
+
 import { formatSessionReuse } from "./cadence";
 import {
   scheduleCreateInput,
@@ -95,7 +97,8 @@ export function ScheduleProvider({
   onCloseCreate,
   children,
 }: ScheduleProviderProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -12,10 +12,11 @@ import {
   CommandPanel,
 } from "@getpie/ui/components/command";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { CornerLeftUpIcon, FolderIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+
+import { useLocalAppClients } from "@/lib/app-clients";
 
 import {
   isProjectDirectoryEntryVisible,
@@ -38,7 +39,7 @@ export function ImportProjectDialog({
   // null = the server's default starting point (the home directory).
   const [path, setPath] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const queryClient = useQueryClient();
 
   const listing = useQuery({

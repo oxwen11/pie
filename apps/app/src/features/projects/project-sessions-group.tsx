@@ -17,11 +17,8 @@ import {
   ProjectSessionRow,
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
-import {
-  sameSessionRef,
-  sessionRefFromRouterMatches,
-  toEnvironmentSessionRef,
-} from "@/lib/session-ref";
+import { useLocalAppClients } from "@/lib/app-clients";
+import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
@@ -53,11 +50,12 @@ const selectNewestFirst = (
  * grouping and fetching; each row composes its own navigation and actions.
  */
 export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
-  const { orpcQueryUtils, localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const { localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const router = useRouter();
   const isSessionActive = (ref: SessionRef) =>
     sameSessionRef(
-      toEnvironmentSessionRef(localEnvironmentId, ref),
+      { environmentId: localEnvironmentId, ref },
       sessionRefFromRouterMatches(router.state.matches),
     );
   const sessions = useQuery({

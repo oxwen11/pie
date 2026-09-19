@@ -7,12 +7,13 @@ import {
 } from "@getpie/ui/components/context-menu";
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Clock, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
+import { useLocalAppClients } from "@/lib/app-clients";
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
@@ -29,7 +30,7 @@ export function SessionActionsMenu({
   readonly render: ReactElement;
   readonly session: SessionSummary;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);

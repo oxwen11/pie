@@ -45,7 +45,7 @@ export const Route = createFileRoute("/session/$sessionId")({
     deps,
   }): Promise<PrepareSessionOutput & { environmentId: string }> => {
     const environmentId = deps.environmentId ?? context.localEnvironmentId;
-    const clients = await context.clientsFor(environmentId);
+    const clients = context.environmentClients.get(environmentId);
     const { session } = clients.orpcQueryUtils.agent;
     const prepareSession = (ref: SessionRef) => {
       const prepared = session.prepare.call({ ref });
@@ -95,8 +95,7 @@ function Component() {
     <Chat
       sessionRef={{
         environmentId: prepared.environmentId,
-        projectId: prepared.ref.projectId,
-        sessionId: prepared.ref.sessionId,
+        ref: prepared.ref,
       }}
     />
   );

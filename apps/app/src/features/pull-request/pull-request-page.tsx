@@ -25,7 +25,6 @@ import { toast } from "sonner";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
-
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
 import { pullRequestActionError } from "./pull-request-action-error";
 import { PullRequestInspect } from "./pull-request-inspect";
