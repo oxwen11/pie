@@ -111,12 +111,12 @@ export const WorktreeServiceLayer: Layer.Layer<
           if (!contains(realHome, realPath)) {
             return yield* new WorkspacePathEscape({ cwd, path: candidate });
           }
-          return realPath;
+          return { path: realPath, exists: true as const };
         }
         if (!contains(paths.worktreesDir, candidate)) {
           return yield* new WorkspacePathEscape({ cwd, path: candidate });
         }
-        return candidate;
+        return { path: candidate, exists: false as const };
       });
 
     const addCheckout = (repoRoot: string, worktreePath: string, argv: readonly string[]) =>
@@ -149,7 +149,9 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
 
         const worktreePath = worktreeDirectory(paths.worktreesDir, repoRoot, worktreeKey);
-        yield* validateWorktreePath(realRoot, worktreePath);
+        if (!contains(paths.worktreesDir, worktreePath)) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+        }
         const exists = yield* fs
           .exists(worktreePath)
           .pipe(Effect.mapError(readError(worktreePath)));
@@ -179,18 +181,8 @@ export const WorktreeServiceLayer: Layer.Layer<
           return yield* new WorkspacePathEscape({ cwd: repoCwd, path: worktreePath });
         }
         const realRoot = yield* resolveRoot(repoCwd);
-        const exists = yield* fs
-          .exists(worktreePath)
-          .pipe(Effect.mapError(readError(worktreePath)));
-        if (exists) {
-          const realPath = yield* validateWorktreePath(realRoot, worktreePath);
-          const info = yield* fs.stat(realPath).pipe(Effect.mapError(readError(worktreePath)));
-          if (info.type !== "Directory") {
-            return yield* new GitWorktreePathExists({ cwd: realRoot, path: worktreePath });
-          }
-          return { path: worktreePath, branch };
-        }
-        yield* validateWorktreePath(realRoot, worktreePath);
+        const checked = yield* validateWorktreePath(realRoot, worktreePath);
+        if (checked.exists) return { path: worktreePath, branch };
         const repoRoot = yield* resolveRepoRoot(realRoot);
         const refs = yield* listRefs(realRoot);
         if (!refs.all.includes(branch)) {

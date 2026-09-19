@@ -1,9 +1,9 @@
-import type { PrepareSessionOutput, SessionRef } from "@getpie/contract";
+import type { PrepareSessionOutput, SessionRef, WorktreeMissingErrorData } from "@getpie/contract";
+import { ORPCError } from "@orpc/client";
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { Chat } from "@/features/chat/chat";
-import { parseWorktreeMissingError } from "@/features/session/worktree-missing";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -11,6 +11,17 @@ type SessionSearch = {
 
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
+
+const parseWorktreeMissingError = (error: unknown): WorktreeMissingErrorData | undefined => {
+  if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return undefined;
+  const data: unknown = error.data;
+  if (typeof data !== "object" || data === null) return undefined;
+  const sessionId = asText("sessionId" in data ? data.sessionId : undefined);
+  const projectId = asText("projectId" in data ? data.projectId : undefined);
+  if (sessionId === undefined || projectId === undefined) return undefined;
+  const branch = asText("branch" in data ? data.branch : undefined);
+  return branch === undefined ? { sessionId, projectId } : { sessionId, projectId, branch };
+};
 
 const throwWorktreeMissingRedirect = (error: unknown): void => {
   if (isRedirect(error)) throw error;
@@ -34,8 +45,8 @@ export const Route = createFileRoute("/session/$sessionId")({
   loaderDeps: ({ search }) => search,
   loader: async ({ context, params, deps }): Promise<PrepareSessionOutput> => {
     const { session } = context.orpcQueryUtils.agent;
-    const prepareSession = async (ref: SessionRef) => {
-      const prepared = await session.prepare.call({ ref });
+    const prepareSession = (ref: SessionRef) => {
+      const prepared = session.prepare.call({ ref });
       void context.queryClient.prefetchQuery(
         context.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
       );

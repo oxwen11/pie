@@ -256,6 +256,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const toPreparedWorkspace = (ref: SessionRef, metadata: SessionWithCwd) =>
       Effect.gen(function* () {
         if (metadata.worktree !== undefined) {
+          const { branch } = metadata.worktree;
           yield* fs.exists(metadata.cwd).pipe(
             Effect.mapError((cause) => new WorkspaceReadError({ path: metadata.cwd, cause })),
             Effect.filterOrFail(
@@ -264,7 +265,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                 new WorktreeCheckoutMissing({
                   sessionId: ref.sessionId,
                   projectId: ref.projectId,
-                  branch: metadata.worktree?.branch,
+                  branch,
                 }),
             ),
           );
