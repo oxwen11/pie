@@ -16,13 +16,9 @@ export const projectRouter = orpc.router({
     const projects = yield* ProjectService;
     return yield* projects.create(input);
   }),
-  allocateRoot: orpc.allocateRoot.effect(function* () {
+  allocateChatProjectDir: orpc.allocateChatProjectDir.effect(function* ({ errors }) {
     const projects = yield* ProjectService;
-    return yield* projects.allocateRoot();
-  }),
-  allocate: orpc.allocate.effect(function* ({ errors }) {
-    const projects = yield* ProjectService;
-    return yield* projects.allocate().pipe(
+    return yield* projects.allocateChatProjectDir().pipe(
       Effect.catchTags({
         WorkspaceNotDirectory: (e) =>
           Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
@@ -31,7 +27,9 @@ export const projectRouter = orpc.router({
         ProjectFolderCreateError: (e) =>
           Effect.fail(errors.INTERNAL({ message: `failed to create folder ${e.path}` })),
         ProjectFolderConflict: (e) =>
-          Effect.fail(errors.CONFLICT({ message: `could not allocate a folder under ${e.root}` })),
+          Effect.fail(
+            errors.CONFLICT({ message: `could not allocate a chat project under ${e.root}` }),
+          ),
       }),
     );
   }),

@@ -11,21 +11,15 @@ import {
 import { FolderIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
-/** Sentinel that is not a project UUID — allocate a folder on send. */
+/** Sentinel that is not a project UUID — `allocateChatProjectDir` on send. */
 const NEW_FOLDER_VALUE = "new-folder";
 
-const CHOOSE_PROJECT_LABEL = "Choose project";
-const CLEAR_PROJECT_LABEL = "Don't work in a project";
-
-// Project picker for the draft surface. `null` means Choose project: send allocates
-// a directory under the new-project root and registers it as a Project.
+// Draft project picker. `null` / Choose project → allocate under `~/Pie` on send.
 export function ProjectSelect({
-  newFolderRoot,
   onChange,
   projects,
   value,
 }: {
-  newFolderRoot?: string;
   onChange: (projectId: string | null) => void;
   projects: ReadonlyArray<Project>;
   value: string | null;
@@ -33,8 +27,6 @@ export function ProjectSelect({
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
   const selected = projects.find((project) => project.id === value);
-  const hasProject = value !== null;
-  const projectItems = projects.map((project) => ({ label: project.name, value: project.id }));
 
   return (
     <div
@@ -51,7 +43,10 @@ export function ProjectSelect({
       }}
     >
       <Select
-        items={[{ label: CHOOSE_PROJECT_LABEL, value: NEW_FOLDER_VALUE }, ...projectItems]}
+        items={[
+          { label: "Choose project", value: NEW_FOLDER_VALUE },
+          ...projects.map((project) => ({ label: project.name, value: project.id })),
+        ]}
         onOpenChange={setOpen}
         onValueChange={(next) => {
           if (next === NEW_FOLDER_VALUE) onChange(null);
@@ -69,9 +64,9 @@ export function ProjectSelect({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           size="sm"
-          title={selected?.path ?? newFolderRoot}
+          title={selected?.path}
         >
-          {hasProject ? (
+          {value !== null ? (
             <span
               aria-label="Clear project"
               className={
@@ -86,7 +81,7 @@ export function ProjectSelect({
           ) : (
             <FolderIcon data-slot="project-select-folder" />
           )}
-          <SelectValue placeholder={CHOOSE_PROJECT_LABEL} />
+          <SelectValue placeholder="Choose project" />
         </SelectTrigger>
         <SelectContent>
           {projects.map((project) => (
@@ -97,18 +92,22 @@ export function ProjectSelect({
               </span>
             </SelectItem>
           ))}
-          {projects.length > 0 ? <SelectSeparator /> : null}
-          <Button
-            className="w-full justify-start"
-            onClick={() => {
-              onChange(null);
-              setOpen(false);
-            }}
-            size="sm"
-            variant="ghost"
-          >
-            {CLEAR_PROJECT_LABEL}
-          </Button>
+          {value !== null ? (
+            <>
+              {projects.length > 0 ? <SelectSeparator /> : null}
+              <Button
+                className="w-full justify-start"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Don't work in a project
+              </Button>
+            </>
+          ) : null}
         </SelectContent>
       </Select>
     </div>

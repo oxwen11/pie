@@ -97,6 +97,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   ensureDir(path.join(runDir, "pids"));
   ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
+  ensureDir(path.join(pieHome, "home"));
   switch (identity.id) {
     case "cli":
     case "desktop":
@@ -119,6 +120,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     request,
     env: {
       ...process.env,
+      HOME: path.join(pieHome, "home"),
       PIE_HOME: pieHome,
       PIE_PORT: String(plan.piePort),
       NODE_ENV: "development",
@@ -183,7 +185,6 @@ function toLaunchCtx(
   switch (identity.id) {
     case "web": {
       const projectBrowseRoot = path.join(base.pieHome, "workspace");
-      const newProjectRoot = path.join(base.pieHome, "new-projects");
       return {
         ...base,
         surface: "web",
@@ -192,7 +193,6 @@ function toLaunchCtx(
         env: {
           ...base.env,
           PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
-          PIE_NEW_PROJECT_ROOT: newProjectRoot,
         },
       };
     }
@@ -205,7 +205,6 @@ function toLaunchCtx(
     case "desktop": {
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
       const projectBrowseRoot = path.join(base.pieHome, "workspace");
-      const newProjectRoot = path.join(base.pieHome, "new-projects");
       return {
         ...base,
         surface: "desktop",
@@ -214,7 +213,6 @@ function toLaunchCtx(
         env: {
           ...base.env,
           PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
-          PIE_NEW_PROJECT_ROOT: newProjectRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };

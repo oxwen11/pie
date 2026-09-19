@@ -537,18 +537,10 @@ export const ProjectSchema = Schema.Struct({
 });
 export type Project = typeof ProjectSchema.Type;
 
-export const isChatProject = (project: Project): boolean => project.type === "chat";
-
 /** The project name is derived server-side from the folder's basename. */
 export const CreateProjectInputSchema = Schema.Struct({
   path: Schema.String,
 });
-
-/** Absolute parent under which `project.allocate` creates a folder. */
-export const NewProjectRootSchema = Schema.Struct({
-  path: Schema.String,
-});
-export type NewProjectRoot = typeof NewProjectRootSchema.Type;
 
 export const DirectoryEntrySchema = Schema.Struct({
   name: Schema.String,

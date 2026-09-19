@@ -68,7 +68,6 @@ function DraftRoute() {
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
-  const allocateRoot = useQuery(orpcQueryUtils.project.allocateRoot.queryOptions());
   const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
@@ -85,7 +84,7 @@ function DraftRoute() {
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.id;
       if (projectId === undefined) {
-        const allocated = await orpcQueryUtils.project.allocate.call();
+        const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
         const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
         queryClient.setQueryData<ReadonlyArray<Project>>(projectListKey, (prev) => {
           if (prev?.some((project) => project.id === allocated.id)) return prev;
@@ -191,7 +190,6 @@ function DraftRoute() {
       draftWorktree={draftWorktree}
       hasContent={hasContent}
       models={modelsQuery.data?.models ?? []}
-      newFolderRoot={allocateRoot.data?.path}
       onModelChange={(provider, modelId) => {
         navigate({
           to: "/draft",
@@ -249,7 +247,6 @@ function DraftComposer({
   draftWorktree,
   hasContent,
   models,
-  newFolderRoot,
   onModelChange,
   onProjectChange,
   onSchedule,
@@ -262,7 +259,6 @@ function DraftComposer({
   draftWorktree: ReturnType<typeof useDraftWorktree>;
   hasContent: boolean;
   models: Parameters<typeof ModelSelectorPicker>[0]["models"];
-  newFolderRoot?: string;
   onModelChange: (provider: string, modelId: string) => void;
   onProjectChange: (next: string | null) => void;
   onSchedule: () => void;
@@ -275,12 +271,7 @@ function DraftComposer({
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
           <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
-            <ProjectSelect
-              newFolderRoot={newFolderRoot}
-              onChange={onProjectChange}
-              projects={projects}
-              value={selectedId}
-            />
+            <ProjectSelect onChange={onProjectChange} projects={projects} value={selectedId} />
             {draftWorktree.gitState === "not-repository" ? (
               <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
             ) : null}

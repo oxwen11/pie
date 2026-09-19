@@ -24,16 +24,12 @@ describe("project router", () => {
     }
   });
 
-  it("allocates a folder under PIE_NEW_PROJECT_ROOT and lists the project", async () => {
+  it("allocates a folder under Paths.chatProjectsDir and lists the project", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pie-new-proj-"));
-    const previous = process.env.PIE_NEW_PROJECT_ROOT;
-    process.env.PIE_NEW_PROJECT_ROOT = root;
     const h = await makeRpcTestHarness(home);
     try {
-      await expect(h.client.project.allocateRoot()).resolves.toEqual({ path: root });
-      const created = await h.client.project.allocate();
-      expect(created.path.startsWith(root + path.sep)).toBe(true);
+      const created = await h.client.project.allocateChatProjectDir();
+      expect(created.path.startsWith(path.join(home, "Pie") + path.sep)).toBe(true);
       expect(created.name).toMatch(/^Chat-\d+$/);
       expect(created.type).toBe("chat");
       expect(path.basename(created.path)).toBe(created.name);
@@ -41,8 +37,6 @@ describe("project router", () => {
       expect(fs.existsSync(created.path)).toBe(true);
       await expect(h.client.project.list()).resolves.toEqual([created]);
     } finally {
-      if (previous === undefined) delete process.env.PIE_NEW_PROJECT_ROOT;
-      else process.env.PIE_NEW_PROJECT_ROOT = previous;
       await h.dispose();
     }
   });

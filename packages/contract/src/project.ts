@@ -1,11 +1,6 @@
 import { Schema } from "effect";
 
-import {
-  CreateProjectInputSchema,
-  NewProjectRootSchema,
-  ProjectSchema,
-  serverErrors,
-} from "./domain";
+import { CreateProjectInputSchema, ProjectSchema, serverErrors } from "./domain";
 import { oc } from "./orpc";
 
 const base = oc.errors(serverErrors);
@@ -13,7 +8,6 @@ const base = oc.errors(serverErrors);
 export const projectContract = {
   list: oc.output(Schema.Array(ProjectSchema)),
   create: oc.input(CreateProjectInputSchema).output(ProjectSchema),
-  /** Create an empty folder under the new-project root and register it as a Project. */
-  allocate: base.output(ProjectSchema),
-  allocateRoot: oc.output(NewProjectRootSchema),
+  /** Create an empty folder under `~/Pie` and register it as a Project. */
+  allocateChatProjectDir: base.output(ProjectSchema),
 };

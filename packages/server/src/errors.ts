@@ -131,7 +131,7 @@ export class ProjectFolderCreateError extends Data.TaggedError("ProjectFolderCre
   readonly cause: unknown;
 }> {}
 
-/** Every generated folder name under the new-project root was already taken. */
+/** Every generated folder name under the chat-project root was already taken. */
 export class ProjectFolderConflict extends Data.TaggedError("ProjectFolderConflict")<{
   readonly root: string;
   readonly name: string;

@@ -5,12 +5,12 @@ Glossary of project-specific terms. pie integrates the Pi coding agent into the 
 ## Session Domain
 
 **Project**:
-A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocate` creates a folder under the **new-project root**, registers it with `type: "chat"`, then `session.create` uses that id as usual. Chat projects stay off the **Projects** sidebar and picker; their sessions appear under **Recent**.
+A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocateChatProjectDir` creates a folder under the **chat-project root**, registers it with `type: "chat"`, then `session.create` uses that id as usual. Chat projects stay off the **Projects** sidebar and picker; their sessions appear under **Recent**.
 _Avoid_: workspace, repo, cwd (for the Project field)
 
-**New-project root**:
-The parent directory where `project.allocate` mints a new folder and registers it as a Project. Default `~/Pie`. Override with `PIE_NEW_PROJECT_ROOT` (tests and Verify must set this under their isolated `$PIE_HOME`). Folders are `<YYYY-MM-DD>/Chat-1`, then `Chat-2`, `Chat-3`, … on collision (not the first prompt). `Project.name` is the leaf basename. The root is user data, not `$PIE_HOME`.
-_Avoid_: scratch, inbox, workspace root, cwd, `~/Documents`, putting chat folders under `$PIE_HOME` in production
+**Chat-project root**:
+The parent directory where `project.allocateChatProjectDir` mints a new folder and registers it as a Project. Fixed at `~/Pie` (`Paths.chatProjectsDir`) — not under `$PIE_HOME` (`.pie`). Folders are `<YYYY-MM-DD>/Chat-1`, then `Chat-2`, `Chat-3`, … on collision (not the first prompt). `Project.name` is the leaf basename.
+_Avoid_: scratch, inbox, workspace root, cwd, `~/Documents`, putting chat folders under `$PIE_HOME`
 
 **SessionRef**:
 The composite identity `{ projectId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.

@@ -1,4 +1,4 @@
-import { isChatProject, type Project } from "@getpie/contract";
+import type { Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -21,12 +21,12 @@ function useProjectListQuery<TData>(
 // Module scope: an inline closure would re-run `select` every render.
 const selectProjects = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
   Array.from(projects)
-    .filter((project) => !isChatProject(project))
+    .filter((project) => project.type !== "chat")
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
 const selectChatNewestFirst = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
   Array.from(projects)
-    .filter(isChatProject)
+    .filter((project) => project.type === "chat")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 /** Imported folders only — the Projects picker and sidebar group. */

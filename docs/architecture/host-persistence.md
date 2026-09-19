@@ -92,7 +92,7 @@ $PIE_HOME/
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Path          | `$PIE_HOME/storage/projects.json`                                                                                                                                                    |
 | Owner         | `ProjectRepository`                                                                                                                                                                  |
-| Data          | `Project[]`; each item is `{ id, name, path, createdAt, type? }`. `type: "chat"` is set by `project.allocate`; omitted means imported                                                |
+| Data          | `Project[]`; each item is `{ id, name, path, createdAt, type? }`. `type: "chat"` is set by `project.allocateChatProjectDir`; omitted means imported                                  |
 | Write points  | First repository open seeds `[]`; project create/remove rewrites the whole array                                                                                                     |
 | Compatibility | A pre-envelope bare `Project[]` is adopted and rewritten as version 1 on first read                                                                                                  |
 | Extension     | Add fields through `ProjectSchema`; a shape change after version 1 requires an explicit migration                                                                                    |
@@ -103,24 +103,24 @@ $PIE_HOME/
 
 ### Allocated project folders
 
-A draft send with no selected Project calls `project.allocate`, which creates
+A draft send with no selected Project calls `project.allocateChatProjectDir`, which creates
 an empty folder and then registers it through `ProjectService.create` (the
 same `projects.json` write as import).
 
-| Property      | Current contract                                                                                                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Path          | `<new-project-root>/<YYYY-MM-DD>/Chat-<n>/`                                                                                                                                                                    |
-| Owner         | The user. Pie creates the directory; Pi and agent tools write inside it afterwards. `ProjectRepository` only stores the registered `path`                                                                      |
-| Root          | `PIE_NEW_PROJECT_ROOT` when non-empty, otherwise `~/Pie` (`DEFAULT_NEW_PROJECT_DIR`). Resolved in `packages/server/src/project/allocate-folder.ts`, not `config/paths.ts` — this is user data, not `$PIE_HOME` |
-| Name          | Date parent is local-calendar `YYYY-MM-DD`. Leaf is `Chat-1`, then `Chat-2`, `Chat-3`, … (not the first prompt). Exclusive mkdir on the leaf. At most 100 attempts. `Project.name` is the leaf basename        |
-| Write points  | `ProjectService.allocate` mkdir of the root (recursive, first use), the date parent (recursive), and the leaf (exclusive). No files are placed in the new folder                                               |
-| Permissions   | Umask, same as imported project folders. No owner-only mode is pinned                                                                                                                                          |
-| Compatibility | New folders only. Existing Projects and imported paths are unchanged                                                                                                                                           |
-| Extension     | Change the resolver or the naming helper (date segment + leaf); do not add a caller-supplied allocate path on the wire                                                                                         |
-| Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie` or `PIE_NEW_PROJECT_ROOT`                                                                                        |
+| Property      | Current contract                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `~/Pie/<YYYY-MM-DD>/Chat-<n>/`                                                                                                                                                                          |
+| Owner         | The user. Pie creates the directory; Pi and agent tools write inside it afterwards. `ProjectRepository` only stores the registered `path`                                                               |
+| Root          | `~/Pie` via `Paths.chatProjectsDir` in `packages/server/src/config/paths.ts` — user data, not `$PIE_HOME`                                                                                               |
+| Name          | Date parent is local-calendar `YYYY-MM-DD`. Leaf is `Chat-1`, then `Chat-2`, `Chat-3`, … (not the first prompt). Exclusive mkdir on the leaf. At most 100 attempts. `Project.name` is the leaf basename |
+| Write points  | `ProjectService.allocateChatProjectDir` mkdir of the root (recursive, first use), the date parent (recursive), and the leaf (exclusive). No files are placed in the new folder                          |
+| Permissions   | Umask, same as imported project folders. No owner-only mode is pinned                                                                                                                                   |
+| Compatibility | New folders only. Existing Projects and imported paths are unchanged                                                                                                                                    |
+| Extension     | Change the Paths field or the naming helper (date segment + leaf); do not add a caller-supplied allocate path on the wire                                                                               |
+| Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie`                                                                                                           |
 
-Verify and tests must set `PIE_NEW_PROJECT_ROOT` under the run's `$PIE_HOME`
-so they never write into the operator's `~/Pie`.
+Tests use `layerPaths(home)` so the chat root sits under the temp `$PIE_HOME`.
+Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
 
 ### Session metadata
 
@@ -362,14 +362,13 @@ $PIE_HOME/workspace/verify-pie[-desktop]-sample/
 ```
 
 Verify owns these non-sensitive, umask-permissioned files and sets
-`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and
-`PIE_NEW_PROJECT_ROOT=$PIE_HOME/new-projects` for the run's server. When
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and `HOME=$PIE_HOME/home` for the
+run's server (so `~/Pie` resolves to `$PIE_HOME/home/Pie`). When
 `PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
 reports no parent there, and resolves real paths before rejecting traversal or
 symlinks outside it. An unset or blank browse root preserves the production
-default of the operator's home directory. An unset new-project root would
-default to the operator's `~/Pie`; Verify always overrides it. Verify overwrites an inherited value with its own
-run path; parallel runs therefore do not share this boundary.
+default of the operator's home directory. Verify overwrites an inherited `HOME`
+with its own run path; parallel runs therefore do not share this boundary.
 
 The sample has no independent schema or migration. Its marker retains the
 existing cleanup compatibility check. Fresh Web and Desktop runs also seed the

@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { Context, Crypto, Effect, FileSystem, Layer, type PlatformError } from "effect";
 
+import { Paths } from "../config/paths";
 import {
   ProjectFolderConflict,
   ProjectFolderCreateError,
@@ -12,11 +13,7 @@ import {
   WorkspaceReadError,
 } from "../errors";
 import type { Project } from "../types";
-import {
-  ALLOCATE_FOLDER_ATTEMPTS,
-  allocateProjectFolderName,
-  resolveNewProjectRoot,
-} from "./allocate-folder";
+import { ALLOCATE_FOLDER_ATTEMPTS, allocateProjectFolderName } from "./allocate-folder";
 import { ProjectRepository } from "./repository";
 
 export type AllocateProjectError =
@@ -31,7 +28,7 @@ const isAlreadyExists = (error: PlatformError.PlatformError): boolean =>
   error.reason._tag === "AlreadyExists";
 
 /**
- * `project` module: list / create (path-dedup) / allocate / remove / findById.
+ * `project` module: list / create (path-dedup) / allocateChatProjectDir / remove / findById.
  * Business rules live here; persistence is delegated to the repo.
  */
 export class ProjectService extends Context.Service<
@@ -48,14 +45,12 @@ export class ProjectService extends Context.Service<
       readonly path: string;
     }) => Effect.Effect<Project, StoreReadError | StoreWriteError>;
     /**
-     * Mint an empty folder under the new-project root and register it as
+     * Mint an empty folder under the chat-project root and register it as
      * `type: "chat"`. `now` is for tests; the RPC always uses the clock at the call.
      */
-    readonly allocate: (input?: {
+    readonly allocateChatProjectDir: (input?: {
       readonly now?: Date;
     }) => Effect.Effect<Project, AllocateProjectError>;
-    /** Resolved parent directory; does not create it. */
-    readonly allocateRoot: () => Effect.Effect<{ readonly path: string }>;
     readonly remove: (
       id: string,
     ) => Effect.Effect<void, StoreReadError | StoreWriteError | ProjectNotFound>;
@@ -65,13 +60,14 @@ export class ProjectService extends Context.Service<
 export const ProjectServiceLayer: Layer.Layer<
   ProjectService,
   never,
-  ProjectRepository | Crypto.Crypto | FileSystem.FileSystem
+  ProjectRepository | Crypto.Crypto | FileSystem.FileSystem | Paths
 > = Layer.effect(
   ProjectService,
   Effect.gen(function* () {
     const repo = yield* ProjectRepository;
     const crypto = yield* Crypto.Crypto;
     const fs = yield* FileSystem.FileSystem;
+    const paths = yield* Paths;
     // A platform RNG that cannot produce a uuid is a defect, not a domain
     // failure — keep it out of the service's error channel. Tag-specific so a
     // future recoverable error on this channel stays typed instead of dying.
@@ -92,13 +88,13 @@ export const ProjectServiceLayer: Layer.Layer<
       const existing = projects.find((p) => path.resolve(p.path) === normalized);
       if (existing !== undefined) return existing;
 
-      const project: Project = {
-        id: yield* newId,
-        name: input.name ?? path.basename(normalized),
-        path: normalized,
-        createdAt: new Date().toISOString(),
-      };
-      if (input.type === "chat") project.type = "chat";
+      const id = yield* newId;
+      const name = input.name ?? path.basename(normalized);
+      const createdAt = new Date().toISOString();
+      const project: Project =
+        input.type === "chat"
+          ? { id, name, path: normalized, createdAt, type: "chat" }
+          : { id, name, path: normalized, createdAt };
       yield* repo.save([...projects, project]);
       return project;
     });
@@ -144,28 +140,28 @@ export const ProjectServiceLayer: Layer.Layer<
 
       create,
 
-      allocate: Effect.fn("ProjectService.allocate")(function* (input?: { readonly now?: Date }) {
-        const root = yield* ensureRoot(resolveNewProjectRoot());
-        const now = input?.now ?? new Date();
-        for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
-          const name = allocateProjectFolderName(now, attempt);
-          const folder = path.resolve(root, name);
-          const parent = path.dirname(folder);
-          yield* fs.makeDirectory(parent, { recursive: true }).pipe(
-            Effect.catchIf(isAlreadyExists, () => Effect.void),
-            Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),
-          );
-          if (yield* tryCreateFolder(folder)) {
-            return yield* create({ type: "chat", path: folder });
+      allocateChatProjectDir: Effect.fn("ProjectService.allocateChatProjectDir")(
+        function* (input?: { readonly now?: Date }) {
+          const root = yield* ensureRoot(paths.chatProjectsDir);
+          const now = input?.now ?? new Date();
+          for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
+            const name = allocateProjectFolderName(now, attempt);
+            const folder = path.resolve(root, name);
+            const parent = path.dirname(folder);
+            yield* fs.makeDirectory(parent, { recursive: true }).pipe(
+              Effect.catchIf(isAlreadyExists, () => Effect.void),
+              Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),
+            );
+            if (yield* tryCreateFolder(folder)) {
+              return yield* create({ type: "chat", path: folder });
+            }
           }
-        }
-        return yield* new ProjectFolderConflict({
-          root,
-          name: allocateProjectFolderName(now, ALLOCATE_FOLDER_ATTEMPTS),
-        });
-      }),
-
-      allocateRoot: () => Effect.sync(() => ({ path: resolveNewProjectRoot() })),
+          return yield* new ProjectFolderConflict({
+            root,
+            name: allocateProjectFolderName(now, ALLOCATE_FOLDER_ATTEMPTS),
+          });
+        },
+      ),
 
       remove: Effect.fn("ProjectService.remove")(function* (id: string) {
         const projects = yield* repo.list();

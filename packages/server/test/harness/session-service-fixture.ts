@@ -105,8 +105,7 @@ const testProjectService = ProjectService.of({
       : Effect.fail(new ProjectNotFound({ projectId })),
   findByPath: () => Effect.succeed(undefined),
   create: () => Effect.die("unused"),
-  allocate: () => Effect.die("unused"),
-  allocateRoot: () => Effect.die("unused"),
+  allocateChatProjectDir: () => Effect.die("unused"),
   remove: () => Effect.die("unused"),
 });
 
