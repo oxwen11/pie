@@ -70,6 +70,7 @@ export default async function setup({
   const bin = path.join(home, "bin");
   fs.mkdirSync(workspace, { recursive: true });
   fs.mkdirSync(bin, { recursive: true });
+  fs.mkdirSync(path.join(home, "home"), { recursive: true });
   writeSample(workspace);
   writeGitSample(workspace);
   const gh = path.join(bin, "gh");
@@ -79,6 +80,7 @@ export default async function setup({
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
+    HOME: path.join(home, "home"),
     PIE_HOME: home,
     PIE_PORT: "0",
     PIE_E2E: "1",

@@ -13,12 +13,8 @@ export async function clickText(text: string): Promise<void> {
   await page.getByText(text, { exact: true }).first().click();
 }
 
-export async function openImportDialog(from: "empty" | "sidebar"): Promise<void> {
-  if (from === "empty") {
-    await page.getByTestId("main").getByRole("button", { name: "Import project" }).click();
-  } else {
-    await page.getByTestId("sidebar").getByTitle("Import project").click();
-  }
+export async function openImportDialog(): Promise<void> {
+  await page.getByTestId("sidebar").getByTitle("Import project").click();
   await expect
     .element(page.getByPlaceholder("Search folders or enter a full path..."), { timeout: 10_000 })
     .toBeVisible();
