@@ -7,9 +7,6 @@ export interface PluginIframePayload {
   readonly title: string;
 }
 
-export const PLUGIN_DEMO_URL = "/plugin-demo/index.html";
-export const PLUGIN_DEMO_TITLE = "Demo";
-
 export function parsePluginIframePayload(raw: unknown): PluginIframePayload | null {
   const { url, title } = asRecord(raw) ?? {};
   return typeof url === "string" && url.length > 0 && typeof title === "string" && title.length > 0

@@ -1,7 +1,7 @@
-import { FlaskConicalIcon } from "lucide-react";
+import { PuzzleIcon } from "lucide-react";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
-import { definePanel } from "@/components/layout/content-panel/react/view";
+import { definePanelFamily } from "@/components/layout/content-panel/react/view";
 
 import {
   type PluginIframePayload,
@@ -9,12 +9,14 @@ import {
   pluginIframeSrc,
 } from "./plugin-iframe";
 
-export const pluginPanel = definePanel({
+export const pluginPanel = definePanelFamily({
   type: "plugin-iframe",
-  label: "Demo",
+  key: (payload) => payload.url,
+  label: (payload) => payload.title,
+  title: "Plugin",
   parse: parsePluginIframePayload,
   view: {
-    icon: FlaskConicalIcon,
+    icon: PuzzleIcon,
     render: (instance) => <PluginIframeView instance={instance} />,
   },
 });

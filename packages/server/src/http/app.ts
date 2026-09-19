@@ -1,10 +1,11 @@
 import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequest";
 import { Effect } from "effect";
+import type { HttpPlatform } from "effect/unstable/http";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
 import { corsHeaders, isLoopbackHost } from "./cors";
-import type { UIApp } from "./ui";
+import type { ServedUI } from "./ui";
 
 export type RequestAppOptions = {
   /**
@@ -20,7 +21,7 @@ export type RequestAppOptions = {
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
   /** Everything the API routes below do not claim. */
-  readonly ui: UIApp;
+  readonly ui: ServedUI;
 };
 
 const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
@@ -41,7 +42,7 @@ export const makeRequestApp = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | HttpPlatform.HttpPlatform
 > =>
   route(options).pipe(
     /**
@@ -92,7 +93,7 @@ const route = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | HttpPlatform.HttpPlatform
 > =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;

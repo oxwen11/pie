@@ -24,6 +24,8 @@ export class Paths extends Context.Service<
     readonly worktreesDir: string;
     /** `$PIE_HOME/logs` — process log and daemon stdio. */
     readonly logsDir: string;
+    /** `$PIE_HOME/plugins/<pluginId>/` — user-installed pie panel plugins. */
+    readonly pluginsDir: string;
   }
 >()("Paths") {}
 
@@ -42,6 +44,7 @@ const resolve = (home: string) => ({
   schedulesDir: path.join(home, "storage", "schedules"),
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
+  pluginsDir: pluginsDirectory(home),
 });
 
 /**
@@ -81,6 +84,9 @@ export function resolveDaemonDirectory(env: NodeJS.ProcessEnv = process.env): st
 
 /** `$PIE_HOME/logs` — the one directory every server process writes logs to. */
 export const logsDirectory = (home: string): string => path.join(home, "logs");
+
+/** `$PIE_HOME/plugins` — user-installed pie panel plugins. Pie reads; it does not write. */
+export const pluginsDirectory = (home: string): string => path.join(home, "plugins");
 
 /** One independently owned resource-log source below `$PIE_HOME/logs/resources`. */
 export const resourceSourceDirectory = (logsDir: string, source: ResourceSource): string =>

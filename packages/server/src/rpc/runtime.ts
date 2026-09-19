@@ -103,6 +103,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   WorktreeProvided,
   PullRequestServiceProvided,
   TerminalManagerLayer,
+  PathsLayer,
   PlatformLayer,
   NodeHttpPlatform.layer,
 );

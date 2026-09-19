@@ -77,6 +77,13 @@ The column beside the chat, in `apps/app/src/components/layout/content-panel/`.
 _Avoid_: right panel, right sidebar, aux panel — "right" is a position, and the
 left one is already the **sidebar**.
 
+**Pie panel plugin**:
+A user-installed directory under `$PIE_HOME/plugins/<pluginId>/` that exposes a
+panel entry (`index.html` / `panel.html`, optional `panel.json` `{ title, entry? }`).
+The daemon serves it at `/plugins/<pluginId>/…`. The left activity rail lists
+these only — Pi-only extension folders without a panel stay dark.
+_Avoid_: shipping plugin HTML in the app bundle; marketplace; `pie.plugin.json`
+
 **ContentPanel**:
 The host: one app-wide instance (`apps/app/src/content-panel.ts`) owning the registry, the per-session tab lists, and every live panel instance. Its zustand store holds only what the UI re-renders on _and_ what survives a reload — everything else lives on the instances. Knows no panel type.
 _Avoid_: panel manager, panel store

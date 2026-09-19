@@ -11,13 +11,32 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
 - **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
 - **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). **Address** and **Reload**. Do not treat its output as a real network.
-- **Demo plugin** — left activity rail (`data-slot="plugin-activity-bar"`), session routes only. Button **Demo**. Opens the `plugin-iframe` ContentPanel with `/plugin-demo/index.html` bound to the current SessionRef.
+- **Pie panel plugins** — left activity rail (`data-slot="plugin-activity-bar"`), session routes only, one icon per directory under `$PIE_HOME/plugins/<id>/` that has a panel entry (`index.html` / `panel.html` or `panel.json`). Click opens the `plugin-iframe` ContentPanel with `/plugins/<id>/…` bound to the current SessionRef. No rail when none are installed.
 
 ## How to get to it (user POV)
 
-1. Open any `/session/<id>`.
-2. Click **Demo** on the left activity rail — ContentPanel docks with the dogfood iframe. Or click **Toggle content panel**.
-3. Pick **Files** / **Review** / **Terminal** / **Browser**, or use **Open a panel** after the first tab exists.
+1. Drop a panel into `$PIE_HOME/plugins/demo/` (not the app repo). Example:
+
+   ```bash
+   mkdir -p "$PIE_HOME/plugins/demo"
+   cat > "$PIE_HOME/plugins/demo/index.html" <<'HTML'
+   <!doctype html><meta charset="utf-8"><title>Demo</title>
+   <h1>Demo</h1>
+   <p id="sessionId"></p>
+   <p id="clock"></p>
+   <script>
+     const q = new URLSearchParams(location.search);
+     sessionId.textContent = q.get("sessionId") ?? "(missing)";
+     const tick = () => { clock.textContent = new Date().toISOString(); };
+     tick(); setInterval(tick, 1000);
+   </script>
+   HTML
+   ```
+
+   Optional `panel.json`: `{ "title": "Demo", "entry": "index.html" }`. Restart or refocus so `plugin.list` refreshes.
+2. Open any `/session/<id>`. The left rail appears only on a session route, and only if at least one pie panel plugin exists.
+3. Click the plugin icon — ContentPanel docks with that local iframe. Or click **Toggle content panel**.
+4. Pick **Files** / **Review** / **Terminal** / **Browser**, or use **Open a panel** after the first tab exists.
 
 ## Driving it with agent-browser
 
