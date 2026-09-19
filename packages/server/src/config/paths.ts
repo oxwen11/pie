@@ -15,6 +15,8 @@ export class Paths extends Context.Service<
   Paths,
   {
     readonly home: string;
+    /** `$PIE_HOME/settings.json` — pie-owned user settings. */
+    readonly settingsFile: string;
     readonly projectsFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
@@ -35,8 +37,12 @@ export const PIE_LOG_FILE = "pie.log";
 export const DAEMON_STDIO_LOG_FILE = "daemon-stdio.log";
 export const RESOURCE_LOGS_DIRECTORY = "resources";
 
+/** `$PIE_HOME/settings.json` — user settings, not a storage collection. */
+export const settingsFile = (home: string): string => path.join(home, "settings.json");
+
 const resolve = (home: string) => ({
   home,
+  settingsFile: settingsFile(home),
   projectsFile: path.join(home, "storage", "projects.json"),
   sessionsDir: path.join(home, "storage", "sessions"),
   schedulesDir: path.join(home, "storage", "schedules"),

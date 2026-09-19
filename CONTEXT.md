@@ -97,6 +97,12 @@ _Avoid_: panel object, panel controller
 The host's row of open panels — the only place a tab is drawn. A panel that wants several of something opens several panels rather than growing tabs of its own.
 _Avoid_: inner tabs, sub-tabs, splits
 
+## Settings
+
+**Settings**:
+Pie-owned user preferences in `$PIE_HOME/settings.json`, namespaced by settings domain (`appearance`, and later domains only when they store a value). Distinct from Pi's agent settings, from `PIE_*` process env, from Desktop host state (window geometry in Electron userData), and from origin-scoped chrome (theme FOUC cache, content-panel, shell layout).
+_Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE_*` in this file; proxying Pi settings; empty domain objects; treating process owners (`ui` / `desktop` / `server`) as JSON root keys; calling this file `config.json`
+
 ## Hub Domain
 
 **Hub**:
