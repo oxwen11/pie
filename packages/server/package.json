@@ -15,10 +15,11 @@
     "./daemon": "./src/daemon/index.ts",
     "./observability": "./src/observability/index.ts",
     "./observability/resources": "./src/observability/resources/index.ts",
+    "./resource-monitor": "./dist/resources/resource-monitor",
     "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "tsdown && bun --no-install build-pi-process.ts",
+    "build": "tsdown && bun --no-install build-pi-process.ts && node scripts/build-resource-monitor.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

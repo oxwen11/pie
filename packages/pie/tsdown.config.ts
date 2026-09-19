@@ -22,6 +22,11 @@ export default defineConfig({
       to: "dist",
       rename: "fff",
     },
+    {
+      from: "../server/dist/resources",
+      to: "dist",
+      rename: "resources",
+    },
   ],
   deps: {
     // The private server/harness/contract packages are compiled into the CLI.
