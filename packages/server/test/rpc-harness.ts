@@ -26,6 +26,7 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { SettingsRepositoryLayer } from "../src/settings";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
@@ -94,6 +95,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -124,6 +126,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    settingsRepositoryLayer,
     scheduleServiceLayer,
     piAgentLayer,
     piProcessLayer,

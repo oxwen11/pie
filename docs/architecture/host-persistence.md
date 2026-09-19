@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-12.
+Last audited: 2026-09-15.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -45,6 +45,7 @@ Changing one does not relocate the other.
 
 ```text
 $PIE_HOME/
+├── settings.json
 ├── storage/
 │   ├── projects.json
 │   ├── sessions/<projectId>/<sessionId>.json
@@ -58,6 +59,21 @@ $PIE_HOME/
     ├── daemon.lock
     └── daemon.stopped
 ```
+
+### User settings
+
+| Property      | Current contract                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/settings.json`                                                                                                                           |
+| Owner         | `SettingsRepository` (server). Desktop Main may **read** the file for the window background before the renderer loads; it does not write.           |
+| Data          | Bare JSON, no envelope. `appearance.theme` is `system`, `light`, or `dark`. Root keys are settings pages.                                           |
+| Write points  | `settings.update` only. Missing file is in-memory defaults and is not created on `settings.get`.                                                    |
+| Compatibility | Missing keys take defaults. Invalid known values, corrupt JSON, and unreadable files fail without reset. Unknown keys are dropped on the next save. |
+| Extension     | Add fields under `appearance` or a new page-named root object. A breaking change may add a sibling `"version"` later.                               |
+| Retention     | Retained with `$PIE_HOME`. No separate uninstall. Permissions follow umask, like `projects.json`.                                                   |
+| Atomicity     | `writeFileAtomic` (sibling temp + rename). Process-local write semaphore. One daemon writer per `$PIE_HOME`.                                        |
+
+Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (see Browser-owned state). Server is the source after attach.
 
 ### Common JSON storage contract
 
@@ -282,9 +298,10 @@ Desktop `pie://app` origin therefore do not share state.
 The current application roots and their build-generated early bootstrap share
 the default key from `theme.ts`, so a stored renderer preference is applied
 before React mounts without duplicating the decision logic in each HTML file.
-Electron's native window background still uses
-the system theme before WebContents loads; synchronizing an explicit preference
-into Electron Main is deferred until the product adds a theme setting.
+After the client attaches, `settings.get` is the source and the cache is
+rewritten to match. Electron Main reads `$PIE_HOME/settings.json` once when
+creating the window and paints `backgroundColor` from `appearance.theme`
+(system / missing / unreadable → OS `nativeTheme`).
 
 ### Content panel
 

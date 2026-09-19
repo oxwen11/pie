@@ -6,7 +6,8 @@ import { isReasoningUIPart, isToolUIPart, type FileUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
-import { CHAT_MARKDOWN_COMPONENTS, CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown-image";
+import { CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown";
+import { ChatMarkdownImage } from "./chat-markdown-image";
 import { ReasoningPart } from "./reasoning-part";
 import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
@@ -71,7 +72,7 @@ export function AssistantMessage({
             <Message key={index} from="assistant">
               <MessageContent>
                 <Response
-                  components={CHAT_MARKDOWN_COMPONENTS}
+                  components={{ img: ChatMarkdownImage }}
                   isAnimating={isStreaming && index === lastTextIndex}
                   remarkPlugins={CHAT_MARKDOWN_REMARK_PLUGINS}
                 >
@@ -97,10 +98,12 @@ function AssistantImage({ part }: { part: FileUIPart }) {
       <MessageContent>
         <img
           alt={part.filename ?? "Tool output image"}
-          className="max-h-[32rem] max-w-full rounded-md object-contain"
+          className="h-auto max-h-[32rem] w-auto max-w-full rounded-md object-contain"
           decoding="async"
+          height={1024}
           loading="lazy"
           src={part.url}
+          width={1024}
         />
       </MessageContent>
     </Message>

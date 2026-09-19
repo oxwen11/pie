@@ -21,6 +21,7 @@ import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
+import { SettingsRepositoryLayer } from "../settings";
 import { TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
@@ -66,6 +67,11 @@ const ProjectServiceProvided = ProjectServiceLayer.pipe(
   Layer.provide(PlatformLayer),
 );
 
+const SettingsRepositoryProvided = SettingsRepositoryLayer.pipe(
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+);
+
 const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
   Layer.provide(PiAgentSessionManagerProvided),
   Layer.provide(PiAgentProvided),
@@ -99,6 +105,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   PiAgentSessionServiceProvided,
   SessionImageAssetsProvided,
   ProjectServiceProvided,
+  SettingsRepositoryProvided,
   ScheduleServiceProvided,
   ScheduleDaemonLayer,
   PiAgentProvided,

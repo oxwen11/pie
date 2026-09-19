@@ -10,6 +10,7 @@ import type { PiAgent } from "../harness/pi/agent";
 import type { ProjectService } from "../project";
 import type { PullRequestService } from "../pull-request";
 import type { ScheduleService } from "../schedule";
+import type { SettingsRepository } from "../settings";
 import type { TerminalManager } from "../terminal";
 
 /** Services every RPC procedure may `yield*`. */
@@ -22,6 +23,7 @@ export type RpcContext = WithEffectContext<
   | PiAgentService
   | ProjectService
   | ScheduleService
+  | SettingsRepository
   | FileSystemService
   | GitService
   | PullRequestService
