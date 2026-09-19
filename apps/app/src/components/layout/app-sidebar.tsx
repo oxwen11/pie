@@ -17,6 +17,7 @@ import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ProjectList } from "@/features/projects/project-list";
+import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
@@ -122,6 +123,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <RecentList />
         <ProjectList />
       </SidebarContent>
 

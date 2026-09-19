@@ -533,6 +533,8 @@ export const ProjectSchema = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   createdAt: Schema.String,
+  /** Only `"chat"` is set today; omitted means a normal imported folder. */
+  type: Schema.optionalKey(Schema.Literal("chat")),
 });
 export type Project = typeof ProjectSchema.Type;
 
