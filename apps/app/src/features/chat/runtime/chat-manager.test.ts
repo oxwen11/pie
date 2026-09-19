@@ -9,12 +9,13 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 
 const refFor = (
   sessionId: string,
-  overrides: Partial<EnvironmentSessionRef> = {},
+  overrides: Partial<{ environmentId: string; projectId: string; sessionId: string }> = {},
 ): EnvironmentSessionRef => ({
-  environmentId: "env-1",
-  projectId: "project-1",
-  sessionId,
-  ...overrides,
+  environmentId: overrides.environmentId ?? "env-1",
+  ref: {
+    projectId: overrides.projectId ?? "project-1",
+    sessionId: overrides.sessionId ?? sessionId,
+  },
 });
 
 class FakeTransport implements ChatSessionTransport {

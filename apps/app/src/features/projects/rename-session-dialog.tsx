@@ -13,9 +13,10 @@ import {
 import { Input } from "@getpie/ui/components/input";
 import { Label } from "@getpie/ui/components/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { useLocalAppClients } from "@/lib/app-clients";
 
 /**
  * Give a session a title of your own. Mount only while open — the draft title
@@ -33,7 +34,7 @@ export function RenameSessionDialog({
   readonly session: SessionSummary;
   onClose: () => void;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(session.title ?? "");
   // The wire schema takes a trimmed, non-empty title; trimming here makes

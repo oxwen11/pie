@@ -58,7 +58,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     instance.navigation.getSnapshot,
   );
   const { orpcQueryUtils } = useAppClients();
-  const projectId = instance.sessionRef.projectId;
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -69,12 +69,12 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     ),
   });
   const panel = useContentPanel();
-  const workspace = { ref: instance.sessionRef };
+  const workspace = { ref: instance.sessionRef.ref };
   const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
   const file = useQuery(
     orpcQueryUtils.fs.readFileString.queryOptions({
-      input: { ref: instance.sessionRef, path },
+      input: { ref: instance.sessionRef.ref, path },
     }),
   );
   const openFile = useCallback(

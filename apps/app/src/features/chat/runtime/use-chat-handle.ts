@@ -1,5 +1,3 @@
-import { useMemo } from "react";
-
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { Chat } from "./chat";
@@ -12,14 +10,7 @@ import type { ChatStoreState } from "./chat-state";
 export const selectTurnInProgress = (s: ChatStoreState): boolean =>
   s.status === "submitted" || s.status === "streaming";
 
-// Get-or-create a Chat by SessionRef and return it with a stable identity.
-// This hook does not subscribe to the store — consumers that read state do
-// their own useStore(chat.store, selector).
+// Get-or-create a Chat by SessionRef. Identity is the manager's Map — not React.
 export function useChatHandle(sessionRef: EnvironmentSessionRef): Chat {
-  const manager = useChatManager();
-  const { environmentId, projectId, sessionId } = sessionRef;
-  return useMemo(
-    () => manager.chatFor({ environmentId, projectId, sessionId }),
-    [manager, environmentId, projectId, sessionId],
-  );
+  return useChatManager().chatFor(sessionRef);
 }

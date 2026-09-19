@@ -127,16 +127,22 @@ export function AppShellBody({ children }: AppShellBodyProps) {
     <AppShellContext value={context}>
       <ShellGroup hasContentPanel={hasVisibleContentPanel} hasSidebar={!isMobile}>
         {children}
-        {hasVisibleContentPanel && (
-          <>
-            <ShellSeparator joined />
-            <ShellContentPanel>
-              <ContentPanelOutlet />
-            </ShellContentPanel>
-          </>
-        )}
       </ShellGroup>
       <ShellContentPanelToggle />
     </AppShellContext>
+  );
+}
+
+/** Session-scoped column beside chat; mount under the same AppClientsProvider as Main. */
+export function AppShellSessionPanel(): ReactNode {
+  const { contentPanel } = useAppShell();
+  if (!contentPanel.visible) return null;
+  return (
+    <>
+      <ShellSeparator joined />
+      <ShellContentPanel>
+        <ContentPanelOutlet />
+      </ShellContentPanel>
+    </>
   );
 }

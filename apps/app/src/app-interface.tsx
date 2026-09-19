@@ -10,9 +10,9 @@ import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
 import { createTerminalPanel } from "./features/terminal/terminal-panel";
+import { createEnvironmentClients } from "./lib/environment-clients";
 import { parseEnvironmentId } from "./lib/environment-id";
-import { createAppClients, disposeAppClients, type AppClients } from "./lib/orpc";
-import { toSessionRef } from "./lib/session-ref";
+import { createAppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
@@ -48,15 +48,6 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
-type CachedRemote = {
-  readonly connectionKey: string;
-  readonly clients: AppClients;
-};
-
-function connectionKey(connection: ServerConnection): string {
-  return `${connection.httpBaseUrl}\0${connection.token}`;
-}
-
 async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
   const url = server === undefined ? "/api/environment" : `${server.httpBaseUrl}/api/environment`;
   const headers = server === undefined ? undefined : { authorization: `Bearer ${server.token}` };
@@ -69,13 +60,6 @@ async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
     return parseEnvironmentId(await response.json()) ?? "local";
   } catch {
     return "local";
-  }
-}
-
-class UnknownEnvironmentError extends Error {
-  constructor(readonly environmentId: string) {
-    super(`Environment ${environmentId} is not connected`);
-    this.name = "UnknownEnvironmentError";
   }
 }
 
@@ -130,70 +114,49 @@ function AppRuntime({
   const platform = usePlatform();
   const { theme } = useTheme();
   const localClients = useStable(() => createAppClients(server, tokenHolder));
-  const remoteClients = useStable(() => new Map<string, CachedRemote>());
-
-  function clientsFor(id: string): AppClients {
-    if (id === environmentId) return localClients;
-    const remote = platform.ssh?.environments
-      .getSnapshot()
-      .remotes.find((entry) => entry.environmentId === id);
-    if (remote === undefined) throw new UnknownEnvironmentError(id);
-    const key = connectionKey(remote.connection);
-    const cached = remoteClients.get(id);
-    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
-    if (cached !== undefined) {
-      remoteClients.delete(id);
-      disposeAppClients(cached.clients);
-    }
-    const created = createAppClients(remote.connection);
-    remoteClients.set(id, { connectionKey: key, clients: created });
-    return created;
-  }
+  const environmentClients = useStable(() =>
+    createEnvironmentClients({
+      localId: environmentId,
+      local: localClients,
+      resolveRemote: (id) =>
+        platform.ssh?.environments.getSnapshot().remotes.find((entry) => entry.environmentId === id)
+          ?.connection,
+    }),
+  );
 
   const chatManager = useStable(
     () =>
       new ChatManager((sessionRef) => {
-        const clients = clientsFor(sessionRef.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(sessionRef));
+        const clients = environmentClients.get(sessionRef.environmentId);
+        return new OrpcChatSessionTransport(clients.orpcClient.agent, sessionRef.ref);
       }),
   );
 
   useEffect(() => {
     const feed = platform.ssh?.environments;
     if (feed === undefined) return undefined;
-    const dropRemote = (id: string, clients: AppClients) => {
-      remoteClients.delete(id);
-      disposeAppClients(clients);
-      chatManager.forgetEnvironment(id);
-    };
     const prune = () => {
       const live = new Map(
-        feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote] as const),
+        feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote.connection]),
       );
-      for (const [id, cached] of remoteClients) {
-        const remote = live.get(id);
-        if (remote === undefined) {
-          dropRemote(id, cached.clients);
-          continue;
-        }
-        if (cached.connectionKey !== connectionKey(remote.connection)) {
-          dropRemote(id, cached.clients);
-        }
-      }
+      environmentClients.prune(live, (id) => {
+        chatManager.forgetEnvironment(id);
+        contentPanel.forgetAllForEnvironment(id);
+      });
     };
     prune();
     return feed.subscribe(prune);
-  }, [platform.ssh, remoteClients, chatManager]);
+  }, [platform.ssh, environmentClients, chatManager]);
 
-  const { orpcClient, queryClient, orpcQueryUtils } = localClients;
-  useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
+  const { queryClient } = localClients;
+  useEffect(
+    () => contentPanel.register(createTerminalPanel(environmentClients)),
+    [environmentClients],
+  );
   const router = useStable(() =>
     createRouter({
-      orpcClient,
-      queryClient,
-      orpcQueryUtils,
       localEnvironmentId: environmentId,
-      clientsFor: async (id) => clientsFor(id),
+      environmentClients,
     }),
   );
 

@@ -1,10 +1,10 @@
-import type { PieClient } from "@getpie/client";
-import { useRouteContext } from "@tanstack/react-router";
 import { TerminalIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
+import { useAppClients } from "@/lib/app-clients";
+import type { EnvironmentClients } from "@/lib/environment-clients";
 
 import { attachTerminalSurface } from "./surface";
 
@@ -16,7 +16,7 @@ interface TerminalPayload {
 
 type TerminalInstance = PanelHandle<TerminalPayload>;
 
-export function createTerminalPanel(client: PieClient) {
+export function createTerminalPanel(environmentClients: EnvironmentClients) {
   return definePanelFamily({
     type: "terminal",
     key: (payload: TerminalPayload) => payload.terminalId,
@@ -29,8 +29,8 @@ export function createTerminalPanel(client: PieClient) {
       return { terminalId };
     },
     onClose: (sessionRef, payload) => {
-      void client.terminal.close({
-        ref: sessionRef,
+      void environmentClients.get(sessionRef.environmentId).orpcClient.terminal.close({
+        ref: sessionRef.ref,
         terminalId: payload.terminalId,
       });
     },
@@ -43,14 +43,14 @@ export function createTerminalPanel(client: PieClient) {
 
 function TerminalPanelView({ instance }: { instance: TerminalInstance }) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const { orpcClient } = useRouteContext({ from: "__root__" });
+  const { orpcClient } = useAppClients();
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return undefined;
     const surface = attachTerminalSurface(mount, {
       client: orpcClient,
-      ref: instance.sessionRef,
+      ref: instance.sessionRef.ref,
       terminalId: instance.payload.terminalId,
     });
     return () => {

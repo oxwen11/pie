@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  type EnvironmentSessionRef,
   sameSessionRef,
   sessionRefFromRouterMatches,
   sessionRefKey,
-  toEnvironmentSessionRef,
-  toSessionRef,
+  type EnvironmentSessionRef,
 } from "./session-ref";
 
-const ref = (overrides: Partial<EnvironmentSessionRef> = {}): EnvironmentSessionRef => ({
-  environmentId: "env-1",
-  projectId: "11111111-1111-4111-8111-111111111111",
-  sessionId: "shared-session-id",
-  ...overrides,
+const ref = (
+  overrides: {
+    environmentId?: string;
+    projectId?: string;
+    sessionId?: string;
+  } = {},
+): EnvironmentSessionRef => ({
+  environmentId: overrides.environmentId ?? "env-1",
+  ref: {
+    projectId: overrides.projectId ?? "11111111-1111-4111-8111-111111111111",
+    sessionId: overrides.sessionId ?? "shared-session-id",
+  },
 });
 
 describe("EnvironmentSessionRef identity", () => {
@@ -32,14 +37,6 @@ describe("EnvironmentSessionRef identity", () => {
     expect(sessionRefKey(ref())).not.toBe(sessionRefKey(ref({ environmentId: "env-2" })));
   });
 
-  it("round-trips the wire SessionRef through an Environment", () => {
-    expect(toSessionRef(ref())).toEqual({
-      projectId: ref().projectId,
-      sessionId: ref().sessionId,
-    });
-    expect(toEnvironmentSessionRef("env-1", toSessionRef(ref()))).toEqual(ref());
-  });
-
   it("reads the session-route loader ref from router matches", () => {
     expect(
       sessionRefFromRouterMatches([
@@ -47,7 +44,7 @@ describe("EnvironmentSessionRef identity", () => {
         {
           routeId: "/session/$sessionId",
           loaderData: {
-            ref: { projectId: ref().projectId, sessionId: ref().sessionId },
+            ref: ref().ref,
             environmentId: "env-1",
           },
         },

@@ -1,7 +1,8 @@
 import type { Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
+
+import { useLocalAppClients } from "@/lib/app-clients";
 
 /**
  * Shared `project.list` readers. The import dialog's create mutation is the
@@ -10,7 +11,7 @@ import { useCallback } from "react";
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,
 ): UseQueryResult<TData> {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   return useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     select,

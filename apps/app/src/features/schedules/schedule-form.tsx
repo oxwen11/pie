@@ -24,8 +24,9 @@ import {
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { useLocalAppClients } from "@/lib/app-clients";
 
 import {
   type ScheduleFormValues,
@@ -130,7 +131,7 @@ function ScheduleFormFields({
   onSubmit,
   onCancel,
 }: ScheduleFormFieldsProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { orpcQueryUtils } = useLocalAppClients();
   const [form, setForm] = useState(() => formFromSource(projects, source));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = source.kind === "edit";
