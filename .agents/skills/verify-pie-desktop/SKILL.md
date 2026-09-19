@@ -119,7 +119,7 @@ agent-browser 0.37.1 records the existing pinned renderer in place. The Verify s
 pnpm exec pie-verify desktop cleanup
 ```
 
-1. Stop and flush the automatic recording, then stop the Desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
+1. Stop and flush the automatic recording, close the owned agent-browser session, then stop the Desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
 2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 

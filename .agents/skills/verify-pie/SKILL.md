@@ -158,7 +158,7 @@ Standards:
 pnpm exec pie-verify web cleanup
 ```
 
-Stops and flushes the automatic recording, then stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops and flushes the automatic recording, closes the owned agent-browser session (and its Chrome for Testing tree), then stops **only** the surface pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** broadly `pkill` pie, vite, or unrelated chromium.
 
 After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web evidence path` printed before teardown (or `.agents/skills/verify-pie/evidence/<run-id>/`).
 
