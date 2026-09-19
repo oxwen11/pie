@@ -1,14 +1,15 @@
-import type {
-  PullRequestAction,
-  PullRequestMergeMethod,
-  PullRequestRef,
-  PullRequestSnapshot,
-  PullRequestSummary,
-  PullRequestStack,
-  PullRequestStackAction,
-  PullRequestStackExpected,
-  PullRequestStackPreview,
-  PullRequestStackActionResult,
+import {
+  pullRequestUrl,
+  type PullRequestAction,
+  type PullRequestMergeMethod,
+  type PullRequestRef,
+  type PullRequestSnapshot,
+  type PullRequestSummary,
+  type PullRequestStack,
+  type PullRequestStackAction,
+  type PullRequestStackExpected,
+  type PullRequestStackPreview,
+  type PullRequestStackActionResult,
 } from "@getpie/contract/pull-request";
 import { Clock, Effect } from "effect";
 import type { ChildProcessSpawner } from "effect/unstable/process";
@@ -51,19 +52,10 @@ export const CURRENT_PULL_REQUEST_FIELDS = [
   "updatedAt",
 ] as const;
 
-export const pullRequestViewUrl = (ref: PullRequestRef): string =>
-  `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
-
 export const currentPullRequestArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
   pullRequest === undefined
     ? ["pr", "view", "--json", CURRENT_PULL_REQUEST_FIELDS.join(",")]
-    : [
-        "pr",
-        "view",
-        pullRequestViewUrl(pullRequest),
-        "--json",
-        CURRENT_PULL_REQUEST_FIELDS.join(","),
-      ];
+    : ["pr", "view", pullRequestUrl(pullRequest), "--json", CURRENT_PULL_REQUEST_FIELDS.join(",")];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -250,7 +242,7 @@ export const makeGitHubCliAdapter = (
       Effect.gen(function* () {
         const raw = yield* read(
           cwd,
-          ["pr", "view", pullRequestViewUrl(ref), "--json", SUMMARY_PULL_REQUEST_FIELDS.join(",")],
+          ["pr", "view", pullRequestUrl(ref), "--json", SUMMARY_PULL_REQUEST_FIELDS.join(",")],
           true,
         );
         if (raw === null) return null;

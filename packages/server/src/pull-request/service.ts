@@ -5,6 +5,7 @@ import type {
   PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
+import { pullRequestKey } from "@getpie/contract/pull-request";
 import { Context, Effect, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
@@ -15,12 +16,6 @@ import {
   type PullRequestReadFailure,
   makeGitHubCliAdapter,
 } from "./github-cli";
-
-const samePullRequest = (left: PullRequestRef, right: PullRequestRef): boolean =>
-  left.host === right.host &&
-  left.owner === right.owner &&
-  left.repository === right.repository &&
-  left.number === right.number;
 
 export type PullRequestActionFailure = PullRequestReadFailure | PullRequestCliActionFailure;
 
@@ -63,7 +58,10 @@ export const PullRequestServiceLayer: Layer.Layer<
     ): Effect.Effect<PullRequestActionApplied, PullRequestActionFailure> =>
       Effect.gen(function* () {
         const snapshot = yield* current(cwd);
-        if (snapshot === null || !samePullRequest(snapshot.ref, expected.pullRequest)) {
+        if (
+          snapshot === null ||
+          pullRequestKey(snapshot.ref) !== pullRequestKey(expected.pullRequest)
+        ) {
           return yield* new PullRequestStaleContext();
         }
         const expectedHeadSha = "headSha" in expected ? expected.headSha : undefined;

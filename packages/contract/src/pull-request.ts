@@ -347,13 +347,9 @@ export const projectSessionPullRequests = (
   const unfinished = (link: SessionPullRequestLink) =>
     link.snapshot === null || link.snapshot.lifecycle.type === "open";
   const chain = groups.length === 1 && groups[0]?.type === "native" ? groups[0] : undefined;
-  const ordered = chain
-    ? chain.links.reduceRight<SessionPullRequestLink[]>((result, link) => {
-        result.push(link);
-        return result;
-      }, [])
-    : visible;
-  const representative = ordered.find(unfinished) ?? ordered[0] ?? null;
+  const representative = chain
+    ? (chain.links.findLast(unfinished) ?? chain.links.at(-1) ?? null)
+    : (visible.find(unfinished) ?? visible[0] ?? null);
   const lifecycle = visible.some((link) => link.snapshot === null)
     ? null
     : (representative?.snapshot?.lifecycle ?? null);
