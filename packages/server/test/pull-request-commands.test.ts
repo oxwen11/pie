@@ -303,7 +303,12 @@ it.effect("confirmed merge uses merge-async with the selected head and does not 
     const fake = scripted([
       { output: stack() },
       { output: access() },
-      { output: { uuid: "merge-1" } },
+      {
+        output: {
+          status: "pending",
+          details: { uuid: "merge-1" },
+        },
+      },
       { output: { status: "merged", details: { sha: "merge-commit" } } },
     ]);
     assert.deepEqual(
@@ -338,7 +343,7 @@ it.effect("a timed-out merge-async poll is unknown and never submits a second me
     const fake = scripted([
       { output: stack() },
       { output: access() },
-      { output: { uuid: "merge-1" } },
+      { output: { status: "pending", details: { uuid: "merge-1" } } },
       { hang: true },
     ]);
     const fiber = yield* fake.cli

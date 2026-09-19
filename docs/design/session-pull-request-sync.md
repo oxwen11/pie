@@ -329,5 +329,5 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 ### 尚未完成的验收与限制
 
 - 物理最小化 / 恢复、多窗口和断线恢复的完整运行时矩阵仍需补验，不能用单元测试冒充这部分证明。
-- Native Stack 写操作只做了确定性命令测试，未在 GitHub 执行。Stack merge 走 GitHub `merge-async`：确认后带所选层 head SHA 提交，再轮询结果；不降级为连续单 PR merge，超时或未知结果不重试。Rebase 仍要求新预览、确认与逐层校验。
+- Native Stack merge 已在 throwaway 私有仓库 `oxwen11/pie-stack-merge-probe-20260919T033748Z` 真机验证：创建 2 层 stack → 对顶层 `PUT .../merge-async`（`sha` + `squash`）→ 轮询至 `merged`，两层同时合入；接受响应的 `uuid` 在 `details.uuid`。Stack merge 走 GitHub `merge-async`：确认后带所选层 head SHA 提交，再轮询结果；不降级为连续单 PR merge，超时或未知结果不重试。Rebase 仍要求新预览、确认与逐层校验。
 - 尚未向 GitHub 上传截图、推送分支或创建 PR；本次没有远端写入授权。

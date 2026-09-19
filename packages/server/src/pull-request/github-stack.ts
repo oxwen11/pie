@@ -62,7 +62,12 @@ const MERGE_METHODS = [
 const AsyncMergeAccepted = Schema.Struct({
   uuid: Schema.optional(Schema.String),
   status: Schema.optional(Schema.String),
-  details: Schema.optional(Schema.Struct({ sha: Schema.optional(Schema.String) })),
+  details: Schema.optional(
+    Schema.Struct({
+      sha: Schema.optional(Schema.String),
+      uuid: Schema.optional(Schema.String),
+    }),
+  ),
 });
 const AsyncMergeResult = Schema.Struct({
   status: Schema.optional(Schema.String),
@@ -277,10 +282,11 @@ export const makeGitHubStack = (read: Read, write: Write) => {
             Schema.decodeUnknownSync(AsyncMergeAccepted)(acceptedRaw),
           );
           if (accepted.status === "merged" || accepted.details?.sha) return;
-          if (!accepted.uuid) return yield* new PullRequestInvalidResponse();
+          const uuid = accepted.uuid ?? accepted.details?.uuid;
+          if (!uuid) return yield* new PullRequestInvalidResponse();
           for (let attempt = 0; attempt < 30; attempt++) {
             const polledRaw = yield* read(
-              api(ref, [`${repoPath(ref)}/pulls/${ref.number}/merge-async/${accepted.uuid}`]),
+              api(ref, [`${repoPath(ref)}/pulls/${ref.number}/merge-async/${uuid}`]),
             );
             const polled = yield* parse(() =>
               Schema.decodeUnknownSync(AsyncMergeResult)(polledRaw),
