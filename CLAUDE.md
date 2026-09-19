@@ -37,6 +37,7 @@ two-process note.
 @.agents/rules/ui-components.md
 @.agents/rules/toolchain.md
 @.agents/rules/verify-evidence.md
+@.agents/rules/ponytail.md
 
 `apps/desktop/src` has its own layering contract in `apps/desktop/AGENTS.md` —
 read it before touching that app.
