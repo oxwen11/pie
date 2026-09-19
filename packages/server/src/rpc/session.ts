@@ -9,17 +9,12 @@ import {
   GitNotRepository,
   GitRefNotFound,
   GitWorktreePathExists,
-  ProjectNotFound,
-  SessionNotFound,
-  SessionNotWorktree,
   WorkspaceNotDirectory,
   WorkspacePathEscape,
   WorkspaceReadError,
-  WorktreeCheckoutMissing,
 } from "../errors";
 import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
-import { AgentOperationError, SessionNotResumable } from "../harness/errors";
 import { ProjectService } from "../project";
 import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
@@ -92,15 +87,13 @@ export const sessionRouter = orpc.router({
     return yield* sessions.prepare(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e: SessionNotFound) =>
+        SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e: ProjectNotFound) =>
+        ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotResumable: (e: SessionNotResumable) =>
-          Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOperationError: (e: AgentOperationError) =>
-          Effect.fail(errors.INTERNAL({ message: e.message })),
-        WorktreeCheckoutMissing: (e: WorktreeCheckoutMissing) =>
+        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        WorktreeCheckoutMissing: (e) =>
           Effect.fail(
             errors.WORKTREE_MISSING({
               data: { sessionId: e.sessionId, projectId: e.projectId, branch: e.branch },
@@ -115,11 +108,11 @@ export const sessionRouter = orpc.router({
     return yield* sessions.restoreWorktree(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e: SessionNotFound) =>
+        SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e: ProjectNotFound) =>
+        ProjectNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotWorktree: (e: SessionNotWorktree) =>
+        SessionNotWorktree: (e) =>
           Effect.fail(
             errors.INVALID_ARGUMENT({
               message: `session ${e.sessionId} is not a worktree session`,
