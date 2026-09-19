@@ -126,6 +126,7 @@ async function setup() {
     gitProvided,
     PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     TerminalManagerLayer,
+    pathsLayer,
     NodeServices.layer,
     Observability.discard,
   );

@@ -3,6 +3,7 @@ import type { RpcContext } from "./context";
 import { fsRouter } from "./fs";
 import { gitRouter } from "./git";
 import { os } from "./orpc";
+import { pluginRouter } from "./plugin";
 import { projectRouter } from "./project";
 import { pullRequestRouter } from "./pull-request";
 import { scheduleRouter } from "./schedule";
@@ -15,6 +16,7 @@ export const router = orpc.router({
   project: projectRouter,
   fs: fsRouter,
   git: gitRouter,
+  plugin: pluginRouter,
   schedule: scheduleRouter,
   pullRequest: pullRequestRouter,
   terminal: terminalRouter,

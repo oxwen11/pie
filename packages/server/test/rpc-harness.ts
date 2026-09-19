@@ -128,6 +128,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     gitProvided,
     pullRequestLayer,
     TerminalManagerLayer,
+    pathsLayer,
     NodeServices.layer,
     Observability.discard,
   );

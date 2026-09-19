@@ -15,6 +15,16 @@ export type UIApp = Effect.Effect<
   HttpServerRequest.HttpServerRequest
 >;
 
+/**
+ * Built UI plus `$PIE_HOME/plugins` files. `HttpServerResponse.file` needs the
+ * platform; the RPC runtime already provides it.
+ */
+export type ServedUI = Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  never,
+  HttpServerRequest.HttpServerRequest | HttpPlatform.HttpPlatform
+>;
+
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 
 const IMMUTABLE_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";

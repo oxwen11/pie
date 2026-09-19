@@ -14,6 +14,8 @@ import { ContentPanelSessionProvider } from "@/components/layout/content-panel/r
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
+import { PluginActivityBar } from "@/features/plugins/plugin-activity-bar";
+import { pluginPanel } from "@/features/plugins/plugin-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
@@ -27,7 +29,14 @@ export interface RouterAppContext {
   queryClient: QueryClient;
 }
 
-contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
+contentPanel.registerAll([
+  filesPanel,
+  filePanel,
+  reviewPanel,
+  pullRequestPanel,
+  browserPanel,
+  pluginPanel,
+]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
@@ -85,7 +94,12 @@ function RootLayout() {
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         <AppShellBody>
           <AppShellSidebar>
-            <AppSidebar />
+            <div className="flex h-full min-h-0 w-full min-w-0">
+              <PluginActivityBar />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <AppSidebar />
+              </div>
+            </div>
           </AppShellSidebar>
           <AppShellMain>
             <CardPanel

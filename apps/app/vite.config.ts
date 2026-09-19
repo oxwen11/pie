@@ -11,7 +11,7 @@ import { themeBootstrapPlugin } from "./theme-bootstrap-plugin";
 
 /**
  * The dev server the browser talks to. The pie server no longer embeds Vite,
- * so this proxies the two prefixes it owns — which also keeps the app
+ * so this proxies the prefixes it owns — which also keeps the app
  * same-origin with the RPC, the way it is when the server serves the built
  * bundle. Add a prefix here whenever the server grows one.
  *
@@ -48,6 +48,7 @@ export default defineConfig({
     allowedHosts: process.env.PIE_ALLOWED_HOSTS?.split(",").filter(Boolean),
     proxy: {
       "/api": { target: serverTarget, changeOrigin: true },
+      "/plugins": { target: serverTarget, changeOrigin: true },
       "/ws/rpc": { target: serverTarget, changeOrigin: true, ws: true },
     },
   },

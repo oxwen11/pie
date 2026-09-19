@@ -1,6 +1,7 @@
 import type { WithEffectContext } from "@orpc/experimental-effect";
 import type { FileSystem } from "effect/FileSystem";
 
+import type { Paths } from "../config/paths";
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
 import type { GitService } from "../git";
@@ -15,6 +16,7 @@ import type { TerminalManager } from "../terminal";
 export type RpcContext = WithEffectContext<
   | EventBus
   | FileSystem
+  | Paths
   | PiAgent
   | PiAgentSessionService
   | PiAgentService

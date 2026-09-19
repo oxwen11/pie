@@ -50,6 +50,7 @@ $PIE_HOME/
 │   ├── sessions/<projectId>/<sessionId>.json
 │   └── schedules/<scheduleId>.json
 ├── worktrees/<repository-basename>/<four-character-key>/
+├── plugins/<pluginId>/
 ├── logs/
 │   ├── pie.log
 │   └── daemon-stdio.log
@@ -184,6 +185,20 @@ worktree administration entry, but it does not delete the generated branch
 ref. No normal session/project/schedule delete path currently removes a
 successfully created worktree or branch, so those writes are retained until an
 explicit future cleanup path or manual Git cleanup.
+
+## User-installed pie panel plugins
+
+| Property      | Current contract                                                                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/plugins/<pluginId>/` (`Paths.pluginsDir`)                                                                                                                                                                |
+| Owner         | The user. Pie lists and serves files; it does not create, migrate, or delete this tree                                                                                                                              |
+| Data          | Static panel files. A pie panel plugin is a directory that has `index.html` or `panel.html`, or a tiny `panel.json` `{ title, entry? }` pointing at an existing entry. Other files (Pi-only extensions) are ignored |
+| Write points  | None from Pie. The operator drops a directory in place                                                                                                                                                              |
+| Compatibility | No envelope. A missing directory is an empty list. Corrupt `panel.json` is skipped for that id                                                                                                                      |
+| Extension     | Add optional fields to `panel.json` without a marketplace / permissions DSL. A new required field must stay backward-compatible by remaining optional                                                               |
+| Retention     | Uninstall is deleting the directory. Pie does not garbage-collect it                                                                                                                                                |
+
+The HTTP surface is `GET /plugins/<pluginId>/…` mapped onto that directory, confined so a request cannot leave the plugin folder. Discovery is `plugin.list`.
 
 ## Daemon lifecycle and logs
 

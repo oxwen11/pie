@@ -6,11 +6,13 @@ import { Cause, Context, Data, Effect, Exit, Scope } from "effect";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { Paths } from "../config/paths";
 import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
 import { makeRequestApp } from "./app";
 import { createTicketStore, type TicketStore } from "./auth";
 import { isAllowedOrigin, isLoopbackHost } from "./cors";
-import { createUIHandler, type UIApp } from "./ui";
+import { withPluginFiles } from "./plugins";
+import { createUIHandler, type ServedUI } from "./ui";
 
 export type ManagedServer = Server & {
   readonly dispose: () => Promise<void>;
@@ -54,7 +56,7 @@ export class ServerStartupError extends Data.TaggedError("ServerStartupError")<{
  */
 export type ServerStages = {
   readonly createRpcRuntime: (effectContext: Context.Context<never>) => Promise<RpcRuntime>;
-  readonly createUI: (runtime: RpcRuntime) => Promise<UIApp>;
+  readonly createUI: (runtime: RpcRuntime) => Promise<ServedUI>;
   readonly createRequestHandler: (
     runtime: RpcRuntime,
     app: ReturnType<typeof makeRequestApp>,
@@ -64,7 +66,11 @@ export type ServerStages = {
 
 const defaultStages: ServerStages = {
   createRpcRuntime: (context) => createRpcRuntime(context),
-  createUI: (runtime) => runtime.run(createUIHandler()),
+  createUI: async (runtime) => {
+    const ui = await runtime.run(createUIHandler());
+    const pluginsDir = await runtime.run(Effect.map(Paths, (paths) => paths.pluginsDir));
+    return withPluginFiles(ui, pluginsDir);
+  },
   // The request half is Effect-native and runs on the RPC runtime, which
   // already carries FileSystem/Path/HttpPlatform. `makeHandler` gives back a
   // plain node `request` listener, which is the whole point: it leaves the
