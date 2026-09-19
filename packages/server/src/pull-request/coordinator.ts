@@ -114,7 +114,6 @@ export const makePullRequestCoordinator = (deps: {
     const stacks = new Map<string, ReadEntry<PullRequestStack | null>>();
     const discoveries = new Map<string, ReadEntry<PullRequestSummary | null>>();
     const globalLimit = Semaphore.makeUnsafe(4);
-    const hostLimits = new Map<string, ReturnType<typeof Semaphore.makeUnsafe>>();
     const cooldowns = new Map<string, number>();
     const stateFor = (ref: SessionRef): SessionState => {
       const key = sessionKey(ref);
@@ -173,20 +172,16 @@ export const makePullRequestCoordinator = (deps: {
         if ((cooldowns.get("*") ?? 0) > now || (cooldowns.get(host) ?? 0) > now)
           return yield* new PullRequestHostUnavailable();
         const current = entry;
-        const limit = hostLimits.get(host) ?? Semaphore.makeUnsafe(2);
-        hostLimits.set(host, limit);
         const fetch = globalLimit.withPermit(
-          limit.withPermit(
-            Effect.gen(function* () {
-              if (!(yield* permitted)) return yield* new PullRequestReadCancelled();
-              return yield* effect.pipe(
-                Effect.timeoutOrElse({
-                  duration: "20 seconds",
-                  orElse: () => Effect.fail(new PullRequestHostUnavailable()),
-                }),
-              );
-            }),
-          ),
+          Effect.gen(function* () {
+            if (!(yield* permitted)) return yield* new PullRequestReadCancelled();
+            return yield* effect.pipe(
+              Effect.timeoutOrElse({
+                duration: "20 seconds",
+                orElse: () => Effect.fail(new PullRequestHostUnavailable()),
+              }),
+            );
+          }),
         );
         // Clear at start. A dirty event during the read sets it again and survives completion.
         current.dirty = false;

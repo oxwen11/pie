@@ -65,16 +65,16 @@ describe("PiAgentSessionService", () => {
           projectId: "proj-a",
           cwd: "/tmp/pie-app",
         });
-        yield* fixture.service.rememberPullRequestRef(ref, first);
-        yield* fixture.service.rememberPullRequestRef(ref, first);
-        yield* fixture.service.rememberPullRequestRef(ref, second);
+        yield* fixture.service.registerPullRequest(ref, first);
+        yield* fixture.service.registerPullRequest(ref, first);
+        yield* fixture.service.registerPullRequest(ref, second);
         return {
-          listed: yield* fixture.service.pullRequestRefsFor(ref),
+          listed: yield* fixture.service.pullRequestsFor(ref),
           stored: yield* fixture.repo.read(ref.projectId, ref.sessionId),
         };
       }),
     );
-    expect(result.listed).toEqual([first, second]);
+    expect(result.listed.map((link) => link.ref)).toEqual([first, second]);
     expect(result.stored.pullRequests?.map((link) => link.ref)).toEqual([first, second]);
   });
 

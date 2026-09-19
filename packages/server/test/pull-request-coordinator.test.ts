@@ -371,13 +371,13 @@ layer(NodePlatformLayer)("demand coordinator", (it) => {
       const f = yield* setup({
         summary: (_cwd, ref) =>
           Effect.gen(function* () {
-            if (++active === 2) yield* Deferred.succeed(started, undefined);
+            if (++active === 4) yield* Deferred.succeed(started, undefined);
             yield* Deferred.await(release);
             return { ...summary, ref };
           }),
       });
       const refs = [f.ref];
-      for (let number = 1; number < 3; number++)
+      for (let number = 1; number < 6; number++)
         refs.push((yield* f.service.create({ projectId: "project", cwd: f.home })).ref);
       for (let index = 0; index < refs.length; index++)
         yield* f.service.registerPullRequest(refs[index]!, { ...prRef, number: index + 1 });
@@ -393,16 +393,16 @@ layer(NodePlatformLayer)("demand coordinator", (it) => {
       );
       yield* f.coordinator.demand({ leaseId: lease.leaseId, version: 1, refs: [] });
       yield* Deferred.succeed(release, undefined);
-      yield* waitForCycle(f, 2, 0, refs);
+      yield* waitForCycle(f, 4, 0, refs);
       const statuses = yield* f.coordinator.statuses(refs);
       const queued = statuses.find((status) => status.links[0]?.snapshot === null);
       assert.ok(queued);
       const refreshed = yield* f.coordinator.refresh(queued.ref);
       assert.equal(refreshed.state, "ready");
-      assert.equal(f.count().reads, 3);
+      assert.equal(f.count().reads, 5);
     }),
   );
-  it.effect("bounds concurrent host reads and shares in-flight work", () =>
+  it.effect("bounds concurrent reads and shares in-flight work", () =>
     Effect.gen(function* () {
       const release = yield* Deferred.make<void>();
       const started = yield* Deferred.make<void>();
@@ -413,24 +413,24 @@ layer(NodePlatformLayer)("demand coordinator", (it) => {
           Effect.gen(function* () {
             active++;
             maximum = Math.max(maximum, active);
-            if (active === 2) yield* Deferred.succeed(started, undefined);
+            if (active === 4) yield* Deferred.succeed(started, undefined);
             yield* Deferred.await(release);
             active--;
             return { ...summary, ref };
           }),
       });
       const refs = [f.ref];
-      for (let index = 0; index < 5; index++)
+      for (let index = 0; index < 7; index++)
         refs.push((yield* f.service.create({ projectId: "project", cwd: f.home })).ref);
       for (let index = 0; index < refs.length; index++)
-        yield* f.service.registerPullRequest(refs[index]!, { ...prRef, number: (index % 3) + 1 });
+        yield* f.service.registerPullRequest(refs[index]!, { ...prRef, number: index + 1 });
       yield* f.coordinator.demand({ version: 0, refs });
       yield* Deferred.await(started);
-      assert.equal(maximum, 2);
+      assert.equal(maximum, 4);
       yield* Deferred.succeed(release, undefined);
-      yield* waitForCycle(f, 3, undefined, refs);
-      assert.equal(maximum, 2);
-      assert.equal(f.count().reads, 3);
+      yield* waitForCycle(f, 8, undefined, refs);
+      assert.equal(maximum, 4);
+      assert.equal(f.count().reads, 8);
     }),
   );
 });

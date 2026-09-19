@@ -56,7 +56,7 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
   ...(metadata.gitBranch !== undefined ? { gitBranch: metadata.gitBranch } : undefined),
   ...(metadata.ownsWorktree !== undefined ? { ownsWorktree: metadata.ownsWorktree } : undefined),
-  pullRequests: fromStorage(metadata).pullRequests ?? [],
+  pullRequests: metadata.pullRequests ?? [],
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),

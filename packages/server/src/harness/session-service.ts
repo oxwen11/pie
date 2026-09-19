@@ -156,14 +156,6 @@ export type PiAgentSessionServiceShape = {
     expected: SessionPullRequestContext,
     links: ReadonlyArray<SessionPullRequestLink>,
   ) => Effect.Effect<boolean, SessionNotFound | StoreReadError | StoreWriteError>;
-  /** Compatibility for internal consumers; never queries GitHub. */
-  readonly pullRequestRefsFor: (
-    ref: SessionRef,
-  ) => Effect.Effect<ReadonlyArray<PullRequestRef>, SessionNotFound | StoreReadError>;
-  readonly rememberPullRequestRef: (
-    ref: SessionRef,
-    pullRequest: PullRequestRef,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | StoreWriteError>;
   readonly list: (
     projectId: string,
     archived: boolean,
@@ -740,17 +732,6 @@ export const makePiAgentSessionService = (deps: {
           return true;
         }),
       ),
-    pullRequestRefsFor: (ref) =>
-      readMetadata(ref).pipe(
-        Effect.map((metadata) =>
-          linksFor(metadata)
-            .filter((link) => !link.excluded)
-            .map((link) => link.ref),
-        ),
-      ),
-    rememberPullRequestRef: (ref, pullRequest) =>
-      registerPullRequest(ref, pullRequest).pipe(Effect.asVoid),
-
     list: (projectId, archived) =>
       repo.list(projectId).pipe(
         Effect.map((sessions) =>

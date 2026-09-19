@@ -25,9 +25,7 @@ export function PullRequestLinks({
           <h3 className="text-muted-foreground text-xs font-medium">
             {group.type === "native"
               ? `Native Stack #${group.stack?.number} · ${group.links.length} layers · bottom to top`
-              : group.type === "derived"
-                ? `Derived chain · ${group.links.length} layers · bottom to top`
-                : "Pull request"}
+              : "Pull request"}
           </h3>
           {group.links.map((link) => {
             const key = pullRequestKey(link.ref);

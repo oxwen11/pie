@@ -27,25 +27,13 @@ const link = (number: number, headBranch: string, baseBranch: string): SessionPu
   };
 };
 describe("association projection", () => {
-  it("orders chains by branches and chooses the highest unfinished layer", () => {
+  it("keeps branch-adjacent associations separate without a native stack", () => {
     const top = link(1, "Top", "Base");
     const bottom = link(2, "Base", "main");
     const projection = projectSessionPullRequests([top, bottom]);
-    expect(projection.badge).toBe("stack");
-    expect(projection.groups[0]?.links.map((item) => item.ref.number)).toEqual([2, 1]);
+    expect(projection.badge).toBe("pr");
+    expect(projection.groups.every((group) => group.type === "single")).toBe(true);
     expect(projection.representative).toBe(top);
-  });
-  it("keeps unrelated, cyclic, forked and reused-head associations separate", () => {
-    for (const links of [
-      [link(1, "a", "main"), link(2, "b", "main")],
-      [link(1, "a", "b"), link(2, "b", "a")],
-      [link(1, "a", "main"), link(2, "b", "a"), link(3, "c", "a")],
-      [link(1, "a", "main"), link(2, "a", "main")],
-    ]) {
-      const projection = projectSessionPullRequests(links);
-      expect(projection.badge).toBe("pr");
-      expect(projection.groups.every((group) => group.type === "single")).toBe(true);
-    }
   });
   it("preserves unknown and excludes canceled links", () => {
     const unknown = { ...link(1, "a", "main"), snapshot: null };
@@ -53,7 +41,7 @@ describe("association projection", () => {
       projectSessionPullRequests([unknown, { ...link(2, "b", "main"), excluded: true }]),
     ).toMatchObject({ count: 1, lifecycle: null, representative: unknown });
   });
-  it("prefers native order without persisting a derived chain", () => {
+  it("prefers native order", () => {
     const a = link(1, "a", "main"),
       b = link(2, "b", "main");
     const stack = {
@@ -66,11 +54,10 @@ describe("association projection", () => {
         lifecycle: item.snapshot!.lifecycle,
       })),
     };
-    expect(
-      projectSessionPullRequests([{ ...a, stack }, b]).groups[0]?.links.map(
-        (item) => item.ref.number,
-      ),
-    ).toEqual([2, 1]);
+    const projection = projectSessionPullRequests([{ ...a, stack }, b]);
+    expect(projection.badge).toBe("stack");
+    expect(projection.groups[0]?.links.map((item) => item.ref.number)).toEqual([2, 1]);
+    expect(projection.representative?.ref.number).toBe(1);
   });
   it("rejects unsafe remote identities", () => {
     const decode = Schema.decodeUnknownSync(PullRequestRefSchema);

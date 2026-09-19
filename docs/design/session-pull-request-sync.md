@@ -118,7 +118,7 @@ Session.pullRequests[]
 - PR 身份按规范化 host / 仓库和编号去重；分支名保留大小写。
 - URL 从校验后的身份生成，不重复保存任意外部 URL。
 - `snapshot: null` 是身份已知、状态未取得，不伪装成 open。
-- 原生 Stack 保存有界的成员摘要和顺序，不复制完整 PR 详情。没有原生 Stack 时，derived chain 从 head/base 快照计算，不额外持久化一套推导结果。
+- 原生 Stack 保存有界的成员摘要和顺序，不复制完整 PR 详情。没有原生 Stack 时展示独立 PR，不推导 chain。
 - 网络错误不能清除旧 snapshot / stack；成功确认没有原生 Stack 才更新为空，并保留本次成功检查的新鲜度记录。未知、无 Stack、查询失败必须可区分。
 - 成功核验更新时间，即使状态内容没变；按 Session 合并落盘，不因窗口数量增加写入次数。Agent 提供的状态文字不冒充 Server 核验快照。
 - checks、review、权限和 head SHA 的完整详情按需读取，不将它们全部固化到 Session 元数据。展示快照绝不作为写操作授权。
@@ -214,13 +214,7 @@ Agent 显式登记是主路径；可信分支发现是用户使用时的补漏�
 
 Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `source: stack` 关联缺少的成员。登记仍走同一个 Session service 方法，不能绕过排除标记或并发检查。
 
-新关联只表示该 PR 属于用户正在查看的原生 Stack，不证明它由当前 Session 创建。远端 Stack 移除某层时更新拓扑，不自动删除历史 Session 关联。host 不支持原生 Stack 时可展示普通 PR / derived chain；暂时查询失败保留旧拓扑并标记待更新。
-
-### Derived chain
-
-对没有原生 Stack 分组的可见关联，按同 host / 仓库的 `child.baseBranch = parent.headBranch` 推导链。原生顺序优先；分支名区分大小写；重复 head、环或分叉等不能确定唯一线性层序的情况，不强行画成一个 Stack。
-
-只在已关联项中推导，不递归搜索 GitHub 邻居，不将推导关系持久化为原生事实，也不提供 derived chain 的 Stack 批量写操作。
+新关联只表示该 PR 属于用户正在查看的原生 Stack，不证明它由当前 Session 创建。远端 Stack 移除某层时更新拓扑，不自动删除历史 Session 关联。host 不支持原生 Stack 时展示普通独立 PR；暂时查询失败保留旧拓扑并标记待更新。不推导/不持久化非原生 chain。
 
 ### 代表项与展示
 
@@ -228,12 +222,12 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 侧栏 Session 行                          PR 内容面板
 [phase] Session title … [PR / Stack]      关联列表
                                          ├─ Native Stack：底层 → 顶层
-单个 PR：编号与状态                      ├─ Derived chain：分支依赖顺序
-多个无关 PR：代表 PR + 额外数量           └─ 无关 PR：独立项
-单条确定的链：Stack 标识 + 层数           当前所选 PR 的详情与允许操作
+单个 PR：编号与状态                      └─ 无关 PR：独立项
+多个无关 PR：代表 PR + 额外数量           当前所选 PR 的详情与允许操作
+原生 Stack：Stack 标识 + 层数
 ```
 
-优先未完成 / 未核验工作；单链选择最高未完成层，全终态单链仍指向顶层。多个无关项按首次关联时间选择未完成代表项，不用请求完成顺序；这只是导航规则，不声称是一个 Stack。聚合状态保留 unknown，不能把尚未核验解释为全部已合并或全部 open。
+优先未完成 / 未核验工作；单条原生 Stack 选择最高未完成层，全终态仍指向顶层。多个无关项按首次关联时间选择未完成代表项，不用请求完成顺序；这只是导航规则，不声称是一个 Stack。聚合状态保留 unknown，不能把尚未核验解释为全部已合并或全部 open。
 
 所有侧栏行读同一个 Server 投影，删除 active-row 的 `current` 覆盖。未知状态保留中性 PR 标识；有旧快照的错误保留上次状态，显示核验时间与 Retry。键盘可获得同样说明，操作不能嵌套交互元素或触发 Session 行导航。
 
@@ -261,7 +255,7 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 - 校验当前关联未排除、host 能力、用户权限、最新原生层序，以及每个受影响层的 expected head。变化时拒绝并要求重新确认。
 - Merge stack 只覆盖所选层及其下方未合并成员，不对全部历史关联盲目 merge。使用 host 支持的原生操作；缺少必要保护时禁用，不退化成无保护循环。
 - Rebase stack 按底到顶更新远端分支，预检各层权限，用 expected head 防止覆盖新提交，并检查已处理层是否再次变化；不改本地 checkout。
-- 只存在 derived chain 时禁用 Stack 批量写操作。
+- 没有原生 Stack 时禁用 Stack 批量写操作。
 - 超时或不可确认结果不得自动重复写入；中途失败明确报告哪些层已完成，不伪装成原子操作，不自动回滚远端历史。
 - 保留现有单 PR merge / auto-merge 的实时上下文校验与 `--match-head-commit`，不因支持关联面板而削弱它们。
 
@@ -285,7 +279,7 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 
 ### 第三步：Stack 与关联 PR 面板
 
-加入所需摘要字段、原生拓扑、自动成员补齐、derived chain、代表项选择和按明确身份的详情。
+加入所需摘要字段、原生拓扑、自动成员补齐、代表项选择和按明确身份的详情。
 
 验收：Agent 可在无 UI 时登记每层但不查 Stack；用户查看后才补齐远端成员；层序不是 PR 编号顺序；无关 PR、环、重复 head 和分叉不伪装成单 Stack；取消项不复活；远端拓扑变化而 PR 状态不变也能在有需求时更新；非活动面板不拉详情。
 
@@ -293,7 +287,7 @@ Server 在有需求时通过 GitHub 原生 Stack API 取得层序，并以 `sour
 
 接入确认 UI、权限 / 预期成员与 head 校验、host 操作和部分失败反馈。
 
-验收：未经确认不执行；确认期间成员或 head 变化被拒绝；中途失败不重试已完成写入；结果未知时不重复提交；本地 checkout 不变；derived chain 不可执行原生 Stack action。真实 GitHub 写入验收必须使用用户授权的测试仓库。
+验收：未经确认不执行；确认期间成员或 head 变化被拒绝；中途失败不重试已完成写入；结果未知时不重复提交；本地 checkout 不变；非原生关联不可执行原生 Stack action。真实 GitHub 写入验收必须使用用户授权的测试仓库。
 
 ### 总体验收
 

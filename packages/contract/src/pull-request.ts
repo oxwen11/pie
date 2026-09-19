@@ -311,7 +311,7 @@ export const pullRequestUrl = (ref: PullRequestRef): string =>
   `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
 
 export type PullRequestGroup = {
-  readonly type: "native" | "derived" | "single";
+  readonly type: "native" | "single";
   readonly links: ReadonlyArray<SessionPullRequestLink>;
   readonly stack: PullRequestStack | null;
 };
@@ -323,7 +323,7 @@ export type PullRequestProjection = {
   readonly lifecycle: PullRequestLifecycle | null;
 };
 
-/** Only unique linear components are chains. Ambiguous components stay individual. */
+/** Native stacks stay grouped; everything else is an individual association. */
 export const projectSessionPullRequests = (
   links: ReadonlyArray<SessionPullRequestLink>,
 ): PullRequestProjection => {
@@ -342,59 +342,11 @@ export const projectSessionPullRequests = (
     for (const member of members) remaining.delete(pullRequestKey(member.ref));
     groups.push({ type: "native", links: members, stack: link.stack });
   }
-  const candidates = [...remaining.values()];
-  const repoKey = (link: SessionPullRequestLink) => pullRequestKey({ ...link.ref, number: 1 });
-  const adjacent = (a: SessionPullRequestLink, b: SessionPullRequestLink) =>
-    a !== b &&
-    repoKey(a) === repoKey(b) &&
-    a.snapshot !== null &&
-    b.snapshot !== null &&
-    (a.snapshot.headBranch === b.snapshot.baseBranch ||
-      b.snapshot.headBranch === a.snapshot.baseBranch ||
-      a.snapshot.headBranch === b.snapshot.headBranch);
-  while (remaining.size > 0) {
-    const first = remaining.values().next().value;
-    if (!first) break;
-    const component = [first];
-    remaining.delete(pullRequestKey(first.ref));
-    for (const member of component) {
-      for (const candidate of candidates) {
-        if (remaining.has(pullRequestKey(candidate.ref)) && adjacent(member, candidate)) {
-          remaining.delete(pullRequestKey(candidate.ref));
-          component.push(candidate);
-        }
-      }
-    }
-    const parents = (child: SessionPullRequestLink) =>
-      component.filter(
-        (parent) => parent !== child && parent.snapshot?.headBranch === child.snapshot?.baseBranch,
-      );
-    const children = (parent: SessionPullRequestLink) =>
-      component.filter(
-        (child) => parent !== child && child.snapshot?.baseBranch === parent.snapshot?.headBranch,
-      );
-    const heads = component.map((member) => member.snapshot?.headBranch);
-    const roots = component.filter((member) => parents(member).length === 0);
-    const unique = new Set(heads).size === heads.length;
-    const ordered: SessionPullRequestLink[] = [];
-    let cursor = roots.length === 1 ? roots[0] : undefined;
-    if (
-      unique &&
-      component.every((member) => parents(member).length <= 1 && children(member).length <= 1)
-    ) {
-      while (cursor && !ordered.includes(cursor)) {
-        ordered.push(cursor);
-        cursor = children(cursor)[0];
-      }
-    }
-    if (component.length > 1 && ordered.length === component.length)
-      groups.push({ type: "derived", links: ordered, stack: null });
-    else
-      for (const member of component) groups.push({ type: "single", links: [member], stack: null });
-  }
+  for (const link of remaining.values())
+    groups.push({ type: "single", links: [link], stack: null });
   const unfinished = (link: SessionPullRequestLink) =>
     link.snapshot === null || link.snapshot.lifecycle.type === "open";
-  const chain = groups.length === 1 && groups[0]?.type !== "single" ? groups[0] : undefined;
+  const chain = groups.length === 1 && groups[0]?.type === "native" ? groups[0] : undefined;
   const ordered = chain
     ? chain.links.reduceRight<SessionPullRequestLink[]>((result, link) => {
         result.push(link);

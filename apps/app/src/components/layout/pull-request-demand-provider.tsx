@@ -11,7 +11,6 @@ import {
 } from "react";
 
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
-import { createQueryRepair } from "@/lib/query-repair";
 import { usePlatform } from "@/platform-context";
 
 import { PullRequestDemand } from "./pull-request-demand";
@@ -38,14 +37,10 @@ export function PullRequestDemandProvider({ children }: { children: ReactNode })
       visibility: new RendererVisibility(platform.visibility),
     };
   });
-  const [repair] = useState(() => {
-    const statuses = createQueryRepair(queryClient, orpcQueryUtils.pullRequest.statuses.key());
-    const details = createQueryRepair(queryClient, orpcQueryUtils.pullRequest.detail.key());
-    return () => {
-      statuses();
-      details();
-    };
-  });
+  const repair = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.statuses.key() });
+    void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.detail.key() });
+  }, [queryClient, orpcQueryUtils]);
   const onSubscribed = useCallback(() => {
     runtime.demand.reconnect();
     repair();
