@@ -6,8 +6,10 @@ import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentModel } from "@getpie/contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { persistDefaultPiModel } from "../../../src/harness/pi/persist-default-model";
-import { resolveDefaultPiModel } from "../../../src/harness/pi/resolve-default-model";
+import {
+  persistDefaultPiModel,
+  resolveDefaultPiModel,
+} from "../../../src/harness/pi/resolve-default-model";
 
 const models: ReadonlyArray<AgentModel> = [
   { provider: "openai", modelId: "gpt-5.4" },

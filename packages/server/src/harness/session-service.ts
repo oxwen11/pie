@@ -38,7 +38,7 @@ import {
   type TurnAlreadyRunning,
 } from "./errors";
 import { PiAgent } from "./pi/agent";
-import { persistDefaultPiModel } from "./pi/persist-default-model";
+import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -332,7 +332,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     );
             return materializeWorkspace.pipe(
               Effect.flatMap((sessionWorkspace) => {
-                const selectedModel = input.model;
                 const metadata: Session = {
                   sessionId,
                   projectId: input.projectId,
@@ -341,8 +340,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   ...(sessionWorkspace.worktree !== undefined
                     ? { worktree: sessionWorkspace.worktree }
                     : undefined),
-                  ...(selectedModel !== undefined
-                    ? { provider: selectedModel.provider, modelId: selectedModel.modelId }
+                  ...(input.model !== undefined
+                    ? { provider: input.model.provider, modelId: input.model.modelId }
                     : undefined),
                   ...(input.title !== undefined ? { title: input.title } : undefined),
                   archived: false,
@@ -353,13 +352,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
-                  Effect.tap(() =>
-                    selectedModel === undefined
-                      ? Effect.void
-                      : Effect.tryPromise(() =>
-                          persistDefaultPiModel(selectedModel.provider, selectedModel.modelId),
-                        ).pipe(Effect.ignore),
-                  ),
+                  Effect.tap(() => {
+                    const model = input.model;
+                    if (model === undefined) return Effect.void;
+                    return Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore);
+                  }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
                     input.title === undefined
