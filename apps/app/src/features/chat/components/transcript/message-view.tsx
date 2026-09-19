@@ -8,18 +8,9 @@ import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import { CompactionMarker, type CompactionPartData } from "./compaction-marker";
+import { CompactionMarker, isCompactionData } from "./compaction-marker";
 import { UserMessage } from "./user-message";
 import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
-
-function isCompactionData(data: unknown): data is CompactionPartData {
-  if (typeof data !== "object" || data === null || !("phase" in data)) return false;
-  const phase = data.phase;
-  if (phase === "running" || phase === "canceled") return true;
-  if (phase === "completed") return "summary" in data && typeof data.summary === "string";
-  if (phase === "failed") return "error" in data && typeof data.error === "string";
-  return false;
-}
 
 const NO_UNSUBSCRIBE = () => {
   /* useSyncExternalStore requires an unsubscribe even when the store has none. */

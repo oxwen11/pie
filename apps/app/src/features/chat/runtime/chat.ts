@@ -12,11 +12,16 @@ import type { JSONContent } from "@tiptap/react";
 import { generateId, readUIMessageStream } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
-import type { CompactionPartData } from "../components/transcript/compaction-marker";
 import type { AgentRequest, AgentResponse } from "./agent-requests";
 import { ChatState, type ChatStoreState } from "./chat-state";
 import type { ChatSessionTransport } from "./chat-transport-port";
 import { sanitizeTail } from "./sanitize-tail";
+
+export type CompactionPartData =
+  | { phase: "running" }
+  | { phase: "completed"; summary: string }
+  | { phase: "canceled" }
+  | { phase: "failed"; error: string };
 
 export interface ChatInit {
   sessionRef: SessionRef;
@@ -596,10 +601,6 @@ export class Chat {
     this.#compactionMessageId = data.phase === "running" ? id : null;
   }
 
-  #isCompacting(): boolean {
-    return this.#compactionMessageId !== null;
-  }
-
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
@@ -659,7 +660,7 @@ export class Chat {
     const busy =
       this.#state.status === "submitted" ||
       this.#state.status === "streaming" ||
-      this.#isCompacting();
+      this.#compactionMessageId !== null;
     if (busy) {
       try {
         await this.#transport.prompt({

@@ -114,7 +114,7 @@ describe("Chat compaction", () => {
 
   it("restores the spinner and queues input while compacting without an active turn", async () => {
     const { chat, attach, transport } = makeChat();
-    await attach({ compaction: { reason: "manual" } });
+    await attach({ compaction: true });
     expect(compactionData(defined(chat.store.getState().messages[0]))).toEqual({
       phase: "running",
     });
