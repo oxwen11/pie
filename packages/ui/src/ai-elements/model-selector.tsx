@@ -1,6 +1,5 @@
 "use client";
 
-import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { Button } from "@getpie/ui/components/button";
 import {
   Combobox,
@@ -9,6 +8,7 @@ import {
   ComboboxGroup,
   ComboboxGroupLabel,
   ComboboxInput,
+  ComboboxItem,
   ComboboxList,
   ComboboxPopup,
   ComboboxTrigger,
@@ -43,7 +43,9 @@ export const ModelSelectorPopup = ({ className, ...props }: ModelSelectorPopupPr
 export type ModelSelectorInputProps = ComponentProps<typeof ComboboxInput>;
 
 export const ModelSelectorInput = (props: ModelSelectorInputProps) => (
-  <ComboboxInput data-slot="model-selector-input" {...props} />
+  // No data-slot override: coss ComboboxInput's startAddon padding targets the
+  // inner input via data-slot="combobox-input"; overriding it breaks that contract.
+  <ComboboxInput {...props} />
 );
 
 export type ModelSelectorListProps = ComponentProps<typeof ComboboxList>;
@@ -74,19 +76,12 @@ export const ModelSelectorCollection = ComboboxCollection;
 
 export const ModelSelectorValue = ComboboxValue;
 
-export type ModelSelectorItemProps = ComboboxPrimitive.Item.Props;
+export type ModelSelectorItemProps = ComponentProps<typeof ComboboxItem>;
 
 export const ModelSelectorItem = ({ className, children, ...props }: ModelSelectorItemProps) => (
-  <ComboboxPrimitive.Item
-    className={cn(
-      "data-highlighted:bg-accent data-highlighted:text-accent-foreground data-selected:bg-accent data-selected:text-accent-foreground flex min-h-8 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-base outline-none in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
-      className,
-    )}
-    data-slot="model-selector-item"
-    {...props}
-  >
+  <ComboboxItem className={className} data-slot="model-selector-item" {...props}>
     <span className="flex min-w-0 items-center gap-2">{children}</span>
-  </ComboboxPrimitive.Item>
+  </ComboboxItem>
 );
 
 export type ModelSelectorLogoProps = Omit<ComponentProps<"img">, "src" | "alt"> & {
@@ -228,36 +223,31 @@ export function ModelSelectorPicker({
         </ModelSelectorValue>
       </ModelSelectorTrigger>
       <ModelSelectorPopup>
-        <div className="border-b px-2 py-1.5">
+        <div className="border-b p-2">
           <ModelSelectorInput
             autoFocus
-            className="border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0"
+            className="rounded-md before:rounded-[calc(var(--radius-md)-1px)]"
             placeholder="Search models…"
             showTrigger={false}
-            size="sm"
             startAddon={<SearchIcon />}
           />
         </div>
-        <ModelSelectorEmpty className="text-muted-foreground text-center text-sm">
-          No matching models.
-        </ModelSelectorEmpty>
-        <div className="min-h-0 flex-1">
-          <ModelSelectorList>
-            {(group: ModelSelectorGroupItems) => (
-              <ModelSelectorGroup items={group.items} key={group.provider}>
-                <ModelSelectorGroupLabel>{group.provider}</ModelSelectorGroupLabel>
-                <ModelSelectorCollection>
-                  {(option: ModelSelectorOption) => (
-                    <ModelSelectorItem key={`${option.provider}:${option.modelId}`} value={option}>
-                      <ModelSelectorLogo provider={option.provider} />
-                      <ModelSelectorName>{option.label}</ModelSelectorName>
-                    </ModelSelectorItem>
-                  )}
-                </ModelSelectorCollection>
-              </ModelSelectorGroup>
-            )}
-          </ModelSelectorList>
-        </div>
+        <ModelSelectorEmpty>No matching models.</ModelSelectorEmpty>
+        <ModelSelectorList>
+          {(group: ModelSelectorGroupItems) => (
+            <ModelSelectorGroup items={group.items} key={group.provider}>
+              <ModelSelectorGroupLabel>{group.provider}</ModelSelectorGroupLabel>
+              <ModelSelectorCollection>
+                {(option: ModelSelectorOption) => (
+                  <ModelSelectorItem key={`${option.provider}:${option.modelId}`} value={option}>
+                    <ModelSelectorLogo provider={option.provider} />
+                    <ModelSelectorName>{option.label}</ModelSelectorName>
+                  </ModelSelectorItem>
+                )}
+              </ModelSelectorCollection>
+            </ModelSelectorGroup>
+          )}
+        </ModelSelectorList>
       </ModelSelectorPopup>
     </ModelSelector>
   );
