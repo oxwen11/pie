@@ -123,6 +123,8 @@ export class Chat {
   // server says in the meantime — snapshot phase, settled transcript — has
   // seen it, and neither may erase the optimistic bubble it put on screen.
   #promptsInFlight = 0;
+  readonly #unacknowledgedPrompts = new Map<string, PieUIMessage>();
+  #transcriptGeneration = 0;
   // replaceQueue writes the chosen list first; Pi then emits an empty
   // queue_update from clear_queue before the remaining lines are rewritten.
   // Ignore those intermediates so the row the user just edited does not flash.
@@ -170,7 +172,21 @@ export class Chat {
     if (event.seq <= this.#cursor) return;
     this.#cursor = event.seq;
     switch (event.type) {
+      case "session.compaction.started":
+        this.store.setState({ compaction: { phase: "running", reason: event.reason } });
+        break;
+      case "session.compaction.ended":
+        if (event.result.outcome === "completed") this.#resetTranscript(event.result.messages);
+        else
+          this.store.setState({
+            compaction:
+              event.result.outcome === "canceled"
+                ? { phase: "canceled" }
+                : { phase: "failed", error: event.result.error },
+          });
+        break;
       case "session.message.chunk":
+        if (event.chunk.type === "finish" && !this.#turnFolds.has(event.turnId)) break;
         this.#observeChunk(event.chunk);
         // Retry is UI status, not transcript — keep it out of the message fold.
         if (event.chunk.type === "data-retry") break;
@@ -183,6 +199,7 @@ export class Chat {
       // optimistic message already carries the same id, making the append a
       // no-op.
       case "session.prompt.submitted":
+        this.#unacknowledgedPrompts.delete(event.messageId);
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
@@ -194,6 +211,7 @@ export class Chat {
       // The server rejected the prompt before it started: drop the sender's
       // optimistic user message. Other clients normally never saw it.
       case "session.prompt.rejected":
+        this.#unacknowledgedPrompts.delete(event.messageId);
         this.#state.messages = this.#state.messages.filter(
           (message) => message.id !== event.messageId,
         );
@@ -239,6 +257,7 @@ export class Chat {
         }
         break;
       case "session.crashed":
+        this.store.setState({ compaction: null });
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
         // The server projection drops its pending requests on crash; a card
@@ -272,6 +291,8 @@ export class Chat {
     // this instance go.
     if (this.#terminated) return;
     this.#terminated = true;
+    this.#transcriptGeneration += 1;
+    this.store.setState({ compaction: null });
     for (const fold of this.#turnFolds.values()) fold.close();
     this.#turnFolds.clear();
     this.#queuedEvents = null;
@@ -310,17 +331,29 @@ export class Chat {
       this.#floorSnapshot = snapshot;
       return;
     }
+    if ((snapshot.lastCompactionSeq ?? 0) > this.#cursor && !snapshot.transcriptReset) {
+      // Compaction and a later turn both happened while detached. Its reset
+      // buffer is gone; load the new settled floor before replaying that turn.
+      this.#queuedEvents = [];
+      this.#floorSnapshot = snapshot;
+      void this.#loadHistoryFloor(true);
+      return;
+    }
     this.#hydrateFromSnapshot(snapshot);
   }
 
-  async #loadHistoryFloor(): Promise<void> {
+  async #loadHistoryFloor(replace = false): Promise<void> {
     try {
       const history = await this.#transport.getMessages();
+      if (this.#terminated) return;
       // Guarded on the transcript, not on status: a non-empty transcript is
       // already ahead of the disk (optimistic prompt), while a server-side
       // active turn just means another client is mid-turn — exactly when the
       // floor is still wanted.
-      if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
+      if (replace && history !== null) {
+        this.#resetTranscript(history);
+        this.#cursor = 0;
+      } else if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
         this.#state.messages = Array.from(history);
       }
       // An empty read is still a floor: the session simply has nothing settled
@@ -359,6 +392,20 @@ export class Chat {
       this.#cursor = 0;
       this.#needsReconcile = true;
     }
+    const reset = snapshot.transcriptReset;
+    if (
+      reset &&
+      reset.seq > this.#cursor &&
+      (this.#cursor > 0 || snapshot.activeTurn?.complete === false)
+    ) {
+      this.#resetTranscript(reset.messages);
+      this.#cursor = reset.seq;
+    }
+    this.store.setState({
+      compaction: snapshot.compaction
+        ? { phase: "running", reason: snapshot.compaction.reason }
+        : null,
+    });
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
@@ -475,6 +522,7 @@ export class Chat {
     }
     for (const chunk of chunks) {
       if (chunk.type === "data-retry") continue;
+      if (chunk.type === "finish" && !this.#turnFolds.has(activeTurn.turnId)) continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
       this.#turnFold(activeTurn.turnId).enqueue(chunk);
     }
@@ -534,8 +582,10 @@ export class Chat {
   // or streaming chunks must not be clobbered. A skipped reconcile converges
   // on the next reload instead.
   async #reconcileHistory(): Promise<void> {
+    const generation = this.#transcriptGeneration;
     try {
       const history = await this.#transport.getMessages();
+      if (this.#terminated || generation !== this.#transcriptGeneration) return;
       // Same read as the floor's, so it answers the same question: a reconcile
       // that lands clears a floor read that failed earlier.
       this.#state.historyStatus = history === null ? "unavailable" : "settled";
@@ -560,9 +610,26 @@ export class Chat {
     }
   }
 
+  #resetTranscript(messages: readonly PieUIMessage[]): void {
+    this.#transcriptGeneration += 1;
+    for (const fold of this.#turnFolds.values()) fold.close();
+    this.#turnFolds.clear();
+    this.#recoverTurnIds.clear();
+    this.#erroredTurnIds.clear();
+    this.#needsReconcile = false;
+    this.store.setState({
+      messages: [...messages, ...this.#unacknowledgedPrompts.values()],
+      compaction: null,
+      retryNotice: undefined,
+      error: undefined,
+      historyStatus: "settled",
+    });
+  }
+
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
+    const generation = this.#transcriptGeneration;
     let controller: ReadableStreamDefaultController<PieUIMessageChunk> | undefined;
     const stream = new ReadableStream<PieUIMessageChunk>({
       start(c) {
@@ -577,7 +644,8 @@ export class Chat {
         // slot. A start chunk with one still overrides this seed.
         const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as PieUIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
-          this.#state.upsertMessage(message);
+          if (generation === this.#transcriptGeneration && !this.#terminated)
+            this.#state.upsertMessage(message);
         }
       } catch (foldError) {
         console.error("Failed to fold turn", foldError);
@@ -616,7 +684,10 @@ export class Chat {
     this.#state.retryNotice = undefined;
     this.#state.error = undefined;
 
-    const busy = this.#state.status === "submitted" || this.#state.status === "streaming";
+    const busy =
+      this.#state.status === "submitted" ||
+      this.#state.status === "streaming" ||
+      this.store.getState().compaction?.phase === "running";
     if (busy) {
       try {
         await this.#transport.prompt({
@@ -633,7 +704,9 @@ export class Chat {
       return;
     }
 
-    this.#state.pushMessage(toUserMessage(messageId, parts));
+    const optimistic = toUserMessage(messageId, parts);
+    this.#unacknowledgedPrompts.set(messageId, optimistic);
+    this.#state.pushMessage(optimistic);
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
@@ -650,6 +723,7 @@ export class Chat {
       this.#setStatus("error");
       throw promptError;
     } finally {
+      this.#unacknowledgedPrompts.delete(messageId);
       this.#promptsInFlight -= 1;
     }
   };
@@ -695,6 +769,7 @@ export class Chat {
   };
 
   dispose = (): void => {
+    this.#transcriptGeneration += 1;
     this.#unsubscribe();
     for (const fold of this.#turnFolds.values()) fold.close();
     this.#turnFolds.clear();

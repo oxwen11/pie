@@ -216,7 +216,7 @@ export const CompactionReasonSchema = Schema.Literals(["manual", "threshold", "o
 export type CompactionReason = typeof CompactionReasonSchema.Type;
 
 export type CompactionResult =
-  | { readonly outcome: "completed"; readonly messages: ReadonlyArray<UIMessage> }
+  | { readonly outcome: "completed"; readonly messages: ReadonlyArray<PieUIMessage> }
   | { readonly outcome: "canceled" }
   | { readonly outcome: "failed"; readonly error: string };
 
@@ -398,11 +398,12 @@ export type SessionRuntimeSnapshot = {
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
   readonly compaction?: { readonly reason: CompactionReason } | null;
+  readonly lastCompactionSeq?: number;
   // A reset is retained only while its turn is active; chunks then cover only
   // the continuation after this boundary, never the compacted prefix.
   readonly transcriptReset?: {
     readonly seq: number;
-    readonly messages: ReadonlyArray<UIMessage>;
+    readonly messages: ReadonlyArray<PieUIMessage>;
   } | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
   readonly cursor: number;
