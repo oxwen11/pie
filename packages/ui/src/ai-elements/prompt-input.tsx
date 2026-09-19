@@ -103,7 +103,7 @@ export const PromptInputButton = ({
   size,
   ...props
 }: PromptInputButtonProps) => {
-  const newSize = (size ?? Children.count(props.children) > 1) ? "default" : "icon";
+  const newSize = size ?? (Children.count(props.children) > 1 ? "default" : "icon-sm");
 
   return (
     <Button
