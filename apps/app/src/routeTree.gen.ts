@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DraftRouteImport } from './routes/draft'
 import { Route as PullRequestsRouteImport } from './routes/pull-requests'
 import { Route as SchedulesRouteImport } from './routes/schedules'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionSessionIdRouteImport } from './routes/session/$sessionId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const SchedulesRoute = SchedulesRouteImport.update({
   path: '/schedules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionSessionIdRoute = SessionSessionIdRouteImport.update({
   id: '/session/$sessionId',
   path: '/session/$sessionId',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/draft': typeof DraftRoute
   '/pull-requests': typeof PullRequestsRoute
   '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/draft': typeof DraftRoute
   '/pull-requests': typeof PullRequestsRoute
   '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRoutesById {
@@ -61,20 +69,33 @@ export interface FileRoutesById {
   '/draft': typeof DraftRoute
   '/pull-requests': typeof PullRequestsRoute
   '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/draft' | '/pull-requests' | '/schedules' | '/session/$sessionId'
+    | '/'
+    | '/draft'
+    | '/pull-requests'
+    | '/schedules'
+    | '/settings'
+    | '/session/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/draft' | '/pull-requests' | '/schedules' | '/session/$sessionId'
+  to:
+    | '/'
+    | '/draft'
+    | '/pull-requests'
+    | '/schedules'
+    | '/settings'
+    | '/session/$sessionId'
   id:
     | '__root__'
     | '/'
     | '/draft'
     | '/pull-requests'
     | '/schedules'
+    | '/settings'
     | '/session/$sessionId'
   fileRoutesById: FileRoutesById
 }
@@ -83,6 +104,7 @@ export interface RootRouteChildren {
   DraftRoute: typeof DraftRoute
   PullRequestsRoute: typeof PullRequestsRoute
   SchedulesRoute: typeof SchedulesRoute
+  SettingsRoute: typeof SettingsRoute
   SessionSessionIdRoute: typeof SessionSessionIdRoute
 }
 
@@ -116,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/session/$sessionId': {
       id: '/session/$sessionId'
       path: '/session/$sessionId'
@@ -131,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   DraftRoute: DraftRoute,
   PullRequestsRoute: PullRequestsRoute,
   SchedulesRoute: SchedulesRoute,
+  SettingsRoute: SettingsRoute,
   SessionSessionIdRoute: SessionSessionIdRoute,
 }
 export const routeTree = rootRouteImport
