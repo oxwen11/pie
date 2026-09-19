@@ -8,11 +8,9 @@ import {
   EmptyTitle,
 } from "@getpie/ui/components/empty";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, isRedirect, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
-
-import { parseWorktreeMissingError } from "@/features/session/worktree-missing";
 
 type FallbackSearch = {
   readonly sessionId: string;
@@ -33,22 +31,6 @@ export const Route = createFileRoute("/session/fallback")({
   },
   beforeLoad: ({ search }) => {
     if (search.sessionId === "" || search.projectId === "") {
-      throw redirect({ to: "/draft" });
-    }
-  },
-  loaderDeps: ({ search }) => search,
-  loader: async ({ context, deps }) => {
-    const ref = { projectId: deps.projectId, sessionId: deps.sessionId };
-    try {
-      await context.orpcQueryUtils.agent.session.prepare.call({ ref });
-      throw redirect({
-        to: "/session/$sessionId",
-        params: { sessionId: deps.sessionId },
-        search: { projectId: deps.projectId },
-      });
-    } catch (error: unknown) {
-      if (isRedirect(error)) throw error;
-      if (parseWorktreeMissingError(error) !== undefined) return;
       throw redirect({ to: "/draft" });
     }
   },
