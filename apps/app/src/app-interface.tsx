@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Toaster } from "sonner";
 
 import "./index.css";
@@ -95,9 +95,19 @@ function ResolveLocalEnvironment({
 }: {
   server?: ServerConnection;
   tokenHolder?: { current: string };
-}): ReactElement {
-  const promise = useStable(() => loadEnvironmentId(server));
-  const environmentId = use(promise);
+}): ReactElement | null {
+  const [environmentId, setEnvironmentId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadEnvironmentId(server).then((id) => {
+      if (!cancelled) setEnvironmentId(id);
+      return undefined;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [server]);
+  if (environmentId === null) return null;
   return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }
 
