@@ -7,24 +7,16 @@ import { ChatInputController, type ChatInputControllerOptions } from "./chat-inp
 
 const getServerSnapshot = (): ChatInputController | null => null;
 
-export type UseChatInputControllerOptions = ChatInputControllerOptions & {
-  /** Called with the editor JSON right before dispose — capture at subscribe. */
-  onDispose?: (doc: JSONContent | undefined) => void;
-};
-
 // The controller is a store this hook owns: subscribe constructs it, the
 // unsubscribe disposes it. StrictMode subscribe/unsubscribe/subscribe creates
 // and destroys a throwaway instance — a destroyed editor is never reused.
 // Callbacks go through a latest-ref so closures never see stale state. First
 // render returns null — consumers must tolerate it.
-//
-// Remount (e.g. `key={sessionRefKey}`) to switch sessions. `onDispose` /
-// `initialContent` are snapshotted when subscribe runs, not read from the
-// latest-ref on unsubscribe: a parent re-render can update opts before the
-// outgoing subscription tears down, and a latest-ref would save the outgoing
-// draft onto the incoming chat.
+// Snapshot onDispose/initialContent at subscribe; latest-ref races session switches.
 export function useChatInputController(
-  opts: UseChatInputControllerOptions,
+  opts: ChatInputControllerOptions & {
+    onDispose?: (doc: JSONContent | undefined) => void;
+  },
 ): ChatInputController | null {
   const optsRef = useLatestRef(opts);
   const storeRef = useRef<ChatInputController | null>(null);
