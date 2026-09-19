@@ -1,6 +1,6 @@
 import type { SessionRef } from "@getpie/contract";
-import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 
+import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
 import { useSessionModels } from "@/features/chat/hooks/use-session-models";
 
 export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
