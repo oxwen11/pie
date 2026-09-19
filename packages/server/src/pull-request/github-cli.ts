@@ -172,14 +172,12 @@ export interface GitHubCliAdapter {
   }) => Effect.Effect<void, PullRequestCliActionFailure>;
 }
 
-export const mapExecutionReadError = (error: GitHubCliExecutionError): PullRequestReadFailure =>
+const mapExecutionReadError = (error: GitHubCliExecutionError): PullRequestReadFailure =>
   error._tag === "GitHubCliExecutableMissing"
     ? new PullRequestMissingGh()
     : new PullRequestHostUnavailable();
 
-export const mapExecutionActionError = (
-  error: GitHubCliExecutionError,
-): PullRequestCliActionFailure =>
+const mapExecutionActionError = (error: GitHubCliExecutionError): PullRequestCliActionFailure =>
   error._tag === "GitHubCliExecutableMissing"
     ? new PullRequestMissingGh()
     : new PullRequestActionOutcomeUnknown();

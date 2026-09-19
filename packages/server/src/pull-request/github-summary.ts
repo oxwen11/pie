@@ -28,7 +28,7 @@ const SummaryJson = Schema.Struct({
   baseRefName: Schema.String,
 });
 
-export const summaryLifecycle = (
+const summaryLifecycle = (
   state: "OPEN" | "CLOSED" | "MERGED",
   draft: boolean,
 ): PullRequestLifecycle =>
