@@ -44,16 +44,24 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
 // pending agent request cards. Only the last message can be streaming, so only
 // it gets streaming affordances.
 function ChatTranscriptView({
+  sessionId,
   snapshot,
   onRespond,
 }: {
+  sessionId: string;
   snapshot: ChatStoreState;
   onRespond: (requestId: string, response: AgentResponse) => void;
 }) {
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
+  // Remount StickToBottom per session so `initial` (instant) applies again.
+  // While the history floor is still loading, keep resize instant too — otherwise
+  // the async message dump rides `resize="smooth"` after the first observer tick.
   return (
-    <Conversation>
+    <Conversation
+      key={sessionId}
+      resize={snapshot.historyStatus === "loading" ? "instant" : "smooth"}
+    >
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
           the panel edge instead of hugging the centered column. */}
       <ConversationContent
@@ -99,7 +107,9 @@ function ChatTranscriptView({
 // message updates re-render only the transcript, never its siblings (the
 // composer subscribes narrowly on its own).
 export function ChatTranscript() {
-  const { store, respondToRequest } = useChatSession();
+  const { sessionId, store, respondToRequest } = useChatSession();
   const snapshot = useStore(store);
-  return <ChatTranscriptView snapshot={snapshot} onRespond={respondToRequest} />;
+  return (
+    <ChatTranscriptView sessionId={sessionId} snapshot={snapshot} onRespond={respondToRequest} />
+  );
 }
