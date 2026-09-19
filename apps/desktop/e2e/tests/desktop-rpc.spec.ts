@@ -192,11 +192,10 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
 test("chats through the fake Pi executable", async ({ e2ePaths, window }) => {
   // The app lands on /draft, the new-session surface: picking the seeded
   // project and typing the first message creates the session and navigates
-  // into it. There is no default project — the composer blocks until one is
-  // chosen.
+  // into it. The picker defaults to Choose project until a project is chosen.
   await waitForConnectedUi(window);
 
-  await window.getByRole("combobox").filter({ hasText: "Select a project" }).click();
+  await window.getByRole("combobox").filter({ hasText: "Choose project" }).click();
   await window.getByRole("option", { name: /e2e-workspace/ }).click();
 
   const input = window.locator("[contenteditable='true']");

@@ -26,21 +26,18 @@ const sample = () => pieE2E().sample;
 const fakeReply = () => pieE2E().fakeReply;
 
 describe("import and draft", () => {
-  it("imports the first project from the empty draft", async () => {
+  it("imports a project from the empty draft via the sidebar", async () => {
     await mountApp();
-    await waitForText("Import your first project");
+    await waitForComposer();
     await expect.element(page.getByTitle("New chat")).toBeVisible();
-    await expect
-      .element(page.getByTestId("main").getByRole("button", { name: "Import project" }))
-      .toBeVisible();
+    await expect.element(page.getByText("Choose project").first()).toBeVisible();
 
-    await openImportDialog("empty");
+    await openImportDialog();
     await importFolder(sample());
 
     await waitForComposer();
     await waitForText(sample());
     expect(window.location.pathname).toBe("/draft");
-    expect(window.location.search).toContain("projectId=");
   });
 
   it("sends a draft and opens a session with user and assistant turns", async () => {
@@ -164,7 +161,7 @@ describe("git workspace and review", () => {
   it("imports a git folder and shows workspace controls", async () => {
     await mountApp();
     await waitForText(sample());
-    await openImportDialog("sidebar");
+    await openImportDialog();
     await importFolder(sampleGit());
     await waitForText(sampleGit());
 
