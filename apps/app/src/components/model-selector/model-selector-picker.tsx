@@ -16,8 +16,6 @@ import {
 import { SearchIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
-import { providerLogoSrc } from "@/components/model-selector/provider-logo";
-
 type ModelOption = {
   provider: string;
   modelId: string;
@@ -44,7 +42,6 @@ function ProviderLogo({ provider }: { provider: string }) {
       <span
         aria-hidden
         className="bg-muted text-muted-foreground flex size-3 shrink-0 items-center justify-center rounded-xs text-xs font-medium uppercase"
-        data-slot="model-selector-logo"
       >
         {provider.slice(0, 1)}
       </span>
@@ -55,10 +52,9 @@ function ProviderLogo({ provider }: { provider: string }) {
       alt=""
       aria-hidden
       className="size-3 shrink-0 dark:invert"
-      data-slot="model-selector-logo"
       height={12}
       onError={() => setFailed(true)}
-      src={providerLogoSrc(provider)}
+      src={`https://models.dev/logos/${encodeURIComponent(provider)}.svg`}
       width={12}
     />
   );
@@ -120,7 +116,7 @@ export function ModelSelectorPicker({
         aria-label={ariaLabel}
         className="data-placeholder:text-muted-foreground hover:bg-accent min-w-0"
         data-slot="model-selector-trigger"
-        render={<Button aria-label={ariaLabel} size="sm" variant="ghost" />}
+        render={<Button size="sm" variant="ghost" />}
       >
         <ComboboxValue placeholder="Default">
           {(option: ModelOption | null) => (
@@ -128,7 +124,7 @@ export function ModelSelectorPicker({
           )}
         </ComboboxValue>
       </ComboboxTrigger>
-      <ComboboxPopup className="min-w-64" data-slot="model-selector-popup">
+      <ComboboxPopup className="min-w-64">
         <div className="border-b p-2">
           <ComboboxInput
             // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus search when the picker opens
