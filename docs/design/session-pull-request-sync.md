@@ -103,7 +103,7 @@ Server 通过受限调用上下文确定完整 `SessionRef { projectId, sessionI
 ```text
 Session.pullRequests[]
 ├─ ref                  host / owner / repository / number
-├─ source               agent / created / branch / stack
+├─ source               agent / branch / stack
 ├─ linkedAt             首次关联时间，不代表 Stack 顺序
 ├─ excluded             用户已取消，禁止自动加回
 ├─ snapshot | null
