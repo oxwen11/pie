@@ -29,12 +29,10 @@ import { oc, toStandardSchema } from "./orpc";
 
 const base = oc.errors(serverErrors);
 
-const worktreeMissingData = toStandardSchema(WorktreeMissingErrorDataSchema);
-
 export const sessionContract = {
   create: base.input(CreateSessionInputSchema).output(CreateSessionOutputSchema),
   prepare: base
-    .errors({ WORKTREE_MISSING: { data: worktreeMissingData } })
+    .errors({ WORKTREE_MISSING: { data: toStandardSchema(WorktreeMissingErrorDataSchema) } })
     .input(RefInputSchema)
     .output(PrepareSessionOutputSchema),
   restoreWorktree: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
