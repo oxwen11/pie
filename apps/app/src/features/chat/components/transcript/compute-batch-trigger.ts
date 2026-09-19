@@ -1,4 +1,5 @@
-import { isReasoningUIPart, type ToolUIPart } from "ai";
+import type { PieToolUIPart } from "@getpie/contract";
+import { isReasoningUIPart } from "ai";
 
 import { BUCKET_ORDER, bucketFor, filePathOf, type BucketKey } from "./tool/bucket";
 import type { BatchPart } from "./use-tool-batches";
@@ -13,7 +14,7 @@ export type BatchTriggerLabel =
   | { kind: "running"; action: string }
   | { kind: "aggregated"; buckets: BucketCount[] };
 
-function isToolRunning(part: ToolUIPart): boolean {
+function isToolRunning(part: PieToolUIPart): boolean {
   return part.state === "input-streaming" || part.state === "input-available";
 }
 
@@ -33,35 +34,25 @@ interface RunningActionMap {
 
 const RUNNING_ACTIONS: RunningActionMap = {
   "tool-read": { verb: "Reading", field: "path" },
-  "tool-Read": { verb: "Reading", field: "file_path" },
-  "tool-WebFetch": { verb: "Fetching", field: "url" },
   "tool-ls": { verb: "Listing", field: "path" },
   "tool-find": { verb: "Finding", field: "pattern" },
-  "tool-Glob": { verb: "Finding", field: "pattern" },
   "tool-grep": { verb: "Searching", field: "pattern" },
-  "tool-Grep": { verb: "Searching", field: "pattern" },
-  "tool-WebSearch": { verb: "Searching", field: "query" },
   "tool-edit": { verb: "Editing", field: "path" },
-  "tool-Edit": { verb: "Editing", field: "file_path" },
   "tool-write": { verb: "Writing", field: "path" },
-  "tool-Write": { verb: "Writing", field: "file_path" },
-  "tool-NotebookEdit": { verb: "Editing", field: "notebook_path" },
   "tool-bash": { verb: "Running", field: "command" },
-  "tool-Bash": { verb: "Running", field: "command" },
-  "tool-TaskOutput": { verb: "Running", field: "task_id" },
 };
 
 function isInputRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null;
 }
 
-function inputString(part: ToolUIPart, key: string): string | undefined {
+function inputString(part: PieToolUIPart, key: string): string | undefined {
   if (!isInputRecord(part.input)) return undefined;
   const value = part.input[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function runningActionOf(part: ToolUIPart): string {
+function runningActionOf(part: PieToolUIPart): string {
   const spec = RUNNING_ACTIONS[part.type];
   if (spec) {
     const target = inputString(part, spec.field);
@@ -83,8 +74,8 @@ function runningActionOf(part: ToolUIPart): string {
  * Reasoning parts are ignored.
  */
 export function computeBatchTrigger(parts: readonly BatchPart[]): BatchTriggerLabel {
-  const tools: ToolUIPart[] = [];
-  let lastRunning: ToolUIPart | undefined;
+  const tools: PieToolUIPart[] = [];
+  let lastRunning: PieToolUIPart | undefined;
   for (const part of parts) {
     if (isReasoningUIPart(part)) continue;
     tools.push(part);

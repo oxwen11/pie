@@ -5,8 +5,10 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
+  PieUIMessage,
+  PieUIMessageChunk,
 } from "@getpie/contract";
-import { generateId, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
+import { generateId, readUIMessageStream } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest, AgentResponse } from "./agent-requests";
@@ -43,7 +45,7 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
 }
 
 /** Wire prompt parts → the user UIMessage every client renders. */
-const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIMessage => ({
+const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): PieUIMessage => ({
   id: messageId,
   role: "user",
   parts: parts.map((part) =>
@@ -51,7 +53,7 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIM
   ),
 });
 
-const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
+const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- data-retry payload is untyped JSON
   const data = chunk.data as {
@@ -75,7 +77,7 @@ const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
 // own reducer (readUIMessageStream — the same machinery the server-side
 // history folds use) turns them into evolving UIMessage snapshots.
 type TurnFold = {
-  readonly enqueue: (chunk: UIMessageChunk) => void;
+  readonly enqueue: (chunk: PieUIMessageChunk) => void;
   readonly close: () => void;
 };
 
@@ -447,7 +449,7 @@ export class Chat {
     // fabricate a seamless-looking transcript, so it abandons the live view
     // and recovers the whole turn at its end instead.
     const contiguous = head !== undefined && head.seq <= this.#cursor + 1;
-    let chunks: UIMessageChunk[];
+    let chunks: PieUIMessageChunk[];
     if (!activeTurn.truncated || contiguous) {
       chunks = unseen.map((chunkEvent) => chunkEvent.chunk);
     } else if (this.#cursor === 0) {
@@ -480,7 +482,7 @@ export class Chat {
   // Shared handlers
   // ---------------------------------------------------------------------
 
-  #observeChunk(chunk: UIMessageChunk): void {
+  #observeChunk(chunk: PieUIMessageChunk): void {
     const retryNotice = retryNoticeFrom(chunk);
     if (retryNotice !== undefined) {
       this.#state.error = undefined;
@@ -550,20 +552,19 @@ export class Chat {
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
-    let controller: ReadableStreamDefaultController<UIMessageChunk> | undefined;
-    const stream = new ReadableStream<UIMessageChunk>({
+    let controller: ReadableStreamDefaultController<PieUIMessageChunk> | undefined;
+    const stream = new ReadableStream<PieUIMessageChunk>({
       start(c) {
         controller = c;
       },
     });
     void (async () => {
       try {
-        // Seed the fold with a turn-derived id: a start chunk that carries no
-        // messageId (claude-code) would otherwise leave the reader's constant
-        // default id on every folded message, and two turns would upsert into
-        // each other's slot. A start chunk that does carry one (pi) still
-        // overrides this seed.
-        const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as UIMessage;
+        // Seed the fold with a turn-derived id: a start chunk without a
+        // messageId would otherwise leave the reader's constant default id on
+        // every folded message, and two turns would upsert into each other's
+        // slot. A start chunk with one still overrides this seed.
+        const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as PieUIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
           this.#state.upsertMessage(message);
         }

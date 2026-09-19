@@ -1,5 +1,5 @@
-import type { SessionPendingPrompt } from "@getpie/contract";
-import type { ChatState as AiChatState, ChatStatus, UIMessage } from "ai";
+import type { SessionPendingPrompt, PieUIMessage } from "@getpie/contract";
+import type { ChatState as AiChatState, ChatStatus } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest } from "./agent-requests";
@@ -18,7 +18,7 @@ const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
 // Each Chat owns its own store: messages + status + error + retryNotice +
 // pendingRequests + pendingPrompt.
 export type ChatStoreState = {
-  messages: UIMessage[];
+  messages: PieUIMessage[];
   status: ChatStatus;
   error?: Error;
   // Transient provider retry (Pi willRetry / auto_retry). Not an Error: a
@@ -35,14 +35,14 @@ export type ChatStoreState = {
 // reconcile the transcript is rewritten wholesale, so indexes are unstable and
 // replacement is id-based (upsertMessage). Implementing the remainder keeps
 // this state pinned to the ai-sdk shape — drift in `ai` fails typecheck here.
-type AiChatStateSlice = Omit<AiChatState<UIMessage>, "popMessage" | "replaceMessage">;
+type AiChatStateSlice = Omit<AiChatState<PieUIMessage>, "popMessage" | "replaceMessage">;
 
 // Chat's state container, backed by the per-Chat store (no global store, no
 // adapter).
 export class ChatState implements AiChatStateSlice {
   readonly store: StoreApi<ChatStoreState>;
 
-  constructor(initialMessages: UIMessage[] = []) {
+  constructor(initialMessages: PieUIMessage[] = []) {
     this.store = createStore<ChatStoreState>()(() => ({
       messages: initialMessages,
       status: "ready",
@@ -54,10 +54,10 @@ export class ChatState implements AiChatStateSlice {
     }));
   }
 
-  get messages(): UIMessage[] {
+  get messages(): PieUIMessage[] {
     return this.store.getState().messages;
   }
-  set messages(messages: UIMessage[]) {
+  set messages(messages: PieUIMessage[]) {
     this.store.setState({ messages });
   }
 
@@ -93,14 +93,14 @@ export class ChatState implements AiChatStateSlice {
     return this.store.getState().pendingPrompt;
   }
 
-  pushMessage = (message: UIMessage) => {
+  pushMessage = (message: PieUIMessage) => {
     this.store.setState((s) => ({ messages: [...s.messages, message] }));
   };
   // Replace-by-id or append: the turn folds produce message snapshots that
   // evolve under a stable id, and the reducer mutates one message object in
   // place across chunks. Clone on write so each update carries fresh part
   // identities — otherwise memos keyed on `message.parts` never recompute.
-  upsertMessage = (message: UIMessage) => {
+  upsertMessage = (message: PieUIMessage) => {
     this.store.setState((s) => {
       const index = s.messages.findIndex((m) => m.id === message.id);
       const next = s.messages.slice();

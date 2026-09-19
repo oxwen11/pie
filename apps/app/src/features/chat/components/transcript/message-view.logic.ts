@@ -1,11 +1,10 @@
-import { isToolUIPart, type UIMessage } from "ai";
+import type { PieUIMessage } from "@getpie/contract";
+import { isToolUIPart } from "ai";
 
-import { isChildToolPart } from "./tool/bucket";
-
-type Part = UIMessage["parts"][number];
+type Part = PieUIMessage["parts"][number];
 
 export function isVisibleWorkPart(part: Part): boolean {
-  if (isToolUIPart(part)) return !isChildToolPart(part);
+  if (isToolUIPart(part)) return true;
   if (part.type === "reasoning") return true;
   return part.type === "text" && part.text.trim() !== "";
 }
