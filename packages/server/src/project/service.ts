@@ -99,7 +99,7 @@ export const ProjectServiceLayer: Layer.Layer<
       return project;
     });
 
-    const ensureRoot = Effect.fn("ProjectService.ensureAllocateRoot")(function* (root: string) {
+    const ensureRoot = Effect.fn("ProjectService.ensureRoot")(function* (root: string) {
       yield* fs.makeDirectory(root, { recursive: true }).pipe(
         Effect.catchIf(isAlreadyExists, () => Effect.void),
         Effect.mapError((cause) => new ProjectFolderCreateError({ path: root, cause })),
