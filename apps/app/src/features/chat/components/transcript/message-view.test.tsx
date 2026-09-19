@@ -19,7 +19,7 @@ const toolMessage = {
       toolCallId: "t1",
       state: "output-available" as const,
       input: { path: "/tmp/a" },
-      output: "ok",
+      output: { content: [] as [], details: undefined },
     },
     { type: "text" as const, text: "done" },
   ],

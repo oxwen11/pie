@@ -1,9 +1,9 @@
+import type { PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import type { UIMessage } from "ai";
 import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
@@ -20,7 +20,7 @@ export function MessageView({
   isStreaming,
   previousTimestamp,
 }: {
-  message: UIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
   previousTimestamp?: string;
 }) {
@@ -41,7 +41,7 @@ function CollapsibleAssistantMessage({
   isStreaming,
   previousTimestamp,
 }: {
-  message: UIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
   previousTimestamp?: string;
 }) {

@@ -625,6 +625,9 @@ importers:
 
   packages/contract:
     dependencies:
+      '@earendil-works/pi-coding-agent':
+        specifier: 0.85.1
+        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.35

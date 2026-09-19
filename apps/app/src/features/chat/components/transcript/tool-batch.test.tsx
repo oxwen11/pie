@@ -25,11 +25,11 @@ const completedParts = (): IndexedBatchPart[] => [
   {
     index: 0,
     part: {
-      type: "tool-Read",
+      type: "tool-read",
       toolCallId: "tool-0",
       state: "output-available",
-      input: { file_path: "/tmp/file-0" },
-      output: "done",
+      input: { path: "/tmp/file-0" },
+      output: { content: [] as [], details: undefined },
     },
   },
 ];
@@ -42,7 +42,7 @@ const mixedParts = (): IndexedBatchPart[] => [
       toolCallId: "done-read",
       state: "output-available",
       input: { path: "/tmp/done.ts" },
-      output: "ok",
+      output: { content: [] as [], details: undefined },
     },
   },
   {
@@ -109,7 +109,7 @@ describe("ToolBatch", () => {
             toolCallId: "b1",
             state: "output-available",
             input: { command: "git status" },
-            output: "ok",
+            output: { content: [] as [], details: {} },
           },
         },
       ],
