@@ -416,20 +416,28 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         resolveWorkspace(ref).pipe(
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
-              if (metadata.worktree !== undefined) {
-                const { branch } = metadata.worktree;
-                yield* fs.exists(metadata.cwd).pipe(
+              const present = yield* fs
+                .exists(metadata.cwd)
+                .pipe(
                   Effect.mapError((cause) => new WorkspaceReadError({ path: metadata.cwd, cause })),
-                  Effect.filterOrFail(
-                    (present) => present,
-                    () =>
-                      new WorktreeCheckoutMissing({
-                        sessionId: ref.sessionId,
-                        projectId: ref.projectId,
-                        branch,
-                      }),
-                  ),
                 );
+              if (!present) {
+                if (metadata.worktree !== undefined) {
+                  return yield* Effect.fail(
+                    new WorktreeCheckoutMissing({
+                      sessionId: ref.sessionId,
+                      projectId: ref.projectId,
+                      branch: metadata.worktree.branch,
+                    }),
+                  );
+                }
+                yield* fs
+                  .makeDirectory(metadata.cwd, { recursive: true })
+                  .pipe(
+                    Effect.mapError(
+                      (cause) => new WorkspaceReadError({ path: metadata.cwd, cause }),
+                    ),
+                  );
               }
               if (metadata.agentSessionId === undefined) {
                 return toSessionWorkspace(metadata);

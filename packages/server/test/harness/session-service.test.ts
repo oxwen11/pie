@@ -127,6 +127,29 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
+  it.effect("prepare creates a missing non-worktree cwd", () =>
+    Effect.gen(function* () {
+      const missingPath = `/tmp/pie-session-cwd-${Date.now()}`;
+      const result = yield* run({}, (fixture) =>
+        Effect.gen(function* () {
+          const { ref } = yield* fixture.service.create({
+            projectId: "proj-a",
+            cwd: missingPath,
+          });
+          yield* fixture.service.close(ref);
+          const fs = yield* FileSystem.FileSystem;
+          const before = yield* fs.exists(missingPath);
+          const workspace = yield* fixture.service.prepare(ref);
+          const after = yield* fs.exists(missingPath);
+          return { before, after, workspace };
+        }),
+      );
+      assert.equal(result.before, false);
+      assert.equal(result.after, true);
+      assert.deepEqual(result.workspace, { cwd: missingPath });
+    }),
+  );
+
   it.effect("prepare backfills the cwd and starts nothing", () =>
     Effect.gen(function* () {
       const result = yield* run({}, (fixture) =>
