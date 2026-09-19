@@ -16,8 +16,10 @@ import { toast } from "sonner";
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
+const CARD_HEADING = "Can't open session";
+
 export const Route = createFileRoute("/session/fallback")({
-  staticData: { cardHeading: "Can't open session" },
+  staticData: { cardHeading: CARD_HEADING },
   validateSearch: (search: Record<string, unknown>): WorktreeMissingErrorData => ({
     sessionId: asText(search.sessionId) ?? "",
     projectId: asText(search.projectId) ?? "",
@@ -61,7 +63,7 @@ function MissingWorktreeRoute() {
         <EmptyMedia variant="icon">
           <TriangleAlertIcon />
         </EmptyMedia>
-        <EmptyTitle>Can&apos;t open session</EmptyTitle>
+        <EmptyTitle>{CARD_HEADING}</EmptyTitle>
         <EmptyDescription>
           This session&apos;s checkout was removed. Restore {search.branch} to continue.
         </EmptyDescription>

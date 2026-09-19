@@ -57,6 +57,16 @@ const mapGitWorktreeErrors = <
     GitError: (e: GitError) => Effect.fail(errors.INTERNAL({ message: `git failed in ${e.cwd}` })),
   });
 
+const mapSessionRefNotFound = <E extends { NOT_FOUND: (input: { message: string }) => unknown }>(
+  errors: E,
+) =>
+  Effect.catchTags({
+    SessionNotFound: (e: { readonly sessionId: string }) =>
+      Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+    ProjectNotFound: (e: { readonly projectId: string }) =>
+      Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+  });
+
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
@@ -87,10 +97,6 @@ export const sessionRouter = orpc.router({
     return yield* sessions.prepare(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         WorktreeCheckoutMissing: (e) =>
@@ -100,6 +106,7 @@ export const sessionRouter = orpc.router({
             }),
           ),
       }),
+      mapSessionRefNotFound(errors),
       mapGitWorktreeErrors(errors),
     );
   }),
@@ -108,10 +115,6 @@ export const sessionRouter = orpc.router({
     return yield* sessions.restoreWorktree(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
         SessionNotWorktree: (e) =>
           Effect.fail(
             errors.INVALID_ARGUMENT({
@@ -119,6 +122,7 @@ export const sessionRouter = orpc.router({
             }),
           ),
       }),
+      mapSessionRefNotFound(errors),
       mapGitWorktreeErrors(errors),
     );
   }),
