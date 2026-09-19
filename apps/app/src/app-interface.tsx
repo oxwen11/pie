@@ -1,6 +1,6 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, useRef, type ReactElement, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
@@ -16,7 +16,7 @@ import { createAppClients, type AppClients } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
-import { useTheme } from "./theme-provider";
+import { ThemeProvider, useTheme } from "./theme-provider";
 
 declare global {
   interface ImportMetaEnv {
@@ -83,7 +83,6 @@ function AppHost({ server }: { server?: ServerConnection }): ReactElement {
 
 /** Explicit stable application dependencies, with no host knowledge. */
 function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): ReactElement {
-  const { theme } = useTheme();
   const router = useStable(() => createRouter({ orpcClient, queryClient, orpcQueryUtils }));
   useEffect(() => contentPanel.register(createTerminalPanel(orpcClient)), [orpcClient]);
   // Composition root: the only place that knows Chat's wire transport is oRPC.
@@ -93,15 +92,35 @@ function AppRuntime({ orpcClient, queryClient, orpcQueryUtils }: AppClients): Re
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ChatManagerProvider manager={chatManager}>
-        <RouterProvider router={router} />
-        {/*
-         * The app's only error surface. Every `toast.*` call — the QueryClient's
-         * global query-error handler in lib/orpc.ts, failed imports, failed
-         * session creates, failed resumes — renders nothing without this mount.
-         */}
-        <Toaster theme={theme} />
-      </ChatManagerProvider>
+      <ServerThemeProvider orpcQueryUtils={orpcQueryUtils}>
+        <ChatManagerProvider manager={chatManager}>
+          <RouterProvider router={router} />
+          {/*
+           * The app's only error surface. Every `toast.*` call — the QueryClient's
+           * global query-error handler in lib/orpc.ts, failed imports, failed
+           * session creates, failed resumes — renders nothing without this mount.
+           */}
+          <AppToaster />
+        </ChatManagerProvider>
+      </ServerThemeProvider>
     </QueryClientProvider>
   );
+}
+
+function ServerThemeProvider({
+  children,
+  orpcQueryUtils,
+}: {
+  children: ReactNode;
+  orpcQueryUtils: AppClients["orpcQueryUtils"];
+}): ReactElement {
+  const { data } = useQuery({
+    ...orpcQueryUtils.settings.get.queryOptions(),
+  });
+  return <ThemeProvider serverTheme={data?.appearance.theme}>{children}</ThemeProvider>;
+}
+
+function AppToaster(): ReactElement {
+  const { theme } = useTheme();
+  return <Toaster theme={theme} />;
 }

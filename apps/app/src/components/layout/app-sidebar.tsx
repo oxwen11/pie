@@ -1,6 +1,7 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -12,7 +13,7 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
-import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
+import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ProjectList } from "@/features/projects/project-list";
@@ -64,6 +65,23 @@ function SchedulesNavItem() {
   );
 }
 
+function SettingsNavItem() {
+  const active =
+    useMatch({
+      from: "/settings",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/settings" />}>
+        <Settings />
+        <span>Settings</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
@@ -106,6 +124,12 @@ export function AppSidebar() {
 
         <ProjectList />
       </SidebarContent>
+
+      <SidebarFooter className="[-webkit-app-region:no-drag]">
+        <SidebarMenu>
+          <SettingsNavItem />
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

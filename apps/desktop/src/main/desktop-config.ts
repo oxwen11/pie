@@ -10,6 +10,7 @@ export class DesktopConfig extends Context.Service<
     readonly devUrl: string | undefined;
     readonly serverEntry: string;
     readonly resourcesPath: string;
+    readonly windowBackgroundColor: string;
   }
 >()("desktop/DesktopConfig") {}
 
@@ -17,6 +18,7 @@ export type DesktopConfigInputs = {
   readonly isPackaged: boolean;
   readonly resourcesPath: string;
   readonly devUrl: string | undefined;
+  readonly windowBackgroundColor: string;
 };
 
 export function startsDesktopInBackground(env: NodeJS.ProcessEnv): boolean {
@@ -64,6 +66,7 @@ export function buildDesktopConfig(inputs: DesktopConfigInputs): DesktopConfig["
     devUrl: inputs.devUrl,
     serverEntry: resolveServerEntry(inputs.isPackaged, inputs.resourcesPath),
     resourcesPath: inputs.resourcesPath,
+    windowBackgroundColor: inputs.windowBackgroundColor,
   };
 }
 

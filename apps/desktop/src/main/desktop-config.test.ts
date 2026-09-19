@@ -14,6 +14,7 @@ describe("buildDesktopConfig", () => {
       isPackaged: true,
       resourcesPath: "/Applications/Pie.app/Contents/Resources",
       devUrl: undefined,
+      windowBackgroundColor: "#ffffff",
     });
 
     expect(config.serverEntry).toBe(
@@ -27,6 +28,7 @@ describe("buildDesktopConfig", () => {
       isPackaged: false,
       resourcesPath: "/unused",
       devUrl: undefined,
+      windowBackgroundColor: "#ffffff",
     });
 
     expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.mjs$/);
