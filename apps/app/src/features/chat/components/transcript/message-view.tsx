@@ -8,6 +8,7 @@ import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
+import { CompactionMarker } from "./compaction-marker";
 import { UserMessage } from "./user-message";
 import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
 
@@ -22,6 +23,17 @@ export function MessageView({
   message: PieUIMessage;
   isStreaming: boolean;
 }) {
+  const compaction = message.parts.find((part) => part.type === "data-compaction");
+  if (
+    compaction &&
+    "data" in compaction &&
+    typeof compaction.data === "object" &&
+    compaction.data !== null &&
+    "summary" in compaction.data &&
+    typeof compaction.data.summary === "string"
+  ) {
+    return <CompactionMarker summary={compaction.data.summary} />;
+  }
   if (message.role === "assistant") {
     return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
   }
