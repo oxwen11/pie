@@ -7,7 +7,6 @@ import { BrowserWindow, shell, type WebContents } from "electron";
 import icon from "../../../resources/icon.png?asset";
 import { DesktopConfig, startsDesktopInBackground } from "../desktop-config";
 import { APP_ORIGIN, registerAppProtocol } from "./app-protocol";
-import { registerModelsDevLogoHttpCache } from "./models-dev-logo-cache";
 import { RendererChannel } from "./renderer-channel";
 
 export class MainWindow extends Context.Service<
@@ -150,7 +149,6 @@ export const MainWindowLive = Layer.effect(
     const config = yield* DesktopConfig;
     const channel = yield* RendererChannel;
     yield* registerAppProtocol(rendererRoot());
-    registerModelsDevLogoHttpCache();
     return yield* makeMainWindow({
       devUrl: config.devUrl,
       backgroundColor: config.windowBackgroundColor,
