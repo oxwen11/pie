@@ -396,22 +396,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           Effect.flatMap((metadata) =>
             Effect.gen(function* () {
               if (metadata.worktree !== undefined) {
-                const present = yield* fs
-                  .exists(metadata.cwd)
-                  .pipe(
-                    Effect.mapError(
-                      (cause) => new WorkspaceReadError({ path: metadata.cwd, cause }),
-                    ),
-                  );
-                if (!present) {
-                  return yield* Effect.fail(
-                    new WorktreeCheckoutMissing({
-                      sessionId: ref.sessionId,
-                      projectId: ref.projectId,
-                      branch: metadata.worktree.branch,
-                    }),
-                  );
-                }
+                const { branch } = metadata.worktree;
+                yield* fs.exists(metadata.cwd).pipe(
+                  Effect.mapError((cause) => new WorkspaceReadError({ path: metadata.cwd, cause })),
+                  Effect.filterOrFail(
+                    (present) => present,
+                    () =>
+                      new WorktreeCheckoutMissing({
+                        sessionId: ref.sessionId,
+                        projectId: ref.projectId,
+                        branch,
+                      }),
+                  ),
+                );
               }
               if (metadata.agentSessionId === undefined) {
                 return toSessionWorkspace(metadata);
