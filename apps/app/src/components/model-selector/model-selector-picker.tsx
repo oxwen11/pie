@@ -14,9 +14,9 @@ import {
   useComboboxFilter,
 } from "@getpie/ui/components/combobox";
 import { SearchIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { providerLogoSrc } from "@/components/model-selector/provider-logo";
+import { resolveProviderLogo } from "@/components/model-selector/provider-logo";
 
 type ModelOption = {
   provider: string;
@@ -38,8 +38,18 @@ export type ModelSelectorPickerProps = {
 };
 
 function ProviderLogo({ provider }: { provider: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const url = await resolveProviderLogo(provider);
+      if (!cancelled) setSrc(url ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+  if (src === null) {
     return (
       <span
         aria-hidden
@@ -57,8 +67,7 @@ function ProviderLogo({ provider }: { provider: string }) {
       className="size-3 shrink-0 dark:invert"
       data-slot="model-selector-logo"
       height={12}
-      onError={() => setFailed(true)}
-      src={providerLogoSrc(provider)}
+      src={src}
       width={12}
     />
   );
