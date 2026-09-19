@@ -74,7 +74,7 @@ export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
 export class WorktreeCheckoutMissing extends Data.TaggedError("WorktreeCheckoutMissing")<{
   readonly sessionId: string;
   readonly projectId: string;
-  readonly branch?: string;
+  readonly branch: string;
 }> {}
 
 /** Session metadata has no worktree branch to restore. */

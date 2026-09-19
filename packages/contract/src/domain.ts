@@ -593,7 +593,7 @@ export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
 export const WorktreeMissingErrorDataSchema = Schema.Struct({
   sessionId: Schema.String,
   projectId: Schema.String,
-  branch: Schema.optionalKey(Schema.NonEmptyString),
+  branch: Schema.NonEmptyString,
 });
 export type WorktreeMissingErrorData = typeof WorktreeMissingErrorDataSchema.Type;
 
