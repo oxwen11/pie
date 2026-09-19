@@ -84,4 +84,17 @@ describe("ThemeProvider", () => {
     expect(localStorage.getItem("custom-theme")).toBe("light");
     expect(localStorage.getItem("pie:theme")).toBeNull();
   });
+
+  it("applies a server preference over localStorage", async () => {
+    localStorage.setItem("pie:theme", "light");
+    await render(
+      <ThemeProvider defaultTheme="light" serverTheme="dark">
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
+
+    await expect.element(page.getByRole("button")).toHaveTextContent("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(localStorage.getItem("pie:theme")).toBe("dark");
+  });
 });

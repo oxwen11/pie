@@ -1,4 +1,3 @@
-import { ThemeProvider } from "@getpie/app";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ErrorBoundary } from "react-error-boundary";
@@ -20,10 +19,8 @@ const host = waitForDesktopPort().then(async (port) => {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ThemeProvider>
-      <ErrorBoundary FallbackComponent={StartupFailure}>
-        <DesktopRoot host={host} />
-      </ErrorBoundary>
-    </ThemeProvider>
+    <ErrorBoundary FallbackComponent={StartupFailure}>
+      <DesktopRoot host={host} />
+    </ErrorBoundary>
   </StrictMode>,
 );

@@ -1,13 +1,15 @@
+import fs from "node:fs";
+
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { resolveDevelopmentScope } from "@getpie/core/development-scope";
-import { resolvePieHome } from "@getpie/server/daemon";
+import { resolvePieHome, settingsFile } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
-import { app, dialog } from "electron";
+import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";
 import { makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
@@ -17,6 +19,16 @@ import { MainWindow, MainWindowLive } from "./electron/main-window";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
+import { readThemePreference, windowBackgroundColor } from "./window-background";
+
+function resolveWindowBackgroundColor(): string {
+  try {
+    const theme = readThemePreference(fs.readFileSync(settingsFile(resolvePieHome()), "utf8"));
+    return windowBackgroundColor(theme, nativeTheme.shouldUseDarkColors);
+  } catch {
+    return windowBackgroundColor(undefined, nativeTheme.shouldUseDarkColors);
+  }
+}
 
 function makeRuntime(devUrl: string | undefined) {
   // The Node platform services: the daemon launcher's file state and token
@@ -33,6 +45,7 @@ function makeRuntime(devUrl: string | undefined) {
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     devUrl,
+    windowBackgroundColor: resolveWindowBackgroundColor(),
   });
 
   return ManagedRuntime.make(
