@@ -207,21 +207,12 @@ export const makePiAgentRuntime = (
       }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
-    let outcome: "completed" | "canceled" = "completed";
     yield* Stream.runForEach(process.session.events(sessionId), (body) =>
       Effect.gen(function* () {
         if (yield* Ref.get(closed)) return;
-        if (body.type === "session.turn.started") {
-          outcome = "completed";
-          yield* Ref.set(activeTurn, body.turnId);
-        }
-        if (body.type === "abort") outcome = "canceled";
+        if (body.type === "session.turn.started") yield* Ref.set(activeTurn, body.turnId);
         yield* emit(body);
         if (body.type === "session.turn.ended") yield* Ref.set(activeTurn, undefined);
-        if (body.type === "finish") {
-          const turnId = yield* Ref.getAndSet(activeTurn, undefined);
-          if (turnId) yield* emit({ type: "session.turn.ended", sessionId, turnId, outcome });
-        }
       }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 

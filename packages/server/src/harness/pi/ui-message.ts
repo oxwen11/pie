@@ -20,11 +20,10 @@ export type PiMetadata = {
   usage?: PiAssistantHistoryMessage["usage"];
 };
 
-// Retry is transient UI status, not transcript. Compaction lifecycle stays
-// off the chunk track; its history marker is a settled data part. The queue is a session
+// Retry is transient UI status, not transcript. Compaction is a client-only
+// live UIMessage (never projected from cold history). The queue is a session
 // event (`session.queue.updated`), not a UI-message data part.
 export type PiDataTypes = {
-  compaction: { summary: string };
   retry: {
     errorMessage: string;
     attempt?: number;

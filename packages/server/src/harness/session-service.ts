@@ -442,11 +442,11 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     manager.status(ref).pipe(
                       Effect.map((status) => {
                         if (status.activeTurnId === undefined) return messages;
+                        // Mid-turn: stop before the open user turn so the live
+                        // stream owns the continuation (compaction markers are
+                        // live-only and never appear in this projection).
                         for (let index = messages.length - 1; index >= 0; index -= 1) {
-                          const message = messages[index];
-                          if (message?.parts.some((part) => part.type === "data-compaction"))
-                            return messages.slice(0, index + 1);
-                          if (message?.role === "user") return messages.slice(0, index);
+                          if (messages[index]?.role === "user") return messages.slice(0, index);
                         }
                         return messages;
                       }),

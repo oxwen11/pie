@@ -8,7 +8,7 @@ import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import { CompactionMarker } from "./compaction-marker";
+import { CompactionMarker, isCompactionData } from "./compaction-marker";
 import { formatWorkedFor, splitWork, timestampOf, workedSeconds } from "./message-view.logic";
 import { UserMessage } from "./user-message";
 
@@ -26,15 +26,8 @@ export function MessageView({
   previousTimestamp?: string;
 }) {
   const compaction = message.parts.find((part) => part.type === "data-compaction");
-  if (
-    compaction &&
-    "data" in compaction &&
-    typeof compaction.data === "object" &&
-    compaction.data !== null &&
-    "summary" in compaction.data &&
-    typeof compaction.data.summary === "string"
-  ) {
-    return <CompactionMarker summary={compaction.data.summary} />;
+  if (compaction && "data" in compaction && isCompactionData(compaction.data)) {
+    return <CompactionMarker data={compaction.data} />;
   }
   if (message.role === "assistant") {
     return (

@@ -8,31 +8,40 @@ import {
 import { Marker, MarkerContent, MarkerIcon } from "@getpie/ui/components/marker";
 import { Spinner } from "@getpie/ui/components/spinner";
 
-import type { CompactionState } from "../../runtime/chat-state";
+import type { CompactionPartData } from "@/features/chat/runtime/chat";
 
-export function CompactionStatus({ state }: { state: CompactionState }) {
-  if (!state) return null;
+export function isCompactionData(data: unknown): data is CompactionPartData {
+  if (typeof data !== "object" || data === null || !("phase" in data)) return false;
   return (
-    <Marker role="status" aria-live="polite" aria-busy={state.phase === "running"} className="my-3">
-      {state.phase === "running" ? (
-        <>
-          <MarkerIcon>
-            <Spinner role="presentation" aria-label={undefined} />
-          </MarkerIcon>
-          <MarkerContent>
-            <Shimmer as="span">Compacting conversation…</Shimmer>
-          </MarkerContent>
-        </>
-      ) : (
-        <MarkerContent>
-          {state.phase === "canceled" ? "Compaction canceled" : state.error}
-        </MarkerContent>
-      )}
-    </Marker>
+    data.phase === "running" ||
+    data.phase === "canceled" ||
+    (data.phase === "completed" && "summary" in data) ||
+    (data.phase === "failed" && "error" in data)
   );
 }
 
-export function CompactionMarker({ summary }: { summary: string }) {
+export function CompactionMarker({ data }: { data: CompactionPartData }) {
+  if (data.phase === "running") {
+    return (
+      <Marker role="status" aria-live="polite" aria-busy className="my-3">
+        <MarkerIcon>
+          <Spinner role="presentation" aria-label={undefined} />
+        </MarkerIcon>
+        <MarkerContent>
+          <Shimmer as="span">Compacting conversation…</Shimmer>
+        </MarkerContent>
+      </Marker>
+    );
+  }
+  if (data.phase === "canceled" || data.phase === "failed") {
+    return (
+      <Marker role="status" aria-live="polite" className="my-3">
+        <MarkerContent>
+          {data.phase === "canceled" ? "Compaction canceled" : data.error}
+        </MarkerContent>
+      </Marker>
+    );
+  }
   return (
     <Collapsible className="my-6">
       <Marker variant="separator">
@@ -44,7 +53,7 @@ export function CompactionMarker({ summary }: { summary: string }) {
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent className="mt-2 text-sm">
-        <Response>{summary}</Response>
+        <Response>{data.summary}</Response>
       </CollapsibleContent>
     </Collapsible>
   );
