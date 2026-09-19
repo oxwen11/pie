@@ -52,11 +52,11 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **pie-pi-process**:
-Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`, currently `bun-v1.4.2`) and sets `PIE_BUN` / `PIE_PI_EXECUTABLE` to the extraResources copies. Missing Bun fails availability.
+Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
 
-**PIE_DAEMON_RUNTIME**:
-Desktop-only switch for the _daemon_ (not the Pi child). Unset / `node` (default) keeps Electron-as-Node (`Pie Helper` + `server.mjs`). `bun` spawns `PIE_BUN` or PATH `bun` + `server.mjs` and does not set `ELECTRON_RUN_AS_NODE`. Restart the app and stop any existing daemon (`pie daemon stop`) after flipping — attach would otherwise reuse the previous runtime. Use this to A/B daemon RSS.
-_Avoid_: spawning the shebang `pi` binary under Bun; treating this as a replacement for idle soft-close / reclaim; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for this process; leaving a Node daemon running when measuring the bun switch
+**Daemon**:
+Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
+_Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
@@ -100,6 +100,12 @@ _Avoid_: panel object, panel controller
 **Tab strip**:
 The host's row of open panels — the only place a tab is drawn. A panel that wants several of something opens several panels rather than growing tabs of its own.
 _Avoid_: inner tabs, sub-tabs, splits
+
+## Settings
+
+**Settings**:
+Pie-owned user preferences in `$PIE_HOME/settings.json`, namespaced by settings domain (`appearance`, and later domains only when they store a value). Distinct from Pi's agent settings, from `PIE_*` process env, from Desktop host state (window geometry in Electron userData), and from origin-scoped chrome (theme FOUC cache, content-panel, shell layout).
+_Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE_*` in this file; proxying Pi settings; empty domain objects; treating process owners (`ui` / `desktop` / `server`) as JSON root keys; calling this file `config.json`
 
 ## Hub Domain
 

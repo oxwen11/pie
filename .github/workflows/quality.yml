@@ -28,6 +28,7 @@ jobs:
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
     runs-on: [self-hosted, pie]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,7 +88,7 @@ jobs:
           if command -v lsof >/dev/null; then
             exit 0
           fi
-          if command -v apt-get >/dev/null && command -v sudo >/dev/null; then
+          if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends lsof
             exit 0
@@ -98,15 +99,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
+      - name: Install Playwright Chromium
+        run: |
+          browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"
+          mkdir -p "$browsers"
+          echo "PLAYWRIGHT_BROWSERS_PATH=${browsers}" >> "$GITHUB_ENV"
+          PLAYWRIGHT_BROWSERS_PATH="$browsers" pnpm exec playwright install chromium chromium-headless-shell
+        shell: bash
+
       # `build` / `typecheck` / `lint:check` go through turbo in one graph
       # so `@getpie/app#build` is not restored a second time. A follow-up
       # `turbo run typecheck` hits `@getpie/desktop` → `^build` →
       # `@getpie/app#build` and replaces `apps/app/dist` while
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
-      # root Vitest workspace (`pnpm test`) after that graph so cli/app
-      # dist is stable. Format only needs node_modules and stays parallel
-      # with the turbo graph.
+      # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e).
+      # Desktop Playwright (`pnpm e2e`) stays local — Electron + xvfb is too
+      # heavy for the self-hosted Check job.
+      # Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail

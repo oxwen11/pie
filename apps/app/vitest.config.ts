@@ -1,15 +1,14 @@
-import url from "node:url";
-
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
+import { appAlias, appDir, browserTsTests } from "./vitest.shared";
+
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
-  },
+  ...appAlias,
   test: {
     name: "app",
+    dir: appDir,
     fsModuleCache: true,
+    include: ["src/**/*.test.ts"],
+    exclude: browserTsTests,
   },
 });

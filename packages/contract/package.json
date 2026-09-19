@@ -16,6 +16,7 @@
     "./agent": "./src/agent.ts",
     "./session-events": "./src/session-events.ts",
     "./schedule": "./src/schedule.ts",
+    "./settings": "./src/settings.ts",
     "./terminal": "./src/terminal.ts"
   },
   "scripts": {
@@ -25,6 +26,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@orpc/contract": "catalog:orpc",
     "@orpc/experimental-effect": "catalog:orpc",
     "ai": "catalog:",

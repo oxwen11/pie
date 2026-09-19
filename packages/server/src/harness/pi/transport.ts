@@ -2,6 +2,7 @@ import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from 
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
+import { fffNodePathEnv } from "./fff";
 import {
   isBlockingUiRequest,
   type AgentSessionEvent,
@@ -28,6 +29,7 @@ export interface PiTransportOptions {
 }
 
 export interface PiTransport {
+  readonly pid: number;
   /** Send a command and await its correlated response; resolves with `data`. */
   readonly command: <A = void>(command: RpcCommand) => Effect.Effect<A, PiTransportFailure>;
   /** Single-consumer stream owned by the facade event router. */
@@ -74,6 +76,11 @@ export const makePiTransport = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const queueCapacity = options.queueCapacity ?? DEFAULT_QUEUE_CAPACITY;
     const executable = options.executable ?? { command: process.execPath, prefixArgs: [] };
+    const lastArg = executable.prefixArgs.at(-1);
+    const fffEnv =
+      lastArg !== undefined && /\.[cm]?js$/i.test(lastArg)
+        ? fffNodePathEnv(process.env, lastArg)
+        : undefined;
     const child = yield* spawner
       .spawn(
         ChildProcess.make(
@@ -87,6 +94,7 @@ export const makePiTransport = (
           ],
           {
             ...(options.cwd ? { cwd: options.cwd } : undefined),
+            ...(fffEnv === undefined ? undefined : { env: fffEnv, extendEnv: true }),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),
@@ -287,6 +295,7 @@ export const makePiTransport = (
       });
 
     return {
+      pid: child.pid,
       command,
       events: Stream.fromQueue(events),
       uiRequests: Stream.fromQueue(uiRequests),

@@ -1,12 +1,9 @@
-// @vitest-environment jsdom
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "vitest-browser-react";
+import { page } from "vitest/browser";
 
 import { ThemeProvider, useTheme } from "./theme-provider";
-
-let root: Root | undefined;
-let container: HTMLDivElement | undefined;
 
 function ThemeProbe(): ReactElement {
   const { storageKey, theme, setTheme } = useTheme();
@@ -33,80 +30,71 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  act(() => root?.unmount());
-  container?.remove();
   document.documentElement.classList.remove("dark");
   localStorage.clear();
-  root = undefined;
-  container = undefined;
   vi.unstubAllGlobals();
 });
 
 describe("ThemeProvider", () => {
-  it("exposes the active preference and applies updates", () => {
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+  it("exposes the active preference and applies updates", async () => {
+    await render(
+      <ThemeProvider defaultTheme="dark">
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
 
-    act(() => {
-      root?.render(
-        <ThemeProvider defaultTheme="dark">
-          <ThemeProbe />
-        </ThemeProvider>,
-      );
-    });
-
-    const button = container.querySelector("button");
-    expect(button?.textContent).toBe("dark");
+    const button = page.getByRole("button");
+    await expect.element(button).toHaveTextContent("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
 
-    act(() => button?.click());
+    await button.click();
 
-    expect(button?.textContent).toBe("light");
+    await expect.element(button).toHaveTextContent("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(button?.dataset.storageKey).toBe("pie:theme");
+    expect(button.element().dataset.storageKey).toBe("pie:theme");
     expect(localStorage.getItem("pie:theme")).toBe("light");
   });
 
-  it("restores a stored preference", () => {
+  it("restores a stored preference", async () => {
     localStorage.setItem("pie:theme", "dark");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    await render(
+      <ThemeProvider defaultTheme="light">
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
 
-    act(() => {
-      root?.render(
-        <ThemeProvider defaultTheme="light">
-          <ThemeProbe />
-        </ThemeProvider>,
-      );
-    });
-
-    expect(container.querySelector("button")?.textContent).toBe("dark");
+    await expect.element(page.getByRole("button")).toHaveTextContent("dark");
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
-  it("supports a custom storage key", () => {
+  it("supports a custom storage key", async () => {
     localStorage.setItem("custom-theme", "dark");
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    await render(
+      <ThemeProvider defaultTheme="light" storageKey="custom-theme">
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
 
-    act(() => {
-      root?.render(
-        <ThemeProvider defaultTheme="light" storageKey="custom-theme">
-          <ThemeProbe />
-        </ThemeProvider>,
-      );
-    });
+    const button = page.getByRole("button");
+    await expect.element(button).toHaveTextContent("dark");
+    expect(button.element().dataset.storageKey).toBe("custom-theme");
 
-    const button = container.querySelector("button");
-    expect(button?.textContent).toBe("dark");
-    expect(button?.dataset.storageKey).toBe("custom-theme");
-
-    act(() => button?.click());
+    await button.click();
 
     expect(localStorage.getItem("custom-theme")).toBe("light");
     expect(localStorage.getItem("pie:theme")).toBeNull();
+  });
+
+  it("applies a server preference over localStorage", async () => {
+    localStorage.setItem("pie:theme", "light");
+    await render(
+      <ThemeProvider defaultTheme="light" serverTheme="dark">
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
+
+    await expect.element(page.getByRole("button")).toHaveTextContent("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(localStorage.getItem("pie:theme")).toBe("dark");
   });
 });

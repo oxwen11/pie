@@ -30,7 +30,7 @@ function buildTriggerPhrase(label: BatchTriggerLabel): string {
 
 // Closed by default. shouldShimmer only drives the trigger shimmer — computed
 // by the parent from `isTrailing && isStreaming`. Chrome matches ToolHeader
-// (size-4 icon, py-1, gap-2) so batches line up with standalone tools.
+// (size-4 icon, py-1, gap-2) so batch rows line up with tool rows.
 export function ToolBatch({
   parts,
   shouldShimmer = false,
@@ -49,7 +49,7 @@ export function ToolBatch({
     <Tool open={isOpen} onOpenChange={setIsOpen} className={className}>
       <ToolHeader icon={ChevronDownIcon}>
         {shouldShimmer ? (
-          <Shimmer duration={2} as="span">
+          <Shimmer duration={2} as="span" className="max-w-full truncate">
             {phrase}
           </Shimmer>
         ) : (

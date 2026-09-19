@@ -6,7 +6,7 @@ import { cn } from "@getpie/ui/lib/utils";
 import type { ChatStatus } from "ai";
 import { ArrowUpIcon, SquareIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, KeyboardEventHandler } from "react";
-import { Children, useMemo } from "react";
+import { useMemo } from "react";
 
 const promptInputSurface = cn(
   "bg-background w-full divide-y rounded-xl",
@@ -100,26 +100,21 @@ export type PromptInputButtonProps = ComponentProps<typeof Button>;
 export const PromptInputButton = ({
   variant = "ghost",
   className,
-  size,
+  size = "icon-sm",
   ...props
-}: PromptInputButtonProps) => {
-  const newSize = (size ?? Children.count(props.children) > 1) ? "default" : "icon";
-
-  return (
-    <Button
-      className={cn(
-        "shrink-0 gap-1.5 rounded-lg",
-        variant === "ghost" && "text-muted-foreground",
-        newSize === "default" && "px-3",
-        className,
-      )}
-      size={newSize}
-      type="button"
-      variant={variant}
-      {...props}
-    />
-  );
-};
+}: PromptInputButtonProps) => (
+  <Button
+    className={cn(
+      "shrink-0 gap-1.5 rounded-full before:rounded-full",
+      variant === "ghost" && "text-muted-foreground",
+      className,
+    )}
+    size={size}
+    type="button"
+    variant={variant}
+    {...props}
+  />
+);
 
 export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
   status?: ChatStatus;

@@ -4,7 +4,6 @@ import type {
   Project,
   SessionSummary,
 } from "@getpie/contract";
-import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -18,6 +17,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
+import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
 import type { ChatInputController } from "@/features/chat/components/input/chat-input-controller";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
@@ -105,6 +105,10 @@ function DraftRoute() {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
+
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
         if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;

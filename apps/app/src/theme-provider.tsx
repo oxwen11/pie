@@ -17,6 +17,8 @@ import {
 
 export type ThemeProviderProps = PropsWithChildren<{
   defaultTheme?: ThemePreference;
+  /** Server-owned preference; wins over localStorage when present. */
+  serverTheme?: ThemePreference;
   storageKey?: string;
 }>;
 
@@ -41,13 +43,22 @@ function readStoredTheme(storageKey: string, defaultTheme: ThemePreference): The
 export function ThemeProvider({
   children,
   defaultTheme = "system",
+  serverTheme,
   storageKey = DEFAULT_THEME_STORAGE_KEY,
 }: ThemeProviderProps): ReactElement {
-  const [theme, setTheme] = useState<ThemePreference>(() =>
+  const [localTheme, setLocalTheme] = useState<ThemePreference>(() =>
     readStoredTheme(storageKey, defaultTheme),
   );
+  const theme = serverTheme ?? localTheme;
 
-  useLayoutEffect(() => startThemeSync(theme), [theme]);
+  useLayoutEffect(() => {
+    try {
+      localStorage.setItem(storageKey, theme);
+    } catch {
+      // Keep the in-memory preference usable when storage is unavailable.
+    }
+    return startThemeSync(theme);
+  }, [storageKey, theme]);
 
   const value = useMemo(
     () => ({
@@ -59,7 +70,7 @@ export function ThemeProvider({
         } catch {
           // Keep the in-memory preference usable when storage is unavailable.
         }
-        setTheme(nextTheme);
+        setLocalTheme(nextTheme);
       },
     }),
     [storageKey, theme],

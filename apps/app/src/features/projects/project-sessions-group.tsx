@@ -1,9 +1,5 @@
 import type { Project } from "@getpie/contract";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@getpie/ui/components/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroupAction,
   SidebarGroupContent,
@@ -13,7 +9,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
-import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 import { useProjectSessionRows } from "@/features/projects/use-project-session-rows";
 
@@ -54,9 +50,9 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
           {/* Names the button per project: element content wins over `title` in the accessible-name computation, so a bare "New chat" would make every project's action announce identically. */}
           <span className="sr-only">New chat in {project.name}</span>
         </SidebarGroupAction>
-        {/* keepMounted: see panel-motion.ts — an unmounting panel makes every
+        {/* keepMounted: see panel-motion.tsx — an unmounting panel makes every
             expand rebuild this project's whole session list. */}
-        <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
+        <KeepMountedCollapsiblePanel>
           <SidebarGroupContent>
             <SidebarMenu>
               {rows.map((session) => {
@@ -74,7 +70,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
               })}
             </SidebarMenu>
           </SidebarGroupContent>
-        </CollapsiblePanel>
+        </KeepMountedCollapsiblePanel>
       </section>
     </Collapsible>
   );

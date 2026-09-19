@@ -1,11 +1,11 @@
-import type {
-  AgentResponse,
-  AgentModelState,
-  SessionCapabilities,
-  SessionPendingPrompt,
+import {
+  SessionCapabilitiesSchema,
+  type AgentModelState,
+  type AgentResponse,
+  type SessionCapabilities,
+  type SessionPendingPrompt,
+  type PieUIMessage,
 } from "@getpie/contract";
-import { SessionCapabilitiesSchema } from "@getpie/contract";
-import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -79,7 +79,7 @@ export type PiAgentRuntime = {
     CapabilityUnsupported | AgentOperationError
   >;
   readonly getMessages: Effect.Effect<
-    ReadonlyArray<UIMessage>,
+    ReadonlyArray<PieUIMessage>,
     SessionClosed | AgentOperationError
   >;
   readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;

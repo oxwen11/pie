@@ -212,6 +212,7 @@ function toLaunchCtx(
         sample: scaffold(identity, projectBrowseRoot),
         env: {
           ...base.env,
+          PIE_DESKTOP_BACKGROUND: process.env.PIE_DESKTOP_BACKGROUND === "0" ? "0" : "1",
           PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },

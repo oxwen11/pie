@@ -1,3 +1,4 @@
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AGENT_BROWSER_UNIX_SOCKET_MAX,
+  agentBrowserDaemonPidPath,
   agentBrowserDaemonSocketPath,
   agentBrowserIsolation,
   applyBrowserEnv,
@@ -20,7 +22,9 @@ import {
   resolveIsolatedChromeExecutable,
   shortAgentBrowserSocketDir,
   stopAutoRecording,
+  teardownOwnedBrowser,
 } from "./browser.ts";
+import { pidAlive } from "./process.ts";
 
 describe("buildAgentBrowserArgv", () => {
   it("injects the isolated session name", () => {
@@ -93,6 +97,56 @@ fi
       `--session pie-verify-desktop --cdp 9223 record start ${output} --fps 60`,
       "--session pie-verify-desktop --cdp 9223 record stop",
     ]);
+  });
+});
+
+describe("teardownOwnedBrowser", () => {
+  it("always closes after an optional record stop and kills a leftover daemon", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-teardown-"));
+    const command = path.join(dir, "agent-browser");
+    const trace = path.join(dir, "trace");
+    const recording = path.join(dir, "recording.webm");
+    const socketDir = path.join(dir, "sockets");
+    const session = "pie-verify-web";
+    const pidPath = agentBrowserDaemonPidPath(socketDir, session);
+    fs.mkdirSync(path.dirname(pidPath), { recursive: true });
+    fs.writeFileSync(
+      command,
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$TRACE"
+`,
+      { mode: 0o755 },
+    );
+    const child = path.join(dir, "linger.sh");
+    fs.writeFileSync(child, "#!/bin/sh\nwhile true; do sleep 30; done\n", { mode: 0o755 });
+    const proc = childProcess.spawn(child, [], { stdio: "ignore", detached: true });
+    proc.unref();
+    if (proc.pid === undefined) throw new Error("missing pid");
+    const pid = proc.pid;
+    fs.writeFileSync(pidPath, `${String(pid)}\n`);
+    fs.writeFileSync(recording, "video");
+    const env = { ...process.env, TRACE: trace, PIE_VERIFY_RECORDING_PATH: recording };
+    try {
+      expect(pidAlive(pid)).toBe(true);
+      await expect(teardownOwnedBrowser(command, env, { socketDir, session })).resolves.toEqual([]);
+      expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual(["record stop", "close"]);
+      expect(pidAlive(pid)).toBe(false);
+      await expect(
+        teardownOwnedBrowser(command, { ...process.env, TRACE: trace }, { socketDir, session }),
+      ).resolves.toEqual([]);
+      expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual([
+        "record stop",
+        "close",
+        "close",
+      ]);
+    } finally {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // already gone
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -248,11 +302,29 @@ describe("browserConfigForEnv", () => {
         resolveBrowserEnv({ session: "pie-verify-desktop", cdpPort: 9223, runDir }),
       );
       expect(config.cdp).toBe("9223");
+      expect(config.headed).toBe(false);
       expect(config.idleTimeout).toBe("0");
       expect(config.timeout).toBe("40000");
       expect(config.pinTab).toBe(true);
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previous);
+    }
+  });
+
+  it("requires a Verify-specific opt-in for a visible browser", () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-browser-"));
+    const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
+    const previousHeaded = process.env.PIE_VERIFY_BROWSER_HEADED;
+    process.env.VERIFY_PIE_AGENT_BROWSER = "/tmp/fake-agent-browser";
+    process.env.PIE_VERIFY_BROWSER_HEADED = "1";
+    try {
+      const config = browserConfigForEnv(
+        resolveBrowserEnv({ session: "pie-verify-web", appUrl: "http://localhost:4190/", runDir }),
+      );
+      expect(config.headed).toBe(true);
+    } finally {
+      restoreEnv("VERIFY_PIE_AGENT_BROWSER", previousBin);
+      restoreEnv("PIE_VERIFY_BROWSER_HEADED", previousHeaded);
     }
   });
 });
@@ -267,6 +339,7 @@ describe("applyBrowserEnv", () => {
         AGENT_BROWSER_CDP: "9223",
         AGENT_BROWSER_PIN_TAB: "true",
         AGENT_BROWSER_AUTO_CONNECT: "1",
+        AGENT_BROWSER_HEADED: "1",
         AGENT_BROWSER_PROFILE: "/tmp/user-chrome",
       };
       applyBrowserEnv(
@@ -277,6 +350,7 @@ describe("applyBrowserEnv", () => {
       expect(env.AGENT_BROWSER_CDP).toBeUndefined();
       expect(env.AGENT_BROWSER_PIN_TAB).toBeUndefined();
       expect(env.AGENT_BROWSER_AUTO_CONNECT).toBeUndefined();
+      expect(env.AGENT_BROWSER_HEADED).toBeUndefined();
       expect(env.AGENT_BROWSER_PROFILE).toBeUndefined();
     } finally {
       restoreEnv("VERIFY_PIE_AGENT_BROWSER", previous);

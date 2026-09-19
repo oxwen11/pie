@@ -1,9 +1,5 @@
 import type { Project } from "@getpie/contract";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@getpie/ui/components/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -12,7 +8,7 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { ChevronRight } from "lucide-react";
 
-import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 import { useProjectSessionRows } from "@/features/projects/use-project-session-rows";
 import { useChatProjects } from "@/features/projects/use-projects";
@@ -35,7 +31,7 @@ export function RecentList() {
           <span>Recent</span>
           <ChevronRight className="transition-transform group-data-[panel-open]/recent-trigger:rotate-90" />
         </SidebarGroupLabel>
-        <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
+        <KeepMountedCollapsiblePanel>
           <SidebarGroupContent>
             <SidebarMenu>
               {projects.map((project) => (
@@ -43,7 +39,7 @@ export function RecentList() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
-        </CollapsiblePanel>
+        </KeepMountedCollapsiblePanel>
       </SidebarGroup>
     </Collapsible>
   );

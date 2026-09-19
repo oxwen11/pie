@@ -4,6 +4,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
+const { assertBuiltFffIsland } = require("./fff-island.cjs");
+
 const BUN_VERSION = "bun-v1.4.2";
 
 const VENDOR_DIR = path.join(__dirname, "..", "vendor");
@@ -55,6 +57,7 @@ function downloadBun(platform, arch) {
 }
 
 exports.default = function beforePack(context) {
+  assertBuiltFffIsland();
   const arch = ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch];
   downloadBun(context.electronPlatformName, arch);
 };

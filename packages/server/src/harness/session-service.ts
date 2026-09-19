@@ -9,9 +9,9 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionStatus,
+  PieUIMessage,
   SessionWorkspace,
 } from "@getpie/contract";
-import type { UIMessage } from "ai";
 import { Context, Crypto, Effect, FileSystem, Layer } from "effect";
 
 import { Paths } from "../config/paths";
@@ -38,6 +38,7 @@ import {
   type TurnAlreadyRunning,
 } from "./errors";
 import { PiAgent } from "./pi/agent";
+import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -89,7 +90,7 @@ export type PiAgentSessionServiceShape = {
   readonly getMessages: (
     ref: SessionRef,
   ) => Effect.Effect<
-    ReadonlyArray<UIMessage>,
+    ReadonlyArray<PieUIMessage>,
     | SessionNotFound
     | ProjectNotFound
     | StoreReadError
@@ -287,7 +288,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       agentSessionId: string,
       cwd: string,
     ): Effect.Effect<
-      ReadonlyArray<UIMessage>,
+      ReadonlyArray<PieUIMessage>,
       ResumeSessionError | SessionClosed | AgentOperationError
     > => {
       const cold = pi.getMessages;
@@ -351,6 +352,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
+                  Effect.tap(() => {
+                    const model = input.model;
+                    if (model === undefined) return Effect.void;
+                    return Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore);
+                  }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
                     input.title === undefined
@@ -424,7 +432,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) => {
             if (metadata.agentSessionId === undefined) {
-              return Effect.succeed<ReadonlyArray<UIMessage>>([]);
+              return Effect.succeed<ReadonlyArray<PieUIMessage>>([]);
             }
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(
@@ -544,11 +552,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
-              const persistModel = repo.write({
-                ...metadata,
-                provider: model.provider,
-                modelId: model.modelId,
-              });
+              const persistModel = repo
+                .write({
+                  ...metadata,
+                  provider: model.provider,
+                  modelId: model.modelId,
+                })
+                .pipe(
+                  Effect.tap(() =>
+                    Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore),
+                  ),
+                );
               if (metadata.agentSessionId === undefined) {
                 return persistModel.pipe(Effect.as(model satisfies AgentModelState));
               }

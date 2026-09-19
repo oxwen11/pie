@@ -13,12 +13,14 @@
     "./rpc": "./src/rpc/index.ts",
     "./http": "./src/http/index.ts",
     "./daemon": "./src/daemon/index.ts",
+    "./config/paths": "./src/config/paths.ts",
     "./observability": "./src/observability/index.ts",
     "./observability/resources": "./src/observability/resources/index.ts",
+    "./resource-monitor": "./dist/resources/resource-monitor",
     "./pi-process": "./dist/pi-process/pi-process.js"
   },
   "scripts": {
-    "build": "bun --no-install build.ts",
+    "build": "tsdown && bun --no-install build-pi-process.ts && node scripts/build-resource-monitor.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -27,6 +29,7 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.85.1",
     "@effect/platform-node": "catalog:effect",
+    "@ff-labs/pi-fff": "0.10.6",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/effect-json-store": "workspace:*",

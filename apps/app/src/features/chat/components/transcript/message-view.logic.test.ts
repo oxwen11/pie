@@ -8,7 +8,7 @@ const tool = (id: string) => ({
   toolCallId: id,
   state: "output-available" as const,
   input: { path: "/tmp/a" },
-  output: "ok",
+  output: { content: [] as [], details: undefined },
 });
 const reasoning = { type: "reasoning" as const, text: "hm", state: "done" as const };
 

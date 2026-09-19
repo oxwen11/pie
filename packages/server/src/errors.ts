@@ -28,6 +28,12 @@ export class StoreWriteError extends Data.TaggedError("StoreWriteError")<{
   readonly cause: unknown;
 }> {}
 
+/** `$PIE_HOME/settings.json` exists but is not valid settings JSON. */
+export class SettingsFileError extends Data.TaggedError("SettingsFileError")<{
+  readonly file: string;
+  readonly cause: unknown;
+}> {}
+
 export class GitError extends Data.TaggedError("GitError")<{
   readonly cwd: string;
   readonly cause: unknown;

@@ -16,6 +16,7 @@ import {
   printEnv,
   resolveActiveBrowserEnv,
   rotateAutoRecordingForRun,
+  teardownOwnedBrowserForRun,
   writeBrowserEnvFile,
   writeIsolationShim,
 } from "./env.ts";
@@ -175,6 +176,51 @@ describe("rotateAutoRecordingForRun", () => {
   });
 });
 
+describe("teardownOwnedBrowserForRun", () => {
+  it("always closes, even with no recording file", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-teardown-"));
+    const command = path.join(dir, "bin/agent-browser");
+    const trace = path.join(dir, "trace");
+    const identity = {
+      ...WEB,
+      root: path.join(dir, "root"),
+      currentLink: path.join(dir, "root/current"),
+      skillDir: path.join(dir, "skill"),
+    };
+    writeRunMeta(path.join(dir, "meta.json"), webMeta());
+    fs.mkdirSync(path.dirname(command), { recursive: true });
+    fs.writeFileSync(command, `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(trace)}\n`, {
+      mode: 0o755,
+    });
+    const previousBin = process.env.VERIFY_PIE_AGENT_BROWSER;
+    const previousChrome = process.env.VERIFY_PIE_CHROME;
+    process.env.VERIFY_PIE_AGENT_BROWSER = command;
+    process.env.VERIFY_PIE_CHROME = "/tmp/fake-chrome";
+    try {
+      await teardownOwnedBrowserForRun(identity, dir);
+      expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual(["close"]);
+
+      const recording = browserEnvForRun(identity, dir).PIE_VERIFY_RECORDING_PATH;
+      if (recording === undefined) throw new Error("missing recording path");
+      fs.mkdirSync(path.dirname(recording), { recursive: true });
+      fs.writeFileSync(recording, "video");
+      await teardownOwnedBrowserForRun(identity, dir);
+      expect(fs.readFileSync(trace, "utf8").trim().split("\n")).toEqual([
+        "close",
+        "record stop",
+        "close",
+      ]);
+    } finally {
+      if (previousBin === undefined) delete process.env.VERIFY_PIE_AGENT_BROWSER;
+      else process.env.VERIFY_PIE_AGENT_BROWSER = previousBin;
+      if (previousChrome === undefined) delete process.env.VERIFY_PIE_CHROME;
+      else process.env.VERIFY_PIE_CHROME = previousChrome;
+      fs.rmSync(agentBrowserIsolation(dir).socketDir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("writeBrowserEnvFile", () => {
   it("writes export lines and config next to meta.json", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-env-"));
@@ -190,14 +236,17 @@ describe("writeBrowserEnvFile", () => {
         expect(text).toContain("export PIE_VERIFY_APP_URL='http://localhost:4190/'");
         expect(text).toContain("export PIE_VERIFY_RECORDING_PATH=");
         expect(text).toContain("unset AGENT_BROWSER_AUTO_CONNECT");
+        expect(text).toContain("unset AGENT_BROWSER_HEADED");
         expect(text).toContain("unset AGENT_BROWSER_CDP");
         const config = JSON.parse(
           fs.readFileSync(path.join(dir, "agent-browser.json"), "utf8"),
         ) as {
           session: string;
+          headed: boolean;
           idleTimeout: string;
         };
         expect(config.session).toBe(WEB.browserSession);
+        expect(config.headed).toBe(false);
         expect(config.idleTimeout).toBe("0");
         expect(fs.existsSync(path.join(dir, "agent-browser/screenshots"))).toBe(true);
         expect(fs.existsSync(path.join(WEB.skillDir, "evidence/run-1"))).toBe(true);

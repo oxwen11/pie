@@ -23,7 +23,7 @@ describe("batchToolParts", () => {
         toolCallId: "t1",
         state: "output-available",
         input: { path: "/tmp/a" },
-        output: "ok",
+        output: { content: [] as [], details: undefined },
       },
       { type: "text", text: "done", state: "done" },
     ]);

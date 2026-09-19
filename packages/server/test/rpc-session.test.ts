@@ -25,7 +25,8 @@ import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
-import { NodePtyLayer, TerminalManagerLayer } from "../src/terminal";
+import { SettingsRepositoryLayer } from "../src/settings";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -114,18 +115,20 @@ async function setup() {
     Layer.provide(harnessSessionLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
+    settingsRepositoryLayer,
     scheduleServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
-    TerminalManagerLayer.pipe(Layer.provide(NodePtyLayer)),
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );

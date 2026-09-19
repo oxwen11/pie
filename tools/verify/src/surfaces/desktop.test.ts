@@ -32,7 +32,9 @@ const http = require('node:http');
 const cp = require('node:child_process');
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.TRACE, JSON.stringify({
-  args, pid: process.pid,
+  args,
+  pid: process.pid,
+  desktopBackground: process.env.PIE_DESKTOP_BACKGROUND,
   projectBrowseRoot: process.env.PIE_PROJECT_BROWSE_ROOT
 }) + '\\n');
 if (args.join(' ') === 'exec install-electron') {
@@ -91,6 +93,8 @@ if (args.includes('record') && args.includes('start')) {
   fs.writeFileSync(recording, output);
 } else if (args.includes('record') && args.includes('stop')) {
   fs.rmSync(recording, { force: true });
+} else if (args.includes('close')) {
+  // owned session teardown; no-op when never attached
 } else if (args.includes('--no-pin-tab')) {
   if (!args.includes('fixture-page')) throw new Error('must select the existing target');
   fs.writeFileSync(binding, 'fixture-page');
@@ -151,6 +155,7 @@ function start(env: NodeJS.ProcessEnv, ...args: string[]) {
 function trace(root: string): Array<{
   args: string[];
   pid: number;
+  desktopBackground?: string;
   projectBrowseRoot?: string;
 }> {
   const file = path.join(root, "trace");
@@ -233,6 +238,7 @@ describe("desktop launch lifecycle", () => {
         (entry) => entry.projectBrowseRoot === path.join(meta.pieHome, "workspace"),
       ),
     ).toBe(true);
+    expect(trace(root).every((entry) => entry.desktopBackground === "1")).toBe(true);
     expect(fs.existsSync(path.join(meta.sampleProject, ".verify-pie-desktop-scaffold"))).toBe(true);
     expect(
       JSON.parse(fs.readFileSync(path.join(meta.pieHome, "storage/projects.json"), "utf8")),
@@ -292,6 +298,8 @@ describe("desktop launch lifecycle", () => {
       (call) => call.args.includes("record") && call.args.includes("stop"),
     );
     expect(stopCalls).toHaveLength(2);
+    const closeCalls = browserTrace(root).filter((call) => call.args.includes("close"));
+    expect(closeCalls).toHaveLength(1);
     const evidence = path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId);
     expect(fs.existsSync(path.join(evidence, "recording-001.webm"))).toBe(true);
     expect(fs.existsSync(path.join(evidence, "recording-002.webm"))).toBe(true);
@@ -299,11 +307,12 @@ describe("desktop launch lifecycle", () => {
   }, 10_000);
 
   it("leaves the project list empty only when requested", async () => {
-    const { root, env } = await fixture();
+    const { root, env } = await fixture({ PIE_DESKTOP_BACKGROUND: "0" });
     const result = await start(env, "launch", "--empty-projects").exited;
     expect(result.code).toBe(0);
     const meta = JSON.parse(fs.readFileSync(path.join(root, "run/current/meta.json"), "utf8"));
     expect(fs.existsSync(path.join(meta.pieHome, "storage/projects.json"))).toBe(false);
+    expect(trace(root).every((entry) => entry.desktopBackground === "0")).toBe(true);
   }, 10_000);
 
   it("reports installation failure without starting Desktop and preserves the log", async () => {
@@ -469,7 +478,15 @@ describe("desktop browser binding", () => {
     const result = await start(env).exited;
     expect(result.code).toBe(1);
     expect(result.output).toContain("ambiguous Desktop renderer");
-    expect(browserTrace(root)).toHaveLength(0);
+    expect(
+      browserTrace(root).filter(
+        (call) =>
+          !(
+            call.args.includes("close") ||
+            (call.args.includes("record") && call.args.includes("stop"))
+          ),
+      ),
+    ).toHaveLength(0);
     await stopped(root);
   }, 10_000);
 
@@ -482,7 +499,15 @@ describe("desktop browser binding", () => {
     const result = await start(second.env).exited;
     expect(result.code).toBe(1);
     expect(result.output).toContain("renderer origin is not owned by this Desktop run");
-    expect(browserTrace(second.root)).toHaveLength(0);
+    expect(
+      browserTrace(second.root).filter(
+        (call) =>
+          !(
+            call.args.includes("close") ||
+            (call.args.includes("record") && call.args.includes("stop"))
+          ),
+      ),
+    ).toHaveLength(0);
     await expect(start(first.env, "doctor").exited).resolves.toMatchObject({ code: 0 });
   }, 15_000);
 

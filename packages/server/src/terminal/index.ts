@@ -1,3 +1,8 @@
-export { TerminalManager, TerminalManagerLayer } from "./manager";
-export { BunPtyLayer } from "./pty-bun";
-export { NodePtyLayer } from "./pty-node";
+import { Layer } from "effect";
+
+import { TerminalManagerLayer as TerminalManagerFromPty } from "./manager";
+import { NodePtyLayer } from "./pty-node";
+
+export { TerminalManager } from "./manager";
+
+export const TerminalManagerLayer = TerminalManagerFromPty.pipe(Layer.provide(NodePtyLayer));

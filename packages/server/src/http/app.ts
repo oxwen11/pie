@@ -1,5 +1,9 @@
 import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequest";
-import { Effect } from "effect";
+import {
+  ElectronRegistrationSchema,
+  type ElectronRegistration,
+} from "@getpie/contract/resource-monitoring";
+import { ByteSize, Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
@@ -19,6 +23,7 @@ export type RequestAppOptions = {
   readonly tickets: TicketStore;
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
+  readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -26,6 +31,7 @@ export type RequestAppOptions = {
 const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
 const unauthorized = HttpServerResponse.text("Unauthorized", { status: 401 });
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
+const badRequest = HttpServerResponse.text("Bad Request", { status: 400 });
 
 /**
  * The request half of the server. The WebSocket upgrade half stays on raw
@@ -143,6 +149,21 @@ const route = (
       !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
     ) {
       return withCors(unauthorized);
+    }
+
+    if (
+      request.method === "POST" &&
+      pathname === "/api/resources/electron" &&
+      options.authToken !== undefined &&
+      options.registerElectron !== undefined
+    ) {
+      const registration = yield* HttpServerRequest.schemaBodyJson(ElectronRegistrationSchema).pipe(
+        Effect.provideService(HttpServerRequest.MaxBodySize, ByteSize.bytes(64 * 1024)),
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (registration === undefined) return withCors(badRequest);
+      options.registerElectron(registration);
+      return withCors(HttpServerResponse.empty({ status: 204 }));
     }
 
     if (
