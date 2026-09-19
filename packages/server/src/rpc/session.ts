@@ -100,19 +100,14 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOperationError: (e: AgentOperationError) =>
           Effect.fail(errors.INTERNAL({ message: e.message })),
-        WorkspaceReadError: (e: WorkspaceReadError) =>
-          Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
         WorktreeCheckoutMissing: (e: WorktreeCheckoutMissing) =>
           Effect.fail(
             errors.WORKTREE_MISSING({
-              data: {
-                sessionId: e.sessionId,
-                projectId: e.projectId,
-                ...(e.branch !== undefined ? { branch: e.branch } : undefined),
-              },
+              data: { sessionId: e.sessionId, projectId: e.projectId, branch: e.branch },
             }),
           ),
       }),
+      mapGitWorktreeErrors(errors),
     );
   }),
   restoreWorktree: orpc.restoreWorktree.effect(function* ({ input, errors }) {
