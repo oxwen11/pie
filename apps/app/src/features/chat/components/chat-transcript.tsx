@@ -16,6 +16,7 @@ import { AgentRequestView } from "./transcript/agent-request";
 import { MessageView } from "./transcript/message-view";
 import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
+
 // What an empty transcript means, in one place: nothing until the settled
 // history floor has landed, so an unread session shows the read rather than a
 // verdict about the conversation. "settled" renders nothing — a session with no
@@ -52,16 +53,23 @@ function ChatTranscriptView({
   snapshot: ChatStoreState;
   onRespond: (requestId: string, response: AgentResponse) => void;
 }) {
+  // StickToBottom's first growth uses `initial`, later growth uses `resize`.
+  // Keep the scroller off-tree until the history floor lands so the dump is
+  // that first growth — same path as opening a session that already has data.
+  if (snapshot.historyStatus === "loading") {
+    return (
+      <div className="relative flex-1 overflow-y-auto">
+        <div className="p-4">
+          <EmptyTranscript historyStatus="loading" />
+        </div>
+      </div>
+    );
+  }
+
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
-  // Remount StickToBottom per session so `initial` (instant) applies again.
-  // While the history floor is still loading, keep resize instant too — otherwise
-  // the async message dump rides `resize="smooth"` after the first observer tick.
   return (
-    <Conversation
-      key={sessionId}
-      resize={snapshot.historyStatus === "loading" ? "instant" : "smooth"}
-    >
+    <Conversation key={sessionId}>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
           the panel edge instead of hugging the centered column. */}
       <ConversationContent
