@@ -10,7 +10,6 @@ import {
   GitRefNotFound,
   GitWorktreePathExists,
   WorkspacePathEscape,
-  type WorkspaceReadError,
 } from "../errors";
 import { contains } from "../path-safety";
 import type { GitFailure } from "./service";
@@ -50,7 +49,6 @@ export class WorktreeService extends Context.Service<
       cwd: string,
       input?: { readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-    readonly checkoutPresent: (worktreePath: string) => Effect.Effect<boolean, WorkspaceReadError>;
     /** Re-create a pie worktree at `worktreePath` from an existing `branch`. */
     readonly restore: (
       repoCwd: string,
@@ -167,12 +165,6 @@ export const WorktreeServiceLayer: Layer.Layer<
         }
         yield* addCheckout(repoRoot, worktreePath, ["-b", branch, worktreePath, startPoint]);
         return { path: worktreePath, branch };
-      }),
-
-      checkoutPresent: Effect.fn("WorktreeService.checkoutPresent")(function* (
-        worktreePath: string,
-      ) {
-        return yield* fs.exists(worktreePath).pipe(Effect.mapError(readError(worktreePath)));
       }),
 
       restore: Effect.fn("WorktreeService.restore")(function* (

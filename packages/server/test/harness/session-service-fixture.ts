@@ -100,7 +100,6 @@ export type SessionServiceRunOpts = {
     worktreePath: string,
     branch: string,
   ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
-  worktreeCheckoutPresent?: (worktreePath: string) => Effect.Effect<boolean>;
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
 
@@ -282,9 +281,6 @@ export const run = <A, E>(
         restore:
           opts.worktreeRestore ??
           (() => Effect.die(new Error("unexpected worktreeRestore in unit test"))),
-        checkoutPresent:
-          opts.worktreeCheckoutPresent ??
-          ((worktreePath) => Effect.sync(() => fs.existsSync(worktreePath))),
         remove:
           opts.worktreeRemove ??
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
