@@ -24,7 +24,6 @@ const parseWorktreeMissingError = (error: unknown): WorktreeMissingErrorData | u
 };
 
 const throwWorktreeMissingRedirect = (error: unknown): void => {
-  if (isRedirect(error)) throw error;
   const missing = parseWorktreeMissingError(error);
   if (missing === undefined) return;
   throw redirect({

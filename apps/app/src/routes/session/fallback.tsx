@@ -15,7 +15,7 @@ import { toast } from "sonner";
 type FallbackSearch = {
   readonly sessionId: string;
   readonly projectId: string;
-  readonly branch?: string;
+  readonly branch: string;
 };
 
 const asText = (value: unknown): string | undefined =>
@@ -23,14 +23,13 @@ const asText = (value: unknown): string | undefined =>
 
 export const Route = createFileRoute("/session/fallback")({
   staticData: { cardHeading: "Can't open session" },
-  validateSearch: (search: Record<string, unknown>): FallbackSearch => {
-    const sessionId = asText(search.sessionId) ?? "";
-    const projectId = asText(search.projectId) ?? "";
-    const branch = asText(search.branch);
-    return branch === undefined ? { sessionId, projectId } : { sessionId, projectId, branch };
-  },
+  validateSearch: (search: Record<string, unknown>): FallbackSearch => ({
+    sessionId: asText(search.sessionId) ?? "",
+    projectId: asText(search.projectId) ?? "",
+    branch: asText(search.branch) ?? "",
+  }),
   beforeLoad: ({ search }) => {
-    if (search.sessionId === "" || search.projectId === "") {
+    if (search.sessionId === "" || search.projectId === "" || search.branch === "") {
       throw redirect({ to: "/draft" });
     }
   },
@@ -69,9 +68,7 @@ function MissingWorktreeRoute() {
         </EmptyMedia>
         <EmptyTitle>Can&apos;t open session</EmptyTitle>
         <EmptyDescription>
-          {search.branch === undefined
-            ? "This session's checkout was removed."
-            : `This session's checkout was removed. Restore ${search.branch} to continue.`}
+          This session&apos;s checkout was removed. Restore {search.branch} to continue.
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
