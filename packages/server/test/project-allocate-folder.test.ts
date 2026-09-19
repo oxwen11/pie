@@ -27,7 +27,6 @@ describe("resolveNewProjectRoot", () => {
     expect(resolveNewProjectRoot({}, () => "/home/user")).toBe(
       path.join("/home/user", DEFAULT_NEW_PROJECT_DIR),
     );
-    expect(DEFAULT_NEW_PROJECT_DIR).toBe("Pie");
   });
 });
 

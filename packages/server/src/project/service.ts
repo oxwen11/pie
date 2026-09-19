@@ -9,10 +9,8 @@ import {
   type StoreReadError,
   type StoreWriteError,
   WorkspaceNotDirectory,
-  WorkspacePathEscape,
   WorkspaceReadError,
 } from "../errors";
-import { contains } from "../path-safety";
 import type { Project } from "../types";
 import {
   ALLOCATE_FOLDER_ATTEMPTS,
@@ -25,7 +23,6 @@ export type AllocateProjectError =
   | StoreReadError
   | StoreWriteError
   | WorkspaceNotDirectory
-  | WorkspacePathEscape
   | WorkspaceReadError
   | ProjectFolderCreateError
   | ProjectFolderConflict;
@@ -153,13 +150,7 @@ export const ProjectServiceLayer: Layer.Layer<
         for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
           const name = allocateProjectFolderName(now, attempt);
           const folder = path.resolve(root, name);
-          if (path.relative(root, folder) !== name || !contains(root, folder)) {
-            return yield* new WorkspacePathEscape({ cwd: root, path: folder });
-          }
           const parent = path.dirname(folder);
-          if (!contains(root, parent)) {
-            return yield* new WorkspacePathEscape({ cwd: root, path: parent });
-          }
           yield* fs.makeDirectory(parent, { recursive: true }).pipe(
             Effect.catchIf(isAlreadyExists, () => Effect.void),
             Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),

@@ -12,7 +12,7 @@ import { FolderIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 /** Sentinel that is not a project UUID — allocate a folder on send. */
-export const NEW_FOLDER_VALUE = "new-folder";
+const NEW_FOLDER_VALUE = "new-folder";
 
 const CHOOSE_PROJECT_LABEL = "Choose project";
 const CLEAR_PROJECT_LABEL = "Don't work in a project";

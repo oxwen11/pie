@@ -26,8 +26,6 @@ export const projectRouter = orpc.router({
       Effect.catchTags({
         WorkspaceNotDirectory: (e) =>
           Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
-        WorkspacePathEscape: (e) =>
-          Effect.fail(errors.FORBIDDEN({ message: `path ${e.path} escapes ${e.cwd}` })),
         WorkspaceReadError: (e) =>
           Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
         ProjectFolderCreateError: (e) =>
