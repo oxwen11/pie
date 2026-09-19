@@ -298,23 +298,8 @@ export const makePiAgentSessionService = (deps: {
   const generation = (ref: SessionRef) => generations.get(sessionKey(ref)) ?? 0;
   const invalidate = (ref: SessionRef) =>
     Effect.sync(() => generations.set(sessionKey(ref), generation(ref) + 1));
-  const linksFor = (metadata: Session): ReadonlyArray<SessionPullRequestLink> => {
-    const links = new Map(
-      (metadata.pullRequests ?? []).map((link) => [pullRequestKey(link.ref), link]),
-    );
-    for (const ref of metadata.pullRequestRefs ?? [])
-      if (!links.has(pullRequestKey(ref)))
-        links.set(pullRequestKey(ref), {
-          ref: normalizePullRequestRef(ref),
-          source: "legacy",
-          linkedAt: metadata.createdAt,
-          excluded: false,
-          snapshot: null,
-          stack: null,
-          stackCheckedAt: null,
-        });
-    return [...links.values()];
-  };
+  const linksFor = (metadata: Session): ReadonlyArray<SessionPullRequestLink> =>
+    metadata.pullRequests ?? [];
   const observedBranch = (metadata: Session) =>
     metadata.ownsWorktree && metadata.cwd && deps.branchFor
       ? deps.branchFor(metadata.cwd)

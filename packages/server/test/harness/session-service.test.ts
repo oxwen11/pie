@@ -76,7 +76,6 @@ describe("PiAgentSessionService", () => {
     );
     expect(result.listed).toEqual([first, second]);
     expect(result.stored.pullRequests?.map((link) => link.ref)).toEqual([first, second]);
-    expect(result.stored.pullRequestRefs).toBeUndefined();
   });
 
   it("the first prompt opens Pi with the model stored at create", async () => {

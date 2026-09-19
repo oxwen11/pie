@@ -103,7 +103,7 @@ Server 通过受限调用上下文确定完整 `SessionRef { projectId, sessionI
 ```text
 Session.pullRequests[]
 ├─ ref                  host / owner / repository / number
-├─ source               agent / created / branch / stack / legacy
+├─ source               agent / created / branch / stack
 ├─ linkedAt             首次关联时间，不代表 Stack 顺序
 ├─ excluded             用户已取消，禁止自动加回
 ├─ snapshot | null
@@ -123,8 +123,6 @@ Session.pullRequests[]
 - 成功核验更新时间，即使状态内容没变；按 Session 合并落盘，不因窗口数量增加写入次数。Agent 提供的状态文字不冒充 Server 核验快照。
 - checks、review、权限和 head SHA 的完整详情按需读取，不将它们全部固化到 Session 元数据。展示快照绝不作为写操作授权。
 - demand、排队、失败退避和 dirty generation 是 Server 临时状态，不写持久任务。重启后保留快照，首次有需求时重新核验，而不是启动时补查。
-
-读取旧 `pullRequestRefs` 时转为 legacy 关联、快照为空；下一次正常元数据写入迁移到新字段，停止双写。迁移保留原身份和顺序；不能因无法查询 GitHub 而丢弃旧记录。不同版本 Server 不得同时写同一 `PIE_HOME`，回退前保留备份。
 
 ## 5. 什么算“用户实际使用”
 

@@ -28,33 +28,6 @@ layer(NodePlatformLayer)("durable Session associations", (it) => {
       assert.equal(f.calls.open, 0);
     }),
   );
-  it.effect("migrates legacy data on the next normal write without querying GitHub", () =>
-    Effect.gen(function* () {
-      const f = yield* makeFixture;
-      const file = `${f.home}/${f.ref.projectId}/${f.ref.sessionId}.json`;
-      const metadata = yield* f.repo.read(f.ref.projectId, f.ref.sessionId);
-      yield* f.fs.writeFileString(
-        file,
-        JSON.stringify({
-          version: 1,
-          data: {
-            ...metadata,
-            pullRequests: undefined,
-            pullRequestRefs: [prRef, { ...prRef, owner: "GETPIE" }],
-          },
-        }),
-      );
-      const links = yield* f.service.pullRequestsFor(f.ref);
-      assert.equal(links.length, 1);
-      assert.equal(links[0]?.source, "legacy");
-      assert.equal(links[0]?.snapshot, null);
-      yield* f.service.rename(f.ref, "Migrated");
-      const data = JSON.parse(yield* f.fs.readFileString(file)).data;
-      assert.equal(data.pullRequestRefs, undefined);
-      assert.equal(data.pullRequests.length, 1);
-      assert.equal(data.title, "Migrated");
-    }),
-  );
   it.effect("rejects late results after cancellation, restore, archive and deletion", () =>
     Effect.gen(function* () {
       const f = yield* makeFixture;

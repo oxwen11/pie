@@ -110,13 +110,7 @@ export const PullRequestStackSchema = Schema.Struct({
   layers: Schema.Array(PullRequestStackLayerSchema).check(Schema.isMaxLength(100)),
 });
 export type PullRequestStack = typeof PullRequestStackSchema.Type;
-export const PullRequestLinkSourceSchema = Schema.Literals([
-  "agent",
-  "created",
-  "branch",
-  "stack",
-  "legacy",
-]);
+export const PullRequestLinkSourceSchema = Schema.Literals(["agent", "created", "branch", "stack"]);
 export type PullRequestLinkSource = typeof PullRequestLinkSourceSchema.Type;
 export const SessionPullRequestLinkSchema = Schema.Struct({
   ref: PullRequestRefSchema,
