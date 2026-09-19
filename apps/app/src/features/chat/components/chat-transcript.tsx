@@ -13,6 +13,7 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
+import { isCompactionData } from "./transcript/compaction-marker";
 import { MessageView } from "./transcript/message-view";
 import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
@@ -52,17 +53,14 @@ function ChatTranscriptView({
 }) {
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
-  const last = snapshot.messages.at(-1);
+  const compaction = snapshot.messages
+    .at(-1)
+    ?.parts.find((part) => part.type === "data-compaction");
   const compacting =
-    last?.parts.some(
-      (part) =>
-        part.type === "data-compaction" &&
-        "data" in part &&
-        typeof part.data === "object" &&
-        part.data !== null &&
-        "phase" in part.data &&
-        part.data.phase === "running",
-    ) ?? false;
+    compaction !== undefined &&
+    "data" in compaction &&
+    isCompactionData(compaction.data) &&
+    compaction.data.phase === "running";
   return (
     <Conversation>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at

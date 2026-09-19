@@ -17,7 +17,7 @@ describe("compaction lifecycle", () => {
       { type: "session.compaction.started", reason: "overflow" },
     );
     const snapshot = toSnapshot(ref, state);
-    expect(snapshot.compaction).toEqual({ reason: "overflow" });
+    expect(snapshot.compaction).toBe(true);
     expect(snapshot.status).toEqual({ phase: "running", activeTurnId: "t" });
   });
   it.each(["canceled", "failed"] as const)(

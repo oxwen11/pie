@@ -487,9 +487,6 @@ describe("entriesToUIMessages", () => {
     const messages = entriesToUIMessages(entries, "a2", "s");
     expect(messages.map((m) => m.id)).toEqual(["kept", "a1", "a2"]);
     expect(messages[1]?.parts[0]).toMatchObject({ state: "output-available" });
-    expect(messages.some((m) => m.parts.some((part) => part.type === "data-compaction"))).toBe(
-      false,
-    );
     const twice = entriesToUIMessages(
       [...entries, compact("compact-2", "a2", "a2")],
       "compact-2",

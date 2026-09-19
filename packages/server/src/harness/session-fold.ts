@@ -259,15 +259,15 @@ export const foldSessionEvent = (
         pendingPrompt: { steering: event.steering, followUp: event.followUp },
       };
     case "session.compaction.started":
-      return { ...base, compaction: { reason: event.reason } };
-    case "session.compaction.ended":
+      return { ...base, compaction: true };
+    case "session.compaction.ended": {
       if (event.result.outcome !== "completed") return { ...base, compaction: null };
+      // Existing clients keep their rendered transcript. Only discard the
+      // reconnect buffer before the boundary so a cold history floor cannot
+      // replay pre-compaction chunks over its trimmed projection.
       return {
         ...base,
         compaction: null,
-        // Existing clients keep their rendered transcript. Only discard the
-        // reconnect buffer before the boundary so a cold history floor cannot
-        // replay pre-compaction chunks over its trimmed projection.
         activePrompt: null,
         activeTurn: current.activeTurn
           ? {
@@ -279,6 +279,7 @@ export const foldSessionEvent = (
             }
           : null,
       };
+    }
     case "session.crashed":
       return {
         ...base,

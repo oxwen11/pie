@@ -20,15 +20,10 @@ export type PiMetadata = {
   usage?: PiAssistantHistoryMessage["usage"];
 };
 
-// Retry is transient UI status, not transcript. Compaction is a live UIMessage
-// data part (inserted by the client on session.compaction.*); cold history
-// trims only and does not emit it. The queue is a session event, not a part.
+// Retry is transient UI status, not transcript. Compaction is a client-only
+// live UIMessage (never projected from cold history). The queue is a session
+// event (`session.queue.updated`), not a UI-message data part.
 export type PiDataTypes = {
-  compaction:
-    | { phase: "running" }
-    | { phase: "completed"; summary: string }
-    | { phase: "canceled" }
-    | { phase: "failed"; error: string };
   retry: {
     errorMessage: string;
     attempt?: number;

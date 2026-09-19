@@ -397,7 +397,8 @@ export type SessionRuntimeSnapshot = {
   readonly pendingPrompt: SessionPendingPrompt;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
-  readonly compaction?: { readonly reason: CompactionReason } | null;
+  // Presence-only: reconnect shows the live spinner; reason stays on the event.
+  readonly compaction?: true | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
   readonly cursor: number;
 };
