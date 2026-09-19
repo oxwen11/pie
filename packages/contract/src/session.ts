@@ -23,14 +23,21 @@ import {
   SessionStatusSchema,
   SubscribeInputSchema,
   type SubscribeStreamEvent,
+  WorktreeMissingErrorDataSchema,
 } from "./domain";
-import { oc } from "./orpc";
+import { oc, toStandardSchema } from "./orpc";
 
 const base = oc.errors(serverErrors);
 
+const worktreeMissingData = toStandardSchema(WorktreeMissingErrorDataSchema);
+
 export const sessionContract = {
   create: base.input(CreateSessionInputSchema).output(CreateSessionOutputSchema),
-  prepare: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
+  prepare: base
+    .errors({ WORKTREE_MISSING: { data: worktreeMissingData } })
+    .input(RefInputSchema)
+    .output(PrepareSessionOutputSchema),
+  restoreWorktree: base.input(RefInputSchema).output(PrepareSessionOutputSchema),
   close: base.input(RefInputSchema),
 
   list: base.input(ListSessionsInputSchema).output(type<ListSessionsOutput>()),
