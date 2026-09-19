@@ -104,6 +104,11 @@ function DraftRoute() {
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
 
+      // Create persists Pi's global default; refresh so the next draft picks it up.
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
+
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
         if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
         const optimistic: SessionSummary = {

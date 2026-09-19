@@ -6,6 +6,7 @@ import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentModel } from "@getpie/contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { persistDefaultPiModel } from "../../../src/harness/pi/persist-default-model";
 import { resolveDefaultPiModel } from "../../../src/harness/pi/resolve-default-model";
 
 const models: ReadonlyArray<AgentModel> = [
@@ -71,6 +72,12 @@ describe("resolveDefaultPiModel", () => {
       settings.setDefaultModelAndProvider("anthropic", "claude-sonnet-4-5");
       await settings.flush();
 
+      const reread = SettingsManager.create(agentDir);
+      expect(resolveDefaultPiModel(models, reread)).toEqual(models[1]);
+    });
+
+    it("persistDefaultPiModel writes the pair listModels will resolve", async () => {
+      await persistDefaultPiModel("anthropic", "claude-sonnet-4-5");
       const reread = SettingsManager.create(agentDir);
       expect(resolveDefaultPiModel(models, reread)).toEqual(models[1]);
     });

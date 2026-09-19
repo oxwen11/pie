@@ -38,6 +38,7 @@ import {
   type TurnAlreadyRunning,
 } from "./errors";
 import { PiAgent } from "./pi/agent";
+import { persistDefaultPiModel } from "./pi/persist-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -331,6 +332,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     );
             return materializeWorkspace.pipe(
               Effect.flatMap((sessionWorkspace) => {
+                const selectedModel = input.model;
                 const metadata: Session = {
                   sessionId,
                   projectId: input.projectId,
@@ -339,8 +341,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   ...(sessionWorkspace.worktree !== undefined
                     ? { worktree: sessionWorkspace.worktree }
                     : undefined),
-                  ...(input.model !== undefined
-                    ? { provider: input.model.provider, modelId: input.model.modelId }
+                  ...(selectedModel !== undefined
+                    ? { provider: selectedModel.provider, modelId: selectedModel.modelId }
                     : undefined),
                   ...(input.title !== undefined ? { title: input.title } : undefined),
                   archived: false,
@@ -350,6 +352,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     sessionWorkspace.worktree === undefined
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
+                  ),
+                  Effect.tap(() =>
+                    selectedModel === undefined
+                      ? Effect.void
+                      : Effect.tryPromise(() =>
+                          persistDefaultPiModel(selectedModel.provider, selectedModel.modelId),
+                        ).pipe(Effect.ignore),
                   ),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
@@ -544,11 +553,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
-              const persistModel = repo.write({
-                ...metadata,
-                provider: model.provider,
-                modelId: model.modelId,
-              });
+              const persistModel = repo
+                .write({
+                  ...metadata,
+                  provider: model.provider,
+                  modelId: model.modelId,
+                })
+                .pipe(
+                  Effect.tap(() =>
+                    Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore),
+                  ),
+                );
               if (metadata.agentSessionId === undefined) {
                 return persistModel.pipe(Effect.as(model satisfies AgentModelState));
               }
