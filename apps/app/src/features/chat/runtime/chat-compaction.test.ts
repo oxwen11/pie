@@ -3,25 +3,21 @@ import { describe, expect, it } from "vitest";
 import {
   activeTurn,
   assistantText,
-  defined,
   chunkEvent,
+  defined,
   makeChat,
   settle,
   textChunks,
   userMessage,
 } from "./chat-test-helpers";
 
-const retained = userMessage("kept", "recent request");
-const marker = {
-  id: "compact-1",
-  role: "assistant" as const,
-  parts: [{ type: "data-compaction" as const, data: { summary: "Earlier work" } }],
-};
-
-const projection = [retained, marker];
+function compactionData(message: { parts: ReadonlyArray<{ type: string; data?: unknown }> }) {
+  const part = message.parts.find((entry) => entry.type === "data-compaction");
+  return part && "data" in part ? part.data : undefined;
+}
 
 describe("Chat compaction", () => {
-  it("keeps live messages and appends the same turn's continuation as a new message", async () => {
+  it("keeps live messages, inserts a compact row, and continues in a new message", async () => {
     const { chat, attach, live, transport } = makeChat();
     transport.history = [userMessage("old", "old request")];
     await attach({});
@@ -35,13 +31,18 @@ describe("Chat compaction", () => {
       live(3 + i, { type: "session.message.chunk", turnId: "t", chunk });
     }
     live(6, { type: "session.compaction.started", reason: "overflow", phase: "running" });
-    expect(chat.store.getState().compaction?.phase).toBe("running");
-    live(7, {
-      type: "session.compaction.ended",
-      result: { outcome: "completed" },
+    expect(compactionData(defined(chat.store.getState().messages.at(-1)))).toEqual({
       phase: "running",
     });
-    expect(chat.store.getState().compaction).toBeNull();
+    live(7, {
+      type: "session.compaction.ended",
+      result: { outcome: "completed", summary: "Earlier work" },
+      phase: "running",
+    });
+    expect(compactionData(defined(chat.store.getState().messages.at(-1)))).toEqual({
+      phase: "completed",
+      summary: "Earlier work",
+    });
     live(8, {
       type: "session.message.chunk",
       turnId: "t",
@@ -51,13 +52,14 @@ describe("Chat compaction", () => {
       live(9 + i, { type: "session.message.chunk", turnId: "t", chunk });
     }
     await settle();
-    expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
-      "old",
-      "old-answer",
-      "new-answer",
-    ]);
+    const ids = chat.store.getState().messages.map((message) => message.id);
+    expect(ids).toHaveLength(4);
+    expect(ids[0]).toBe("old");
+    expect(ids[1]).toBe("old-answer");
+    expect(ids[3]).toBe("new-answer");
+    expect(ids[2]).not.toBe("old-answer");
     expect(assistantText(defined(chat.store.getState().messages[1]))).toBe("old text");
-    expect(assistantText(defined(chat.store.getState().messages[2]))).toBe("new text");
+    expect(assistantText(defined(chat.store.getState().messages[3]))).toBe("new text");
     expect(transport.getMessagesCalls).toBe(1);
   });
 
@@ -83,15 +85,18 @@ describe("Chat compaction", () => {
         live(7 + i, { type: "session.message.chunk", turnId: "t", chunk });
       }
       await settle();
-      expect(chat.store.getState().messages).toHaveLength(1);
+      expect(chat.store.getState().messages).toHaveLength(2);
+      expect(chat.store.getState().messages[0]?.id).toBe("answer");
       expect(assistantText(defined(chat.store.getState().messages[0]))).toBe("beforeafter");
-      expect(chat.store.getState().compaction?.phase).toBe(outcome);
+      expect(compactionData(defined(chat.store.getState().messages[1]))).toEqual(
+        outcome === "failed" ? { phase: "failed", error: "quota" } : { phase: "canceled" },
+      );
     },
   );
 
-  it("uses the compacted Session Messages only as the cold floor", async () => {
+  it("uses trimmed Session Messages as the cold floor without a compact marker", async () => {
     const { chat, attach, transport } = makeChat();
-    transport.history = projection;
+    transport.history = [userMessage("kept", "recent request")];
     await attach({
       cursor: 14,
       status: { phase: "running", activeTurnId: "t" },
@@ -103,20 +108,18 @@ describe("Chat compaction", () => {
         ],
       }),
     });
-    expect(chat.store.getState().messages.map((message) => message.id)).toEqual([
-      "kept",
-      "compact-1",
-      "tail",
-    ]);
-    expect(assistantText(defined(chat.store.getState().messages[2]))).toBe("continuing");
+    expect(chat.store.getState().messages.map((message) => message.id)).toEqual(["kept", "tail"]);
+    expect(assistantText(defined(chat.store.getState().messages[1]))).toBe("continuing");
   });
 
   it("restores the spinner and queues input while compacting without an active turn", async () => {
     const { chat, attach, transport } = makeChat();
     await attach({ compaction: { reason: "manual" } });
-    expect(chat.store.getState().compaction?.phase).toBe("running");
+    expect(compactionData(defined(chat.store.getState().messages[0]))).toEqual({
+      phase: "running",
+    });
     await chat.prompt("later");
     expect(transport.promptCalls[0]?.delivery).toBe("followUp");
-    expect(chat.store.getState().messages).toEqual([]);
+    expect(chat.store.getState().messages.map((message) => message.role)).toEqual(["assistant"]);
   });
 });

@@ -13,7 +13,6 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
-import { CompactionStatus } from "./transcript/compaction-marker";
 import { MessageView } from "./transcript/message-view";
 import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
@@ -53,6 +52,17 @@ function ChatTranscriptView({
 }) {
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
+  const compacting = snapshot.messages.some((message) =>
+    message.parts.some(
+      (part) =>
+        part.type === "data-compaction" &&
+        "data" in part &&
+        typeof part.data === "object" &&
+        part.data !== null &&
+        "phase" in part.data &&
+        part.data.phase === "running",
+    ),
+  );
   return (
     <Conversation>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
@@ -68,14 +78,11 @@ function ChatTranscriptView({
           <MessageView
             key={message.id}
             message={message}
-            isStreaming={
-              turnInProgress && snapshot.compaction?.phase !== "running" && index === lastIndex
-            }
+            isStreaming={turnInProgress && !compacting && index === lastIndex}
             previousTimestamp={timestampOf(snapshot.messages[index - 1]?.metadata)}
           />
         ))}
-        <CompactionStatus state={snapshot.compaction} />
-        {snapshot.status === "submitted" && snapshot.compaction?.phase !== "running" && (
+        {snapshot.status === "submitted" && !compacting && (
           <div
             role="status"
             aria-live="polite"

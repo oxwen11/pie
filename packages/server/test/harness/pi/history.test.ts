@@ -461,10 +461,10 @@ describe("entriesToUIMessages", () => {
       "a1",
       "s1",
     );
-    expect(messages.map((message) => message.id)).toEqual(["u1", "n6", "a1"]);
+    expect(messages.map((message) => message.id)).toEqual(["u1", "a1"]);
   });
 
-  it("places the latest compaction marker after retained messages and before continuation", () => {
+  it("trims to the latest compaction floor without inserting a marker", () => {
     const compact = (id: string, parentId: string, firstKeptEntryId: string) =>
       entry({
         type: "compaction",
@@ -485,17 +485,17 @@ describe("entriesToUIMessages", () => {
       compact("abandoned", "old", "old"),
     ];
     const messages = entriesToUIMessages(entries, "a2", "s");
-    expect(messages.map((m) => m.id)).toEqual(["kept", "a1", "compact-1", "a2"]);
+    expect(messages.map((m) => m.id)).toEqual(["kept", "a1", "a2"]);
     expect(messages[1]?.parts[0]).toMatchObject({ state: "output-available" });
-    expect(messages[2]?.parts).toEqual([
-      { type: "data-compaction", data: { summary: "compact-1" } },
-    ]);
+    expect(messages.some((m) => m.parts.some((part) => part.type === "data-compaction"))).toBe(
+      false,
+    );
     const twice = entriesToUIMessages(
       [...entries, compact("compact-2", "a2", "a2")],
       "compact-2",
       "s",
     );
-    expect(twice.map((m) => m.id)).toEqual(["a2", "compact-2"]);
+    expect(twice.map((m) => m.id)).toEqual(["a2"]);
   });
 
   it.each(["missing", "compact", "result"])(
@@ -519,7 +519,7 @@ describe("entriesToUIMessages", () => {
         "compact",
         "s",
       );
-      expect(messages.map((m) => m.id)).toEqual(["u", "a", "compact"]);
+      expect(messages.map((m) => m.id)).toEqual(["u", "a"]);
       expect(messages[1]?.parts[0]).toMatchObject({ state: "output-available" });
     },
   );

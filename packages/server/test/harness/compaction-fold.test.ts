@@ -41,7 +41,7 @@ describe("compaction lifecycle", () => {
     const state = fold(
       { type: "session.turn.started", turnId: "t" },
       { type: "session.message.chunk", turnId: "t", chunk: { type: "start", messageId: "old" } },
-      { type: "session.compaction.ended", result: { outcome: "completed" } },
+      { type: "session.compaction.ended", result: { outcome: "completed", summary: "earlier" } },
       { type: "session.message.chunk", turnId: "t", chunk: { type: "start", messageId: "new" } },
     );
     const snapshot = toSnapshot(ref, state);
