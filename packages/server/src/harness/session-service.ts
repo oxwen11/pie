@@ -22,7 +22,7 @@ import {
   type SessionRefNotFound,
   type StoreReadError,
   type StoreWriteError,
-  type WorkspaceReadError,
+  WorkspaceReadError,
   WorktreeCheckoutMissing,
   UnsupportedPromptPart,
 } from "../errors";
@@ -226,6 +226,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | WorktreeService
   | ProjectService
   | Crypto.Crypto
+  | FileSystem.FileSystem
   | SessionMetadata
   | SessionMetadataLocks
 > = Layer.effect(
@@ -238,6 +239,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const worktrees = yield* WorktreeService;
     const projects = yield* ProjectService;
     const crypto = yield* Crypto.Crypto;
+    const fs = yield* FileSystem.FileSystem;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
     const { readMetadata, ensureCwd, readAndStampTitleFromFirstPrompt } = sessionMetadata;
@@ -251,26 +253,22 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const resolveWorkspace = (ref: SessionRef) =>
       withMetadataMutation(ref, readMetadata(ref).pipe(Effect.flatMap(ensureCwd)));
 
-    const ensureWorktreeCheckout = (ref: SessionRef, metadata: SessionWithCwd) =>
-      metadata.worktree === undefined
-        ? Effect.void
-        : worktrees.checkoutPresent(metadata.cwd).pipe(
-            Effect.flatMap((present) =>
-              present
-                ? Effect.void
-                : Effect.fail(
-                    new WorktreeCheckoutMissing({
-                      sessionId: ref.sessionId,
-                      projectId: ref.projectId,
-                      branch: metadata.worktree?.branch,
-                    }),
-                  ),
-            ),
-          );
-
     const toPreparedWorkspace = (ref: SessionRef, metadata: SessionWithCwd) =>
       Effect.gen(function* () {
-        yield* ensureWorktreeCheckout(ref, metadata);
+        if (metadata.worktree !== undefined) {
+          yield* fs.exists(metadata.cwd).pipe(
+            Effect.mapError((cause) => new WorkspaceReadError({ path: metadata.cwd, cause })),
+            Effect.filterOrFail(
+              (present) => present,
+              () =>
+                new WorktreeCheckoutMissing({
+                  sessionId: ref.sessionId,
+                  projectId: ref.projectId,
+                  branch: metadata.worktree?.branch,
+                }),
+            ),
+          );
+        }
         if (metadata.agentSessionId === undefined) {
           return toSessionWorkspace(metadata);
         }

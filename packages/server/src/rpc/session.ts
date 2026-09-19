@@ -1,4 +1,3 @@
-import type { SessionRef, SessionWorkspace } from "@getpie/contract";
 import { sessionContract } from "@getpie/contract/session";
 import { Effect } from "effect";
 
@@ -29,11 +28,6 @@ import { openScopedSubscription } from "./session-stream";
 import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
-
-const preparedSessionOutput = (ref: SessionRef, workspace: SessionWorkspace) => ({
-  ref,
-  workspace,
-});
 
 const mapGitWorktreeErrors = <
   E extends {
@@ -96,7 +90,7 @@ export const sessionRouter = orpc.router({
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.prepare(input.ref).pipe(
-      Effect.map((workspace) => preparedSessionOutput(input.ref, workspace)),
+      Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
         SessionNotFound: (e: SessionNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
@@ -124,7 +118,7 @@ export const sessionRouter = orpc.router({
   restoreWorktree: orpc.restoreWorktree.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.restoreWorktree(input.ref).pipe(
-      Effect.map((workspace) => preparedSessionOutput(input.ref, workspace)),
+      Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
         SessionNotFound: (e: SessionNotFound) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),

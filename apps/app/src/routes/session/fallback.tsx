@@ -17,9 +17,6 @@ import { parseWorktreeMissingError } from "@/features/session/worktree-missing";
 type FallbackSearch = {
   readonly sessionId: string;
   readonly projectId: string;
-};
-
-type FallbackLoaderData = {
   readonly branch?: string;
 };
 
@@ -31,7 +28,8 @@ export const Route = createFileRoute("/session/fallback")({
   validateSearch: (search: Record<string, unknown>): FallbackSearch => {
     const sessionId = asText(search.sessionId) ?? "";
     const projectId = asText(search.projectId) ?? "";
-    return { sessionId, projectId };
+    const branch = asText(search.branch);
+    return branch === undefined ? { sessionId, projectId } : { sessionId, projectId, branch };
   },
   beforeLoad: ({ search }) => {
     if (search.sessionId === "" || search.projectId === "") {
@@ -39,7 +37,7 @@ export const Route = createFileRoute("/session/fallback")({
     }
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({ context, deps }): Promise<FallbackLoaderData> => {
+  loader: async ({ context, deps }) => {
     const ref = { projectId: deps.projectId, sessionId: deps.sessionId };
     try {
       await context.orpcQueryUtils.agent.session.prepare.call({ ref });
@@ -50,8 +48,7 @@ export const Route = createFileRoute("/session/fallback")({
       });
     } catch (error: unknown) {
       if (isRedirect(error)) throw error;
-      const missing = parseWorktreeMissingError(error);
-      if (missing !== undefined) return { branch: missing.branch };
+      if (parseWorktreeMissingError(error) !== undefined) return;
       throw redirect({ to: "/draft" });
     }
   },
@@ -60,7 +57,6 @@ export const Route = createFileRoute("/session/fallback")({
 
 function MissingWorktreeRoute() {
   const search = Route.useSearch();
-  const { branch } = Route.useLoaderData();
   const { orpcQueryUtils } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -91,9 +87,9 @@ function MissingWorktreeRoute() {
         </EmptyMedia>
         <EmptyTitle>Can&apos;t open session</EmptyTitle>
         <EmptyDescription>
-          {branch === undefined
+          {search.branch === undefined
             ? "This session's checkout was removed."
-            : `This session's checkout was removed. Restore ${branch} to continue.`}
+            : `This session's checkout was removed. Restore ${search.branch} to continue.`}
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
