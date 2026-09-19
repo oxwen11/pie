@@ -11,6 +11,7 @@ import type {
 import { generateId, readUIMessageStream } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
+import type { CompactionPartData } from "../components/transcript/compaction-marker";
 import type { AgentRequest, AgentResponse } from "./agent-requests";
 import { ChatState, type ChatStoreState } from "./chat-state";
 import type { ChatSessionTransport } from "./chat-transport-port";
@@ -43,12 +44,6 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
       return "streaming";
   }
 }
-
-type CompactionPartData =
-  | { phase: "running" }
-  | { phase: "completed"; summary: string }
-  | { phase: "canceled" }
-  | { phase: "failed"; error: string };
 
 /** Wire prompt parts → the user PieUIMessage every client renders. */
 const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): PieUIMessage => ({
@@ -220,8 +215,6 @@ export class Chat {
         this.#state.messages = this.#state.messages.filter(
           (message) => message.id !== event.messageId,
         );
-        break;
-      case "session.turn.started":
         break;
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
@@ -590,33 +583,18 @@ export class Chat {
     }
   }
 
-  #compactionMessage(data: CompactionPartData): PieUIMessage {
-    return {
-      id: this.#compactionMessageId ?? generateId(),
+  #upsertCompaction(data: CompactionPartData): void {
+    const id = this.#compactionMessageId ?? generateId();
+    this.#state.upsertMessage({
+      id,
       role: "assistant",
       parts: [{ type: "data-compaction", data }],
-    };
-  }
-
-  #upsertCompaction(data: CompactionPartData): void {
-    const message = this.#compactionMessage(data);
-    this.#compactionMessageId = message.id;
-    this.#state.upsertMessage(message);
+    });
+    this.#compactionMessageId = data.phase === "running" ? id : null;
   }
 
   #isCompacting(): boolean {
-    const id = this.#compactionMessageId;
-    if (id === null) return false;
-    const message = this.#state.messages.find((entry) => entry.id === id);
-    const part = message?.parts.find((entry) => entry.type === "data-compaction");
-    return Boolean(
-      part &&
-      "data" in part &&
-      typeof part.data === "object" &&
-      part.data !== null &&
-      "phase" in part.data &&
-      part.data.phase === "running",
-    );
+    return this.#compactionMessageId !== null;
   }
 
   #turnFold(turnId: string): TurnFold {

@@ -52,8 +52,9 @@ function ChatTranscriptView({
 }) {
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
-  const compacting = snapshot.messages.some((message) =>
-    message.parts.some(
+  const last = snapshot.messages.at(-1);
+  const compacting =
+    last?.parts.some(
       (part) =>
         part.type === "data-compaction" &&
         "data" in part &&
@@ -61,8 +62,7 @@ function ChatTranscriptView({
         part.data !== null &&
         "phase" in part.data &&
         part.data.phase === "running",
-    ),
-  );
+    ) ?? false;
   return (
     <Conversation>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
