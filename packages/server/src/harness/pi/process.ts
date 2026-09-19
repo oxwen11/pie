@@ -283,7 +283,7 @@ export const makePiProcessWithDependencies = <R>(
           const result: CompactionResult = event.aborted
             ? { outcome: "canceled" }
             : event.result
-              ? { outcome: "completed" }
+              ? { outcome: "completed", summary: event.result.summary }
               : { outcome: "failed", error: event.errorMessage ?? "Compaction failed" };
           yield* offerChunk(session, {
             type: "session.compaction.ended",

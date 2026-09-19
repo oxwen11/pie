@@ -216,7 +216,7 @@ export const CompactionReasonSchema = Schema.Literals(["manual", "threshold", "o
 export type CompactionReason = typeof CompactionReasonSchema.Type;
 
 export type CompactionResult =
-  | { readonly outcome: "completed" }
+  | { readonly outcome: "completed"; readonly summary: string }
   | { readonly outcome: "canceled" }
   | { readonly outcome: "failed"; readonly error: string };
 

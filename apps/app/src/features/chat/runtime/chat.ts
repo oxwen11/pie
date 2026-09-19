@@ -45,6 +45,12 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
   }
 }
 
+type CompactionPartData =
+  | { phase: "running" }
+  | { phase: "completed"; summary: string }
+  | { phase: "canceled" }
+  | { phase: "failed"; error: string };
+
 /** Wire prompt parts → the user PieUIMessage every client renders. */
 const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): PieUIMessage => ({
   id: messageId,
@@ -115,6 +121,8 @@ export class Chat {
   // server says in the meantime — snapshot phase, settled transcript — has
   // seen it, and neither may erase the optimistic bubble it put on screen.
   #promptsInFlight = 0;
+  // Live-only transcript row for compaction UI. Cold history never emits it.
+  #compactionMessageId: string | null = null;
   // replaceQueue writes the chosen list first; Pi then emits an empty
   // queue_update from clear_queue before the remaining lines are rewritten.
   // Ignore those intermediates so the row the user just edited does not flash.
@@ -163,7 +171,7 @@ export class Chat {
     this.#cursor = event.seq;
     switch (event.type) {
       case "session.compaction.started":
-        this.store.setState({ compaction: { phase: "running", reason: event.reason } });
+        this.#upsertCompaction({ phase: "running" });
         break;
       case "session.compaction.ended":
         if (event.result.outcome === "completed") {
@@ -171,15 +179,12 @@ export class Chat {
           // untouched; the next Pi start opens a clean continuation message.
           for (const fold of this.#turnFolds.values()) fold.close();
           this.#turnFolds.clear();
+          this.#upsertCompaction({ phase: "completed", summary: event.result.summary });
+        } else if (event.result.outcome === "canceled") {
+          this.#upsertCompaction({ phase: "canceled" });
+        } else {
+          this.#upsertCompaction({ phase: "failed", error: event.result.error });
         }
-        this.store.setState({
-          compaction:
-            event.result.outcome === "completed"
-              ? null
-              : event.result.outcome === "canceled"
-                ? { phase: "canceled" }
-                : { phase: "failed", error: event.result.error },
-        });
         break;
       case "session.message.chunk":
         if (event.chunk.type === "finish" && !this.#turnFolds.has(event.turnId)) break;
@@ -220,8 +225,6 @@ export class Chat {
         );
         break;
       case "session.turn.started":
-        if (this.store.getState().compaction?.phase !== "running")
-          this.store.setState({ compaction: null });
         break;
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
@@ -262,7 +265,8 @@ export class Chat {
         }
         break;
       case "session.crashed":
-        this.store.setState({ compaction: null, error: new Error(event.reason) });
+        this.#compactionMessageId = null;
+        this.store.setState({ error: new Error(event.reason) });
         for (const fold of this.#turnFolds.values()) fold.close();
         this.#turnFolds.clear();
         // The server projection drops its pending requests on crash; a card
@@ -296,7 +300,7 @@ export class Chat {
     // this instance go.
     if (this.#terminated) return;
     this.#terminated = true;
-    this.store.setState({ compaction: null });
+    this.#compactionMessageId = null;
     for (const fold of this.#turnFolds.values()) fold.close();
     this.#turnFolds.clear();
     this.#queuedEvents = null;
@@ -385,11 +389,7 @@ export class Chat {
       this.#cursor = 0;
       this.#needsReconcile = true;
     }
-    this.store.setState({
-      compaction: snapshot.compaction
-        ? { phase: "running", reason: snapshot.compaction.reason }
-        : null,
-    });
+    if (snapshot.compaction) this.#upsertCompaction({ phase: "running" });
     // Pending requests are server state: replace wholesale, no diffing.
     this.#state.setPendingRequests([]);
     for (const request of snapshot.pendingRequests) this.#handleRequest(request);
@@ -593,6 +593,35 @@ export class Chat {
     }
   }
 
+  #compactionMessage(data: CompactionPartData): PieUIMessage {
+    return {
+      id: this.#compactionMessageId ?? generateId(),
+      role: "assistant",
+      parts: [{ type: "data-compaction", data }],
+    };
+  }
+
+  #upsertCompaction(data: CompactionPartData): void {
+    const message = this.#compactionMessage(data);
+    this.#compactionMessageId = message.id;
+    this.#state.upsertMessage(message);
+  }
+
+  #isCompacting(): boolean {
+    const id = this.#compactionMessageId;
+    if (id === null) return false;
+    const message = this.#state.messages.find((entry) => entry.id === id);
+    const part = message?.parts.find((entry) => entry.type === "data-compaction");
+    return Boolean(
+      part &&
+      "data" in part &&
+      typeof part.data === "object" &&
+      part.data !== null &&
+      "phase" in part.data &&
+      part.data.phase === "running",
+    );
+  }
+
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
@@ -652,7 +681,7 @@ export class Chat {
     const busy =
       this.#state.status === "submitted" ||
       this.#state.status === "streaming" ||
-      this.store.getState().compaction?.phase === "running";
+      this.#isCompacting();
     if (busy) {
       try {
         await this.#transport.prompt({

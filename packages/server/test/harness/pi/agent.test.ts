@@ -721,6 +721,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         const ended = events.find((e) => e.type === "session.compaction.ended");
         assert.deepEqual(ended?.type === "session.compaction.ended" ? ended.result : undefined, {
           outcome: "completed",
+          summary: "earlier work",
         });
         const starts = events.filter((e) => e.type === "start");
         assert.notEqual(starts[0]?.messageId, starts[1]?.messageId);
