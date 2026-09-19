@@ -483,6 +483,39 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
+  it.effect(
+    "getMessages keeps the retained user segment above a compaction marker during continuation",
+    () =>
+      Effect.gen(function* () {
+        const marker: UIMessage = {
+          id: "compact",
+          role: "assistant",
+          parts: [{ type: "data-compaction", data: { summary: "summary" } }],
+        };
+        const history = [
+          ...fourTurnHistory,
+          marker,
+          { id: "continuing", role: "assistant" as const, parts: [] },
+        ];
+        const messages = yield* run({ history, turn: "open" }, (fixture) =>
+          Effect.gen(function* () {
+            const { ref } = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+            });
+            yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
+            yield* Effect.yieldNow;
+            yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
+            return yield* fixture.service.getMessages(ref);
+          }),
+        );
+        assert.deepEqual(
+          messages.map((message) => message.id),
+          ["u1", "a1", "u2", "a2", "compact"],
+        );
+      }),
+  );
+
   it.effect("getMessages does not trim for a finished turn's retained buffer", () =>
     Effect.gen(function* () {
       const messages = yield* run({ history: fourTurnHistory, turn: "finished" }, (fixture) =>

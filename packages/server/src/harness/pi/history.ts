@@ -278,7 +278,32 @@ export function entriesToUIMessages(
     };
   };
 
-  for (const entry of rebuildBranch(entries, leafId)) {
+  const branch = rebuildBranch(entries, leafId);
+  let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
+  for (const entry of branch) if (entry.type === "compaction") compaction = entry;
+  const keptIndex = compaction
+    ? branch.findIndex((entry) => entry.id === compaction.firstKeptEntryId)
+    : -1;
+  const compactionIndex = compaction ? branch.indexOf(compaction) : -1;
+  const kept = branch[keptIndex];
+  // Invalid extension anchors must not discard history or orphan a tool result.
+  const canTrim =
+    keptIndex >= 0 &&
+    keptIndex < compactionIndex &&
+    !(kept?.type === "message" && kept.message.role === "toolResult");
+  for (const entry of canTrim ? branch.slice(keptIndex) : branch) {
+    if (entry.type === "compaction") {
+      if (entry.id === compaction?.id) {
+        assistant = null;
+        messages.push({
+          id: entry.id,
+          role: "assistant",
+          metadata: { sessionId },
+          parts: [{ type: "data-compaction", data: { summary: entry.summary } }],
+        });
+      }
+      continue;
+    }
     if (entry.type !== "message") {
       // Skipped entry kinds (§5): bookkeeping, extension state, and the
       // summaries/custom_message gap deferred to their own ticket. The
@@ -290,7 +315,6 @@ export function entriesToUIMessages(
         | "custom"
         | "label"
         | "session_info"
-        | "compaction"
         | "branch_summary"
         | "custom_message");
       continue;

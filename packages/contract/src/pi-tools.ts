@@ -55,6 +55,7 @@ export type PieAssistantMetadata = {
 
 // SDK default `UIDataTypes` is `Record<string, unknown>`.
 export type PieDataTypes = {
+  compaction: { summary: string };
   retry: {
     errorMessage: string;
     attempt?: number;

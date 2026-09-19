@@ -83,6 +83,7 @@ export type SessionState = {
   readonly pendingPrompt: SessionPendingPrompt;
   readonly compaction: SessionRuntimeSnapshot["compaction"];
   readonly transcriptReset: SessionRuntimeSnapshot["transcriptReset"];
+  readonly lastCompactionSeq: number;
 };
 
 const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
@@ -97,6 +98,7 @@ export const initialSessionState: SessionState = {
   pendingPrompt: emptyPendingPrompt,
   compaction: null,
   transcriptReset: null,
+  lastCompactionSeq: 0,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -214,6 +216,7 @@ export const foldSessionEvent = (
       return {
         ...base,
         phase: "running",
+        transcriptReset: null,
         activeTurn: {
           turnId: event.turnId,
           messageId: null,
@@ -263,7 +266,23 @@ export const foldSessionEvent = (
     case "session.compaction.started":
       return { ...base, compaction: { reason: event.reason } };
     case "session.compaction.ended":
-      return { ...base, compaction: null };
+      if (event.result.outcome !== "completed") return { ...base, compaction: null };
+      return {
+        ...base,
+        compaction: null,
+        activePrompt: null,
+        transcriptReset: { seq: event.seq, messages: event.result.messages },
+        lastCompactionSeq: event.seq,
+        activeTurn: current.activeTurn
+          ? {
+              ...current.activeTurn,
+              messageId: null,
+              chunks: [],
+              bytes: 0,
+              truncated: false,
+            }
+          : null,
+      };
     case "session.crashed":
       return {
         ...base,
@@ -306,5 +325,6 @@ export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntime
   activePrompt: state.activePrompt,
   compaction: state.compaction,
   transcriptReset: state.transcriptReset,
+  lastCompactionSeq: state.lastCompactionSeq,
   cursor: state.cursor,
 });
