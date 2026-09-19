@@ -1,3 +1,4 @@
+import type { WorktreeMissingErrorData } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import {
   Empty,
@@ -12,18 +13,12 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
 
-type FallbackSearch = {
-  readonly sessionId: string;
-  readonly projectId: string;
-  readonly branch: string;
-};
-
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
 export const Route = createFileRoute("/session/fallback")({
   staticData: { cardHeading: "Can't open session" },
-  validateSearch: (search: Record<string, unknown>): FallbackSearch => ({
+  validateSearch: (search: Record<string, unknown>): WorktreeMissingErrorData => ({
     sessionId: asText(search.sessionId) ?? "",
     projectId: asText(search.projectId) ?? "",
     branch: asText(search.branch) ?? "",
