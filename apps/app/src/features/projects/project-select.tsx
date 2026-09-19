@@ -104,7 +104,7 @@ export function ProjectSelect({
                 size="sm"
                 variant="ghost"
               >
-                {"Don't work in a project"}
+                Don&apos;t work in a project
               </Button>
             </>
           ) : null}
