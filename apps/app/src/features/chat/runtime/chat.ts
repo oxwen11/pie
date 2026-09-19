@@ -217,6 +217,8 @@ export class Chat {
         );
         break;
       case "session.turn.started":
+        if (this.store.getState().compaction?.phase !== "running")
+          this.store.setState({ compaction: null });
         break;
       case "session.turn.ended":
         this.#turnFolds.get(event.turnId)?.close();
