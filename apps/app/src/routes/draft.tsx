@@ -104,6 +104,10 @@ function DraftRoute() {
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
 
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
+
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
         if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
         const optimistic: SessionSummary = {

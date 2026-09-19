@@ -38,6 +38,7 @@ import {
   type TurnAlreadyRunning,
 } from "./errors";
 import { PiAgent } from "./pi/agent";
+import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -351,6 +352,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
+                  Effect.tap(() => {
+                    const model = input.model;
+                    if (model === undefined) return Effect.void;
+                    return Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore);
+                  }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
                     input.title === undefined
@@ -544,11 +552,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
-              const persistModel = repo.write({
-                ...metadata,
-                provider: model.provider,
-                modelId: model.modelId,
-              });
+              const persistModel = repo
+                .write({
+                  ...metadata,
+                  provider: model.provider,
+                  modelId: model.modelId,
+                })
+                .pipe(
+                  Effect.tap(() =>
+                    Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore),
+                  ),
+                );
               if (metadata.agentSessionId === undefined) {
                 return persistModel.pipe(Effect.as(model satisfies AgentModelState));
               }
