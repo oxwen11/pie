@@ -13,6 +13,7 @@ import { GitBranchIcon, SquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
+import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
 import { useLatestRef } from "@/hooks/use-latest-ref";
 
 import { ChatInputQueue } from "./chat-input-queue";
@@ -43,6 +44,7 @@ export function ChatInputComposer({
   const currentBranch =
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
+  const chat = useChatHandle(sessionRef);
   const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
@@ -51,6 +53,10 @@ export function ChatInputComposer({
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
+    initialContent: chat.composerDraft,
+    onDispose: (doc) => {
+      chat.setComposerDraft(doc);
+    },
     // Order is a hard constraint: base extensions first, submit keymap last —
     // otherwise bare Enter is consumed by the default newline behavior before
     // the keymap ever sees it.
@@ -63,6 +69,7 @@ export function ChatInputComposer({
       // accepts the send as a follow-up.
       if (workspaceUnavailableRef.current) return false;
       prompt(text, canInterrupt ? "followUp" : undefined);
+      chat.setComposerDraft(undefined);
       return undefined;
     },
   });

@@ -5,6 +5,7 @@ import { ChatInputComposer } from "@/features/chat/components/chat-input-compose
 import { ChatModelSelect } from "@/features/chat/components/chat-model-select";
 import { ChatSessionProvider } from "@/features/chat/components/chat-session-provider";
 import { ChatTranscript } from "@/features/chat/components/chat-transcript";
+import { sessionRefKey } from "@/lib/session-ref";
 
 export function Chat({ className, sessionRef }: { className?: string; sessionRef: SessionRef }) {
   return (
@@ -13,6 +14,7 @@ export function Chat({ className, sessionRef }: { className?: string; sessionRef
         <ChatTranscript />
         <div className="mx-auto w-full max-w-4xl min-w-80 shrink-0 px-2 pt-2 pb-4">
           <ChatInputComposer
+            key={sessionRefKey(sessionRef)}
             sessionRef={sessionRef}
             toolbar={<ChatModelSelect sessionRef={sessionRef} />}
           />
