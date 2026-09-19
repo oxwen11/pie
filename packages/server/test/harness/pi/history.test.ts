@@ -461,8 +461,68 @@ describe("entriesToUIMessages", () => {
       "a1",
       "s1",
     );
-    expect(messages.map((message) => message.id)).toEqual(["u1", "a1"]);
+    expect(messages.map((message) => message.id)).toEqual(["u1", "n6", "a1"]);
   });
+
+  it("places the latest compaction marker after retained messages and before continuation", () => {
+    const compact = (id: string, parentId: string, firstKeptEntryId: string) =>
+      entry({
+        type: "compaction",
+        id,
+        parentId,
+        firstKeptEntryId,
+        summary: id,
+        tokensBefore: 100,
+        timestamp: "t",
+      });
+    const entries = [
+      userEntry("old", null, "old"),
+      userEntry("kept", "old", "recent"),
+      assistantEntry("a1", "kept", [toolCall("c1", "bash", { command: "pwd" })]),
+      toolResultEntry("result", "a1", { content: [{ type: "text", text: "ok" }] }),
+      compact("compact-1", "result", "kept"),
+      assistantEntry("a2", "compact-1", [{ type: "text", text: "after" }]),
+      compact("abandoned", "old", "old"),
+    ];
+    const messages = entriesToUIMessages(entries, "a2", "s");
+    expect(messages.map((m) => m.id)).toEqual(["kept", "a1", "compact-1", "a2"]);
+    expect(messages[1]?.parts[0]).toMatchObject({ state: "output-available" });
+    expect(messages[2]?.parts).toEqual([
+      { type: "data-compaction", data: { summary: "compact-1" } },
+    ]);
+    const twice = entriesToUIMessages(
+      [...entries, compact("compact-2", "a2", "a2")],
+      "compact-2",
+      "s",
+    );
+    expect(twice.map((m) => m.id)).toEqual(["a2", "compact-2"]);
+  });
+
+  it.each(["missing", "compact", "result"])(
+    "preserves history for an invalid anchor %s",
+    (firstKeptEntryId) => {
+      const messages = entriesToUIMessages(
+        [
+          userEntry("u", null, "keep me"),
+          assistantEntry("a", "u", [toolCall("c1", "bash", {})]),
+          toolResultEntry("result", "a", { content: [] }),
+          entry({
+            type: "compaction",
+            id: "compact",
+            parentId: "result",
+            firstKeptEntryId,
+            summary: "s",
+            tokensBefore: 1,
+            timestamp: "t",
+          }),
+        ],
+        "compact",
+        "s",
+      );
+      expect(messages.map((m) => m.id)).toEqual(["u", "a", "compact"]);
+      expect(messages[1]?.parts[0]).toMatchObject({ state: "output-available" });
+    },
+  );
 
   it("matches the live transform's folded message part-for-part (no steer)", async () => {
     const transform = createPiTransform("s1");

@@ -1,4 +1,4 @@
-import type { SessionPendingPrompt, PieUIMessage } from "@getpie/contract";
+import type { CompactionReason, SessionPendingPrompt, PieUIMessage } from "@getpie/contract";
 import type { ChatState as AiChatState, ChatStatus } from "ai";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
@@ -17,7 +17,14 @@ const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
 
 // Each Chat owns its own store: messages + status + error + retryNotice +
 // pendingRequests + pendingPrompt.
+export type CompactionState =
+  | { phase: "running"; reason: CompactionReason }
+  | { phase: "canceled" }
+  | { phase: "failed"; error: string }
+  | null;
+
 export type ChatStoreState = {
+  compaction: CompactionState;
   messages: PieUIMessage[];
   status: ChatStatus;
   error?: Error;
@@ -45,6 +52,7 @@ export class ChatState implements AiChatStateSlice {
   constructor(initialMessages: PieUIMessage[] = []) {
     this.store = createStore<ChatStoreState>()(() => ({
       messages: initialMessages,
+      compaction: null,
       status: "ready",
       error: undefined,
       retryNotice: undefined,
