@@ -57,5 +57,23 @@ describe("ChatInputController", () => {
 
     expect(() => controller.hasContent()).not.toThrow();
     expect(controller.hasContent()).toBe(false);
+    expect(controller.getJSON()).toBeUndefined();
+  });
+
+  it("seeds from initialContent and exposes getJSON", () => {
+    const initialContent = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "saved draft" }] }],
+    };
+    const controller = new ChatInputController({
+      extensions: () => createChatBaseExtensions(),
+      onSubmit: () => {},
+      initialContent,
+    });
+
+    expect(controller.getText()).toBe("saved draft");
+    expect(controller.getJSON()).toEqual(initialContent);
+
+    controller.dispose();
   });
 });
