@@ -113,7 +113,10 @@ describe("resource control protocol", () => {
         schemaVersion: 1,
         type: "replace_roots",
         revision: 3,
-        roots: [{ process: { pid: 123 }, role: "daemon" }],
+        roots: [
+          { process: { pid: 123 }, role: "daemon" },
+          { process: { pid: 124 }, role: "electron-renderer" },
+        ],
       }),
     ).toBe(true);
     expect(

@@ -249,7 +249,7 @@ export type ResourceRecord = typeof ResourceRecordSchema.Type;
 
 export const ResourceRootSchema = Schema.Struct({
   process: ResourceProcessIdentitySchema,
-  role: Schema.Literals(["daemon", "pi", "electron-main"]),
+  role: ResourceProcessRoleSchema,
 });
 export type ResourceRoot = typeof ResourceRootSchema.Type;
 
