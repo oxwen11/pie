@@ -958,6 +958,13 @@ importers:
   tools/typescript: {}
 
   tools/verify:
+    dependencies:
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*

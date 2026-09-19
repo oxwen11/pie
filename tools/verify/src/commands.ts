@@ -4,6 +4,7 @@ import { doctor } from "./lifecycle/doctor.ts";
 import { printEnv } from "./lifecycle/env.ts";
 import { evidence } from "./lifecycle/evidence.ts";
 import { launch } from "./lifecycle/launch.ts";
+import { verifyResources } from "./resources.ts";
 import { VerifyError } from "./runtime/fail.ts";
 import type { Surface } from "./surface.ts";
 import { runPie } from "./surfaces/cli.ts";
@@ -30,6 +31,9 @@ export async function dispatchCommands(surface: Surface, argv: string[]): Promis
       return;
     case "env":
       printEnv(surface, rest);
+      return;
+    case "resources":
+      await verifyResources(surface, rest);
       return;
     case "run":
       if (surface.identity.id !== "cli") {

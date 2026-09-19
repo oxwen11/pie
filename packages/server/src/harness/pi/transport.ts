@@ -29,6 +29,7 @@ export interface PiTransportOptions {
 }
 
 export interface PiTransport {
+  readonly pid: number;
   /** Send a command and await its correlated response; resolves with `data`. */
   readonly command: <A = void>(command: RpcCommand) => Effect.Effect<A, PiTransportFailure>;
   /** Single-consumer stream owned by the facade event router. */
@@ -294,6 +295,7 @@ export const makePiTransport = (
       });
 
     return {
+      pid: child.pid,
       command,
       events: Stream.fromQueue(events),
       uiRequests: Stream.fromQueue(uiRequests),

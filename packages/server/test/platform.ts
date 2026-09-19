@@ -3,6 +3,7 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { Context, type Crypto, Effect, type FileSystem, Layer, Scope } from "effect";
 
 import * as Observability from "../src/observability";
+import { ResourceMonitoringDiscard } from "../src/observability/resources";
 
 /**
  * The real Node platform services, mirroring what `rpc/runtime.ts` provides,
@@ -14,12 +15,13 @@ export const NodePlatformLayer: Layer.Layer<FileSystem.FileSystem | Crypto.Crypt
   NodeFileSystem.layer,
   NodeCrypto.layer,
   Observability.discard,
+  ResourceMonitoringDiscard,
 );
 
 /** `CurrentLoggers` in a captured context, for Promise-shaped `createServer`. */
 export const discardContext = (): Promise<Context.Context<never>> =>
   Effect.runPromise(
-    Layer.build(Observability.discard).pipe(
+    Layer.build(Layer.merge(Observability.discard, ResourceMonitoringDiscard)).pipe(
       Effect.map((context) => Context.omit(Scope.Scope)(context)),
       Effect.scoped,
     ),

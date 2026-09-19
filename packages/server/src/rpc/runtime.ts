@@ -18,6 +18,7 @@ import {
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
+import { ResourceMonitoring } from "../observability/resources";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
@@ -33,9 +34,16 @@ const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(Platfo
 const piExecutable = resolvePiExecutable();
 const piProcessOptions = { executable: piExecutable };
 
-export const PiProcessLayer: Layer.Layer<PiProcessTag> = Layer.effect(
+export const PiProcessLayer: Layer.Layer<PiProcessTag, never, ResourceMonitoring> = Layer.effect(
   PiProcessTag,
-  makePiProcess(piProcessOptions),
+  Effect.gen(function* () {
+    const resources = yield* ResourceMonitoring;
+    return yield* makePiProcess({
+      ...piProcessOptions,
+      onSpawn: (sessionId, pid) => resources.registerPi(sessionId, { pid }),
+      onExit: (sessionId, pid) => resources.unregisterPi(sessionId, { pid }),
+    });
+  }),
 ).pipe(Layer.provide(NodeProcessLayer));
 
 const PiAgentProvided = Layer.effect(
