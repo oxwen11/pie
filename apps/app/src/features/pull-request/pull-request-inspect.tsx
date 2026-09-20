@@ -5,7 +5,7 @@ import type {
 } from "@getpie/contract/pull-request";
 import { Response } from "@getpie/ui/ai-elements/response";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@getpie/ui/components/alert";
-import { Button } from "@getpie/ui/components/button";
+import { Button, buttonVariants } from "@getpie/ui/components/button";
 import { Separator } from "@getpie/ui/components/separator";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@getpie/ui/components/tabs";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -14,7 +14,6 @@ import { ExternalLinkIcon, GitPullRequestIcon, RefreshCwIcon } from "lucide-reac
 import { PullRequestActions } from "./pull-request-actions";
 import { PullRequestChecks } from "./pull-request-checks";
 import { PullRequestDiffPane } from "./pull-request-diff-pane";
-import { countDiffFiles } from "./pull-request-presentation";
 import { PullRequestSummary } from "./pull-request-summary";
 
 export function PullRequestInspect({
@@ -34,96 +33,80 @@ export function PullRequestInspect({
   refreshing: boolean;
   snapshot: PullRequestSnapshot;
 }) {
-  const fileCount = diff.data === undefined ? undefined : countDiffFiles(diff.data.patch);
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
-        <GitPullRequestIcon className="text-muted-foreground size-4" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={snapshot.title}>
-          {snapshot.title}
+    <Tabs className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden" defaultValue="summary">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
+        <span className="relative me-1">
+          <GitPullRequestIcon className="text-muted-foreground size-4" />
+          <span className="bg-pull-request-open ring-background absolute -right-1 -bottom-0.5 size-2 rounded-full ring-2" />
         </span>
-        <Button
-          aria-label="Refresh pull request"
-          loading={refreshing}
-          onClick={onRefresh}
-          size="icon-xs"
-          variant="ghost"
-        >
-          <RefreshCwIcon />
-        </Button>
-        <Button
-          render={
-            <a
-              aria-label="Open pull request on GitHub"
-              href={snapshot.url}
-              rel="noreferrer"
-              target="_blank"
-            />
-          }
-          size="xs"
-          variant="outline"
-        >
-          Open
-          <ExternalLinkIcon />
-        </Button>
+        <TabsList>
+          <TabsTab value="summary">Summary</TabsTab>
+          <TabsTab value="code">Code</TabsTab>
+        </TabsList>
+        <div className="ms-auto flex items-center gap-1.5">
+          <Button
+            aria-label="Refresh pull request"
+            loading={refreshing}
+            onClick={onRefresh}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <RefreshCwIcon />
+          </Button>
+          <a
+            aria-label="Open pull request on GitHub"
+            className={buttonVariants({ size: "icon-xs", variant: "ghost" })}
+            href={snapshot.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <ExternalLinkIcon />
+          </a>
+          {onAction === undefined ? null : (
+            <PullRequestActions disabled={actionPending} onAction={onAction} snapshot={snapshot} />
+          )}
+        </div>
       </div>
 
-      <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="overview">
-        <div className="flex h-9 shrink-0 items-center border-b px-3">
-          <TabsList variant="underline">
-            <TabsTab value="overview">Overview</TabsTab>
-            <TabsTab value="files">
-              Files
-              {fileCount === undefined ? null : (
-                <span className="text-muted-foreground">{fileCount}</span>
-              )}
-            </TabsTab>
-          </TabsList>
-        </div>
+      <TabsPanel className="min-h-0 flex-1 overflow-y-auto p-5" value="summary">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+          {postActionRefreshFailed ? (
+            <Alert variant="warning">
+              <AlertTitle>Action applied; status refresh failed</AlertTitle>
+              <AlertDescription>
+                The write succeeded on GitHub, but this snapshot is stale.
+              </AlertDescription>
+              <AlertAction>
+                <Button onClick={onRefresh} size="xs" variant="outline">
+                  Retry
+                </Button>
+              </AlertAction>
+            </Alert>
+          ) : null}
 
-        <TabsPanel className="min-h-0 flex-1 overflow-y-auto p-4" value="overview">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            {postActionRefreshFailed ? (
-              <Alert variant="warning">
-                <AlertTitle>Action applied; status refresh failed</AlertTitle>
-                <AlertDescription>
-                  The write succeeded on GitHub, but this snapshot is stale.
-                </AlertDescription>
-                <AlertAction>
-                  <Button onClick={onRefresh} size="xs" variant="outline">
-                    Retry
-                  </Button>
-                </AlertAction>
-              </Alert>
-            ) : null}
+          <PullRequestSummary snapshot={snapshot} />
 
-            <PullRequestSummary snapshot={snapshot} />
+          <Separator />
+          <section aria-labelledby="pull-request-description" className="flex flex-col gap-4">
+            <h2 id="pull-request-description" className="text-base font-medium">
+              Description
+            </h2>
             {snapshot.body.length > 0 ? (
-              <>
-                <Separator />
-                <Response animated={false}>{snapshot.body}</Response>
-              </>
-            ) : null}
-            <Separator />
-            <PullRequestChecks snapshot={snapshot} />
-            {onAction === undefined ? null : (
-              <PullRequestActions
-                disabled={actionPending}
-                onAction={onAction}
-                snapshot={snapshot}
-              />
+              <Response animated={false}>{snapshot.body}</Response>
+            ) : (
+              <p className="text-muted-foreground text-sm">No description provided.</p>
             )}
-          </div>
-        </TabsPanel>
+          </section>
 
-        <TabsPanel className="flex min-h-0 flex-1 flex-col overflow-hidden" value="files">
-          <PullRequestDiffPane
-            baseBranch={snapshot.baseBranch}
-            diff={diff}
-            key={snapshot.head.sha}
-          />
-        </TabsPanel>
-      </Tabs>
-    </div>
+          <Separator />
+          <PullRequestChecks snapshot={snapshot} />
+        </div>
+      </TabsPanel>
+
+      <TabsPanel className="flex min-h-0 flex-1 flex-col overflow-hidden" value="code">
+        <PullRequestDiffPane baseBranch={snapshot.baseBranch} diff={diff} key={snapshot.head.sha} />
+      </TabsPanel>
+    </Tabs>
   );
 }
