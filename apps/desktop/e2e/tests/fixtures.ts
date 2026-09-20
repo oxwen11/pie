@@ -1,4 +1,6 @@
+import childProcess from "node:child_process";
 import fs from "node:fs";
+import module from "node:module";
 import path from "node:path";
 
 import {
@@ -12,6 +14,22 @@ import {
   e2eIsolatedAgentEnv,
   e2ePiProcessEnv,
 } from "../../../../tools/testing/seed-e2e-pi-agent.mts";
+
+const electronExecutable = module.createRequire(import.meta.url)("electron") as string;
+
+/** Switches that keep Electron 44 from wedging before "DevTools listening" on Xvfb. */
+const LINUX_CI_SWITCHES = [
+  "--ozone-platform=x11",
+  "--disable-gpu",
+  "--in-process-gpu",
+  "--disable-gpu-sandbox",
+  "--disable-software-rasterizer",
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-namespace-sandbox",
+  "--no-zygote",
+  "--disable-dev-shm-usage",
+];
 
 /** The one seeded project's id — the contract validates projectId as a UUID. */
 export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
@@ -144,7 +162,7 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
           ELECTRON_OZONE_PLATFORM_HINT: "x11",
           // Read before argv, so a setuid sandbox helper cannot stall launch.
           ELECTRON_DISABLE_SANDBOX: "1",
-          DBUS_SESSION_BUS_ADDRESS: "/dev/null",
+          DBUS_SESSION_BUS_ADDRESS: "disabled:",
         }
       : undefined),
   };
@@ -153,17 +171,7 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
 /** Chromium switches that have to precede the app entry. */
 export function electronAppArgs(appPath: string, userData: string): string[] {
   return [
-    ...(process.platform === "linux" && process.env.CI
-      ? [
-          "--ozone-platform=x11",
-          "--disable-gpu",
-          "--no-sandbox",
-          // Zygote waits on user namespaces on this runner and never prints
-          // "DevTools listening", so Playwright's launch never returns.
-          "--no-zygote",
-          "--disable-dev-shm-usage",
-        ]
-      : []),
+    ...(process.platform === "linux" && process.env.CI ? LINUX_CI_SWITCHES : []),
     appPath,
     `--user-data-dir=${userData}`,
   ];
@@ -177,12 +185,46 @@ export function launchPieElectron(
 ) {
   const args = electronAppArgs(appPath, userData);
   const env = pieElectronEnv(pieHome, extra);
-  // Under the test timeout, a wedged launch reports Electron's log instead
-  // of dying in worker teardown with no message.
   if (process.platform === "linux" && process.env.CI) {
-    return electron.launch({ args, env, timeout: 25_000 });
+    return proveElectronBoots(args, env).then(() =>
+      electron.launch({ args, env, timeout: 20_000 }),
+    );
   }
   return electron.launch({ args, env });
+}
+
+/** Playwright hides a wedged boot. Print it, then kill the process group. */
+function proveElectronBoots(args: string[], env: Record<string, string | undefined>) {
+  const child = childProcess.spawn(
+    electronExecutable,
+    ["--inspect=0", "--remote-debugging-port=0", ...args],
+    { env: env, stdio: ["ignore", "pipe", "pipe"], detached: true },
+  );
+  let log = "";
+  const take = (chunk: Buffer) => {
+    log += chunk.toString();
+  };
+  child.stdout.on("data", take);
+  child.stderr.on("data", take);
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(finish, 12_000);
+    child.stderr.on("data", () => {
+      if (log.includes("DevTools listening")) finish();
+    });
+    child.on("exit", () => finish());
+    function finish() {
+      clearTimeout(timer);
+      if (child.pid) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          child.kill("SIGKILL");
+        }
+      }
+      if (log.includes("DevTools listening")) resolve();
+      else reject(new Error(`electron did not print DevTools listening\n${log.slice(-6000)}`));
+    }
+  });
 }
 
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
