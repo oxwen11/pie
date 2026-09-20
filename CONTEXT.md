@@ -81,8 +81,12 @@ left one is already the **sidebar**.
 A user-installed directory under `$PIE_HOME/plugins/<pluginId>/` that exposes a
 panel entry (`index.html` / `panel.html`, optional `panel.json` `{ title, entry? }`).
 The daemon serves it at `/plugins/<pluginId>/…`. The left activity rail lists
-these only — Pi-only extension folders without a panel stay dark.
-_Avoid_: shipping plugin HTML in the app bundle; marketplace; `pie.plugin.json`
+these only — Pi-only extension folders without a panel stay dark. The host
+forwards that session's Pi activity (`SessionScopedEvent`: turns, tool chunks,
+prompts) into the iframe as `pi.session.event` via `postMessage`. Pie collection
+events stay out. The iframe does not prompt or reply.
+_Avoid_: shipping plugin HTML in the app bundle; marketplace; `pie.plugin.json`;
+iframe talking to `/ws/rpc`
 
 **ContentPanel**:
 The host: one app-wide instance (`apps/app/src/content-panel.ts`) owning the registry, the per-session tab lists, and every live panel instance. Its zustand store holds only what the UI re-renders on _and_ what survives a reload — everything else lives on the instances. Knows no panel type.

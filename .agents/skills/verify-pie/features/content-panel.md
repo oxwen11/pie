@@ -11,7 +11,7 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
 - **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.
 - **Browser** — placeholder chrome (`apps/app/src/components/layout/content-panel/panels/README.md`). **Address** and **Reload**. Do not treat its output as a real network.
-- **Pie panel plugins** — left activity rail (`data-slot="plugin-activity-bar"`), session routes only, one icon per directory under `$PIE_HOME/plugins/<id>/` that has a panel entry (`index.html` / `panel.html` or `panel.json`). Click opens the `plugin-iframe` ContentPanel with `/plugins/<id>/…` bound to the current SessionRef. No rail when none are installed.
+- **Pie panel plugins** — left activity rail (`data-slot="plugin-activity-bar"`), session routes only, one icon per directory under `$PIE_HOME/plugins/<id>/` that has a panel entry (`index.html` / `panel.html` or `panel.json`). Click opens the `plugin-iframe` ContentPanel with `/plugins/<id>/…` bound to the current SessionRef. The host posts `pi.session.event` for that session's Pi activity (turns, `session.message.chunk` tool-input/output, prompts). No rail when none are installed.
 
 ## How to get to it (user POV)
 
@@ -23,12 +23,24 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
    <!doctype html><meta charset="utf-8"><title>Demo</title>
    <h1>Demo</h1>
    <p id="sessionId"></p>
-   <p id="clock"></p>
+   <p id="tool"></p>
+   <pre id="log"></pre>
    <script>
      const q = new URLSearchParams(location.search);
      sessionId.textContent = q.get("sessionId") ?? "(missing)";
-     const tick = () => { clock.textContent = new Date().toISOString(); };
-     tick(); setInterval(tick, 1000);
+     window.addEventListener("message", (event) => {
+       const data = event.data;
+       if (!data || data.type !== "pi.session.event") return;
+       const ev = data.event;
+       log.textContent = ev.type;
+       if (ev.type !== "session.message.chunk") return;
+       const chunk = ev.chunk;
+       if (chunk.type === "tool-input-available") {
+         tool.textContent = chunk.toolName + " " + JSON.stringify(chunk.input ?? {});
+       } else if (chunk.type === "tool-output-available" || chunk.type === "tool-output-error") {
+         tool.textContent = (tool.textContent || chunk.toolCallId) + " done";
+       }
+     });
    </script>
    HTML
    ```
