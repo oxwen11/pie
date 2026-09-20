@@ -34,7 +34,6 @@ export function ChatInputQueue({
             kind="steering"
             text={text}
             onRemove={() => onReplace(removeQueuedItem(pending, "steering", position))}
-            onSave={(next) => onReplace(replaceQueuedItem(pending, "steering", position, next))}
           />
         ))}
         {pending.followUp.map((text, position) => (
@@ -63,7 +62,7 @@ function ChatInputQueueItem({
   text: string;
   onPromote?: () => void;
   onRemove: () => void;
-  onSave: (text: string) => void;
+  onSave?: (text: string) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const trimmed = draft?.trim() ?? "";
@@ -78,7 +77,7 @@ function ChatInputQueueItem({
           onSubmit={(event) => {
             event.preventDefault();
             if (trimmed.length === 0) return;
-            onSave(trimmed);
+            onSave?.(trimmed);
             setDraft(null);
           }}
         >
@@ -120,15 +119,17 @@ function ChatInputQueueItem({
             Send
           </Button>
         ) : null}
-        <Button
-          aria-label="Edit queued message"
-          onClick={() => setDraft(text)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <PencilIcon />
-        </Button>
+        {onSave ? (
+          <Button
+            aria-label="Edit queued message"
+            onClick={() => setDraft(text)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <PencilIcon />
+          </Button>
+        ) : null}
         <Button
           aria-label="Remove queued message"
           onClick={onRemove}
