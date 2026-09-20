@@ -138,8 +138,16 @@ describe("ToolBatch", () => {
     const label = trigger.element().querySelector(".truncate");
     expect(label).not.toBeNull();
     expect(label?.className).toMatch(/min-w-0/);
+    expect(label?.className).toMatch(/leading-none/);
+    const icon = trigger.element().querySelector("svg")?.parentElement;
+    expect(icon?.className).toMatch(/flex/);
+    expect(icon?.className).toMatch(/size-4/);
+    expect(icon?.className).toMatch(/items-center/);
     const shimmer = trigger.element().querySelector(".shimmer");
-    expect(shimmer?.className).toMatch(/truncate/);
-    expect(shimmer?.className).toMatch(/max-w-full/);
+    const shimmerClass = shimmer?.className.split(/\s+/) ?? [];
+    expect(shimmerClass).toContain("truncate");
+    expect(shimmerClass).toContain("max-w-full");
+    expect(shimmerClass).toContain("block");
+    expect(shimmerClass).not.toContain("inline-block");
   });
 });

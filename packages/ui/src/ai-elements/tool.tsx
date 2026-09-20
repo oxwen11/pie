@@ -28,16 +28,14 @@ export const ToolHeader = ({ className, icon: Icon, children, ...props }: ToolHe
     className={cn("group", className)}
     render={
       <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
-        <span className="relative shrink-0">
-          {Icon && (
-            <Icon className="size-4 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
-          )}
-          <div className="absolute inset-0 size-4 opacity-0 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+        <span className="relative flex size-4 shrink-0 items-center justify-center">
+          {Icon && <Icon className="size-4 group-hover:opacity-0" />}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
             <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
             <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
           </div>
         </span>
-        <span className="min-w-0 truncate text-sm">{children}</span>
+        <span className="min-w-0 truncate text-sm leading-none">{children}</span>
       </div>
     }
     {...props}
