@@ -487,7 +487,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     "getMessages keeps the retained user segment above a compaction marker during continuation",
     () =>
       Effect.gen(function* () {
-        const marker: UIMessage = {
+        const marker: PieUIMessage = {
           id: "compact",
           role: "assistant",
           parts: [{ type: "data-compaction", data: { summary: "summary" } }],
