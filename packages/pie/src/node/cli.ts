@@ -10,7 +10,7 @@ import { Command } from "effect/unstable/cli";
 
 import pkg from "../../package.json" with { type: "json" };
 import { resolveCliDaemon } from "./daemon";
-import { runCommand } from "./session-cli";
+import { sessionWorkCommands } from "./session-cli";
 
 type DaemonStartInput = {
   readonly port: Option.Option<number>;
@@ -80,7 +80,7 @@ const daemon = Command.make("daemon", serveFlags, startDaemon).pipe(
 // Bare `pie` defaults to daemon startup.
 const pie = Command.make("pie", serveFlags, startDaemon).pipe(
   Command.withDescription("Pie local server"),
-  Command.withSubcommands([serve, daemon, runCommand]),
+  Command.withSubcommands([serve, daemon, ...sessionWorkCommands]),
 );
 
 Command.run(pie, { version: pkg.version }).pipe(
