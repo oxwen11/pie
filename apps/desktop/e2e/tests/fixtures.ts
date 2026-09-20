@@ -102,12 +102,19 @@ function processAlive(pid: number): boolean {
  * ponytail: SIGKILL instead of a graceful quit on Linux. Drop when dispose yields.
  */
 export async function closeElectron(app: ElectronApplication): Promise<void> {
-  if (process.platform !== "linux") {
-    await app.close();
+  let pid: number | undefined;
+  try {
+    pid = app.process().pid;
+  } catch {
+    // Already closed (Quit button / prior close).
     return;
   }
 
-  const pid = app.process().pid;
+  if (process.platform !== "linux") {
+    await app.close().catch(() => undefined);
+    return;
+  }
+
   const closed = app.close().then(
     () => undefined,
     () => undefined,
