@@ -84,7 +84,6 @@ export function ChatInputComposer({
         </CardFrameHeader>
       ) : null}
       <Card
-        data-chat-composer
         render={
           <PromptInput
             className="divide-y-0"

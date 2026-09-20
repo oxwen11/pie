@@ -7,6 +7,7 @@ export function ChatInput({ className }: { className?: string }) {
   const { editor } = useCurrentEditor();
   return (
     <EditorContent
+      data-slot="chat-input"
       editor={editor}
       className={
         className ??

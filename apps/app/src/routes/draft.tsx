@@ -300,7 +300,6 @@ function DraftComposer({
           </div>
         </CardFrameHeader>
         <Card
-          data-chat-composer
           render={
             <PromptInput
               className="divide-y-0"
