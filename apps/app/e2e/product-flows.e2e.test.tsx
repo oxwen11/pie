@@ -150,8 +150,8 @@ describe("schedules and pull requests", () => {
     await mountApp();
     await page.getByRole("link", { name: "Pull requests" }).click();
     await expect.poll(() => window.location.pathname).toBe("/pull-requests");
-    await waitForText("No open pull requests");
-    await expect.element(page.getByText("No open pull requests")).toBeVisible();
+    await waitForText("No open pull requests.");
+    await expect.element(page.getByText("No open pull requests.")).toBeVisible();
   });
 });
 
