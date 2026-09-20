@@ -78,6 +78,13 @@ jobs:
           } >> "$GITHUB_PATH"
           export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
           mise install --locked
+          # Same repair as quality.yml: mise's rust backend delegates to the
+          # shared ambient rustup, and mise install is a no-op once the
+          # toolchain dir exists — re-assert the pinned default.
+          if command -v rustup >/dev/null; then
+            rustup default "$(mise current rust)"
+          fi
+          cargo --version
         shell: bash
 
       - name: Native toolchain (node-pty)
