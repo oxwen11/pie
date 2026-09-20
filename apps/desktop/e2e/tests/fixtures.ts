@@ -1,12 +1,11 @@
-import childProcess from "node:child_process";
 import fs from "node:fs";
-import module from "node:module";
 import path from "node:path";
 
 import {
   type ElectronApplication,
   type Page,
   _electron as electron,
+  expect,
   test as base,
 } from "@playwright/test";
 
@@ -15,18 +14,12 @@ import {
   e2ePiProcessEnv,
 } from "../../../../tools/testing/seed-e2e-pi-agent.mts";
 
-const electronExecutable = module.createRequire(import.meta.url)("electron") as string;
-
 /** Switches that keep Electron 44 from wedging before "DevTools listening" on Xvfb. */
 const LINUX_CI_SWITCHES = [
   "--ozone-platform=x11",
   "--disable-gpu",
   "--in-process-gpu",
-  "--disable-gpu-sandbox",
-  "--disable-software-rasterizer",
   "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-namespace-sandbox",
   "--no-zygote",
   "--disable-dev-shm-usage",
 ];
@@ -152,6 +145,8 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
     NODE_ENV: "test",
     PIE_E2E: "1",
     PIE_HOME: pieHome,
+    // Prefer Node for the daemon under Xvfb; Electron-as-Node can hang pre-health.
+    npm_node_execpath: process.env.npm_node_execpath ?? process.execPath,
     ...e2eIsolatedAgentEnv(pieHome),
     ...extra,
     ...(process.platform === "linux" && process.env.CI
@@ -183,53 +178,44 @@ export function launchPieElectron(
   pieHome: string,
   extra: Record<string, string> = {},
 ) {
-  const args = electronAppArgs(appPath, userData);
-  const env = pieElectronEnv(pieHome, extra);
-  if (process.platform === "linux" && process.env.CI) {
-    return proveElectronBoots(args, env).then(() =>
-      electron.launch({ args, env, timeout: 20_000 }),
-    );
-  }
-  return electron.launch({ args, env });
+  return electron.launch({
+    args: electronAppArgs(appPath, userData),
+    env: pieElectronEnv(pieHome, extra),
+    ...(process.platform === "linux" && process.env.CI ? { timeout: 30_000 } : undefined),
+  });
 }
 
-/** Playwright hides a wedged boot. Print it, then kill the process group. */
-function proveElectronBoots(args: string[], env: Record<string, string | undefined>) {
-  // Match Playwright: drop undefined keys so Node does not stringify them.
-  const spawnEnv: NodeJS.ProcessEnv = {};
-  for (const [name, value] of Object.entries(env)) {
-    if (value !== undefined) spawnEnv[name] = value;
-  }
-  const child = childProcess.spawn(
-    electronExecutable,
-    ["--inspect=0", "--remote-debugging-port=0", ...args],
-    { env: spawnEnv, stdio: ["ignore", "pipe", "pipe"], detached: true },
-  );
-  let log = "";
-  const take = (chunk: Buffer) => {
-    log += chunk.toString();
-  };
-  child.stdout.on("data", take);
-  child.stderr.on("data", take);
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(finish, 12_000);
-    child.stderr.on("data", () => {
-      if (log.includes("DevTools listening")) finish();
-    });
-    child.on("exit", () => finish());
-    function finish() {
-      clearTimeout(timer);
-      if (child.pid) {
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
-          child.kill("SIGKILL");
-        }
-      }
-      if (log.includes("DevTools listening")) resolve();
-      else reject(new Error(`electron did not print DevTools listening\n${log.slice(-6000)}`));
+/** Dump daemon files so a stuck splash fails with a cause, not a blank timeout. */
+export function dumpPieHomeDiagnostics(pieHome: string): string {
+  const files = [
+    path.join(pieHome, "daemon", "daemon.pid"),
+    path.join(pieHome, "logs", "daemon-stdio.log"),
+    path.join(pieHome, "logs", "pie.log"),
+  ];
+  const chunks: string[] = [`pieHome=${pieHome}`];
+  for (const file of files) {
+    try {
+      chunks.push(`--- ${file} ---\n${fs.readFileSync(file, "utf8").slice(-8000)}`);
+    } catch (error) {
+      chunks.push(`--- ${file} ---\n${error instanceof Error ? error.message : String(error)}`);
     }
-  });
+  }
+  return chunks.join("\n");
+}
+
+export async function awaitDesktopReady(window: Page, pieHome: string, timeout = 30_000) {
+  try {
+    await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({ timeout });
+  } catch (error) {
+    const body = await window
+      .locator("body")
+      .textContent()
+      .catch(() => "<no body>");
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\nUI:\n${body}\n${dumpPieHomeDiagnostics(pieHome)}`,
+      { cause: error },
+    );
+  }
 }
 
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import { launchPieElectron, stopDaemonFor } from "./fixtures.js";
+import { awaitDesktopReady, launchPieElectron, stopDaemonFor } from "./fixtures.js";
 
 const SAMPLE = "desktop-import-sample";
 
@@ -31,9 +31,7 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
     });
 
     const window = await app.firstWindow({ timeout: 30_000 });
-    await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
-      timeout: 30_000,
-    });
+    await awaitDesktopReady(window, pieHome);
     // No empty-state control anymore (#288) — the sidebar action is the entry.
     await window.getByTestId("sidebar").getByTitle("Import project").click();
     await expect(window.getByPlaceholder("Search folders or enter a full path...")).toBeVisible({
