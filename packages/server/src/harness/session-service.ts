@@ -238,7 +238,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       metadata: SessionWithCwd,
     ): Effect.Effect<
       PiAgentRuntime,
-      ResumeSessionError | StoreReadError | StoreWriteError | AgentOperationError
+      ResumeSessionError | SessionNotFound | StoreReadError | StoreWriteError | AgentOperationError
     > =>
       Effect.gen(function* () {
         const existing = yield* manager.peek(ref);
@@ -253,7 +253,20 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
             },
             ref,
           );
-          yield* repo.write({ ...metadata, agentSessionId: runtime.sessionId });
+          // The spawn above can take seconds; archive/rename may mutate the
+          // metadata meanwhile. Re-read under the per-session lock so the
+          // agentSessionId write does not resurrect stale fields (e.g. an
+          // archived flag written while the spawn was in flight).
+          yield* withMetadataMutation(
+            ref,
+            readMetadata(ref).pipe(
+              Effect.flatMap((fresh) =>
+                fresh.agentSessionId === undefined
+                  ? repo.write({ ...fresh, agentSessionId: runtime.sessionId })
+                  : Effect.void,
+              ),
+            ),
+          );
           return runtime;
         }
 
