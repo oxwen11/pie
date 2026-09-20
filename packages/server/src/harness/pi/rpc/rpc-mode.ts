@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.85.1
+ * Vendored from @earendil-works/pi-coding-agent v0.86.0
  * (`packages/coding-agent/src/modes/rpc/rpc-mode.ts`).
  *
  * Pie owns this loop so extension bind (`session.bindExtensions`), the RPC
@@ -457,12 +457,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       }
 
       case "steer": {
-        await session.steer(command.message, command.images);
+        await session.steer(command.message, command.images, { source: "rpc" });
         return success(id, "steer");
       }
 
       case "follow_up": {
-        await session.followUp(command.message, command.images);
+        await session.followUp(command.message, command.images, { source: "rpc" });
         return success(id, "follow_up");
       }
 

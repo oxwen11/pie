@@ -32,7 +32,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.86.0",
     "@effect/platform-node": "catalog:effect",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",

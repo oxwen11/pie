@@ -1,5 +1,5 @@
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index e2b640b661a7712fa3f86ed5ecb494b98a6f9e4d..bb75a52bb6f9bb306d73f04eb36e39dd62835551 100644
+index 205144dbf79e7fc8b15ffc5d9db9922aef3d87de..e7e5d622b7346fd0c172753baf99446e8d0316ae 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,3 +1,5 @@
@@ -289,7 +289,7 @@ index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c28309233
 +export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
 +export function supportsLanguage(_name) { return false; }
 diff --git a/package.json b/package.json
-index 572af1e947bf8b827389ecafae428a13b4957fa9..7db1f4a78341ae95109020586a622f173457a34e 100644
+index 2f6cc3f36fbea78887be3e7bbe0a2cf537f27d97..1766d7db1fa3b5b9712578a10b89d3778856256d 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,6 +16,14 @@

@@ -132,6 +132,26 @@ describe("entriesToUIMessages", () => {
     expect(entriesToUIMessages(entries, "u1", "s1")).toEqual([]);
   });
 
+  it("keeps 0.86 system messages and usage records out of UI history", () => {
+    const entries = [
+      entry({
+        type: "message",
+        id: "system",
+        parentId: null,
+        timestamp: "t",
+        message: { role: "system", content: "instructions", timestamp: 0 },
+      }),
+      userEntry("user", "system", "hi"),
+      entry({ type: "usage", id: "usage", parentId: "user", timestamp: "t", usage }),
+      assistantEntry("assistant", "usage", [{ type: "text", text: "hello" }]),
+    ];
+
+    expect(entriesToUIMessages(entries, "assistant", "s1").map(({ role }) => role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+  });
+
   it("rebuilds only the branch that leads to the leaf", () => {
     const messages = entriesToUIMessages(
       [
