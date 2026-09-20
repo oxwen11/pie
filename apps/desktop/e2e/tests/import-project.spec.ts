@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
+import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import { electronAppArgs, pieElectronEnv, stopDaemonFor } from "./fixtures.js";
+import { launchPieElectron, stopDaemonFor } from "./fixtures.js";
 
 const SAMPLE = "desktop-import-sample";
 
@@ -26,9 +26,8 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   let app: ElectronApplication | undefined;
   try {
-    app = await electron.launch({
-      args: electronAppArgs(appPath, userData),
-      env: pieElectronEnv(pieHome, { PIE_PROJECT_BROWSE_ROOT: browseRoot }),
+    app = await launchPieElectron(appPath, userData, pieHome, {
+      PIE_PROJECT_BROWSE_ROOT: browseRoot,
     });
 
     const window = await app.firstWindow({ timeout: 30_000 });

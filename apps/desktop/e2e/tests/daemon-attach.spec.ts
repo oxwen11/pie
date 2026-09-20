@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
+import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import { electronAppArgs, pieElectronEnv, seedProject, stopDaemonFor } from "./fixtures.js";
+import { launchPieElectron, seedProject, stopDaemonFor } from "./fixtures.js";
 
 function readDaemonPid(pieHome: string): number | undefined {
   try {
@@ -22,10 +22,7 @@ async function launchWindow(
   pieHome: string,
 ): Promise<ElectronApplication> {
   fs.mkdirSync(userData, { recursive: true });
-  const app = await electron.launch({
-    args: electronAppArgs(appPath, userData),
-    env: pieElectronEnv(pieHome),
-  });
+  const app = await launchPieElectron(appPath, userData, pieHome);
   const window = await app.firstWindow({ timeout: 30_000 });
   await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
     timeout: 30_000,

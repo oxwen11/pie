@@ -142,6 +142,9 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
           WAYLAND_DISPLAY: undefined,
           ELECTRON_RUN_AS_NODE: undefined,
           ELECTRON_OZONE_PLATFORM_HINT: "x11",
+          // Read before argv, so a setuid sandbox helper cannot stall launch.
+          ELECTRON_DISABLE_SANDBOX: "1",
+          DBUS_SESSION_BUS_ADDRESS: "/dev/null",
         }
       : undefined),
   };
@@ -154,10 +157,10 @@ export function electronAppArgs(appPath: string, userData: string): string[] {
       ? [
           "--ozone-platform=x11",
           "--disable-gpu",
-          // A separate GPU process blocks on Xvfb before Chromium prints
-          // "DevTools listening", so Playwright's launch waits out the test.
-          "--in-process-gpu",
           "--no-sandbox",
+          // Zygote waits on user namespaces on this runner and never prints
+          // "DevTools listening", so Playwright's launch never returns.
+          "--no-zygote",
           "--disable-dev-shm-usage",
         ]
       : []),
@@ -166,12 +169,25 @@ export function electronAppArgs(appPath: string, userData: string): string[] {
   ];
 }
 
+export function launchPieElectron(
+  appPath: string,
+  userData: string,
+  pieHome: string,
+  extra: Record<string, string> = {},
+) {
+  const args = electronAppArgs(appPath, userData);
+  const env = pieElectronEnv(pieHome, extra);
+  // Under the test timeout, a wedged launch reports Electron's log instead
+  // of dying in worker teardown with no message.
+  if (process.platform === "linux" && process.env.CI) {
+    return electron.launch({ args, env, timeout: 25_000 });
+  }
+  return electron.launch({ args, env });
+}
+
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
-  return electron.launch({
-    args: electronAppArgs(appPath, e2ePaths.userData),
-    env: pieElectronEnv(e2ePaths.pieHome, e2ePaths.launchEnv),
-  });
+  return launchPieElectron(appPath, e2ePaths.userData, e2ePaths.pieHome, e2ePaths.launchEnv);
 }
 
 /**
