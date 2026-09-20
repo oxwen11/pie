@@ -119,7 +119,8 @@ describe("entriesToUIMessages", () => {
         provider: "anthropic",
         stopReason: "stop",
         usage,
-        timestamp: "t",
+        messageStartTimestamp: "1970-01-01T00:00:00.000Z",
+        messageEndTimestamp: "t",
       },
       parts: [{ type: "text", text: "hello", state: "done" }],
     });
@@ -356,7 +357,7 @@ describe("entriesToUIMessages", () => {
           "a1",
           "u1",
           [toolCall("c1", "bash", { command: "ls" })],
-          {},
+          { timestamp: Date.parse("2026-07-26T11:45:20.000Z") },
           "2026-07-26T11:45:24.683Z",
         ),
         toolResultEntry(
@@ -377,7 +378,8 @@ describe("entriesToUIMessages", () => {
       "s1",
     );
     expect(messages[0]?.metadata?.timestamp).toBe("2026-07-26T11:45:17.114Z");
-    expect(messages[1]?.metadata?.timestamp).toBe("2026-07-26T11:45:28.158Z");
+    expect(messages[1]?.metadata?.messageStartTimestamp).toBe("2026-07-26T11:45:20.000Z");
+    expect(messages[1]?.metadata?.messageEndTimestamp).toBe("2026-07-26T11:45:28.158Z");
   });
 
   it("folds a run of assistant and toolResult entries into one message", () => {

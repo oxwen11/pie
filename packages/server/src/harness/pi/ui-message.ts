@@ -8,11 +8,15 @@ type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role:
 export type PiMetadata = {
   /** Pi session id (a uuid we assign via `--session-id`). */
   sessionId: string;
-  // History enrichment: only messages folded from disk carry these — the live
-  // stream never surfaces usage/model, so live/history metadata is asymmetric
-  // by design (docs/design/pi-history-read-design.md §5). Values come from the
-  // segment's last assistant entry; `usage.cost` carries the cost breakdown.
-  // `timestamp` is the JSONL entry timestamp, copied as-is.
+  // History enrichment: only messages folded from disk carry model/usage — the
+  // live stream never surfaces those, so live/history metadata is asymmetric
+  // by design (docs/design/pi-history-read-design.md §5). On an assistant segment,
+  // `messageStartTimestamp` is the first message's own timestamp and
+  // `messageEndTimestamp` is when its last message ended: the JSONL entry time
+  // on restore, message_end receipt on stream. `timestamp` is the user entry
+  // time and is not the worked-for span.
+  messageStartTimestamp?: string;
+  messageEndTimestamp?: string;
   timestamp?: SessionMessageEntry["timestamp"];
   model?: PiAssistantHistoryMessage["model"];
   provider?: PiAssistantHistoryMessage["provider"];

@@ -39,17 +39,28 @@ export function formatWorkedFor(seconds: number): string {
   return rest === 0 ? `Worked for ${minutes}m` : `Worked for ${minutes}m ${rest}s`;
 }
 
-export function timestampOf(metadata: unknown): string | undefined {
-  if (typeof metadata !== "object" || metadata === null || !("timestamp" in metadata)) {
+export function messageStartTimestampOf(metadata: unknown): string | undefined {
+  if (typeof metadata !== "object" || metadata === null || !("messageStartTimestamp" in metadata)) {
     return undefined;
   }
-  return typeof metadata.timestamp === "string" ? metadata.timestamp : undefined;
+  return typeof metadata.messageStartTimestamp === "string"
+    ? metadata.messageStartTimestamp
+    : undefined;
 }
 
-export function workedSeconds(
-  from: string | undefined,
-  to: string | undefined,
-): number | undefined {
+function messageEndTimestampOf(metadata: unknown): string | undefined {
+  if (typeof metadata !== "object" || metadata === null || !("messageEndTimestamp" in metadata)) {
+    return undefined;
+  }
+  return typeof metadata.messageEndTimestamp === "string"
+    ? metadata.messageEndTimestamp
+    : undefined;
+}
+
+/** Settled span: messageEndTimestamp minus messageStartTimestamp, in whole seconds. */
+export function workedSeconds(metadata: unknown): number | undefined {
+  const from = messageStartTimestampOf(metadata);
+  const to = messageEndTimestampOf(metadata);
   if (from === undefined || to === undefined) return undefined;
   const start = Date.parse(from);
   const end = Date.parse(to);

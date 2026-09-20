@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentSessionEvent } from "../../../src/harness/pi/protocol";
 import { createPiTransform } from "../../../src/harness/pi/transform";
@@ -32,6 +32,10 @@ const userStart = (text = "hi") =>
   e({ type: "message_start", message: { role: "user", content: text, timestamp: 0 } });
 
 describe("createPiTransform", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("opens the turn once per run, even across retries", () => {
     const t = createPiTransform("s1");
     const first = [...t(e({ type: "agent_start" }))];
@@ -90,6 +94,9 @@ describe("createPiTransform", () => {
     expect(user[1]).toMatchObject({ parts: [{ type: "text", text: "steer" }] });
     const split = run(assistantStart());
     expect(types(split)).toEqual(["start"]);
+    expect(split[0]).toMatchObject({
+      messageMetadata: { sessionId: "s1", messageStartTimestamp: "1970-01-01T00:00:00.000Z" },
+    });
     expect((split[0] as { messageId: string }).messageId).not.toBe(firstMessageId);
 
     // Blocks of the continuation land under a fresh ordinal, in the new message.
@@ -233,7 +240,10 @@ describe("createPiTransform", () => {
     const t = createPiTransform("s1");
     const run = (event: AgentSessionEvent) => [...t(event)];
     run(e({ type: "agent_start" }));
-    expect([...t(e({ type: "message_end", message: assistant() }))]).toEqual([]);
+    expect(run(e({ type: "message_end", message: assistant() }))[0]).toMatchObject({
+      type: "message-metadata",
+      messageMetadata: { sessionId: "s1" },
+    });
 
     const failed = assistant({ stopReason: "error", errorMessage: "boom" });
     const ended = [...t(e({ type: "agent_end", messages: [failed], willRetry: false }))];
@@ -308,6 +318,46 @@ describe("createPiTransform", () => {
     expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual(
       [],
     );
+  });
+
+  it("stamps the segment start once and the message_end receipt as the end", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:11.000Z"));
+    const t = createPiTransform("s1");
+    const run = (event: AgentSessionEvent) => [...t(event)];
+    run(e({ type: "agent_start" }));
+    const started = run(
+      e({
+        type: "message_start",
+        message: assistant({ timestamp: Date.parse("2026-01-01T00:00:00.000Z") }),
+      }),
+    );
+    expect(started).toEqual([
+      {
+        type: "message-metadata",
+        messageMetadata: { sessionId: "s1", messageStartTimestamp: "2026-01-01T00:00:00.000Z" },
+      },
+    ]);
+    expect(
+      run(
+        e({
+          type: "message_start",
+          message: assistant({ timestamp: Date.parse("2026-01-01T00:00:09.000Z") }),
+        }),
+      ),
+    ).toEqual([]);
+    const ended = run(
+      e({
+        type: "message_end",
+        message: assistant({ timestamp: Date.parse("2026-01-01T00:00:09.000Z") }),
+      }),
+    );
+    expect(ended).toEqual([
+      {
+        type: "message-metadata",
+        messageMetadata: { sessionId: "s1", messageEndTimestamp: "2026-01-01T00:00:11.000Z" },
+      },
+    ]);
   });
 
   it("ignores bookkeeping events and user-message echoes", () => {

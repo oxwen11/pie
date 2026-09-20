@@ -30,6 +30,10 @@ type PiToolPart = Extract<PiUIMessagePart, { type: `tool-${string}` }>;
 type PiDynamicToolPart = Extract<PiUIMessagePart, { type: "dynamic-tool" }>;
 
 /** Where a not-yet-answered toolCall part sits, so its result can replace it. */
+function isoTime(ms: number): string {
+  return new Date(ms).toISOString();
+}
+
 type PendingCall = {
   readonly parts: PiUIMessagePart[];
   readonly index: number;
@@ -180,11 +184,16 @@ export function entriesToUIMessages(
       assistant = { id: entry.id, role: "assistant", metadata: { sessionId }, parts: [] };
       messages.push(assistant);
     }
-    // Metadata reflects the segment's last assistant entry (final model /
-    // stopReason; usage follows pi's own getLastAssistantUsage semantics).
+    // Model / stopReason / usage follow the segment's last assistant entry.
+    // `messageStartTimestamp` stays on the first assistant message;
+    // `messageEndTimestamp` moves to whichever entry closed last (its JSONL time
+    // is the message_end).
+    const messageStartTimestamp =
+      assistant.metadata?.messageStartTimestamp ?? isoTime(message.timestamp);
     assistant.metadata = {
       sessionId,
-      timestamp: entry.timestamp,
+      messageStartTimestamp,
+      messageEndTimestamp: entry.timestamp,
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
@@ -241,7 +250,7 @@ export function entriesToUIMessages(
     assistant.metadata = {
       ...assistant.metadata,
       sessionId,
-      timestamp: entry.timestamp,
+      messageEndTimestamp: entry.timestamp,
     };
   };
 
