@@ -2,6 +2,7 @@
   "$schema": "https://turborepo.com/schema.v2.json",
   "globalDependencies": ["mise.toml", "mise.lock"],
   "globalEnv": ["CI"],
+  "globalPassThroughEnv": ["RUSTUP_TOOLCHAIN"],
   "tasks": {
     "dev": {
       "cache": false,
