@@ -23,7 +23,11 @@ async function launchWindow(
 ): Promise<ElectronApplication> {
   fs.mkdirSync(userData, { recursive: true });
   const app = await electron.launch({
-    args: [appPath, `--user-data-dir=${userData}`],
+    args: [
+      ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+      appPath,
+      `--user-data-dir=${userData}`,
+    ],
     env: pieElectronEnv(pieHome),
   });
   const window = await app.firstWindow({ timeout: 30_000 });

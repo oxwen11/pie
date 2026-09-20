@@ -27,7 +27,11 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
   let app: ElectronApplication | undefined;
   try {
     app = await electron.launch({
-      args: [appPath, `--user-data-dir=${userData}`],
+      args: [
+        ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+        appPath,
+        `--user-data-dir=${userData}`,
+      ],
       env: pieElectronEnv(pieHome, { PIE_PROJECT_BROWSE_ROOT: browseRoot }),
     });
 
