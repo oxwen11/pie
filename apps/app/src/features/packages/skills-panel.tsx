@@ -61,7 +61,7 @@ export function SkillsPanel(): ReactElement {
         <SearchIcon className="text-muted-foreground ml-3 size-4" />
         <input
           aria-label="Search skills"
-          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent px-2 pr-4 text-sm outline-none"
+          className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent px-2 pr-4 text-base outline-none"
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search skills"
           value={query}
@@ -88,7 +88,7 @@ export function SkillsPanel(): ReactElement {
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {items.map((item) => (
               <li
-                className="bg-muted/50 flex items-center gap-3 rounded-2xl px-3 py-3"
+                className="bg-muted/50 flex items-center gap-3 rounded-2xl p-3"
                 key={`${item.source}:${item.path}`}
               >
                 <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl text-sm">
