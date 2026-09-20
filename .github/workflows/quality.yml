@@ -53,6 +53,16 @@ jobs:
           } >> "$GITHUB_PATH"
           export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
           mise install --locked
+          # mise's rust backend delegates to the shared ambient rustup, and
+          # `mise install` is a no-op once the toolchain directory exists — a
+          # lost rustup default (concurrent jobs, toolchain churn on the box)
+          # then breaks every cargo invocation with "no default is
+          # configured". Re-assert the pin and fail fast here instead of deep
+          # inside the build.
+          if command -v rustup >/dev/null; then
+            rustup default "$(mise current rust)"
+          fi
+          cargo --version
         shell: bash
 
       - name: Verify CI environment
