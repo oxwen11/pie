@@ -58,5 +58,4 @@ Destructive ops are non-interactive (`--yes` when a guard is required).
 
 ## Docs
 
-Change the command surface → update `docs/design/pie-cli.md` and the
-`pie-cli` skill in the same change.
+Change the command surface → update `docs/design/pie-cli.md` in the same change.

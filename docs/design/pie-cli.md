@@ -156,24 +156,13 @@ pie run -q "fix the failing test"    # prints sessionId; exit 0 when idle
 Exact pending-request exit shape is fixed in the implementing PR; must
 stay decidable without scraping prose.
 
-## Skill
-
-`.agents/skills/pie-cli`:
-
-- Prefer `-q` to carry ids; use `--json` for requests/transcripts
-- Always `wait` with `--timeout`
-- Never ignore a `request` state — `respond` or `interrupt`
-- Read `logs` / `status` before another `send` on a busy session
-- Do not scrape prose from stderr; parse stdout / `--json` / exit codes
-
 ## Land order
 
 Delivery sequencing only — not a design rule.
 
 1. **Rules + this doc** — delivered
-2. **Session work + `pie-cli` skill:** default short output for `run`; add
-   `wait` / `logs` / `send` / `respond` / `interrupt`; `--json` / `-q`;
-   delete stream print — delivered
+2. **Session work:** default short output for `run`; add `wait` / `logs` /
+   `send` / `respond` / `interrupt`; `--json` / `-q`; delete stream print — delivered
 3. **`session` + `project` noun CRUD**
 4. **`schedule` → `hub` → `terminal`**
 
