@@ -195,10 +195,15 @@ export function launchPieElectron(
 
 /** Playwright hides a wedged boot. Print it, then kill the process group. */
 function proveElectronBoots(args: string[], env: Record<string, string | undefined>) {
+  // Match Playwright: drop undefined keys so Node does not stringify them.
+  const spawnEnv: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined) spawnEnv[name] = value;
+  }
   const child = childProcess.spawn(
     electronExecutable,
     ["--inspect=0", "--remote-debugging-port=0", ...args],
-    { env: env, stdio: ["ignore", "pipe", "pipe"], detached: true },
+    { env: spawnEnv, stdio: ["ignore", "pipe", "pipe"], detached: true },
   );
   let log = "";
   const take = (chunk: Buffer) => {
