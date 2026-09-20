@@ -10,16 +10,6 @@ import { Spinner } from "@getpie/ui/components/spinner";
 
 import type { CompactionPartData } from "@/features/chat/runtime/chat";
 
-export function isCompactionData(data: unknown): data is CompactionPartData {
-  if (typeof data !== "object" || data === null || !("phase" in data)) return false;
-  return (
-    data.phase === "running" ||
-    data.phase === "canceled" ||
-    (data.phase === "completed" && "summary" in data) ||
-    (data.phase === "failed" && "error" in data)
-  );
-}
-
 export function CompactionMarker({ data }: { data: CompactionPartData }) {
   if (data.phase === "running") {
     return (

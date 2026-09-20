@@ -23,6 +23,16 @@ export type CompactionPartData =
   | { phase: "canceled" }
   | { phase: "failed"; error: string };
 
+export function isCompactionData(data: unknown): data is CompactionPartData {
+  if (typeof data !== "object" || data === null || !("phase" in data)) return false;
+  return (
+    data.phase === "running" ||
+    data.phase === "canceled" ||
+    (data.phase === "completed" && "summary" in data) ||
+    (data.phase === "failed" && "error" in data)
+  );
+}
+
 export interface ChatInit {
   sessionRef: SessionRef;
   transport: ChatSessionTransport;

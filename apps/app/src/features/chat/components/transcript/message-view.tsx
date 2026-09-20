@@ -7,8 +7,10 @@ import {
 import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { isCompactionData } from "@/features/chat/runtime/chat";
+
 import { AssistantMessage } from "./assistant-message";
-import { CompactionMarker, isCompactionData } from "./compaction-marker";
+import { CompactionMarker } from "./compaction-marker";
 import { UserMessage } from "./user-message";
 import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
 

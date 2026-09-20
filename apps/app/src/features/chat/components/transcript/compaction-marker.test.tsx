@@ -1,62 +1,38 @@
-/** @vitest-environment jsdom */
-import { createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { act } from "react-dom/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { render } from "vitest-browser-react";
+import { page } from "vitest/browser";
 
 import { CompactionMarker } from "./compaction-marker";
 import { MessageView } from "./message-view";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-let root: Root | undefined;
-let container: HTMLDivElement | undefined;
-
-afterEach(() => {
-  act(() => root?.unmount());
-  container?.remove();
-  root = undefined;
-  container = undefined;
-});
-
-function mount(node: Parameters<Root["render"]>[0]) {
-  container = document.createElement("div");
-  document.body.append(container);
-  root = createRoot(container);
-  act(() => root?.render(node));
-  return container;
-}
-
 describe("compaction markers", () => {
-  it("shows running, failed, and canceled states from the data part", () => {
-    const running = mount(<CompactionMarker data={{ phase: "running" }} />);
-    expect(running.textContent).toContain("Compacting conversation");
-    act(() =>
-      root?.render(
-        <CompactionMarker data={{ phase: "failed", error: "Compaction failed: quota" }} />,
-      ),
+  it("shows running, failed, and canceled states from the data part", async () => {
+    const view = await render(<CompactionMarker data={{ phase: "running" }} />);
+    await expect.element(page.getByText("Compacting conversation…")).toBeVisible();
+
+    await view.rerender(
+      <CompactionMarker data={{ phase: "failed", error: "Compaction failed: quota" }} />,
     );
-    expect(container?.textContent).toContain("Compaction failed: quota");
-    act(() => root?.render(<CompactionMarker data={{ phase: "canceled" }} />));
-    expect(container?.textContent).toContain("Compaction canceled");
+    await expect.element(page.getByText("Compaction failed: quota")).toBeVisible();
+
+    await view.rerender(<CompactionMarker data={{ phase: "canceled" }} />);
+    await expect.element(page.getByText("Compaction canceled")).toBeVisible();
   });
 
-  it("renders a completed summary marker from MessageView", () => {
-    const node = mount(
-      createElement(MessageView, {
-        message: {
+  it("renders a completed summary marker from MessageView", async () => {
+    await render(
+      <MessageView
+        isStreaming={false}
+        message={{
           id: "compact-1",
           role: "assistant",
           parts: [
             { type: "data-compaction", data: { phase: "completed", summary: "Earlier work" } },
           ],
-        },
-        isStreaming: false,
-      }),
+        }}
+      />,
     );
-    expect(node.textContent).toContain("Conversation compacted");
-    expect(node.querySelector<HTMLElement>("[data-slot=marker]")?.dataset.variant).toBe(
-      "separator",
-    );
+    await expect.element(page.getByText("Conversation compacted")).toBeVisible();
+    await expect.element(page.getBySlot("marker")).toHaveAttribute("data-variant", "separator");
   });
 });

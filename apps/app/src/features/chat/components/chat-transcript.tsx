@@ -9,11 +9,11 @@ import {
   ConversationScrollButton,
 } from "@/components/conversation";
 import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
+import { isCompactionData } from "@/features/chat/runtime/chat";
 import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat-state";
 
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
-import { isCompactionData } from "./transcript/compaction-marker";
 import { MessageView } from "./transcript/message-view";
 import { ModelErrorCard } from "./transcript/model-error-card";
 
