@@ -34,6 +34,28 @@ export class SettingsFileError extends Data.TaggedError("SettingsFileError")<{
   readonly cause: unknown;
 }> {}
 
+/** Pi package source failed validation or could not be written. */
+export class InvalidPackageSource extends Data.TaggedError("InvalidPackageSource")<{
+  readonly source: string;
+  readonly reason: string;
+}> {}
+
+/** Pi package source is not present in user settings. */
+export class PackageNotFound extends Data.TaggedError("PackageNotFound")<{
+  readonly source: string;
+}> {}
+
+/** Pi accepted a package settings change but could not persist it. */
+export class PackageSettingsWriteFailed extends Data.TaggedError("PackageSettingsWriteFailed")<{
+  readonly source: string;
+  readonly cause: unknown;
+}> {}
+
+/** npm package catalog search failed. */
+export class PackageCatalogUnavailable extends Data.TaggedError("PackageCatalogUnavailable")<{
+  readonly reason: string;
+}> {}
+
 export class GitError extends Data.TaggedError("GitError")<{
   readonly cwd: string;
   readonly cause: unknown;

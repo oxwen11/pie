@@ -19,6 +19,7 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import type { PiExecutable } from "../src/harness/pi/resolve-executable";
 import * as Observability from "../src/observability";
+import { makePackageService, PackageService } from "../src/packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
@@ -26,6 +27,7 @@ import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
+import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
@@ -118,6 +120,14 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
   );
   const pullRequestLayer =
     options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
+  const packageServiceLayer = Layer.succeed(
+    PackageService,
+    makePackageService(() => path.join(home, "pi-agent")),
+  );
+  const skillService = Layer.succeed(
+    SkillService,
+    makeSkillService(() => path.join(home, "pi-agent")),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -125,6 +135,8 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     projectServiceLayer,
     settingsRepositoryLayer,
     scheduleServiceLayer,
+    packageServiceLayer,
+    skillService,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
