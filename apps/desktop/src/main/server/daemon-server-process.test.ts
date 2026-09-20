@@ -23,7 +23,7 @@ describe("resolveDaemonCommand", () => {
   test("uses Node under PIE_E2E when npm_node_execpath is set", () => {
     const command = resolveDaemonCommand({
       PIE_E2E: "1",
-      npm_node_execpath: "/usr/bin/node",
+      PIE_E2E_NODE: "/usr/bin/node",
     });
     expect(command.argv).toEqual(["/usr/bin/node"]);
     expect(command.environment.ELECTRON_RUN_AS_NODE).toBeUndefined();

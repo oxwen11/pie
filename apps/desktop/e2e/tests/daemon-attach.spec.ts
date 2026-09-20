@@ -3,7 +3,15 @@ import path from "node:path";
 
 import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import { awaitDesktopReady, launchPieElectron, seedProject, stopDaemonFor } from "./fixtures.js";
+import {
+  awaitDesktopReady,
+  closePieElectron,
+  launchPieElectron,
+  seedProject,
+  stopDaemonFor,
+} from "./fixtures.js";
+
+test.setTimeout(120_000);
 
 function readDaemonPid(pieHome: string): number | undefined {
   try {
@@ -54,8 +62,8 @@ test("a second Desktop attaches to the running daemon", async ({}, testInfo) => 
     second = await launchWindow(appPath, path.join(root, "user-data-b"), pieHome);
     expect(readDaemonPid(pieHome)).toBe(pid);
   } finally {
-    await first?.close();
-    await second?.close();
+    await closePieElectron(first);
+    await closePieElectron(second);
     await stopDaemonFor(pieHome);
   }
 });

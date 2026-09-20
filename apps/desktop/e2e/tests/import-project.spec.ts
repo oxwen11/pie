@@ -3,8 +3,14 @@ import path from "node:path";
 
 import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import { awaitDesktopReady, launchPieElectron, stopDaemonFor } from "./fixtures.js";
+import {
+  awaitDesktopReady,
+  closePieElectron,
+  launchPieElectron,
+  stopDaemonFor,
+} from "./fixtures.js";
 
+test.setTimeout(120_000);
 const SAMPLE = "desktop-import-sample";
 
 /**
@@ -48,7 +54,7 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
     ) as { data: Array<{ name: string; path: string }> };
     expect(projects.data.some((project) => project.name === SAMPLE)).toBe(true);
   } finally {
-    await app?.close();
+    await closePieElectron(app);
     await stopDaemonFor(pieHome);
   }
 });

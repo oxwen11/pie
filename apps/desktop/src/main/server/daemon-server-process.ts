@@ -64,9 +64,11 @@ export function resolveDaemonCommand(
   platform: NodeJS.Platform = process.platform,
 ) {
   const nodeExec =
-    environment.PIE_E2E === "1" && typeof environment.npm_node_execpath === "string"
-      ? environment.npm_node_execpath
-      : undefined;
+    environment.PIE_E2E === "1" && typeof environment.PIE_E2E_NODE === "string"
+      ? environment.PIE_E2E_NODE
+      : environment.PIE_E2E === "1" && typeof environment.npm_node_execpath === "string"
+        ? environment.npm_node_execpath
+        : undefined;
   if (nodeExec) {
     return { argv: [nodeExec] as const, environment: { ...environment } };
   }

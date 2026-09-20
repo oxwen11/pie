@@ -140,13 +140,18 @@ function makePaths(
  * empty agent dir (seeded over by chat specs' `launchEnv`).
  */
 export function pieElectronEnv(pieHome: string, extra: Record<string, string> = {}) {
+  const nodeExec = process.env.npm_node_execpath ?? process.execPath;
+  // Leave a breadcrumb for splash-timeout dumps.
+  fs.mkdirSync(pieHome, { recursive: true });
+  fs.writeFileSync(path.join(pieHome, "e2e-node.txt"), nodeExec);
   return {
     ...process.env,
     NODE_ENV: "test",
     PIE_E2E: "1",
     PIE_HOME: pieHome,
     // Prefer Node for the daemon under Xvfb; Electron-as-Node can hang pre-health.
-    npm_node_execpath: process.env.npm_node_execpath ?? process.execPath,
+    PIE_E2E_NODE: nodeExec,
+    npm_node_execpath: nodeExec,
     ...e2eIsolatedAgentEnv(pieHome),
     ...extra,
     ...(process.platform === "linux" && process.env.CI
@@ -188,6 +193,7 @@ export function launchPieElectron(
 /** Dump daemon files so a stuck splash fails with a cause, not a blank timeout. */
 export function dumpPieHomeDiagnostics(pieHome: string): string {
   const files = [
+    path.join(pieHome, "e2e-node.txt"),
     path.join(pieHome, "daemon", "daemon.pid"),
     path.join(pieHome, "logs", "daemon-stdio.log"),
     path.join(pieHome, "logs", "pie.log"),
@@ -203,7 +209,7 @@ export function dumpPieHomeDiagnostics(pieHome: string): string {
   return chunks.join("\n");
 }
 
-export async function awaitDesktopReady(window: Page, pieHome: string, timeout = 30_000) {
+export async function awaitDesktopReady(window: Page, pieHome: string, timeout = 20_000) {
   try {
     await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({ timeout });
   } catch (error) {
@@ -211,10 +217,28 @@ export async function awaitDesktopReady(window: Page, pieHome: string, timeout =
       .locator("body")
       .textContent()
       .catch(() => "<no body>");
-    throw new Error(
-      `${error instanceof Error ? error.message : String(error)}\nUI:\n${body}\n${dumpPieHomeDiagnostics(pieHome)}`,
-      { cause: error },
-    );
+    const details = `${error instanceof Error ? error.message : String(error)}\nUI:\n${body}\n${dumpPieHomeDiagnostics(pieHome)}`;
+    // Test timeout can swallow the thrown Error; always print first.
+    console.error(details);
+    throw new Error(details, { cause: error });
+  }
+}
+
+export async function closePieElectron(app: ElectronApplication | undefined) {
+  if (!app) return;
+  try {
+    await Promise.race([
+      app.close(),
+      new Promise<void>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("electron close timed out")), 5_000);
+      }),
+    ]);
+  } catch {
+    try {
+      app.process().kill("SIGKILL");
+    } catch {
+      // already gone
+    }
   }
 }
 
