@@ -43,7 +43,7 @@ function PullRequestsNavItem() {
     <SidebarMenuItem>
       <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
         <GitPullRequestIcon />
-        <span>Pull Request</span>
+        <span>Pull requests</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
