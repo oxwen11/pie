@@ -45,16 +45,19 @@ export function filterPullRequestItems(
   });
 }
 
-export function selectedPullRequest(
-  items: ReadonlyArray<PullRequestListItem>,
-  visible: ReadonlyArray<PullRequestListItem>,
-  selectedRef: PullRequestRef | null,
-): PullRequestListItem | undefined {
-  if (selectedRef !== null) {
-    const match = items.find((item) => samePullRequestRef(item.ref, selectedRef));
-    if (match !== undefined) return match;
-  }
-  return visible[0] ?? items[0];
+/** Compact relative age for list rows (`1h`, `2d`) — matches Codex chrome. */
+export function formatPullRequestAge(iso: string, now = Date.now()): string {
+  const ms = now - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `${Math.max(1, minutes)}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(months / 12)}y`;
 }
 
 export function pullRequestSessionState(
