@@ -107,6 +107,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       : defaultModel;
 
   const startSession = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.id;
       if (projectId === undefined) {
@@ -267,7 +268,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
         if (selected === null) return;
         navigate({
           to: "/schedules",
-          search: { create: true, projectId: selected.id },
+          search: { create: true, environmentId, projectId: selected.id },
         }).catch((error: unknown) => {
           console.error("Failed to open the schedule editor", error);
         });

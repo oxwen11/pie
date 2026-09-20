@@ -23,6 +23,7 @@ export function SettingsPage(): ReactElement {
   });
   const settingsQueryKey = orpcQueryUtils.settings.get.queryOptions().queryKey;
   const updateSettings = useMutation({
+    mutationKey: orpcQueryUtils.settings.update.key(),
     mutationFn: (next: Settings) => orpcQueryUtils.settings.update.call(next),
     onSuccess: (data) => {
       queryClient.setQueryData(settingsQueryKey, data);

@@ -42,6 +42,7 @@ export function RenameSessionDialog({
   const title = draft.trim();
 
   const rename = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.rename.key(),
     mutationFn: (nextTitle: string) =>
       orpcQueryUtils.agent.session.rename.call({
         ref: {

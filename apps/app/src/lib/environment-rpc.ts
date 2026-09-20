@@ -28,7 +28,7 @@ type LinkEntry = {
 };
 
 function connectionKey(connection: ServerConnection): string {
-  return `${connection.httpBaseUrl}\0${connection.token}`;
+  return `${connection.httpBaseUrl}\0${connection.wsBaseUrl}\0${connection.token}`;
 }
 
 function disposeLink(link: ClientLink<PieClientContext>): void {
@@ -49,6 +49,7 @@ export function createEnvironmentRpc(input: {
     [input.localId, { connectionKey: "local", link: input.localLink }],
   ]);
   const environments = new Map<string, EnvironmentOrpc>();
+  const removed = new Set<string>();
 
   const resolveLink = (environmentId: string): ClientLink<PieClientContext> => {
     const cached = links.get(environmentId);
@@ -57,6 +58,9 @@ export function createEnvironmentRpc(input: {
       return cached.link;
     }
 
+    if (removed.has(environmentId)) {
+      throw new Error(`Environment ${environmentId} is not connected`);
+    }
     const connection = input.resolveRemote(environmentId);
     if (connection === undefined) {
       throw new Error(`Environment ${environmentId} is not connected`);
@@ -104,6 +108,7 @@ export function createEnvironmentRpc(input: {
     },
     sync(live, onRemove) {
       for (const [environmentId, connection] of live) {
+        removed.delete(environmentId);
         const key = connectionKey(connection);
         const cached = links.get(environmentId);
         if (cached?.connectionKey !== key) {
@@ -115,10 +120,11 @@ export function createEnvironmentRpc(input: {
       for (const environmentId of links.keys()) {
         if (environmentId === input.localId || live.has(environmentId)) continue;
         onRemove?.(environmentId);
-        const removed = links.get(environmentId);
-        if (removed !== undefined) disposeLink(removed.link);
+        const removedLink = links.get(environmentId);
+        if (removedLink !== undefined) disposeLink(removedLink.link);
         links.delete(environmentId);
         environments.delete(environmentId);
+        removed.add(environmentId);
         disposeEnvironmentCache(input.queryClient, environmentId);
       }
     },

@@ -50,6 +50,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
     void diff.refetch();
   };
   const action = useMutation({
+    mutationKey: orpcQueryUtils.pullRequest.runAction.key(),
     mutationFn: (input: PullRequestActionInput) => orpcQueryUtils.pullRequest.runAction.call(input),
     onMutate: () => setPostActionRefreshFailed(false),
     onSuccess: () => {

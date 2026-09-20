@@ -249,6 +249,7 @@ function ImportFolderDialog({
   );
 
   const importProject = useMutation({
+    mutationKey: orpcQueryUtils.project.create.key(),
     mutationFn: (target: string) => orpcQueryUtils.project.create.call({ path: target }),
     onSuccess: (project) => {
       onClose();

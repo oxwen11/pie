@@ -73,7 +73,7 @@ export const Route = createFileRoute("/session/$sessionId")({
       .catch((error: unknown) => {
         console.error("Failed to resolve session", error);
         toast.error(`Session ${params.sessionId} could not be found.`);
-        throw redirect({ to: "/draft" });
+        throw redirect({ to: "/draft", search: { environmentId } });
       });
     return prepareSession(ref)
       .then((prepared) => ({ ...prepared, environmentId }))

@@ -15,6 +15,7 @@ export function useSessionModels(ref: SessionRef) {
   );
 
   const setModel = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.setModel.key(),
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>
       orpcQueryUtils.agent.session.setModel.call({ ref, provider, modelId }),
     onSuccess: () => {

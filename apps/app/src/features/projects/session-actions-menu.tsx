@@ -21,11 +21,13 @@ import { useCatalogOrpc } from "@/lib/environment-orpc";
  *  without opening the menu. */
 export function SessionActionsMenu({
   children,
+  environmentId,
   isActive,
   render,
   session,
 }: {
   readonly children: ReactNode;
+  readonly environmentId: string;
   readonly isActive: () => boolean;
   readonly render: ReactElement;
   readonly session: SessionSummary;
@@ -36,6 +38,7 @@ export function SessionActionsMenu({
   const [renaming, setRenaming] = useState(false);
 
   const setArchived = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.archive.key(),
     mutationFn: (archived: boolean) =>
       orpcQueryUtils.agent.session.archive.call({
         ref: {
@@ -57,7 +60,10 @@ export function SessionActionsMenu({
       if (archived && isActive()) {
         return Promise.all([
           refreshLists,
-          navigate({ to: "/draft", search: { projectId: session.projectId } }),
+          navigate({
+            to: "/draft",
+            search: { environmentId, projectId: session.projectId },
+          }),
         ]);
       }
 
@@ -88,6 +94,7 @@ export function SessionActionsMenu({
                   to: "/schedules",
                   search: {
                     create: true,
+                    environmentId,
                     projectId: session.projectId,
                     sessionId: session.sessionId,
                   },

@@ -26,7 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
-import { useLocalOrpc } from "@/lib/environment-orpc";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import {
   type ScheduleFormValues,
@@ -131,7 +131,7 @@ function ScheduleFormFields({
   onSubmit,
   onCancel,
 }: ScheduleFormFieldsProps) {
-  const orpcQueryUtils = useLocalOrpc();
+  const orpcQueryUtils = useEnvironmentOrpc();
   const [form, setForm] = useState(() => formFromSource(projects, source));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = source.kind === "edit";

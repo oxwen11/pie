@@ -4,7 +4,6 @@ import {
   useRouteContext,
   useRouterState,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
 
 import {
   AppShell,
@@ -62,11 +61,17 @@ function RootLayout() {
           environmentId: sessionRoute.loaderData.environmentId,
           ref: sessionRoute.loaderData.ref,
         };
-  const draftProjectId = useMatch({
+  const draft = useMatch({
     from: "/draft",
     shouldThrow: false,
-    select: (match) => match.search.projectId ?? null,
+    select: (match) => ({
+      environmentId: match.search.environmentId,
+      projectId: match.search.projectId ?? null,
+    }),
   });
+  const { environmentRpc, localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const environmentId = sessionRef?.environmentId ?? draft?.environmentId ?? localEnvironmentId;
+  const projectId = sessionRef?.ref.projectId ?? draft?.projectId;
   const cardHeading = useRouterState({
     select: (state): string | false | undefined => {
       for (let index = state.matches.length - 1; index >= 0; index -= 1) {
@@ -85,9 +90,6 @@ function RootLayout() {
       return undefined;
     },
   });
-  const project = useProject(sessionRef?.ref.projectId ?? draftProjectId);
-  const sessionTitle = useProjectSessionTitle(sessionRef?.ref);
-
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
@@ -99,39 +101,46 @@ function RootLayout() {
           <AppShellSidebar>
             <AppSidebar />
           </AppShellSidebar>
-          <SessionBound sessionRef={sessionRef}>
+          <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
             <AppShellMain>
-              <CardPanel
-                heading={
-                  cardHeading === false
-                    ? undefined
-                    : (cardHeading ??
-                      (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
-                }
-                hideHeader={cardHeader === false}
-                supportingText={cardHeading !== undefined ? undefined : project?.name}
+              <EnvironmentCardPanel
+                cardHeader={cardHeader}
+                cardHeading={cardHeading}
+                projectId={projectId}
+                sessionRef={sessionRef}
               />
             </AppShellMain>
             <AppShellSessionPanel />
-          </SessionBound>
+          </EnvironmentOrpcProvider>
         </AppShellBody>
       </ContentPanelSessionProvider>
     </AppShell>
   );
 }
 
-function SessionBound({
+function EnvironmentCardPanel({
+  cardHeader,
+  cardHeading,
+  projectId,
   sessionRef,
-  children,
 }: {
+  cardHeader: false | undefined;
+  cardHeading: string | false | undefined;
+  projectId: string | null | undefined;
   sessionRef: EnvironmentSessionRef | null;
-  children: ReactNode;
 }) {
-  const { localEnvironmentId, environmentRpc } = useRouteContext({ from: "__root__" });
-  const environmentId = sessionRef?.environmentId ?? localEnvironmentId;
+  const project = useProject(projectId);
+  const sessionTitle = useProjectSessionTitle(sessionRef?.ref);
+
   return (
-    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
-      {children}
-    </EnvironmentOrpcProvider>
+    <CardPanel
+      heading={
+        cardHeading === false
+          ? undefined
+          : (cardHeading ?? (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
+      }
+      hideHeader={cardHeader === false}
+      supportingText={cardHeading !== undefined ? undefined : project?.name}
+    />
   );
 }

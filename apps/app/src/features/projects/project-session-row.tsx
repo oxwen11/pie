@@ -34,6 +34,7 @@ export function ProjectSessionRow({
   return (
     <SidebarMenuItem>
       <SessionActionsMenu
+        environmentId={environmentId}
         isActive={isActive}
         session={session}
         render={
