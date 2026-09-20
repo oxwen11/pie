@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-15.
+Last audited: 2026-09-20.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -197,6 +197,28 @@ Each run contains `{ id, startedAt, reason, status }` plus optional finish time,
 session id, error/skip details, missed count, and a snapshot of the schedule
 inputs used for that run. Only the newest 20 runs remain in `runs`;
 `firedCount` is the durable counter when older runs fall out of that window.
+
+## Pi package settings and installs
+
+Package configuration is Pi-owned state outside `$PIE_HOME`. Pie exposes it in
+the Plugins UI through `PackageService`; it does not duplicate the configuration
+under Pie storage.
+
+| Property      | Current contract                                                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PI_CODING_AGENT_DIR/settings.json`; Pi defaults the directory to `~/.pi/agent`.                                                                                                                                                                               |
+| Owner         | Pi SDK `SettingsManager` / `DefaultPackageManager`. Pie's `PackageService` invokes those APIs for user-scope packages only.                                                                                                                                     |
+| Data          | Pi's bare settings JSON. This feature changes only the `packages` array and preserves other current file fields. New entries are package source strings accepted by Pi, such as `npm:name`, `git:https://host/owner/repo`, or a local path.                     |
+| Write points  | `packages.add` and `packages.remove`. Both await Pi's settings write queue before RPC success and surface persistence failures. They update settings only; they do not install or uninstall package files immediately.                                          |
+| Compatibility | Pi owns settings parsing and migrations. Missing settings start from `{}`. Corrupt or unreadable settings refuse the change without overwrite. Pi merges the modified `packages` field into the latest locked file contents so unrelated settings are retained. |
+| Atomicity     | Pi serializes each manager's write queue and uses `proper-lockfile` across processes, then rewrites the JSON file directly; there is no sibling-temp rename. Effective file and directory permissions follow umask.                                             |
+| Retention     | Removing a source removes only its settings entry. Existing package files remain under Pi's managed `npm/` or `git/` directories until Pi or the user removes them. Clearing `$PIE_HOME` does not remove Pi settings or installed packages.                     |
+
+At the next Pi session start, Pi resolves configured sources and may use its
+configured npm command or Git to install missing content below the same agent
+directory. Those delegated package-manager writes use Pi's existing layout and
+lifecycle; Pie Desktop does not require or spawn a separately installed `pi`
+CLI.
 
 ## Git worktrees and repository metadata
 

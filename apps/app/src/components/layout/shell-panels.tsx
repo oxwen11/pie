@@ -15,6 +15,7 @@ import {
   use,
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -56,7 +57,10 @@ const ShellLayoutContext = createContext<SubscribeToUserLayout | null>(null);
 function useUserLayoutChanged(listener: UserLayoutListener): void {
   const subscribe = use(ShellLayoutContext);
   if (subscribe === null) throw new Error("Shell panels must be rendered inside ShellGroup");
-  useEffect(() => subscribe(listener), [listener, subscribe]);
+  // Registration is the Effect's sync concern; the listener reads latest
+  // committed values (e.g. `open`) at event time, so it must not re-subscribe.
+  const onUserLayoutChanged = useEffectEvent(listener);
+  useEffect(() => subscribe(onUserLayoutChanged), [subscribe]);
 }
 
 export function ShellGroup({
@@ -266,7 +270,7 @@ function useSidebarDrawer(
     }
   };
 
-  const rememberUserLayout = useCallback(() => {
+  const rememberUserLayout = () => {
     const panel = panelRef.current;
     if (panel === null) return;
 
@@ -282,7 +286,7 @@ function useSidebarDrawer(
     if (layout.expandedWidth === undefined) return;
     expandedWidth.set(layout.expandedWidth);
     animatedWidth.jump(layout.expandedWidth);
-  }, [animatedWidth, expandedWidth, open, panelElementRef, panelRef, setOpen]);
+  };
   useUserLayoutChanged(rememberUserLayout);
 
   return {
