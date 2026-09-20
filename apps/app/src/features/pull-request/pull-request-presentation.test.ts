@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   countDiffFiles,
   filterPullRequestItems,
+  formatPullRequestAge,
   pullRequestActionInput,
   pullRequestSessionState,
-  selectedPullRequest,
 } from "./pull-request-presentation";
 
 const snapshot: PullRequestSnapshot = {
@@ -52,15 +52,10 @@ describe("pull request presentation", () => {
     expect(filterPullRequestItems([listItem, other], "feature/pr-status")).toEqual([listItem]);
   });
 
-  it("keeps an explicit selection even when the search hides it", () => {
-    const other: PullRequestListItem = {
-      ...listItem,
-      ref: { ...listItem.ref, number: 7 },
-      title: "Fix the daemon",
-      url: "https://github.com/getpie/pie/pull/7",
-    };
-    expect(selectedPullRequest([listItem, other], [other], listItem.ref)).toBe(listItem);
-    expect(selectedPullRequest([listItem, other], [other], null)).toBe(other);
+  it("formats compact relative ages for list rows", () => {
+    const now = Date.parse("2026-08-30T12:00:00Z");
+    expect(formatPullRequestAge("2026-08-30T11:00:00Z", now)).toBe("1h");
+    expect(formatPullRequestAge("2026-08-29T12:00:00Z", now)).toBe("1d");
   });
 
   it("reduces snapshots to the lifecycle shown in a session row", () => {

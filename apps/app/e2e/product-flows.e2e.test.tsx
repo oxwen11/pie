@@ -148,7 +148,7 @@ describe("schedules and pull requests", () => {
 
   it("opens the pull-request page empty state", async () => {
     await mountApp();
-    await page.getByRole("link", { name: "Pull Request" }).click();
+    await page.getByRole("link", { name: "Pull requests" }).click();
     await expect.poll(() => window.location.pathname).toBe("/pull-requests");
     await waitForText("No open pull requests");
     await expect.element(page.getByText("No open pull requests")).toBeVisible();
