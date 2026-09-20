@@ -151,7 +151,15 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
 export function electronAppArgs(appPath: string, userData: string): string[] {
   return [
     ...(process.platform === "linux" && process.env.CI
-      ? ["--ozone-platform=x11", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"]
+      ? [
+          "--ozone-platform=x11",
+          "--disable-gpu",
+          // A separate GPU process blocks on Xvfb before Chromium prints
+          // "DevTools listening", so Playwright's launch waits out the test.
+          "--in-process-gpu",
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+        ]
       : []),
     appPath,
     `--user-data-dir=${userData}`,
