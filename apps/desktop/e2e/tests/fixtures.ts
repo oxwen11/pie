@@ -96,6 +96,11 @@ function processAlive(pid: number): boolean {
   }
 }
 
+/** Linux runners have no Chromium setuid sandbox and a small /dev/shm. */
+export function linuxElectronArgs(): string[] {
+  return process.platform === "linux" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
+}
+
 /**
  * Extended test fixtures for Electron testing
  */
@@ -130,7 +135,7 @@ export const test = base.extend<{
     const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
 
     const app = await electron.launch({
-      args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
+      args: [...linuxElectronArgs(), appPath, `--user-data-dir=${e2ePaths.userData}`],
       env: {
         ...process.env,
         NODE_ENV: "test",

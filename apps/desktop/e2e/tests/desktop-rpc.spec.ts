@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, type Page } from "@playwright/test";
 
-import { expect, stopDaemonFor, test } from "./fixtures.js";
+import { expect, linuxElectronArgs, stopDaemonFor, test } from "./fixtures.js";
 
 function appPid(electronApp: ElectronApplication): number {
   const pid = electronApp.process().pid;
@@ -162,6 +162,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
 
   const app = await electron.launch({
     args: [
+      ...linuxElectronArgs(),
       path.join(import.meta.dirname, "../../dist/main/index.js"),
       `--user-data-dir=${userData}`,
     ],

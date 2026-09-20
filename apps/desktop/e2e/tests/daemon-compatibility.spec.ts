@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
+import { linuxElectronArgs, seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
 
 const LEGACY_SERVER = `
 import fs from "node:fs";
@@ -43,10 +43,11 @@ async function waitForConnectedUi(
   const packagedExecutable = process.env.PIE_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(packagedExecutable === undefined ? undefined : { executablePath: packagedExecutable }),
-    args:
-      packagedExecutable === undefined
-        ? [appPath, `--user-data-dir=${userData}`]
-        : [`--user-data-dir=${userData}`],
+    args: [
+      ...linuxElectronArgs(),
+      ...(packagedExecutable === undefined ? [appPath] : []),
+      `--user-data-dir=${userData}`,
+    ],
     env: {
       ...process.env,
       NODE_ENV: "test",
