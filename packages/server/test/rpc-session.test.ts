@@ -341,9 +341,22 @@ describe("agent.session router", () => {
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
-      const prepared = await client.agent.session.prepare({ ref: created.ref });
-      expect(prepared.workspace).toEqual(created.workspace);
+      await expect(client.agent.session.prepare({ ref: created.ref })).rejects.toMatchObject({
+        code: "WORKTREE_MISSING",
+        data: {
+          sessionId: created.ref.sessionId,
+          projectId: created.ref.projectId,
+          branch: created.workspace.worktree?.branch,
+        },
+      });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
+
+      const restored = await client.agent.session.restoreWorktree({ ref: created.ref });
+      expect(restored.workspace).toEqual(created.workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const ready = await client.agent.session.prepare({ ref: created.ref });
+      expect(ready.workspace).toEqual(created.workspace);
 
       await client.agent.session.close({ ref: created.ref });
     } finally {
