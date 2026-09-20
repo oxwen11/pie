@@ -53,6 +53,7 @@ jobs:
           } >> "$GITHUB_PATH"
           export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
           mise install --locked
+          echo "RUSTUP_TOOLCHAIN=$(mise current rust)" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Verify CI environment
