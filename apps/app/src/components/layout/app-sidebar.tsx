@@ -127,7 +127,7 @@ export function AppSidebar() {
         <ProjectList />
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="[-webkit-app-region:no-drag]">
         {platform.ssh ? <ConnectionSwitcher /> : null}
         <SidebarMenu>
           <SettingsNavItem />
