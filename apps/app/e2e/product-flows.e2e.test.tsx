@@ -1,5 +1,6 @@
+import { createCloseablePieClient, getWsTicket } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import {
   clickText,
@@ -241,6 +242,35 @@ describe("streaming queue", () => {
     await page.getByRole("button", { name: "Steer queued message" }).click();
     await waitForText("Steer", 10_000);
 
+    // Optimistic UI updates before RPC — prove the server queue moved too.
+    const sessionId = window.location.pathname.split("/").at(-1);
+    const projectId = new URL(window.location.href).searchParams.get("projectId");
+    expect(sessionId).toBeTruthy();
+    expect(projectId).toBeTruthy();
+    if (sessionId === undefined || projectId === null) {
+      throw new Error("missing session ref after steer");
+    }
+    const server = pieE2E();
+    const { client, close } = createCloseablePieClient({
+      url: `${server.wsBaseUrl}/ws/rpc`,
+      getTicket: () => getWsTicket(server.httpBaseUrl),
+    });
+    try {
+      await expect
+        .poll(
+          async () => {
+            const snapshot = await client.agent.session.getSnapshot({
+              ref: { projectId, sessionId },
+            });
+            return snapshot.pendingPrompt;
+          },
+          { timeout: 15_000 },
+        )
+        .toEqual({ steering: ["queued while streaming"], followUp: [] });
+    } finally {
+      close();
+    }
+
     await page.getByRole("button", { name: "Stop generating" }).click();
     await expect
       .element(page.getByRole("button", { name: "Stop generating" }), { timeout: 30_000 })
@@ -261,6 +291,25 @@ describe("terminal panel", () => {
     await page.getByRole("button", { name: "Toggle content panel" }).click();
     await waitForText("Choose what to show alongside the chat.");
     await page.getByRole("button", { name: "Terminal" }).click();
-    await expect.element(page.getByLabelText("zsh input"), { timeout: 30_000 }).toBeVisible();
+    const input = page.getByLabelText("zsh input");
+    await expect.element(input, { timeout: 30_000 }).toBeVisible();
+
+    // textarea exists before PTY connect — retry until write/output works.
+    const marker = "__PIE_TERMINAL_E2E__";
+    await expect
+      .poll(
+        async () => {
+          await input.click();
+          await userEvent.keyboard(`printf '${marker}\\n'{Enter}`);
+          try {
+            await expect.element(page.getByText(marker).first(), { timeout: 2_000 }).toBeVisible();
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true);
   });
 });

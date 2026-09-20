@@ -18,14 +18,10 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
   const userData = path.join(root, "user-data");
   const browseRoot = path.join(root, "browse");
   const sample = path.join(browseRoot, SAMPLE);
-  fs.mkdirSync(path.join(pieHome, "storage"), { recursive: true });
   fs.mkdirSync(userData, { recursive: true });
   fs.mkdirSync(sample, { recursive: true });
   fs.writeFileSync(path.join(sample, "README.md"), "# desktop import sample\n");
-  fs.writeFileSync(
-    path.join(pieHome, "storage", "projects.json"),
-    JSON.stringify({ version: 1, data: [] }),
-  );
+  // Leave projects.json absent — first launch must create storage itself.
 
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   let app: ElectronApplication | undefined;
