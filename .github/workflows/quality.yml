@@ -27,7 +27,9 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, pie]
+    # runner-cursor already has xvfb. rn-pie-02 needs a root bootstrap pass
+    # (xvfb xauth) before this label pin can drop back to [self-hosted, pie].
+    runs-on: [self-hosted, pie, runner-cursor]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,12 +114,18 @@ jobs:
           if command -v xvfb-run >/dev/null && command -v xauth >/dev/null; then
             exit 0
           fi
+          if [ "$(id -u)" -eq 0 ] && command -v apt-get >/dev/null; then
+            apt-get update -qq
+            apt-get install -y --no-install-recommends xvfb xauth
+            exit 0
+          fi
           if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends xvfb xauth
             exit 0
           fi
-          echo "Desktop e2e needs xvfb-run and xauth on PATH." >&2
+          echo "Desktop e2e needs xvfb-run and xauth on $(hostname)." >&2
+          echo "Re-run .github/scripts/bootstrap-ci-runner.sh as root on this host." >&2
           exit 1
         shell: bash
 
