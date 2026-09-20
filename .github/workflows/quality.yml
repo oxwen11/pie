@@ -97,6 +97,20 @@ jobs:
           exit 1
         shell: bash
 
+      - name: Ensure Xvfb (Desktop baseline e2e)
+        run: |
+          if command -v xvfb-run >/dev/null && command -v xauth >/dev/null; then
+            exit 0
+          fi
+          if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends xvfb xauth
+            exit 0
+          fi
+          echo "Desktop baseline e2e needs xvfb-run and xauth on PATH." >&2
+          exit 1
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       - name: Install Playwright Chromium
@@ -114,8 +128,8 @@ jobs:
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
       # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e).
-      # Desktop Playwright (`pnpm e2e`) stays local — Electron + xvfb is too
-      # heavy for the self-hosted Check job.
+      # The full Desktop Playwright suite stays local. CI runs only the two
+      # product-baseline specs added here after the shared build completes.
       # Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
@@ -130,3 +144,11 @@ jobs:
           wait "$turbo_pid"
           pnpm test
           wait "$format_pid"
+
+      - name: Run Desktop baseline e2e
+        run: |
+          xvfb-run -a pnpm --filter @getpie/desktop exec playwright test \
+            -c e2e/playwright.config.ts \
+            e2e/tests/import-project.spec.ts \
+            e2e/tests/daemon-attach.spec.ts
+        shell: bash
