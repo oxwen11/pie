@@ -1,67 +1,65 @@
 import type { PullRequestSnapshot } from "@getpie/contract/pull-request";
-import { Badge, type BadgeProps } from "@getpie/ui/components/badge";
+import {
+  CircleCheckIcon,
+  GitBranchIcon,
+  GitPullRequestIcon,
+  MessagesSquareIcon,
+} from "lucide-react";
 
 import {
   checksSummaryLabel,
-  mergeMethodLabel,
+  formatPullRequestAge,
   pullRequestLifecycleLabel,
   pullRequestReviewLabel,
 } from "./pull-request-presentation";
 
+const checksSummaryClasses = {
+  failing: "text-destructive",
+  none: "text-muted-foreground",
+  passing: "text-pull-request-open",
+  pending: "text-warning",
+} satisfies Record<PullRequestSnapshot["checks"]["summary"], string>;
+
 export function PullRequestSummary({ snapshot }: { snapshot: PullRequestSnapshot }) {
-  const autoMerge = snapshot.autoMerge;
+  const age = formatPullRequestAge(snapshot.updatedAt);
   return (
-    <section aria-labelledby="pull-request-summary" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 id="pull-request-summary" className="text-base font-semibold">
-          #{snapshot.ref.number}
-        </h2>
-        <Badge variant={lifecycleBadgeVariant(snapshot)}>
-          {pullRequestLifecycleLabel(snapshot)}
-        </Badge>
-        <Badge variant={checksBadgeVariant(snapshot.checks.summary)}>
-          {checksSummaryLabel(snapshot.checks.summary)}
-        </Badge>
-        {snapshot.mergeability === "conflicting" ? <Badge variant="error">Conflicts</Badge> : null}
+    <section aria-labelledby="pull-request-summary" className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h1
+          id="pull-request-summary"
+          className="text-2xl leading-tight font-semibold tracking-tight"
+        >
+          {snapshot.title}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {snapshot.ref.owner}
+          {age.length > 0 ? ` · ${age}` : ""}
+        </p>
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt className="text-muted-foreground">Branches</dt>
-        <dd className="min-w-0 truncate font-mono text-xs">
-          {snapshot.head.branch} → {snapshot.baseBranch}
+
+      <dl className="grid grid-cols-[1.25rem_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-3 text-sm">
+        <GitBranchIcon className="text-muted-foreground size-4" />
+        <dt className="text-muted-foreground">Branch</dt>
+        <dd className="min-w-0 truncate">
+          <span className="font-mono text-xs">{snapshot.head.branch}</span>
+          <span className="text-muted-foreground px-2">→</span>
+          <span className="font-mono text-xs">{snapshot.baseBranch}</span>
         </dd>
-        <dt className="text-muted-foreground">Head</dt>
-        <dd className="font-mono text-xs">{snapshot.head.sha.slice(0, 12)}</dd>
+
+        <MessagesSquareIcon className="text-muted-foreground size-4" />
         <dt className="text-muted-foreground">Review</dt>
         <dd>{pullRequestReviewLabel(snapshot)}</dd>
-        <dt className="text-muted-foreground">Auto-merge</dt>
-        <dd>{autoMerge === null ? "Off" : `On · ${mergeMethodLabel(autoMerge.method)}`}</dd>
+
+        <CircleCheckIcon className="text-pull-request-open size-4" />
+        <dt className="text-muted-foreground">Checks</dt>
+        <dd className={checksSummaryClasses[snapshot.checks.summary]}>
+          {checksSummaryLabel(snapshot.checks.summary)}
+        </dd>
+
+        <GitPullRequestIcon className="text-muted-foreground size-4" />
+        <dt className="text-muted-foreground">Status</dt>
+        <dd>{pullRequestLifecycleLabel(snapshot)}</dd>
       </dl>
     </section>
   );
-}
-
-function lifecycleBadgeVariant(snapshot: PullRequestSnapshot): BadgeProps["variant"] {
-  if (snapshot.lifecycle.type === "merged") return "info";
-  if (snapshot.lifecycle.type === "closed") return "error";
-  if (snapshot.lifecycle.draft) return "secondary";
-  return "success";
-}
-
-function checksBadgeVariant(
-  summary: PullRequestSnapshot["checks"]["summary"],
-): BadgeProps["variant"] {
-  switch (summary) {
-    case "passing":
-      return "success";
-    case "pending":
-      return "warning";
-    case "failing":
-      return "error";
-    case "none":
-      return "secondary";
-    default: {
-      const exhaustive: never = summary;
-      return exhaustive;
-    }
-  }
 }
