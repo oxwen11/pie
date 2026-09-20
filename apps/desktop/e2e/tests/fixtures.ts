@@ -138,11 +138,10 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
     ...extra,
     ...(process.platform === "linux" && process.env.CI
       ? {
-          // Runners may expose Wayland and no X. Headless Ozone still opens CDP.
-          DISPLAY: undefined,
+          // Leave DISPLAY for xvfb-run. Wayland would hide the window from X.
           WAYLAND_DISPLAY: undefined,
           ELECTRON_RUN_AS_NODE: undefined,
-          ELECTRON_OZONE_PLATFORM_HINT: "headless",
+          ELECTRON_OZONE_PLATFORM_HINT: "x11",
         }
       : undefined),
   };
@@ -152,7 +151,7 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
 export function electronAppArgs(appPath: string, userData: string): string[] {
   return [
     ...(process.platform === "linux" && process.env.CI
-      ? ["--ozone-platform=headless", "--disable-gpu"]
+      ? ["--ozone-platform=x11", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"]
       : []),
     appPath,
     `--user-data-dir=${userData}`,

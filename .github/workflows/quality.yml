@@ -27,7 +27,8 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, pie]
+    # runner-cursor has Xvfb. rn-pie-02 does not, and this job cannot sudo.
+    runs-on: [self-hosted, pie, runner-cursor]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -143,8 +144,14 @@ jobs:
 
       - name: Run Desktop baseline e2e
         run: |
-          # Headless Ozone: no Xvfb. Some runners have neither a display nor sudo.
-          pnpm --filter @getpie/desktop exec playwright test \
+          if ! command -v xvfb-run >/dev/null || ! command -v xauth >/dev/null; then
+            echo "Desktop baseline e2e needs xvfb-run and xauth on $(hostname)." >&2
+            exit 1
+          fi
+          # Electron 44 follows Wayland and never opens a window on Xvfb.
+          unset WAYLAND_DISPLAY ELECTRON_RUN_AS_NODE
+          export ELECTRON_OZONE_PLATFORM_HINT=x11
+          xvfb-run -a pnpm --filter @getpie/desktop exec playwright test \
             -c e2e/playwright.config.ts \
             --retries=0 \
             e2e/tests/import-project.spec.ts \
