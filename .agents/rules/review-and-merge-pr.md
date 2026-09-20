@@ -90,10 +90,11 @@ Only a clean code review proceeds to verification.
 The author's test results, screenshots and completion message cannot replace
 this step. The reviewer must run the relevant flow on the reviewed code:
 
-1. Use a clean worktree at the recorded head and build the affected artifacts
-   through Turbo. Confirm the running instance and build belong to this
-   worktree/revision. Verify can reuse old runs/builds; `launch --replace`
-   alone does not establish freshness.
+1. Use a separate, clean reviewer-owned worktree pinned to the recorded PR
+   head, never the developer's working checkout. Install locked dependencies
+   and build the affected artifacts through Turbo there. Confirm the running
+   instance and build belong to this worktree/revision. Verify can reuse old
+   runs/builds; `launch --replace` alone does not establish freshness.
 2. Follow the applicable [web](../skills/verify-pie/SKILL.md),
    [CLI](../skills/verify-pie-cli/SKILL.md), or
    [Desktop](../skills/verify-pie-desktop/SKILL.md) recipe:
@@ -109,8 +110,14 @@ this step. The reviewer must run the relevant flow on the reviewed code:
 
 Use the actual affected surface: Web cannot prove Desktop, source startup cannot
 prove an installed package, and fake Pi cannot prove real model/tool execution.
-Use isolated data, never real user data or unauthorized production operations;
-clean up only this task's processes and do not expose credentials.
+A worktree isolates code, not processes, ports or user data, and is not a
+security sandbox. Use Verify's isolated HOME/PIE_HOME, sample Projects and
+browser; never reuse the user's running app or development instance. Run one
+verification task per host at a time: an overlapping task or foreign occupied
+port means skip this run, not kill the owner. Scheduled execution must enforce
+non-overlap in its launcher/scheduler, not rely on a prompt alone.
+Never use real user data or unauthorized production operations. Clean up only
+this task's processes, preserve evidence and do not expose credentials.
 
 **Verification fails, cannot run, or leaves an affected outcome unproven →
 comment with the result/gap and stop. Verification fully passes → step 4.**
