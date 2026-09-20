@@ -84,9 +84,10 @@ export function ChatInputComposer({
         </CardFrameHeader>
       ) : null}
       <Card
-        variant="composer"
+        data-chat-composer
         render={
           <PromptInput
+            className="divide-y-0"
             onSubmit={(e) => {
               e.preventDefault();
               void controller?.submit();

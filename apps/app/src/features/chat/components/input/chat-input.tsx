@@ -10,7 +10,7 @@ export function ChatInput({ className }: { className?: string }) {
       editor={editor}
       className={
         className ??
-        "chat-input-scroll-fade font-ui max-h-[25dvh] min-h-11 w-full min-w-0 overflow-y-auto text-sm leading-5 pointer-coarse:text-base [&_.tiptap]:p-3 [&_.tiptap]:outline-none"
+        "chat-input-scroll-fade max-h-[25dvh] min-h-11 w-full min-w-0 overflow-y-auto text-sm leading-5 pointer-coarse:text-base [&_.tiptap]:p-3 [&_.tiptap]:outline-none"
       }
     />
   );

@@ -132,6 +132,26 @@
   height: 0;
 }
 
+[data-chat-composer] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(16px);
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+[data-chat-composer]:focus-within {
+  border-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+
+.chat-input-scroll-fade {
+  font-weight: 430;
+}
+
 @property --chat-input-fade-top {
   syntax: "<length>";
   inherits: false;
