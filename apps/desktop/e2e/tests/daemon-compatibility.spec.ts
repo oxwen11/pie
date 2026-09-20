@@ -4,7 +4,13 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { linuxElectronArgs, seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
+import {
+  linuxElectronArgs,
+  seedProject,
+  stopDaemonFor,
+  stopProcess,
+  closeElectron,
+} from "./fixtures.js";
 
 const LEGACY_SERVER = `
 import fs from "node:fs";
@@ -65,7 +71,7 @@ async function waitForConnectedUi(
     await expect(window.getByText("Pie could not start")).toHaveCount(0);
     return app;
   } catch (error) {
-    await app.close();
+    await closeElectron(app);
     throw error;
   }
 }
@@ -119,7 +125,7 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
     }
     expect(() => process.kill(legacyPid, 0)).toThrow();
 
-    await firstApp.close();
+    await closeElectron(firstApp);
     firstApp = undefined;
 
     secondApp = await waitForConnectedUi(appPath, path.join(root, "user-data-second"), pieHome);
@@ -130,8 +136,8 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
     expect(relaunched.pid).toBe(replacement.pid);
     expect(relaunched.compatibilityKey).toBe(replacement.compatibilityKey);
   } finally {
-    await firstApp?.close();
-    await secondApp?.close();
+    if (firstApp) await closeElectron(firstApp);
+    if (secondApp) await closeElectron(secondApp);
     await stopDaemonFor(pieHome);
     await stopProcess(legacyPid);
   }
