@@ -19,6 +19,7 @@ import {
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
+import { makePackageService, PackageService } from "../src/packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
@@ -26,6 +27,7 @@ import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
+import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
@@ -116,6 +118,14 @@ async function setup() {
     Layer.provide(pathsLayer),
   );
   const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
+  const packageServiceLayer = Layer.succeed(
+    PackageService,
+    makePackageService(() => path.join(home, "pi-agent")),
+  );
+  const skillServiceLayer = Layer.succeed(
+    SkillService,
+    makeSkillService(() => path.join(home, "pi-agent")),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     PiAgentServiceLayer,
@@ -123,6 +133,8 @@ async function setup() {
     projectServiceLayer,
     settingsRepositoryLayer,
     scheduleServiceLayer,
+    packageServiceLayer,
+    skillServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
