@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
+import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
@@ -109,8 +109,8 @@ function useElapsedSeconds(active: boolean): number {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-// +/- only on hover; ListTree stays visible while open. Local rather than
-// borrowed: this row summarises a turn, not a tool call.
+// +/- only on hover; Timer stays visible while open. Local rather than
+// borrowed: this row is elapsed time, not a tool batch (ListCollapse).
 function SummaryTrigger({ label }: { label: string }) {
   return (
     <CollapsibleTrigger
@@ -118,7 +118,7 @@ function SummaryTrigger({ label }: { label: string }) {
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
           <span className="relative flex size-4 shrink-0 items-center justify-center">
-            <ListTreeIcon className="size-4 group-hover:opacity-0" />
+            <TimerIcon className="size-4 group-hover:opacity-0" />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
