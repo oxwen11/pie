@@ -162,6 +162,13 @@ jobs:
           pnpm test
           wait "$format_pid"
 
+      # Direct Playwright, not `pnpm e2e`. Turbo holds a task's log until the
+      # task exits, so a hung Electron suite looks like silence. `script`
+      # allocates a tty so Node flushes each line. Desktop dist is already
+      # built by the turbo graph above.
       - name: Run Desktop e2e
-        run: xvfb-run -a pnpm e2e
+        run: |
+          xvfb-run -a script --quiet --return --command \
+            "pnpm --filter @getpie/desktop exec playwright test -c e2e/playwright.config.ts --reporter=line" \
+            /dev/null
         shell: bash
