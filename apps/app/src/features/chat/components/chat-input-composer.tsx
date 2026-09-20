@@ -84,6 +84,7 @@ export function ChatInputComposer({
         </CardFrameHeader>
       ) : null}
       <Card
+        variant="composer"
         render={
           <PromptInput
             onSubmit={(e) => {

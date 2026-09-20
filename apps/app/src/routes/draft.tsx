@@ -300,9 +300,9 @@ function DraftComposer({
           </div>
         </CardFrameHeader>
         <Card
+          variant="composer"
           render={
             <PromptInput
-              className="divide-y-0"
               onSubmit={(event) => {
                 event.preventDefault();
                 void controller?.submit();

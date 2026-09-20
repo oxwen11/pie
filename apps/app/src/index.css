@@ -132,6 +132,44 @@
   height: 0;
 }
 
+@property --chat-input-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --chat-input-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@supports (animation-timeline: scroll()) {
+  .chat-input-scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black var(--chat-input-fade-top) calc(100% - var(--chat-input-fade-bottom)),
+      transparent
+    );
+    animation: chat-input-scroll-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+
+@keyframes chat-input-scroll-fade {
+  0%,
+  1% {
+    --chat-input-fade-top: 0px;
+    --chat-input-fade-bottom: 12px;
+  }
+  99%,
+  100% {
+    --chat-input-fade-top: 12px;
+    --chat-input-fade-bottom: 0px;
+  }
+}
+
 /* Thin, theme-aware scrollbar for the chat transcript. Applied where the
    Conversation component is used, via its `scrollClassName` prop, so the
    visual style lives in the app rather than in @getpie/ui. */

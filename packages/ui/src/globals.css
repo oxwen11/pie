@@ -56,6 +56,7 @@
   --font-heading: var(--font-heading, ui-sans-serif, system-ui, sans-serif);
   --font-mono: var(--font-mono, ui-monospace, monospace);
   --font-sans: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-weight-ui: 430;
   --animate-skeleton: skeleton 2s -1s infinite linear;
   @keyframes skeleton {
     to {

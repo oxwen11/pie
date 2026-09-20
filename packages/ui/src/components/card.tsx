@@ -8,11 +8,16 @@ import type React from "react";
 export function Card({
   className,
   render,
+  variant = "default",
   ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
+}: useRender.ComponentProps<"div"> & {
+  variant?: "default" | "composer";
+}): React.ReactElement {
   const defaultProps = {
     className: cn(
       "bg-card text-card-foreground relative flex flex-col rounded-2xl border shadow-xs/5 not-dark:bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+      variant === "composer" &&
+        "bg-card/90 focus-within:border-ring/50 focus-within:ring-ring/20 grid grid-cols-[minmax(0,1fr)_auto] items-end divide-y-0 backdrop-blur-lg transition-colors transition-shadow duration-150 focus-within:ring-2",
       className,
     ),
     "data-slot": "card",
