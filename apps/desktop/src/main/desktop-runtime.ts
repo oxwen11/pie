@@ -100,11 +100,19 @@ export function startDesktopRuntime(): void {
     if (disposing) return;
     disposing = true;
     try {
-      await runtime?.dispose();
+      // ponytail: cap a stuck Effect finalizer. Raise if shutdown work legitimately exceeds this.
+      await Promise.race([
+        runtime?.dispose() ?? Promise.resolve(),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 2_000);
+        }),
+      ]);
     } finally {
       runtime = undefined;
       allowQuit = true;
-      app.quit();
+      // app.quit() is a no-op on Linux after a prevented before-quit re-enters
+      // through window-all-closed. exit() is what lets Playwright's close finish.
+      app.exit(0);
     }
   };
 
@@ -157,7 +165,7 @@ export function startDesktopRuntime(): void {
   app.on("activate", () => runWindowAction((window) => window.ensureOpen));
 
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") app.quit();
+    if (process.platform !== "darwin" && !disposing) app.quit();
   });
 
   app.on("before-quit", (event) => {

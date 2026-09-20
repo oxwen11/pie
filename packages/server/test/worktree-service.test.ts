@@ -88,4 +88,34 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
       yield* worktrees.remove(created.path);
     }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
   );
+
+  it.effect("restores a removed checkout onto the existing branch", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      yield* worktrees.remove(created.path);
+      const fileSystem = yield* FileSystem.FileSystem;
+      assert.equal(yield* fileSystem.exists(created.path), false);
+
+      const restored = yield* worktrees.restore(dir, created.path, created.branch);
+      assert.equal(restored.path, created.path);
+      assert.equal(restored.branch, created.branch);
+      assert.equal(yield* fileSystem.exists(created.path), true);
+
+      yield* worktrees.remove(created.path);
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
+
+  it.effect("restore is a no-op when the checkout still exists", () =>
+    Effect.gen(function* () {
+      const dir = yield* repo;
+      const worktrees = yield* WorktreeService;
+      const created = yield* worktrees.create(dir);
+      const restored = yield* worktrees.restore(dir, created.path, created.branch);
+      assert.equal(restored.path, created.path);
+      assert.equal(restored.branch, created.branch);
+      yield* worktrees.remove(created.path);
+    }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
+  );
 });

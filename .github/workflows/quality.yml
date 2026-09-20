@@ -27,8 +27,10 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, pie]
-    timeout-minutes: 15
+    # runner-cursor already has xvfb. rn-pie-02 needs a root bootstrap pass
+    # (xvfb xauth) before this label pin can drop back to [self-hosted, pie].
+    runs-on: [self-hosted, pie, runner-cursor]
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -107,6 +109,26 @@ jobs:
           exit 1
         shell: bash
 
+      - name: Ensure Xvfb (Desktop e2e)
+        run: |
+          if command -v xvfb-run >/dev/null && command -v xauth >/dev/null; then
+            exit 0
+          fi
+          if [ "$(id -u)" -eq 0 ] && command -v apt-get >/dev/null; then
+            apt-get update -qq
+            apt-get install -y --no-install-recommends xvfb xauth
+            exit 0
+          fi
+          if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends xvfb xauth
+            exit 0
+          fi
+          echo "Desktop e2e needs xvfb-run and xauth on $(hostname)." >&2
+          echo "Re-run .github/scripts/bootstrap-ci-runner.sh as root on this host." >&2
+          exit 1
+        shell: bash
+
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       - name: Install Playwright Chromium
@@ -124,8 +146,7 @@ jobs:
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
       # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e).
-      # Desktop Playwright (`pnpm e2e`) stays local — Electron + xvfb is too
-      # heavy for the self-hosted Check job.
+      # Desktop Playwright (`pnpm e2e`) runs after that graph, under xvfb.
       # Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
@@ -140,3 +161,14 @@ jobs:
           wait "$turbo_pid"
           pnpm test
           wait "$format_pid"
+
+      # Direct Playwright, not `pnpm e2e`. Turbo holds a task's log until the
+      # task exits, so a hung Electron suite looks like silence. `script`
+      # allocates a tty so Node flushes each line. Desktop dist is already
+      # built by the turbo graph above.
+      - name: Run Desktop e2e
+        run: |
+          xvfb-run -a script --quiet --return --command \
+            "pnpm --filter @getpie/desktop exec playwright test -c e2e/playwright.config.ts --reporter=line" \
+            /dev/null
+        shell: bash

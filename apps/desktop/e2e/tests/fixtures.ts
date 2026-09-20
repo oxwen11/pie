@@ -97,6 +97,57 @@ function processAlive(pid: number): boolean {
 }
 
 /**
+ * Linux shutdown blocks the Electron main thread inside runtime dispose, so
+ * Playwright's `close()` never returns. Kill the process from this side.
+ * ponytail: SIGKILL instead of a graceful quit on Linux. Drop when dispose yields.
+ */
+export async function closeElectron(app: ElectronApplication): Promise<void> {
+  let pid: number | undefined;
+  try {
+    pid = app.process().pid;
+  } catch {
+    // Already closed (Quit button / prior close).
+    return;
+  }
+
+  if (process.platform !== "linux") {
+    await app.close().catch(() => undefined);
+    return;
+  }
+
+  const closed = app.close().then(
+    () => undefined,
+    () => undefined,
+  );
+  const outcome = await Promise.race([
+    closed.then(() => "closed" as const),
+    new Promise<"hung">((resolve) => {
+      setTimeout(() => resolve("hung"), 1_000);
+    }),
+  ]);
+  if (outcome === "closed") return;
+
+  if (typeof pid === "number" && processAlive(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already exited
+    }
+  }
+  await Promise.race([
+    closed,
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 2_000);
+    }),
+  ]);
+}
+
+/** Linux runners have no Chromium setuid sandbox and a small /dev/shm. */
+export function linuxElectronArgs(): string[] {
+  return process.platform === "linux" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
+}
+
+/**
  * Extended test fixtures for Electron testing
  */
 export const test = base.extend<{
@@ -130,7 +181,7 @@ export const test = base.extend<{
     const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
 
     const app = await electron.launch({
-      args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
+      args: [...linuxElectronArgs(), appPath, `--user-data-dir=${e2ePaths.userData}`],
       env: {
         ...process.env,
         NODE_ENV: "test",
@@ -144,7 +195,7 @@ export const test = base.extend<{
 
     await use(app);
 
-    await app.close();
+    await closeElectron(app);
   },
 
   window: async ({ electronApp }, use) => {
