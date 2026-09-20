@@ -107,20 +107,6 @@ jobs:
           exit 1
         shell: bash
 
-      - name: Ensure Xvfb (Desktop baseline e2e)
-        run: |
-          if command -v xvfb-run >/dev/null && command -v xauth >/dev/null; then
-            exit 0
-          fi
-          if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends xvfb xauth
-            exit 0
-          fi
-          echo "Desktop baseline e2e needs xvfb-run and xauth on PATH." >&2
-          exit 1
-        shell: bash
-
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
       - name: Install Playwright Chromium
@@ -157,12 +143,10 @@ jobs:
 
       - name: Run Desktop baseline e2e
         run: |
-          # Electron 44 follows WAYLAND_DISPLAY and never attaches to Xvfb.
-          unset WAYLAND_DISPLAY ELECTRON_RUN_AS_NODE
-          export ELECTRON_OZONE_PLATFORM_HINT=x11
-          export NO_AT_BRIDGE=1
-          xvfb-run -a pnpm --filter @getpie/desktop exec playwright test \
+          # Headless Ozone: no Xvfb. Some runners have neither a display nor sudo.
+          pnpm --filter @getpie/desktop exec playwright test \
             -c e2e/playwright.config.ts \
+            --retries=0 \
             e2e/tests/import-project.spec.ts \
             e2e/tests/daemon-attach.spec.ts
         shell: bash

@@ -136,15 +136,23 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
     PIE_HOME: pieHome,
     ...e2eIsolatedAgentEnv(pieHome),
     ...extra,
+    ...(process.platform === "linux" && process.env.CI
+      ? {
+          // Runners may expose Wayland and no X. Headless Ozone still opens CDP.
+          DISPLAY: undefined,
+          WAYLAND_DISPLAY: undefined,
+          ELECTRON_RUN_AS_NODE: undefined,
+          ELECTRON_OZONE_PLATFORM_HINT: "headless",
+        }
+      : undefined),
   };
 }
 
 /** Chromium switches that have to precede the app entry. */
 export function electronAppArgs(appPath: string, userData: string): string[] {
   return [
-    // ponytail: Linux CI is Xvfb. Electron 44 otherwise picks Wayland and never opens a window.
     ...(process.platform === "linux" && process.env.CI
-      ? ["--ozone-platform=x11", "--disable-gpu"]
+      ? ["--ozone-platform=headless", "--disable-gpu"]
       : []),
     appPath,
     `--user-data-dir=${userData}`,
@@ -154,7 +162,7 @@ export function electronAppArgs(appPath: string, userData: string): string[] {
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   return electron.launch({
-    args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
+    args: electronAppArgs(appPath, e2ePaths.userData),
     env: pieElectronEnv(e2ePaths.pieHome, e2ePaths.launchEnv),
   });
 }
