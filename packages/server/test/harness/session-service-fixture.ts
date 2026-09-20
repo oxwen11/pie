@@ -81,6 +81,11 @@ export type SessionServiceRunOpts = {
   promptStarted?: boolean;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;
+  // Hold pi.create mid-flight so archive/rename can race the first spawn.
+  createHold?: {
+    readonly onStart: () => void;
+    readonly until: Promise<void>;
+  };
   prompt?: (
     input: UserInput,
   ) => Effect.Effect<{ readonly turnId: string; readonly started: boolean }>;
@@ -206,13 +211,18 @@ export const run = <A, E>(
         whenAvailable(
           Effect.logDebug("pi creating").pipe(
             Effect.andThen(
-              Effect.sync(() => {
+              Effect.gen(function* () {
                 spy.open.push({
                   cwd: input.cwd,
                   ...(input.provider !== undefined ? { provider: input.provider } : undefined),
                   ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
                 });
                 opened += 1;
+                const hold = opts.createHold;
+                if (hold) {
+                  hold.onStart();
+                  yield* Effect.promise(() => hold.until);
+                }
                 return makeSession(`native-${opened}`);
               }),
             ),
