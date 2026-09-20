@@ -1198,6 +1198,65 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
+  it.effect("keeps archived true when archive races the first pi.create", () =>
+    Effect.gen(function* () {
+      let releaseCreate!: () => void;
+      let markCreateStarted!: () => void;
+      const createStarted = new Promise<void>((resolve) => {
+        markCreateStarted = resolve;
+      });
+      const createReleased = new Promise<void>((resolve) => {
+        releaseCreate = resolve;
+      });
+
+      const result = yield* run(
+        {
+          createHold: {
+            onStart: () => markCreateStarted(),
+            until: createReleased,
+          },
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const { ref } = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+            });
+            const prompting = yield* Effect.forkChild(
+              fixture.service
+                .prompt({ ref, parts: [{ type: "text", text: "go" }] })
+                .pipe(Effect.exit),
+            );
+            yield* Effect.promise(() => createStarted);
+            // archive persists archived:true before manager.close; close then
+            // waits on the in-flight create — fork so we can release create.
+            const archiving = yield* Effect.forkChild(fixture.service.archive(ref, true));
+            yield* Effect.gen(function* () {
+              for (let attempt = 0; attempt < 200; attempt += 1) {
+                const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+                if (stored.archived) return undefined;
+                yield* Effect.yieldNow;
+              }
+              return yield* Effect.die(new Error("archive metadata never wrote"));
+            });
+            releaseCreate();
+            yield* Fiber.join(archiving);
+            yield* Fiber.join(prompting);
+            const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+            const active = yield* fixture.service.list("proj-a", false);
+            const archived = yield* fixture.service.list("proj-a", true);
+            return { stored, active, archived, closed: fixture.spy.close.slice() };
+          }),
+      );
+
+      assert.equal(result.stored.archived, true);
+      assert.equal(result.stored.agentSessionId, "native-1");
+      assert.deepEqual(result.active, []);
+      assert.equal(result.archived.length, 1);
+      assert.deepEqual(result.closed, ["native-1"]);
+    }),
+  );
+
   it.effect("keeps the manual title when rename races the first prompt stamp", () =>
     Effect.gen(function* () {
       const listed = yield* run({}, (fixture) =>
