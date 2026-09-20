@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
+import { pieElectronEnv, seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
 
 const LEGACY_SERVER = `
 import fs from "node:fs";
@@ -39,7 +39,6 @@ async function waitForConnectedUi(
   userData: string,
   pieHome: string,
 ): Promise<ElectronApplication> {
-  const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
   const packagedExecutable = process.env.PIE_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(packagedExecutable === undefined ? undefined : { executablePath: packagedExecutable }),
@@ -47,13 +46,7 @@ async function waitForConnectedUi(
       packagedExecutable === undefined
         ? [appPath, `--user-data-dir=${userData}`]
         : [`--user-data-dir=${userData}`],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      PIE_E2E: "1",
-      PIE_E2E_PI_EXECUTABLE: fakePiPath,
-      PIE_HOME: pieHome,
-    },
+    env: pieElectronEnv(pieHome),
   });
   try {
     const window = await app.firstWindow({ timeout: 30_000 });

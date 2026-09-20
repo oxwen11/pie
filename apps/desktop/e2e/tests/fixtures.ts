@@ -8,6 +8,11 @@ import {
   test as base,
 } from "@playwright/test";
 
+import {
+  e2eIsolatedAgentEnv,
+  e2ePiProcessEnv,
+} from "../../../../tools/testing/seed-e2e-pi-agent.mts";
+
 /** The one seeded project's id — the contract validates projectId as a UUID. */
 export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -96,60 +101,101 @@ function processAlive(pid: number): boolean {
   }
 }
 
+type E2ePaths = {
+  userData: string;
+  pieHome: string;
+  /** Env overlay for Electron. Default: isolated empty agent dir only. */
+  launchEnv: Record<string, string>;
+};
+
+function makePaths(
+  testInfo: { outputPath: () => string },
+  launchEnv: (pieHome: string) => Record<string, string>,
+): E2ePaths {
+  const output = testInfo.outputPath();
+  fs.mkdirSync(output, { recursive: true });
+  const pieHome = path.join(output, "pie-home");
+  fs.mkdirSync(pieHome, { recursive: true });
+  seedProject(pieHome, path.join(output, "workspace"));
+  return {
+    userData: path.join(output, "user-data"),
+    pieHome,
+    launchEnv: launchEnv(pieHome),
+  };
+}
+
 /**
- * Extended test fixtures for Electron testing
+ * Env for any Electron launch in desktop e2e: test mode, isolated home,
+ * empty agent dir (seeded over by chat specs' `launchEnv`).
+ */
+export function pieElectronEnv(pieHome: string, extra: Record<string, string> = {}) {
+  return {
+    ...process.env,
+    NODE_ENV: "test",
+    PIE_E2E: "1",
+    PIE_HOME: pieHome,
+    ...e2eIsolatedAgentEnv(pieHome),
+    ...extra,
+  };
+}
+
+async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
+  const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
+  return electron.launch({
+    args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
+    env: pieElectronEnv(e2ePaths.pieHome, e2ePaths.launchEnv),
+  });
+}
+
+/**
+ * Default desktop e2e: window / daemon / MessagePort. No fake provider —
+ * pie-pi-process is not part of these proofs.
  */
 export const test = base.extend<{
-  e2ePaths: {
-    fakePiLog: string;
-    userData: string;
-    pieHome: string;
-  };
+  e2ePaths: E2ePaths;
   electronApp: ElectronApplication;
   window: Page;
 }>({
   // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
   e2ePaths: async ({}, use, testInfo) => {
-    const output = testInfo.outputPath();
-    fs.mkdirSync(output, { recursive: true });
-    const pieHome = path.join(output, "pie-home");
-    fs.mkdirSync(pieHome, { recursive: true });
-    seedProject(pieHome, path.join(output, "workspace"));
-    await use({
-      fakePiLog: path.join(output, "fake-pi.jsonl"),
-      userData: path.join(output, "user-data"),
-      pieHome,
-    });
-
-    await stopDaemonFor(pieHome);
+    const paths = makePaths(testInfo, e2eIsolatedAgentEnv);
+    await use(paths);
+    await stopDaemonFor(paths.pieHome);
   },
 
-  // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
   electronApp: async ({ e2ePaths }, use) => {
-    const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
-    const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
-
-    const app = await electron.launch({
-      args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
-      env: {
-        ...process.env,
-        NODE_ENV: "test",
-        PIE_E2E: "1",
-        PIE_E2E_PI_EXECUTABLE: fakePiPath,
-        PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
-        PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
-        PIE_HOME: e2ePaths.pieHome,
-      },
-    });
-
+    const app = await launchApp(e2ePaths);
     await use(app);
-
     await app.close();
   },
 
   window: async ({ electronApp }, use) => {
     const window = await electronApp.firstWindow({ timeout: 30_000 });
     await use(window);
+  },
+});
+
+/** Reply the e2e provider returns in desktop chat specs. */
+const CHAT_REPLY = "Desktop fake Pi reply";
+
+/**
+ * Conversation e2e only: seeds the e2e provider so a real pie-pi-process can
+ * answer without an API key.
+ */
+export const chatTest = test.extend<{
+  e2ePaths: E2ePaths;
+  fakeReply: string;
+}>({
+  // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
+  e2ePaths: async ({}, use, testInfo) => {
+    const paths = makePaths(testInfo, (pieHome) => e2ePiProcessEnv(pieHome, { reply: CHAT_REPLY }));
+    await use(paths);
+    await stopDaemonFor(paths.pieHome);
+  },
+
+  // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
+  fakeReply: async ({}, use) => {
+    await use(CHAT_REPLY);
   },
 });
 
