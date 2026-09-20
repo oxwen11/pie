@@ -1,0 +1,45 @@
+{
+  // Optional local graph scan. Not a CI / `pnpm check` gate.
+  // oxlint + react-doctor stay authoritative for unused/circular/boundaries.
+  // See CLAUDE.md (`pnpm fallow`, `pnpm fallow:audit`).
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "entry": [
+    // Vitest browser + app e2e (default vitest plugin reads only vitest.config.*)
+    "apps/app/src/**/*.test.tsx",
+    "apps/app/e2e/**/*.{ts,tsx}",
+    "apps/app/vitest.browser.config.ts",
+    // electron-builder pack hooks
+    "apps/desktop/scripts/**/*.{cjs,js}",
+    // oxlint loads these via jsPlugins specifiers, not imports
+    "oxlint.config.mts",
+    "oxlint.deferred.mts",
+    "**/tsdown.config.ts",
+    // tsdown object entry the plugin does not seed
+    "packages/server/src/http/main.ts",
+    "tools/oxlint/**/*.ts",
+    "tools/testing/**/*.{ts,mjs}",
+    "tools/verify/src/agent-browser.ts"
+  ],
+  "ignorePatterns": ["**/routeTree.gen.ts"],
+  "ignoreDependencies": [
+    // copy-island / additionalExtensionPaths; must not be statically imported
+    "@ff-labs/pi-fff",
+    // root toolchain, consumed via pnpm scripts / jsPlugins / Vite configs
+    "@getpie/oxlint",
+    "@getpie/verify",
+    "@shadcn/lint",
+    "eslint-plugin-react-you-might-not-need-an-effect",
+    "unrun",
+    "agent-cli-detector"
+  ],
+  "ignoreUnresolvedImports": [
+    "../../../../packages/server/dist/server.mjs",
+    "../../../dist/server.mjs",
+    "../../../dist/pi-process/pi-process.js"
+  ],
+  "ignoreDependencyOverrides": [
+    { "package": "@effect/platform-node-shared", "source": "pnpm-workspace.yaml" },
+    { "package": "prosemirror-view", "source": "pnpm-workspace.yaml" }
+  ]
+}

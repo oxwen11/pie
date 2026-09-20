@@ -20,6 +20,7 @@ mounted in Chromium). `pnpm e2e` is Playwright Desktop (Electron).
 | `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                       |
 | `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                           |
 | `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                               |
+| `pnpm fallow` / `pnpm fallow:audit` | optional local graph scan (dupes, health, unused). **Not** in `pnpm check` or CI          |
 
 `format` is root-only (oxfmt) and not a turbo task. `test` is two root
 Vitest processes, not a turbo task. `e2e` is Playwright Electron through turbo
@@ -108,5 +109,6 @@ not 4000 (daemon). See `.agents/skills/verify`.
 - `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
 - `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
 - `.agents/skills/react-doctor` — React health check; `doctor.config.json` enables every 0.9.14 rule at error (three stack mismatches off); CI fails on warning and error. Sibling skills: `performance` (`scan` on `:4190`), `improve-react` (read-only audit/plans)
+- `.fallowrc.json` — optional [fallow](https://github.com/fallow-rs/fallow) 3.27.0 scan (`pnpm fallow`, `pnpm fallow:audit`). Advisory only; oxlint + react-doctor stay the gates
 - `.agents/skills/prune-tests` — recurring playbook for deleting meaningless tests; user-invoked only
 - `todos/` — numbered security/perf remediation tickets
