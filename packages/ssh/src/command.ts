@@ -139,6 +139,8 @@ export function baseSshArgs(target: SshTarget): string[] {
     "-o",
     "BatchMode=yes",
     "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
     "ConnectTimeout=10",
     ...(target.port !== null ? ["-p", String(target.port)] : []),
   ];
