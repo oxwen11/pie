@@ -1,9 +1,9 @@
-import type { PieClient } from "@getpie/client";
 import type { SessionRef, TerminalConnectEvent } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 
+import type { EnvironmentOrpc } from "@/lib/orpc";
 import { isAbortError, sleep } from "@/lib/utils";
 
 import { subscribeToAppTheme, xtermThemeFromElement } from "./theme";
@@ -15,7 +15,7 @@ interface TerminalSurface {
 export function attachTerminalSurface(
   mount: HTMLElement,
   options: {
-    readonly client: PieClient;
+    readonly client: EnvironmentOrpc;
     readonly ref: SessionRef;
     readonly terminalId: string;
   },
@@ -38,8 +38,8 @@ export function attachTerminalSurface(
   let attachedWriter = false;
   const dataDisposable = term.onData((data) => {
     if (!attachedWriter) return;
-    void options.client.terminal
-      .write({
+    void options.client.terminal.write
+      .call({
         ref: options.ref,
         terminalId: options.terminalId,
         data,
@@ -48,8 +48,8 @@ export function attachTerminalSurface(
   });
   const resizeDisposable = term.onResize(({ cols, rows }) => {
     if (!attachedWriter) return;
-    void options.client.terminal
-      .resize({
+    void options.client.terminal.resize
+      .call({
         ref: options.ref,
         terminalId: options.terminalId,
         cols,
@@ -97,7 +97,7 @@ export function attachTerminalSurface(
       try {
         const cols = Math.max(1, term.cols);
         const rows = Math.max(1, term.rows);
-        const stream = await options.client.terminal.connect(
+        const stream = await options.client.terminal.connect.call(
           {
             ref: options.ref,
             terminalId: options.terminalId,

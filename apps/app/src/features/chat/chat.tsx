@@ -20,7 +20,7 @@ export function Chat({
         <div className="mx-auto w-full max-w-4xl min-w-80 shrink-0 px-4 pt-2 pb-4">
           <ChatInputComposer
             key={sessionRefKey(sessionRef)}
-            sessionRef={sessionRef.ref}
+            sessionRef={sessionRef}
             toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
           />
         </div>

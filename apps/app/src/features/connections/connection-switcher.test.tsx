@@ -132,6 +132,7 @@ describe("ConnectionSwitcher", () => {
     });
 
     expect(document.body.textContent).toContain("Add SSH host");
-    expect(document.getElementById("ssh-target")).not.toBeNull();
+    expect(document.body.textContent).toContain("Add environment");
+    expect(document.getElementById("ssh-host")).not.toBeNull();
   });
 });

@@ -1,22 +1,25 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
+import { AppErrorPage } from "./components/app-error-page";
 import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createEnvironmentCatalog } from "./features/projects/environment-catalog";
 import { createTerminalPanel } from "./features/terminal/terminal-panel";
-import { createEnvironmentClients } from "./lib/environment-clients";
 import { parseEnvironmentId } from "./lib/environment-id";
-import { createAppClients } from "./lib/orpc";
+import { createEnvironmentRpc } from "./lib/environment-rpc";
+import { createAppQueryClient, createLocalPieLink, type EnvironmentOrpc } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
-import { useTheme } from "./theme-provider";
+import { ThemeProvider, useTheme } from "./theme-provider";
 import { useStable } from "./use-stable";
 
 declare global {
@@ -74,6 +77,22 @@ export function AppInterface({
   /** Host-owned token box. Updated in the event that mints a new token, not during render. */
   tokenHolder?: { current: string };
 }): ReactElement {
+  return (
+    <ErrorBoundary FallbackComponent={AppErrorPage}>
+      <AppHost server={server} environmentId={environmentId} tokenHolder={tokenHolder} />
+    </ErrorBoundary>
+  );
+}
+
+function AppHost({
+  server,
+  environmentId,
+  tokenHolder,
+}: {
+  server?: ServerConnection;
+  environmentId?: string;
+  tokenHolder?: { current: string };
+}): ReactElement {
   usePlatform();
   const identity = server?.httpBaseUrl ?? "default";
   if (environmentId !== undefined) {
@@ -122,12 +141,12 @@ function AppRuntime({
   tokenHolder?: { current: string };
 }): ReactElement {
   const platform = usePlatform();
-  const { theme } = useTheme();
-  const localClients = useStable(() => createAppClients(server, tokenHolder));
-  const environmentClients = useStable(() =>
-    createEnvironmentClients({
+  const queryClient = useStable(createAppQueryClient);
+  const environmentRpc = useStable(() =>
+    createEnvironmentRpc({
       localId: environmentId,
-      local: localClients,
+      localLink: createLocalPieLink(server, tokenHolder),
+      queryClient,
       resolveRemote: (id) =>
         platform.ssh?.environments.getSnapshot().remotes.find((entry) => entry.environmentId === id)
           ?.connection,
@@ -137,50 +156,85 @@ function AppRuntime({
   const chatManager = useStable(
     () =>
       new ChatManager((sessionRef) => {
-        const clients = environmentClients.get(sessionRef.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, sessionRef.ref);
+        const session = environmentRpc.for(sessionRef.environmentId).agent.session;
+        return new OrpcChatSessionTransport(
+          {
+            session: {
+              prompt: session.prompt.call,
+              interrupt: session.interrupt.call,
+              replaceQueue: session.replaceQueue.call,
+              respondToAgentRequest: session.respondToAgentRequest.call,
+              getSnapshot: session.getSnapshot.call,
+              getMessages: session.getMessages.call,
+              subscribe: session.subscribe.call,
+            },
+          },
+          sessionRef.ref,
+        );
       }),
   );
+  const environmentCatalog = useStable(() => createEnvironmentCatalog(environmentRpc));
 
   useEffect(() => {
+    environmentCatalog.start(environmentId);
     const feed = platform.ssh?.environments;
-    if (feed === undefined) return undefined;
-    const prune = () => {
+    if (feed === undefined) return () => environmentCatalog.dispose();
+    const sync = () => {
       const live = new Map(
         feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote.connection]),
       );
-      environmentClients.prune(live, (id) => {
+      environmentRpc.sync(live, (id) => {
+        environmentCatalog.stop(id);
         chatManager.forgetEnvironment(id);
         contentPanel.forgetAllForEnvironment(id);
       });
+      for (const id of live.keys()) environmentCatalog.start(id);
     };
-    prune();
-    return feed.subscribe(prune);
-  }, [platform.ssh, environmentClients, chatManager]);
+    sync();
+    const unsubscribe = feed.subscribe(sync);
+    return () => {
+      unsubscribe();
+      environmentCatalog.dispose();
+    };
+  }, [platform.ssh, environmentId, environmentRpc, environmentCatalog, chatManager]);
 
-  const { queryClient } = localClients;
-  useEffect(
-    () => contentPanel.register(createTerminalPanel(environmentClients)),
-    [environmentClients],
-  );
+  useEffect(() => contentPanel.register(createTerminalPanel(environmentRpc)), [environmentRpc]);
   const router = useStable(() =>
     createRouter({
       localEnvironmentId: environmentId,
-      environmentClients,
+      environmentRpc,
     }),
   );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ChatManagerProvider manager={chatManager}>
-        <RouterProvider router={router} />
-        {/*
-         * The app's only error surface. Every `toast.*` call — the QueryClient's
-         * global query-error handler in lib/orpc.ts, failed imports, failed
-         * session creates, failed resumes — renders nothing without this mount.
-         */}
-        <Toaster theme={theme} />
-      </ChatManagerProvider>
+      <ServerThemeProvider orpc={environmentRpc.for(environmentId)}>
+        <ChatManagerProvider manager={chatManager}>
+          <RouterProvider router={router} />
+          {/*
+           * The app's only error surface. Every `toast.*` call — the QueryClient's
+           * global query-error handler in lib/orpc.ts, failed imports, failed
+           * session creates, failed resumes — renders nothing without this mount.
+           */}
+          <AppToaster />
+        </ChatManagerProvider>
+      </ServerThemeProvider>
     </QueryClientProvider>
   );
+}
+
+function ServerThemeProvider({
+  children,
+  orpc,
+}: {
+  children: ReactNode;
+  orpc: EnvironmentOrpc;
+}): ReactElement {
+  const { data } = useQuery(orpc.settings.get.queryOptions());
+  return <ThemeProvider serverTheme={data?.appearance.theme}>{children}</ThemeProvider>;
+}
+
+function AppToaster(): ReactElement {
+  const { theme } = useTheme();
+  return <Toaster theme={theme} />;
 }

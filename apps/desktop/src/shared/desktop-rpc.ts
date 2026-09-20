@@ -79,6 +79,7 @@ export const DesktopBootstrapSchema = Schema.Struct({
   status: ServerStatusSchema,
   statusRevision: Schema.Natural,
   os: DesktopOsSchema,
+  hostname: Schema.NonEmptyString,
   sshClient: SshClientAvailabilitySchema,
   tailscaleClient: TailscaleClientAvailabilitySchema,
   environments: EnvironmentSnapshotSchema,

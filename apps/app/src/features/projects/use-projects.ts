@@ -2,7 +2,7 @@ import type { Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { useLocalAppClients } from "@/lib/app-clients";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 /**
  * Shared `project.list` readers. Writers are the import dialog and draft
@@ -11,7 +11,7 @@ import { useLocalAppClients } from "@/lib/app-clients";
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,
 ): UseQueryResult<TData> {
-  const { orpcQueryUtils } = useLocalAppClients();
+  const orpcQueryUtils = useCatalogOrpc();
   return useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     select,

@@ -13,7 +13,7 @@ import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
-import { useLocalAppClients } from "@/lib/app-clients";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
@@ -30,7 +30,7 @@ export function SessionActionsMenu({
   readonly render: ReactElement;
   readonly session: SessionSummary;
 }) {
-  const { orpcQueryUtils } = useLocalAppClients();
+  const orpcQueryUtils = useCatalogOrpc();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);

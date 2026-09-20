@@ -2,7 +2,7 @@ import type { SessionRef, SessionSummary } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { useLocalAppClients } from "@/lib/app-clients";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 export const selectProjectSessionTitle = (
   sessions: ReadonlyArray<SessionSummary>,
@@ -25,7 +25,7 @@ export const selectProjectSessionTitle = (
  * session-page request.
  */
 export function useProjectSessionTitle(ref: SessionRef | undefined): string | undefined {
-  const { orpcQueryUtils } = useLocalAppClients();
+  const orpcQueryUtils = useCatalogOrpc();
   const projectId = ref?.projectId;
   const sessionId = ref?.sessionId;
   const enabled = projectId !== undefined && sessionId !== undefined;

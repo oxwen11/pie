@@ -3,8 +3,8 @@ import { useEffect, useRef } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
-import { useAppClients } from "@/lib/app-clients";
-import type { EnvironmentClients } from "@/lib/environment-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
+import type { EnvironmentRpc } from "@/lib/environment-rpc";
 
 import { attachTerminalSurface } from "./surface";
 
@@ -16,7 +16,7 @@ interface TerminalPayload {
 
 type TerminalInstance = PanelHandle<TerminalPayload>;
 
-export function createTerminalPanel(environmentClients: EnvironmentClients) {
+export function createTerminalPanel(environmentRpc: EnvironmentRpc) {
   return definePanelFamily({
     type: "terminal",
     key: (payload: TerminalPayload) => payload.terminalId,
@@ -29,7 +29,7 @@ export function createTerminalPanel(environmentClients: EnvironmentClients) {
       return { terminalId };
     },
     onClose: (sessionRef, payload) => {
-      void environmentClients.get(sessionRef.environmentId).orpcClient.terminal.close({
+      void environmentRpc.for(sessionRef.environmentId).terminal.close.call({
         ref: sessionRef.ref,
         terminalId: payload.terminalId,
       });
@@ -43,20 +43,20 @@ export function createTerminalPanel(environmentClients: EnvironmentClients) {
 
 function TerminalPanelView({ instance }: { instance: TerminalInstance }) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const { orpcClient } = useAppClients();
+  const orpc = useEnvironmentOrpc();
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return undefined;
     const surface = attachTerminalSurface(mount, {
-      client: orpcClient,
+      client: orpc,
       ref: instance.sessionRef.ref,
       terminalId: instance.payload.terminalId,
     });
     return () => {
       surface.detach();
     };
-  }, [instance, orpcClient]);
+  }, [instance, orpc]);
 
   return (
     <div

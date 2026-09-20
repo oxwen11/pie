@@ -83,6 +83,8 @@ ensure_remote_node_path() {
   # fnm must not skip ~/.local/bin, or the runner falls through to npx.
   prepend_path_if_dir "$HOME/.local/bin"
   prepend_path_if_dir "$HOME/bin"
+  # The daemon runs on Node; its Pi child resolves Bun from the inherited PATH.
+  prepend_path_if_dir "$HOME/.bun/bin"
 
   if remote_node_major_is_24; then
     return 0

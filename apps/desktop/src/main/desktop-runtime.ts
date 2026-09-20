@@ -13,11 +13,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";
-import {
-  DesktopConfig,
-  makeDesktopConfigLive,
-  startsDesktopInBackground,
-} from "./desktop-config";
+import { DesktopConfig, makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, MainWindowLive } from "./electron/main-window";

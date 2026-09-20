@@ -7,7 +7,7 @@ import type { PanelHandle } from "@/components/layout/content-panel/model/panel"
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 import { PanelEmptyState } from "@/components/layout/panel-empty-state";
-import { useAppClients } from "@/lib/app-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -24,7 +24,7 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils } = useAppClients();
+  const orpcQueryUtils = useEnvironmentOrpc();
   const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),

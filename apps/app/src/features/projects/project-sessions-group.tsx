@@ -9,7 +9,7 @@ import {
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
@@ -17,7 +17,7 @@ import {
   ProjectSessionRow,
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
-import { useLocalAppClients } from "@/lib/app-clients";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
@@ -49,15 +49,17 @@ const selectNewestFirst = (
  * panel is open (two icon entities, not a rotation). This component owns only
  * grouping and fetching; each row composes its own navigation and actions.
  */
-export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
-  const { localEnvironmentId } = useRouteContext({ from: "__root__" });
-  const { orpcQueryUtils } = useLocalAppClients();
+export function ProjectSessionsGroup({
+  environmentId,
+  project,
+}: {
+  readonly environmentId: string;
+  readonly project: Project;
+}) {
+  const orpcQueryUtils = useCatalogOrpc();
   const router = useRouter();
   const isSessionActive = (ref: SessionRef) =>
-    sameSessionRef(
-      { environmentId: localEnvironmentId, ref },
-      sessionRefFromRouterMatches(router.state.matches),
-    );
+    sameSessionRef({ environmentId, ref }, sessionRefFromRouterMatches(router.state.matches));
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -106,14 +108,14 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
         </SidebarGroupLabel>
         <SidebarGroupAction
           className="top-1 right-1"
-          render={<Link to="/draft" search={{ projectId: project.id }} />}
+          render={<Link to="/draft" search={{ projectId: project.id, environmentId }} />}
           title={`New chat in ${project.name}`}
         >
           <SquarePen />
           {/* Names the button per project: element content wins over `title` in the accessible-name computation, so a bare "New chat" would make every project's action announce identically. */}
           <span className="sr-only">New chat in {project.name}</span>
         </SidebarGroupAction>
-        {/* keepMounted: see panel-motion.ts — an unmounting panel makes every
+        {/* keepMounted: see panel-motion.tsx — an unmounting panel makes every
             expand rebuild this project's whole session list. */}
         <KeepMountedCollapsiblePanel>
           <SidebarGroupContent>
@@ -126,7 +128,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
                     key={session.sessionId}
                     active={active}
                     createdBySchedule={firedSessionIds.data?.has(session.sessionId) === true}
-                    environmentId={localEnvironmentId}
+                    environmentId={environmentId}
                     isActive={() => isSessionActive(session)}
                     pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}

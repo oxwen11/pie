@@ -1,124 +1,82 @@
-# EnvironmentClients: layered `environmentId` routing
+# Environment RPC routing
 
-**Date:** 2026-09-19  
-**Status:** accepted for implementation (PR #38 follow-up)  
-**Context:** remote Environments. #38 half-wired multi-env clients; session system surfaces must hit the session’s daemon.  
-**T3 analogue:** `EnvironmentRegistry.run(environmentId, …)` — pie keeps the idea, not Effect Atom.
+**Status:** accepted and implemented on `feat/environment-clients-routing`
+**Context:** every local or SSH daemon has a persistent UUID from `/api/environment`.
 
 ## Invariant
 
-Open session `{ environmentId, sessionId, projectId }` → agent / fs / git / pty / session-scoped PR RPCs all use that env’s daemon.
+For `{ environmentId, ref }`, agent, files, Git, terminal, project, session, schedule, and pull-request RPCs must all target that Environment's daemon.
 
-Catalog (sidebar, draft, schedules, list-sync) may stay local this slice.
+The UI does not select URLs, tokens, tunnels, or query-key prefixes.
 
-## Decision
+## Runtime shape
 
-**Registry of stable per-env `AppClients`. Not oRPC `DynamicLink` as the app seam.**
-
-| Layer               | Owns                                                                                                       | Does not own      |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------- |
-| **L0 Connection**   | `resolveRemote(envId) → ServerConnection \| undefined` from SSH/platform snapshot; connection key          | sockets, React    |
-| **L1 Client bag**   | existing `createAppClients` / `disposeAppClients` — one `PieClient` + `QueryClient` + utils per connection | env lookup        |
-| **L2 Registry**     | `Map<envId, { connectionKey, clients }>`; `get` / `prune`                                                  | panel/chat policy |
-| **L3 Session bind** | SessionBound wraps Chat **and** Outlet; `useAppClients()` under that provider                              | catalog sidebar   |
-
-oRPC stays ordinary: one `WebSocketRPCLink` per env (lazy connect + reconnect).  
-`DynamicLink` would only re-implement L2 behind a single client handle; TanStack Query still needs per-env QC or utils `prefix`, and chat/pty want a stable client for the session lifetime. Skip that shell.
-
-Routing truth: **`registry.get(environmentId)`**. Provider is sugar inside SessionBound.
-
-```
-UI(session) → L3 bind → L2.get(envId) → L1 AppClients → L0 connection → daemon
-catalog UI  → L2.get(localId)  (same registry, local only)
+```text
+EnvironmentRpc
+├── one TanStack QueryClient
+├── one oRPC DynamicLink
+├── links: Map<environmentId, WebSocket ClientLink>
+├── orpc: Map<environmentId, prefixed EnvironmentOrpc>
+└── EnvironmentCatalog workers
+    └── Map<environmentId, AbortController>
 ```
 
-## Minimal API
-
-One module: `apps/app/src/lib/environment-clients.ts`.
+`EnvironmentRpc.for(environmentId)` returns the only application RPC surface:
 
 ```ts
-type EnvironmentClients = {
-  get(environmentId: string): AppClients; // sync; unknown → throw
-  prune(
-    live: ReadonlyMap<string, ServerConnection>,
-    onDrop?: (environmentId: string) => void,
-  ): void;
-};
+const orpc = environmentRpc.for(environmentId);
 
-function createEnvironmentClients(input: {
-  localId: string;
-  local: AppClients;
-  resolveRemote: (environmentId: string) => ServerConnection | undefined;
-}): EnvironmentClients;
+await orpc.agent.session.prepare.call({ ref });
+useQuery(orpc.project.list.queryOptions());
 ```
 
-`get` rules: local identity; remote cache-by-key (http+token); miss → mint; missing remote → throw (no local fallback).
+Each cached oRPC proxy is stateless. Its client interceptor adds the immutable `environmentId` to every direct, query, mutation, and streaming call. `DynamicLink` reads that operation-local context and resolves the current WebSocket link. TanStack's native `prefix: environmentId` isolates identical procedures in the shared cache.
 
-React: registry on router context. SessionBound wraps Main + content panel. Catalog uses `useLocalAppClients()`. No second React registry channel.
+There is no mutable current Environment, per-Environment `QueryClient`, per-Environment transport client, or separate `rpc` facade.
 
-No second `clientsFor(): Promise`. No router-level duplicate Map.
+## Connection lifecycle
 
-## Tree
+The Environment feed is authoritative for connected remotes.
 
-```
-ChatManager(transport = registry.get(env))
-Router({ environmentClients, localEnvironmentId })
-  SessionBound(esr) → AppClientsProvider → Chat (Main) + ContentPanelOutlet
-  Sidebar → useLocalAppClients()  (outer local QC)
-```
+- **Add:** upsert the remote link, create its prefixed oRPC surface lazily, then start catalog hydration and session synchronization.
+- **Rotate URL/token:** replace the link entry. Existing oRPC objects remain stable; subsequent calls resolve the new link.
+- **Remove:** abort the Environment worker and session surfaces, forget its chats/panels, remove the link and prefixed cache, and fail later calls closed.
+- **Race:** `for(environmentId)` may resolve a remote directly from the latest feed snapshot, so React observing the new Environment before the orchestration subscriber is safe.
 
-Prune (owner next to registry create — today’s `app-interface` effect):
+The daemon UUID—not SSH alias, hostname, project, or session—is the routing and cache identity.
 
-```
-remote gone | connectionKey changed →
-  registry.prune(liveConnections, (env) => {
-    chatManager.forgetEnvironment(env)
-    contentPanel.forgetAllForEnvironment(env)
-  })
-```
+## Proactive catalog synchronization
 
-## Identity (same change set as bind)
+Each connected Environment owns one worker. It opens the global session stream before fetching the baseline, then:
 
-`PanelHandle.sessionRef` / `onClose` → `EnvironmentSessionRef` (`{ environmentId, ref }`).  
-Wire edge: `.ref`. Terminal register closes over `environmentClients` for `onClose`; view uses SessionBound `useAppClients`.
+1. fetches `project.list`;
+2. fetches active `agent.session.list` for every project;
+3. applies session events to that Environment's prefixed list keys;
+4. retries the stream with backoff until removed.
 
-## Call sites (session plane only)
+Session-event invalidation refetches inactive prefetched entries as well as mounted queries. The sidebar therefore does not need to be opened before a newly added Environment begins loading Projects and Sessions.
 
-| Site                           | Change                                      |
-| ------------------------------ | ------------------------------------------- |
-| Chat transport                 | `registry.get(env)` + `sessionRef.ref`      |
-| files / review / PR / terminal | SessionBound `useAppClients()` + `.ref`     |
-| sidebar / draft / schedules    | `useLocalAppClients()`                      |
-| terminal `onClose`             | `environmentClients.get(env)` at close time |
-| SessionBound                   | wrap Main + Outlet; sync get                |
-| loader                         | `registry.get(env)`                         |
+## React and non-React consumers
 
-## Ship
+React may use `EnvironmentOrpcProvider` as a convenience binding around an already selected `EnvironmentOrpc`.
 
-| Slice               | Work                                                                                                                                        | Proof                |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| **registry + tree** | `EnvironmentClients`; ESR; SessionBound wraps Chat+Outlet; catalog `useLocalAppClients`; terminal on session clients; env-wide panel forget | unit + typecheck     |
-| **runtime**         | SSH remote Files/Terminal on tunnel port                                                                                                    | `pie-verify desktop` |
+Non-React consumers use the same registry directly:
 
-## Acceptance
+- router loaders: `environmentRpc.for(environmentId)`;
+- ChatManager: Environment-bound session procedures;
+- Terminal: Environment-bound direct calls and streams;
+- catalog/session synchronization: one worker per connected Environment.
 
-1. SSH remote session → Files `fs`/`git` on tunnel port, not local daemon.
-2. Same session Terminal pty open/close on tunnel port.
-3. Local session → local daemon port.
-4. Remove remote → clients disposed, no requests to dead tunnel.
+Provider remounting is not a routing mechanism. The global `QueryClient` never changes.
 
-Evidence: `pie-verify desktop` + PR screenshots/video.
+## Verification
 
-## Non-goals
+Required coverage:
 
-- `DynamicLink` / single shared `PieClient` with per-call `context.environmentId`
-- Effect Atom / T3 command families
-- Wire `{ environmentId, input }` on every RPC
-- Remote sidebar / Connections switcher
-- Serve allow-host / IPv6 / Host substring
-
-## Success
-
-- Session system I/O only via `registry.get(environmentId)` (or SessionBound / Outlet `useAppClients`).
-- Layers stay separate: connection resolve ≠ client mint ≠ React bind.
-- Acceptance passes on one real SSH remote.
+1. local and remote procedure keys have different daemon UUID prefixes;
+2. calls through cached Environment surfaces select the matching DynamicLink;
+3. concurrent calls to different Environments cannot cross-route;
+4. URL/token rotation retains the Environment oRPC object while changing its link;
+5. removal preserves local cache, removes only the departed prefix, and fails closed;
+6. adding an Environment proactively requests projects and sessions;
+7. Chat, Files, Git, Terminal, loaders, and session subscriptions use the session Environment.

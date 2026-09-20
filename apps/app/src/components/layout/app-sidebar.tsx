@@ -100,8 +100,7 @@ export function AppSidebar() {
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
       <SidebarHeader
         className={cn(
-          // Same string as SHELL_TITLEBAR_HEADER_CLASS — imported
-          // constants are unreadable to require-static-classes.
+          // Keep this literal so require-static-classes can validate it.
           "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
           desktop && "px-0",
         )}

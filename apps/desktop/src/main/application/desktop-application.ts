@@ -1,3 +1,5 @@
+import os from "node:os";
+
 import { Context, Effect, Stream, SubscriptionRef } from "effect";
 
 import type {
@@ -144,10 +146,12 @@ export function makeDesktopApplication({
     bootstrap: Effect.gen(function* () {
       const current = yield* server.snapshot;
       const environments = yield* SubscriptionRef.get(environmentsRef);
+      const hostname = os.hostname();
       return {
         status: current.status,
         statusRevision: current.revision,
         os: currentOs(),
+        hostname: hostname.split(".")[0] || hostname,
         sshClient: ssh.client,
         tailscaleClient: tailscale.client,
         environments,

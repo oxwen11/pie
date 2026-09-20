@@ -16,7 +16,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
-import { useAppClients } from "@/lib/app-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -73,7 +73,7 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const { orpcQueryUtils } = useAppClients();
+  const orpcQueryUtils = useEnvironmentOrpc();
   const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),

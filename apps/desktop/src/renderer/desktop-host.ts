@@ -42,6 +42,7 @@ export function createDesktopHost(
         });
       },
       os: bootstrap.os,
+      hostname: bootstrap.hostname,
       ssh: {
         client: bootstrap.sshClient,
         environments: {

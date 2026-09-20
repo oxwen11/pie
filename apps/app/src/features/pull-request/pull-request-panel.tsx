@@ -2,14 +2,14 @@ import type { PullRequestAction, PullRequestActionInput } from "@getpie/contract
 import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitPullRequestIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { definePanel } from "@/components/layout/content-panel/react/view";
-import { useAppClients } from "@/lib/app-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
 import { pullRequestActionError } from "./pull-request-action-error";
@@ -27,7 +27,8 @@ export const pullRequestPanel = definePanel({
 });
 
 function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils, queryClient } = useAppClients();
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const queryClient = useQueryClient();
   const sessionRef = instance.sessionRef.ref;
   const options = orpcQueryUtils.pullRequest.current.queryOptions({
     input: { ref: sessionRef },

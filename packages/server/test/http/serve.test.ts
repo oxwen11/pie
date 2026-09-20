@@ -126,9 +126,9 @@ describe("runServe", () => {
     process.env.PIE_AUTH_TOKEN = token;
 
     const fiber = Effect.runFork(
-      Effect.scoped(runServe({ port: Option.some(port), host: Option.none(), corsOrigin: [], allowedHost: [] })).pipe(
-        Effect.provide(NodePlatformLayer),
-      ),
+      Effect.scoped(
+        runServe({ port: Option.some(port), host: Option.none(), corsOrigin: [], allowedHost: [] }),
+      ).pipe(Effect.provide(NodePlatformLayer)),
     );
 
     try {
@@ -175,9 +175,14 @@ describe("runServe", () => {
 
     try {
       const exit = await Effect.runPromiseExit(
-        Effect.scoped(runServe({ port: Option.some(port), host: Option.none(), corsOrigin: [], allowedHost: [] })).pipe(
-          Effect.provide(NodePlatformLayer),
-        ),
+        Effect.scoped(
+          runServe({
+            port: Option.some(port),
+            host: Option.none(),
+            corsOrigin: [],
+            allowedHost: [],
+          }),
+        ).pipe(Effect.provide(NodePlatformLayer)),
       );
       const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
       expect(error).toBeInstanceOf(ServerStartupError);

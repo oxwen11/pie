@@ -5,7 +5,7 @@ import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { useLocalAppClients } from "@/lib/app-clients";
+import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { formatSessionReuse } from "./cadence";
 import {
@@ -98,7 +98,7 @@ export function ScheduleProvider({
   children,
 }: ScheduleProviderProps) {
   const { localEnvironmentId } = useRouteContext({ from: "__root__" });
-  const { orpcQueryUtils } = useLocalAppClients();
+  const orpcQueryUtils = useLocalOrpc();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -123,7 +123,7 @@ export function ScheduleProvider({
       onCloseCreate();
       void invalidate();
       if (created.lastSessionId !== undefined) {
-        openScheduleSession(navigate, created.projectId, created.lastSessionId);
+        openScheduleSession(navigate, created.projectId, created.lastSessionId, localEnvironmentId);
         return;
       }
       reportScheduleStart(created);
@@ -160,7 +160,12 @@ export function ScheduleProvider({
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
-        openScheduleSession(navigate, result.ref.projectId, result.ref.sessionId);
+        openScheduleSession(
+          navigate,
+          result.ref.projectId,
+          result.ref.sessionId,
+          localEnvironmentId,
+        );
         return;
       }
       reportScheduleStart(result.schedule);
@@ -213,7 +218,8 @@ export function ScheduleProvider({
         save: (id, form) => update.mutate({ id, ...form }),
         openCreate: onOpenCreate,
         closeCreate: onCloseCreate,
-        openSession: (projectId, sessionId) => openScheduleSession(navigate, projectId, sessionId),
+        openSession: (projectId, sessionId) =>
+          openScheduleSession(navigate, projectId, sessionId, localEnvironmentId),
       },
       meta: {
         items,
@@ -249,6 +255,7 @@ export function ScheduleProvider({
       items,
       listError,
       listPending,
+      localEnvironmentId,
       navigate,
       nowMs,
       onCloseCreate,
@@ -294,11 +301,12 @@ function openScheduleSession(
   navigate: ReturnType<typeof useNavigate>,
   projectId: string,
   sessionId: string,
+  environmentId: string,
 ): void {
   navigate({
     to: "/session/$sessionId",
     params: { sessionId },
-    search: { projectId },
+    search: { projectId, environmentId },
   }).catch((error: unknown) => {
     console.error("Failed to open the schedule session", error);
   });

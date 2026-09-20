@@ -6,7 +6,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
-import { useAppClients } from "@/lib/app-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
@@ -57,7 +57,7 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     instance.navigation.getSnapshot,
     instance.navigation.getSnapshot,
   );
-  const { orpcQueryUtils } = useAppClients();
+  const orpcQueryUtils = useEnvironmentOrpc();
   const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),

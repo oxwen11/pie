@@ -79,6 +79,8 @@ export type Platform = {
    * that corner is ours to fill — see `components/layout/shell-chrome.ts`.
    */
   os?: PlatformOs;
+  /** Desktop host short hostname (e.g. `mac-mini`). Absent in the browser. */
+  hostname?: string;
   /**
    * Desktop-only: SSH-forwarded remote pie daemons, all connected in parallel.
    * Absent in the browser. On desktop, `client.available` is false when OpenSSH

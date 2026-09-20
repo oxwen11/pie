@@ -22,16 +22,15 @@ import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
-import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
-import { AppClientsProvider } from "@/lib/app-clients";
-import type { EnvironmentClients } from "@/lib/environment-clients";
+import { EnvironmentOrpcProvider } from "@/lib/environment-orpc";
+import type { EnvironmentRpc } from "@/lib/environment-rpc";
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   localEnvironmentId: string;
-  environmentClients: EnvironmentClients;
+  environmentRpc: EnvironmentRpc;
 }
 
 contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
@@ -42,10 +41,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
-  // Keeps every `session.list` cache converged from the server's events
-  // (multi-tab / desktop), independent of which route is mounted.
-  useSessionListSync();
-
   // This is the shell's one route-identity seam for the card: the content
   // panel and heading derive from the same authoritative session-route ref.
   // Sidebar modules read the route themselves and jump without callbacks.
@@ -97,7 +92,7 @@ function RootLayout() {
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
         {/*
-         * One AppClientsProvider for chat + content panel. Sidebar stays on the
+         * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
          * outer local QueryClient above the router.
          */}
         <AppShellBody>
@@ -132,8 +127,11 @@ function SessionBound({
   sessionRef: EnvironmentSessionRef | null;
   children: ReactNode;
 }) {
-  const { localEnvironmentId, environmentClients } = useRouteContext({ from: "__root__" });
+  const { localEnvironmentId, environmentRpc } = useRouteContext({ from: "__root__" });
   const environmentId = sessionRef?.environmentId ?? localEnvironmentId;
-  const clients = environmentClients.get(environmentId);
-  return <AppClientsProvider clients={clients}>{children}</AppClientsProvider>;
+  return (
+    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+      {children}
+    </EnvironmentOrpcProvider>
+  );
 }

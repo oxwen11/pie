@@ -133,7 +133,7 @@ export function AppShellBody({ children }: AppShellBodyProps) {
   );
 }
 
-/** Session-scoped column beside chat; mount under the same AppClientsProvider as Main. */
+/** Session-scoped column beside chat; mount under the same EnvironmentOrpcProvider as Main. */
 export function AppShellSessionPanel(): ReactNode {
   const { contentPanel } = useAppShell();
   if (!contentPanel.visible) return null;

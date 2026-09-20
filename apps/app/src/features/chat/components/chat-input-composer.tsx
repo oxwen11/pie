@@ -13,8 +13,8 @@ import { useStore } from "zustand";
 
 import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
 import { useLatestRef } from "@/hooks/use-latest-ref";
-import { useAppClients } from "@/lib/app-clients";
-import { toSessionRef, type EnvironmentSessionRef } from "@/lib/session-ref";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
@@ -39,9 +39,9 @@ export function ChatInputComposer({
   sessionRef: EnvironmentSessionRef;
   toolbar?: ReactNode;
 }) {
-  const { orpcQueryUtils } = useAppClients();
+  const orpcQueryUtils = useEnvironmentOrpc();
   const branch = useQuery(
-    orpcQueryUtils.git.branch.queryOptions({ input: { ref: toSessionRef(sessionRef) } }),
+    orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef.ref } }),
   );
   const currentBranch =
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
