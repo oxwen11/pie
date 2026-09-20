@@ -88,7 +88,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
         if: steps.pr-gate.outputs.skip != 'true'
 
-      - run: pnpm turbo run build --filter=@getpie/cli
+      - run: mise exec -- pnpm turbo run build --filter=@getpie/cli
         if: steps.pr-gate.outputs.skip != 'true'
 
       # Preview tarball for this commit/branch. Not npm. Needs the pkg-pr-new
