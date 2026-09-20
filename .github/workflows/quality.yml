@@ -157,6 +157,10 @@ jobs:
 
       - name: Run Desktop baseline e2e
         run: |
+          # Electron 44 follows WAYLAND_DISPLAY and never attaches to Xvfb.
+          unset WAYLAND_DISPLAY ELECTRON_RUN_AS_NODE
+          export ELECTRON_OZONE_PLATFORM_HINT=x11
+          export NO_AT_BRIDGE=1
           xvfb-run -a pnpm --filter @getpie/desktop exec playwright test \
             -c e2e/playwright.config.ts \
             e2e/tests/import-project.spec.ts \

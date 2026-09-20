@@ -139,6 +139,18 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
   };
 }
 
+/** Chromium switches that have to precede the app entry. */
+export function electronAppArgs(appPath: string, userData: string): string[] {
+  return [
+    // ponytail: Linux CI is Xvfb. Electron 44 otherwise picks Wayland and never opens a window.
+    ...(process.platform === "linux" && process.env.CI
+      ? ["--ozone-platform=x11", "--disable-gpu"]
+      : []),
+    appPath,
+    `--user-data-dir=${userData}`,
+  ];
+}
+
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   return electron.launch({

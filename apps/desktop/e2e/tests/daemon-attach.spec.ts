@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { pieElectronEnv, seedProject, stopDaemonFor } from "./fixtures.js";
+import { electronAppArgs, pieElectronEnv, seedProject, stopDaemonFor } from "./fixtures.js";
 
 function readDaemonPid(pieHome: string): number | undefined {
   try {
@@ -23,11 +23,7 @@ async function launchWindow(
 ): Promise<ElectronApplication> {
   fs.mkdirSync(userData, { recursive: true });
   const app = await electron.launch({
-    args: [
-      ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
-      appPath,
-      `--user-data-dir=${userData}`,
-    ],
+    args: electronAppArgs(appPath, userData),
     env: pieElectronEnv(pieHome),
   });
   const window = await app.firstWindow({ timeout: 30_000 });

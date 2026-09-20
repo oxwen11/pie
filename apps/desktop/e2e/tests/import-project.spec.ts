@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { pieElectronEnv, stopDaemonFor } from "./fixtures.js";
+import { electronAppArgs, pieElectronEnv, stopDaemonFor } from "./fixtures.js";
 
 const SAMPLE = "desktop-import-sample";
 
@@ -27,11 +27,7 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
   let app: ElectronApplication | undefined;
   try {
     app = await electron.launch({
-      args: [
-        ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
-        appPath,
-        `--user-data-dir=${userData}`,
-      ],
+      args: electronAppArgs(appPath, userData),
       env: pieElectronEnv(pieHome, { PIE_PROJECT_BROWSE_ROOT: browseRoot }),
     });
 
