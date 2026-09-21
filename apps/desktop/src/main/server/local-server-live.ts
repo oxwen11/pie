@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { resolveDevelopmentScope } from "@getpie/core/development-scope";
-import { developmentDaemonEnvironment } from "@getpie/server/daemon";
 import { Effect, FileSystem, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
@@ -23,13 +21,7 @@ export const LocalServerLive = Layer.effect(
     const platform = yield* Effect.context<
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
-    const environment = (
-      config.isPackaged
-        ? Effect.succeed(loginShell.env)
-        : Effect.sync(() =>
-            developmentDaemonEnvironment({ ...loginShell.env }, resolveDevelopmentScope()),
-          )
-    ).pipe(
+    const environment = Effect.succeed(loginShell.env).pipe(
       Effect.map((env) =>
         applyDesktopRuntime(env, {
           isPackaged: config.isPackaged,
