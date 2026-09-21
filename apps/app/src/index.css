@@ -159,16 +159,29 @@ form:has(> [data-slot="chat-input"]):focus-within {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
 }
 
+/* Inline widget: 1em = glyph box (native caret), not leading-5. Width 0 so
+ * typing is not shifted; the bar is the border. */
 .chat-input-caret {
-  position: fixed;
-  top: 0;
-  left: 0;
-  /* Overlay lives on body so composer clip-path cannot trap it. */
-  z-index: 2;
-  width: 2px;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  margin-right: -2px;
+  border-right: 2px solid var(--foreground);
   pointer-events: none;
-  background: var(--foreground);
   animation: var(--animate-caret-blink);
+}
+
+.tiptap.chat-thick-caret {
+  caret-color: transparent;
+}
+
+.tiptap.chat-thick-caret:not(.ProseMirror-focused) .chat-input-caret,
+.tiptap.chat-thick-caret[data-composing] .chat-input-caret {
+  visibility: hidden;
+}
+
+.tiptap.chat-thick-caret[data-composing] {
+  caret-color: currentColor;
 }
 
 @property --chat-input-fade-top {
