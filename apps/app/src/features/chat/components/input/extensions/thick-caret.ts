@@ -1,12 +1,10 @@
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import type { EditorView } from "@tiptap/pm/view";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 
-// Native caret is 1px; Blink does not expose a width. Overlay a 2px bar on
-// the body (composer backdrop-filter would otherwise trap position:fixed) and
-// hide the native caret. IME uses the DOM selection (coordsAtPos sits at the
-// composition start). `view.hasFocus()` is `activeElement === view.dom`, which
-// goes false during IME — track focus on the events and contains().
+// 2px caret as a widget decoration (TipTap/ProseMirror), not a measured overlay.
+// Height is 1em in CSS — the glyph box — so it tracks font-size instead of
+// leading / coordsAtPos. Native caret during IME (`data-composing`).
 export function createThickCaretExtension() {
   return Extension.create({
     name: "chatThickCaret",
@@ -14,47 +12,31 @@ export function createThickCaretExtension() {
       return [
         new Plugin({
           key: new PluginKey("chatThickCaret"),
+          props: {
+            decorations(state) {
+              const { selection } = state;
+              if (!selection.empty) return null;
+              return DecorationSet.create(state.doc, [
+                Decoration.widget(selection.head, caretEl, { key: "caret", side: 1 }),
+              ]);
+            },
+          },
           view(view) {
-            const el = document.createElement("div");
-            el.className = "chat-input-caret";
-            el.ariaHidden = "true";
-            document.body.append(el);
-            let focused = editorHasFocus(view);
-            let raf = 0;
-            const update = () => {
-              cancelAnimationFrame(raf);
-              raf = requestAnimationFrame(() => place(view, el, focused));
+            view.dom.classList.add("chat-thick-caret");
+            const onStart = () => {
+              view.dom.dataset.composing = "";
             };
-            const onFocus = () => {
-              focused = true;
-              update();
+            const onEnd = () => {
+              delete view.dom.dataset.composing;
             };
-            const onBlur = () => {
-              if (view.composing) return;
-              focused = false;
-              update();
-            };
-            const onCompositionEnd = () => {
-              focused = editorHasFocus(view);
-              update();
-            };
-            view.dom.addEventListener("focus", onFocus);
-            view.dom.addEventListener("blur", onBlur);
-            view.dom.addEventListener("compositionupdate", update);
-            view.dom.addEventListener("compositionend", onCompositionEnd);
-            window.addEventListener("scroll", update, true);
-            update();
+            view.dom.addEventListener("compositionstart", onStart);
+            view.dom.addEventListener("compositionend", onEnd);
             return {
-              update,
               destroy() {
-                cancelAnimationFrame(raf);
-                view.dom.removeEventListener("focus", onFocus);
-                view.dom.removeEventListener("blur", onBlur);
-                view.dom.removeEventListener("compositionupdate", update);
-                view.dom.removeEventListener("compositionend", onCompositionEnd);
-                window.removeEventListener("scroll", update, true);
-                view.dom.style.caretColor = "";
-                el.remove();
+                view.dom.removeEventListener("compositionstart", onStart);
+                view.dom.removeEventListener("compositionend", onEnd);
+                view.dom.classList.remove("chat-thick-caret");
+                delete view.dom.dataset.composing;
               },
             };
           },
@@ -64,38 +46,9 @@ export function createThickCaretExtension() {
   });
 }
 
-function editorHasFocus(view: EditorView) {
-  const active = view.root.activeElement;
-  return active === view.dom || (active != null && view.dom.contains(active));
-}
-
-function place(view: EditorView, el: HTMLElement, focused: boolean) {
-  if (!(focused || editorHasFocus(view)) || !view.state.selection.empty) {
-    el.hidden = true;
-    view.dom.style.caretColor = "";
-    return;
-  }
-  const caret = caretRect(view);
-  const line = lineHeightPx(view.dom);
-  const height = Math.max(Math.round(caret.bottom - caret.top), Math.round(line));
-  el.hidden = false;
-  view.dom.style.caretColor = "transparent";
-  el.style.transform = `translate(${Math.round(caret.left)}px, ${Math.round(caret.top)}px)`;
-  el.style.height = `${height}px`;
-}
-
-function lineHeightPx(el: HTMLElement) {
-  const n = Number.parseFloat(getComputedStyle(el).lineHeight);
-  return Number.isFinite(n) ? n : 16;
-}
-
-function caretRect(view: EditorView) {
-  const sel = window.getSelection();
-  if (sel?.rangeCount && view.dom.contains(sel.anchorNode)) {
-    const range = sel.getRangeAt(0).cloneRange();
-    range.collapse(false);
-    const rect = range.getBoundingClientRect();
-    if (rect.height > 0) return rect;
-  }
-  return view.coordsAtPos(view.state.selection.head);
+function caretEl() {
+  const el = document.createElement("span");
+  el.className = "chat-input-caret";
+  el.ariaHidden = "true";
+  return el;
 }
