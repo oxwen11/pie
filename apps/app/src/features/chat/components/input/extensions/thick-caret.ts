@@ -3,7 +3,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 
 // 2px caret as a widget decoration (TipTap/ProseMirror), not a measured overlay.
-// ZWSP so the inline-block shares the text baseline; CSS line-height 1 = 1em.
+// ZWSP so the inline-block shares the text baseline; CSS line-height 1.2.
 // Native caret during IME (`data-composing`).
 export function createThickCaretExtension() {
   return Extension.create({
