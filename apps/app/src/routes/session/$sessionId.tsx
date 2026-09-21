@@ -13,7 +13,7 @@ type SessionSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const throwWorktreeMissingRedirect = (error: unknown): void => {
+const throwWorktreeMissingRedirect = (error: unknown, environmentId: string): void => {
   if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return;
   const data: unknown = error.data;
   if (typeof data !== "object" || data === null) return;
@@ -23,7 +23,9 @@ const throwWorktreeMissingRedirect = (error: unknown): void => {
   if (sessionId === undefined || projectId === undefined || branch === undefined) return;
   throw redirect({
     to: "/session/fallback",
-    search: { sessionId, projectId, branch } satisfies WorktreeMissingErrorData,
+    search: { sessionId, projectId, branch, environmentId } satisfies WorktreeMissingErrorData & {
+      environmentId: string;
+    },
   });
 };
 
@@ -61,7 +63,7 @@ export const Route = createFileRoute("/session/$sessionId")({
         sessionId: params.sessionId,
       };
       const prepared = await prepareSession(hinted).catch((error: unknown) => {
-        throwWorktreeMissingRedirect(error);
+        throwWorktreeMissingRedirect(error, environmentId);
         console.warn("Preparing the URL's ref failed, falling back to lookup", error);
         return undefined;
       });
@@ -78,7 +80,7 @@ export const Route = createFileRoute("/session/$sessionId")({
     return prepareSession(ref)
       .then((prepared) => ({ ...prepared, environmentId }))
       .catch((error: unknown) => {
-        throwWorktreeMissingRedirect(error);
+        throwWorktreeMissingRedirect(error, environmentId);
         console.error("Failed to prepare session", error);
         toast.error(
           `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,

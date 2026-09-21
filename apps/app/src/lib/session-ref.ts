@@ -61,7 +61,12 @@ export const sessionRefFromRouterMatches = (
 ): EnvironmentSessionRef | undefined => {
   const data = matches.find((match) => match.routeId === "/session/$sessionId")?.loaderData;
   const ref = sessionLoaderRef(data);
-  if (ref === undefined || data === null || typeof data !== "object" || !("environmentId" in data)) {
+  if (
+    ref === undefined ||
+    data === null ||
+    typeof data !== "object" ||
+    !("environmentId" in data)
+  ) {
     return undefined;
   }
   const environmentId = data.environmentId;
