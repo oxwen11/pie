@@ -1,20 +1,66 @@
-import type { PieUIMessage } from "@getpie/contract";
+import type { PieAssistantMetadata, PieAssistantUIMessage, PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
+import { isToolUIPart } from "ai";
 import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import {
-  formatWorkedFor,
-  messageStartTimestampOf,
-  splitWork,
-  workedSeconds,
-} from "./message-view.logic";
 import { UserMessage } from "./user-message";
+
+type Part = PieUIMessage["parts"][number];
+
+export function isVisibleWorkPart(part: Part): boolean {
+  if (isToolUIPart(part)) return true;
+  if (part.type === "reasoning") return true;
+  return part.type === "text" && part.text.trim() !== "";
+}
+
+export function splitWork(
+  parts: readonly Part[],
+  isStreaming: boolean,
+): { workParts: Part[]; answerParts: Part[] } | null {
+  if (isStreaming) {
+    return parts.length === 0 ? null : { workParts: [...parts], answerParts: [] };
+  }
+
+  let lastText = -1;
+  for (const [index, part] of parts.entries()) {
+    if (part.type === "text" && part.text.trim() !== "") lastText = index;
+  }
+  const workAfterLastText =
+    lastText >= 0 && parts.slice(lastText + 1).some((part) => isVisibleWorkPart(part));
+  if (lastText >= 0 && !workAfterLastText) {
+    const workParts = parts.slice(0, lastText);
+    if (!workParts.some((part) => isVisibleWorkPart(part))) return null;
+    return { workParts, answerParts: parts.slice(lastText) };
+  }
+  if (!parts.some((part) => isVisibleWorkPart(part))) return null;
+  return { workParts: [...parts], answerParts: [] };
+}
+
+export function formatWorkedFor(seconds: number): string {
+  if (seconds < 60) return `Worked for ${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0 ? `Worked for ${minutes}m` : `Worked for ${minutes}m ${rest}s`;
+}
+
+/** Settled span: messageEndTimestamp minus messageStartTimestamp, in whole seconds. */
+export function workedSeconds(
+  metadata: Pick<PieAssistantMetadata, "messageStartTimestamp" | "messageEndTimestamp"> | undefined,
+): number | undefined {
+  const from = metadata?.messageStartTimestamp;
+  const to = metadata?.messageEndTimestamp;
+  if (from === undefined || to === undefined) return undefined;
+  const start = Date.parse(from);
+  const end = Date.parse(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return undefined;
+  return Math.floor((end - start) / 1000);
+}
 
 const NO_UNSUBSCRIBE = () => {
   /* useSyncExternalStore requires an unsubscribe even when the store has none. */
@@ -37,7 +83,7 @@ function CollapsibleAssistantMessage({
   message,
   isStreaming,
 }: {
-  message: PieUIMessage;
+  message: PieAssistantUIMessage;
   isStreaming: boolean;
 }) {
   const summary = useMemo(
@@ -80,9 +126,9 @@ function CollapsibleAssistantMessage({
 
 // Open: now minus messageStartTimestamp, so a remount keeps counting.
 // Settled: messageEndTimestamp minus messageStartTimestamp. No start: count from mount.
-function useWorkedSeconds(active: boolean, metadata: unknown): number {
+function useWorkedSeconds(active: boolean, metadata: PieAssistantMetadata | undefined): number {
   const settled = active ? undefined : workedSeconds(metadata);
-  const elapsed = useElapsedSeconds(active, messageStartTimestampOf(metadata));
+  const elapsed = useElapsedSeconds(active, metadata?.messageStartTimestamp);
   return settled ?? elapsed;
 }
 

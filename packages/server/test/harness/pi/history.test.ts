@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { readUIMessageStream, type UIMessageChunk } from "ai";
+import { readUIMessageStream } from "ai";
 import { describe, expect, it } from "vitest";
 
 import { entriesToUIMessages } from "../../../src/harness/pi/history";
@@ -524,7 +524,7 @@ describe("entriesToUIMessages", () => {
     const chunks = liveEvents
       .flatMap((liveEvent) => [...transform(liveEvent)])
       .filter((item): item is PiUIMessageChunk => item.type !== "session.prompt.submitted");
-    const stream = new ReadableStream<UIMessageChunk>({
+    const stream = new ReadableStream<PiUIMessageChunk>({
       start(controller) {
         for (const chunk of chunks) controller.enqueue(chunk);
         controller.close();

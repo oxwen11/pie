@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldRenderReasoningPart } from "./reasoning-part.logic";
+import { shouldRenderReasoningPart } from "./reasoning-part";
 
 describe("shouldRenderReasoningPart", () => {
   it("keeps an empty reasoning block visible while the message is streaming", () => {

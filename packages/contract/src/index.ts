@@ -12,7 +12,17 @@ import { terminalContract } from "./terminal";
 
 export * from "./domain";
 export { toStandardSchema } from "./orpc";
-export type { PiTools, PieToolUIPart, PieUIMessage, PieUIMessageChunk } from "./pi-tools";
+export type {
+  PiTools,
+  PieAssistantMetadata,
+  PieAssistantUIMessage,
+  PieDataTypes,
+  PieToolUIPart,
+  PieUIMessage,
+  PieUIMessageChunk,
+  PieUserMetadata,
+  PieUserUIMessage,
+} from "./pi-tools";
 export * from "./packages";
 export * from "./project";
 export * from "./schedule";
