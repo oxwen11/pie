@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatWorkedFor, splitWork, timestampOf, workedSeconds } from "./message-view.logic";
+import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
 
 const text = (value: string) => ({ type: "text" as const, text: value });
 const tool = (id: string) => ({
@@ -60,9 +60,13 @@ describe("formatWorkedFor", () => {
 });
 
 describe("workedSeconds", () => {
-  it("reads whole seconds from jsonl timestamps", () => {
-    expect(workedSeconds("2026-07-26T11:45:17.114Z", "2026-07-26T11:45:29.514Z")).toBe(12);
-    expect(timestampOf({ timestamp: "2026-07-26T11:45:17.114Z" })).toBe("2026-07-26T11:45:17.114Z");
-    expect(workedSeconds(undefined, "2026-07-26T11:45:29.514Z")).toBeUndefined();
+  it("is messageEndTimestamp minus messageStartTimestamp", () => {
+    expect(
+      workedSeconds({
+        messageStartTimestamp: "2026-07-26T11:45:17.114Z",
+        messageEndTimestamp: "2026-07-26T11:45:29.514Z",
+      }),
+    ).toBe(12);
+    expect(workedSeconds({ messageEndTimestamp: "2026-07-26T11:45:29.514Z" })).toBeUndefined();
   });
 });

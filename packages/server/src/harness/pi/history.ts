@@ -1,7 +1,7 @@
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
 import { isDynamicPiTool } from "./tools";
 import { stripReadDetailsContent, toolResultText } from "./transform";
-import type { PiMetadata, PiUIMessage } from "./ui-message";
+import type { PiAssistantMetadata, PiAssistantUIMessage, PiUIMessage } from "./ui-message";
 
 // Pi session-file entries → final-form UIMessages, the history counterpart of
 // createPiTransform (docs/design/pi-history-read-design.md §4/§5). History is
@@ -30,6 +30,10 @@ type PiToolPart = Extract<PiUIMessagePart, { type: `tool-${string}` }>;
 type PiDynamicToolPart = Extract<PiUIMessagePart, { type: "dynamic-tool" }>;
 
 /** Where a not-yet-answered toolCall part sits, so its result can replace it. */
+function isoTime(ms: number): string {
+  return new Date(ms).toISOString();
+}
+
 type PendingCall = {
   readonly parts: PiUIMessagePart[];
   readonly index: number;
@@ -162,7 +166,7 @@ export function entriesToUIMessages(
 ): PiUIMessage[] {
   const messages: PiUIMessage[] = [];
   // The open assistant segment, or null between segments.
-  let assistant: PiUIMessage | null = null;
+  let assistant: PiAssistantUIMessage | null = null;
   const pendingCalls = new Map<string, PendingCall>();
 
   const onUser = (entry: SessionMessageEntry, message: PiUserMessage) => {
@@ -180,16 +184,21 @@ export function entriesToUIMessages(
       assistant = { id: entry.id, role: "assistant", metadata: { sessionId }, parts: [] };
       messages.push(assistant);
     }
-    // Metadata reflects the segment's last assistant entry (final model /
-    // stopReason; usage follows pi's own getLastAssistantUsage semantics).
+    // Model / stopReason / usage follow the segment's last assistant entry.
+    // `messageStartTimestamp` stays on the first assistant message;
+    // `messageEndTimestamp` moves to whichever entry closed last (its JSONL time
+    // is the message_end).
+    const messageStartTimestamp =
+      assistant.metadata?.messageStartTimestamp ?? isoTime(message.timestamp);
     assistant.metadata = {
       sessionId,
-      timestamp: entry.timestamp,
+      messageStartTimestamp,
+      messageEndTimestamp: entry.timestamp,
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
       usage: message.usage,
-    } satisfies PiMetadata;
+    } satisfies PiAssistantMetadata;
     for (const block of message.content) {
       switch (block.type) {
         case "text":
@@ -241,7 +250,7 @@ export function entriesToUIMessages(
     assistant.metadata = {
       ...assistant.metadata,
       sessionId,
-      timestamp: entry.timestamp,
+      messageEndTimestamp: entry.timestamp,
     };
   };
 

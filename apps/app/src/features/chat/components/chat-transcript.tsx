@@ -14,7 +14,6 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
 import { MessageView } from "./transcript/message-view";
-import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
 
 // What an empty transcript means, in one place: nothing until the settled
@@ -84,7 +83,6 @@ function ChatTranscriptView({
             key={message.id}
             message={message}
             isStreaming={turnInProgress && index === lastIndex}
-            previousTimestamp={timestampOf(snapshot.messages[index - 1]?.metadata)}
           />
         ))}
         {snapshot.status === "submitted" && (
