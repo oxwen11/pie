@@ -264,15 +264,6 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
           console.error("Failed to select draft project", error);
         });
       }}
-      onSchedule={() => {
-        if (selected === null) return;
-        navigate({
-          to: "/schedules",
-          search: { create: true, environmentId, projectId: selected.id },
-        }).catch((error: unknown) => {
-          console.error("Failed to open the schedule editor", error);
-        });
-      }}
       projects={projects.data ?? []}
       selectedId={selected?.id ?? null}
       startPending={startSession.isPending}
@@ -339,7 +330,6 @@ function DraftComposer({
   models,
   onModelChange,
   onProjectChange,
-  onSchedule,
   projects,
   selectedId,
   startPending,
@@ -351,7 +341,6 @@ function DraftComposer({
   models: Parameters<typeof ModelSelectorPicker>[0]["models"];
   onModelChange: (provider: string, modelId: string) => void;
   onProjectChange: (next: string | null) => void;
-  onSchedule: () => void;
   projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
   selectedId: string | null;
   startPending: boolean;
@@ -374,15 +363,6 @@ function DraftComposer({
                 draftWorktree={draftWorktree}
               />
             ) : null}
-            <Button
-              className="ms-auto"
-              disabled={selectedId === null}
-              onClick={onSchedule}
-              size="sm"
-              variant="ghost"
-            >
-              Schedule…
-            </Button>
           </div>
         </CardFrameHeader>
         <Card
