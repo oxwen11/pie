@@ -1,7 +1,7 @@
 {
   // Optional local graph scan. Not a CI / `pnpm check` gate.
   // oxlint + react-doctor stay authoritative for unused/circular/boundaries.
-  // See CLAUDE.md (`pnpm fallow`, `pnpm fallow:audit`).
+  // Invoke via `.agents/skills/fallow` (`npx --yes fallow@3.27.0 <subcommand>`).
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignoreExportsUsedInFile": true,
   "entry": [

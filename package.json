@@ -21,9 +21,7 @@
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks",
-    "doctor": "turbo run doctor",
-    "fallow": "npx --yes fallow@3.27.0",
-    "fallow:audit": "npx --yes fallow@3.27.0 audit"
+    "doctor": "turbo run doctor"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
