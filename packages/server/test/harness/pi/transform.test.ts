@@ -93,9 +93,17 @@ describe("createPiTransform", () => {
     expect(types(user)).toEqual(["finish", "session.prompt.submitted"]);
     expect(user[1]).toMatchObject({ parts: [{ type: "text", text: "steer" }] });
     const split = run(assistantStart());
-    expect(types(split)).toEqual(["start"]);
-    expect(split[0]).toMatchObject({
-      messageMetadata: { sessionId: "s1", messageStartTimestamp: "1970-01-01T00:00:00.000Z" },
+    expect(types(split)).toEqual(["start", "message-metadata"]);
+    expect(split[0]).toMatchObject({ type: "start", messageMetadata: { sessionId: "s1" } });
+    expect(Object.keys((split[0] as { messageMetadata: object }).messageMetadata)).toEqual([
+      "sessionId",
+    ]);
+    expect(split[1]).toEqual({
+      type: "message-metadata",
+      messageMetadata: {
+        sessionId: "s1",
+        messageStartTimestamp: "1970-01-01T00:00:00.000Z",
+      },
     });
     expect((split[0] as { messageId: string }).messageId).not.toBe(firstMessageId);
 

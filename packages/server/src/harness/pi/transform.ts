@@ -33,10 +33,9 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //     Successful read output drops file content because the UI only renders
 //     its input path; other tool results forward whole.
 //   • the first assistant message_start of a segment stamps `messageStartTimestamp`
-//     (message.timestamp; message_end carries the same value). Each later
-//     assistant / toolResult message_end stamps `messageEndTimestamp` at receipt, which
-//     is the end message.timestamp does not record. Compaction /
-//     auto_retry_end are skipped
+//     on message-metadata (message.timestamp). A steered segment's `start` stays
+//     `{ sessionId }`. Each later assistant / toolResult message_end stamps
+//     `messageEndTimestamp` at receipt. Compaction / auto_retry_end are skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
 //   • queue_update → skipped here; the process offers it on `queueUpdates`
@@ -163,18 +162,18 @@ export function createPiTransform(
       case "message_start":
         if (!turnOpen) break;
         if (event.message.role === "assistant") {
-          const messageStartTimestamp = isoTime(event.message.timestamp);
+          const firstInSegment = pendingAssistantStart || messageOrdinal === 0;
           if (pendingAssistantStart) {
             pendingAssistantStart = false;
-            yield {
-              type: "start",
-              messageId: uuid(),
-              messageMetadata: { sessionId, messageStartTimestamp },
-            };
-          } else if (messageOrdinal === 0) {
+            yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
+          }
+          if (firstInSegment) {
             yield {
               type: "message-metadata",
-              messageMetadata: { sessionId, messageStartTimestamp },
+              messageMetadata: {
+                sessionId,
+                messageStartTimestamp: isoTime(event.message.timestamp),
+              },
             };
           }
           messageOrdinal += 1;
