@@ -377,9 +377,13 @@ describe("entriesToUIMessages", () => {
       "a2",
       "s1",
     );
-    expect(messages[0]?.metadata?.timestamp).toBe("2026-07-26T11:45:17.114Z");
-    expect(messages[1]?.metadata?.messageStartTimestamp).toBe("2026-07-26T11:45:20.000Z");
-    expect(messages[1]?.metadata?.messageEndTimestamp).toBe("2026-07-26T11:45:28.158Z");
+    expect(messages[0]?.metadata).toMatchObject({
+      timestamp: "2026-07-26T11:45:17.114Z",
+    });
+    expect(messages[1]?.metadata).toMatchObject({
+      messageStartTimestamp: "2026-07-26T11:45:20.000Z",
+      messageEndTimestamp: "2026-07-26T11:45:28.158Z",
+    });
   });
 
   it("folds a run of assistant and toolResult entries into one message", () => {
@@ -399,7 +403,7 @@ describe("entriesToUIMessages", () => {
     expect(messages).toHaveLength(2);
     // messageId is the segment's first assistant entry; metadata is the last's.
     expect(messages[1]?.id).toBe("a1");
-    expect(messages[1]?.metadata?.model).toBe("m2");
+    expect(messages[1]?.metadata).toMatchObject({ model: "m2" });
     expect(messages[1]?.parts.map((part) => part.type)).toEqual(["text", "tool-bash", "text"]);
   });
 

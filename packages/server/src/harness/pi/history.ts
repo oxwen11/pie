@@ -1,7 +1,7 @@
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
 import { isDynamicPiTool } from "./tools";
 import { stripReadDetailsContent, toolResultText } from "./transform";
-import type { PiMetadata, PiUIMessage } from "./ui-message";
+import type { PiAssistantMetadata, PiAssistantUIMessage, PiUIMessage } from "./ui-message";
 
 // Pi session-file entries → final-form UIMessages, the history counterpart of
 // createPiTransform (docs/design/pi-history-read-design.md §4/§5). History is
@@ -166,7 +166,7 @@ export function entriesToUIMessages(
 ): PiUIMessage[] {
   const messages: PiUIMessage[] = [];
   // The open assistant segment, or null between segments.
-  let assistant: PiUIMessage | null = null;
+  let assistant: PiAssistantUIMessage | null = null;
   const pendingCalls = new Map<string, PendingCall>();
 
   const onUser = (entry: SessionMessageEntry, message: PiUserMessage) => {
@@ -198,7 +198,7 @@ export function entriesToUIMessages(
       provider: message.provider,
       stopReason: message.stopReason,
       usage: message.usage,
-    } satisfies PiMetadata;
+    } satisfies PiAssistantMetadata;
     for (const block of message.content) {
       switch (block.type) {
         case "text":

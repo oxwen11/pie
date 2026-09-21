@@ -5,19 +5,22 @@ import type { SessionMessageEntry } from "./protocol";
 
 type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role: "assistant" }>;
 
-export type PiMetadata = {
+export type PiUserMetadata = {
   /** Pi session id (a uuid we assign via `--session-id`). */
   sessionId: string;
-  // History enrichment: only messages folded from disk carry model/usage — the
-  // live stream never surfaces those, so live/history metadata is asymmetric
-  // by design (docs/design/pi-history-read-design.md §5). On an assistant segment,
-  // `messageStartTimestamp` is the first message's own timestamp and
-  // `messageEndTimestamp` is when its last message ended: the JSONL entry time
-  // on restore, message_end receipt on stream. `timestamp` is the user entry
-  // time and is not the worked-for span.
+  /** JSONL entry time. Not the worked-for span. */
+  timestamp?: SessionMessageEntry["timestamp"];
+};
+
+// model/usage are history-only (docs/design/pi-history-read-design.md §5).
+// `messageStartTimestamp` is the first assistant message's own timestamp.
+// `messageEndTimestamp` is when its last message ended: JSONL entry time on
+// restore, message_end receipt on stream.
+export type PiAssistantMetadata = {
+  /** Pi session id (a uuid we assign via `--session-id`). */
+  sessionId: string;
   messageStartTimestamp?: string;
   messageEndTimestamp?: string;
-  timestamp?: SessionMessageEntry["timestamp"];
   model?: PiAssistantHistoryMessage["model"];
   provider?: PiAssistantHistoryMessage["provider"];
   stopReason?: PiAssistantHistoryMessage["stopReason"];
@@ -35,5 +38,11 @@ export type PiDataTypes = {
   };
 };
 
-export type PiUIMessage = UIMessage<PiMetadata, PiDataTypes, PiTools>;
+export type PiUserUIMessage = UIMessage<PiUserMetadata, PiDataTypes, PiTools> & {
+  role: "user";
+};
+export type PiAssistantUIMessage = UIMessage<PiAssistantMetadata, PiDataTypes, PiTools> & {
+  role: "assistant";
+};
+export type PiUIMessage = PiUserUIMessage | PiAssistantUIMessage;
 export type PiUIMessageChunk = InferUIMessageChunk<PiUIMessage>;

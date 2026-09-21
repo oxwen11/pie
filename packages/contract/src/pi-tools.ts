@@ -47,7 +47,7 @@ export type PiTools = {
 
 // The message shapes that carry typed tool parts on the session wire (history
 // reads and `session.message.chunk` events). Metadata stays loose: the server
-// stamps richer PiMetadata and clients read it defensively.
+// stamps per-role metadata and clients read it defensively.
 export type PieUIMessage = UIMessage<unknown, UIDataTypes, PiTools>;
 export type PieUIMessageChunk = InferUIMessageChunk<PieUIMessage>;
 
