@@ -6,23 +6,10 @@ const shared = {
   format: ["esm" as const],
   minify: true,
   deps: {
-    // The private server/harness/contract packages are compiled into the CLI.
-    // Whitelist their bundled runtime dependencies so additions fail closed.
-    // `simple-git` (and its tree) is pulled in by GitService on the serve path.
-    onlyBundle: [
-      "effect",
-      "@effect/platform-node-shared",
-      "@effect/platform-node",
-      "@standard-server/shared",
-      "@orpc/experimental-effect",
-      "simple-git",
-      /^@simple-git\//,
-      /^@kwsites\//,
-      "debug",
-      "ms",
-      "supports-color",
-      "has-flag",
-    ],
+    // Bundle JavaScript dependencies so npm installs only the native addon.
+    alwaysBundle: [/.*/],
+    neverBundle: ["node-pty", "vite"],
+    onlyBundle: false,
   },
   dts: false,
   shims: true,
