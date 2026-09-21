@@ -1,8 +1,8 @@
-import type { SessionRef } from "@getpie/contract";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { selectTurnInProgress, useChatHandle } from "@/features/chat/runtime/use-chat-handle";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import { ChatSessionContext, type ChatSessionValue } from "./chat-session-context";
 
@@ -10,7 +10,7 @@ export function ChatSessionProvider({
   sessionRef,
   children,
 }: {
-  sessionRef: SessionRef;
+  sessionRef: EnvironmentSessionRef;
   children: ReactNode;
 }) {
   const chat = useChatHandle(sessionRef);
@@ -44,7 +44,7 @@ export function ChatSessionProvider({
 
   const value = useMemo<ChatSessionValue>(
     () => ({
-      sessionId: sessionRef.sessionId,
+      sessionId: sessionRef.ref.sessionId,
       store: chat.store,
       prompt,
       interrupt,
@@ -52,7 +52,15 @@ export function ChatSessionProvider({
       respondToRequest,
       turnInProgress,
     }),
-    [sessionRef.sessionId, chat, prompt, interrupt, replaceQueue, respondToRequest, turnInProgress],
+    [
+      sessionRef.ref.sessionId,
+      chat,
+      prompt,
+      interrupt,
+      replaceQueue,
+      respondToRequest,
+      turnInProgress,
+    ],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

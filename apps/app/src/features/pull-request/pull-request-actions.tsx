@@ -1,6 +1,7 @@
 import type { PullRequestAction, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { Button } from "@getpie/ui/components/button";
-import { GitMergeIcon } from "lucide-react";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/menu";
+import { ChevronDownIcon, GitMergeIcon } from "lucide-react";
 
 import { mergeMethodActionLabel, mergeMethodLabel } from "./pull-request-presentation";
 
@@ -13,43 +14,46 @@ export function PullRequestActions({
   onAction: (action: PullRequestAction) => void;
   snapshot: PullRequestSnapshot;
 }) {
-  if (snapshot.offeredActions.length === 0) return null;
+  const available = snapshot.offeredActions.length > 0;
+  const trigger = (
+    <Button
+      disabled={disabled || !available}
+      render={available ? <MenuTrigger /> : undefined}
+      size="sm"
+      title={available ? undefined : "Merge is not currently available"}
+    >
+      <GitMergeIcon />
+      Merge
+      {available ? <ChevronDownIcon /> : null}
+    </Button>
+  );
+
+  if (!available) return trigger;
+
   return (
-    <section aria-labelledby="pull-request-actions" className="flex flex-col gap-2">
-      <h2 id="pull-request-actions" className="text-sm font-semibold">
-        Actions
-      </h2>
-      <div className="flex flex-wrap gap-2">
+    <Menu>
+      {trigger}
+      <MenuPopup align="end" className="min-w-48">
         {snapshot.offeredActions.flatMap((offered) => {
           if (offered.type === "disable-auto-merge") {
-            return [
-              <Button
-                disabled={disabled}
-                key={offered.type}
-                onClick={() => onAction({ type: "disable-auto-merge" })}
-                size="sm"
-                variant="outline"
-              >
+            return (
+              <MenuItem key={offered.type} onClick={() => onAction({ type: "disable-auto-merge" })}>
                 Disable auto-merge
-              </Button>,
-            ];
+              </MenuItem>
+            );
           }
           return offered.methods.map((method) => (
-            <Button
-              disabled={disabled}
+            <MenuItem
               key={`${offered.type}:${method}`}
               onClick={() => onAction({ type: offered.type, method })}
-              size="sm"
-              variant={offered.type === "merge" ? "default" : "outline"}
             >
-              <GitMergeIcon />
               {offered.type === "merge"
                 ? mergeMethodActionLabel(method)
                 : `Auto · ${mergeMethodLabel(method)}`}
-            </Button>
+            </MenuItem>
           ));
         })}
-      </div>
-    </section>
+      </MenuPopup>
+    </Menu>
   );
 }

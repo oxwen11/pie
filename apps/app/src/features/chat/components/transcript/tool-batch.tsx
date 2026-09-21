@@ -1,7 +1,7 @@
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
 import { Tool, ToolHeader } from "@getpie/ui/ai-elements/tool";
 import { CollapsibleContent } from "@getpie/ui/components/collapsible";
-import { ChevronDownIcon } from "lucide-react";
+import { ListCollapseIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { computeBatchTrigger, type BatchTriggerLabel } from "./compute-batch-trigger";
@@ -47,9 +47,9 @@ export function ToolBatch({
 
   return (
     <Tool open={isOpen} onOpenChange={setIsOpen} className={className}>
-      <ToolHeader icon={ChevronDownIcon}>
+      <ToolHeader icon={ListCollapseIcon}>
         {shouldShimmer ? (
-          <Shimmer duration={2} as="span" className="max-w-full truncate">
+          <Shimmer duration={2} as="span" className="block max-w-full truncate leading-none">
             {phrase}
           </Shimmer>
         ) : (

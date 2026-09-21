@@ -1,4 +1,3 @@
-import { createAgentSessionServices } from "@earendil-works/pi-coding-agent";
 import type { ListAgentModelsOutput } from "@getpie/contract";
 import { Effect } from "effect";
 
@@ -22,6 +21,10 @@ export function listAvailablePiModels(
   cwd: string,
 ): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
   return Effect.gen(function* () {
+    const { createAgentSessionServices } = yield* Effect.tryPromise({
+      try: () => import("@earendil-works/pi-coding-agent"),
+      catch: listModelsError,
+    });
     const services = yield* Effect.tryPromise({
       try: () => createAgentSessionServices({ cwd }),
       catch: listModelsError,
