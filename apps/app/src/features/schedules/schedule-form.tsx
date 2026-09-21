@@ -5,7 +5,6 @@ import {
   MAX_SCHEDULE_PROMPT_CHARS,
   reuseSessionIdOf,
 } from "@getpie/contract";
-import { ModelSelectorPicker } from "@getpie/ui/ai-elements/model-selector";
 import {
   PromptInputBox,
   PromptInputTextarea,
@@ -24,8 +23,10 @@ import {
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import {
   type ScheduleFormValues,
@@ -130,7 +131,7 @@ function ScheduleFormFields({
   onSubmit,
   onCancel,
 }: ScheduleFormFieldsProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useEnvironmentOrpc();
   const [form, setForm] = useState(() => formFromSource(projects, source));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = source.kind === "edit";

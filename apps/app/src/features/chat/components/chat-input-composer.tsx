@@ -1,4 +1,3 @@
-import type { SessionRef } from "@getpie/contract";
 import {
   PromptInput,
   PromptInputButton,
@@ -8,12 +7,14 @@ import {
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "zustand";
 
+import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
 import { useLatestRef } from "@/hooks/use-latest-ref";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
@@ -25,9 +26,9 @@ import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
-// handled by the submit keymap) / Shift+Enter breaks the line. An in-flight
-// turn queues Send as a Pi follow-up — Send only appears once the draft has
-// content (empty streaming shows Stop in the primary slot). prompt comes from
+// handled by the submit keymap) / Shift+Enter breaks the line. Stop and Send
+// are mutually exclusive: empty streaming → Stop; any draft (or idle) → Send
+// (queues a follow-up while a turn is in flight). prompt comes from
 // ChatSessionProvider — not props. The CardFrame header lists queued prompts
 // as editable rows (steering first); the footer shows the session workspace's
 // git availability and current branch.
@@ -35,14 +36,17 @@ export function ChatInputComposer({
   sessionRef,
   toolbar,
 }: {
-  sessionRef: SessionRef;
+  sessionRef: EnvironmentSessionRef;
   toolbar?: ReactNode;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef } }));
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const branch = useQuery(
+    orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef.ref } }),
+  );
   const currentBranch =
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
+  const chat = useChatHandle(sessionRef);
   const { prompt, interrupt, replaceQueue, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
@@ -51,6 +55,10 @@ export function ChatInputComposer({
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatInputController({
+    initialContent: chat.composerDraft,
+    onDispose: (doc) => {
+      chat.setComposerDraft(doc);
+    },
     // Order is a hard constraint: base extensions first, submit keymap last —
     // otherwise bare Enter is consumed by the default newline behavior before
     // the keymap ever sees it.
@@ -63,6 +71,7 @@ export function ChatInputComposer({
       // accepts the send as a follow-up.
       if (workspaceUnavailableRef.current) return false;
       prompt(text, canInterrupt ? "followUp" : undefined);
+      chat.setComposerDraft(undefined);
       return undefined;
     },
   });
@@ -79,6 +88,7 @@ export function ChatInputComposer({
       <Card
         render={
           <PromptInput
+            className="divide-y-0"
             onSubmit={(e) => {
               e.preventDefault();
               void controller?.submit();
@@ -122,24 +132,22 @@ function ChatComposerActions({
   interrupt: () => Promise<void>;
   workspaceUnavailable: boolean;
 }) {
+  // Exactly one primary action: Stop while streaming with an empty draft,
+  // otherwise Send (disabled when empty / workspace missing).
+  if (canInterrupt && !hasContent) {
+    return (
+      <PromptInputButton
+        aria-label="Stop generating"
+        onClick={() => void interrupt()}
+        variant="default"
+      >
+        <SquareIcon className="size-4" />
+      </PromptInputButton>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      {canInterrupt ? (
-        <PromptInputButton
-          aria-label="Stop generating"
-          onClick={() => void interrupt()}
-          variant={hasContent ? "ghost" : "default"}
-        >
-          <SquareIcon className="size-4" />
-        </PromptInputButton>
-      ) : null}
-      {!canInterrupt || hasContent ? (
-        <PromptInputSubmit
-          aria-label="Send message"
-          disabled={!hasContent || workspaceUnavailable}
-        />
-      ) : null}
-    </div>
+    <PromptInputSubmit aria-label="Send message" disabled={!hasContent || workspaceUnavailable} />
   );
 }
 

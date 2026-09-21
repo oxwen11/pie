@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-15.
+Last audited: 2026-09-20.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -108,7 +108,7 @@ Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (se
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Path          | `$PIE_HOME/storage/projects.json`                                                                                                                                                    |
 | Owner         | `ProjectRepository`                                                                                                                                                                  |
-| Data          | `Project[]`; each item is `{ id, name, path, createdAt }`                                                                                                                            |
+| Data          | `Project[]`; each item is `{ id, name, path, createdAt, type? }`. `type: "chat"` is set by `project.allocateChatProjectDir`; omitted means imported                                  |
 | Write points  | First repository open seeds `[]`; project create/remove rewrites the whole array                                                                                                     |
 | Compatibility | A pre-envelope bare `Project[]` is adopted and rewritten as version 1 on first read                                                                                                  |
 | Extension     | Add fields through `ProjectSchema`; a shape change after version 1 requires an explicit migration                                                                                    |
@@ -116,6 +116,27 @@ Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (se
 
 `path` is an absolute registered workspace path and is the only persisted
 `projectId -> path` mapping.
+
+### Allocated project folders
+
+A draft send with no selected Project calls `project.allocateChatProjectDir`, which creates
+an empty folder and then registers it through `ProjectService.create` (the
+same `projects.json` write as import).
+
+| Property      | Current contract                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `~/Pie/<YYYY-MM-DD>/Chat-<n>/`                                                                                                                                                                          |
+| Owner         | The user. Pie creates the directory; Pi and agent tools write inside it afterwards. `ProjectRepository` only stores the registered `path`                                                               |
+| Root          | `~/Pie` via `Paths.chatProjectsDir` in `packages/server/src/config/paths.ts` — user data, not `$PIE_HOME`                                                                                               |
+| Name          | Date parent is local-calendar `YYYY-MM-DD`. Leaf is `Chat-1`, then `Chat-2`, `Chat-3`, … (not the first prompt). Exclusive mkdir on the leaf. At most 100 attempts. `Project.name` is the leaf basename |
+| Write points  | `ProjectService.allocateChatProjectDir` mkdir of the root (recursive, first use), the date parent (recursive), and the leaf (exclusive). No files are placed in the new folder                          |
+| Permissions   | Umask, same as imported project folders. No owner-only mode is pinned                                                                                                                                   |
+| Compatibility | New folders only. Existing Projects and imported paths are unchanged                                                                                                                                    |
+| Extension     | Change the Paths field or the naming helper (date segment + leaf); do not add a caller-supplied allocate path on the wire                                                                               |
+| Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie`                                                                                                           |
+
+Tests use `layerPaths(home)` so the chat root sits under the temp `$PIE_HOME`.
+Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
 
 ### Session metadata
 
@@ -177,6 +198,28 @@ session id, error/skip details, missed count, and a snapshot of the schedule
 inputs used for that run. Only the newest 20 runs remain in `runs`;
 `firedCount` is the durable counter when older runs fall out of that window.
 
+## Pi package settings and installs
+
+Package configuration is Pi-owned state outside `$PIE_HOME`. Pie exposes it in
+the Plugins UI through `PackageService`; it does not duplicate the configuration
+under Pie storage.
+
+| Property      | Current contract                                                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PI_CODING_AGENT_DIR/settings.json`; Pi defaults the directory to `~/.pi/agent`.                                                                                                                                                                               |
+| Owner         | Pi SDK `SettingsManager` / `DefaultPackageManager`. Pie's `PackageService` invokes those APIs for user-scope packages only.                                                                                                                                     |
+| Data          | Pi's bare settings JSON. This feature changes only the `packages` array and preserves other current file fields. New entries are package source strings accepted by Pi, such as `npm:name`, `git:https://host/owner/repo`, or a local path.                     |
+| Write points  | `packages.add` and `packages.remove`. Both await Pi's settings write queue before RPC success and surface persistence failures. They update settings only; they do not install or uninstall package files immediately.                                          |
+| Compatibility | Pi owns settings parsing and migrations. Missing settings start from `{}`. Corrupt or unreadable settings refuse the change without overwrite. Pi merges the modified `packages` field into the latest locked file contents so unrelated settings are retained. |
+| Atomicity     | Pi serializes each manager's write queue and uses `proper-lockfile` across processes, then rewrites the JSON file directly; there is no sibling-temp rename. Effective file and directory permissions follow umask.                                             |
+| Retention     | Removing a source removes only its settings entry. Existing package files remain under Pi's managed `npm/` or `git/` directories until Pi or the user removes them. Clearing `$PIE_HOME` does not remove Pi settings or installed packages.                     |
+
+At the next Pi session start, Pi resolves configured sources and may use its
+configured npm command or Git to install missing content below the same agent
+directory. Those delegated package-manager writes use Pi's existing layout and
+lifecycle; Pie Desktop does not require or spawn a separately installed `pi`
+CLI.
+
 ## Git worktrees and repository metadata
 
 A session or Schedule may request a worktree. `WorktreeService` then:
@@ -189,10 +232,14 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
 The session record persists the resulting `cwd` and `worktree: { branch }` so a
-worktree session can still be opened after that checkout is gone. There is no
-separate worktree manifest. Checkouts must stay under `$PIE_HOME/worktrees/`.
-`prepare` and prompt do not re-create the checkout or require `HEAD` to match
-the stored branch.
+removed checkout can be restored at that path. There is no separate worktree
+manifest. Checkouts must stay under `$PIE_HOME/worktrees/`. `prepare` and prompt do not re-create a worktree checkout or require `HEAD`
+to match the stored branch. When the stored `cwd` directory is gone,
+`prepare` fails with `WORKTREE_MISSING` for worktree sessions and otherwise
+creates the directory. `session.restoreWorktree` is the explicit worktree
+write: `git worktree prune` then `git worktree add <cwd> <branch>` at the
+stored path. It does not mint a new key or branch. If the directory already
+exists it is a no-op.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and
@@ -358,12 +405,13 @@ $PIE_HOME/workspace/verify-pie[-desktop]-sample/
 ```
 
 Verify owns these non-sensitive, umask-permissioned files and sets
-`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` for the run's server. When this
-environment value is set, the project picker starts at that directory, reports
-no parent there, and resolves real paths before rejecting traversal or symlinks
-outside it. An unset or blank value preserves the production default of the
-operator's home directory. Verify overwrites an inherited value with its own
-run path; parallel runs therefore do not share this boundary.
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and `HOME=$PIE_HOME/home` for the
+run's server (so `~/Pie` resolves to `$PIE_HOME/home/Pie`). When
+`PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
+reports no parent there, and resolves real paths before rejecting traversal or
+symlinks outside it. An unset or blank browse root preserves the production
+default of the operator's home directory. Verify overwrites an inherited `HOME`
+with its own run path; parallel runs therefore do not share this boundary.
 
 The sample has no independent schema or migration. Its marker retains the
 existing cleanup compatibility check. Fresh Web and Desktop runs also seed the

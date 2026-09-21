@@ -1,15 +1,18 @@
+import crypto from "node:crypto";
 import type { RequestListener, Server } from "node:http";
 import http from "node:http";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Cause, Context, Data, Effect, Exit, Scope } from "effect";
+import { Cause, Context, Data, Effect, Exit, Option, Scope } from "effect";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { ResourceMonitoring } from "../observability/resources";
 import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
 import { makeRequestApp } from "./app";
 import { createTicketStore, type TicketStore } from "./auth";
 import { isAllowedOrigin, isLoopbackHost } from "./cors";
+import { createPairingStore, type PairingStore } from "./pairing";
 import { createUIHandler, type UIApp } from "./ui";
 
 export type ManagedServer = Server & {
@@ -40,6 +43,12 @@ export type CreateServerOptions = {
   effectContext?: Context.Context<never> | undefined;
   /** Authenticated daemon-only shutdown callback. */
   shutdown?: (() => void) | undefined;
+  /**
+   * Stable Environment id this daemon authors. Pairing exchange returns it so
+   * SSH and a paired browser name the same daemon. Unset mints a process-local
+   * UUID (tests); `runServe` persists one under `$PIE_HOME`.
+   */
+  environmentId?: string | undefined;
 };
 
 /** Startup failed for an operational reason: building the server or binding. */
@@ -230,11 +239,13 @@ const buildServer = (
     const {
       authToken,
       corsOrigins = [],
-      allowedHosts = [],
+      allowedHosts: allowedHostsOption = [],
       effectContext = Context.empty(),
       shutdown,
+      environmentId,
     } = options;
     const runInContext = Effect.runForkWith(effectContext);
+    const resources = Context.getOption(effectContext, ResourceMonitoring);
 
     const rpcRuntime = yield* Effect.acquireRelease(
       Effect.promise(() => stages.createRpcRuntime(effectContext)),
@@ -242,6 +253,10 @@ const buildServer = (
     );
     const wsHandler = createWsRPCHandler(rpcRuntime.context);
     const tickets = createTicketStore();
+    const allowedHosts = [...allowedHostsOption];
+    const resolvedEnvironmentId = environmentId ?? crypto.randomUUID();
+    const pairing: PairingStore | undefined =
+      authToken === undefined ? undefined : createPairingStore();
 
     const ui = yield* Effect.promise(() => stages.createUI(rpcRuntime));
 
@@ -254,7 +269,20 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, shutdown, ui }),
+        makeRequestApp({
+          authToken,
+          corsOrigins,
+          allowedHosts,
+          tickets,
+          pairing,
+          environmentId: resolvedEnvironmentId,
+          shutdown,
+          registerElectron:
+            authToken === undefined || Option.isNone(resources)
+              ? undefined
+              : (registration) => resources.value.registerElectron(registration),
+          ui,
+        }),
         requestScope,
       ),
     );

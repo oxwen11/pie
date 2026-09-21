@@ -24,6 +24,7 @@ export function resolveResourceArtifacts(
     resolve("@getpie/server/resource-monitor") ?? resolve("@getpie/cli/resource-monitor");
   const candidates = [
     ...(exported === undefined ? [] : [asarUnpackedPath(exported)]),
+    siblingResourceMonitor(suffix),
     ...(options.fallbackDirectory === undefined
       ? []
       : [path.join(options.fallbackDirectory, `resource-monitor${suffix}`)]),
@@ -33,6 +34,12 @@ export function resolveResourceArtifacts(
     if (isFile(monitorCommand)) return { monitorCommand };
   }
   return undefined;
+}
+
+/** The packaged daemon runs `Resources/server/server.mjs`; its native monitor sits in `Resources/resources/`. */
+function siblingResourceMonitor(suffix: string): string {
+  const modulePath = asarUnpackedPath(import.meta.filename);
+  return path.join(path.dirname(modulePath), "..", "resources", `resource-monitor${suffix}`);
 }
 
 function resolvePackageFile(specifier: string): string | undefined {

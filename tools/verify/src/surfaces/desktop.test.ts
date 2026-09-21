@@ -20,7 +20,9 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}) {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages: []\n");
+  fs.mkdirSync(path.join(root, "packages/server/dist/pi-process"), { recursive: true });
   fs.writeFileSync(path.join(root, "packages/server/dist/server.mjs"), "");
+  fs.writeFileSync(path.join(root, "packages/server/dist/pi-process/pi-process.js"), "");
   fs.writeFileSync(
     path.join(root, "bin/pnpm"),
     `#!${process.execPath}
@@ -91,6 +93,8 @@ if (args.includes('record') && args.includes('start')) {
   fs.writeFileSync(recording, output);
 } else if (args.includes('record') && args.includes('stop')) {
   fs.rmSync(recording, { force: true });
+} else if (args.includes('close')) {
+  // owned session teardown; no-op when never attached
 } else if (args.includes('--no-pin-tab')) {
   if (!args.includes('fixture-page')) throw new Error('must select the existing target');
   fs.writeFileSync(binding, 'fixture-page');
@@ -294,6 +298,8 @@ describe("desktop launch lifecycle", () => {
       (call) => call.args.includes("record") && call.args.includes("stop"),
     );
     expect(stopCalls).toHaveLength(2);
+    const closeCalls = browserTrace(root).filter((call) => call.args.includes("close"));
+    expect(closeCalls).toHaveLength(1);
     const evidence = path.join(root, ".agents/skills/verify-pie-desktop/evidence", meta.runId);
     expect(fs.existsSync(path.join(evidence, "recording-001.webm"))).toBe(true);
     expect(fs.existsSync(path.join(evidence, "recording-002.webm"))).toBe(true);
@@ -472,7 +478,15 @@ describe("desktop browser binding", () => {
     const result = await start(env).exited;
     expect(result.code).toBe(1);
     expect(result.output).toContain("ambiguous Desktop renderer");
-    expect(browserTrace(root)).toHaveLength(0);
+    expect(
+      browserTrace(root).filter(
+        (call) =>
+          !(
+            call.args.includes("close") ||
+            (call.args.includes("record") && call.args.includes("stop"))
+          ),
+      ),
+    ).toHaveLength(0);
     await stopped(root);
   }, 10_000);
 
@@ -485,7 +499,15 @@ describe("desktop browser binding", () => {
     const result = await start(second.env).exited;
     expect(result.code).toBe(1);
     expect(result.output).toContain("renderer origin is not owned by this Desktop run");
-    expect(browserTrace(second.root)).toHaveLength(0);
+    expect(
+      browserTrace(second.root).filter(
+        (call) =>
+          !(
+            call.args.includes("close") ||
+            (call.args.includes("record") && call.args.includes("stop"))
+          ),
+      ),
+    ).toHaveLength(0);
     await expect(start(first.env, "doctor").exited).resolves.toMatchObject({ code: 0 });
   }, 15_000);
 

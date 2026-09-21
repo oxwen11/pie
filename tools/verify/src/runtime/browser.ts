@@ -3,7 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { ensureDir, writeText } from "./fs.ts";
-import { commandOnPath, findRepoRoot, runCommand } from "./process.ts";
+import {
+  commandOnPath,
+  findRepoRoot,
+  killTree,
+  pidAlive,
+  runCommand,
+  waitDead,
+} from "./process.ts";
 
 /** agent-browser rejects Unix socket paths over this many bytes (sun_path minus NUL). */
 export const AGENT_BROWSER_UNIX_SOCKET_MAX = 103;
@@ -160,6 +167,35 @@ export function stopAutoRecording(
     : message || `automatic agent-browser recording stop exited ${result.status}`;
 }
 
+/** Always record-stop, close the owned session, then killTree+waitDead any leftover daemon pid. */
+export async function teardownOwnedBrowser(
+  command: string,
+  env: NodeJS.ProcessEnv,
+  ownership: { socketDir: string; session: string },
+): Promise<string[]> {
+  const errors: string[] = [];
+  const recordError = stopAutoRecording(command, {}, env);
+  if (recordError !== undefined) errors.push(recordError);
+
+  const close = runCommand(command, buildAgentBrowserArgv(["close"], {}), { env });
+  if (close.status !== 0) {
+    const message = `${close.stderr}\n${close.stdout}`.trim();
+    errors.push(message || `agent-browser close exited ${close.status}`);
+  }
+
+  if (ownership.session !== "") {
+    const pidPath = agentBrowserDaemonPidPath(ownership.socketDir, ownership.session);
+    if (fs.existsSync(pidPath)) {
+      const pid = Number(fs.readFileSync(pidPath, "utf8").trim());
+      if (Number.isInteger(pid) && pid > 0 && pidAlive(pid)) {
+        killTree(pid);
+        await waitDead(pid);
+      }
+    }
+  }
+  return errors;
+}
+
 /**
  * agent-browser 0.37 binds `{socketDir}/namespaces/{namespace}/run/{session}.sock`.
  * A run-scoped dir such as
@@ -181,6 +217,10 @@ export function agentBrowserIsolation(runDir: string) {
 
 export function agentBrowserDaemonSocketPath(socketDir: string, session: string): string {
   return path.join(socketDir, "namespaces", session, "run", `${session}.sock`);
+}
+
+export function agentBrowserDaemonPidPath(socketDir: string, session: string): string {
+  return path.join(socketDir, "namespaces", session, "run", `${session}.pid`);
 }
 
 export function shortAgentBrowserSocketDir(runDir: string): string {

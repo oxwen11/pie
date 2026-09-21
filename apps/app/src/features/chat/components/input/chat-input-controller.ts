@@ -1,4 +1,4 @@
-import { Editor, type Extensions } from "@tiptap/react";
+import { Editor, type Extensions, type JSONContent } from "@tiptap/react";
 
 import { getChatText, hasChatContent } from "./serialize";
 
@@ -10,6 +10,8 @@ export interface ChatInputControllerOptions {
    * submit was not consumed (host is not accepting right now) — content stays.
    */
   onSubmit: (text: string) => void | boolean | Promise<void | boolean>;
+  /** TipTap JSON doc to seed the editor (per-session draft restore). */
+  initialContent?: JSONContent;
 }
 
 // React-free, session-agnostic input editor facade: owns the editor lifecycle,
@@ -21,6 +23,13 @@ export class ChatInputController {
 
   constructor(private readonly opts: ChatInputControllerOptions) {
     this.editor = new Editor({ extensions: opts.extensions(this) });
+    if (opts.initialContent) {
+      this.editor.commands.setContent(opts.initialContent);
+    }
+  }
+
+  getJSON(): JSONContent | undefined {
+    return this.editor.isDestroyed ? undefined : this.editor.getJSON();
   }
 
   focus() {

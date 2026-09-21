@@ -5,8 +5,12 @@ Glossary of project-specific terms. pie integrates the Pi coding agent into the 
 ## Session Domain
 
 **Project**:
-A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path.
+A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocateChatProjectDir` creates a folder under the **chat-project root**, registers it with `type: "chat"`, then `session.create` uses that id as usual. Chat projects stay off the **Projects** sidebar and picker; their sessions appear under **Recent**.
 _Avoid_: workspace, repo, cwd (for the Project field)
+
+**Chat-project root**:
+The parent directory where `project.allocateChatProjectDir` mints a new folder and registers it as a Project. Fixed at `~/Pie` (`Paths.chatProjectsDir`) — not under `$PIE_HOME` (`.pie`). Folders are `<YYYY-MM-DD>/Chat-1`, then `Chat-2`, `Chat-3`, … on collision (not the first prompt). `Project.name` is the leaf basename.
+_Avoid_: scratch, inbox, workspace root, cwd, `~/Documents`, putting chat folders under `$PIE_HOME`
 
 **SessionRef**:
 The composite identity `{ projectId, sessionId }` that every session operation addresses. `sessionId` is a server-generated, globally unique opaque UUID so a bookmarked URL can reverse-resolve its complete ref; clients still use the complete ref for operations, caches, and persisted state.
@@ -17,7 +21,7 @@ The Pi-native session identity held in the session's metadata. Internal plumbing
 _Avoid_: harnessSessionId (removed — no migration), native id
 
 **Attach**:
-A client connecting to a session's live event stream — `agent.session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `agent.session.prepare` (validate the ref, backfill cwd, restore a missing worktree checkout, check whether Pi still knows the native session — starts no Pi process); getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
+A client connecting to a session's live event stream — `agent.session.subscribe` plus the snapshot taken at connect, surfaced to the chat runtime as the synthetic `"attached"` event (whose terminal counterpart is `"closed"`). Reserved for that: nothing else in the session domain attaches. Opening a session page is `agent.session.prepare` (validate the ref, backfill cwd, check whether Pi still knows the native session — starts no Pi process). `prepare` fails with `WORKTREE_MISSING` when the checkout is gone; the session page catches that and redirects to `/session/fallback` for an explicit restore, then back to the session route. Getting the client-side `Chat` instance for a ref is `ChatManager.chatFor`.
 _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat instance; resume (`agent.session.prepare` starts no Pi process — only a prompt does)
 
 **Session metadata**:
@@ -28,7 +32,7 @@ An application-level job stored under `$PIE_HOME/storage/schedules/`. Independen
 _Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, cron (as the domain noun — it is one spec kind), automation / automations (the old domain name), outputMode / sessionMode / independent / merged / session.type (session policy is `isolated` | `owned` | `existing`), a second schedule store on Hub. The product and code noun is **Schedule** (sidebar: **Scheduled**).
 
 **Workspace path**:
-The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. Worktree creation runs inside create (not a git RPC) and is never stored as a pending flag. A worktree session stores `worktree: { branch }` so the session can still be opened after that checkout is gone; `prepare` and prompt do not re-create it or require `HEAD` to match. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
+The validated absolute directory handed to Pi when opening or resuming a session. Persisted on session metadata as `cwd` at `session.create` — `Project.path`, or a git worktree path when create requested `worktree`. Worktree creation runs inside create (not a git RPC) and is never stored as a pending flag. A worktree session stores `worktree: { branch }` so a removed checkout can be restored at the stored `cwd`. When the stored directory is gone, `prepare` fails with `WORKTREE_MISSING` for worktree sessions (session page → `/session/fallback` → explicit `restoreWorktree`) and otherwise creates the directory. `restoreWorktree` prunes stale git state and `git worktree add`s the stored branch at the stored path; it does not re-create on prepare/prompt or require `HEAD` to match. Git failure fails create and leaves no session record. `prepare` backfills `cwd` from the project only when metadata has none; it never overwrites a stored worktree path. Worktree checkouts live under `$PIE_HOME/worktrees/<repo>/<key>/`; callers never supply a raw path on the wire. Pi still opens on the first prompt, in the already-stored cwd.
 _Avoid_: cwd (in session APIs)
 
 ## Server Session Services
@@ -120,3 +124,9 @@ _Avoid_: using `executionId` as a SessionRef or wire session identity; calling H
 **Session source**:
 Optional floor field on session metadata, `{ kind: "hub", executionId }`, written only when Hub created the session. Absence means a human-created session. The channel (`github`, later others) lives on the create frame's `trigger`, not on `kind`.
 _Avoid_: storing GitHub issue numbers on the session record; overlaying `source` from Pi
+
+## Environments (desktop)
+
+**Environment**:
+A pie daemon the desktop app is talking to. `local` is this computer's daemon and does not need OpenSSH. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel, and only exists when this computer has an OpenSSH client on PATH. A Tailscale MagicDNS name is an ordinary SSH host on the tailnet — the renderer still talks only to `127.0.0.1` after the tunnel is up. Opt-in `tailscale serve` can reverse-proxy this computer's loopback daemon at the MagicDNS HTTPS name; CORS trusts that name via `PIE_ALLOWED_HOSTS`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
+_Avoid_: server (ambiguous with the HTTP process), remote machine, workspace, connection (the token+URL triple is `ServerConnection`)

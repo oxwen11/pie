@@ -7,10 +7,11 @@ export function ChatInput({ className }: { className?: string }) {
   const { editor } = useCurrentEditor();
   return (
     <EditorContent
+      data-slot="chat-input"
       editor={editor}
       className={
         className ??
-        "max-h-[6lh] w-full overflow-y-auto text-sm pointer-coarse:text-base [&_.tiptap]:p-3 [&_.tiptap]:outline-none"
+        "chat-input-scroll-fade max-h-[25dvh] min-h-11 w-full min-w-0 overflow-y-auto text-sm leading-5 font-medium pointer-coarse:text-base [&_.tiptap]:p-3 [&_.tiptap]:outline-none"
       }
     />
   );

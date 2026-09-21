@@ -18,9 +18,12 @@ import { Paths } from "../config/paths";
 import {
   type ProjectNotFound,
   type SessionNotFound,
+  SessionNotWorktree,
   type SessionRefNotFound,
   type StoreReadError,
   type StoreWriteError,
+  WorkspaceReadError,
+  WorktreeCheckoutMissing,
   UnsupportedPromptPart,
 } from "../errors";
 import { EventBus } from "../events/event-bus";
@@ -38,6 +41,7 @@ import {
   type TurnAlreadyRunning,
 } from "./errors";
 import { PiAgent } from "./pi/agent";
+import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
@@ -76,8 +80,22 @@ export type PiAgentSessionServiceShape = {
     | ProjectNotFound
     | StoreReadError
     | StoreWriteError
+    | WorkspaceReadError
+    | WorktreeCheckoutMissing
     | SessionNotResumable
     | AgentOperationError
+  >;
+  readonly restoreWorktree: (
+    ref: SessionRef,
+  ) => Effect.Effect<
+    SessionWorkspace,
+    | SessionNotFound
+    | ProjectNotFound
+    | SessionNotWorktree
+    | StoreReadError
+    | StoreWriteError
+    | WorkspaceReadError
+    | GitWorktreeFailure
   >;
   readonly close: (ref: SessionRef) => Effect.Effect<void, SessionNotFound | StoreReadError>;
   readonly delete: (
@@ -207,7 +225,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
   | PiAgentSessionRepository
   | EventBus
   | WorktreeService
+  | ProjectService
   | Crypto.Crypto
+  | FileSystem.FileSystem
   | SessionMetadata
   | SessionMetadataLocks
 > = Layer.effect(
@@ -218,7 +238,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     const repo = yield* PiAgentSessionRepository;
     const bus = yield* EventBus;
     const worktrees = yield* WorktreeService;
+    const projects = yield* ProjectService;
     const crypto = yield* Crypto.Crypto;
+    const fs = yield* FileSystem.FileSystem;
     const sessionMetadata = yield* SessionMetadata;
     const locks = yield* SessionMetadataLocks;
     const { readMetadata, ensureCwd, readAndStampTitleFromFirstPrompt } = sessionMetadata;
@@ -237,7 +259,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       metadata: SessionWithCwd,
     ): Effect.Effect<
       PiAgentRuntime,
-      ResumeSessionError | StoreReadError | StoreWriteError | AgentOperationError
+      ResumeSessionError | SessionNotFound | StoreReadError | StoreWriteError | AgentOperationError
     > =>
       Effect.gen(function* () {
         const existing = yield* manager.peek(ref);
@@ -252,7 +274,20 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
             },
             ref,
           );
-          yield* repo.write({ ...metadata, agentSessionId: runtime.sessionId });
+          // The spawn above can take seconds; archive/rename may mutate the
+          // metadata meanwhile. Re-read under the per-session lock so the
+          // agentSessionId write does not resurrect stale fields (e.g. an
+          // archived flag written while the spawn was in flight).
+          yield* withMetadataMutation(
+            ref,
+            readMetadata(ref).pipe(
+              Effect.flatMap((fresh) =>
+                fresh.agentSessionId === undefined
+                  ? repo.write({ ...fresh, agentSessionId: runtime.sessionId })
+                  : Effect.void,
+              ),
+            ),
+          );
           return runtime;
         }
 
@@ -351,6 +386,13 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       ? Effect.void
                       : worktrees.remove(sessionWorkspace.cwd).pipe(Effect.ignore),
                   ),
+                  Effect.tap(() => {
+                    const model = input.model;
+                    if (model === undefined) return Effect.void;
+                    return Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore);
+                  }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
                     input.title === undefined
@@ -372,20 +414,51 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       prepare: (ref) =>
         resolveWorkspace(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed(toSessionWorkspace(metadata));
-            }
-            return pi
-              .getSessionInfo(metadata.agentSessionId, metadata.cwd)
-              .pipe(
-                Effect.flatMap((info) =>
-                  info._tag === "missing"
-                    ? Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }))
-                    : Effect.succeed(toSessionWorkspace(metadata)),
-                ),
-              );
-          }),
+          Effect.flatMap((metadata) =>
+            Effect.gen(function* () {
+              const cwdError = (cause: unknown) =>
+                new WorkspaceReadError({ path: metadata.cwd, cause });
+              const present = yield* fs.exists(metadata.cwd).pipe(Effect.mapError(cwdError));
+              if (!present) {
+                if (metadata.worktree !== undefined) {
+                  return yield* new WorktreeCheckoutMissing({
+                    sessionId: ref.sessionId,
+                    projectId: ref.projectId,
+                    branch: metadata.worktree.branch,
+                  });
+                }
+                yield* fs
+                  .makeDirectory(metadata.cwd, { recursive: true })
+                  .pipe(Effect.mapError(cwdError));
+              }
+              if (metadata.agentSessionId === undefined) {
+                return toSessionWorkspace(metadata);
+              }
+              const info = yield* pi.getSessionInfo(metadata.agentSessionId, metadata.cwd);
+              if (info._tag === "missing") {
+                return yield* new SessionNotResumable({ sessionId: ref.sessionId });
+              }
+              return toSessionWorkspace(metadata);
+            }),
+          ),
+          inSession(ref),
+        ),
+
+      restoreWorktree: (ref) =>
+        resolveWorkspace(ref).pipe(
+          Effect.flatMap((metadata) =>
+            Effect.gen(function* () {
+              if (metadata.worktree === undefined) {
+                return yield* new SessionNotWorktree({
+                  sessionId: ref.sessionId,
+                  projectId: ref.projectId,
+                });
+              }
+              const project = yield* projects.findById(metadata.projectId);
+              yield* worktrees.restore(project.path, metadata.cwd, metadata.worktree.branch);
+              return toSessionWorkspace(metadata);
+            }),
+          ),
           inSession(ref),
         ),
 
@@ -544,11 +617,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
-              const persistModel = repo.write({
-                ...metadata,
-                provider: model.provider,
-                modelId: model.modelId,
-              });
+              const persistModel = repo
+                .write({
+                  ...metadata,
+                  provider: model.provider,
+                  modelId: model.modelId,
+                })
+                .pipe(
+                  Effect.tap(() =>
+                    Effect.tryPromise(() =>
+                      persistDefaultPiModel(model.provider, model.modelId),
+                    ).pipe(Effect.ignore),
+                  ),
+                );
               if (metadata.agentSessionId === undefined) {
                 return persistModel.pipe(Effect.as(model satisfies AgentModelState));
               }

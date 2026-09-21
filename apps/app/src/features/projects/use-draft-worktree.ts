@@ -1,14 +1,15 @@
 import type { CreateWorktreeInput, Project } from "@getpie/contract";
 import { isGitRepositoryBranch } from "@getpie/contract/git";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 import type { DraftWorkspaceMode } from "./draft-workspace-select";
 import { defaultWorktreeBase } from "./draft-worktree-base";
 
 export function useDraftWorktree(selected: Project | null) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useCatalogOrpc();
   const projectId = selected?.id ?? null;
   const [draft, setDraft] = useState<{
     projectId: string | null;
@@ -24,9 +25,10 @@ export function useDraftWorktree(selected: Project | null) {
     ...orpcQueryUtils.git.branch.queryOptions({
       input: selected === null ? skipToken : { cwd: selected.path },
     }),
-    // Repository availability is an explicit result; only unexpected failures reach error state.
+    // Repository availability is an explicit result; old daemons can still fail on unborn repos.
     retry: false,
     refetchOnWindowFocus: false,
+    meta: { errorMode: "inline" },
   });
 
   const branchData = gitBranch.data;

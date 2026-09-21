@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useRef, useState, type ComponentProps } from "react";
 
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
+
 import { useChatSession } from "../chat-session-context";
 import { classifyMarkdownImageSource, type MarkdownImageSource } from "./chat-markdown";
 
@@ -51,13 +53,15 @@ function SessionMarkdownImage({
   source: Extract<MarkdownImageSource, { type: "session-file" }>;
 }) {
   const { sessionRef, turnInProgress } = useChatSession();
-  const { httpBaseUrl, orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpc = useEnvironmentOrpc();
+  const { environmentRpc } = useRouteContext({ from: "__root__" });
+  const httpBaseUrl = environmentRpc.httpBaseUrl(sessionRef.environmentId);
   const retriedRef = useRef(false);
   const [recovering, setRecovering] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const imageUrl = useQuery({
-    ...orpcQueryUtils.assets.createUrl.queryOptions({
-      input: { ref: sessionRef, destination: source.destination },
+    ...orpc.assets.createUrl.queryOptions({
+      input: { ref: sessionRef.ref, destination: source.destination },
     }),
     enabled: !turnInProgress,
     staleTime: ASSET_STALE_TIME_MS,

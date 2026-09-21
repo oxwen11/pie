@@ -5,6 +5,8 @@ import type { ServerStatusSnapshot } from "../shared/desktop-rpc";
 import { DesktopApplication } from "./application/desktop-application";
 import { DesktopApplicationLive } from "./desktop-runtime-glue";
 import { LocalServer } from "./server/local-server";
+import { DesktopSsh, disabledDesktopSsh } from "./ssh/desktop-ssh";
+import { DesktopTailscale, disabledDesktopTailscale } from "./tailscale/desktop-tailscale";
 
 describe("DesktopApplicationLive", () => {
   it("resolves a DesktopApplication built from a LocalServer provided through the Layer graph", async () => {
@@ -12,9 +14,8 @@ describe("DesktopApplicationLive", () => {
       SubscriptionRef.make<ServerStatusSnapshot>({ revision: 0, status: "ready" }),
     );
 
-    // Only LocalServer is faked: this test exercises the Layer wiring
-    // introduced by this module (LocalServer -> DesktopApplication), not
-    // the already-covered supervision logic inside makeLocalServer itself.
+    // LocalServer and DesktopSsh are faked: this test exercises the Layer
+    // wiring introduced by this module, not supervision or SSH launch.
     const fakeLocalServerLive = Layer.succeed(LocalServer, {
       connection: Effect.succeed({
         httpBaseUrl: "http://127.0.0.1:1",
@@ -26,8 +27,15 @@ describe("DesktopApplicationLive", () => {
       retry: Effect.void,
     });
 
+    const fakeSshLive = Layer.succeed(DesktopSsh, disabledDesktopSsh());
+    const fakeTailscaleLive = Layer.succeed(DesktopTailscale, disabledDesktopTailscale());
+
     const runtime = ManagedRuntime.make(
-      DesktopApplicationLive.pipe(Layer.provide(fakeLocalServerLive)),
+      DesktopApplicationLive.pipe(
+        Layer.provide(fakeLocalServerLive),
+        Layer.provide(fakeSshLive),
+        Layer.provide(fakeTailscaleLive),
+      ),
     );
 
     try {

@@ -45,6 +45,9 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   switch (identity.build) {
     case "core":
       ensureCoreBuilt(repo);
+      // pie serve loads TypeScript, but availability stats the bun-built
+      // pie-pi-process entry under @getpie/server/pi-process.
+      ensureServerBuilt(repo);
       break;
     case "server":
       ensureServerBuilt(repo);
@@ -94,6 +97,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   ensureDir(path.join(runDir, "pids"));
   ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
+  ensureDir(path.join(pieHome, "home"));
   switch (identity.id) {
     case "cli":
     case "desktop":
@@ -116,6 +120,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     request,
     env: {
       ...process.env,
+      HOME: path.join(pieHome, "home"),
       PIE_HOME: pieHome,
       PIE_PORT: String(plan.piePort),
       NODE_ENV: "development",
@@ -185,7 +190,10 @@ function toLaunchCtx(
         surface: "web",
         vitePort: identity.vitePort,
         sample: scaffold(identity, projectBrowseRoot),
-        env: { ...base.env, PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot },
+        env: {
+          ...base.env,
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
+        },
       };
     }
     case "cli": {

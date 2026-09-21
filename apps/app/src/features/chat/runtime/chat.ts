@@ -8,6 +8,7 @@ import type {
   PieUIMessage,
   PieUIMessageChunk,
 } from "@getpie/contract";
+import type { JSONContent } from "@tiptap/react";
 import { generateId, readUIMessageStream } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -97,6 +98,16 @@ export class Chat {
   readonly #state: ChatState;
   readonly #transport: ChatSessionTransport;
   readonly #onTerminated: (() => void) | undefined;
+  /** Unsent TipTap JSON for this session — survives route switches with the Chat cache. */
+  #composerDraft: JSONContent | undefined;
+
+  get composerDraft(): JSONContent | undefined {
+    return this.#composerDraft;
+  }
+
+  setComposerDraft(doc: JSONContent | undefined): void {
+    this.#composerDraft = doc;
+  }
   readonly #unsubscribe: () => void;
   readonly #turnFolds = new Map<string, TurnFold>();
   // Turns whose live rendering was abandoned (buffer truncated, replay gap):

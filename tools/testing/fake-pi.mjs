@@ -3,6 +3,14 @@
 import fs from "node:fs";
 import readline from "node:readline";
 
+if (process.argv.includes("--list-models")) {
+  process.stdout.write(`provider       model         context
+xai            grok-4.3      1M
+cliproxyapi    gpt-5.6-sol   272K
+`);
+  process.exit(0);
+}
+
 const send = (frame) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 
 const logPath = process.env["PIE_E2E_PI_LOG"];

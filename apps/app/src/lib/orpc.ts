@@ -1,6 +1,7 @@
-import { createPieClient, getWsTicket, type PieClient } from "@getpie/client";
+import { createPieLink, getWsTicket, type PieClient, type PieClientContext } from "@getpie/client";
+import type { ClientLink } from "@orpc/client";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import type { ServerConnection } from "@/server-connection";
@@ -12,12 +13,7 @@ declare module "@tanstack/react-query" {
   }
 }
 
-export type AppClients = {
-  httpBaseUrl: string;
-  orpcClient: PieClient;
-  queryClient: QueryClient;
-  orpcQueryUtils: ReturnType<typeof createTanstackQueryUtils<PieClient>>;
-};
+export type EnvironmentOrpc = ReturnType<typeof createTanstackQueryUtils<PieClient>>;
 
 /**
  * App-wide query policy. Call sites should not repeat these; override only
@@ -29,15 +25,15 @@ const queryDefaults = {
   refetchOnWindowFocus: "always" as const,
 };
 
-function retryAllQueries(queryClient: QueryClient): void {
-  queryClient.invalidateQueries().catch((retryError: unknown) => {
+function retryQuery(queryClient: QueryClient, queryKey: QueryKey): void {
+  queryClient.invalidateQueries({ queryKey }).catch((retryError: unknown) => {
     toast.error(
       `Retry failed: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
     );
   });
 }
 
-function createQueryClient(): QueryClient {
+export function createAppQueryClient(): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: { queries: queryDefaults },
     queryCache: new QueryCache({
@@ -46,9 +42,7 @@ function createQueryClient(): QueryClient {
         toast.error(`Error: ${error.message}`, {
           action: {
             label: "retry",
-            onClick: () => {
-              retryAllQueries(queryClient);
-            },
+            onClick: () => retryQuery(queryClient, query.queryKey),
           },
         });
       },
@@ -70,25 +64,37 @@ async function getBrowserWsTicket(): Promise<string> {
   return getWsTicket(globalThis.location.origin, token);
 }
 
-function createOrpcClient(server?: ServerConnection): PieClient {
-  if (!server) return createPieClient({ getTicket: getBrowserWsTicket });
+export function createLocalPieLink(
+  server?: ServerConnection,
+  tokenRef?: { current: string },
+): ClientLink<PieClientContext> {
+  if (!server) return createPieLink({ getTicket: getBrowserWsTicket });
 
   const { httpBaseUrl, wsBaseUrl, token } = server;
-  return createPieClient({
+  const presented = tokenRef ?? { current: token };
+  return createPieLink({
     url: `${wsBaseUrl}/ws/rpc`,
-    getTicket: () => getWsTicket(httpBaseUrl, token),
+    getTicket: () => getWsTicket(httpBaseUrl, presented.current),
   });
 }
 
-/** Create the stable oRPC, TanStack Query, and oRPC Query dependencies for a server. */
-export function createAppClients(server?: ServerConnection): AppClients {
-  const queryClient = createQueryClient();
-  const httpBaseUrl = server?.httpBaseUrl ?? globalThis.location?.origin ?? "http://localhost";
-  const orpcClient = createOrpcClient(server);
-  const orpcQueryUtils = createTanstackQueryUtils(orpcClient);
+export function createRemotePieLink(connection: ServerConnection): ClientLink<PieClientContext> {
+  return createPieLink({
+    url: `${connection.wsBaseUrl}/ws/rpc`,
+    getTicket: () => getWsTicket(connection.httpBaseUrl, connection.token),
+  });
+}
+
+/** One Environment's typed oRPC surface on the app-wide QueryClient. */
+export function createEnvironmentOrpc(
+  client: PieClient,
+  environmentId: string,
+  queryClient: QueryClient,
+): EnvironmentOrpc {
+  const orpc = createTanstackQueryUtils(client, { prefix: environmentId });
 
   // Draft seeds optimistic rows; the session event stream invalidates this list.
-  queryClient.setQueryDefaults(orpcQueryUtils.agent.session.list.key(), {
+  queryClient.setQueryDefaults(orpc.agent.session.list.key(), {
     staleTime: 30_000,
   });
   const pullRequestDefaults = {
@@ -96,21 +102,35 @@ export function createAppClients(server?: ServerConnection): AppClients {
     retry: false,
     meta: { errorMode: "inline" as const },
   };
-  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.current.key(), pullRequestDefaults);
-  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.diff.key(), pullRequestDefaults);
-  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.statuses.key(), pullRequestDefaults);
-  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.list.key(), pullRequestDefaults);
-  queryClient.setQueryDefaults(orpcQueryUtils.pullRequest.detail.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pullRequest.current.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pullRequest.diff.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pullRequest.statuses.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pullRequest.list.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pullRequest.detail.key(), pullRequestDefaults);
+
+  // Branch discovery is a capability probe; failure must not block or toast over a session.
+  queryClient.setQueryDefaults(orpc.git.branch.key(), {
+    retry: false,
+    meta: { errorMode: "inline" },
+  });
 
   // These queries render their own error state in the workspace panels.
   for (const key of [
-    orpcQueryUtils.git.review.key(),
-    orpcQueryUtils.git.diff.key(),
-    orpcQueryUtils.fs.readTree.key(),
-    orpcQueryUtils.fs.readFileString.key(),
+    orpc.git.review.key(),
+    orpc.git.diff.key(),
+    orpc.fs.readTree.key(),
+    orpc.fs.readFileString.key(),
   ]) {
     queryClient.setQueryDefaults(key, { meta: { errorMode: "inline" } });
   }
 
-  return { httpBaseUrl, orpcClient, queryClient, orpcQueryUtils };
+  return orpc;
+}
+
+/** Drop only one Environment's entries from the shared TanStack caches. */
+export function disposeEnvironmentCache(queryClient: QueryClient, environmentId: string): void {
+  const key = [environmentId];
+  queryClient.removeQueries({ queryKey: key });
+  const mutations = queryClient.getMutationCache().findAll({ mutationKey: key });
+  for (const mutation of mutations) queryClient.getMutationCache().remove(mutation);
 }

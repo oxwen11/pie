@@ -90,7 +90,7 @@ function BrowserPanelView({ instance }: { instance: BrowserInstance }) {
           <RotateCwIcon className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
         </Button>
       </form>
-      <div className="bg-muted/30 text-muted-foreground flex min-h-0 flex-1 items-center justify-center text-xs">
+      <div className="bg-muted/30 text-muted-foreground flex min-h-0 flex-1 items-center justify-center">
         {loading ? "Loading…" : `Rendered ${title}`}
       </div>
     </div>

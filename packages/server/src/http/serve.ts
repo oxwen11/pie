@@ -11,18 +11,50 @@ import {
   piePort,
   nodeEnv,
 } from "../config/env";
-import { PathsLayer } from "../config/paths";
+import { Paths, PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { ResourceMonitoringLayer } from "../observability/resources";
+import { loadOrCreateEnvironmentId } from "./environment-id";
 import { formatReadyLine } from "./handshake";
-import { listenServer } from "./listen";
+import {
+  DEFAULT_LISTEN_HOST,
+  extraAllowedHostsForListen,
+  isLoopbackBind,
+  listenServer,
+} from "./listen";
 import { createServer, ServerStartupError } from "./server";
 
 const DEFAULT_PORT = 4000;
 
+function hostFromEnv(): string {
+  const raw = process.env.PIE_HOST?.trim();
+  return raw === undefined || raw.length === 0 ? DEFAULT_LISTEN_HOST : raw;
+}
+
+function uniqueHosts(hosts: readonly string[]): string[] {
+  return Array.from(new Map(hosts.map((host) => [host.toLowerCase(), host])).values());
+}
+
+/** Env the daemon child should inherit so `pie daemon start --host` actually binds. */
+export function daemonServeEnvironment(
+  env: NodeJS.ProcessEnv,
+  config: ServeConfig,
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = { ...env, PIE_HOST: config.host };
+  if (config.corsOrigins.length > 0) result.PIE_CORS_ORIGINS = config.corsOrigins.join(",");
+  if (config.allowedHosts.length > 0) result.PIE_ALLOWED_HOSTS = config.allowedHosts.join(",");
+  return result;
+}
+
 export const serveFlags = {
   port: Flag.Int("port").pipe(
     Flag.withDescription("Port to listen on (overrides PIE_PORT)"),
+    Flag.optional,
+  ),
+  host: Flag.String("host").pipe(
+    Flag.withDescription(
+      "bind this address (default 127.0.0.1; a LAN IP is trusted automatically)",
+    ),
     Flag.optional,
   ),
   corsOrigin: Flag.String("cors-origin").pipe(
@@ -31,7 +63,7 @@ export const serveFlags = {
   ),
   allowedHost: Flag.String("allowed-host").pipe(
     Flag.withDescription(
-      "Extra Host header accepted besides loopback, for a trusted reverse proxy; repeatable",
+      "Extra Host for a reverse proxy. Prefer --host, Tailscale Serve, or pie relay attach — they trust the published name themselves",
     ),
     Flag.atLeast(0),
   ),
@@ -39,12 +71,14 @@ export const serveFlags = {
 
 type ServeInput = {
   readonly port: Option.Option<number>;
+  readonly host: Option.Option<string>;
   readonly corsOrigin: ReadonlyArray<string>;
   readonly allowedHost: ReadonlyArray<string>;
 };
 
 export type ServeConfig = {
   readonly port: number;
+  readonly host: string;
   readonly corsOrigins: readonly string[];
   readonly allowedHosts: readonly string[];
 };
@@ -60,10 +94,13 @@ export const resolveServeConfig = (input: ServeInput) =>
     const corsFromEnv = yield* pieCorsOrigins;
     const hostsFromEnv = yield* pieAllowedHosts;
     const defaultPort = envName === "development" ? 0 : DEFAULT_PORT;
+    const host = Option.getOrElse(input.host, hostFromEnv);
+    const allowedHosts = input.allowedHost.length > 0 ? input.allowedHost : hostsFromEnv;
     return {
       port: Option.getOrElse(input.port, () => Option.getOrElse(envPort, () => defaultPort)),
+      host,
       corsOrigins: input.corsOrigin.length > 0 ? input.corsOrigin : corsFromEnv,
-      allowedHosts: input.allowedHost.length > 0 ? input.allowedHost : hostsFromEnv,
+      allowedHosts: uniqueHosts([...allowedHosts, ...extraAllowedHostsForListen(host)]),
     };
   });
 
@@ -118,7 +155,22 @@ const serveWith = (input: ServeInput) =>
       onNone: () => undefined,
       onSome: Redacted.value,
     });
-    const { port: requestedPort, corsOrigins, allowedHosts } = yield* resolveServeConfig(input);
+    const {
+      port: requestedPort,
+      host,
+      corsOrigins,
+      allowedHosts,
+    } = yield* resolveServeConfig(input);
+    if (!isLoopbackBind(host) && authToken === undefined) {
+      return yield* new ServerStartupError({
+        phase: "create",
+        cause: new Error("non-loopback bind requires PIE_AUTH_TOKEN"),
+      });
+    }
+    const paths = yield* Paths;
+    const environmentId = yield* loadOrCreateEnvironmentId(paths.home).pipe(
+      Effect.mapError((cause) => new ServerStartupError({ phase: "create", cause })),
+    );
     const compatibilityKey = optionString(yield* pieDaemonCompatibilityKey);
     const version = optionString(yield* npmPackageVersion);
 
@@ -130,6 +182,7 @@ const serveWith = (input: ServeInput) =>
       Effect.annotateLogs({
         event: "server.starting",
         requestedPort,
+        host,
         authenticated: authToken !== undefined,
         compatibilityKey,
         corsOrigins,
@@ -148,6 +201,7 @@ const serveWith = (input: ServeInput) =>
             authToken,
             corsOrigins,
             allowedHosts,
+            environmentId,
             effectContext,
             shutdown:
               authToken === undefined
@@ -178,7 +232,7 @@ const serveWith = (input: ServeInput) =>
     );
 
     const port = yield* Effect.tryPromise({
-      try: () => listenServer(server, requestedPort),
+      try: () => listenServer(server, requestedPort, host),
       catch: (cause) => new ServerStartupError({ phase: "listen", cause }),
     });
 
@@ -186,7 +240,7 @@ const serveWith = (input: ServeInput) =>
     // second. Both go to stdout; observability writes to the local log file and
     // only mirrors to stderr when `PIE_PRINT_LOGS=1`.
     console.log(formatReadyLine({ port }));
-    console.log(`pie listening on http://127.0.0.1:${port}`);
+    console.log(`pie listening on http://${host}:${port}`);
 
     yield* Effect.logInfo("server listening").pipe(
       Effect.annotateLogs({ event: "server.listening", pid: process.pid, port }),

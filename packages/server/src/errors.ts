@@ -34,6 +34,28 @@ export class SettingsFileError extends Data.TaggedError("SettingsFileError")<{
   readonly cause: unknown;
 }> {}
 
+/** Pi package source failed validation or could not be written. */
+export class InvalidPackageSource extends Data.TaggedError("InvalidPackageSource")<{
+  readonly source: string;
+  readonly reason: string;
+}> {}
+
+/** Pi package source is not present in user settings. */
+export class PackageNotFound extends Data.TaggedError("PackageNotFound")<{
+  readonly source: string;
+}> {}
+
+/** Pi accepted a package settings change but could not persist it. */
+export class PackageSettingsWriteFailed extends Data.TaggedError("PackageSettingsWriteFailed")<{
+  readonly source: string;
+  readonly cause: unknown;
+}> {}
+
+/** npm package catalog search failed. */
+export class PackageCatalogUnavailable extends Data.TaggedError("PackageCatalogUnavailable")<{
+  readonly reason: string;
+}> {}
+
 export class GitError extends Data.TaggedError("GitError")<{
   readonly cwd: string;
   readonly cause: unknown;
@@ -74,6 +96,19 @@ export class GitWorktreePathExists extends Data.TaggedError("GitWorktreePathExis
 export class SessionNotFound extends Data.TaggedError("SessionNotFound")<{
   readonly projectId: string;
   readonly sessionId: string;
+}> {}
+
+/** A pie worktree session whose checkout directory is gone. */
+export class WorktreeCheckoutMissing extends Data.TaggedError("WorktreeCheckoutMissing")<{
+  readonly sessionId: string;
+  readonly projectId: string;
+  readonly branch: string;
+}> {}
+
+/** Session metadata has no worktree branch to restore. */
+export class SessionNotWorktree extends Data.TaggedError("SessionNotWorktree")<{
+  readonly sessionId: string;
+  readonly projectId: string;
 }> {}
 
 /** A SessionRef's projectId disagrees with the stored session metadata. */
@@ -129,6 +164,18 @@ export class WorkspaceBinaryFile extends Data.TaggedError("WorkspaceBinaryFile")
 export class WorkspaceReadError extends Data.TaggedError("WorkspaceReadError")<{
   readonly path: string;
   readonly cause: unknown;
+}> {}
+
+/** Creating a new project folder failed (mkdir of the root, date parent, or leaf). */
+export class ProjectFolderCreateError extends Data.TaggedError("ProjectFolderCreateError")<{
+  readonly path: string;
+  readonly cause: unknown;
+}> {}
+
+/** Every generated folder name under the chat-project root was already taken. */
+export class ProjectFolderConflict extends Data.TaggedError("ProjectFolderConflict")<{
+  readonly root: string;
+  readonly name: string;
 }> {}
 
 /** No live PTY for this session-scoped terminal id. */

@@ -1,11 +1,12 @@
 # Sidebar sessions
 
-The left **Projects** list is how a user finds chats. Each imported project is a collapsible group. Sessions are newest-first. The shell treats the session-route loader ref as the single source for the active row, card heading, and content panel.
+The left sidebar is how a user finds chats. **Recent** lists sessions from **Choose project** / allocate. Each imported project is a collapsible group under **Projects**. Sessions are newest-first. The shell treats the session-route loader ref as the single source for the active row, card heading, and content panel.
 
 ## Sub-features
 
 - **New chat** — top of the sidebar; navigates to `/draft` (no project hint).
-- **Projects group** — label **Projects**, collapse chevron, **Import project** action.
+- **Recent group** — label **Recent**; session rows from chat projects (`type: "chat"`, prompt title). Not a project folder.
+- **Projects group** — label **Projects**, collapse chevron, **Import project** action. Imported folders only.
 - **Per-project group** — visible label is `project.name` (folder basename); HTML `title` tooltip is the full path. **New chat in \<name\>** pen, session rows.
 - **Open session** — row label is `session.title ?? "New chat"`. Status dots: **A turn is running in this session**, **Waiting for your action**, **Session crashed**.
 - **Actions menu** — right-click a session row. **Rename** and **Archive** / **Restore**. Archive of the open session returns to `/draft?projectId=`.

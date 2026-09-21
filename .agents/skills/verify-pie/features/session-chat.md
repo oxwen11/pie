@@ -7,10 +7,10 @@
 - **Open from a URL** with `?projectId=` (fast path) or bare `/session/<id>` (`session.resolveRef` then prepare).
 - **Transcript** — user bubbles (right, primary), assistant + tool/reasoning. Empty settled history renders nothing; loading shows **Loading earlier messages…**; failed history shows **Earlier messages couldn't be loaded...**.
 - **Composer** — same TipTap stack as draft, no draft placeholder. Submit keymap is Enter; **click Send message**. Footer shows the current git branch, **Not a Git repository**, or **Workspace unavailable**.
-- **Streaming toolbar** — while `status === "streaming"` and the draft is empty: **Stop generating** (primary). Typing a draft lights **Send message** (queues a follow-up) and keeps Stop as a ghost action. Stop only aborts the current run.
+- **Streaming toolbar** — while `status === "streaming"` and the draft is empty: **Stop generating**. Typing a draft replaces Stop with **Send message** (queues a follow-up). Stop and Send never appear together. Stop only aborts the current run.
 - **Follow-up** — Send / Enter while a turn is running queues `delivery: "followUp"`. The draft is **not** a transcript bubble; it appears as a row in the **queued messages** Frame above the composer.
 - **Steer** — only via queue-row **Send** (`Steer queued message`), which promotes that follow-up to `delivery: "steer"` (inject before the next LLM call). The composer has no Steer control. Steering rows appear first, labeled **Steer**.
-- **Queue rows** — each queued line is its own row. Send while streaming queues as follow-up. **Send** on a follow-up row (`Steer queued message`) promotes that line to steering (labeled **Steer**). **Edit queued message** rewrites that line; **Remove queued message** drops it. Edits, deletes, and promote rewrite Pi's native queue (`clear_queue`, then remaining `steer` / `follow_up`). Empty Frame is omitted. Steering rows have no Send.
+- **Queue rows** — each queued line is its own row. Send while streaming queues as follow-up. **Send** on a follow-up row (`Steer queued message`) promotes that line to steering (labeled **Steer**). **Edit queued message** (follow-up rows only; steering rows are consumed mid-run, so they cannot be edited) rewrites that line; **Remove queued message** drops it. Edits, deletes, and promote rewrite Pi's native queue (`clear_queue`, then remaining `steer` / `follow_up`). Empty Frame is omitted. Steering rows have no Send and no Edit.
 - **Model select** — live session toolbar; same combobox as draft.
 - **In-flight** — **Thinking…** / **working…** status after submit, before tokens.
 
@@ -38,7 +38,7 @@ Follow-up prompt (idle session — Pi finished or failed):
 Queue + Steer (only when a turn is actually streaming — hold-open fake Pi, or a long real turn):
 
 1. Snapshot: **Stop generating** is present. **Send message** is absent while the draft is empty. There is no composer **Steer message** control.
-2. Type a distinctive follow-up. **Send message** appears enabled. Click **Send message**. The line appears as its own row under **queued messages** with no Steer label. The draft clears. The user bubble must **not** gain that text. Send disappears again (empty draft, still streaming).
+2. Type a distinctive follow-up. **Send message** appears enabled and **Stop generating** is gone (mutually exclusive). Click **Send message**. The line appears as its own row under **queued messages** with no Steer label. The draft clears. The user bubble must **not** gain that text. Send disappears again; Stop returns (empty draft, still streaming).
 3. Type another line and click **Send message** again. It joins the queue as another row.
 4. Click **Steer queued message** (**Send**) on a follow-up row. That row moves up, labeled **Steer**. The composer Send stays follow-up. Transcript bubbles do not gain the text. The fake-pi / child log shows `clear_queue`, then `steer` for that line and `follow_up` for the rest.
 5. Click **Edit queued message** on a follow-up row, change the text, press Enter. The row updates; transcript bubbles do not.

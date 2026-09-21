@@ -9,7 +9,7 @@ import {
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
-import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
 import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
@@ -17,6 +17,7 @@ import {
   ProjectSessionRow,
   type SessionPullRequest,
 } from "@/features/projects/project-session-row";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
@@ -48,11 +49,17 @@ const selectNewestFirst = (
  * panel is open (two icon entities, not a rotation). This component owns only
  * grouping and fetching; each row composes its own navigation and actions.
  */
-export function ProjectSessionsGroup({ project }: { readonly project: Project }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+export function ProjectSessionsGroup({
+  environmentId,
+  project,
+}: {
+  readonly environmentId: string;
+  readonly project: Project;
+}) {
+  const orpcQueryUtils = useCatalogOrpc();
   const router = useRouter();
   const isSessionActive = (ref: SessionRef) =>
-    sameSessionRef(ref, sessionRefFromRouterMatches(router.state.matches));
+    sameSessionRef({ environmentId, ref }, sessionRefFromRouterMatches(router.state.matches));
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -101,7 +108,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
         </SidebarGroupLabel>
         <SidebarGroupAction
           className="top-1 right-1"
-          render={<Link to="/draft" search={{ projectId: project.id }} />}
+          render={<Link to="/draft" search={{ projectId: project.id, environmentId }} />}
           title={`New chat in ${project.name}`}
         >
           <SquarePen />
@@ -121,6 +128,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
                     key={session.sessionId}
                     active={active}
                     createdBySchedule={firedSessionIds.data?.has(session.sessionId) === true}
+                    environmentId={environmentId}
                     isActive={() => isSessionActive(session)}
                     pullRequest={active ? (activePullRequest.data ?? listed) : listed}
                     session={session}

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import type { PieUIMessage } from "@getpie/contract";
@@ -81,6 +82,11 @@ export type SessionServiceRunOpts = {
   promptStarted?: boolean;
   // Optional close hook for exercising lifecycle contention.
   close?: (sessionId: string) => Promise<void>;
+  // Hold pi.create mid-flight so archive/rename can race the first spawn.
+  createHold?: {
+    readonly onStart: () => void;
+    readonly until: Promise<void>;
+  };
   prompt?: (
     input: UserInput,
   ) => Effect.Effect<{ readonly turnId: string; readonly started: boolean }>;
@@ -89,8 +95,25 @@ export type SessionServiceRunOpts = {
     cwd: string,
     input?: { readonly base?: string },
   ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+  worktreeRestore?: (
+    repoCwd: string,
+    worktreePath: string,
+    branch: string,
+  ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
   worktreeRemove?: (path: string) => Effect.Effect<void, GitFailure>;
 };
+
+/** Mock worktree create that also creates the checkout path on disk for prepare(). */
+export const stubWorktreeCreate =
+  (
+    worktreePath = "/tmp/pie-worktree",
+    branch = "pie/abcd1234",
+  ): NonNullable<SessionServiceRunOpts["worktreeCreate"]> =>
+  () =>
+    Effect.sync(() => {
+      fs.mkdirSync(worktreePath, { recursive: true });
+      return { path: worktreePath, branch };
+    });
 
 const testProjectService = ProjectService.of({
   list: () => Effect.succeed([]),
@@ -105,6 +128,7 @@ const testProjectService = ProjectService.of({
       : Effect.fail(new ProjectNotFound({ projectId })),
   findByPath: () => Effect.succeed(undefined),
   create: () => Effect.die("unused"),
+  allocateChatProjectDir: () => Effect.die("unused"),
   remove: () => Effect.die("unused"),
 });
 
@@ -115,8 +139,8 @@ export const run = <A, E>(
   ) => Effect.Effect<A, E, Scope.Scope | FileSystem.FileSystem | Crypto.Crypto>,
 ) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-svc-" });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-svc-" });
     const spy: Spy = { open: [], resume: [], close: [], prompts: [] };
     let opened = 0;
     const turnEvents = (sessionId: string) => {
@@ -205,13 +229,18 @@ export const run = <A, E>(
         whenAvailable(
           Effect.logDebug("pi creating").pipe(
             Effect.andThen(
-              Effect.sync(() => {
+              Effect.gen(function* () {
                 spy.open.push({
                   cwd: input.cwd,
                   ...(input.provider !== undefined ? { provider: input.provider } : undefined),
                   ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
                 });
                 opened += 1;
+                const hold = opts.createHold;
+                if (hold) {
+                  hold.onStart();
+                  yield* Effect.promise(() => hold.until);
+                }
                 return makeSession(`native-${opened}`);
               }),
             ),
@@ -249,6 +278,9 @@ export const run = <A, E>(
         create:
           opts.worktreeCreate ??
           (() => Effect.die(new Error("unexpected worktreeCreate in unit test"))),
+        restore:
+          opts.worktreeRestore ??
+          (() => Effect.die(new Error("unexpected worktreeRestore in unit test"))),
         remove:
           opts.worktreeRemove ??
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
@@ -263,6 +295,7 @@ export const run = <A, E>(
         Layer.provide(Layer.succeed(EventBus, bus)),
         Layer.provide(Layer.succeed(ProjectService, testProjectService)),
         Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+        Layer.provide(Layer.succeed(FileSystem.FileSystem, fileSystem)),
         Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
       );
       const context = yield* Layer.build(graph);

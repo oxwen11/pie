@@ -37,11 +37,11 @@ Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http:
 What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
-- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Other workspace packages export `src/*.ts`; this one does not.
+- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing. Also builds `@getpie/server` when `dist/pi-process/pi-process.js` is missing — `pie serve` loads TypeScript, but availability still stats that bun-built entry. Other workspace packages export `src/*.ts`.
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and Choose project proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `HOME=$PIE_HOME/home` so `~/Pie` resolves under the run and allocate never writes to the operator's real home.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
@@ -93,7 +93,7 @@ Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use
 ### UI rules
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Select a project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Choose project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
 3. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
 4. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
@@ -101,15 +101,16 @@ Stable handles (from source, not guesses):
 
 | UI | How it appears |
 | --- | --- |
-| Empty draft (no projects) | Heading **Import your first project**; button **Import project** |
+| Empty draft (no projects) | Composer with picker **Choose project**; sidebar **Import project**. No **Import your first project** heading |
 | Sidebar new draft | **New chat** |
+| Sidebar Recent | session rows from **Choose project** / allocate sends (prompt title). Not under **Projects** |
 | Sidebar import | button name **Import project** (plus-folder on the Projects group) |
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
-| Draft project picker | combobox / button **Select a project** until a project is chosen; options are folder basenames |
+| Draft project picker | one combobox: folder icon then **Choose project** until a project is chosen. Open list: folder basenames, then button **Don't work in a project**. After a project is chosen: trigger shows the name; hovering the picker shows **X** (**Clear project**) |
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
 | Draft composer | contenteditable; placeholder **Ask Pi anything...** |
-| Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty / no project) |
-| Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing lights **Send message** (queue follow-up) and keeps Stop as a ghost action |
+| Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
+| Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
@@ -158,7 +159,7 @@ Standards:
 pnpm exec pie-verify web cleanup
 ```
 
-Stops and flushes the automatic recording, then stops **only** the pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** `pkill` pie, vite, or chromium.
+Stops and flushes the automatic recording, closes the owned agent-browser session (and its Chrome for Testing tree), then stops **only** the surface pids recorded for this run (process tree, TERM then KILL). Removes `/tmp/pie-verify-web/runs/<id>`, including its `$PIE_HOME/workspace/verify-pie-sample`. Does **not** delete `.cursor/skills/verify-pie/evidence/`. Does **not** broadly `pkill` pie, vite, or unrelated chromium.
 
 After cleanup, confirm evidence is still at the path `pnpm exec pie-verify web evidence path` printed before teardown (or `.agents/skills/verify-pie/evidence/<run-id>/`).
 
