@@ -154,6 +154,7 @@ form:has(> [data-slot="chat-input"]):focus-within {
   position: fixed;
   top: 0;
   left: 0;
+  z-index: 1;
   width: 2px;
   pointer-events: none;
   background: var(--foreground);
