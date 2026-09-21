@@ -136,11 +136,14 @@ form:has(> [data-slot="chat-input"]) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  background: color-mix(in srgb, var(--card) 90%, transparent);
-  backdrop-filter: blur(16px);
-  transition:
-    border-color 150ms,
-    box-shadow 150ms;
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"]) {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"])::before {
+  box-shadow: none;
 }
 
 form:has(> [data-slot="chat-input"]):focus-within {
