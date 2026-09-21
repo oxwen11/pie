@@ -109,7 +109,7 @@ function useElapsedSeconds(active: boolean): number {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-// +/- only on hover; Timer stays visible while open. Local rather than
+// +/- on hover or keyboard focus; Timer stays visible while open. Local rather than
 // borrowed: this row is elapsed time, not a tool batch (ListCollapse).
 function SummaryTrigger({ label }: { label: string }) {
   return (
@@ -118,8 +118,8 @@ function SummaryTrigger({ label }: { label: string }) {
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
           <span className="relative flex size-4 shrink-0 items-center justify-center">
-            <TimerIcon className="size-4 group-hover:opacity-0" />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
             </div>
