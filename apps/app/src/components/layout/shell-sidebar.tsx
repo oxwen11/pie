@@ -58,6 +58,7 @@ export function ShellSidebarPanel({
         className="flex min-h-0 shrink-0 flex-col overflow-hidden md:py-1 md:ps-1"
         data-slot="sidebar-drawer"
         data-state={open ? "open" : "closed"}
+        data-testid="sidebar"
         inert={!open}
         style={{ width: columnWidth }}
       >
