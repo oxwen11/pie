@@ -1,15 +1,10 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import {
-  animate,
-  useMotionValue,
-  useMotionValueEvent,
-  useReducedMotion,
-  useTransform,
-} from "motion/react";
+import { animate, useMotionValue, useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
 import {
   createContext,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
   use,
@@ -18,8 +13,8 @@ import {
   useEffectEvent,
   useLayoutEffect,
   useMemo,
-  useReducer,
   useRef,
+  useState,
 } from "react";
 import {
   Group,
@@ -34,20 +29,22 @@ import {
 import { ResizablePanel } from "@/components/layout/resizable-panel";
 import {
   notifyUserLayoutListeners,
-  resolveSidebarUserLayout,
   type UserLayoutListener,
 } from "@/components/layout/shell-user-layout";
 
-/** Resizable sidebar | chat | content-panel columns. */
+/** Chat | content-panel columns. Session list is a sibling pixel column. */
 
 const SHELL_LAYOUT_ID = "pie:shell-layout";
-const SIDEBAR_DEFAULT_SIZE = "16rem";
-const SIDEBAR_MIN_SIZE = "12rem";
+const SIDEBAR_WIDTH_KEY = "pie:sidebar-width";
+const SIDEBAR_MIN_PX = 192;
+const SIDEBAR_MAX_PX = 480;
+const SIDEBAR_DEFAULT_PX = 256;
+const CONTENT_DEFAULT_SIZE = "28rem";
+const CONTENT_MIN_SIZE = "18rem";
 
 const PANEL_IDS = {
   content: "content",
   main: "main",
-  sidebar: "sidebar",
 } as const;
 
 type SubscribeToUserLayout = (listener: UserLayoutListener) => () => void;
@@ -57,32 +54,36 @@ const ShellLayoutContext = createContext<SubscribeToUserLayout | null>(null);
 function useUserLayoutChanged(listener: UserLayoutListener): void {
   const subscribe = use(ShellLayoutContext);
   if (subscribe === null) throw new Error("Shell panels must be rendered inside ShellGroup");
-  // Registration is the Effect's sync concern; the listener reads latest
-  // committed values (e.g. `open`) at event time, so it must not re-subscribe.
   const onUserLayoutChanged = useEffectEvent(listener);
   useEffect(() => subscribe(onUserLayoutChanged), [subscribe]);
 }
 
+function clampSidebarWidth(px: number): number {
+  return Math.min(SIDEBAR_MAX_PX, Math.max(SIDEBAR_MIN_PX, Math.round(px)));
+}
+
+function readSidebarWidth(): number {
+  const n = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  return Number.isFinite(n) && n > 0 ? clampSidebarWidth(n) : SIDEBAR_DEFAULT_PX;
+}
+
+function writeSidebarWidth(px: number): void {
+  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(px));
+}
+
 export function ShellGroup({
-  hasSidebar,
   hasContentPanel,
   children,
 }: {
-  hasSidebar: boolean;
   hasContentPanel: boolean;
   children: ReactNode;
 }): ReactNode {
   const panelIds = useMemo(
-    () => [
-      ...(hasSidebar ? [PANEL_IDS.sidebar] : []),
-      PANEL_IDS.main,
-      ...(hasContentPanel ? [PANEL_IDS.content] : []),
-    ],
-    [hasSidebar, hasContentPanel],
+    () => [PANEL_IDS.main, ...(hasContentPanel ? [PANEL_IDS.content] : [])],
+    [hasContentPanel],
   );
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: SHELL_LAYOUT_ID,
-    // Do not persist transient imperative collapses.
     onlySaveAfterUserInteractions: true,
     panelIds,
     storage: localStorage,
@@ -98,12 +99,11 @@ export function ShellGroup({
   return (
     <ShellLayoutContext value={subscribeToUserLayout}>
       <Group
-        className="flex min-h-0 w-full flex-1"
+        className="flex min-h-0 min-w-0 flex-1"
         defaultLayout={defaultLayout}
         resizeTargetMinimumSize={{ coarse: 28, fine: 18 }}
         onLayoutChanged={(layout, meta) => {
           notifyUserLayoutListeners(meta, userLayoutListeners.current);
-          // Preserve the last expanded widths.
           if (Object.values(layout).some((size) => size === 0)) return;
           onLayoutChanged(layout, meta);
         }}
@@ -114,6 +114,9 @@ export function ShellGroup({
     </ShellLayoutContext>
   );
 }
+
+const SHELL_GUTTER_CLASS =
+  "relative bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1 after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width] hover:after:via-foreground/20 hover:after:opacity-100";
 
 /** Inter-card gutter and resize handle. */
 export function ShellSeparator({
@@ -126,10 +129,9 @@ export function ShellSeparator({
   return (
     <Separator
       className={cn(
-        "relative bg-transparent md:my-1",
-        joined ? "bg-border w-px" : "w-1",
-        "after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width]",
-        "hover:after:via-foreground/20 data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 hover:after:opacity-100 data-[separator=active]:after:w-0.5 data-[separator=active]:after:opacity-100 data-[separator=focus]:after:opacity-100",
+        SHELL_GUTTER_CLASS,
+        joined && "bg-border w-px",
+        "data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 data-[separator=active]:after:w-0.5 data-[separator=active]:after:opacity-100 data-[separator=focus]:after:opacity-100",
         disabled && "w-0 after:hidden",
         locked && "pointer-events-none",
         className,
@@ -144,9 +146,9 @@ export function ShellSeparator({
 function useCollapsedBinding(
   panelRef: RefObject<PanelImperativeHandle | null>,
   collapsed: boolean,
-  onCollapsedChange: (collapsed: boolean) => void,
-  expandedSize: string,
-): OnPanelResize {
+  onCollapsedChange: ((collapsed: boolean) => void) | undefined,
+  expandedSize: number | string,
+): NonNullable<OnPanelResize> {
   const laidOut = useRef(false);
 
   const sync = useCallback(
@@ -164,7 +166,6 @@ function useCollapsedBinding(
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
-    // The imperative handle is only safe after the panel's first layout.
     if (panel === null || !laidOut.current) return;
     sync(panel);
   }, [collapsed, panelRef, sync]);
@@ -173,128 +174,11 @@ function useCollapsedBinding(
     const panel = panelRef.current;
     if (laidOut.current) {
       const isCollapsed = size.inPixels === 0;
-      if (isCollapsed !== collapsed) onCollapsedChange(isCollapsed);
+      if (isCollapsed !== collapsed) onCollapsedChange?.(isCollapsed);
       return;
     }
     laidOut.current = true;
     if (panel !== null) sync(panel);
-  };
-}
-
-/** True while the drawer width has not reached the `open` target. */
-function sidebarDrawerInFlight(open: boolean, px: number, expandedPx: number): boolean {
-  return open ? px < expandedPx - 0.5 : px > 0.5;
-}
-
-/**
- * Toggle springs the column width; the rail's `x` is `width - expanded` so the
- * contents slide as a drawer instead of squashing. Drag-resize stays a snap.
- * `minSize` is 0 while the spring is in flight — the panel group otherwise
- * refuses any `resize()` below 12rem.
- */
-function useSidebarDrawer(
-  open: boolean,
-  setOpen: (open: boolean) => void,
-  panelRef: RefObject<PanelImperativeHandle | null>,
-  panelElementRef: RefObject<HTMLDivElement | null>,
-) {
-  const reduceMotion = useReducedMotion() === true;
-  const laidOut = useRef(false);
-  const skipNextAnimation = useRef(false);
-
-  // The panel owns live width while open. Motion values only hold the remembered
-  // expanded width and the transient width used during toggle animation.
-  const expandedWidth = useMotionValue(256);
-  const animatedWidth = useMotionValue(open ? 256 : 0);
-  const drawerX = useTransform(() => animatedWidth.get() - expandedWidth.get());
-  const rerenderAtSettle = useReducer((n: number) => n + 1, 0)[1];
-  const inFlight = sidebarDrawerInFlight(open, animatedWidth.get(), expandedWidth.get());
-
-  useMotionValueEvent(animatedWidth, "change", (value) => {
-    if (sidebarDrawerInFlight(open, value, expandedWidth.get()) !== inFlight) {
-      rerenderAtSettle();
-    }
-  });
-
-  const settledOpen = open && !inFlight;
-  const minSize = settledOpen ? SIDEBAR_MIN_SIZE : 0;
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (panel === null || !laidOut.current) return undefined;
-
-    if (skipNextAnimation.current) {
-      skipNextAnimation.current = false;
-      animatedWidth.jump(open ? expandedWidth.get() : 0);
-      return undefined;
-    }
-
-    if (reduceMotion) {
-      animatedWidth.jump(open ? expandedWidth.get() : 0);
-      if (open) {
-        panel.expand();
-        panel.resize(expandedWidth.get());
-      } else if (!panel.isCollapsed()) {
-        panel.collapse();
-      }
-      return undefined;
-    }
-
-    const controls = animate(animatedWidth, open ? expandedWidth.get() : 0, {
-      onUpdate(value) {
-        if (value <= 0.5) {
-          if (!panel.isCollapsed()) panel.collapse();
-          return;
-        }
-        panel.resize(value);
-      },
-    });
-    return () => controls.stop();
-  }, [animatedWidth, expandedWidth, open, panelRef, reduceMotion]);
-
-  const onResize: OnPanelResize = (size) => {
-    const panel = panelRef.current;
-    if (laidOut.current) return;
-
-    laidOut.current = true;
-    if (size.inPixels > 0) {
-      const width = panelElementRef.current?.getBoundingClientRect().width ?? size.inPixels;
-      expandedWidth.set(width);
-      if (open) animatedWidth.set(width);
-    }
-    if (panel === null) return;
-    if (!open && !panel.isCollapsed()) panel.collapse();
-    if (open && panel.isCollapsed()) {
-      panel.expand();
-      if (panel.isCollapsed()) panel.resize(expandedWidth.get());
-    }
-  };
-
-  const rememberUserLayout = () => {
-    const panel = panelRef.current;
-    if (panel === null) return;
-
-    const layout = resolveSidebarUserLayout(
-      open,
-      panel.isCollapsed(),
-      panelElementRef.current?.getBoundingClientRect().width,
-    );
-    if (layout.open !== undefined) {
-      skipNextAnimation.current = true;
-      setOpen(layout.open);
-    }
-    if (layout.expandedWidth === undefined) return;
-    expandedWidth.set(layout.expandedWidth);
-    animatedWidth.jump(layout.expandedWidth);
-  };
-  useUserLayoutChanged(rememberUserLayout);
-
-  return {
-    minSize,
-    onResize,
-    settledOpen,
-    style: settledOpen ? { width: "100%", x: 0 } : { width: expandedWidth, x: drawerX },
-    transitioning: inFlight,
   };
 }
 
@@ -305,38 +189,66 @@ export function ShellSidebarPanel({
   children: ReactNode;
   separatorDisabled?: boolean;
 }): ReactNode {
-  const { open, setOpen } = useSidebar();
-  const panelRef = usePanelRef();
-  const panelElementRef = useRef<HTMLDivElement>(null);
-  const drawer = useSidebarDrawer(open, setOpen, panelRef, panelElementRef);
-  const handleSidebarResize = drawer.onResize;
+  const { open } = useSidebar();
+  const reduceMotion = useReducedMotion() === true;
+  const [expanded, setExpanded] = useState(readSidebarWidth);
+  const expandedRef = useRef(expanded);
+  const columnWidth = useMotionValue(open ? expanded : 0);
+  const drag = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    const target = open ? expanded : 0;
+    if (reduceMotion || drag.current !== null) {
+      columnWidth.jump(target);
+      return undefined;
+    }
+    const controls = animate(columnWidth, target);
+    return () => controls.stop();
+  }, [columnWidth, expanded, open, reduceMotion]);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (separatorDisabled || !open) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    expandedRef.current = expanded;
+    drag.current = { startX: event.clientX, startWidth: expanded };
+  };
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (drag.current === null) return;
+    const next = clampSidebarWidth(drag.current.startWidth + event.clientX - drag.current.startX);
+    expandedRef.current = next;
+    setExpanded(next);
+    columnWidth.jump(next);
+  };
+  const onPointerUp = (): void => {
+    if (drag.current === null) return;
+    drag.current = null;
+    writeSidebarWidth(expandedRef.current);
+  };
 
   return (
     <>
-      <ResizablePanel
-        className="flex min-w-0 flex-col md:py-1 md:ps-1"
-        collapsedSize={0}
-        collapsible
-        defaultSize={SIDEBAR_DEFAULT_SIZE}
-        elementRef={panelElementRef}
-        groupResizeBehavior="preserve-pixel-size"
-        id={PANEL_IDS.sidebar}
-        maxSize="30rem"
-        minSize={drawer.minSize}
-        onResize={handleSidebarResize}
-        panelRef={panelRef}
+      <m.aside
+        className="flex min-h-0 shrink-0 flex-col overflow-hidden md:py-1 md:ps-1"
+        data-slot="sidebar-drawer"
+        data-state={open ? "open" : "closed"}
+        inert={!open}
+        style={{ width: columnWidth }}
       >
-        <m.div
-          className={cn("flex h-full min-h-0 flex-col", drawer.settledOpen ? "w-full" : "shrink-0")}
-          data-slot="sidebar-drawer"
-          data-state={open ? "open" : "closed"}
-          inert={!open}
-          style={drawer.style}
-        >
+        <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: expanded }}>
           {children}
-        </m.div>
-      </ResizablePanel>
-      <ShellSeparator disabled={separatorDisabled} locked={drawer.transitioning} />
+        </div>
+      </m.aside>
+      <div
+        aria-disabled={separatorDisabled || !open || undefined}
+        aria-orientation="vertical"
+        aria-label="Resize session list"
+        className={cn(SHELL_GUTTER_CLASS, (separatorDisabled || !open) && "w-0 after:hidden")}
+        onLostPointerCapture={onPointerUp}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        role="separator"
+      />
     </>
   );
 }
@@ -380,16 +292,53 @@ export function ShellMainPanel({
   );
 }
 
-export function ShellContentPanel({ children }: { children: ReactNode }): ReactNode {
+export function ShellContentPanel({
+  children,
+  collapsed = false,
+  locked = false,
+  onSizeChange,
+  size,
+}: {
+  children: ReactNode;
+  collapsed?: boolean;
+  /** Skip size apply/save while the column is filling leftover space. */
+  locked?: boolean;
+  onSizeChange?: (width: number) => void;
+  size?: number;
+}): ReactNode {
+  const panelRef = usePanelRef();
+  const expandedSize = size ?? CONTENT_DEFAULT_SIZE;
+  const onResize = useCollapsedBinding(panelRef, collapsed, undefined, expandedSize);
+
+  useLayoutEffect(() => {
+    if (collapsed || locked) return undefined;
+    const frame = requestAnimationFrame(() => panelRef.current?.resize(expandedSize));
+    return () => cancelAnimationFrame(frame);
+  }, [collapsed, expandedSize, locked, panelRef]);
+
+  useUserLayoutChanged(() => {
+    if (collapsed || locked) return;
+    const width = panelRef.current?.getSize().inPixels;
+    if (width !== undefined && width > 0) onSizeChange?.(width);
+  });
+
   return (
-    <ResizablePanel
-      className="flex min-w-0 flex-col md:py-1 md:pe-1"
-      defaultSize="28rem"
-      groupResizeBehavior="preserve-pixel-size"
-      id={PANEL_IDS.content}
-      minSize="18rem"
-    >
-      {children}
-    </ResizablePanel>
+    <>
+      <ShellSeparator disabled={collapsed} joined />
+      <ResizablePanel
+        className="flex min-w-0 flex-col md:py-1 md:pe-1"
+        collapsedSize={0}
+        collapsible
+        defaultSize={collapsed ? 0 : expandedSize}
+        groupResizeBehavior="preserve-pixel-size"
+        id={PANEL_IDS.content}
+        inert={collapsed}
+        minSize={collapsed ? 0 : CONTENT_MIN_SIZE}
+        onResize={onResize}
+        panelRef={panelRef}
+      >
+        {children}
+      </ResizablePanel>
+    </>
   );
 }

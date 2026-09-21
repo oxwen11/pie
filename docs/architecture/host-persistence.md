@@ -357,7 +357,7 @@ creating the window and paints `backgroundColor` from `appearance.theme`
 | Key           | localStorage `pie:content-panel`                                                                                                                                   |
 | Owner         | `ContentPanel` through Zustand persist                                                                                                                             |
 | Envelope      | `{ state: { bySessionKey }, version: 0 }`                                                                                                                          |
-| Data          | Per `SessionRef` key: `{ presentation, activeId, panels[] }`; a panel record is `{ id, type, payload }`                                                            |
+| Data          | Per `SessionRef` key: `{ presentation, activeId, panels[], width? }`; a panel record is `{ id, type, payload }`; `width` is the docked column size in pixels       |
 | Compatibility | No Zustand `migrate` callback. Each registered panel may parse its own payload. Unknown or invalid panel records stay stored but are hidden until compatible again |
 | Retention     | No automatic pruning. `forget(ref)` can remove one session, but no production caller currently invokes it                                                          |
 
@@ -372,12 +372,23 @@ not persisted.
 react-resizable-panels:pie:shell-layout:<panel-id>:<panel-id>...
 ```
 
-The suffix is the active ordered set drawn from `sidebar`, `main`, and
-`content`; the value is a JSON object mapping each panel id to its numeric size.
+The suffix is the active ordered set drawn from `main` and `content`; the value
+is a JSON object mapping each panel id to its numeric size. Session-list width
+is not in this layout.
 The library also has a backward reader for the older group-only key
 `react-resizable-panels:pie:shell-layout`, whose value grouped `{ layout: [] }`
 records by comma-joined panel ids. Pie defines no independent schema version or
 migration for this data.
+
+### Sidebar width
+
+| Property      | Current contract                                                            |
+| ------------- | --------------------------------------------------------------------------- |
+| Key           | localStorage `pie:sidebar-width`                                            |
+| Owner         | `ShellSidebarPanel`                                                         |
+| Data          | Decimal integer pixels, clamped to 192–480. Missing or non-numeric → 256    |
+| Compatibility | No version. Unreadable values are replaced by the default on the next write |
+| Retention     | No automatic pruning                                                        |
 
 ### Sidebar cookie
 

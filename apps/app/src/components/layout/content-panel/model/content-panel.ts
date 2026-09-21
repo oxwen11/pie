@@ -26,6 +26,8 @@ interface SessionPanels {
   readonly presentation: PanelPresentation;
   readonly activeId: string | null;
   readonly panels: readonly PanelRecord[];
+  /** Docked column width in pixels. Missing means the shell default. */
+  readonly width?: number;
 }
 
 /**
@@ -66,6 +68,7 @@ export interface OpenablePanel<View> {
 
 export interface PanelSnapshot<View> {
   readonly presentation: PanelPresentation;
+  readonly width?: number;
   /**
    * Resolved panels only. A record whose type is not registered *yet*, or
    * whose payload no longer parses, stays in storage but never surfaces — so a
@@ -256,6 +259,7 @@ export class ContentPanel<View = unknown> {
     // Closing the active tab lands on its neighbour, the way an editor does.
     const fallback = panels[Math.min(index, panels.length - 1)] ?? null;
     this.#writeSession(sessionRef, {
+      ...session,
       presentation: panels.length === 0 ? "hidden" : session.presentation,
       activeId: session.activeId === id ? (fallback?.id ?? null) : session.activeId,
       panels,
@@ -266,6 +270,14 @@ export class ContentPanel<View = unknown> {
     const session = this.#sessionOf(sessionRef);
     if (session.presentation === presentation) return;
     this.#writeSession(sessionRef, { ...session, presentation });
+  }
+
+  setWidth(sessionRef: EnvironmentSessionRef, width: number): void {
+    if (!Number.isFinite(width) || width <= 0) return;
+    const next = Math.round(width);
+    const session = this.#sessionOf(sessionRef);
+    if (session.width === next) return;
+    this.#writeSession(sessionRef, { ...session, width: next });
   }
 
   /** Hidden → docked, anything else → hidden. */
@@ -331,6 +343,7 @@ export class ContentPanel<View = unknown> {
       panels,
       active: panels.find((panel) => panel.id === session.activeId) ?? null,
       openable,
+      width: session.width,
     };
   }
 
@@ -401,6 +414,7 @@ export class ContentPanel<View = unknown> {
     const session = this.#sessionOf(sessionRef);
     const isOpen = session.panels.some((panel) => panel.id === id);
     this.#writeSession(sessionRef, {
+      ...session,
       presentation: session.presentation === "hidden" ? "docked" : session.presentation,
       activeId: id,
       panels: isOpen

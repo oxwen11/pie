@@ -25,6 +25,7 @@ export interface ContentPanelSession {
   activate(id: string): void;
   close(id: string): void;
   setPresentation(presentation: PanelPresentation): void;
+  setWidth(width: number): void;
   toggleVisibility(): void;
 }
 
@@ -48,6 +49,7 @@ export function useContentPanel(): ContentPanelSession | null {
       activate: (id) => contentPanel.activate(sessionRef, id),
       close: (id) => contentPanel.close(sessionRef, id),
       setPresentation: (presentation) => contentPanel.setPresentation(sessionRef, presentation),
+      setWidth: (width) => contentPanel.setWidth(sessionRef, width),
       toggleVisibility: () => contentPanel.toggleVisibility(sessionRef),
     };
   }, [contentPanel, sessionRef]);

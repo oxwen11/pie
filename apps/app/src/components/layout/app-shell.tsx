@@ -8,9 +8,7 @@ import { shellProviderStyle } from "@/components/layout/shell-chrome";
 import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import {
   ShellContentPanel,
-  ShellGroup,
   ShellMainPanel,
-  ShellSeparator,
   ShellSidebarPanel,
 } from "@/components/layout/shell-panels";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
@@ -103,7 +101,6 @@ export interface AppShellBodyProps {
 }
 
 export function AppShellBody({ children }: AppShellBodyProps) {
-  const { isMobile } = useSidebar();
   const session = useContentPanel();
   const presentation = usePanelSnapshot((snapshot) => snapshot.presentation);
   const hasVisibleContentPanel = presentation !== "hidden" && session !== null;
@@ -125,9 +122,7 @@ export function AppShellBody({ children }: AppShellBodyProps) {
 
   return (
     <AppShellContext value={context}>
-      <ShellGroup hasContentPanel={hasVisibleContentPanel} hasSidebar={!isMobile}>
-        {children}
-      </ShellGroup>
+      <div className="flex min-h-0 w-full flex-1">{children}</div>
       <ShellContentPanelToggle />
     </AppShellContext>
   );
@@ -136,13 +131,16 @@ export function AppShellBody({ children }: AppShellBodyProps) {
 /** Session-scoped column beside chat; mount under the same EnvironmentOrpcProvider as Main. */
 export function AppShellSessionPanel(): ReactNode {
   const { contentPanel } = useAppShell();
-  if (!contentPanel.visible) return null;
+  const session = useContentPanel();
+  const width = usePanelSnapshot((snapshot) => snapshot.width);
   return (
-    <>
-      <ShellSeparator joined />
-      <ShellContentPanel>
-        <ContentPanelOutlet />
-      </ShellContentPanel>
-    </>
+    <ShellContentPanel
+      collapsed={!contentPanel.visible}
+      locked={contentPanel.maximized}
+      onSizeChange={(w) => session?.setWidth(w)}
+      size={width}
+    >
+      <ContentPanelOutlet />
+    </ShellContentPanel>
   );
 }

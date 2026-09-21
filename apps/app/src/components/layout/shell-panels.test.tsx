@@ -1,13 +1,12 @@
 import { SidebarProvider } from "@getpie/ui/components/sidebar";
 import { domAnimation, LazyMotion } from "motion/react";
-import { Group } from "react-resizable-panels";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 import { page } from "vitest/browser";
 
 import { ResizablePanel } from "./resizable-panel";
 import { ShellContentPanel, ShellGroup, ShellSidebarPanel } from "./shell-panels";
-import { notifyUserLayoutListeners, resolveSidebarUserLayout } from "./shell-user-layout";
+import { notifyUserLayoutListeners } from "./shell-user-layout";
 
 window.matchMedia = (query) => ({
   addEventListener() {
@@ -33,12 +32,14 @@ describe("shell panels", () => {
     await render(
       <SidebarProvider defaultOpen>
         <LazyMotion features={domAnimation}>
-          <ShellGroup hasContentPanel={false} hasSidebar>
+          <div className="flex" style={{ width: 1200, height: 400 }}>
             <ShellSidebarPanel>
               <div>Sidebar</div>
             </ShellSidebarPanel>
-            <ResizablePanel id="main">Main</ResizablePanel>
-          </ShellGroup>
+            <ShellGroup hasContentPanel={false}>
+              <ResizablePanel id="main">Main</ResizablePanel>
+            </ShellGroup>
+          </div>
         </LazyMotion>
       </SidebarProvider>,
     );
@@ -47,8 +48,7 @@ describe("shell panels", () => {
     const drawer = page.getByText("Sidebar").element().closest("[data-slot=sidebar-drawer]");
     expect(drawer).toBeInstanceOf(HTMLElement);
     expect((drawer as HTMLElement).dataset.state).toBe("open");
-    expect((drawer as HTMLElement).style.width).toBe("100%");
-    expect((drawer as HTMLElement).style.transform).toBe("none");
+    expect((drawer as HTMLElement).getBoundingClientRect().width).toBeGreaterThan(100);
   });
 
   it("notifies width memory only for completed user layouts", () => {
@@ -62,35 +62,74 @@ describe("shell panels", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it("remembers expanded user widths and synchronizes user collapse state", () => {
-    expect(resolveSidebarUserLayout(true, false, 360)).toEqual({ expandedWidth: 360 });
-    expect(resolveSidebarUserLayout(true, true, 0)).toEqual({ open: false });
-    expect(resolveSidebarUserLayout(false, false, 360)).toEqual({
-      expandedWidth: 360,
-      open: true,
-    });
-  });
-
   it("clips the resizable panel content wrapper", async () => {
     await render(
-      <Group orientation="horizontal">
+      <ShellGroup hasContentPanel>
+        <ResizablePanel id="main" style={{ color: "red", overflow: "visible" }}>
+          <div>Filler</div>
+        </ResizablePanel>
         <ShellContentPanel>
           <div>Content</div>
         </ShellContentPanel>
-        <ResizablePanel id="filler" style={{ color: "red", overflow: "visible" }}>
-          <div>Filler</div>
-        </ResizablePanel>
-      </Group>,
+      </ShellGroup>,
     );
 
     const panel = page.getByTestId("content").element();
     const contentWrapper = panel.firstElementChild as HTMLElement | null;
-    const fillerWrapper = page.getByTestId("filler").element()
+    const fillerWrapper = page.getByTestId("main").element()
       .firstElementChild as HTMLElement | null;
 
     expect(panel.parentElement?.dataset.group).toBe("true");
     expect(contentWrapper?.style.overflow).toBe("hidden");
     expect(fillerWrapper?.style.overflow).toBe("hidden");
     expect(fillerWrapper?.style.color).toBe("red");
+  });
+
+  it("keeps sidebar width when the content panel collapses", async () => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.includes("pie:shell-layout") || key === "pie:sidebar-width")
+        localStorage.removeItem(key);
+    }
+
+    function Shell({ contentOpen }: { contentOpen: boolean }) {
+      return (
+        <SidebarProvider defaultOpen>
+          <LazyMotion features={domAnimation}>
+            <div className="flex" style={{ width: 1200, height: 400 }}>
+              <ShellSidebarPanel>
+                <div>Sidebar</div>
+              </ShellSidebarPanel>
+              <ShellGroup hasContentPanel>
+                <ResizablePanel id="main">Main</ResizablePanel>
+                <ShellContentPanel collapsed={!contentOpen}>
+                  {contentOpen ? <div>Content</div> : null}
+                </ShellContentPanel>
+              </ShellGroup>
+            </div>
+          </LazyMotion>
+        </SidebarProvider>
+      );
+    }
+
+    const drawerWidth = (): number => {
+      const drawer = page.getByText("Sidebar").element().closest("[data-slot=sidebar-drawer]");
+      expect(drawer).toBeInstanceOf(HTMLElement);
+      return (drawer as HTMLElement).getBoundingClientRect().width;
+    };
+
+    const screen = await render(<Shell contentOpen={false} />);
+    await expect.element(page.getByText("Sidebar")).toBeVisible();
+    const hiddenWidth = drawerWidth();
+    expect(hiddenWidth).toBeGreaterThan(100);
+
+    await screen.rerender(<Shell contentOpen />);
+    await expect
+      .poll(() => page.getByTestId("content").element().getBoundingClientRect().width)
+      .toBeGreaterThan(100);
+    expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
+
+    await screen.rerender(<Shell contentOpen={false} />);
+    await expect.element(page.getByText("Sidebar")).toBeVisible();
+    expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
   });
 });
