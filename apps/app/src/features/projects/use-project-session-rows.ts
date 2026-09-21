@@ -5,7 +5,11 @@ import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext, useRouter } from "@tanstack/react-router";
 
 import type { SessionPullRequest } from "@/features/projects/project-session-row";
-import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
+import {
+  sameSessionRef,
+  sessionRefFromRouterMatches,
+  toEnvironmentSessionRef,
+} from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
 const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
@@ -30,10 +34,13 @@ const selectNewestFirst = (
 
 /** Session rows + PR/schedule adornments for one project's sidebar list. */
 export function useProjectSessionRows(project: Project) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { localEnvironmentId, orpcQueryUtils } = useRouteContext({ from: "__root__" });
   const router = useRouter();
   const isSessionActive = (ref: SessionRef) =>
-    sameSessionRef(ref, sessionRefFromRouterMatches(router.state.matches));
+    sameSessionRef(
+      toEnvironmentSessionRef(localEnvironmentId, ref),
+      sessionRefFromRouterMatches(router.state.matches),
+    );
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -63,6 +70,7 @@ export function useProjectSessionRows(project: Project) {
   });
 
   return {
+    environmentId: localEnvironmentId,
     isSessionActive,
     rows,
     pullRequestFor: (session: SessionSummary, active: boolean) => {

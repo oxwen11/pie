@@ -62,7 +62,7 @@ export function writeFakePiExecutable(): PiExecutable {
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE_PI);
   fs.chmodSync(file, 0o755);
-  return { command: file };
+  return { command: file, prefixArgs: [] };
 }
 
 export interface RpcTestHarnessOptions {
