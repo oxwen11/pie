@@ -27,7 +27,7 @@ rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
   if (msg.type !== "prompt") return;
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });

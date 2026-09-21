@@ -6,7 +6,7 @@ import path from "node:path";
 import { createPieClient } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createServer, type ManagedServer } from "../../src/http/server";
+import type { ManagedServer } from "../../src/http/server";
 import { discardContext } from "../platform";
 
 const TOKEN = "test-token-pairing-prompt";
@@ -27,7 +27,7 @@ rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
   if (msg.type !== "prompt") return;
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
@@ -76,6 +76,7 @@ describe("createServer pairing prompt", () => {
     process.env.PIE_E2E_PI_EXECUTABLE = fakePi;
     process.env.PIE_HOME = home;
 
+    const { createServer } = await import("../../src/http/server");
     server = await createServer({
       authToken: TOKEN,
       environmentId: ENVIRONMENT_ID,
