@@ -103,6 +103,7 @@ export const resolvePieEndpoint = (
 
     const { port } = yield* resolveServeConfig({
       port: Option.none(),
+      host: Option.none(),
       corsOrigin: [],
       allowedHost: [],
     });
