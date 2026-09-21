@@ -148,8 +148,14 @@ form:has(> [data-slot="chat-input"]):focus-within {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
 }
 
-.chat-input-scroll-fade {
-  font-weight: 430;
+.chat-input-caret {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 2px;
+  pointer-events: none;
+  background: var(--foreground);
+  animation: var(--animate-caret-blink);
 }
 
 @property --chat-input-fade-top {
