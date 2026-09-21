@@ -61,13 +61,14 @@ Application code depends on the `DesktopSsh` Tag, not on `@getpie/ssh` directly.
    hostname always from `-G`.
 2. `ssh` stdin = generated script; remote argv `sh -l -s <stateKey>`.
 3. Script `unset`s `NODE_ENV` / `PIE_*` so a desktop-dev client cannot push the
-   remote into `~/.pie-dev`, bootstraps Node 24 onto PATH, writes
-   `~/.pie/ssh-launch/<stateKey>/run-pie.sh`, runs `pie daemon start` (or
-   `npx @getpie/cli@latest daemon start`).
-4. Reads `~/.pie/daemon/daemon.pid` and prints
-   `{ remotePort, token, serverKind: "daemon" }`. Local parser takes the last
-   `{…}` and requires `serverKind === "daemon"`. Token fields are redacted in
-   error stdout.
+   remote into `~/.pie-dev` and bootstraps Node 24 onto PATH. It then reads
+   `~/.pie/daemon/daemon.pid`. A live pid whose `GET /api/health` body is `ok`
+   prints the launch JSON and exits, without writing
+   `~/.pie/ssh-launch/<stateKey>/` or running `pie`.
+4. Otherwise it writes `~/.pie/ssh-launch/<stateKey>/run-pie.sh`, runs
+   `pie daemon start` (or `npx @getpie/cli@latest daemon start`), reads the
+   record, and prints `{ remotePort, token, hostname }`. Local parser takes the
+   last `{…}`. Token fields are redacted in error stdout.
 5. Reserve a local loopback port, `ssh -N -L` with `ExitOnForwardFailure`,
    keepalives, `BatchMode=yes`. Poll `GET /api/health` until the body is exactly
    `ok` (unauthenticated, as locally).

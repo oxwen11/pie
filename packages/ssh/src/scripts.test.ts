@@ -1,5 +1,6 @@
 import childProcess from "node:child_process";
 import fs from "node:fs/promises";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 
@@ -61,7 +62,11 @@ describe("remote launch scripts", () => {
   it("starts or attaches the remote pie daemon and prints launch JSON", () => {
     const script = buildRemoteLaunchScript();
     expect(script).toContain("unset NODE_ENV PIE_HOME PIE_DAEMON_DIR PIE_AUTH_TOKEN");
+    expect(script.indexOf("emit_daemon_record attach")).toBeLessThan(
+      script.indexOf('"$RUNNER_FILE" daemon start'),
+    );
     expect(script).toContain("daemon start");
+    expect(script).toContain("/api/health");
     expect(script).toContain("$HOME/.pie/daemon/daemon.pid");
     expect(script).toContain("$HOME/.pie/ssh-launch/");
     expect(script).toContain("remotePort: port");
@@ -214,4 +219,123 @@ nvm() { :; }
       await fs.rm(home, { recursive: true, force: true });
     }
   });
+
+  it("attaches to a healthy ~/.pie/daemon without starting pie", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-attach-"));
+    const server = http.createServer((request, response) => {
+      response.end(request.url === "/api/health" ? "ok" : "");
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const listened = server.address();
+    if (listened === null || typeof listened === "string") {
+      server.close();
+      throw new Error("health server did not listen");
+    }
+    try {
+      const bin = path.join(home, "bin");
+      await installNodeShim(bin);
+      await writeExecutable(
+        path.join(bin, "pie"),
+        '#!/bin/sh\necho called > "$HOME/pie-called"\nexit 99\n',
+      );
+      await fs.mkdir(path.join(home, ".pie", "daemon"), { recursive: true });
+      await fs.writeFile(
+        path.join(home, ".pie", "daemon", "daemon.pid"),
+        JSON.stringify({
+          pid: process.pid,
+          address: `http://127.0.0.1:${String(listened.port)}`,
+          token: "secret-token",
+          startedAt: 1,
+        }),
+      );
+
+      const result = await runLaunch(home, `${bin}:/usr/bin:/bin`);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(`"remotePort":${String(listened.port)}`);
+      expect(result.stdout).toContain('"token":"secret-token"');
+      await expect(fs.stat(path.join(home, "pie-called"))).rejects.toThrow(/ENOENT/);
+    } finally {
+      server.close();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("starts pie when the recorded daemon is not alive", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-start-"));
+    try {
+      const bin = path.join(home, "bin");
+      await installNodeShim(bin);
+      await writeExecutable(
+        path.join(bin, "pie"),
+        `#!/bin/sh
+mkdir -p "$HOME/.pie/daemon"
+printf '%s\n' '{"pid":1,"address":"http://127.0.0.1:9","token":"started-token","startedAt":1}' > "$HOME/.pie/daemon/daemon.pid"
+echo called > "$HOME/pie-called"
+exit 0
+`,
+      );
+      await fs.mkdir(path.join(home, ".pie", "daemon"), { recursive: true });
+      await fs.writeFile(
+        path.join(home, ".pie", "daemon", "daemon.pid"),
+        JSON.stringify({
+          pid: 2_147_483_646,
+          address: "http://127.0.0.1:9",
+          token: "stale",
+          startedAt: 1,
+        }),
+      );
+
+      const result = await runLaunch(home, `${bin}:/usr/bin:/bin`);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('"remotePort":9');
+      expect(result.stdout).toContain('"token":"started-token"');
+      await expect(fs.readFile(path.join(home, "pie-called"), "utf8")).resolves.toContain("called");
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
 });
+
+async function installNodeShim(bin: string): Promise<void> {
+  const node = process.execPath.replaceAll("'", String.raw`'\''`);
+  await writeExecutable(
+    path.join(bin, "node"),
+    `#!/bin/sh
+if [ "$1" = "-v" ]; then
+  echo v24.18.0
+  exit 0
+fi
+exec '${node}' "$@"
+`,
+  );
+}
+
+function runLaunch(
+  home: string,
+  pathEnv: string,
+): Promise<{ stdout: string; stderr: string; status: number }> {
+  const script = buildRemoteLaunchScript();
+  return new Promise((resolve) => {
+    const child = childProcess.spawn("/bin/sh", ["-s", "state"], {
+      env: { HOME: home, PATH: pathEnv, TMPDIR: os.tmpdir() },
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => child.kill(), 10_000);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, status: code ?? 1 });
+    });
+    child.stdin.end(script);
+  });
+}
