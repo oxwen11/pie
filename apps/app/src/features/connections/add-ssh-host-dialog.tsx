@@ -21,10 +21,12 @@ import { PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 
-import type { DiscoveredSshHost } from "@/platform";
+import type { DiscoveredSshHost, PlatformSsh } from "@/platform";
 import { usePlatform } from "@/platform-context";
 
 import { composeSshConnectTarget } from "./ssh-connect-target";
+
+const MISMATCH = "already running with a different version";
 
 function discoveredHostAddress(host: DiscoveredSshHost): string {
   const authority = host.username ? `${host.username}@${host.hostname}` : host.hostname;
@@ -54,8 +56,38 @@ function hostMatchesQuery(host: DiscoveredSshHost, query: string): boolean {
   );
 }
 
+function connectSsh(
+  ssh: PlatformSsh,
+  target: string,
+  replace: boolean,
+  onClose: () => void,
+  onMismatch: (target: string) => void,
+  onIdle: () => void,
+): void {
+  void ssh
+    .connect(target, { replace })
+    .then(() => {
+      onClose();
+      return undefined;
+    })
+    .catch((error: unknown) => {
+      onIdle();
+      if (!replace && error instanceof Error && error.message.includes(MISMATCH)) {
+        onMismatch(target);
+        return undefined;
+      }
+      toast.error(error instanceof Error ? error.message : "Failed to connect over SSH.");
+      return undefined;
+    });
+}
+
 export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactElement | null {
   const ssh = usePlatform().ssh;
+  if (!ssh || !ssh.client.available) return null;
+  return <AddSshHostForm onClose={onClose} ssh={ssh} />;
+}
+
+function AddSshHostForm({ onClose, ssh }: { onClose: () => void; ssh: PlatformSsh }): ReactElement {
   const [host, setHost] = useState("");
   const [username, setUsername] = useState("");
   const [port, setPort] = useState("");
@@ -66,7 +98,6 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
   const [replaceTarget, setReplaceTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!ssh) return undefined;
     let cancelled = false;
     void ssh
       .discoverHosts()
@@ -95,54 +126,32 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
   );
   const showSuggestions = hostsLoading || filteredHosts.length > 0 || host.trim().length > 0;
 
-  if (!ssh || !ssh.client.available) return null;
-
   const connectTarget = (target: string, replace = false) => {
     if (pending) return;
     setPending(true);
     setReplaceTarget(null);
-    void ssh
-      .connect(target, { replace })
-      .then(() => {
-        onClose();
-        return undefined;
-      })
-      .catch((error: unknown) => {
-        setPending(false);
-        if (
-          !replace &&
-          error instanceof Error &&
-          error.message.includes("already running with a different version")
-        ) {
-          setReplaceTarget(target);
-          return undefined;
-        }
-        toast.error(error instanceof Error ? error.message : "Failed to connect over SSH.");
-        return undefined;
-      });
+    connectSsh(ssh, target, replace, onClose, setReplaceTarget, () => setPending(false));
   };
 
   const submitManual = () => {
-    let target: string;
     try {
-      target = composeSshConnectTarget({ host, username, port });
+      connectTarget(composeSshConnectTarget({ host, username, port }));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Invalid SSH target.");
-      return;
     }
-    connectTarget(target);
   };
 
   const selectDiscovered = (entry: DiscoveredSshHost) => {
+    const nextPort = entry.port === null ? "" : String(entry.port);
     setHost(entry.alias);
     setUsername(entry.username ?? "");
-    setPort(entry.port === null ? "" : String(entry.port));
+    setPort(nextPort);
     setSuggestionsOpen(false);
     connectTarget(
       composeSshConnectTarget({
         host: entry.alias,
         username: entry.username ?? "",
-        port: entry.port === null ? "" : String(entry.port),
+        port: nextPort,
       }),
     );
   };
@@ -167,66 +176,17 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
           <div className="flex flex-col gap-3 px-6 py-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ssh-host">SSH host or alias</Label>
-              <Autocomplete
-                items={filteredHosts}
-                itemToStringValue={(entry) => entry.alias}
-                mode="none"
-                open={suggestionsOpen && showSuggestions}
-                openOnInputClick
-                value={host}
-                onOpenChange={(open) => {
-                  setSuggestionsOpen(open);
-                }}
-                onValueChange={(value, eventDetails) => {
-                  setHost(value);
-                  if (eventDetails.reason !== "item-press") return;
-                  const entry = filteredHosts.find((candidate) => candidate.alias === value);
-                  if (entry) selectDiscovered(entry);
-                }}
-              >
-                <AutocompleteInput
-                  id="ssh-host"
-                  autoComplete="off"
-                  disabled={pending}
-                  placeholder="Search hosts or type user@host"
-                  spellCheck={false}
-                />
-                {showSuggestions ? (
-                  <AutocompletePopup>
-                    {hostsLoading ? (
-                      <div className="text-muted-foreground px-3 py-2 text-xs">Loading hosts…</div>
-                    ) : filteredHosts.length > 0 ? (
-                      <AutocompleteList className="max-h-72">
-                        {filteredHosts.map((entry) => {
-                          const address = discoveredHostAddress(entry);
-                          return (
-                            <AutocompleteItem
-                              key={`${entry.source}:${entry.alias}:${entry.hostname}:${entry.port ?? ""}`}
-                              className="h-8 min-h-8 whitespace-nowrap"
-                              value={entry}
-                            >
-                              <span className="min-w-0 truncate text-sm font-medium">
-                                {discoveredHostOptionLabel(entry)}
-                              </span>
-                              {address !== entry.alias ? (
-                                <span className="text-muted-foreground ms-2 min-w-0 flex-1 truncate text-xs">
-                                  {address}
-                                </span>
-                              ) : (
-                                <span className="flex-1" />
-                              )}
-                            </AutocompleteItem>
-                          );
-                        })}
-                      </AutocompleteList>
-                    ) : (
-                      <AutocompleteEmpty className="break-all">
-                        No hosts match &quot;{host.trim()}&quot;.
-                      </AutocompleteEmpty>
-                    )}
-                  </AutocompletePopup>
-                ) : null}
-              </Autocomplete>
+              <HostPicker
+                filteredHosts={filteredHosts}
+                host={host}
+                hostsLoading={hostsLoading}
+                pending={pending}
+                showSuggestions={showSuggestions}
+                suggestionsOpen={suggestionsOpen}
+                onHostChange={setHost}
+                onOpenChange={setSuggestionsOpen}
+                onSelect={selectDiscovered}
+              />
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
               <div className="flex flex-col gap-1.5">
@@ -278,5 +238,110 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
         </form>
       </DialogPopup>
     </Dialog>
+  );
+}
+
+function HostPicker({
+  filteredHosts,
+  host,
+  hostsLoading,
+  pending,
+  showSuggestions,
+  suggestionsOpen,
+  onHostChange,
+  onOpenChange,
+  onSelect,
+}: {
+  filteredHosts: readonly DiscoveredSshHost[];
+  host: string;
+  hostsLoading: boolean;
+  pending: boolean;
+  showSuggestions: boolean;
+  suggestionsOpen: boolean;
+  onHostChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (entry: DiscoveredSshHost) => void;
+}): ReactElement {
+  return (
+    <Autocomplete
+      items={filteredHosts}
+      itemToStringValue={(entry) => entry.alias}
+      mode="none"
+      open={suggestionsOpen && showSuggestions}
+      openOnInputClick
+      value={host}
+      onOpenChange={onOpenChange}
+      onValueChange={(value, eventDetails) => {
+        onHostChange(value);
+        if (eventDetails.reason !== "item-press") return;
+        const entry = filteredHosts.find((candidate) => candidate.alias === value);
+        if (entry) onSelect(entry);
+      }}
+    >
+      <AutocompleteInput
+        id="ssh-host"
+        autoComplete="off"
+        disabled={pending}
+        placeholder="Search hosts or type user@host"
+        spellCheck={false}
+      />
+      {showSuggestions ? (
+        <HostSuggestions filteredHosts={filteredHosts} host={host} hostsLoading={hostsLoading} />
+      ) : null}
+    </Autocomplete>
+  );
+}
+
+function HostSuggestions({
+  filteredHosts,
+  host,
+  hostsLoading,
+}: {
+  filteredHosts: readonly DiscoveredSshHost[];
+  host: string;
+  hostsLoading: boolean;
+}): ReactElement {
+  if (hostsLoading) {
+    return (
+      <AutocompletePopup>
+        <div className="text-muted-foreground px-3 py-2 text-xs">Loading hosts…</div>
+      </AutocompletePopup>
+    );
+  }
+  if (filteredHosts.length === 0) {
+    return (
+      <AutocompletePopup>
+        <AutocompleteEmpty className="break-all">
+          No hosts match &quot;{host.trim()}&quot;.
+        </AutocompleteEmpty>
+      </AutocompletePopup>
+    );
+  }
+  return (
+    <AutocompletePopup>
+      <AutocompleteList className="max-h-72">
+        {filteredHosts.map((entry) => {
+          const address = discoveredHostAddress(entry);
+          return (
+            <AutocompleteItem
+              key={`${entry.source}:${entry.alias}:${entry.hostname}:${entry.port ?? ""}`}
+              className="h-8 min-h-8 whitespace-nowrap"
+              value={entry}
+            >
+              <span className="min-w-0 truncate text-sm font-medium">
+                {discoveredHostOptionLabel(entry)}
+              </span>
+              {address !== entry.alias ? (
+                <span className="text-muted-foreground ms-2 min-w-0 flex-1 truncate text-xs">
+                  {address}
+                </span>
+              ) : (
+                <span className="flex-1" />
+              )}
+            </AutocompleteItem>
+          );
+        })}
+      </AutocompleteList>
+    </AutocompletePopup>
   );
 }
