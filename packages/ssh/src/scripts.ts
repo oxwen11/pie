@@ -2,7 +2,6 @@
 
 export type RemotePieRunnerOptions = {
   readonly packageSpec?: string;
-  readonly replace?: boolean;
 };
 
 export const REMOTE_LAUNCH_TIMEOUT_MS = 90_000;
@@ -208,7 +207,7 @@ chmod 700 "$RUNNER_FILE"
 if ! ensure_remote_node_path; then
   exit 1
 fi
-if ! "$RUNNER_FILE" daemon start $([ "\${2:-}" = replace ] && printf %s --replace) >>"$LOG_FILE" 2>&1; then
+if ! "$RUNNER_FILE" daemon start >>"$LOG_FILE" 2>&1; then
   printf 'Remote pie daemon failed to start. Last log:\\n' >&2
   if [ -s "$LOG_FILE" ]; then
     tail -n 80 "$LOG_FILE" >&2 2>/dev/null || true

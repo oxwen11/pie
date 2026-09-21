@@ -59,24 +59,24 @@ function hostMatchesQuery(host: DiscoveredSshHost, query: string): boolean {
 function connectSsh(
   ssh: PlatformSsh,
   target: string,
-  replace: boolean,
   onClose: () => void,
-  onMismatch: (target: string) => void,
   onIdle: () => void,
 ): void {
   void ssh
-    .connect(target, { replace })
+    .connect(target)
     .then(() => {
       onClose();
       return undefined;
     })
     .catch((error: unknown) => {
       onIdle();
-      if (!replace && error instanceof Error && error.message.includes(MISMATCH)) {
-        onMismatch(target);
-        return undefined;
-      }
-      toast.error(error instanceof Error ? error.message : "Failed to connect over SSH.");
+      toast.error(
+        error instanceof Error && error.message.includes(MISMATCH)
+          ? "Pie on that machine is a different version. Update Pie there, then connect."
+          : error instanceof Error
+            ? error.message
+            : "Failed to connect over SSH.",
+      );
       return undefined;
     });
 }
@@ -95,7 +95,6 @@ function AddSshHostForm({ onClose, ssh }: { onClose: () => void; ssh: PlatformSs
   const [hostsLoading, setHostsLoading] = useState(true);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [replaceTarget, setReplaceTarget] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,11 +125,10 @@ function AddSshHostForm({ onClose, ssh }: { onClose: () => void; ssh: PlatformSs
   );
   const showSuggestions = hostsLoading || filteredHosts.length > 0 || host.trim().length > 0;
 
-  const connectTarget = (target: string, replace = false) => {
+  const connectTarget = (target: string) => {
     if (pending) return;
     setPending(true);
-    setReplaceTarget(null);
-    connectSsh(ssh, target, replace, onClose, setReplaceTarget, () => setPending(false));
+    connectSsh(ssh, target, onClose, () => setPending(false));
   };
 
   const submitManual = () => {
@@ -168,9 +166,8 @@ function AddSshHostForm({ onClose, ssh }: { onClose: () => void; ssh: PlatformSs
           <DialogHeader>
             <DialogTitle>Add SSH host</DialogTitle>
             <DialogDescription>
-              {replaceTarget === null
-                ? "Pie launches the remote pie daemon and forwards it over SSH. Use ssh-agent or an IdentityFile; password prompts are not wired yet."
-                : "Pie on that machine is already running a different version. Restarting it will disconnect the Desktop app there."}
+              Pie launches the remote pie daemon and forwards it over SSH. Use ssh-agent or an
+              IdentityFile; password prompts are not wired yet.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 px-6 py-2">
@@ -220,20 +217,10 @@ function AddSshHostForm({ onClose, ssh }: { onClose: () => void; ssh: PlatformSs
             <Button disabled={pending} type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            {replaceTarget === null ? (
-              <Button disabled={pending || host.trim().length === 0} type="submit">
-                <PlusIcon className="size-3.5" />
-                {pending ? "Adding…" : "Add environment"}
-              </Button>
-            ) : (
-              <Button
-                disabled={pending}
-                type="button"
-                onClick={() => connectTarget(replaceTarget, true)}
-              >
-                {pending ? "Restarting…" : "Restart remote Pie"}
-              </Button>
-            )}
+            <Button disabled={pending || host.trim().length === 0} type="submit">
+              <PlusIcon className="size-3.5" />
+              {pending ? "Adding…" : "Add environment"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogPopup>

@@ -46,7 +46,7 @@ export type PlatformSsh = {
   readonly client: SshClientAvailability;
   readonly environments: EnvironmentFeed;
   readonly discoverHosts: () => Promise<readonly DiscoveredSshHost[]>;
-  readonly connect: (target: string, options?: { readonly replace?: boolean }) => Promise<void>;
+  readonly connect: (target: string) => Promise<void>;
   readonly remove: (id: string) => Promise<void>;
 };
 

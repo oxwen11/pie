@@ -78,8 +78,7 @@ export function createDesktopHost(
           },
         },
         discoverHosts: () => client.environments.discoverSshHosts(),
-        connect: (target, options) =>
-          client.environments.connectSsh({ target, replace: options?.replace }),
+        connect: (target) => client.environments.connectSsh({ target }),
         remove: (id) => client.environments.removeSsh({ id }),
       },
       tailscale: {

@@ -215,13 +215,7 @@ export const launchOrReuseRemoteServer = (
         ...options,
         packageSpec: resolveRemotePiePackageSpec(options?.packageSpec),
       }),
-      remoteCommandArgs: [
-        "sh",
-        "-l",
-        "-s",
-        remoteStateKey(target),
-        ...(options?.replace === true ? ["replace"] : []),
-      ],
+      remoteCommandArgs: ["sh", "-l", "-s", remoteStateKey(target)],
       timeoutMs: REMOTE_LAUNCH_TIMEOUT_MS,
       env: options?.env,
     }).pipe(Effect.mapError(toLaunchError));

@@ -106,7 +106,6 @@ export type DesktopSshShape = {
   readonly listSaved: Effect.Effect<readonly SavedSshEnvironment[]>;
   readonly connect: (
     raw: string,
-    options?: { readonly replace?: boolean },
   ) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError | SshPersistError>;
   readonly disconnect: Effect.Effect<void>;
   readonly remove: (id: string) => Effect.Effect<void, SshPersistError>;
@@ -345,7 +344,7 @@ export function makeDesktopSsh(input: {
         Effect.provide(platform),
         Effect.map((state) => state.environments),
       ),
-      connect: (raw, options) =>
+      connect: (raw) =>
         Effect.gen(function* () {
           const missingMessage = client.available ? undefined : client.message;
           if (missingMessage !== undefined && input.connectEnvironment === undefined) {
@@ -362,8 +361,7 @@ export function makeDesktopSsh(input: {
           }
 
           const connected = yield* (
-            input.connectEnvironment?.(target) ??
-              connectSshEnvironment(target, { ...cli, replace: options?.replace })
+            input.connectEnvironment?.(target) ?? connectSshEnvironment(target, cli)
           );
           const connection = {
             httpBaseUrl: connected.httpBaseUrl,

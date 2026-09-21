@@ -107,14 +107,7 @@ export const desktopContract = {
       .input(StatusSubscribeInputSchema)
       .output(asyncIteratorObject(toStandardSchema(EnvironmentSnapshotSchema))),
     discoverSshHosts: oc.output(Schema.Array(DiscoveredSshHostSchema)),
-    connectSsh: oc
-      .input(
-        Schema.Struct({
-          target: Schema.NonEmptyString,
-          replace: Schema.optionalKey(Schema.Boolean),
-        }),
-      )
-      .output(Schema.Void),
+    connectSsh: oc.input(Schema.Struct({ target: Schema.NonEmptyString })).output(Schema.Void),
     removeSsh: oc.input(Schema.Struct({ id: Schema.NonEmptyString })).output(Schema.Void),
   },
   tailscale: {
