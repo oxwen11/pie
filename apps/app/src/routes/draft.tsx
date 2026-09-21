@@ -214,7 +214,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     );
   }
 
-  if (projects.data.length === 0) {
+  if (projects.data.length === 0 && search.projectId === undefined) {
     return (
       <DraftEmptyImport
         importOpen={importOpen}
