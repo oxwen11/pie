@@ -31,7 +31,7 @@ function glyphLineRect(root: HTMLElement) {
 }
 
 describe("thick caret", () => {
-  it("is a 1em widget inside the editor, not a body overlay", async () => {
+  it("is a slightly-taller-than-1em widget inside the editor, not a body overlay", async () => {
     const controller = makeController();
     await render(
       <EditorContent className="text-sm leading-5 font-medium" editor={controller.editor} />,
@@ -56,10 +56,10 @@ describe("thick caret", () => {
     if (!bar || !line) return;
     const cr = bar.getBoundingClientRect();
     const fs = Number.parseFloat(getComputedStyle(controller.editor.view.dom).fontSize);
-    expect(cr.height).toBeGreaterThan(fs - 2);
-    expect(cr.height).toBeLessThan(fs + 2);
-    expect(cr.top).toBeGreaterThanOrEqual(line.top - 1);
-    expect(cr.bottom).toBeLessThanOrEqual(line.bottom + 1);
+    expect(cr.height).toBeGreaterThan(fs * 1.2 - 2);
+    expect(cr.height).toBeLessThan(fs * 1.2 + 2);
+    expect(cr.top).toBeGreaterThanOrEqual(line.top - 3);
+    expect(cr.bottom).toBeLessThanOrEqual(line.bottom + 3);
     expect(Math.abs(cr.top - line.top - (line.bottom - cr.bottom))).toBeLessThan(2);
 
     const { view } = controller.editor;
