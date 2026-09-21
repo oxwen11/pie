@@ -103,16 +103,16 @@ export function AppSidebar() {
           // constants are unreadable to require-static-classes.
           "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
           desktop && "px-0",
-          "[-webkit-app-region:drag]",
         )}
+        data-drag-region=""
       >
         {isDesktopMacosHost(platform) ? null : (
           <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
         )}
-        {!desktop && expanded ? <SidebarTrigger className="[-webkit-app-region:no-drag]" /> : null}
+        {!desktop && expanded ? <SidebarTrigger /> : null}
       </SidebarHeader>
 
-      <SidebarContent className="[-webkit-app-region:no-drag]">
+      <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -127,7 +127,7 @@ export function AppSidebar() {
         <ProjectList />
       </SidebarContent>
 
-      <SidebarFooter className="[-webkit-app-region:no-drag]">
+      <SidebarFooter>
         <SidebarMenu>
           <SettingsNavItem />
         </SidebarMenu>

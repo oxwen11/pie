@@ -31,7 +31,7 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-2xl dark:border-white/8",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 md:rounded-2xl dark:border-white/8",
         presentation === "docked"
           ? "md:rounded-s-none md:border-s-0"
           : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
@@ -67,7 +67,10 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12">
+    <div
+      className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12"
+      data-drag-region=""
+    >
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
