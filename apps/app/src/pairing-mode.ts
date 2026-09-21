@@ -22,7 +22,9 @@ export function resolvePairingAccess(
  */
 export async function readPairingMode(fetchImpl: typeof fetch = fetch): Promise<PairingMode> {
   try {
-    const response = await fetchImpl("/api/environment");
+    const response = await fetchImpl("/api/environment", {
+      signal: AbortSignal.timeout(8000),
+    });
     return response.status === 200 ? "open" : "required";
   } catch {
     return "open";
@@ -38,6 +40,7 @@ export async function validateStoredPairingSession(
   try {
     const response = await fetchImpl("/api/environment", {
       headers: { authorization: `Bearer ${stored.token}` },
+      signal: AbortSignal.timeout(8000),
     });
     if (response.ok) return stored;
   } catch {

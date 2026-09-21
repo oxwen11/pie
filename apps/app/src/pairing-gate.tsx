@@ -1,4 +1,4 @@
-import { use, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
 import { AppInterface } from "./app-interface";
 import {
@@ -12,7 +12,6 @@ import {
   writePairingSession,
   type StoredPairingSession,
 } from "./pairing-session";
-import { useStable } from "./use-stable";
 
 async function loadPairingAccess(): Promise<{
   readonly mode: Awaited<ReturnType<typeof readPairingMode>>;
@@ -25,11 +24,23 @@ async function loadPairingAccess(): Promise<{
   return { mode, session };
 }
 
-export function PairingGate(): ReactElement {
-  const pairing = useStable(() => loadPairingAccess());
-  const loaded = use(pairing);
-  const [session, setSession] = useState(loaded.session);
-  const access = resolvePairingAccess(loaded.mode, session);
+export function PairingGate(): ReactElement | null {
+  const [loaded, setLoaded] = useState<Awaited<ReturnType<typeof loadPairingAccess>> | null>(null);
+  const [session, setSession] = useState<StoredPairingSession | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const next = await loadPairingAccess();
+      if (!cancelled) setLoaded(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loaded === null) return null;
+  const access = resolvePairingAccess(loaded.mode, session ?? loaded.session);
 
   if (access.kind === "open") {
     return <AppInterface />;
