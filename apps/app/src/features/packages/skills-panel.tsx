@@ -7,18 +7,18 @@ import {
   EmptyTitle,
 } from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { CheckIcon, SearchIcon, Sparkles } from "lucide-react";
 import { useMemo, useState, type ReactElement } from "react";
 
 import Loader from "@/components/loader";
+import { useLocalOrpc } from "@/lib/environment-orpc";
 
 function skillInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
 }
 
 export function SkillsPanel(): ReactElement {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useLocalOrpc();
   const [query, setQuery] = useState("");
   const list = useQuery({
     ...orpcQueryUtils.skills.list.queryOptions(),

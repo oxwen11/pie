@@ -10,12 +10,12 @@ import {
 import { InputGroup, InputGroupInput } from "@getpie/ui/components/input-group";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { Package, SearchIcon, Trash2 } from "lucide-react";
 import { useState, type ReactElement } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
+import { useLocalOrpc } from "@/lib/environment-orpc";
 
 export type PackageDetail = {
   name: string;
@@ -431,7 +431,7 @@ function usePackageMutations(
   onAddingSourceOpenChange: (open: boolean) => void,
   setSource: (source: string) => void,
 ) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useLocalOrpc();
   const queryClient = useQueryClient();
   const listKey = orpcQueryUtils.packages.list.queryOptions().queryKey;
   const add = useMutation({
@@ -474,7 +474,7 @@ export function PackagesPanel({
   onAddingSourceOpenChange: (open: boolean) => void;
   onDetailChange: (detail: PackageDetail | null) => void;
 }): ReactElement {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useLocalOrpc();
   const list = useQuery({
     ...orpcQueryUtils.packages.list.queryOptions(),
     meta: { errorMode: "inline" },
