@@ -191,12 +191,14 @@ exit 1
 `;
 
 export const REMOTE_LAUNCH_SCRIPT = `set -eu
-# Drop client-side SendEnv leaks so the remote daemon uses ~/.pie, not ~/.pie-dev.
-unset NODE_ENV PIE_HOME PIE_DAEMON_DIR PIE_AUTH_TOKEN PIE_PORT PIE_CORS_ORIGINS || true
+# Drop client port and token leaks. Keep the remote login shell's PIE_HOME:
+# the local ssh child already strips it, and a test home is not ~/.pie.
+unset NODE_ENV PIE_DAEMON_DIR PIE_AUTH_TOKEN PIE_PORT PIE_CORS_ORIGINS || true
 @@PIE_NODE_ENV_SCRIPT@@
 STATE_KEY="$1"
-STATE_DIR="$HOME/.pie/ssh-launch/$STATE_KEY"
-DAEMON_RECORD="$HOME/.pie/daemon/daemon.pid"
+PIE_RUNTIME_HOME="\${PIE_HOME:-$HOME/.pie}"
+STATE_DIR="$PIE_RUNTIME_HOME/ssh-launch/$STATE_KEY"
+DAEMON_RECORD="$PIE_RUNTIME_HOME/daemon/daemon.pid"
 LOG_FILE="$STATE_DIR/server.log"
 RUNNER_FILE="$STATE_DIR/run-pie.sh"
 if ! ensure_remote_node_path; then

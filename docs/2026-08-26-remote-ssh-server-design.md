@@ -60,12 +60,13 @@ Application code depends on the `DesktopSsh` Tag, not on `@getpie/ssh` directly.
 1. `parseSshInput` then `ssh -G` (`resolveSshInput`). Typed user/port win;
    hostname always from `-G`.
 2. `ssh` stdin = generated script; remote argv `sh -l -s <stateKey>`.
-3. Script `unset`s `NODE_ENV` / `PIE_*` so a desktop-dev client cannot push the
-   remote into `~/.pie-dev` and bootstraps Node 24 onto PATH. It then reads
-   `~/.pie/daemon/daemon.pid`. A live pid whose `GET /api/health` body is `ok`
-   prints the launch JSON and exits, without writing
-   `~/.pie/ssh-launch/<stateKey>/` or running `pie`.
-4. Otherwise it writes `~/.pie/ssh-launch/<stateKey>/run-pie.sh`, runs
+3. The local `ssh` child strips `PIE_HOME` so a desktop-dev client cannot push
+   its home over SendEnv. The script keeps the remote login shell's `PIE_HOME`,
+   otherwise `$HOME/.pie`, bootstraps Node 24 onto PATH, and reads
+   `$PIE_HOME/daemon/daemon.pid`. A live pid whose `GET /api/health` body is `ok`
+   prints the launch JSON and exits, without writing `ssh-launch/<stateKey>/` or
+   running `pie`.
+4. Otherwise it writes `ssh-launch/<stateKey>/run-pie.sh` under that same home, runs
    `pie daemon start` (or `npx @getpie/cli@latest daemon start`), reads the
    record, and prints `{ remotePort, token, hostname }`. Local parser takes the
    last `{…}`. Token fields are redacted in error stdout.

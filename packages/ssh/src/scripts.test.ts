@@ -61,14 +61,17 @@ node -v
 describe("remote launch scripts", () => {
   it("starts or attaches the remote pie daemon and prints launch JSON", () => {
     const script = buildRemoteLaunchScript();
-    expect(script).toContain("unset NODE_ENV PIE_HOME PIE_DAEMON_DIR PIE_AUTH_TOKEN");
+    expect(script).toContain("unset NODE_ENV PIE_DAEMON_DIR PIE_AUTH_TOKEN");
+    expect(script).not.toContain("unset NODE_ENV PIE_HOME");
     expect(script.indexOf("emit_daemon_record attach")).toBeLessThan(
       script.indexOf('"$RUNNER_FILE" daemon start'),
     );
     expect(script).toContain("daemon start");
     expect(script).toContain("/api/health");
-    expect(script).toContain("$HOME/.pie/daemon/daemon.pid");
-    expect(script).toContain("$HOME/.pie/ssh-launch/");
+    expect(script).toContain("PIE_RUNTIME_HOME=");
+    expect(script).toContain("PIE_HOME:-$HOME/.pie");
+    expect(script).toContain('DAEMON_RECORD="$PIE_RUNTIME_HOME/daemon/daemon.pid"');
+    expect(script).toContain("/ssh-launch/");
     expect(script).toContain("remotePort: port");
     expect(script).toContain("token: token");
     expect(script).toContain("os.hostname()");
@@ -262,6 +265,49 @@ nvm() { :; }
     }
   });
 
+  it("attaches to the daemon under PIE_HOME", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-home-"));
+    const pieHome = path.join(home, "pie-test");
+    const server = http.createServer((request, response) => {
+      response.end(request.url === "/api/health" ? "ok" : "");
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const listened = server.address();
+    if (listened === null || typeof listened === "string") {
+      server.close();
+      throw new Error("health server did not listen");
+    }
+    try {
+      const bin = path.join(home, "bin");
+      await installNodeShim(bin);
+      await writeExecutable(
+        path.join(bin, "pie"),
+        '#!/bin/sh\necho called > "$HOME/pie-called"\nexit 99\n',
+      );
+      await fs.mkdir(path.join(pieHome, "daemon"), { recursive: true });
+      await fs.writeFile(
+        path.join(pieHome, "daemon", "daemon.pid"),
+        JSON.stringify({
+          pid: process.pid,
+          address: `http://127.0.0.1:${String(listened.port)}`,
+          token: "secret-token",
+          startedAt: 1,
+        }),
+      );
+
+      const result = await runLaunch(home, `${bin}:/usr/bin:/bin`, { PIE_HOME: pieHome });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(`"remotePort":${String(listened.port)}`);
+      await expect(fs.stat(path.join(home, "pie-called"))).rejects.toThrow(/ENOENT/);
+      await expect(fs.stat(path.join(home, ".pie"))).rejects.toThrow(/ENOENT/);
+    } finally {
+      server.close();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("starts pie when the recorded daemon is not alive", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-start-"));
     try {
@@ -315,11 +361,12 @@ exec '${node}' "$@"
 function runLaunch(
   home: string,
   pathEnv: string,
+  extra: NodeJS.ProcessEnv = {},
 ): Promise<{ stdout: string; stderr: string; status: number }> {
   const script = buildRemoteLaunchScript();
   return new Promise((resolve) => {
     const child = childProcess.spawn("/bin/sh", ["-s", "state"], {
-      env: { HOME: home, PATH: pathEnv, TMPDIR: os.tmpdir() },
+      env: { HOME: home, PATH: pathEnv, TMPDIR: os.tmpdir(), ...extra },
     });
     let stdout = "";
     let stderr = "";
