@@ -357,7 +357,7 @@ creating the window and paints `backgroundColor` from `appearance.theme`
 | Key           | localStorage `pie:content-panel`                                                                                                                                   |
 | Owner         | `ContentPanel` through Zustand persist                                                                                                                             |
 | Envelope      | `{ state: { bySessionKey }, version: 0 }`                                                                                                                          |
-| Data          | Per `SessionRef` key: `{ presentation, activeId, panels[], width? }`; a panel record is `{ id, type, payload }`; `width` is the docked column size in pixels       |
+| Data          | Per `SessionRef` key: `{ presentation, activeId, panels[] }`; a panel record is `{ id, type, payload }`                                                            |
 | Compatibility | No Zustand `migrate` callback. Each registered panel may parse its own payload. Unknown or invalid panel records stay stored but are hidden until compatible again |
 | Retention     | No automatic pruning. `forget(ref)` can remove one session, but no production caller currently invokes it                                                          |
 
@@ -380,15 +380,15 @@ The library also has a backward reader for the older group-only key
 records by comma-joined panel ids. Pie defines no independent schema version or
 migration for this data.
 
-### Sidebar width
+### Shell widths
 
-| Property      | Current contract                                                            |
-| ------------- | --------------------------------------------------------------------------- |
-| Key           | localStorage `pie:sidebar-width`                                            |
-| Owner         | `ShellSidebarPanel`                                                         |
-| Data          | Decimal integer pixels, clamped to 192–480. Missing or non-numeric → 256    |
-| Compatibility | No version. Unreadable values are replaced by the default on the next write |
-| Retention     | No automatic pruning                                                        |
+| Property      | Current contract                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Key           | localStorage `pie:shell-widths`                                                                                    |
+| Owner         | `ShellLayout`                                                                                                      |
+| Data          | `{ sidebarWidth, contentBySession }`. Sidebar pixels clamped 192–480 (default 256). Content pixels per session key |
+| Compatibility | No version. Unreadable envelopes fall back to defaults                                                             |
+| Retention     | No automatic pruning                                                                                               |
 
 ### Sidebar cookie
 

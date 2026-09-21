@@ -26,8 +26,6 @@ interface SessionPanels {
   readonly presentation: PanelPresentation;
   readonly activeId: string | null;
   readonly panels: readonly PanelRecord[];
-  /** Docked column width in pixels. Missing means the shell default. */
-  readonly width?: number;
 }
 
 /**
@@ -68,7 +66,6 @@ export interface OpenablePanel<View> {
 
 export interface PanelSnapshot<View> {
   readonly presentation: PanelPresentation;
-  readonly width?: number;
   /**
    * Resolved panels only. A record whose type is not registered *yet*, or
    * whose payload no longer parses, stays in storage but never surfaces — so a
@@ -272,14 +269,6 @@ export class ContentPanel<View = unknown> {
     this.#writeSession(sessionRef, { ...session, presentation });
   }
 
-  setWidth(sessionRef: EnvironmentSessionRef, width: number): void {
-    if (!Number.isFinite(width) || width <= 0) return;
-    const next = Math.round(width);
-    const session = this.#sessionOf(sessionRef);
-    if (session.width === next) return;
-    this.#writeSession(sessionRef, { ...session, width: next });
-  }
-
   /** Hidden → docked, anything else → hidden. */
   toggleVisibility(sessionRef: EnvironmentSessionRef): void {
     const { presentation } = this.#sessionOf(sessionRef);
@@ -343,7 +332,6 @@ export class ContentPanel<View = unknown> {
       panels,
       active: panels.find((panel) => panel.id === session.activeId) ?? null,
       openable,
-      width: session.width,
     };
   }
 

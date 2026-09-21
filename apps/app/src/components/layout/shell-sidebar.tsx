@@ -2,33 +2,11 @@ import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { animate, useMotionValue, useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
-import {
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef } from "react";
+import { useStore } from "zustand";
 
+import { shellLayout } from "@/components/layout/shell-layout";
 import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-panels";
-
-const SIDEBAR_WIDTH_KEY = "pie:sidebar-width";
-const SIDEBAR_MIN_PX = 192;
-const SIDEBAR_MAX_PX = 480;
-const SIDEBAR_DEFAULT_PX = 256;
-
-function clampSidebarWidth(px: number): number {
-  return Math.min(SIDEBAR_MAX_PX, Math.max(SIDEBAR_MIN_PX, Math.round(px)));
-}
-
-function readSidebarWidth(): number {
-  const n = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
-  return Number.isFinite(n) && n > 0 ? clampSidebarWidth(n) : SIDEBAR_DEFAULT_PX;
-}
-
-function writeSidebarWidth(px: number): void {
-  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(px));
-}
 
 export function ShellSidebarPanel({
   children,
@@ -39,7 +17,7 @@ export function ShellSidebarPanel({
 }): ReactNode {
   const { open } = useSidebar();
   const reduceMotion = useReducedMotion() === true;
-  const [expanded, setExpanded] = useState(readSidebarWidth);
+  const expanded = useStore(shellLayout.store, (state) => state.sidebarWidth);
   const expandedRef = useRef(expanded);
   const columnWidth = useMotionValue(open ? expanded : 0);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -62,15 +40,15 @@ export function ShellSidebarPanel({
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (drag.current === null) return;
-    const next = clampSidebarWidth(drag.current.startWidth + event.clientX - drag.current.startX);
+    shellLayout.setSidebarWidth(drag.current.startWidth + event.clientX - drag.current.startX);
+    const next = shellLayout.store.getState().sidebarWidth;
     expandedRef.current = next;
-    setExpanded(next);
     columnWidth.jump(next);
   };
   const onPointerUp = (): void => {
     if (drag.current === null) return;
     drag.current = null;
-    writeSidebarWidth(expandedRef.current);
+    shellLayout.setSidebarWidth(expandedRef.current, true);
   };
 
   return (

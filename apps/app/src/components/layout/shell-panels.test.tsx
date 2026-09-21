@@ -87,7 +87,7 @@ describe("shell panels", () => {
 
   it("keeps sidebar width when the content panel collapses", async () => {
     for (const key of Object.keys(localStorage)) {
-      if (key.includes("pie:shell-layout") || key === "pie:sidebar-width")
+      if (key.includes("pie:shell-layout") || key === "pie:shell-widths")
         localStorage.removeItem(key);
     }
 

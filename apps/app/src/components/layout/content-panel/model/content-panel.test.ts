@@ -52,17 +52,6 @@ const storageHolding = (bySessionKey: unknown): Storage => {
 };
 
 describe("ContentPanel", () => {
-  it("remembers docked width per session", () => {
-    const host = withPanels(diff);
-    const other = ref({ sessionId: "session-2" });
-    host.setWidth(S, 400);
-    host.setWidth(other, 600);
-    host.open(S, diff);
-
-    expect(snapshotOf(host).width).toBe(400);
-    expect(snapshotOf(host, other).width).toBe(600);
-  });
-
   it("opens a singleton and docks the panel", () => {
     const host = withPanels(diff);
     host.open(S, diff);
@@ -324,10 +313,8 @@ describe("ContentPanel", () => {
     // If the strip were rebuilt here, every click would re-render the subtree.
     host.activate(S, "diff");
     host.setPresentation(S, "maximized");
-    host.setWidth(S, 400);
     expect(snapshotOf(host).panels).toBe(panels);
     expect(snapshotOf(host).openable).toBe(openable);
-    expect(snapshotOf(host).width).toBe(400);
 
     // Opening one does change the records — but not the registry, so the menu
     // is left alone.

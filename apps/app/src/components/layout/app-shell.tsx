@@ -1,11 +1,13 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
 import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
+import { useStore } from "zustand";
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
 import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
+import { shellLayout } from "@/components/layout/shell-layout";
 import { ShellContentPanel, ShellGroup, ShellMainPanel } from "@/components/layout/shell-panels";
 import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
@@ -132,13 +134,17 @@ export function AppShellBody({ children }: AppShellBodyProps) {
 /** Session-scoped column beside chat; mount under the same EnvironmentOrpcProvider as Main. */
 export function AppShellSessionPanel(): ReactNode {
   const { contentPanel } = useAppShell();
-  const session = useContentPanel();
-  const width = usePanelSnapshot((snapshot) => snapshot.width);
+  const sessionKey = useContentPanel()?.sessionKey ?? null;
+  const width = useStore(shellLayout.store, (state) =>
+    sessionKey === null ? undefined : state.contentBySession[sessionKey],
+  );
   return (
     <ShellContentPanel
       collapsed={!contentPanel.visible}
       locked={contentPanel.maximized}
-      onSizeChange={(w) => session?.setWidth(w)}
+      onSizeChange={
+        sessionKey === null ? undefined : (next) => shellLayout.setContentWidth(sessionKey, next)
+      }
       size={width}
     >
       <ContentPanelOutlet />
