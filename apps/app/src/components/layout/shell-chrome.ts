@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { Platform } from "@/platform";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
-/** Matches `ShellSidebarPanel` / `ShellMainPanel` `md:py-1` and `md:ps-1`. */
+/** Matches shell column `md:py-1` / `md:ps-1`. */
 const SHELL_GUTTER_PX = 4;
 
 /** Electron `trafficLightPosition.x` (see `main-window.ts`). */
@@ -56,6 +56,10 @@ export function shellProviderStyle(platform: Platform): ShellProviderStyle {
     "--shell-sidebar-brand-inset": `${contentLeft - SHELL_GUTTER_PX}px`,
   };
 }
+
+/** Resize gutter between shell columns. */
+export const SHELL_GUTTER_CLASS =
+  "relative bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1 after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width] hover:after:via-foreground/20 hover:after:opacity-100";
 
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =

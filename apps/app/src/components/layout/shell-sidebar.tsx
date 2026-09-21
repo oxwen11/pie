@@ -5,8 +5,8 @@ import * as m from "motion/react-m";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef } from "react";
 import { useStore } from "zustand";
 
+import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-chrome";
 import { shellLayout } from "@/components/layout/shell-layout";
-import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-panels";
 
 export function ShellSidebarPanel({
   children,
@@ -48,7 +48,8 @@ export function ShellSidebarPanel({
   const onPointerUp = (): void => {
     if (drag.current === null) return;
     drag.current = null;
-    shellLayout.setSidebarWidth(expandedRef.current, true);
+    shellLayout.setSidebarWidth(expandedRef.current);
+    shellLayout.persist();
   };
 
   return (

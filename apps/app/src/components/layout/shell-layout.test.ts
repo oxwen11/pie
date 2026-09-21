@@ -24,9 +24,10 @@ describe("ShellLayout", () => {
   it("remembers sidebar width and per-session content width", () => {
     const disk = storage();
     const layout = new ShellLayout(disk);
-    layout.setSidebarWidth(400, true);
+    layout.setSidebarWidth(400);
     layout.setContentWidth("session-a", 320);
     layout.setContentWidth("session-b", 480);
+    layout.persist();
 
     expect(layout.store.getState().sidebarWidth).toBe(400);
     expect(layout.store.getState().contentBySession).toEqual({
@@ -40,12 +41,12 @@ describe("ShellLayout", () => {
     expect(restored.store.getState().contentBySession["session-b"]).toBe(480);
   });
 
-  it("does not persist sidebar width until asked", () => {
+  it("does not persist until persist() is called", () => {
     const disk = storage();
     const layout = new ShellLayout(disk);
     layout.setSidebarWidth(360);
     expect(new ShellLayout(disk).store.getState().sidebarWidth).toBe(256);
-    layout.setSidebarWidth(360, true);
+    layout.persist();
     expect(new ShellLayout(disk).store.getState().sidebarWidth).toBe(360);
   });
 });

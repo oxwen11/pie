@@ -1,16 +1,15 @@
 import { SidebarProvider } from "@getpie/ui/components/sidebar";
 import { domAnimation, LazyMotion } from "motion/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 import { page } from "vitest/browser";
 
-import { ResizablePanel } from "./resizable-panel";
-import { notifyUserLayoutListeners, ShellContentPanel, ShellGroup } from "./shell-panels";
+import { ShellContentPanel } from "./shell-content";
 import { ShellSidebarPanel } from "./shell-sidebar";
 
 window.matchMedia = (query) => ({
   addEventListener() {
-    /* tests drive layout through notifyUserLayoutListeners */
+    /* tests drive layout through pointer / open state */
   },
   addListener() {
     /* MediaQueryList still types this deprecated alias */
@@ -20,15 +19,15 @@ window.matchMedia = (query) => ({
   media: query,
   onchange: null,
   removeEventListener() {
-    /* tests drive layout through notifyUserLayoutListeners */
+    /* tests drive layout through pointer / open state */
   },
   removeListener() {
     /* MediaQueryList still types this deprecated alias */
   },
 });
 
-describe("shell panels", () => {
-  it("keeps the settled sidebar drawer bound to the live panel width", async () => {
+describe("shell columns", () => {
+  it("keeps the session list open at a pixel width", async () => {
     await render(
       <SidebarProvider defaultOpen>
         <LazyMotion features={domAnimation}>
@@ -36,9 +35,7 @@ describe("shell panels", () => {
             <ShellSidebarPanel>
               <div>Sidebar</div>
             </ShellSidebarPanel>
-            <ShellGroup hasContentPanel={false}>
-              <ResizablePanel id="main">Main</ResizablePanel>
-            </ShellGroup>
+            <div className="min-w-0 flex-1">Main</div>
           </div>
         </LazyMotion>
       </SidebarProvider>,
@@ -51,44 +48,9 @@ describe("shell panels", () => {
     expect((drawer as HTMLElement).getBoundingClientRect().width).toBeGreaterThan(100);
   });
 
-  it("notifies width memory only for completed user layouts", () => {
-    const listener = vi.fn<() => void>();
-    const listeners = new Set([listener]);
-
-    notifyUserLayoutListeners({ isUserInteraction: false }, listeners);
-    expect(listener).not.toHaveBeenCalled();
-
-    notifyUserLayoutListeners({ isUserInteraction: true }, listeners);
-    expect(listener).toHaveBeenCalledOnce();
-  });
-
-  it("clips the resizable panel content wrapper", async () => {
-    await render(
-      <ShellGroup hasContentPanel>
-        <ResizablePanel id="main" style={{ color: "red", overflow: "visible" }}>
-          <div>Filler</div>
-        </ResizablePanel>
-        <ShellContentPanel>
-          <div>Content</div>
-        </ShellContentPanel>
-      </ShellGroup>,
-    );
-
-    const panel = page.getByTestId("content").element();
-    const contentWrapper = panel.firstElementChild as HTMLElement | null;
-    const fillerWrapper = page.getByTestId("main").element()
-      .firstElementChild as HTMLElement | null;
-
-    expect(panel.parentElement?.dataset.group).toBe("true");
-    expect(contentWrapper?.style.overflow).toBe("hidden");
-    expect(fillerWrapper?.style.overflow).toBe("hidden");
-    expect(fillerWrapper?.style.color).toBe("red");
-  });
-
   it("keeps sidebar width when the content panel collapses", async () => {
     for (const key of Object.keys(localStorage)) {
-      if (key.includes("pie:shell-layout") || key === "pie:shell-widths")
-        localStorage.removeItem(key);
+      if (key === "pie:shell-widths") localStorage.removeItem(key);
     }
 
     function Shell({ contentOpen }: { contentOpen: boolean }) {
@@ -99,12 +61,10 @@ describe("shell panels", () => {
               <ShellSidebarPanel>
                 <div>Sidebar</div>
               </ShellSidebarPanel>
-              <ShellGroup hasContentPanel>
-                <ResizablePanel id="main">Main</ResizablePanel>
-                <ShellContentPanel collapsed={!contentOpen}>
-                  {contentOpen ? <div>Content</div> : null}
-                </ShellContentPanel>
-              </ShellGroup>
+              <div className="min-w-0 flex-1">Main</div>
+              <ShellContentPanel collapsed={!contentOpen} maximized={false} sessionKey="s1">
+                <div>Content</div>
+              </ShellContentPanel>
             </div>
           </LazyMotion>
         </SidebarProvider>
@@ -124,7 +84,13 @@ describe("shell panels", () => {
 
     await screen.rerender(<Shell contentOpen />);
     await expect
-      .poll(() => page.getByTestId("content").element().getBoundingClientRect().width)
+      .poll(() => {
+        const column = page
+          .getByText("Content")
+          .element()
+          .closest("[data-slot=content-panel-column]");
+        return column instanceof HTMLElement ? column.getBoundingClientRect().width : 0;
+      })
       .toBeGreaterThan(100);
     expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
 

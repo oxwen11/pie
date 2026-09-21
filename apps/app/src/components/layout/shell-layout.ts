@@ -4,14 +4,18 @@ const STORAGE_NAME = "pie:shell-widths";
 const SIDEBAR_MIN_PX = 192;
 const SIDEBAR_MAX_PX = 480;
 const SIDEBAR_DEFAULT_PX = 256;
+const CONTENT_MIN_PX = 288;
+const CONTENT_MAX_PX = 960;
+
+export const CONTENT_DEFAULT_PX = 448;
 
 export interface ShellLayoutState {
   readonly sidebarWidth: number;
   readonly contentBySession: Readonly<Record<string, number>>;
 }
 
-function clampSidebarWidth(px: number): number {
-  return Math.min(SIDEBAR_MAX_PX, Math.max(SIDEBAR_MIN_PX, Math.round(px)));
+function clamp(px: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(px)));
 }
 
 function parseState(raw: string | null): ShellLayoutState {
@@ -23,13 +27,13 @@ function parseState(raw: string | null): ShellLayoutState {
     const record = parsed as { sidebarWidth?: unknown; contentBySession?: unknown };
     const sidebarWidth =
       typeof record.sidebarWidth === "number" && Number.isFinite(record.sidebarWidth)
-        ? clampSidebarWidth(record.sidebarWidth)
+        ? clamp(record.sidebarWidth, SIDEBAR_MIN_PX, SIDEBAR_MAX_PX)
         : SIDEBAR_DEFAULT_PX;
     const contentBySession: Record<string, number> = {};
     if (typeof record.contentBySession === "object" && record.contentBySession !== null) {
       for (const [key, value] of Object.entries(record.contentBySession)) {
         if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-          contentBySession[key] = Math.round(value);
+          contentBySession[key] = clamp(value, CONTENT_MIN_PX, CONTENT_MAX_PX);
         }
       }
     }
@@ -54,23 +58,22 @@ export class ShellLayout {
     this.store = createStore(() => parseState(storage?.getItem(STORAGE_NAME) ?? null));
   }
 
-  setSidebarWidth(px: number, persist = false): void {
+  setSidebarWidth(px: number): void {
     if (!Number.isFinite(px)) return;
-    const next = clampSidebarWidth(px);
-    if (this.store.getState().sidebarWidth !== next) this.store.setState({ sidebarWidth: next });
-    if (persist) this.#save();
+    const next = clamp(px, SIDEBAR_MIN_PX, SIDEBAR_MAX_PX);
+    if (this.store.getState().sidebarWidth === next) return;
+    this.store.setState({ sidebarWidth: next });
   }
 
   setContentWidth(sessionKey: string, px: number): void {
-    if (!Number.isFinite(px) || px <= 0) return;
-    const next = Math.round(px);
+    if (!Number.isFinite(px)) return;
+    const next = clamp(px, CONTENT_MIN_PX, CONTENT_MAX_PX);
     const { contentBySession } = this.store.getState();
     if (contentBySession[sessionKey] === next) return;
     this.store.setState({ contentBySession: { ...contentBySession, [sessionKey]: next } });
-    this.#save();
   }
 
-  #save(): void {
+  persist(): void {
     this.#storage?.setItem(STORAGE_NAME, JSON.stringify(this.store.getState()));
   }
 }

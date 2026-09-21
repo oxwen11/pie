@@ -1,14 +1,13 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
+import { cn } from "@getpie/ui/lib/utils";
 import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
-import { useStore } from "zustand";
 
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ShellContentPanel } from "@/components/layout/shell-content";
 import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
-import { shellLayout } from "@/components/layout/shell-layout";
-import { ShellContentPanel, ShellGroup, ShellMainPanel } from "@/components/layout/shell-panels";
 import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import { usePlatform } from "@/platform-context";
@@ -52,18 +51,21 @@ export interface AppShellMainProps {
 }
 
 export function AppShellMain({ children }: AppShellMainProps) {
-  const { isMobile } = useSidebar();
   const { contentPanel } = useAppShell();
-  const handleCollapsedChange = contentPanel.setMaximized;
+  const fill = contentPanel.maximized;
+  const withContent = contentPanel.visible && !fill;
   return (
-    <ShellMainPanel
-      hasContentPanel={contentPanel.visible}
-      collapsed={contentPanel.maximized}
-      collapsible={contentPanel.maximized || (contentPanel.visible && !isMobile)}
-      onCollapsedChange={handleCollapsedChange}
+    <div
+      className={cn(
+        "flex min-h-0 flex-col md:py-1",
+        fill ? "w-0 overflow-hidden" : "min-w-0 flex-1",
+        withContent
+          ? "md:[&_[data-slot=sidebar-inset]]:rounded-e-none md:[&_[data-slot=sidebar-inset]]:border-e-0"
+          : "md:pe-1",
+      )}
     >
       {children}
-    </ShellMainPanel>
+    </div>
   );
 }
 
@@ -93,10 +95,6 @@ export function AppShell({ children }: AppShellProps) {
       </LazyMotion>
     </SidebarProvider>
   );
-}
-
-export function AppShellWorkspace({ children }: { children: ReactNode }): ReactNode {
-  return <ShellGroup hasContentPanel>{children}</ShellGroup>;
 }
 
 export interface AppShellBodyProps {
@@ -135,17 +133,11 @@ export function AppShellBody({ children }: AppShellBodyProps) {
 export function AppShellSessionPanel(): ReactNode {
   const { contentPanel } = useAppShell();
   const sessionKey = useContentPanel()?.sessionKey ?? null;
-  const width = useStore(shellLayout.store, (state) =>
-    sessionKey === null ? undefined : state.contentBySession[sessionKey],
-  );
   return (
     <ShellContentPanel
       collapsed={!contentPanel.visible}
-      locked={contentPanel.maximized}
-      onSizeChange={
-        sessionKey === null ? undefined : (next) => shellLayout.setContentWidth(sessionKey, next)
-      }
-      size={width}
+      maximized={contentPanel.maximized}
+      sessionKey={sessionKey}
     >
       <ContentPanelOutlet />
     </ShellContentPanel>

@@ -364,22 +364,6 @@ creating the window and paints `backgroundColor` from `appearance.theme`
 Live panel instances, loaded content, spinners, and scrollback are intentionally
 not persisted.
 
-### Shell layout
-
-`react-resizable-panels` owns these localStorage entries:
-
-```text
-react-resizable-panels:pie:shell-layout:<panel-id>:<panel-id>...
-```
-
-The suffix is the active ordered set drawn from `main` and `content`; the value
-is a JSON object mapping each panel id to its numeric size. Session-list width
-is not in this layout.
-The library also has a backward reader for the older group-only key
-`react-resizable-panels:pie:shell-layout`, whose value grouped `{ layout: [] }`
-records by comma-joined panel ids. Pie defines no independent schema version or
-migration for this data.
-
 ### Shell widths
 
 | Property      | Current contract                                                                                                   |
