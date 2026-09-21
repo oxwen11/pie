@@ -63,7 +63,6 @@ export function createDesktopHost(
                     console.error("Desktop environment stream failed", error);
                   }
                 },
-                onFinish: () => {},
               },
             );
 
