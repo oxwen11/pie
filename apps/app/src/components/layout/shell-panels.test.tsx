@@ -5,8 +5,8 @@ import { render } from "vitest-browser-react";
 import { page } from "vitest/browser";
 
 import { ResizablePanel } from "./resizable-panel";
-import { ShellContentPanel, ShellGroup, ShellSidebarPanel } from "./shell-panels";
-import { notifyUserLayoutListeners } from "./shell-user-layout";
+import { notifyUserLayoutListeners, ShellContentPanel, ShellGroup } from "./shell-panels";
+import { ShellSidebarPanel } from "./shell-sidebar";
 
 window.matchMedia = (query) => ({
   addEventListener() {

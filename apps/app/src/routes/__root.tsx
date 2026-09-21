@@ -11,8 +11,8 @@ import {
   AppShellMain,
   AppShellSessionPanel,
   AppShellSidebar,
+  AppShellWorkspace,
 } from "@/components/layout/app-shell";
-import { ShellGroup } from "@/components/layout/shell-panels";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
@@ -103,7 +103,7 @@ function RootLayout() {
             <AppSidebar />
           </AppShellSidebar>
           <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
-            <ShellGroup hasContentPanel>
+            <AppShellWorkspace>
               <AppShellMain>
                 <EnvironmentCardPanel
                   cardHeader={cardHeader}
@@ -113,7 +113,7 @@ function RootLayout() {
                 />
               </AppShellMain>
               <AppShellSessionPanel />
-            </ShellGroup>
+            </AppShellWorkspace>
           </EnvironmentOrpcProvider>
         </AppShellBody>
       </ContentPanelSessionProvider>

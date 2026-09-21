@@ -6,11 +6,8 @@ import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-p
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { shellProviderStyle } from "@/components/layout/shell-chrome";
 import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
-import {
-  ShellContentPanel,
-  ShellMainPanel,
-  ShellSidebarPanel,
-} from "@/components/layout/shell-panels";
+import { ShellContentPanel, ShellGroup, ShellMainPanel } from "@/components/layout/shell-panels";
+import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import { usePlatform } from "@/platform-context";
 
@@ -94,6 +91,10 @@ export function AppShell({ children }: AppShellProps) {
       </LazyMotion>
     </SidebarProvider>
   );
+}
+
+export function AppShellWorkspace({ children }: { children: ReactNode }): ReactNode {
+  return <ShellGroup hasContentPanel>{children}</ShellGroup>;
 }
 
 export interface AppShellBodyProps {
