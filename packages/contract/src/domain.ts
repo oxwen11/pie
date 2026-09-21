@@ -609,6 +609,14 @@ export type CreateSessionOutput = typeof CreateSessionOutputSchema.Type;
 export const PrepareSessionOutputSchema = CreateSessionOutputSchema;
 export type PrepareSessionOutput = typeof PrepareSessionOutputSchema.Type;
 
+/** Payload for the `WORKTREE_MISSING` prepare error. */
+export const WorktreeMissingErrorDataSchema = Schema.Struct({
+  sessionId: Schema.String,
+  projectId: Schema.String,
+  branch: Schema.NonEmptyString,
+});
+export type WorktreeMissingErrorData = typeof WorktreeMissingErrorDataSchema.Type;
+
 export const ListSessionsInputSchema = Schema.Struct({
   projectId: Schema.String.check(Schema.isUUID()),
   archived: Schema.optionalKey(Schema.Boolean),

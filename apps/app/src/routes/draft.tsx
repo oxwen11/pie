@@ -12,8 +12,18 @@ import {
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { FolderPlusIcon } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
@@ -31,12 +41,15 @@ import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-st
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
+import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
+import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
 
 type DraftSearch = {
   readonly projectId?: string;
+  readonly environmentId?: string;
   readonly provider?: string;
   readonly modelId?: string;
 };
@@ -56,6 +69,7 @@ const optional = <K extends keyof DraftSearch>(
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
     ...optional("projectId", asText(search.projectId)),
+    ...optional("environmentId", asText(search.environmentId)),
     ...optional("provider", asText(search.provider)),
     ...optional("modelId", asText(search.modelId)),
   }),
@@ -63,11 +77,23 @@ export const Route = createFileRoute("/draft")({
 });
 
 function DraftRoute() {
-  const { orpcQueryUtils } = Route.useRouteContext();
+  const { localEnvironmentId, environmentRpc } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const environmentId = search.environmentId ?? localEnvironmentId;
+  return (
+    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+      <DraftPage environmentId={environmentId} />
+    </EnvironmentOrpcProvider>
+  );
+}
+
+function DraftPage({ environmentId }: { readonly environmentId: string }) {
+  const orpcQueryUtils = useCatalogOrpc();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const chats = useChatManager();
   const queryClient = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
@@ -85,6 +111,7 @@ function DraftRoute() {
       : defaultModel;
 
   const startSession = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.id;
       if (projectId === undefined) {
@@ -130,7 +157,7 @@ function DraftRoute() {
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
-        .chatFor(created.ref)
+        .chatFor({ environmentId, ref: created.ref })
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
@@ -139,7 +166,7 @@ function DraftRoute() {
       navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
-        search: { projectId: created.ref.projectId },
+        search: { projectId: created.ref.projectId, environmentId },
       }).catch((error: unknown) => {
         console.error("Failed to open the new session", error);
       });
@@ -191,6 +218,25 @@ function DraftRoute() {
     );
   }
 
+  if (projects.data.length === 0 && search.projectId === undefined) {
+    return (
+      <DraftEmptyImport
+        importOpen={importOpen}
+        onCloseImport={() => setImportOpen(false)}
+        onImported={(projectId, importedEnvironmentId) => {
+          navigate({
+            to: "/draft",
+            search: { projectId, environmentId: importedEnvironmentId },
+            replace: true,
+          }).catch((error: unknown) => {
+            console.error("Failed to open the imported project", error);
+          });
+        }}
+        onOpenImport={() => setImportOpen(true)}
+      />
+    );
+  }
+
   return (
     <DraftComposer
       commandState={commandState}
@@ -214,22 +260,13 @@ function DraftRoute() {
           search: (prev) => {
             if (next === null) {
               const { projectId: _removed, ...rest } = prev;
-              return rest;
+              return { ...rest, environmentId };
             }
-            return { ...prev, projectId: next };
+            return { ...prev, projectId: next, environmentId };
           },
           replace: true,
         }).catch((error: unknown) => {
           console.error("Failed to select draft project", error);
-        });
-      }}
-      onSchedule={() => {
-        if (selected === null) return;
-        navigate({
-          to: "/schedules",
-          search: { create: true, projectId: selected.id },
-        }).catch((error: unknown) => {
-          console.error("Failed to open the schedule editor", error);
         });
       }}
       projects={projects.data ?? []}
@@ -250,6 +287,46 @@ function DraftProjectsError({ message, onRetry }: { message: string; onRetry: ()
   );
 }
 
+function DraftEmptyImport({
+  importOpen,
+  onCloseImport,
+  onImported,
+  onOpenImport,
+}: {
+  importOpen: boolean;
+  onCloseImport: () => void;
+  onImported: (projectId: string, environmentId: string) => void;
+  onOpenImport: () => void;
+}) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <FolderPlusIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>
+          <h1>Import your first project</h1>
+        </EmptyTitle>
+        <EmptyDescription>
+          Choose a folder for your coding agent to work in. You can start a chat right after
+          importing.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onOpenImport}>Import project</Button>
+      </EmptyContent>
+      {importOpen ? (
+        <ImportProjectDialog
+          onClose={onCloseImport}
+          onImported={(project, importedEnvironmentId) => {
+            onImported(project.id, importedEnvironmentId);
+          }}
+        />
+      ) : null}
+    </Empty>
+  );
+}
+
 function DraftComposer({
   commandState,
   controller,
@@ -259,7 +336,6 @@ function DraftComposer({
   models,
   onModelChange,
   onProjectChange,
-  onSchedule,
   projects,
   selectedId,
   startPending,
@@ -272,7 +348,6 @@ function DraftComposer({
   models: Parameters<typeof ModelSelectorPicker>[0]["models"];
   onModelChange: (provider: string, modelId: string) => void;
   onProjectChange: (next: string | null) => void;
-  onSchedule: () => void;
   projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
   selectedId: string | null;
   startPending: boolean;
@@ -295,15 +370,6 @@ function DraftComposer({
                 draftWorktree={draftWorktree}
               />
             ) : null}
-            <Button
-              className="ms-auto"
-              disabled={selectedId === null}
-              onClick={onSchedule}
-              size="sm"
-              variant="ghost"
-            >
-              Schedule…
-            </Button>
           </div>
         </CardFrameHeader>
         <Card

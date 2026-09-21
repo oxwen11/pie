@@ -25,12 +25,14 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
-  const showHeader = !hideHeader || isMobile || webCollapsedChrome;
+  // Desktop keeps a titlebar strip even when the route hides labels — that strip
+  // is the frameless window drag region (ChatGPT/T3 pattern).
+  const showHeader = !hideHeader || isMobile || webCollapsedChrome || desktop;
 
   return (
     <SidebarInset
       className={cn(
-        "bg-card flex min-h-0 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-2xl md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:border-white/8",
+        "bg-card flex min-h-0 flex-col overflow-hidden border border-black/10 md:rounded-2xl md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:border-white/8",
         // Drop the top border when collapsed so the card header lines up with
         // the viewport-fixed titlebar row.
         collapsedDesktop && desktop && "border-t-0",
@@ -89,18 +91,18 @@ function CardPanelHeader({
     <header
       className={cn(
         SHELL_TITLEBAR_HEADER_CLASS,
-        "[-webkit-app-region:drag]",
         !hideHeader && "border-b",
         desktop && collapsedDesktop && "ps-(--shell-titlebar-content-left)",
       )}
+      data-drag-region=""
     >
       <div className="flex min-w-0 flex-1 items-center">
         {isMobile ? (
-          <SidebarTrigger className="-ms-0.5 me-2 [-webkit-app-region:no-drag]" />
+          <SidebarTrigger className="-ms-0.5 me-2" />
         ) : webCollapsedChrome ? (
           <div className="me-2 flex items-center">
             <BrandMark className="shrink-0" />
-            <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px [-webkit-app-region:no-drag]" />
+            <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px" />
           </div>
         ) : null}
         {!hideHeader ? (

@@ -1,9 +1,11 @@
 import type { Project, Schedule } from "@getpie/contract";
 import { MAX_SCHEDULES } from "@getpie/contract";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { formatSessionReuse } from "./cadence";
 import {
@@ -77,6 +79,7 @@ export function useSchedule(): ScheduleContextValue {
 }
 
 export type ScheduleProviderProps = {
+  readonly environmentId: string;
   readonly projects: ReadonlyArray<Project>;
   readonly projectsReady: boolean;
   readonly createOpen: boolean;
@@ -87,6 +90,7 @@ export type ScheduleProviderProps = {
 };
 
 export function ScheduleProvider({
+  environmentId,
   projects,
   projectsReady,
   createOpen,
@@ -95,7 +99,7 @@ export function ScheduleProvider({
   onCloseCreate,
   children,
 }: ScheduleProviderProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useEnvironmentOrpc();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -114,13 +118,14 @@ export function ScheduleProvider({
     ]);
 
   const create = useMutation({
+    mutationKey: orpcQueryUtils.schedule.create.key(),
     mutationFn: (value: ScheduleFormSubmit) =>
       orpcQueryUtils.schedule.create.call(scheduleCreateInput(value)),
     onSuccess: (created) => {
       onCloseCreate();
       void invalidate();
       if (created.lastSessionId !== undefined) {
-        openScheduleSession(navigate, created.projectId, created.lastSessionId);
+        openScheduleSession(navigate, created.projectId, created.lastSessionId, environmentId);
         return;
       }
       reportScheduleStart(created);
@@ -129,6 +134,7 @@ export function ScheduleProvider({
   });
 
   const update = useMutation({
+    mutationKey: orpcQueryUtils.schedule.update.key(),
     mutationFn: (
       input: { readonly id: string } & Partial<ScheduleFormSubmit> & {
           readonly enabled?: boolean;
@@ -142,6 +148,7 @@ export function ScheduleProvider({
   });
 
   const remove = useMutation({
+    mutationKey: orpcQueryUtils.schedule.delete.key(),
     mutationFn: (id: string) => orpcQueryUtils.schedule.delete.call({ id }),
     onSuccess: () => {
       setDeletingId(null);
@@ -153,11 +160,12 @@ export function ScheduleProvider({
   });
 
   const runNow = useMutation({
+    mutationKey: orpcQueryUtils.schedule.runNow.key(),
     mutationFn: (id: string) => orpcQueryUtils.schedule.runNow.call({ id }),
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
-        openScheduleSession(navigate, result.ref.projectId, result.ref.sessionId);
+        openScheduleSession(navigate, result.ref.projectId, result.ref.sessionId, environmentId);
         return;
       }
       reportScheduleStart(result.schedule);
@@ -210,7 +218,8 @@ export function ScheduleProvider({
         save: (id, form) => update.mutate({ id, ...form }),
         openCreate: onOpenCreate,
         closeCreate: onCloseCreate,
-        openSession: (projectId, sessionId) => openScheduleSession(navigate, projectId, sessionId),
+        openSession: (projectId, sessionId) =>
+          openScheduleSession(navigate, projectId, sessionId, environmentId),
       },
       meta: {
         items,
@@ -246,6 +255,7 @@ export function ScheduleProvider({
       items,
       listError,
       listPending,
+      environmentId,
       navigate,
       nowMs,
       onCloseCreate,
@@ -291,11 +301,12 @@ function openScheduleSession(
   navigate: ReturnType<typeof useNavigate>,
   projectId: string,
   sessionId: string,
+  environmentId: string,
 ): void {
   navigate({
     to: "/session/$sessionId",
     params: { sessionId },
-    search: { projectId },
+    search: { projectId, environmentId },
   }).catch((error: unknown) => {
     console.error("Failed to open the schedule session", error);
   });

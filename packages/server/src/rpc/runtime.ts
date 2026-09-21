@@ -18,10 +18,12 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/ag
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ResourceMonitoring } from "../observability/resources";
+import { PackageServiceLayer } from "../packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../project";
 import { PullRequestServiceLayer } from "../pull-request";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
 import { SettingsRepositoryLayer } from "../settings";
+import { SkillServiceLayer } from "../skills";
 import { TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
@@ -111,6 +113,8 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   SettingsRepositoryProvided,
   ScheduleServiceProvided,
   ScheduleDaemonLayer,
+  PackageServiceLayer,
+  SkillServiceLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

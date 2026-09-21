@@ -11,6 +11,9 @@ import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from
 const DIFF_UNSAFE_CSS = `
   :host {
     --diffs-font-family: var(--font-mono);
+    --diffs-header-font-family: var(--font-sans);
+    font-size: inherit;
+    line-height: inherit;
     --diffs-light-bg: var(--background);
     --diffs-dark-bg: var(--background);
     --diffs-light: var(--foreground);

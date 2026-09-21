@@ -7,12 +7,13 @@ import {
 } from "@getpie/ui/components/context-menu";
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Clock, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
@@ -20,21 +21,24 @@ import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
  *  without opening the menu. */
 export function SessionActionsMenu({
   children,
+  environmentId,
   isActive,
   render,
   session,
 }: {
   readonly children: ReactNode;
+  readonly environmentId: string;
   readonly isActive: () => boolean;
   readonly render: ReactElement;
   readonly session: SessionSummary;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useCatalogOrpc();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
 
   const setArchived = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.archive.key(),
     mutationFn: (archived: boolean) =>
       orpcQueryUtils.agent.session.archive.call({
         ref: {
@@ -56,7 +60,10 @@ export function SessionActionsMenu({
       if (archived && isActive()) {
         return Promise.all([
           refreshLists,
-          navigate({ to: "/draft", search: { projectId: session.projectId } }),
+          navigate({
+            to: "/draft",
+            search: { environmentId, projectId: session.projectId },
+          }),
         ]);
       }
 
@@ -87,6 +94,7 @@ export function SessionActionsMenu({
                   to: "/schedules",
                   search: {
                     create: true,
+                    environmentId,
                     projectId: session.projectId,
                     sessionId: session.sessionId,
                   },
