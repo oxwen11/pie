@@ -1,11 +1,7 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
 import { collectFiredSessionIds } from "@getpie/contract";
 import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@getpie/ui/components/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroupAction,
   SidebarGroupContent,
@@ -16,7 +12,7 @@ import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { Link, useRouteContext, useRouter } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
-import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import {
   ProjectSessionRow,
   type SessionPullRequest,
@@ -121,7 +117,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
         </SidebarGroupAction>
         {/* keepMounted: see panel-motion.ts — an unmounting panel makes every
             expand rebuild this project's whole session list. */}
-        <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
+        <KeepMountedCollapsiblePanel>
           <SidebarGroupContent>
             <SidebarMenu>
               {rows.map((session) => {
@@ -141,7 +137,7 @@ export function ProjectSessionsGroup({ project }: { readonly project: Project })
               })}
             </SidebarMenu>
           </SidebarGroupContent>
-        </CollapsiblePanel>
+        </KeepMountedCollapsiblePanel>
       </section>
     </Collapsible>
   );
