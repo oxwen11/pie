@@ -20,7 +20,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
   await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
     timeout: 30_000,
   });
-  await window.getByRole("combobox").filter({ hasText: "Select a project" }).click();
+  await window.getByRole("combobox").filter({ hasText: "Choose project" }).click();
   await window.getByRole("option", { name: /e2e-workspace/ }).click();
   await window.locator("[contenteditable='true']").fill("Render the local image");
   await window.locator("[contenteditable='true']").press("Enter");
