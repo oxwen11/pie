@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { Effect, Layer } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { applyDesktopRuntime, DesktopConfig } from "../desktop-config";
+import { withTailscaleAllowedHosts } from "../tailscale/allowed-hosts";
 import { makeDaemonServerProcess } from "./daemon-server-process";
 import { LocalServer, makeLocalServer } from "./local-server";
-import { resolveLoginShellEnvironmentWith } from "./login-shell-environment";
+import { LoginShellEnvironment } from "./login-shell-environment";
 
 const existingFile = (pathname: string): string | undefined =>
   fs.existsSync(pathname) ? pathname : undefined;
@@ -16,12 +17,11 @@ export const LocalServerLive = Layer.effect(
   LocalServer,
   Effect.gen(function* () {
     const config = yield* DesktopConfig;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const environment = (
-      config.isPackaged
-        ? resolveLoginShellEnvironmentWith(spawner)
-        : Effect.sync(() => ({ ...process.env }))
-    ).pipe(
+    const loginShell = yield* LoginShellEnvironment;
+    const platform = yield* Effect.context<
+      FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+    >();
+    const environment = Effect.succeed(loginShell.env).pipe(
       Effect.map((env) =>
         applyDesktopRuntime(env, {
           isPackaged: config.isPackaged,
@@ -34,6 +34,8 @@ export const LocalServerLive = Layer.effect(
           ),
         }),
       ),
+      Effect.flatMap(withTailscaleAllowedHosts),
+      Effect.provide(platform),
     );
 
     // Attach the daemon selected by PIE_HOME (the same one the CLI uses)

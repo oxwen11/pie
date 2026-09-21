@@ -89,6 +89,19 @@ what something _is_, not how it looks, so themes swap under them. For dynamic
 values use CSS variables (`bg-[var(--color)]` + `style={{ "--color": x }}`),
 never interpolated class names.
 
+### Scope gate — feature styling stays local
+
+Keep product- and feature-specific styling in the owning app or feature.
+`packages/ui` and global theme tokens are shared contracts: change them only
+when at least two independent consumers need the same API, or the task
+explicitly requests a shared primitive.
+
+Treat `shadcn(no-restyle)` as a boundary failure, not a lint workaround. Resolve
+it through feature-local composition or a stable `data-slot`; adding a shared
+component variant or global token solely to silence the diagnostic fails this
+gate. Before committing a feature-only change, inspect the diff: unexpected
+`packages/ui` or global theme-token edits must be removed.
+
 ## Data attributes — state and identity, not className props
 
 Never expose per-state className props (`openClassName`, `classes={{...}}`).
@@ -138,4 +151,5 @@ Every item verified, or named as a deliberate exception:
 - [ ] `cn` ordering: base → variants → conditionals → `className`
 - [ ] State on `data-state`, identity on `data-slot`; no per-state className props
 - [ ] Colors/spacing from design tokens
+- [ ] Feature-only styling stays local; shared UI/theme edits pass the scope gate
 - [ ] Keyboard map complete; accessible names present; semantic elements used

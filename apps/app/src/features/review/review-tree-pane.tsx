@@ -40,16 +40,13 @@ export function ReviewTreePane({
   return (
     <div className="bg-background flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2">
-        <span
-          className="text-muted-foreground min-w-0 flex-1 truncate px-1 text-xs"
-          title={workspacePath}
-        >
+        <span className="text-muted-foreground min-w-0 flex-1 truncate px-1" title={workspacePath}>
           {workspaceName}
         </span>
       </div>
 
       {tree.isError && tree.data !== undefined ? (
-        <div className="text-destructive flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs">
+        <div className="text-destructive flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
           <TriangleAlertIcon className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate" title={treeErrorMessage(tree.error)}>
             Refresh failed; showing the previous file tree.
