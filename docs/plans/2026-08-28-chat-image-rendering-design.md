@@ -114,6 +114,8 @@ Relevant upstream files:
 
 T3Code resolves the effective checkout root from thread identity, canonicalizes the target, rejects path and symlink escape, validates the preview type, and issues an expiring exact-file capability. Pie adopts the same transport boundary while using `SessionRef`, Pi's stored `cwd`, and a server-owned immutable asset cache.
 
+Dimension-by-dimension comparison after shipping: [`docs/2026-09-22-pie-vs-t3code-markdown-assets.md`](../2026-09-22-pie-vs-t3code-markdown-assets.md).
+
 ## Decision
 
 Use short-lived signed HTTP asset URLs for assistant Markdown local images.
