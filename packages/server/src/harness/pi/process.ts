@@ -359,14 +359,21 @@ export const makePiProcessWithDependencies = <R>(
             if (transition.interrupted) {
               yield* offerChunk(session, { type: "abort" });
             }
-            if (chunk === undefined) {
-              yield* completeTurn(session);
-              continue;
+            if (chunk !== undefined) yield* offerChunk(session, chunk);
+            const turn = yield* Ref.get(session.turnState);
+            yield* completeTurn(session);
+            if (turn._tag === "Active") {
+              yield* offerChunk(session, {
+                type: "session.turn.ended",
+                sessionId: session.sessionId,
+                turnId: turn.turnId,
+                outcome: turn.interrupted ? "canceled" : "completed",
+              });
             }
+            continue;
           }
 
-          if (chunk === undefined) continue;
-          yield* offerChunk(session, chunk);
+          if (chunk !== undefined) yield* offerChunk(session, chunk);
         }
       });
 
@@ -543,10 +550,7 @@ export const makePiProcessWithDependencies = <R>(
         ),
       );
 
-    const sessionEvents = (session: SessionState) =>
-      streamFromQueueOne(session.chunks).pipe(
-        Stream.tap((body) => (body.type === "finish" ? completeTurn(session) : Effect.void)),
-      );
+    const sessionEvents = (session: SessionState) => streamFromQueueOne(session.chunks);
 
     return {
       session: {
@@ -631,11 +635,11 @@ export const makePiProcessWithDependencies = <R>(
                     turnId,
                     started: true,
                     output: sessionEvents(session).pipe(
+                      Stream.takeUntil((body) => body.type === "session.turn.ended"),
                       Stream.filter(
                         (body): body is PiStreamItem =>
                           !isSessionEvent(body) || body.type === "session.prompt.submitted",
                       ),
-                      Stream.takeUntil((chunk) => chunk.type === "finish"),
                       Stream.ensuring(abandonTurn),
                     ),
                   };

@@ -161,6 +161,12 @@ it.effect("a finish chunk completes the turn so a later close does not re-end it
 
     yield* runtime.prompt(PROMPT);
     yield* Queue.offer(fake.output, { type: "finish" });
+    yield* Queue.offer(fake.output, {
+      type: "session.turn.ended",
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      outcome: "completed",
+    });
     yield* Effect.eventually(
       Ref.get(collected.bodies).pipe(
         Effect.filterOrFail(
