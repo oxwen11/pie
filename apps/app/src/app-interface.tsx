@@ -1,6 +1,6 @@
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { use, useEffect, type ReactElement, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
@@ -36,6 +36,7 @@ declare global {
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
   void import("react-grab/core").then(({ init }) => {
     init({ telemetry: false });
+    return undefined;
   });
 }
 
@@ -96,7 +97,7 @@ export function AppInterface({
 }): ReactElement {
   return (
     <ErrorBoundary FallbackComponent={AppErrorPage}>
-      <AppHost server={server} environmentId={environmentId} />
+      <AppHost server={server} environmentId={environmentId} tokenHolder={tokenHolder} />
     </ErrorBoundary>
   );
 }
@@ -104,9 +105,11 @@ export function AppInterface({
 function AppHost({
   server,
   environmentId,
+  tokenHolder,
 }: {
   server?: ServerConnection;
   environmentId?: string;
+  tokenHolder?: { current: string };
 }): ReactElement {
   usePlatform();
   const identity = server?.httpBaseUrl ?? "default";
@@ -146,9 +149,35 @@ function AppRuntime({
   tokenHolder?: { current: string };
 }): ReactElement {
   const platform = usePlatform();
-  const localClients = useState(() => createAppClients(server, tokenHolder))[0];
-  const remoteClients = useState(() => new Map<string, CachedRemote>())[0];
-  const chatManagerHolder = useState(() => ({ current: null as ChatManager | null }))[0];
+  const localClients = useStable(() => createAppClients(server, tokenHolder));
+  const remoteClients = useStable(() => new Map<string, CachedRemote>());
+  const { orpcClient, queryClient, orpcQueryUtils } = localClients;
+
+  function clientsFor(id: string): AppClients {
+    if (id === environmentId) return localClients;
+    const remote = platform.ssh?.environments
+      .getSnapshot()
+      .remotes.find((entry) => entry.environmentId === id);
+    if (remote === undefined) throw new UnknownEnvironmentError(id);
+    const key = connectionKey(remote.connection);
+    const cached = remoteClients.get(id);
+    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
+    if (cached !== undefined) {
+      remoteClients.delete(id);
+      disposeAppClients(cached.clients);
+    }
+    const created = createAppClients(remote.connection);
+    remoteClients.set(id, { connectionKey: key, clients: created });
+    return created;
+  }
+
+  const chatManager = useStable(
+    () =>
+      new ChatManager((ref) => {
+        const clients = clientsFor(ref.environmentId);
+        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
+      }),
+  );
 
   useEffect(() => {
     const feed = platform.ssh?.environments;
@@ -156,7 +185,7 @@ function AppRuntime({
     const dropRemote = (id: string, clients: AppClients) => {
       remoteClients.delete(id);
       disposeAppClients(clients);
-      chatManagerHolder.current?.forgetEnvironment(id);
+      chatManager.forgetEnvironment(id);
     };
     const prune = () => {
       const live = new Map(
@@ -175,37 +204,9 @@ function AppRuntime({
     };
     prune();
     return feed.subscribe(prune);
-  }, [platform.ssh, remoteClients, chatManagerHolder]);
+  }, [platform.ssh, remoteClients, chatManager]);
 
-  const clientsFor = (id: string): AppClients => {
-    if (id === environmentId) return localClients;
-    const remote = platform.ssh?.environments
-      .getSnapshot()
-      .remotes.find((entry) => entry.environmentId === id);
-    if (remote === undefined) throw new UnknownEnvironmentError(id);
-    const key = connectionKey(remote.connection);
-    const cached = remoteClients.get(id);
-    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
-    if (cached !== undefined) {
-      remoteClients.delete(id);
-      disposeAppClients(cached.clients);
-      chatManagerHolder.current?.forgetEnvironment(id);
-    }
-    const created = createAppClients(remote.connection);
-    remoteClients.set(id, { connectionKey: key, clients: created });
-    return created;
-  };
-
-  const [{ orpcClient, queryClient, orpcQueryUtils }] = useState(() => localClients);
-  const [chatManager] = useState(
-    () =>
-      new ChatManager((ref) => {
-        const clients = clientsFor(ref.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
-      }),
-  );
-  chatManagerHolder.current = chatManager;
-  const [router] = useState(() =>
+  const router = useStable(() =>
     createRouter({
       orpcClient,
       queryClient,
