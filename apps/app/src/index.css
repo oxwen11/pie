@@ -153,13 +153,13 @@ form:has(> [data-slot="chat-input"]):focus-within {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
 }
 
-/* Inline widget: 1em character box (ZWSP + line-height 1), not leading-5.
- * Empty inline-block baseline is the box bottom and sits too high. Width 0 so
- * typing is not shifted; the bar is the border. */
+/* Inline widget: a bit taller than the 1em box (ZWSP + line-height), still
+ * centered — half-leading grows both sides. Not leading-5. Width 0 so typing
+ * is not shifted; the bar is the border. */
 .chat-input-caret {
   display: inline-block;
   width: 0;
-  line-height: 1;
+  line-height: 1.2;
   margin-right: -2px;
   border-right: 2px solid var(--foreground);
   pointer-events: none;
