@@ -98,17 +98,20 @@ const mintPairing = () =>
     if (!response.ok) {
       return yield* Effect.fail(new Error(`pairing mint failed (${String(response.status)})`));
     }
-    const body = (yield* Effect.tryPromise(() => response.json())) as {
-      code?: unknown;
-      expiresAt?: unknown;
-    };
-    if (typeof body.code !== "string") {
+    const body: unknown = yield* Effect.tryPromise(() => response.json());
+    if (
+      body === null ||
+      typeof body !== "object" ||
+      !("code" in body) ||
+      typeof body.code !== "string"
+    ) {
       return yield* Effect.fail(new Error("pairing mint returned no code"));
     }
     console.log(body.code);
-    if (typeof body.expiresAt === "number") {
+    if ("expiresAt" in body && typeof body.expiresAt === "number") {
       console.log(`expires ${new Date(body.expiresAt).toISOString()}`);
     }
+    return undefined;
   });
 
 const pairingMint = Command.make("mint", {}, mintPairing).pipe(
@@ -124,13 +127,13 @@ const relayListen = Command.make("listen", relayListenFlags, runRelayListen).pip
 );
 
 const relayAttachFlags = {
-  to: Flag.string("to").pipe(
+  to: Flag.String("to").pipe(
     Flag.withDescription("Public relay host:port (e.g. 96.44.165.19:8443)"),
   ),
-  control: Flag.string("control").pipe(
+  control: Flag.String("control").pipe(
     Flag.withDescription("Control host:port printed by pie relay listen"),
   ),
-  local: Flag.string("local").pipe(
+  local: Flag.String("local").pipe(
     Flag.withDescription("Foreground pie serve host:port instead of the running daemon"),
     Flag.optional,
   ),
