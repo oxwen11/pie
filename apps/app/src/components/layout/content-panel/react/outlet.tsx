@@ -127,7 +127,7 @@ function Tab({
       // finds the tab to scroll into view.
       data-active={active || undefined}
       className={cn(
-        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1 text-xs",
+        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",

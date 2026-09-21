@@ -12,6 +12,17 @@ interface TerminalSurface {
   readonly detach: () => void;
 }
 
+function applyHostType(term: Terminal, host: HTMLElement) {
+  const styles = getComputedStyle(host);
+  const fontSize = parseFloat(styles.fontSize);
+  if (Number.isFinite(fontSize) && fontSize > 0 && term.options.fontSize !== fontSize) {
+    term.options.fontSize = fontSize;
+  }
+  if (styles.fontFamily !== "" && term.options.fontFamily !== styles.fontFamily) {
+    term.options.fontFamily = styles.fontFamily;
+  }
+}
+
 export function attachTerminalSurface(
   mount: HTMLElement,
   options: {
@@ -24,14 +35,13 @@ export function attachTerminalSurface(
   const term = new Terminal({
     convertEol: true,
     cursorBlink: true,
-    fontSize: 12,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     theme: xtermThemeFromElement(mount),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(mount);
   term.textarea?.setAttribute("aria-label", "zsh input");
+  applyHostType(term, mount);
   fit.fit();
 
   const abort = new AbortController();
@@ -60,6 +70,7 @@ export function attachTerminalSurface(
 
   const observer = new ResizeObserver(() => {
     try {
+      applyHostType(term, mount);
       fit.fit();
     } catch {
       // Unmounted mid-frame.
