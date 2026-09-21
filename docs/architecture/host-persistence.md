@@ -364,11 +364,11 @@ creating the window and paints `backgroundColor` from `appearance.theme`
 Live panel instances, loaded content, spinners, and scrollback are intentionally
 not persisted.
 
-### Shell widths
+### Shell layout
 
 | Property      | Current contract                                                                                                   |
 | ------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Key           | localStorage `pie:shell-widths`                                                                                    |
+| Key           | localStorage `pie:shell-layout`                                                                                    |
 | Owner         | `ShellLayout`                                                                                                      |
 | Data          | `{ sidebarWidth, contentBySession }`. Sidebar pixels clamped 192–480 (default 256). Content pixels per session key |
 | Compatibility | No version. Unreadable envelopes fall back to defaults                                                             |

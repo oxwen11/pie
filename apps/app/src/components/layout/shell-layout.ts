@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-const STORAGE_NAME = "pie:shell-widths";
+const STORAGE_NAME = "pie:shell-layout";
 const SIDEBAR_MIN_PX = 192;
 const SIDEBAR_MAX_PX = 480;
 const SIDEBAR_DEFAULT_PX = 256;
