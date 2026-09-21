@@ -154,6 +154,8 @@ form:has(> [data-slot="chat-input"]):focus-within {
   position: fixed;
   top: 0;
   left: 0;
+  /* Above form:focus-within (z-index 1). Overlay lives on body. */
+  z-index: 2;
   width: 2px;
   pointer-events: none;
   background: var(--foreground);
