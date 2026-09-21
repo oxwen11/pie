@@ -14,7 +14,11 @@ const serverArgv = (): string[] => [
 ];
 
 /** The single CLI seam for attaching to or starting its local daemon. */
-export const resolveCliDaemon = (port: number, environment?: NodeJS.ProcessEnv) => {
+export const resolveCliDaemon = (
+  port: number,
+  environment?: NodeJS.ProcessEnv,
+  extras?: { readonly replaceIncompatible?: boolean },
+) => {
   let options: ResolveDaemonOptions = {
     home: resolvePieHome(),
     requiredCompatibilityKey: embeddedDaemonCompatibilityKey(),
@@ -22,5 +26,8 @@ export const resolveCliDaemon = (port: number, environment?: NodeJS.ProcessEnv) 
     port,
   };
   if (environment !== undefined) options = { ...options, environment };
+  if (extras?.replaceIncompatible === true) {
+    options = { ...options, replaceIncompatible: true };
+  }
   return resolveOrSpawnDaemon(options);
 };

@@ -26,6 +26,9 @@ import { usePlatform } from "@/platform-context";
 
 import { composeSshConnectTarget } from "./ssh-connect-target";
 
+const isRemoteDaemonReplaceRequired = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes("already running with a different version");
+
 function discoveredHostAddress(host: DiscoveredSshHost): string {
   const authority = host.username ? `${host.username}@${host.hostname}` : host.hostname;
   return host.port === null ? authority : `${authority}:${String(host.port)}`;
@@ -63,6 +66,7 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
   const [hostsLoading, setHostsLoading] = useState(true);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ssh) return undefined;
@@ -96,17 +100,22 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
 
   if (!ssh || !ssh.client.available) return null;
 
-  const connectTarget = (target: string) => {
+  const connectTarget = (target: string, replace = false) => {
     if (pending) return;
     setPending(true);
+    setReplaceTarget(null);
     void ssh
-      .connect(target)
+      .connect(target, replace ? { replace: true } : undefined)
       .then(() => {
         onClose();
         return undefined;
       })
       .catch((error: unknown) => {
         setPending(false);
+        if (!replace && isRemoteDaemonReplaceRequired(error)) {
+          setReplaceTarget(target);
+          return undefined;
+        }
         toast.error(error instanceof Error ? error.message : "Failed to connect over SSH.");
         return undefined;
       });
@@ -149,8 +158,9 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
           <DialogHeader>
             <DialogTitle>Add SSH host</DialogTitle>
             <DialogDescription>
-              Pie launches the remote pie daemon and forwards it over SSH. Use ssh-agent or an
-              IdentityFile; password prompts are not wired yet.
+              {replaceTarget === null
+                ? "Pie launches the remote pie daemon and forwards it over SSH. Use ssh-agent or an IdentityFile; password prompts are not wired yet."
+                : "Pie on that machine is already running a different version. Restarting it will disconnect the Desktop app there."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 px-6 py-2">
@@ -249,10 +259,20 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
             <Button disabled={pending} type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={pending || host.trim().length === 0} type="submit">
-              <PlusIcon className="size-3.5" />
-              {pending ? "Adding…" : "Add environment"}
-            </Button>
+            {replaceTarget === null ? (
+              <Button disabled={pending || host.trim().length === 0} type="submit">
+                <PlusIcon className="size-3.5" />
+                {pending ? "Adding…" : "Add environment"}
+              </Button>
+            ) : (
+              <Button
+                disabled={pending}
+                type="button"
+                onClick={() => connectTarget(replaceTarget, true)}
+              >
+                {pending ? "Restarting…" : "Restart remote Pie"}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogPopup>

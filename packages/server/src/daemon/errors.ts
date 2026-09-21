@@ -13,3 +13,13 @@ export class DaemonLaunchError extends Data.TaggedError("DaemonLaunchError")<{
 export class DaemonStoppedError extends Data.TaggedError("DaemonStoppedError")<{
   readonly message: string;
 }> {}
+
+export const DAEMON_VERSION_MISMATCH_MESSAGE =
+  "pie daemon is already running with a different version. Restart it with: pie daemon start --replace";
+
+/** A healthy daemon is already running on a different compatibility class. */
+export class DaemonCompatibilityMismatchError extends Data.TaggedError(
+  "DaemonCompatibilityMismatchError",
+)<{
+  readonly message: string;
+}> {}

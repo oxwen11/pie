@@ -47,7 +47,7 @@ export class DesktopApplication extends Context.Service<
     readonly watchEnvironments: (after: number) => Stream.Stream<EnvironmentSnapshot>;
     readonly connectSsh: (
       target: string,
-      options?: { readonly background?: boolean },
+      options?: { readonly background?: boolean; readonly replace?: boolean },
     ) => Effect.Effect<void, SshEnvironmentError | SshPersistError>;
     readonly removeSsh: (id: string) => Effect.Effect<void, SshPersistError>;
     readonly discoverSshHosts: Effect.Effect<readonly DiscoveredSshHost[]>;
@@ -104,7 +104,10 @@ export function makeDesktopApplication({
       };
     });
 
-  const connectSsh = (target: string, options?: { readonly background?: boolean }) =>
+  const connectSsh = (
+    target: string,
+    options?: { readonly background?: boolean; readonly replace?: boolean },
+  ) =>
     Effect.gen(function* () {
       const trimmed = target.trim();
       const entry: ConnectingSshHost = {
@@ -119,7 +122,9 @@ export function makeDesktopApplication({
         connecting: [...current.connecting, entry],
         remotes: current.remotes,
       }));
-      const result = yield* ssh.connect(trimmed).pipe(Effect.tapError(() => clearConnecting));
+      const result = yield* ssh
+        .connect(trimmed, { replace: options?.replace })
+        .pipe(Effect.tapError(() => clearConnecting));
       const remote: SshRemoteEnvironment = {
         id: result.id,
         environmentId: result.environmentId,

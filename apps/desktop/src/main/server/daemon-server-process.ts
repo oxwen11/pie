@@ -95,6 +95,7 @@ export function makeDaemonServerProcess(
           port: port === 0 ? undefined : port,
           environment,
           autoRespawn: port !== 0,
+          replaceIncompatible: true,
         }).pipe(
           Effect.mapError(
             (cause) =>

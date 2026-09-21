@@ -11,7 +11,12 @@ import {
   LOGS_DIRECTORY_MODE,
   logsDirectory,
 } from "../config/paths";
-import { DaemonLaunchError, DaemonStoppedError } from "./errors";
+import {
+  DAEMON_VERSION_MISMATCH_MESSAGE,
+  DaemonCompatibilityMismatchError,
+  DaemonLaunchError,
+  DaemonStoppedError,
+} from "./errors";
 import { daemonAlive, healthy, pidAlive } from "./liveness";
 import { acquireLock } from "./lock";
 import { reservePort } from "./port";
@@ -61,10 +66,15 @@ export type ResolveDaemonOptions = {
    * explicitly stopped. Explicit front-doors leave this unset.
    */
   readonly autoRespawn?: boolean;
+  /** Replace a healthy daemon whose compatibility key does not match. */
+  readonly replaceIncompatible?: boolean;
   readonly readyTimeoutMs?: number;
 };
 
-export type DaemonLauncherError = DaemonLaunchError | DaemonStoppedError;
+export type DaemonLauncherError =
+  | DaemonLaunchError
+  | DaemonStoppedError
+  | DaemonCompatibilityMismatchError;
 
 /**
  * The platform services the launcher's file state runs on. Provided at each
@@ -248,6 +258,11 @@ const resolveLocked = (
         return attach(existing, true);
       }
     } else if (existing !== undefined && existingHealthy) {
+      if (options.replaceIncompatible !== true) {
+        return yield* new DaemonCompatibilityMismatchError({
+          message: DAEMON_VERSION_MISMATCH_MESSAGE,
+        });
+      }
       yield* Effect.logInfo("Replacing incompatible pie daemon").pipe(
         Effect.annotateLogs({
           event: "daemon.compatibility_mismatch",
