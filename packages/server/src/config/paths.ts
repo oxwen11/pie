@@ -28,6 +28,8 @@ export class Paths extends Context.Service<
     readonly logsDir: string;
     /** `~/Pie` — parent for `project.allocateChatProjectDir` chat folders (`type: "chat"`). */
     readonly chatProjectsDir: string;
+    /** `storage/ssh-environments.json` — Desktop and CLI saved SSH hosts. */
+    readonly sshEnvironmentsFile: string;
   }
 >()("Paths") {}
 
@@ -51,6 +53,7 @@ const resolve = (home: string, chatProjectsDir: string) => ({
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
   chatProjectsDir,
+  sshEnvironmentsFile: sshEnvironmentsFile(home),
 });
 
 /**
@@ -94,6 +97,11 @@ export const logsDirectory = (home: string): string => path.join(home, "logs");
 /** One independently owned resource-log source below `$PIE_HOME/logs/resources`. */
 export const resourceSourceDirectory = (logsDir: string, source: ResourceSource): string =>
   path.join(logsDir, RESOURCE_LOGS_DIRECTORY, source);
+
+/** Saved SSH hosts for Desktop and CLI. Not Electron userData. */
+export function sshEnvironmentsFile(home: string): string {
+  return path.join(home, "storage", "ssh-environments.json");
+}
 
 export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 

@@ -296,6 +296,8 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
+          const stored = yield* fixture.repo.read(a.projectId, a.sessionId);
+          yield* fixture.repo.write({ ...stored, agentSessionId: "native-a" });
           const listed = yield* fixture.service.list("proj-a", false);
           return { a, b, listed };
         }),
@@ -305,10 +307,13 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
         Array.from(result.listed.map((summary) => summary.sessionId)).sort(),
         Array.from([result.a.sessionId, result.b.sessionId]).sort(),
       );
-      // We own the record, so a session we created reads as history-available.
       assert.equal(
-        result.listed.every((summary) => summary.historyAvailable),
+        result.listed.find((summary) => summary.sessionId === result.a.sessionId)?.historyAvailable,
         true,
+      );
+      assert.equal(
+        result.listed.find((summary) => summary.sessionId === result.b.sessionId)?.historyAvailable,
+        false,
       );
       assert.equal(
         result.listed.every((summary) => !summary.archived),

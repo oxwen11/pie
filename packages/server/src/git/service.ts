@@ -214,7 +214,7 @@ export const GitServiceLayer: Layer.Layer<
       });
 
     const currentBranch = (cwd: string) =>
-      raw(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).pipe(
+      raw(cwd, ["branch", "--show-current"]).pipe(
         Effect.map((value) => {
           const name = value.trim();
           return name === "" ? null : name;
