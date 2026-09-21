@@ -135,8 +135,8 @@ describe("schedules and pull requests", () => {
     await mountApp();
     await page.getByRole("link", { name: "Scheduled" }).click();
     await waitForText("No schedules yet");
-    await page.getByRole("button", { name: "New schedule" }).click();
-    await waitForText("New schedule");
+    await page.getByRole("button", { name: "Create" }).click();
+    await waitForText("Name");
     await page.getByLabelText("Name").fill("e2e nightly");
     await page.getByLabelText("Prompt").fill("e2e scheduled ping");
     await page.getByRole("button", { name: /create|save/i }).click();
