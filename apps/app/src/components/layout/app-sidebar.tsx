@@ -13,7 +13,7 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
-import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
+import { Clock, GitPullRequestIcon, Puzzle, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
@@ -45,6 +45,23 @@ function PullRequestsNavItem() {
       <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
         <GitPullRequestIcon />
         <span>Pull requests</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PluginsNavItem() {
+  const active =
+    useMatch({
+      from: "/plugins",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/plugins" />}>
+        <Puzzle />
+        <span>Plugins</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -119,6 +136,7 @@ export function AppSidebar() {
               <NewChatNavItem />
               <SchedulesNavItem />
               <PullRequestsNavItem />
+              <PluginsNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
