@@ -136,11 +136,20 @@ form:has(> [data-slot="chat-input"]) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  background: color-mix(in srgb, var(--card) 90%, transparent);
-  backdrop-filter: blur(16px);
-  transition:
-    border-color 150ms,
-    box-shadow 150ms;
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"]) {
+  box-shadow:
+    0 18px 47px rgba(0, 0, 0, 0.03),
+    0 7.5px 19px rgba(0, 0, 0, 0.02),
+    0 4px 10.5px rgba(0, 0, 0, 0.02),
+    0 2.3px 5.8px rgba(0, 0, 0, 0.01),
+    0 1.2px 3.1px rgba(0, 0, 0, 0.01),
+    0 0.5px 1.3px rgba(0, 0, 0, 0.01);
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"])::before {
+  box-shadow: none;
 }
 
 form:has(> [data-slot="chat-input"]):focus-within {
@@ -154,7 +163,7 @@ form:has(> [data-slot="chat-input"]):focus-within {
   position: fixed;
   top: 0;
   left: 0;
-  /* Above form:focus-within (z-index 1). Overlay lives on body. */
+  /* Overlay lives on body so composer clip-path cannot trap it. */
   z-index: 2;
   width: 2px;
   pointer-events: none;
