@@ -46,35 +46,25 @@ const copyPackage = (name: string, destNodeModules: string) => {
   });
 };
 
-/** Copy pi-fff + fff-bun + the installed platform bin into `dest/node_modules`. */
+const platformBin = (): string => {
+  if (process.platform === "linux") {
+    const report = process.report.getReport();
+    const glibc =
+      "header" in report &&
+      typeof report.header === "object" &&
+      report.header !== null &&
+      "glibcVersionRuntime" in report.header;
+    return `@ff-labs/fff-bin-linux-${process.arch}-${glibc ? "gnu" : "musl"}`;
+  }
+  return `@ff-labs/fff-bin-${process.platform}-${process.arch}`;
+};
+
+/** Copy pi-fff + fff-bun + the current platform bin into `dest/node_modules`. */
 export function copyFffIsland(dest: string): void {
   const destNodeModules = path.join(dest, "node_modules");
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(destNodeModules, { recursive: true });
   copyPackage("@ff-labs/pi-fff", destNodeModules);
   copyPackage("@ff-labs/fff-bun", destNodeModules);
-  const bunManifest: unknown = JSON.parse(
-    fs.readFileSync(path.join(destNodeModules, "@ff-labs", "fff-bun", "package.json"), "utf8"),
-  );
-  const optional =
-    typeof bunManifest === "object" &&
-    bunManifest !== null &&
-    "optionalDependencies" in bunManifest &&
-    typeof bunManifest.optionalDependencies === "object" &&
-    bunManifest.optionalDependencies !== null
-      ? bunManifest.optionalDependencies
-      : {};
-  let copied = 0;
-  for (const name of Object.keys(optional)) {
-    if (!name.startsWith("@ff-labs/fff-bin-")) continue;
-    try {
-      copyPackage(name, destNodeModules);
-      copied += 1;
-    } catch {
-      /* other platforms are not installed */
-    }
-  }
-  if (copied === 0) {
-    throw new Error("copy-fff: no fff-bin-* installed for this platform");
-  }
+  copyPackage(platformBin(), destNodeModules);
 }

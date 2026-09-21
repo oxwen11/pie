@@ -18,11 +18,14 @@ const file = definePanelFamily({
   view: null,
 });
 
-const ref = (overrides: Partial<EnvironmentSessionRef> = {}): EnvironmentSessionRef => ({
-  environmentId: "env-1",
-  projectId: "11111111-1111-4111-8111-111111111111",
-  sessionId: "session-1",
-  ...overrides,
+const ref = (
+  overrides: Partial<{ environmentId: string; projectId: string; sessionId: string }> = {},
+): EnvironmentSessionRef => ({
+  environmentId: overrides.environmentId ?? "env-1",
+  ref: {
+    projectId: overrides.projectId ?? "11111111-1111-4111-8111-111111111111",
+    sessionId: overrides.sessionId ?? "session-1",
+  },
 });
 const S = ref();
 
@@ -467,6 +470,26 @@ describe("ContentPanel", () => {
     expect(snapshotOf(host).panels).toHaveLength(0);
     expect(host.instanceFor(S, "counted:1")).toBeUndefined();
     expect(host.instanceFor(S, "counted:2")).toBeUndefined();
+  });
+
+  it("forgetAllForEnvironment drops every session on that Environment", () => {
+    let disposed = 0;
+    const disposable = definePanel({
+      type: "disposable",
+      label: "Disposable",
+      create: () => ({ dispose: () => void disposed++ }),
+      view: null,
+    });
+    const host = withPanels(disposable);
+    const other = ref({ environmentId: "env-2", sessionId: "s-2" });
+    host.open(S, disposable);
+    host.open(other, disposable);
+
+    host.forgetAllForEnvironment("env-1");
+
+    expect(disposed).toBe(1);
+    expect(snapshotOf(host).panels).toHaveLength(0);
+    expect(snapshotOf(host, other).panels).toHaveLength(1);
   });
 
   it("no session means no panels", () => {

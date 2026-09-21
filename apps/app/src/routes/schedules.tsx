@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { useProjects } from "@/features/projects/use-projects";
 import { SchedulePage } from "@/features/schedules/schedule-page";
+import { EnvironmentOrpcProvider } from "@/lib/environment-orpc";
 
 type SchedulesSearch = {
+  readonly environmentId?: string;
   readonly create?: true;
   readonly projectId?: string;
   readonly sessionId?: string;
@@ -24,6 +26,7 @@ const optional = <K extends keyof SchedulesSearch>(
 export const Route = createFileRoute("/schedules")({
   staticData: { cardHeading: false, cardHeader: false },
   validateSearch: (search: Record<string, unknown>): SchedulesSearch => ({
+    ...optional("environmentId", asText(search.environmentId)),
     ...optional("create", search.create === true || search.create === "true" ? true : undefined),
     ...optional("projectId", asText(search.projectId)),
     ...optional("sessionId", asText(search.sessionId)),
@@ -32,20 +35,44 @@ export const Route = createFileRoute("/schedules")({
 });
 
 function SchedulesRoute() {
-  const projects = useProjects();
+  const { environmentRpc, localEnvironmentId } = Route.useRouteContext();
   const search = Route.useSearch();
+  const environmentId = search.environmentId ?? localEnvironmentId;
+  return (
+    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+      <EnvironmentSchedulesRoute environmentId={environmentId} search={search} />
+    </EnvironmentOrpcProvider>
+  );
+}
+
+function EnvironmentSchedulesRoute({
+  environmentId,
+  search,
+}: {
+  readonly environmentId: string;
+  readonly search: SchedulesSearch;
+}) {
+  const projects = useProjects();
   const navigate = useNavigate();
   return (
     <SchedulePage
       createDefaults={{ projectId: search.projectId, sessionId: search.sessionId }}
       createOpen={search.create === true}
+      environmentId={environmentId}
       onCloseCreate={() => {
-        navigate({ to: "/schedules", search: {}, replace: true }).catch((error: unknown) => {
+        navigate({
+          to: "/schedules",
+          search: { environmentId },
+          replace: true,
+        }).catch((error: unknown) => {
           console.error("Failed to close the schedule editor", error);
         });
       }}
       onOpenCreate={() => {
-        navigate({ to: "/schedules", search: { create: true } }).catch((error: unknown) => {
+        navigate({
+          to: "/schedules",
+          search: { create: true, environmentId },
+        }).catch((error: unknown) => {
           console.error("Failed to open the schedule editor", error);
         });
       }}

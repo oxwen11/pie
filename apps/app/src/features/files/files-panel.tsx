@@ -7,7 +7,7 @@ import type { PanelHandle } from "@/components/layout/content-panel/model/panel"
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 import { PanelEmptyState } from "@/components/layout/panel-empty-state";
-import { useAppClients } from "@/lib/app-clients";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -24,8 +24,8 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils } = useAppClients();
-  const projectId = instance.sessionRef.projectId;
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -36,7 +36,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     ),
   });
   const panel = useContentPanel();
-  const workspace = { ref: instance.sessionRef };
+  const workspace = { ref: instance.sessionRef.ref };
   const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
   const openFile = useCallback(

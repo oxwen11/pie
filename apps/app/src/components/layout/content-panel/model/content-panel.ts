@@ -2,7 +2,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
-import { sessionRefKey } from "@/lib/session-ref";
+import { parseSessionRefKey, sessionRefKey } from "@/lib/session-ref";
 
 import {
   type AnyPanelDefinition,
@@ -290,6 +290,18 @@ export class ContentPanel<View = unknown> {
       const { [sessionKey]: _forgotten, ...bySessionKey } = state.bySessionKey;
       return { bySessionKey };
     });
+  }
+
+  /** Drop every session whose Environment was disconnected or rotated. */
+  forgetAllForEnvironment(environmentId: string): void {
+    for (const sessionKey of Object.keys(this.store.getState().bySessionKey)) {
+      const parsed = parseSessionRefKey(sessionKey);
+      if (parsed === null || parsed.environmentId !== environmentId) continue;
+      this.forget({
+        environmentId: parsed.environmentId,
+        ref: { projectId: "", sessionId: parsed.sessionId },
+      });
+    }
   }
 
   /** The test seam: asserts on instance lifetime without going through a render. */

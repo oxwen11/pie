@@ -21,7 +21,7 @@ export function Chat({
           <ChatInputComposer
             key={sessionRefKey(sessionRef)}
             sessionRef={sessionRef}
-            toolbar={<ChatModelSelect sessionRef={sessionRef} />}
+            toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
           />
         </div>
       </div>

@@ -18,12 +18,19 @@ const asText = (value: unknown): string | undefined =>
 
 const CARD_HEADING = "Can't open session";
 
+type FallbackSearch = WorktreeMissingErrorData & {
+  readonly environmentId?: string;
+};
+
 export const Route = createFileRoute("/session/fallback")({
   staticData: { cardHeading: CARD_HEADING },
-  validateSearch: (search: Record<string, unknown>): WorktreeMissingErrorData => ({
+  validateSearch: (search: Record<string, unknown>): FallbackSearch => ({
     sessionId: asText(search.sessionId) ?? "",
     projectId: asText(search.projectId) ?? "",
     branch: asText(search.branch) ?? "",
+    ...(asText(search.environmentId) === undefined
+      ? undefined
+      : { environmentId: asText(search.environmentId) }),
   }),
   beforeLoad: ({ search }) => {
     if (search.sessionId === "" || search.projectId === "" || search.branch === "") {
@@ -35,11 +42,14 @@ export const Route = createFileRoute("/session/fallback")({
 
 function MissingWorktreeRoute() {
   const search = Route.useSearch();
-  const { orpcQueryUtils } = Route.useRouteContext();
+  const { environmentRpc, localEnvironmentId } = Route.useRouteContext();
+  const environmentId = search.environmentId ?? localEnvironmentId;
+  const orpcQueryUtils = environmentRpc.for(environmentId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const ref = { projectId: search.projectId, sessionId: search.sessionId };
   const restore = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.restoreWorktree.key(),
     mutationFn: () => orpcQueryUtils.agent.session.restoreWorktree.call({ ref }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -51,7 +61,7 @@ function MissingWorktreeRoute() {
       return navigate({
         to: "/session/$sessionId",
         params: { sessionId: search.sessionId },
-        search: { projectId: search.projectId },
+        search: { projectId: search.projectId, environmentId },
       });
     },
     onError: (error) => toast.error(`Failed to restore worktree: ${error.message}`),

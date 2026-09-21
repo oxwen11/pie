@@ -13,7 +13,7 @@ type SessionSearch = {
 const asText = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
 
-const throwWorktreeMissingRedirect = (error: unknown): void => {
+const throwWorktreeMissingRedirect = (error: unknown, environmentId: string): void => {
   if (!(error instanceof ORPCError) || error.code !== "WORKTREE_MISSING") return;
   const data: unknown = error.data;
   if (typeof data !== "object" || data === null) return;
@@ -23,7 +23,9 @@ const throwWorktreeMissingRedirect = (error: unknown): void => {
   if (sessionId === undefined || projectId === undefined || branch === undefined) return;
   throw redirect({
     to: "/session/fallback",
-    search: { sessionId, projectId, branch } satisfies WorktreeMissingErrorData,
+    search: { sessionId, projectId, branch, environmentId } satisfies WorktreeMissingErrorData & {
+      environmentId: string;
+    },
   });
 };
 
@@ -45,14 +47,14 @@ export const Route = createFileRoute("/session/$sessionId")({
     deps,
   }): Promise<PrepareSessionOutput & { environmentId: string }> => {
     const environmentId = deps.environmentId ?? context.localEnvironmentId;
-    const clients = await context.clientsFor(environmentId);
-    const { session } = clients.orpcQueryUtils.agent;
+    const orpc = context.environmentRpc.for(environmentId);
+    const { session } = orpc.agent;
     const prepareSession = (ref: SessionRef) => {
-      const prepared = session.prepare.call({ ref });
-      void clients.queryClient.prefetchQuery(
-        clients.orpcQueryUtils.git.branch.queryOptions({ input: { ref } }),
-      );
-      return prepared;
+      void context.environmentRpc.queryClient.prefetchQuery({
+        ...orpc.git.branch.queryOptions({ input: { ref } }),
+        meta: { errorMode: "inline" },
+      });
+      return session.prepare.call({ ref });
     };
 
     if (deps.projectId !== undefined) {
@@ -61,7 +63,7 @@ export const Route = createFileRoute("/session/$sessionId")({
         sessionId: params.sessionId,
       };
       const prepared = await prepareSession(hinted).catch((error: unknown) => {
-        throwWorktreeMissingRedirect(error);
+        throwWorktreeMissingRedirect(error, environmentId);
         console.warn("Preparing the URL's ref failed, falling back to lookup", error);
         return undefined;
       });
@@ -73,12 +75,12 @@ export const Route = createFileRoute("/session/$sessionId")({
       .catch((error: unknown) => {
         console.error("Failed to resolve session", error);
         toast.error(`Session ${params.sessionId} could not be found.`);
-        throw redirect({ to: "/draft" });
+        throw redirect({ to: "/draft", search: { environmentId } });
       });
     return prepareSession(ref)
       .then((prepared) => ({ ...prepared, environmentId }))
       .catch((error: unknown) => {
-        throwWorktreeMissingRedirect(error);
+        throwWorktreeMissingRedirect(error, environmentId);
         console.error("Failed to prepare session", error);
         toast.error(
           `Failed to prepare session: ${error instanceof Error ? error.message : String(error)}`,
@@ -95,8 +97,7 @@ function Component() {
     <Chat
       sessionRef={{
         environmentId: prepared.environmentId,
-        projectId: prepared.ref.projectId,
-        sessionId: prepared.ref.sessionId,
+        ref: prepared.ref,
       }}
     />
   );

@@ -19,6 +19,15 @@ type DaemonStartInput = {
   readonly host: Option.Option<string>;
   readonly corsOrigin: ReadonlyArray<string>;
   readonly allowedHost: ReadonlyArray<string>;
+  readonly replace?: boolean;
+};
+
+const daemonStartFlags = {
+  ...serveFlags,
+  replace: Flag.Boolean("replace").pipe(
+    Flag.withDescription("Restart a running daemon if its version does not match"),
+    Flag.withDefault(false),
+  ),
 };
 
 // Default startup is the daemon: a short-lived `pie` command must operate a
@@ -35,6 +44,7 @@ const startDaemon = (input: DaemonStartInput) =>
     const handle = yield* resolveCliDaemon(
       config.port,
       daemonServeEnvironment(process.env, config),
+      input.replace === true,
     );
     console.log(
       handle.reused
@@ -66,7 +76,7 @@ const statusHandler = () =>
     console.log(`pie daemon running at ${status.record.address} (pid ${status.record.pid})`);
   });
 
-const daemonStart = Command.make("start", serveFlags, startDaemon).pipe(
+const daemonStart = Command.make("start", daemonStartFlags, startDaemon).pipe(
   Command.withDescription("Start the pie daemon, or attach if one is already running"),
 );
 const daemonStop = Command.make("stop", {}, stopHandler).pipe(
@@ -76,7 +86,7 @@ const daemonStatus = Command.make("status", {}, statusHandler).pipe(
   Command.withDescription("Report whether the pie daemon is running"),
 );
 
-const daemon = Command.make("daemon", serveFlags, startDaemon).pipe(
+const daemon = Command.make("daemon", daemonStartFlags, startDaemon).pipe(
   Command.withDescription("Manage the pie daemon (bare `daemon` starts it)"),
   Command.withSubcommands([daemonStart, daemonStop, daemonStatus]),
 );

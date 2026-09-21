@@ -37,10 +37,12 @@ describe("ssh command helpers", () => {
     expect(isSshSpawnNotFound({ code: "EACCES" })).toBe(false);
   });
 
-  it("adds BatchMode and an explicit port", () => {
+  it("accepts new host keys non-interactively and preserves explicit ports", () => {
     expect(baseSshArgs(parseSshInput("alice@example.com:2222"))).toEqual([
       "-o",
       "BatchMode=yes",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
       "-o",
       "ConnectTimeout=10",
       "-p",

@@ -1,18 +1,21 @@
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { use, useEffect, type ReactElement, type ReactNode } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner";
 
 import "./index.css";
 
 import { AppErrorPage } from "./components/app-error-page";
+import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
+import { createEnvironmentCatalog } from "./features/projects/environment-catalog";
+import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { parseEnvironmentId } from "./lib/environment-id";
-import { createAppClients, disposeAppClients, type AppClients } from "./lib/orpc";
-import { toSessionRef } from "./lib/session-ref";
+import { createEnvironmentRpc } from "./lib/environment-rpc";
+import { createAppQueryClient, createLocalPieLink, type EnvironmentOrpc } from "./lib/orpc";
 import { usePlatform } from "./platform-context";
 import { createRouter } from "./router";
 import type { ServerConnection } from "./server-connection";
@@ -34,10 +37,7 @@ declare global {
 // the default init fires a version check at react-grab.com, which the Electron
 // renderer's CSP blocks with a console error.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  void import("react-grab/core").then(({ init }) => {
-    init({ telemetry: false });
-    return undefined;
-  });
+  void import("react-grab/core").then(({ init }) => init({ telemetry: false }));
 }
 
 // Dev only: highlights components as they re-render so you can spot wasted
@@ -48,18 +48,7 @@ if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
 // Its own version check has no opt-out and is patched out instead — see
 // `patches/react-scan@0.5.7.patch`.
 if (import.meta.env.DEV && !import.meta.env.PIE_RUN_IN_AGENT) {
-  // react-scan's intro is another %c console.log; hideIntro skips it.
-  Object.assign(window, { hideIntro: true });
   void import("react-scan").then(({ scan }) => scan());
-}
-
-type CachedRemote = {
-  readonly connectionKey: string;
-  readonly clients: AppClients;
-};
-
-function connectionKey(connection: ServerConnection): string {
-  return `${connection.httpBaseUrl}\0${connection.token}`;
 }
 
 async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
@@ -74,13 +63,6 @@ async function loadEnvironmentId(server?: ServerConnection): Promise<string> {
     return parseEnvironmentId(await response.json()) ?? "local";
   } catch {
     return "local";
-  }
-}
-
-class UnknownEnvironmentError extends Error {
-  constructor(readonly environmentId: string) {
-    super(`Environment ${environmentId} is not connected`);
-    this.name = "UnknownEnvironmentError";
   }
 }
 
@@ -132,9 +114,19 @@ function ResolveLocalEnvironment({
 }: {
   server?: ServerConnection;
   tokenHolder?: { current: string };
-}): ReactElement {
-  const promise = useStable(() => loadEnvironmentId(server));
-  const environmentId = use(promise);
+}): ReactElement | null {
+  const [environmentId, setEnvironmentId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadEnvironmentId(server).then((id) => {
+      if (!cancelled) setEnvironmentId(id);
+      return undefined;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [server]);
+  if (environmentId === null) return null;
   return <AppRuntime server={server} environmentId={environmentId} tokenHolder={tokenHolder} />;
 }
 
@@ -149,76 +141,74 @@ function AppRuntime({
   tokenHolder?: { current: string };
 }): ReactElement {
   const platform = usePlatform();
-  const localClients = useStable(() => createAppClients(server, tokenHolder));
-  const remoteClients = useStable(() => new Map<string, CachedRemote>());
-  const { orpcClient, queryClient, orpcQueryUtils } = localClients;
-
-  function clientsFor(id: string): AppClients {
-    if (id === environmentId) return localClients;
-    const remote = platform.ssh?.environments
-      .getSnapshot()
-      .remotes.find((entry) => entry.environmentId === id);
-    if (remote === undefined) throw new UnknownEnvironmentError(id);
-    const key = connectionKey(remote.connection);
-    const cached = remoteClients.get(id);
-    if (cached !== undefined && cached.connectionKey === key) return cached.clients;
-    if (cached !== undefined) {
-      remoteClients.delete(id);
-      disposeAppClients(cached.clients);
-    }
-    const created = createAppClients(remote.connection);
-    remoteClients.set(id, { connectionKey: key, clients: created });
-    return created;
-  }
+  const queryClient = useStable(createAppQueryClient);
+  const environmentRpc = useStable(() =>
+    createEnvironmentRpc({
+      localId: environmentId,
+      localLink: createLocalPieLink(server, tokenHolder),
+      queryClient,
+      resolveRemote: (id) =>
+        platform.ssh?.environments.getSnapshot().remotes.find((entry) => entry.environmentId === id)
+          ?.connection,
+    }),
+  );
 
   const chatManager = useStable(
     () =>
-      new ChatManager((ref) => {
-        const clients = clientsFor(ref.environmentId);
-        return new OrpcChatSessionTransport(clients.orpcClient.agent, toSessionRef(ref));
+      new ChatManager((sessionRef) => {
+        const session = environmentRpc.for(sessionRef.environmentId).agent.session;
+        return new OrpcChatSessionTransport(
+          {
+            session: {
+              prompt: session.prompt.call,
+              interrupt: session.interrupt.call,
+              replaceQueue: session.replaceQueue.call,
+              respondToAgentRequest: session.respondToAgentRequest.call,
+              getSnapshot: session.getSnapshot.call,
+              getMessages: session.getMessages.call,
+              subscribe: session.subscribe.call,
+            },
+          },
+          sessionRef.ref,
+        );
       }),
   );
+  const environmentCatalog = useStable(() => createEnvironmentCatalog(environmentRpc));
 
   useEffect(() => {
+    environmentCatalog.start(environmentId);
     const feed = platform.ssh?.environments;
-    if (feed === undefined) return undefined;
-    const dropRemote = (id: string, clients: AppClients) => {
-      remoteClients.delete(id);
-      disposeAppClients(clients);
-      chatManager.forgetEnvironment(id);
-    };
-    const prune = () => {
+    if (feed === undefined) return () => environmentCatalog.dispose();
+    const sync = () => {
       const live = new Map(
-        feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote] as const),
+        feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote.connection]),
       );
-      for (const [id, cached] of remoteClients) {
-        const remote = live.get(id);
-        if (remote === undefined) {
-          dropRemote(id, cached.clients);
-          continue;
-        }
-        if (cached.connectionKey !== connectionKey(remote.connection)) {
-          dropRemote(id, cached.clients);
-        }
-      }
+      environmentRpc.sync(live, (id) => {
+        environmentCatalog.stop(id);
+        chatManager.forgetEnvironment(id);
+        contentPanel.forgetAllForEnvironment(id);
+      });
+      for (const id of live.keys()) environmentCatalog.start(id);
     };
-    prune();
-    return feed.subscribe(prune);
-  }, [platform.ssh, remoteClients, chatManager]);
+    sync();
+    const unsubscribe = feed.subscribe(sync);
+    return () => {
+      unsubscribe();
+      environmentCatalog.dispose();
+    };
+  }, [platform.ssh, environmentId, environmentRpc, environmentCatalog, chatManager]);
 
+  useEffect(() => contentPanel.register(createTerminalPanel(environmentRpc)), [environmentRpc]);
   const router = useStable(() =>
     createRouter({
-      orpcClient,
-      queryClient,
-      orpcQueryUtils,
       localEnvironmentId: environmentId,
-      clientsFor: async (id) => clientsFor(id),
+      environmentRpc,
     }),
   );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ServerThemeProvider orpcQueryUtils={orpcQueryUtils}>
+      <ServerThemeProvider orpc={environmentRpc.for(environmentId)}>
         <ChatManagerProvider manager={chatManager}>
           <RouterProvider router={router} />
           {/*
@@ -235,14 +225,12 @@ function AppRuntime({
 
 function ServerThemeProvider({
   children,
-  orpcQueryUtils,
+  orpc,
 }: {
   children: ReactNode;
-  orpcQueryUtils: AppClients["orpcQueryUtils"];
+  orpc: EnvironmentOrpc;
 }): ReactElement {
-  const { data } = useQuery({
-    ...orpcQueryUtils.settings.get.queryOptions(),
-  });
+  const { data } = useQuery(orpc.settings.get.queryOptions());
   return <ThemeProvider serverTheme={data?.appearance.theme}>{children}</ThemeProvider>;
 }
 

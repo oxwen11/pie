@@ -65,6 +65,7 @@ describe("DesktopApplication", () => {
       status: "ready",
       statusRevision: 0,
       os: anyOs,
+      hostname: expect.any(String),
       sshClient: { available: true },
       tailscaleClient: { available: true },
       environments: {

@@ -41,6 +41,7 @@ if ! ensure_remote_node_path; then
 fi
 command -v pie
 command -v node
+command -v bun || true
 node -v
 `;
   return new Promise((resolve) => {
@@ -113,6 +114,23 @@ describe("resolveRemotePiePackageSpec", () => {
 });
 
 describe.skipIf(!posix)("ensure_remote_node_path", () => {
+  it("adds the standard Bun install to the daemon PATH", async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-bun-"));
+    try {
+      await writeExecutable(path.join(home, ".local", "bin", "pie"), "#!/bin/sh\necho pie-ok\n");
+      const bun = path.join(home, ".bun", "bin", "bun");
+      await writeExecutable(bun, "#!/bin/sh\necho bun-ok\n");
+      const nodeBin = path.join(home, "node", "bin");
+      await writeExecutable(path.join(nodeBin, "node"), nodeShim("v24.0.0"));
+
+      const result = await runEnsure(home, `${nodeBin}:/usr/bin:/bin`);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(bun);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("picks fnm Node 24 over nvm 20 and a PATH Node 25", async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "pie-ssh-node-"));
     try {

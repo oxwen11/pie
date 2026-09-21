@@ -119,6 +119,7 @@ describe("Desktop MessagePort RPC", () => {
         statusRevision: 0,
         // Literal would pin this to the developer's OS; see desktop-application.test.ts.
         os: expect.stringMatching(/^(macos|windows|linux)$/),
+        hostname: expect.any(String),
         sshClient: { available: true },
         tailscaleClient: { available: true },
         environments: {
