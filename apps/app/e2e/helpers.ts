@@ -16,15 +16,15 @@ export async function clickText(text: string): Promise<void> {
 export async function openImportDialog(): Promise<void> {
   await page.getByTestId("sidebar").getByTitle("Import project").click();
   await expect
-    .element(page.getByPlaceholder("Search folders or enter a full path..."), { timeout: 10_000 })
+    .element(page.getByPlaceholder("Enter path (e.g. ~/projects/my-app)"), { timeout: 10_000 })
     .toBeVisible();
 }
 
 export async function importFolder(name: string): Promise<void> {
   await page.getByText(name, { exact: true }).click();
-  const importButton = page.getByRole("button", { name: "Import this folder" });
-  await expect.element(importButton, { timeout: 10_000 }).toBeEnabled();
-  await importButton.click();
+  const addButton = page.getByRole("button", { name: "Add (Enter)" });
+  await expect.element(addButton, { timeout: 10_000 }).toBeEnabled();
+  await addButton.click();
 }
 
 export async function openDraftForProject(name: string): Promise<void> {

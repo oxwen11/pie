@@ -19,16 +19,11 @@ export function ScheduleCard({ schedule, projectName }: ScheduleCardProps) {
   const { state, actions, meta } = useSchedule();
   const selected = schedule.id === state.selectedId;
   return (
-    <ScheduleItem
-      className={selected ? "bg-accent/50" : undefined}
-      data-state={selected ? "selected" : undefined}
-    >
+    <ScheduleItem data-state={selected ? "selected" : undefined}>
       <ScheduleItemTrigger aria-pressed={selected} onClick={() => actions.select(schedule.id)}>
         <ScheduleItemTitle>{schedule.name}</ScheduleItemTitle>
         <ScheduleItemDescription>
-          {projectName} · {formatSpec(schedule.spec)}
-        </ScheduleItemDescription>
-        <ScheduleItemDescription>
+          {projectName} · {formatSpec(schedule.spec)} ·{" "}
           {formatNextRun(
             schedule.nextRunAt,
             schedule.enabled,

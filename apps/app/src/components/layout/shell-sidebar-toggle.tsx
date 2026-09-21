@@ -12,7 +12,7 @@ export function ShellSidebarToggle(): ReactElement | null {
   if (isMobile || !isDesktopHost(platform)) return null;
 
   return (
-    <div className="pointer-events-none fixed start-[var(--shell-controls-left)] top-1.5 z-50 flex h-10 items-center">
+    <div className="pointer-events-none fixed start-[var(--shell-controls-left)] top-1.5 z-50 flex h-10 items-center [-webkit-app-region:initial]">
       <SidebarTrigger className="pointer-events-auto [-webkit-app-region:no-drag]" />
     </div>
   );

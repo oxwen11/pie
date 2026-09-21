@@ -23,7 +23,7 @@ export function ScheduleEditorPanel() {
   if (meta.createOpen) {
     return (
       <ScheduleEditorFrame
-        heading="New schedule"
+        heading="New"
         onClose={() => actions.closeCreate()}
         submitting={meta.submitting}
       >
@@ -41,7 +41,7 @@ export function ScheduleEditorPanel() {
   if (schedule === undefined) return null;
   return (
     <ScheduleEditorFrame
-      heading="Edit schedule"
+      heading="Edit"
       onClose={() => actions.cancelEdit()}
       submitting={meta.submitting}
     >
@@ -81,12 +81,7 @@ function ScheduleEditorFrame({
           <SchedulePanelTitle>{heading}</SchedulePanelTitle>
           <SchedulePanelClose disabled={submitting} onClick={onClose} />
         </SchedulePanelHeader>
-        <SchedulePanelBody>
-          <p className="text-muted-foreground mb-4 text-sm">
-            When this is due, pie starts a session in the project and sends the prompt.
-          </p>
-          {children}
-        </SchedulePanelBody>
+        <SchedulePanelBody className="overflow-hidden p-0">{children}</SchedulePanelBody>
       </SchedulePanel>
     </m.div>
   );

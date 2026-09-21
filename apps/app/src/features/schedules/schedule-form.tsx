@@ -23,10 +23,10 @@ import {
 } from "@getpie/ui/components/select";
 import { Switch } from "@getpie/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import {
   type ScheduleFormValues,
@@ -131,7 +131,7 @@ function ScheduleFormFields({
   onSubmit,
   onCancel,
 }: ScheduleFormFieldsProps) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useEnvironmentOrpc();
   const [form, setForm] = useState(() => formFromSource(projects, source));
   const [error, setError] = useState<string | null>(null);
   const projectLocked = source.kind === "edit";
@@ -166,7 +166,7 @@ function ScheduleFormFields({
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSubmit) return;
@@ -197,95 +197,99 @@ function ScheduleFormFields({
         }
       }}
     >
-      <Field>
-        <FieldLabel htmlFor="schedule-name">Name</FieldLabel>
-        <Input
-          id="schedule-name"
-          maxLength={MAX_SCHEDULE_NAME_CHARS}
-          onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-          required
-          value={form.name}
-        />
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
-        <Select
-          disabled={scheduleProjectLocked(projectLocked, projects.length)}
-          items={projects.map((project) => ({ label: project.name, value: project.id }))}
-          onValueChange={(next) => {
-            if (typeof next === "string") {
-              setForm((current) => ({
-                ...current,
-                projectId: next,
-                sessionPick: "create",
-                sessionId: "",
-                model: undefined,
-              }));
-            }
-          }}
-          value={scheduleProjectValue(form.projectId)}
-        >
-          <SelectTrigger id="schedule-project">
-            <SelectValue placeholder="Select a project" />
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <PromptInputBox>
-        <PromptInputTextarea
-          aria-label="Prompt"
-          id="schedule-prompt"
-          maxLength={MAX_SCHEDULE_PROMPT_CHARS}
-          onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-          placeholder="Ask Pi anything..."
-          required
-          value={form.prompt}
-        />
-        <PromptInputToolbar>
-          <PromptInputTools>
-            <ModelSelectorPicker
-              aria-label="Model"
-              modelId={model?.modelId}
-              models={modelOptions}
-              onChange={(provider, modelId) =>
-                setForm((current) => ({ ...current, model: { provider, modelId } }))
-              }
-              providerId={model?.provider}
-            />
-          </PromptInputTools>
-        </PromptInputToolbar>
-      </PromptInputBox>
-      <ScheduleFormCadenceFields form={form} setForm={setForm} />
-      <ScheduleFormLimitsFields form={form} setForm={setForm} />
-      <ScheduleFormSessionFields
-        form={form}
-        selectedSessionValue={selectedSessionValue}
-        sessionItems={sessionItems}
-        setForm={setForm}
-      />
-      <Field>
-        <div className="flex w-full items-center justify-between gap-3">
-          <FieldLabel htmlFor="schedule-worktree">Isolated worktree</FieldLabel>
-          <Switch
-            checked={form.worktree}
-            id="schedule-worktree"
-            onCheckedChange={(checked) => setForm((current) => ({ ...current, worktree: checked }))}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <Field>
+          <FieldLabel htmlFor="schedule-name">Name</FieldLabel>
+          <Input
+            id="schedule-name"
+            maxLength={MAX_SCHEDULE_NAME_CHARS}
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+            required
+            value={form.name}
           />
-        </div>
-      </Field>
-      <ScheduleFormCreateOptions
-        creating={creating}
-        onRunNowChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
-        runNow={form.runNow}
-      />
-      <ScheduleFormError error={error} />
-      <div className="flex justify-end gap-2">
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="schedule-project">Project</FieldLabel>
+          <Select
+            disabled={scheduleProjectLocked(projectLocked, projects.length)}
+            items={projects.map((project) => ({ label: project.name, value: project.id }))}
+            onValueChange={(next) => {
+              if (typeof next === "string") {
+                setForm((current) => ({
+                  ...current,
+                  projectId: next,
+                  sessionPick: "create",
+                  sessionId: "",
+                  model: undefined,
+                }));
+              }
+            }}
+            value={scheduleProjectValue(form.projectId)}
+          >
+            <SelectTrigger id="schedule-project">
+              <SelectValue placeholder="Select a project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <PromptInputBox>
+          <PromptInputTextarea
+            aria-label="Prompt"
+            id="schedule-prompt"
+            maxLength={MAX_SCHEDULE_PROMPT_CHARS}
+            onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
+            placeholder="Ask Pi anything..."
+            required
+            value={form.prompt}
+          />
+          <PromptInputToolbar>
+            <PromptInputTools>
+              <ModelSelectorPicker
+                aria-label="Model"
+                modelId={model?.modelId}
+                models={modelOptions}
+                onChange={(provider, modelId) =>
+                  setForm((current) => ({ ...current, model: { provider, modelId } }))
+                }
+                providerId={model?.provider}
+              />
+            </PromptInputTools>
+          </PromptInputToolbar>
+        </PromptInputBox>
+        <ScheduleFormCadenceFields form={form} setForm={setForm} />
+        <ScheduleFormLimitsFields form={form} setForm={setForm} />
+        <ScheduleFormSessionFields
+          form={form}
+          selectedSessionValue={selectedSessionValue}
+          sessionItems={sessionItems}
+          setForm={setForm}
+        />
+        <Field>
+          <div className="flex w-full items-center justify-between gap-3">
+            <FieldLabel htmlFor="schedule-worktree">Isolated worktree</FieldLabel>
+            <Switch
+              checked={form.worktree}
+              id="schedule-worktree"
+              onCheckedChange={(checked) =>
+                setForm((current) => ({ ...current, worktree: checked }))
+              }
+            />
+          </div>
+        </Field>
+        <ScheduleFormCreateOptions
+          creating={creating}
+          onRunNowChange={(checked) => setForm((current) => ({ ...current, runNow: checked }))}
+          runNow={form.runNow}
+        />
+        <ScheduleFormError error={error} />
+      </div>
+      <div className="flex justify-end gap-2 border-t px-4 py-3">
         <Button onClick={onCancel} type="button" variant="outline">
           Cancel
         </Button>

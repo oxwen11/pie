@@ -1,9 +1,9 @@
-import type { PieClient } from "@getpie/client";
 import type { SessionRef, TerminalConnectEvent } from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 
+import type { EnvironmentOrpc } from "@/lib/orpc";
 import { isAbortError, sleep } from "@/lib/utils";
 
 import { subscribeToAppTheme, xtermThemeFromElement } from "./theme";
@@ -12,10 +12,21 @@ interface TerminalSurface {
   readonly detach: () => void;
 }
 
+function applyHostType(term: Terminal, host: HTMLElement) {
+  const styles = getComputedStyle(host);
+  const fontSize = parseFloat(styles.fontSize);
+  if (Number.isFinite(fontSize) && fontSize > 0 && term.options.fontSize !== fontSize) {
+    term.options.fontSize = fontSize;
+  }
+  if (styles.fontFamily !== "" && term.options.fontFamily !== styles.fontFamily) {
+    term.options.fontFamily = styles.fontFamily;
+  }
+}
+
 export function attachTerminalSurface(
   mount: HTMLElement,
   options: {
-    readonly client: PieClient;
+    readonly client: EnvironmentOrpc;
     readonly ref: SessionRef;
     readonly terminalId: string;
   },
@@ -24,22 +35,21 @@ export function attachTerminalSurface(
   const term = new Terminal({
     convertEol: true,
     cursorBlink: true,
-    fontSize: 12,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     theme: xtermThemeFromElement(mount),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(mount);
   term.textarea?.setAttribute("aria-label", "zsh input");
+  applyHostType(term, mount);
   fit.fit();
 
   const abort = new AbortController();
   let attachedWriter = false;
   const dataDisposable = term.onData((data) => {
     if (!attachedWriter) return;
-    void options.client.terminal
-      .write({
+    void options.client.terminal.write
+      .call({
         ref: options.ref,
         terminalId: options.terminalId,
         data,
@@ -48,8 +58,8 @@ export function attachTerminalSurface(
   });
   const resizeDisposable = term.onResize(({ cols, rows }) => {
     if (!attachedWriter) return;
-    void options.client.terminal
-      .resize({
+    void options.client.terminal.resize
+      .call({
         ref: options.ref,
         terminalId: options.terminalId,
         cols,
@@ -60,6 +70,7 @@ export function attachTerminalSurface(
 
   const observer = new ResizeObserver(() => {
     try {
+      applyHostType(term, mount);
       fit.fit();
     } catch {
       // Unmounted mid-frame.
@@ -97,7 +108,7 @@ export function attachTerminalSurface(
       try {
         const cols = Math.max(1, term.cols);
         const rows = Math.max(1, term.rows);
-        const stream = await options.client.terminal.connect(
+        const stream = await options.client.terminal.connect.call(
           {
             ref: options.ref,
             terminalId: options.terminalId,

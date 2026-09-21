@@ -5,7 +5,7 @@ import { Effect } from "effect";
 
 import { GitNotRepository } from "../../src/errors";
 import { NodePlatformLayer } from "../platform";
-import { run } from "./session-service-fixture";
+import { run, stubWorktreeCreate } from "./session-service-fixture";
 
 layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
   it.effect("creates a worktree at create and does not recreate it on prompt", () =>
@@ -17,10 +17,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
           worktreeCreate: (_cwd, input) => {
             creates += 1;
             bases.push(input?.base);
-            return Effect.succeed({
-              path: "/tmp/pie-worktree",
-              branch: "pie/abcd1234",
-            });
+            return stubWorktreeCreate()(_cwd, input);
           },
         },
         (fixture) =>
@@ -112,8 +109,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
     Effect.gen(function* () {
       const result = yield* run(
         {
-          worktreeCreate: () =>
-            Effect.succeed({ path: "/tmp/pie-worktree", branch: "pie/abcd1234" }),
+          worktreeCreate: stubWorktreeCreate(),
         },
         (fixture) =>
           Effect.gen(function* () {
@@ -131,17 +127,66 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
     }),
   );
 
+  it.effect("prepare fails when the worktree checkout is gone", () =>
+    Effect.gen(function* () {
+      const missingPath = `/tmp/pie-worktree-gone-${Date.now()}`;
+      const result = yield* run(
+        {
+          worktreeCreate: () => Effect.succeed({ path: missingPath, branch: "pie/abcd1234" }),
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            });
+            const error = yield* Effect.flip(fixture.service.prepare(created.ref));
+            return { created, error };
+          }),
+      );
+      assert.equal(result.error._tag, "WorktreeCheckoutMissing");
+      if (result.error._tag !== "WorktreeCheckoutMissing") return;
+      assert.equal(result.error.sessionId, result.created.ref.sessionId);
+      assert.equal(result.error.projectId, "proj-a");
+      assert.equal(result.error.branch, "pie/abcd1234");
+    }),
+  );
+
+  it.effect("restoreWorktree re-creates the stored checkout", () =>
+    Effect.gen(function* () {
+      const restored: Array<readonly [string, string, string]> = [];
+      const result = yield* run(
+        {
+          worktreeCreate: stubWorktreeCreate(),
+          worktreeRestore: (repoCwd, worktreePath, branch) => {
+            restored.push([repoCwd, worktreePath, branch]);
+            return Effect.succeed({ path: worktreePath, branch });
+          },
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const created = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              worktree: {},
+            });
+            const workspace = yield* fixture.service.restoreWorktree(created.ref);
+            return { created, workspace };
+          }),
+      );
+      assert.deepEqual(restored, [["/tmp/pie-app", "/tmp/pie-worktree", "pie/abcd1234"]]);
+      assert.deepEqual(result.workspace, result.created.workspace);
+    }),
+  );
+
   it.effect("removes the worktree when persist fails after create", () =>
     Effect.gen(function* () {
       const removed: string[] = [];
       const result = yield* run(
         {
           failWrite: true,
-          worktreeCreate: () =>
-            Effect.succeed({
-              path: "/tmp/pie-worktree",
-              branch: "pie/abcd1234",
-            }),
+          worktreeCreate: stubWorktreeCreate(),
           worktreeRemove: (worktreePath) => {
             removed.push(worktreePath);
             return Effect.void;

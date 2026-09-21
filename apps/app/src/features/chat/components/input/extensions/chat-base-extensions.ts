@@ -7,6 +7,7 @@ import { UndoRedo } from "@tiptap/extensions";
 import type { Extensions } from "@tiptap/react";
 
 import { createPastePlainTextExtension } from "./paste-plain-text";
+import { createThickCaretExtension } from "./thick-caret";
 
 // Base extensions for the chat input: a self-owned minimal set (explicitly
 // listed and maintained here instead of the StarterKit aggregate) — plain-text
@@ -22,5 +23,6 @@ export function createChatBaseExtensions(opts: { placeholder?: () => string } = 
     UndoRedo,
     Placeholder.configure({ placeholder: () => opts.placeholder?.() ?? "" }),
     createPastePlainTextExtension(),
+    createThickCaretExtension(),
   ];
 }

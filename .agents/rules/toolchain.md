@@ -97,7 +97,7 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  Electron — local `pnpm e2e` / `turbo run e2e` only, not CI. `tools/testing/fake-pi.mjs` is referenced by relative
+  Electron and runs in Code check (`pnpm e2e` under xvfb). `tools/testing/fake-pi.mjs` is referenced by relative
   path from server tests, CLI tests, desktop e2e, and app e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.

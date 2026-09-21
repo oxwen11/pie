@@ -27,7 +27,8 @@ const TREE_STYLE = {
   "--trees-fg-muted-override": "var(--muted-foreground)",
   "--trees-focus-ring-color-override": "var(--ring)",
   "--trees-font-family-override": "var(--font-mono)",
-  "--trees-font-size-override": "12px",
+  "--trees-font-size-override": "inherit",
+  "--trees-font-weight-regular-override": "inherit",
   "--trees-selected-bg-override": "var(--accent)",
   "--trees-selected-fg-override": "var(--accent-foreground)",
 } as CSSProperties;

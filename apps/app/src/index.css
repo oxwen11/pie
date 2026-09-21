@@ -136,20 +136,47 @@ form:has(> [data-slot="chat-input"]) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  background: color-mix(in srgb, var(--card) 90%, transparent);
-  backdrop-filter: blur(16px);
-  transition:
-    border-color 150ms,
-    box-shadow 150ms;
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"]) {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"])::before {
+  box-shadow: none;
 }
 
 form:has(> [data-slot="chat-input"]):focus-within {
+  z-index: 1;
+  clip-path: none;
   border-color: color-mix(in srgb, var(--ring) 50%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
 }
 
-.chat-input-scroll-fade {
-  font-weight: 430;
+/* Inline widget: a bit taller than the 1em box (ZWSP + line-height), still
+ * centered — half-leading grows both sides. Not leading-5. Width 0 so typing
+ * is not shifted; the bar is the border. */
+.chat-input-caret {
+  display: inline-block;
+  width: 0;
+  line-height: 1.2;
+  margin-right: -2px;
+  border-right: 2px solid var(--foreground);
+  pointer-events: none;
+  animation: var(--animate-caret-blink);
+}
+
+.tiptap.chat-thick-caret {
+  caret-color: transparent;
+}
+
+.tiptap.chat-thick-caret:not(.ProseMirror-focused) .chat-input-caret,
+.tiptap.chat-thick-caret[data-composing] .chat-input-caret {
+  visibility: hidden;
+}
+
+.tiptap.chat-thick-caret[data-composing] {
+  caret-color: currentColor;
 }
 
 @property --chat-input-fade-top {
@@ -196,4 +223,20 @@ form:has(> [data-slot="chat-input"]):focus-within {
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--foreground) 20%, transparent) transparent;
+}
+
+/* Frameless Electron titlebar: drag the strip, dig buttons/inputs/links out.
+   Attribute, not a class: shadcn lint only allows Tailwind classes on chrome. */
+[data-drag-region] {
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-drag-region] button,
+[data-drag-region] input,
+[data-drag-region] textarea,
+[data-drag-region] select,
+[data-drag-region] a {
+  -webkit-app-region: no-drag;
 }
