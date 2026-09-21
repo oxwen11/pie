@@ -76,10 +76,17 @@ function place(view: EditorView, el: HTMLElement, focused: boolean) {
     return;
   }
   const caret = caretRect(view);
+  const line = lineHeightPx(view.dom);
+  const height = Math.max(Math.round(caret.bottom - caret.top), Math.round(line));
   el.hidden = false;
   view.dom.style.caretColor = "transparent";
   el.style.transform = `translate(${Math.round(caret.left)}px, ${Math.round(caret.top)}px)`;
-  el.style.height = `${Math.max(1, Math.round(caret.bottom - caret.top))}px`;
+  el.style.height = `${height}px`;
+}
+
+function lineHeightPx(el: HTMLElement) {
+  const n = Number.parseFloat(getComputedStyle(el).lineHeight);
+  return Number.isFinite(n) ? n : 16;
 }
 
 function caretRect(view: EditorView) {

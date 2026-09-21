@@ -22,6 +22,7 @@ describe("thick caret", () => {
     await page.getByRole("textbox").click();
 
     await expect.poll(() => overlay()?.hidden).toBe(false);
+    await expect.poll(() => overlay()?.getBoundingClientRect().height ?? 0).toBeGreaterThan(8);
 
     controller.editor.commands.insertContent("hello");
     await expect.poll(() => overlay()?.hidden).toBe(false);
