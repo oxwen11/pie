@@ -27,7 +27,8 @@ const TREE_STYLE = {
   "--trees-fg-muted-override": "var(--muted-foreground)",
   "--trees-focus-ring-color-override": "var(--ring)",
   "--trees-font-family-override": "var(--font-mono)",
-  "--trees-font-size-override": "12px",
+  "--trees-font-size-override": "inherit",
+  "--trees-font-weight-regular-override": "inherit",
   "--trees-selected-bg-override": "var(--accent)",
   "--trees-selected-fg-override": "var(--accent-foreground)",
 } as CSSProperties;
@@ -65,7 +66,7 @@ export function ReviewTreeAdapter({
   useEffect(() => {
     const host = containerRef.current?.querySelector("file-tree-container");
     const shadowRoot = host?.shadowRoot;
-    if (shadowRoot === undefined || shadowRoot === null) return;
+    if (shadowRoot === undefined || shadowRoot === null) return undefined;
 
     const annotateRows = (): void => {
       for (const row of shadowRoot.querySelectorAll<HTMLElement>("[data-item-path]")) {
@@ -102,7 +103,7 @@ export function ReviewTreeAdapter({
     onSelectFile(path);
   };
 
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+  const handleSelectFile = (event: MouseEvent<HTMLElement>): void => {
     openPath(pathFromComposedEvent(event));
   };
 
@@ -123,7 +124,7 @@ export function ReviewTreeAdapter({
       <PierreFileTree
         aria-label="Project files"
         model={state.model}
-        onClick={handleClick}
+        onClick={handleSelectFile}
         onKeyDown={handleKeyDown}
         style={TREE_STYLE}
       />

@@ -1,41 +1,38 @@
-import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, useMatch, useRouterState } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  useMatch,
+  useRouteContext,
+  useRouterState,
+} from "@tanstack/react-router";
 
 import {
   AppShell,
   AppShellBody,
   AppShellMain,
+  AppShellSessionPanel,
   AppShellSidebar,
 } from "@/components/layout/app-shell";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
-import { terminalPanel } from "@/components/layout/content-panel/panels/terminal-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
-import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
-import type { AppClients } from "@/lib/orpc";
+import { EnvironmentOrpcProvider } from "@/lib/environment-orpc";
+import type { EnvironmentRpc } from "@/lib/environment-rpc";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
-  orpcClient: AppClients["orpcClient"];
-  orpcQueryUtils: AppClients["orpcQueryUtils"];
-  queryClient: QueryClient;
+  localEnvironmentId: string;
+  environmentRpc: EnvironmentRpc;
 }
 
-contentPanel.registerAll([
-  filesPanel,
-  filePanel,
-  reviewPanel,
-  pullRequestPanel,
-  terminalPanel,
-  browserPanel,
-]);
+contentPanel.registerAll([filesPanel, filePanel, reviewPanel, pullRequestPanel, browserPanel]);
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
@@ -43,10 +40,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
-  // Keeps every `session.list` cache converged from the server's events
-  // (multi-tab / desktop), independent of which route is mounted.
-  useSessionListSync();
-
   // This is the shell's one route-identity seam for the card: the content
   // panel and heading derive from the same authoritative session-route ref.
   // Sidebar modules read the route themselves and jump without callbacks.
@@ -61,12 +54,24 @@ function RootLayout() {
       from: "/session/$sessionId",
       shouldThrow: false,
     }) ?? null;
-  const sessionRef = sessionRoute?.loaderData?.ref ?? null;
-  const draftProjectId = useMatch({
+  const sessionRef =
+    sessionRoute?.loaderData === undefined
+      ? null
+      : {
+          environmentId: sessionRoute.loaderData.environmentId,
+          ref: sessionRoute.loaderData.ref,
+        };
+  const draft = useMatch({
     from: "/draft",
     shouldThrow: false,
-    select: (match) => match.search.projectId ?? null,
+    select: (match) => ({
+      environmentId: match.search.environmentId,
+      projectId: match.search.projectId ?? null,
+    }),
   });
+  const { environmentRpc, localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const environmentId = sessionRef?.environmentId ?? draft?.environmentId ?? localEnvironmentId;
+  const projectId = sessionRef?.ref.projectId ?? draft?.projectId;
   const cardHeading = useRouterState({
     select: (state): string | false | undefined => {
       for (let index = state.matches.length - 1; index >= 0; index -= 1) {
@@ -85,30 +90,57 @@ function RootLayout() {
       return undefined;
     },
   });
-  const project = useProject(sessionRef?.projectId ?? draftProjectId);
-  const sessionTitle = useProjectSessionTitle(sessionRef ?? undefined);
-
   return (
     <AppShell>
       <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+        {/*
+         * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
+         * outer local QueryClient above the router.
+         */}
         <AppShellBody>
           <AppShellSidebar>
             <AppSidebar />
           </AppShellSidebar>
-          <AppShellMain>
-            <CardPanel
-              heading={
-                cardHeading === false
-                  ? undefined
-                  : (cardHeading ??
-                    (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
-              }
-              hideHeader={cardHeader === false}
-              supportingText={cardHeading !== undefined ? undefined : project?.name}
-            />
-          </AppShellMain>
+          <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+            <AppShellMain>
+              <EnvironmentCardPanel
+                cardHeader={cardHeader}
+                cardHeading={cardHeading}
+                projectId={projectId}
+                sessionRef={sessionRef}
+              />
+            </AppShellMain>
+            <AppShellSessionPanel />
+          </EnvironmentOrpcProvider>
         </AppShellBody>
       </ContentPanelSessionProvider>
     </AppShell>
+  );
+}
+
+function EnvironmentCardPanel({
+  cardHeader,
+  cardHeading,
+  projectId,
+  sessionRef,
+}: {
+  cardHeader: false | undefined;
+  cardHeading: string | false | undefined;
+  projectId: string | null | undefined;
+  sessionRef: EnvironmentSessionRef | null;
+}) {
+  const project = useProject(projectId);
+  const sessionTitle = useProjectSessionTitle(sessionRef?.ref);
+
+  return (
+    <CardPanel
+      heading={
+        cardHeading === false
+          ? undefined
+          : (cardHeading ?? (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
+      }
+      hideHeader={cardHeader === false}
+      supportingText={cardHeading !== undefined ? undefined : project?.name}
+    />
   );
 }

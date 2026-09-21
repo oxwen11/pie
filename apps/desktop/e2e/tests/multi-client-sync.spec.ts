@@ -90,11 +90,14 @@ test.afterAll(() => {
 });
 
 const send = async (page: Page, text: string) => {
-  const editor = page.locator('[contenteditable="true"]').first();
+  const editor = page.getByRole("textbox").first();
   await editor.click();
   await editor.pressSequentially(text);
-  // Enter is a newline in the composer; submission is the button.
   await page.locator('button[type="submit"]').last().click();
+};
+
+const waitForComposer = async (page: Page) => {
+  await expect(page.getByRole("textbox")).toBeVisible({ timeout: 20_000 });
 };
 
 /** Create a session through the draft surface (the real `open` path) and
@@ -105,7 +108,7 @@ const createSession = async (browser: Browser, firstPrompt: string): Promise<Pag
   // Draft config lives in the URL so the project is picked deterministically
   // instead of driving a dropdown.
   await page.goto(`${baseUrl}/draft?projectId=${PROJECT_ID}`);
-  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
+  await waitForComposer(page);
   await send(page, firstPrompt);
   await page.waitForURL(/\/session\//, { timeout: 20_000 });
   await expect(page.getByText(FAKE_REPLY).first()).toBeVisible({ timeout: 15_000 });
@@ -116,7 +119,11 @@ const joinSession = async (browser: Browser, sessionUrl: string): Promise<Page> 
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(sessionUrl);
-  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 20_000 });
+  await waitForComposer(page);
+  // Floor must settle before live assertions: events queue while get_entries
+  // is in flight. Fake-pi returns an empty tree, so this is "attached", not
+  // "history backfilled".
+  await expect(page.getByText("Loading earlier messages…")).toBeHidden({ timeout: 20_000 });
   return page;
 };
 

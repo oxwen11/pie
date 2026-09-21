@@ -1,18 +1,13 @@
 import type { WorkspaceTreeResult } from "@getpie/contract/fs";
 import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { FilesIcon, RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
 import { lazy, Suspense } from "react";
+
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 
 const FileTreeAdapter = lazy(() =>
   import("./file-tree-adapter").then((module) => ({ default: module.FileTreeAdapter })),
@@ -44,10 +39,7 @@ export function WorkspaceTreePane({
   return (
     <div className="bg-background flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2">
-        <span
-          className="text-muted-foreground min-w-0 flex-1 truncate px-1 text-xs"
-          title={workspacePath}
-        >
+        <span className="text-muted-foreground min-w-0 flex-1 truncate px-1" title={workspacePath}>
           {workspaceName}
           {gitBranch !== undefined ? (
             <span className="text-muted-foreground/80"> · {gitBranch}</span>
@@ -65,7 +57,7 @@ export function WorkspaceTreePane({
       </div>
 
       {tree.isError && hasTree ? (
-        <div className="text-destructive flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs">
+        <div className="text-destructive flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
           <TriangleAlertIcon className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate" title={treeErrorMessage(tree.error)}>
             Refresh failed; showing the previous file tree.
@@ -81,32 +73,13 @@ export function WorkspaceTreePane({
           <Spinner className="text-muted-foreground size-4" />
         </div>
       ) : tree.data === undefined ? (
-        <Empty className="py-8 md:py-8">
-          <EmptyMedia variant="icon">
-            <TriangleAlertIcon />
-          </EmptyMedia>
-          <EmptyContent>
-            <div>
-              <EmptyTitle className="text-base">Unable to load files</EmptyTitle>
-              <EmptyDescription>{treeErrorMessage(tree.error)}</EmptyDescription>
-            </div>
-            <Button onClick={refresh} size="sm" variant="outline">
-              Try again
-            </Button>
-          </EmptyContent>
-        </Empty>
+        <PanelEmptyState icon={TriangleAlertIcon} onRetry={refresh} title="Unable to load files">
+          {treeErrorMessage(tree.error)}
+        </PanelEmptyState>
       ) : tree.data.entries.length === 0 ? (
-        <Empty className="py-8 md:py-8">
-          <EmptyMedia variant="icon">
-            <FilesIcon />
-          </EmptyMedia>
-          <EmptyContent>
-            <div>
-              <EmptyTitle className="text-base">No files</EmptyTitle>
-              <EmptyDescription>This workspace contains no visible files.</EmptyDescription>
-            </div>
-          </EmptyContent>
-        </Empty>
+        <PanelEmptyState icon={FilesIcon} title="No files">
+          This workspace contains no visible files.
+        </PanelEmptyState>
       ) : (
         <Suspense
           fallback={

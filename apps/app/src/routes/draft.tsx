@@ -1,4 +1,9 @@
-import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import type {
+  CreateWorktreeInput,
+  ListSessionsOutput,
+  Project,
+  SessionSummary,
+} from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -22,8 +27,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
+import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
+import type { ChatInputController } from "@/features/chat/components/input/chat-input-controller";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
@@ -36,9 +42,11 @@ import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
+import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
 
 type DraftSearch = {
   readonly projectId?: string;
+  readonly environmentId?: string;
   readonly provider?: string;
   readonly modelId?: string;
 };
@@ -49,12 +57,16 @@ const asText = (value: unknown): string | undefined =>
 const optional = <K extends keyof DraftSearch>(
   key: K,
   value: DraftSearch[K],
-): Pick<DraftSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
+): Partial<Pick<DraftSearch, K>> => {
+  const result: Partial<Pick<DraftSearch, K>> = {};
+  if (value !== undefined) result[key] = value;
+  return result;
+};
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
     ...optional("projectId", asText(search.projectId)),
+    ...optional("environmentId", asText(search.environmentId)),
     ...optional("provider", asText(search.provider)),
     ...optional("modelId", asText(search.modelId)),
   }),
@@ -62,7 +74,18 @@ export const Route = createFileRoute("/draft")({
 });
 
 function DraftRoute() {
-  const { orpcQueryUtils } = Route.useRouteContext();
+  const { localEnvironmentId, environmentRpc } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const environmentId = search.environmentId ?? localEnvironmentId;
+  return (
+    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+      <DraftPage environmentId={environmentId} />
+    </EnvironmentOrpcProvider>
+  );
+}
+
+function DraftPage({ environmentId }: { readonly environmentId: string }) {
+  const orpcQueryUtils = useCatalogOrpc();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const chats = useChatManager();
@@ -84,10 +107,20 @@ function DraftRoute() {
       : defaultModel;
 
   const startSession = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
-      if (!selected) throw new Error("No project selected");
+      let projectId = selected?.id;
+      if (projectId === undefined) {
+        const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
+        const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
+        queryClient.setQueryData<ReadonlyArray<Project>>(projectListKey, (prev) => {
+          if (prev?.some((project) => project.id === allocated.id)) return prev;
+          return [...(prev ?? []), allocated];
+        });
+        projectId = allocated.id;
+      }
       const created = await orpcQueryUtils.agent.session.create.call({
-        projectId: selected.id,
+        projectId,
         ...(draftModel !== undefined
           ? { provider: draftModel.provider, modelId: draftModel.modelId }
           : undefined),
@@ -99,6 +132,10 @@ function DraftRoute() {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
+
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
         if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
@@ -116,7 +153,7 @@ function DraftRoute() {
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
-        .chatFor(created.ref)
+        .chatFor({ environmentId, ref: created.ref })
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
@@ -125,7 +162,7 @@ function DraftRoute() {
       navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
-        search: { projectId: created.ref.projectId },
+        search: { projectId: created.ref.projectId, environmentId },
       }).catch((error: unknown) => {
         console.error("Failed to open the new session", error);
       });
@@ -143,10 +180,6 @@ function DraftRoute() {
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      if (!selected) {
-        toast.error("Pick a project before sending.");
-        return false;
-      }
       if (draftWorktree.gitState === "workspace-unavailable") {
         toast.error("The selected project folder is unavailable.");
         return false;
@@ -174,71 +207,150 @@ function DraftRoute() {
 
   if (projects.isError) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-        <p className="text-muted-foreground text-sm">
-          Couldn&apos;t load your projects: {projects.error.message}
-        </p>
-        <Button onClick={() => void projects.refetch()} size="sm" variant="outline">
-          Retry
-        </Button>
-      </div>
+      <DraftProjectsError
+        message={projects.error.message}
+        onRetry={() => void projects.refetch()}
+      />
     );
   }
 
-  if (projects.data.length === 0) {
+  if (projects.data.length === 0 && search.projectId === undefined) {
     return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <FolderPlusIcon aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle>
-            <h1>Import your first project</h1>
-          </EmptyTitle>
-          <EmptyDescription>
-            Choose a local folder for your coding agent to work in. You can start a chat right after
-            importing.
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button onClick={() => setImportOpen(true)}>Import project</Button>
-        </EmptyContent>
-        {importOpen && (
-          <ImportProjectDialog
-            onClose={() => setImportOpen(false)}
-            onImported={(project) => {
-              navigate({
-                to: "/draft",
-                search: { projectId: project.id },
-                replace: true,
-              }).catch((error: unknown) => {
-                console.error("Failed to open the imported project", error);
-              });
-            }}
-          />
-        )}
-      </Empty>
+      <DraftEmptyImport
+        importOpen={importOpen}
+        onCloseImport={() => setImportOpen(false)}
+        onImported={(projectId, importedEnvironmentId) => {
+          navigate({
+            to: "/draft",
+            search: { projectId, environmentId: importedEnvironmentId },
+            replace: true,
+          }).catch((error: unknown) => {
+            console.error("Failed to open the imported project", error);
+          });
+        }}
+        onOpenImport={() => setImportOpen(true)}
+      />
     );
   }
 
+  return (
+    <DraftComposer
+      controller={controller}
+      draftModel={draftModel}
+      draftWorktree={draftWorktree}
+      hasContent={hasContent}
+      models={modelsQuery.data?.models ?? []}
+      onModelChange={(provider, modelId) => {
+        navigate({
+          to: "/draft",
+          search: (prev) => ({ ...prev, provider, modelId }),
+          replace: true,
+        }).catch((error: unknown) => {
+          console.error("Failed to set the draft model", error);
+        });
+      }}
+      onProjectChange={(next) => {
+        navigate({
+          to: "/draft",
+          search: (prev) => {
+            if (next === null) {
+              const { projectId: _removed, ...rest } = prev;
+              return { ...rest, environmentId };
+            }
+            return { ...prev, projectId: next, environmentId };
+          },
+          replace: true,
+        }).catch((error: unknown) => {
+          console.error("Failed to select draft project", error);
+        });
+      }}
+      projects={projects.data ?? []}
+      selectedId={selected?.id ?? null}
+      startPending={startSession.isPending}
+    />
+  );
+}
+
+function DraftProjectsError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      <p className="text-muted-foreground text-sm">Couldn&apos;t load your projects: {message}</p>
+      <Button onClick={onRetry} size="sm" variant="outline">
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function DraftEmptyImport({
+  importOpen,
+  onCloseImport,
+  onImported,
+  onOpenImport,
+}: {
+  importOpen: boolean;
+  onCloseImport: () => void;
+  onImported: (projectId: string, environmentId: string) => void;
+  onOpenImport: () => void;
+}) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <FolderPlusIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>
+          <h1>Import your first project</h1>
+        </EmptyTitle>
+        <EmptyDescription>
+          Choose a folder for your coding agent to work in. You can start a chat right after
+          importing.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onOpenImport}>Import project</Button>
+      </EmptyContent>
+      {importOpen ? (
+        <ImportProjectDialog
+          onClose={onCloseImport}
+          onImported={(project, importedEnvironmentId) => {
+            onImported(project.id, importedEnvironmentId);
+          }}
+        />
+      ) : null}
+    </Empty>
+  );
+}
+
+function DraftComposer({
+  controller,
+  draftModel,
+  draftWorktree,
+  hasContent,
+  models,
+  onModelChange,
+  onProjectChange,
+  projects,
+  selectedId,
+  startPending,
+}: {
+  controller: ChatInputController | null;
+  draftModel: { provider: string; modelId: string } | undefined;
+  draftWorktree: ReturnType<typeof useDraftWorktree>;
+  hasContent: boolean;
+  models: Parameters<typeof ModelSelectorPicker>[0]["models"];
+  onModelChange: (provider: string, modelId: string) => void;
+  onProjectChange: (next: string | null) => void;
+  projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
+  selectedId: string | null;
+  startPending: boolean;
+}) {
   return (
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
           <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
-            <ProjectSelect
-              onChange={(next) => {
-                navigate({
-                  to: "/draft",
-                  search: { projectId: next },
-                  replace: true,
-                }).catch((error: unknown) => {
-                  console.error("Failed to select draft project", error);
-                });
-              }}
-              projects={projects.data}
-              value={selected?.id ?? null}
-            />
+            <ProjectSelect onChange={onProjectChange} projects={projects} value={selectedId} />
             {draftWorktree.gitState === "not-repository" ? (
               <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
             ) : null}
@@ -246,47 +358,19 @@ function DraftRoute() {
               <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
             ) : null}
             {draftWorktree.gitAvailable ? (
-              <>
-                <DraftWorkspaceSelect
-                  disabled={startSession.isPending || selected === null}
-                  mode={draftWorktree.mode}
-                  onModeChange={draftWorktree.setMode}
-                />
-                {draftWorktree.mode === "worktree" ? (
-                  <DraftWorktreeBaseSelect
-                    branch={draftWorktree.repositoryBranch}
-                    disabled={startSession.isPending || selected === null}
-                    onValueChange={draftWorktree.setWorktreeBaseOverride}
-                    value={draftWorktree.worktreeBase}
-                  />
-                ) : null}
-              </>
+              <DraftWorkspaceControls
+                disabled={startPending || selectedId === null}
+                draftWorktree={draftWorktree}
+              />
             ) : null}
-            <Button
-              className="ms-auto"
-              disabled={selected === null}
-              onClick={() => {
-                if (selected === null) return;
-                navigate({
-                  to: "/schedules",
-                  search: { create: true, projectId: selected.id },
-                }).catch((error: unknown) => {
-                  console.error("Failed to open the schedule editor", error);
-                });
-              }}
-              size="sm"
-              variant="ghost"
-            >
-              Schedule…
-            </Button>
           </div>
         </CardFrameHeader>
         <Card
           render={
             <PromptInput
               className="divide-y-0"
-              onSubmit={(e) => {
-                e.preventDefault();
+              onSubmit={(event) => {
+                event.preventDefault();
                 void controller?.submit();
               }}
             />
@@ -296,27 +380,18 @@ function DraftRoute() {
             <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
-                <DraftModelSelect
-                  projectId={selected?.id}
-                  providerId={draftModel?.provider}
+                <ModelSelectorPicker
                   modelId={draftModel?.modelId}
-                  onChange={(provider, modelId) => {
-                    navigate({
-                      to: "/draft",
-                      search: (prev) => ({ ...prev, provider, modelId }),
-                      replace: true,
-                    }).catch((error: unknown) => {
-                      console.error("Failed to set the draft model", error);
-                    });
-                  }}
+                  models={models}
+                  onChange={onModelChange}
+                  providerId={draftModel?.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit
                 disabled={
                   !hasContent ||
-                  !selected ||
                   draftWorktree.gitState === "workspace-unavailable" ||
-                  startSession.isPending ||
+                  startPending ||
                   (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }
               />
@@ -325,5 +400,33 @@ function DraftRoute() {
         </Card>
       </CardFrame>
     </div>
+  );
+}
+
+function DraftWorkspaceControls({
+  disabled,
+  draftWorktree,
+}: {
+  disabled: boolean;
+  draftWorktree: ReturnType<typeof useDraftWorktree>;
+}) {
+  const handleModeChange = draftWorktree.setMode;
+  const handleValueChange = draftWorktree.setWorktreeBaseOverride;
+  return (
+    <>
+      <DraftWorkspaceSelect
+        disabled={disabled}
+        mode={draftWorktree.mode}
+        onModeChange={handleModeChange}
+      />
+      {draftWorktree.mode === "worktree" ? (
+        <DraftWorktreeBaseSelect
+          branch={draftWorktree.repositoryBranch}
+          disabled={disabled}
+          onValueChange={handleValueChange}
+          value={draftWorktree.worktreeBase}
+        />
+      ) : null}
+    </>
   );
 }

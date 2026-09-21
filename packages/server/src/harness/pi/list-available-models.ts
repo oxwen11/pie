@@ -1,4 +1,3 @@
-import { createAgentSessionServices } from "@earendil-works/pi-coding-agent";
 import type { ListAgentModelsOutput } from "@getpie/contract";
 import { Effect } from "effect";
 
@@ -16,12 +15,16 @@ const listModelsError = (cause: unknown) =>
 /**
  * Available models plus Pi's startup default, from one
  * `createAgentSessionServices` load — same source as `pi --list-models` and
- * RPC `get_available_models`, without spawning `pi --mode rpc`.
+ * RPC `get_available_models`, without spawning pie-pi-process.
  */
 export function listAvailablePiModels(
   cwd: string,
 ): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
   return Effect.gen(function* () {
+    const { createAgentSessionServices } = yield* Effect.tryPromise({
+      try: () => import("@earendil-works/pi-coding-agent"),
+      catch: listModelsError,
+    });
     const services = yield* Effect.tryPromise({
       try: () => createAgentSessionServices({ cwd }),
       catch: listModelsError,

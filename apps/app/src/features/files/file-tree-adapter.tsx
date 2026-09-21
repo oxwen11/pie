@@ -27,7 +27,8 @@ const TREE_STYLE = {
   "--trees-fg-muted-override": "var(--muted-foreground)",
   "--trees-focus-ring-color-override": "var(--ring)",
   "--trees-font-family-override": "var(--font-mono)",
-  "--trees-font-size-override": "12px",
+  "--trees-font-size-override": "inherit",
+  "--trees-font-weight-regular-override": "inherit",
   "--trees-selected-bg-override": "var(--accent)",
   "--trees-selected-fg-override": "var(--accent-foreground)",
 } as CSSProperties;
@@ -60,7 +61,7 @@ export function FileTreeAdapter({
   useEffect(() => {
     const host = containerRef.current?.querySelector("file-tree-container");
     const shadowRoot = host?.shadowRoot;
-    if (shadowRoot === undefined || shadowRoot === null) return;
+    if (shadowRoot === undefined || shadowRoot === null) return undefined;
 
     const annotateRows = (): void => {
       for (const row of shadowRoot.querySelectorAll<HTMLElement>("[data-item-path]")) {
@@ -95,7 +96,7 @@ export function FileTreeAdapter({
     if (isOpenableTreeEntry(entry)) onOpenFile(path);
   };
 
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+  const handleOpenFile = (event: MouseEvent<HTMLElement>): void => {
     openPath(pathFromComposedEvent(event));
   };
 
@@ -108,7 +109,8 @@ export function FileTreeAdapter({
       return;
     }
     event.preventDefault();
-    onOpenFile(focusedPath!);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- isOpenableTreeEntry already proved focusedPath is a tree file path
+    onOpenFile(focusedPath as string);
   };
 
   return (
@@ -116,7 +118,7 @@ export function FileTreeAdapter({
       <PierreFileTree
         aria-label="Project files"
         model={state.model}
-        onClick={handleClick}
+        onClick={handleOpenFile}
         onKeyDown={handleKeyDown}
         style={TREE_STYLE}
       />

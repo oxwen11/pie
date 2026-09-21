@@ -1,16 +1,17 @@
 import type { Project } from "@getpie/contract";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
+import { useCatalogOrpc } from "@/lib/environment-orpc";
+
 /**
- * Shared `project.list` readers. The import dialog's create mutation is the
- * only writer and invalidates on success.
+ * Shared `project.list` readers. Writers are the import dialog and draft
+ * allocate (both update this cache on success).
  */
 function useProjectListQuery<TData>(
   select: (projects: ReadonlyArray<Project>) => TData,
 ): UseQueryResult<TData> {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useCatalogOrpc();
   return useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     select,
@@ -19,15 +20,24 @@ function useProjectListQuery<TData>(
 
 // Oldest-first, so importing a project appends to the bottom of the sidebar.
 // Module scope: an inline closure would re-run `select` every render.
-const selectOrdered = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
-  Array.from(projects).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+const selectProjects = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
+  Array.from(projects)
+    .filter((project) => project.type !== "chat")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-/**
- * Every imported project, oldest-first. Returns the query, not just the data:
- * empty is "no projects yet" (the import flow), which is not `isError`.
- */
+const selectChatNewestFirst = (projects: ReadonlyArray<Project>): ReadonlyArray<Project> =>
+  Array.from(projects)
+    .filter((project) => project.type === "chat")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+/** Imported folders only — the Projects picker and sidebar group. */
 export function useProjects(): UseQueryResult<ReadonlyArray<Project>> {
-  return useProjectListQuery(selectOrdered);
+  return useProjectListQuery(selectProjects);
+}
+
+/** Chat projects (`type: "chat"`), newest first — the Recent sidebar group. */
+export function useChatProjects(): UseQueryResult<ReadonlyArray<Project>> {
+  return useProjectListQuery(selectChatNewestFirst);
 }
 
 /**

@@ -81,7 +81,7 @@ export const WEB: WebIdentity = {
     marker: ".verify-pie-scaffold",
     readme: "sample project for pie verification\n",
     markerBody:
-      "verify-pie scaffolding — safe to delete. Created so the import-project dialog\nlists a distinctive folder at $HOME without walking a long path.\n",
+      "verify-pie scaffolding — safe to delete. Created inside the isolated project picker.\n",
   },
   browserSession: process.env.VERIFY_PIE_BROWSER_SESSION ?? "pie-verify-web",
 };

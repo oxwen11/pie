@@ -7,7 +7,7 @@ import { AgentOperationError } from "../../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../../src/harness/events/framework";
 import type { PiProcess } from "../../../src/harness/pi/process";
 import { makePiAgentRuntime } from "../../../src/harness/pi/runtime";
-import type { PiUIMessageChunk } from "../../../src/harness/pi/ui-message";
+import type { PiStreamItem } from "../../../src/harness/pi/transform";
 import { streamFromQueueOne } from "../../../src/harness/queue-stream";
 
 const SESSION_ID = "session-1";
@@ -18,7 +18,7 @@ const unexpected = () => Effect.die("unexpected");
 
 const makeFakeProcess = Effect.gen(function* () {
   const termination = yield* Deferred.make<never, AgentOperationError>();
-  const output = yield* Queue.bounded<PiUIMessageChunk>(32);
+  const output = yield* Queue.bounded<PiStreamItem>(32);
   const abortCalls = yield* Ref.make(0);
 
   const process: PiProcess = {
@@ -29,7 +29,9 @@ const makeFakeProcess = Effect.gen(function* () {
         Effect.succeed({
           turnId: TURN_ID,
           started: true,
-          output: streamFromQueueOne(output),
+          output: streamFromQueueOne(output).pipe(
+            Stream.takeUntil((chunk) => chunk.type === "finish"),
+          ),
         }),
       getEntries: () => unexpected(),
       requestPermission: () => Stream.empty,

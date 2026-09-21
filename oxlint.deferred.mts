@@ -10,31 +10,27 @@
  * from a later override in `oxlint.config.mts` (`deferredVitestUltraciteRules`).
  */
 export const deferredUltraciteRules = {
-  // --- slice 2 — hooks + type-aware exhaustiveness ---
-  // Enable first. rust-native, high signal, no format churn.
-  "react/rules-of-hooks": "off",
+  // --- slice 2 — remaining type-aware exhaustiveness ---
+  // switch-exhaustiveness wants every union member listed even when a default
+  // already covers them (sanitize-tail, pi event transforms). only-throw-error
+  // fights TanStack `throw redirect()`. no-confusing-void-expression is 169 hits
+  // of `.catch()` / Effect callbacks.
   "typescript/switch-exhaustiveness-check": "off",
-  "typescript/no-deprecated": "off",
   "typescript/only-throw-error": "off",
   "typescript/no-confusing-void-expression": "off",
 
-  // --- slice 3 — waterfalls / barrels / derived effects ---
+  // --- slice 3 — waterfalls / barrels ---
+  // Package index barrels are the public API. Sequential await is the retry /
+  // event-iterator pattern, not a waterfall to flatten.
   "oxc/no-barrel-file": "off",
   "no-await-in-loop": "off",
-  "react/no-deriving-state-in-effects": "off",
 
-  // --- slice 4 — any / non-null / unsafe / strict boolean ---
-  // Will be noisy. Enable one package at a time if needed.
-  "typescript/no-explicit-any": "off",
-  "typescript/no-non-null-assertion": "off",
-  "typescript/no-unsafe-argument": "off",
-  "typescript/no-unsafe-assignment": "off",
-  "typescript/no-unsafe-call": "off",
-  "typescript/no-unsafe-member-access": "off",
-  "typescript/no-unsafe-return": "off",
+  // --- slice 4 — any / unsafe / strict boolean ---
+  // no-unsafe-* is on (this slice). Remaining: strict boolean, void-return.
+  // no-explicit-any is on (#219). no-non-null-assertion is on (#218).
+  // consistent-return and no-unnecessary-type-assertion are on (#220).
   "typescript/strict-boolean-expressions": "off",
   "typescript/strict-void-return": "off",
-  "typescript/prefer-nullish-coalescing": "off",
 
   // --- later — perf ---
   "no-useless-call": "off",
@@ -49,20 +45,12 @@ export const deferredUltraciteRules = {
   "jsdoc/require-yields-type": "off",
   "max-classes-per-file": "off",
   "max-nested-callbacks": "off",
-  "no-case-declarations": "off",
   "no-else-return": "off",
-  "no-fallthrough": "off",
   "no-inline-comments": "off",
   "no-inner-declarations": "off",
   "no-lonely-if": "off",
-  "no-loop-func": "off",
   "no-negated-condition": "off",
-  "no-prototype-builtins": "off",
-  "no-redeclare": "off",
   "no-warning-comments": "off",
-  "oxc/branches-sharing-code": "off",
-  "prefer-promise-reject-errors": "off",
-  "react/display-name": "off",
   "react/no-unescaped-entities": "off",
   "require-await": "off",
   "require-unicode-regexp": "off",
@@ -71,7 +59,6 @@ export const deferredUltraciteRules = {
   "typescript/ban-ts-comment": "off",
   "typescript/ban-types": "off",
   "typescript/prefer-enum-initializers": "off",
-  "typescript/prefer-includes": "off",
   "typescript/prefer-ts-expect-error": "off",
   "unicorn/escape-case": "off",
   "unicorn/no-negated-condition": "off",
@@ -89,11 +76,7 @@ export const deferredUltraciteRules = {
   "jsx-a11y/anchor-ambiguous-text": "off",
   "no-bitwise": "off",
   "no-div-regex": "off",
-  "no-empty": "off",
-  "no-empty-function": "off",
   "no-eq-null": "off",
-  "no-implicit-globals": "off",
-  "no-param-reassign": "off",
   "no-plusplus": "off",
   "no-regex-spaces": "off",
   "no-restricted-globals": "off",
@@ -113,7 +96,6 @@ export const deferredUltraciteRules = {
   "react/syntax": "off",
   "react/todo": "off",
   "react/unsupported-syntax": "off",
-  "typescript/no-dynamic-delete": "off",
   "typescript/no-invalid-void-type": "off",
   "typescript/no-restricted-types": "off",
   "typescript/non-nullable-type-assertion-style": "off",
@@ -200,11 +182,8 @@ export const deferredUltraciteRules = {
   "typescript/method-signature-style": "off",
   "typescript/no-inferrable-types": "off",
   "typescript/parameter-properties": "off",
-  "typescript/prefer-find": "off",
-  "typescript/prefer-for-of": "off",
   "typescript/prefer-readonly": "off",
   "typescript/prefer-regexp-exec": "off",
-  "typescript/prefer-string-starts-ends-with": "off",
   "typescript/unified-signatures": "off",
   "unicorn/catch-error-name": "off",
   "unicorn/empty-brace-spaces": "off",

@@ -1,11 +1,12 @@
 import type {
   PromptPart,
   SessionPendingPrompt,
-  SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
+  PieUIMessage,
 } from "@getpie/contract";
-import type { UIMessage } from "ai";
+
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { AgentResponse } from "./agent-requests";
 
@@ -73,11 +74,11 @@ export interface ChatSessionTransport {
    */
   replaceQueue(pending: SessionPendingPrompt): Promise<void>;
   /**
-   * The session's native history as final-form UIMessages, or `null` when Pi
+   * The session's native history as final-form session UI messages, or `null` when Pi
    * serves no history for this session — capability absence is a normal outcome
    * here, not an error.
    */
-  getMessages(): Promise<readonly UIMessage[] | null>;
+  getMessages(): Promise<readonly PieUIMessage[] | null>;
   /**
    * Resolves normally when the request is no longer pending — including when
    * another client answered it first (the server's "not pending" is an
@@ -89,4 +90,6 @@ export interface ChatSessionTransport {
 // Binds a SessionRef to a transport. ChatManager holds one of these instead of
 // the wire client, so swapping the oRPC binding for anything else is a one-line
 // change at the composition root.
-export type ChatSessionTransportFactory = (sessionRef: SessionRef) => ChatSessionTransport;
+export type ChatSessionTransportFactory = (
+  sessionRef: EnvironmentSessionRef,
+) => ChatSessionTransport;

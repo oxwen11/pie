@@ -8,7 +8,7 @@ import {
   statusDaemon,
 } from "@getpie/server/daemon";
 import { resolveServeConfig } from "@getpie/server/http";
-import { Effect, Option } from "effect";
+import { type Config, Effect, Option } from "effect";
 import { Flag } from "effect/unstable/cli";
 
 import { resolveCliDaemon } from "./daemon";
@@ -25,7 +25,7 @@ const emptyToUndefined = (value: string | undefined): string | undefined =>
 export const normalizeAddress = (raw: string): string => new URL(raw).origin;
 
 export const urlFlag = () =>
-  Flag.string("url").pipe(
+  Flag.String("url").pipe(
     Flag.withDescription(
       "Pie server URL (also PIE_URL). Connects only — never starts a daemon. Token from PIE_AUTH_TOKEN, or the local daemon record when the URL matches.",
     ),
@@ -84,7 +84,7 @@ const withLaunchHint = (error: DaemonLauncherError): DaemonLauncherError => {
  */
 export const resolvePieEndpoint = (
   url: Option.Option<string>,
-): Effect.Effect<PieEndpoint, DaemonLauncherError, DaemonPlatform> =>
+): Effect.Effect<PieEndpoint, DaemonLauncherError | Config.ConfigError, DaemonPlatform> =>
   Effect.gen(function* () {
     const explicit = Option.getOrUndefined(url) ?? emptyToUndefined(process.env.PIE_URL);
     const status = yield* statusDaemon(resolveDaemonDirectory());
@@ -101,8 +101,9 @@ export const resolvePieEndpoint = (
       });
     }
 
-    const { port } = resolveServeConfig({
+    const { port } = yield* resolveServeConfig({
       port: Option.none(),
+      host: Option.none(),
       corsOrigin: [],
       allowedHost: [],
     });

@@ -1,6 +1,6 @@
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
 import { isDynamicPiTool } from "./tools";
-import { toolResultText } from "./transform";
+import { stripReadDetailsContent, toolResultText } from "./transform";
 import type { PiMetadata, PiUIMessage } from "./ui-message";
 
 // Pi session-file entries → final-form UIMessages, the history counterpart of
@@ -14,7 +14,7 @@ import type { PiMetadata, PiUIMessage } from "./ui-message";
 //   • Segmentation is by user entry: a `user` message entry opens a new
 //     message, and the following run of `assistant` / `toolResult` entries
 //     folds into ONE assistant message (steer/follow-up injections open new
-//     segments — see ADR 0003 for the resulting live/history asymmetry).
+//     segments — see ADR 0003; the live transform uses the same boundary).
 //   • messageId: the user entry's id, or the segment's first assistant entry
 //     id — pi entry ids are stable across reads, so refreshes reconcile.
 //   • Trimming the active turn is the caller's job (the facade folds the
@@ -103,6 +103,7 @@ function callPart(call: PendingCall): PiUIMessagePart {
       providerExecuted: true,
     } satisfies PiDynamicToolPart;
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   return {
     type: `tool-${call.toolName}`,
     toolCallId: call.toolCallId,
@@ -113,16 +114,22 @@ function callPart(call: PendingCall): PiUIMessagePart {
 }
 
 function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessagePart {
-  // isError lives in the part state, mirroring the live path where it is a
-  // sibling of `tool_execution_end.result` — the output stays result-shaped.
-  const output = { content: result.content, details: result.details };
+  const details: unknown = result.details;
+  const output =
+    call.toolName === "read" && !result.isError
+      ? { content: [], details: stripReadDetailsContent(details) }
+      : { content: result.content, details };
   const settled = result.isError
     ? {
         state: "output-error" as const,
         input: call.input,
         errorText: toolResultText(output) || "Tool execution failed",
       }
-    : { state: "output-available" as const, input: call.input, output };
+    : {
+        state: "output-available" as const,
+        input: call.input,
+        output,
+      };
   if (isDynamicPiTool(call.toolName)) {
     return {
       type: "dynamic-tool",
@@ -130,8 +137,9 @@ function resultPart(call: PendingCall, result: PiToolResultMessage): PiUIMessage
       toolCallId: call.toolCallId,
       providerExecuted: true,
       ...settled,
-    } as PiDynamicToolPart;
+    };
   }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   return {
     type: `tool-${call.toolName}`,
     toolCallId: call.toolCallId,
@@ -162,7 +170,7 @@ export function entriesToUIMessages(
     messages.push({
       id: entry.id,
       role: "user",
-      metadata: { sessionId },
+      metadata: { sessionId, timestamp: entry.timestamp },
       parts: userParts(message),
     });
   };
@@ -176,6 +184,7 @@ export function entriesToUIMessages(
     // stopReason; usage follows pi's own getLastAssistantUsage semantics).
     assistant.metadata = {
       sessionId,
+      timestamp: entry.timestamp,
       model: message.model,
       provider: message.provider,
       stopReason: message.stopReason,
@@ -220,7 +229,7 @@ export function entriesToUIMessages(
     }
   };
 
-  const onToolResult = (message: PiToolResultMessage) => {
+  const onToolResult = (entry: SessionMessageEntry, message: PiToolResultMessage) => {
     // Paired by id across the whole branch, not just the open segment: a
     // result landing after a steer-injected user entry still completes its
     // call. Results without a matching call (corruption) are dropped.
@@ -228,6 +237,12 @@ export function entriesToUIMessages(
     if (call === undefined) return;
     pendingCalls.delete(message.toolCallId);
     call.parts[call.index] = resultPart(call, message);
+    if (assistant === null) return;
+    assistant.metadata = {
+      ...assistant.metadata,
+      sessionId,
+      timestamp: entry.timestamp,
+    };
   };
 
   for (const entry of rebuildBranch(entries, leafId)) {
@@ -256,7 +271,7 @@ export function entriesToUIMessages(
         onAssistant(entry, message);
         break;
       case "toolResult":
-        onToolResult(message);
+        onToolResult(entry, message);
         break;
       default:
         // Custom message roles stay off the transcript this phase (§5).

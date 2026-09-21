@@ -5,10 +5,10 @@ import type {
   SessionPendingPrompt,
   SessionPhase,
   SessionRuntimeSnapshot,
-  SessionScopedEvent,
   SessionScopedEventBody,
+  PieUIMessage,
+  PieUIMessageChunk,
 } from "@getpie/contract";
-import type { UIMessage, UIMessageChunk } from "ai";
 
 import type { AgentResponse } from "./agent-requests";
 import { Chat } from "./chat";
@@ -32,7 +32,7 @@ export const settle = async () => {
 export class FakeTransport implements ChatSessionTransport {
   onEvent: ((event: ChatTransportEvent) => void) | null = null;
   disposed = 0;
-  history: readonly UIMessage[] | null = null;
+  history: readonly PieUIMessage[] | null = null;
   // When set, getMessages blocks on it — for tests that race the history
   // floor against live traffic.
   historyGate: Promise<void> | null = null;
@@ -43,6 +43,7 @@ export class FakeTransport implements ChatSessionTransport {
     delivery?: "steer" | "followUp";
   }> = [];
   promptError: Error | null = null;
+  promptStarted = true;
   // When set, prompt blocks on it — for tests where the RPC is still in flight
   // (a dropped socket queues it until the link reconnects).
   promptGate: Promise<void> | null = null;
@@ -66,7 +67,7 @@ export class FakeTransport implements ChatSessionTransport {
     this.promptCalls.push(input);
     if (this.promptGate) await this.promptGate;
     if (this.promptError) throw this.promptError;
-    return { turnId: "turn-receipt", started: true };
+    return { turnId: "turn-receipt", started: this.promptStarted };
   };
   getMessages = async () => {
     this.getMessagesCalls += 1;
@@ -107,16 +108,15 @@ export const makeChat = (options?: { onTerminated?: () => void }) => {
     await settle();
   };
   const live = (seq: number, body: SessionScopedEventBody & { phase?: SessionPhase }) =>
-    emit({ seq, ref, ...body } as SessionScopedEvent);
+    emit({ seq, ref, ...body });
   return { chat, transport, attach, live, emit };
 };
 
 export const chunkEvent = (
   seq: number,
   turnId: string,
-  chunk: UIMessageChunk,
-): SessionMessageChunkEvent =>
-  ({ seq, ref, type: "session.message.chunk", turnId, chunk }) as SessionMessageChunkEvent;
+  chunk: PieUIMessageChunk,
+): SessionMessageChunkEvent => ({ seq, ref, type: "session.message.chunk", turnId, chunk });
 
 type ActiveTurnInit = Partial<NonNullable<SessionRuntimeSnapshot["activeTurn"]>> & {
   turnId: string;
@@ -132,19 +132,29 @@ export const activeTurn = (
   ...init,
 });
 
-export const textChunks = (id: string, text: string): UIMessageChunk[] => [
+export function defined<T>(value: T | undefined | null): T {
+  if (value == null) {
+    throw new Error("expected a defined value");
+  }
+  return value;
+}
+
+export const textChunks = (
+  id: string,
+  text: string,
+): [PieUIMessageChunk, PieUIMessageChunk, PieUIMessageChunk] => [
   { type: "text-start", id },
   { type: "text-delta", id, delta: text },
   { type: "text-end", id },
 ];
 
-export const userMessage = (id: string, text: string): UIMessage => ({
+export const userMessage = (id: string, text: string): PieUIMessage => ({
   id,
   role: "user",
   parts: [{ type: "text", text }],
 });
 
-export const assistantText = (message: UIMessage): string =>
+export const assistantText = (message: PieUIMessage): string =>
   message.parts.map((part) => (part.type === "text" ? part.text : "")).join("");
 
 export const toolRequest: AgentRequest = {

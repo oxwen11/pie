@@ -19,12 +19,16 @@ import {
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
+import { makePackageService, PackageService } from "../src/packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { SettingsRepositoryLayer } from "../src/settings";
+import { makeSkillService, SkillService } from "../src/skills";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -41,7 +45,7 @@ rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
   if (msg.type !== "prompt") return;
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
@@ -54,7 +58,7 @@ rl.on("line", (line) => {
 `;
 
 function makeFake(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-rpc-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pie-pi-process-"));
   const file = path.join(dir, "fake-pi.js");
   fs.writeFileSync(file, FAKE);
   fs.chmodSync(file, 0o755);
@@ -66,7 +70,7 @@ async function setup() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
+  const piExecutable = { command: makeFake(), prefixArgs: [] };
   const piProcessLayer = Layer.effect(
     PiProcessTag,
     makePiProcess({ executable: piExecutable }),
@@ -113,17 +117,30 @@ async function setup() {
     Layer.provide(harnessSessionLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
+  const packageServiceLayer = Layer.succeed(
+    PackageService,
+    makePackageService(() => path.join(home, "pi-agent")),
+  );
+  const skillServiceLayer = Layer.succeed(
+    SkillService,
+    makeSkillService(() => path.join(home, "pi-agent")),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
+    settingsRepositoryLayer,
     scheduleServiceLayer,
+    packageServiceLayer,
+    skillServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );
@@ -133,6 +150,27 @@ async function setup() {
   };
   const client = createRouterClient(router, { context });
   return { client, workspace, dispose: () => runtime.dispose() };
+}
+
+async function initGitRepo(workspace: string) {
+  const { simpleGit } = await import("simple-git");
+  const git = simpleGit(workspace);
+  await git.init(["-b", "main"]);
+  await git.addConfig("user.email", "test@example.com");
+  await git.addConfig("user.name", "Test");
+  await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
+  await git.add(".");
+  await git.commit("init");
+  return git;
+}
+
+async function createWorktreeSession(
+  client: Awaited<ReturnType<typeof setup>>["client"],
+  workspace: string,
+) {
+  await initGitRepo(workspace);
+  const project = await client.project.create({ path: workspace });
+  return client.agent.session.create({ projectId: project.id, worktree: {} });
 }
 
 describe("agent.session router", () => {
@@ -266,22 +304,9 @@ describe("agent.session router", () => {
   it("creates a git worktree on session.create when requested", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
+      const created = await createWorktreeSession(client, workspace);
 
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
-
-      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.worktree?.branch).toMatch(/^pie\/[a-f0-9]{8}$/);
       expect(created.workspace.cwd).not.toBe(workspace);
       expect(fs.existsSync(created.workspace.cwd)).toBe(true);
 
@@ -299,9 +324,39 @@ describe("agent.session router", () => {
       const branch = await client.git.branch({ ref: created.ref });
       expect(branch.kind).toBe("repository");
       if (branch.kind !== "repository") throw new Error("expected repository branch data");
-      expect(branch.current).toBe(created.workspace.gitBranch);
+      expect(branch.current).toBe(created.workspace.worktree?.branch);
       const tree = await client.fs.readTree({ ref: created.ref });
       expect(tree.cwd).toBe(created.workspace.cwd);
+
+      await client.agent.session.close({ ref: created.ref });
+    } finally {
+      await dispose();
+    }
+  }, 30_000);
+
+  it("prepares a worktree session after the checkout is gone", async () => {
+    const { client, workspace, dispose } = await setup();
+    try {
+      const created = await createWorktreeSession(client, workspace);
+      fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
+      expect(fs.existsSync(created.workspace.cwd)).toBe(false);
+
+      await expect(client.agent.session.prepare({ ref: created.ref })).rejects.toMatchObject({
+        code: "WORKTREE_MISSING",
+        data: {
+          sessionId: created.ref.sessionId,
+          projectId: created.ref.projectId,
+          branch: created.workspace.worktree?.branch,
+        },
+      });
+      expect(fs.existsSync(created.workspace.cwd)).toBe(false);
+
+      const restored = await client.agent.session.restoreWorktree({ ref: created.ref });
+      expect(restored.workspace).toEqual(created.workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const ready = await client.agent.session.prepare({ ref: created.ref });
+      expect(ready.workspace).toEqual(created.workspace);
 
       await client.agent.session.close({ ref: created.ref });
     } finally {
@@ -312,23 +367,10 @@ describe("agent.session router", () => {
   it("defaults worktree layout and branch like Cursor (pie/<hex> under worktrees/<repo>/<key>)", async () => {
     const { client, workspace, dispose } = await setup();
     try {
-      const { simpleGit } = await import("simple-git");
-      const git = simpleGit(workspace);
-      await git.init(["-b", "main"]);
-      await git.addConfig("user.email", "test@example.com");
-      await git.addConfig("user.name", "Test");
-      await fs.promises.writeFile(path.join(workspace, "README.md"), "hello\n");
-      await git.add(".");
-      await git.commit("init");
-
-      const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
-        projectId: project.id,
-        worktree: {},
-      });
+      const created = await createWorktreeSession(client, workspace);
 
       const repoName = path.basename(workspace);
-      expect(created.workspace.gitBranch).toMatch(/^pie\/[a-f0-9]{8}$/);
+      expect(created.workspace.worktree?.branch).toMatch(/^pie\/[a-f0-9]{8}$/);
       expect(created.workspace.cwd).toMatch(
         new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
       );

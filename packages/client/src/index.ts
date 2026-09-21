@@ -1,10 +1,19 @@
 import type { Contract } from "@getpie/contract";
-import { createORPCClient } from "@orpc/client";
+import { createORPCClient, type ClientLink } from "@orpc/client";
 import { RPCLink as WebSocketRPCLink } from "@orpc/client/websocket";
 import type { RouterContractClient } from "@orpc/contract";
 
+export type PieClientContext = {
+  /** Client-side routing identity; servers do not receive this value. */
+  readonly environmentId?: string;
+};
+
 /** A fully typed client for the Pie server, derived from the contract. */
-export type PieClient = RouterContractClient<Contract>;
+export type PieClient = RouterContractClient<Contract, PieClientContext>;
+
+export type PieLink = ClientLink<PieClientContext> & {
+  dispose(): void;
+};
 
 export type CreatePieClientOptions = {
   /** WebSocket endpoint. Defaults to `/ws/rpc` on the current origin. */
@@ -27,7 +36,8 @@ export type CloseablePieClient = {
 };
 
 function defaultWsUrl(): URL {
-  const url = new URL("/ws/rpc", globalThis.location.origin);
+  const location = (globalThis as { location?: { origin?: string } }).location;
+  const url = new URL("/ws/rpc", location?.origin ?? "http://127.0.0.1");
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url;
 }
@@ -41,8 +51,14 @@ export async function getWsTicket(httpBaseUrl: string | URL, token?: string): Pr
   if (!response.ok) {
     throw new Error(`Failed to obtain a WebSocket ticket: ${response.status}`);
   }
-  const body = (await response.json()) as { ticket: string };
-  if (typeof body.ticket !== "string" || body.ticket.length === 0) {
+  const body: unknown = await response.json();
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("ticket" in body) ||
+    typeof body.ticket !== "string" ||
+    body.ticket.length === 0
+  ) {
     throw new Error("WebSocket ticket response was empty");
   }
   return body.ticket;
@@ -62,22 +78,42 @@ export function createWsConnect(options: CreatePieClientOptions): () => Promise<
   };
 }
 
-const createClient = (
+export function createPieLink(
   options: CreatePieClientOptions,
-  reconnect: boolean,
+  reconnect = true,
   onConnect?: (socket: WebSocket) => void,
-): PieClient => {
+): PieLink {
   const connect = createWsConnect(options);
-  const link = new WebSocketRPCLink({
+  const sockets = new Set<WebSocket>();
+  let disposed = false;
+  const link = new WebSocketRPCLink<PieClientContext>({
     connect: async () => {
       const socket = await connect();
+      if (disposed) {
+        socket.close();
+        throw new Error("Pie link is disposed");
+      }
+      sockets.add(socket);
+      socket.addEventListener("close", () => sockets.delete(socket), { once: true });
       onConnect?.(socket);
       return socket;
     },
     reconnect: { enabled: reconnect },
   });
-  return createORPCClient(link);
-};
+  return Object.assign(link, {
+    dispose() {
+      disposed = true;
+      for (const socket of sockets) socket.close();
+      sockets.clear();
+    },
+  });
+}
+
+const createClient = (
+  options: CreatePieClientOptions,
+  reconnect: boolean,
+  onConnect?: (socket: WebSocket) => void,
+): PieClient => createORPCClient(createPieLink(options, reconnect, onConnect));
 
 /**
  * WebSocket client: every call multiplexed over one connection. The link takes

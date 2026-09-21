@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GlobalEventDefs, SessionEventDefs } from "../../src/harness/event-manifest";
+import { GlobalEventDefs, SessionEventDefs } from "../../src/harness/events/framework";
 
 const RESERVED_VERBS = new Set([
   "created",
@@ -8,6 +8,7 @@ const RESERVED_VERBS = new Set([
   "deleted",
   "renamed",
   "started",
+  "submitted",
   "ended",
   "asked",
   "replied",
@@ -41,6 +42,7 @@ describe("event manifest naming invariant", () => {
 
   it("includes the v1 session-scoped catalog", () => {
     const types = SessionEventDefs.map((d) => d.type);
+    expect(types).toContain("session.prompt.submitted");
     expect(types).toContain("session.turn.started");
     expect(types).toContain("session.turn.ended");
     expect(types).toContain("session.request.asked");

@@ -19,12 +19,16 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/p
 import { makePiProcess } from "../src/harness/pi/process";
 import type { PiExecutable } from "../src/harness/pi/resolve-executable";
 import * as Observability from "../src/observability";
+import { makePackageService, PackageService } from "../src/packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
+import { SettingsRepositoryLayer } from "../src/settings";
+import { makeSkillService, SkillService } from "../src/skills";
+import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
 const readline = require("node:readline");
@@ -41,7 +45,7 @@ rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
   if (msg.type !== "prompt") return;
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
   send({ type: "message_start", message: assistant() });
   upd({ type: "start" });
@@ -92,6 +96,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     Layer.provide(ProjectRepositoryLayer),
     Layer.provide(pathsLayer),
   );
+  const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
   const harnessSessionLayer = PiAgentSessionServiceLayer.pipe(
     Layer.provide(
       PiAgentSessionManagerLayer.pipe(
@@ -115,17 +120,29 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
   );
   const pullRequestLayer =
     options.pullRequestLayer ?? PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
+  const packageServiceLayer = Layer.succeed(
+    PackageService,
+    makePackageService(() => path.join(home, "pi-agent")),
+  );
+  const skillService = Layer.succeed(
+    SkillService,
+    makeSkillService(() => path.join(home, "pi-agent")),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
+    settingsRepositoryLayer,
     scheduleServiceLayer,
+    packageServiceLayer,
+    skillService,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     pullRequestLayer,
+    TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
   );

@@ -5,7 +5,7 @@ import { Context, Effect, Layer, Scope } from "effect";
 import { BrowserWindow, shell, type WebContents } from "electron";
 
 import icon from "../../../resources/icon.png?asset";
-import { DesktopConfig } from "../desktop-config";
+import { DesktopConfig, startsDesktopInBackground } from "../desktop-config";
 import { APP_ORIGIN, registerAppProtocol } from "./app-protocol";
 import { RendererChannel } from "./renderer-channel";
 
@@ -19,6 +19,7 @@ export class MainWindow extends Context.Service<
 
 export type MainWindowOptions = {
   readonly devUrl: string | undefined;
+  readonly backgroundColor: string;
   readonly connectRenderer: (webContents: WebContents) => () => Promise<void>;
 };
 
@@ -37,7 +38,7 @@ export function makeMainWindow(
   return Effect.gen(function* () {
     let mainWindow: BrowserWindow | undefined;
     let disconnectRenderer: (() => Promise<void>) | undefined;
-    const isE2E = process.env["PIE_E2E"] === "1";
+    const background = startsDesktopInBackground(process.env);
 
     const disconnectCurrentRenderer = (): void => {
       const disconnect = disconnectRenderer;
@@ -54,6 +55,8 @@ export function makeMainWindow(
         minWidth: 800,
         minHeight: 600,
         show: false,
+        // Paint the native window before renderer HTML loads.
+        backgroundColor: options.backgroundColor,
         autoHideMenuBar: true,
         titleBarStyle: "hiddenInset",
         // y=19 centers the ~14px traffic lights on the 26px titlebar centerline.
@@ -64,13 +67,13 @@ export function makeMainWindow(
           sandbox: true,
           contextIsolation: true,
           nodeIntegration: false,
-          backgroundThrottling: !isE2E,
+          backgroundThrottling: !background,
         },
       });
       mainWindow = window;
 
       window.on("ready-to-show", () => {
-        if (!isE2E) window.show();
+        if (!background) window.show();
       });
       window.webContents.on("did-finish-load", () => {
         disconnectCurrentRenderer();
@@ -110,12 +113,14 @@ export function makeMainWindow(
       }),
     );
 
-    // Detached so ensureOpen stays fire-and-forget; the load outcome is only
-    // observed for logging.
+    const scope = yield* Scope.Scope;
+
+    // Forked into the window Scope so ensureOpen stays fire-and-forget while
+    // shutdown still interrupts an in-flight loadURL.
     const loadRenderer = (window: BrowserWindow) =>
       Effect.tryPromise(() => window.loadURL(target)).pipe(
         Effect.catchCause((cause) => Effect.logError("Failed to load the desktop renderer", cause)),
-        Effect.forkDetach,
+        Effect.forkIn(scope),
       );
 
     return {
@@ -124,7 +129,7 @@ export function makeMainWindow(
         yield* loadRenderer(createWindow());
       }),
       focus: Effect.sync(() => {
-        if (isE2E) return;
+        if (background) return;
         const window = mainWindow;
         if (!window || window.isDestroyed()) return;
         if (window.isMinimized()) window.restore();
@@ -146,6 +151,7 @@ export const MainWindowLive = Layer.effect(
     yield* registerAppProtocol(rendererRoot());
     return yield* makeMainWindow({
       devUrl: config.devUrl,
+      backgroundColor: config.windowBackgroundColor,
       connectRenderer: channel.connect,
     });
   }),

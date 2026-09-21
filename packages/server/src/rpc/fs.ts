@@ -5,7 +5,9 @@ import { fsContract } from "@getpie/contract/fs";
 import { Effect } from "effect";
 import { FileSystem } from "effect/FileSystem";
 
+import { resolveProjectBrowseRoot } from "../config/paths";
 import { FileSystemService } from "../fs";
+import { contains } from "../path-safety";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
 import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
@@ -56,12 +58,21 @@ export const fsRouter = orpc.router({
   }),
   browse: orpc.browse.effect(function* ({ input, errors }) {
     const fs = yield* FileSystem;
-    const dir = path.resolve(input.path ?? os.homedir());
+    const projectBrowseRoot = resolveProjectBrowseRoot();
+    const dir = path.resolve(input.path ?? projectBrowseRoot ?? os.homedir());
+    if (projectBrowseRoot !== undefined) {
+      const readFailed = () => errors.READ_FAILED({ data: { path: dir } });
+      const [root, target] = yield* Effect.all([
+        fs.realPath(projectBrowseRoot).pipe(Effect.mapError(readFailed)),
+        fs.realPath(dir).pipe(Effect.mapError(readFailed)),
+      ]);
+      if (!contains(root, target)) return yield* Effect.fail(readFailed());
+    }
     const names = yield* fs
       .readDirectory(dir)
       .pipe(Effect.mapError(() => errors.READ_FAILED({ data: { path: dir } })));
     const candidates = names.filter(
-      (name) => (input.includeHidden || !name.startsWith(".")) && !IGNORED_DIRS.has(name),
+      (name) => (input.includeHidden === true || !name.startsWith(".")) && !IGNORED_DIRS.has(name),
     );
     const flagged = yield* Effect.forEach(
       candidates,
@@ -78,7 +89,11 @@ export const fsRouter = orpc.router({
       .map((entry) => ({ name: entry.name, path: path.join(dir, entry.name) }));
     directories.sort((left, right) => left.name.localeCompare(right.name));
     const parent = path.dirname(dir);
-    return { path: dir, parent: parent === dir ? null : parent, directories };
+    return {
+      path: dir,
+      parent: parent === dir || dir === projectBrowseRoot ? null : parent,
+      directories,
+    };
   }),
 });
 

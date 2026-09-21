@@ -4,43 +4,13 @@ import { Input } from "@getpie/ui/components/input";
 import { PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
-export type QueuedPromptKind = "steering" | "followUp";
-
-export function replaceQueuedItem(
-  pending: SessionPendingPrompt,
-  kind: QueuedPromptKind,
-  index: number,
-  text: string,
-): SessionPendingPrompt {
-  const items = pending[kind];
-  if (index < 0 || index >= items.length) return pending;
-  const next = items.slice();
-  next[index] = text;
-  return { ...pending, [kind]: next };
-}
-
-export function removeQueuedItem(
-  pending: SessionPendingPrompt,
-  kind: QueuedPromptKind,
-  index: number,
-): SessionPendingPrompt {
-  const items = pending[kind];
-  if (index < 0 || index >= items.length) return pending;
-  return { ...pending, [kind]: items.filter((_, itemIndex) => itemIndex !== index) };
-}
-
-export function promoteQueuedFollowUp(
-  pending: SessionPendingPrompt,
-  index: number,
-): SessionPendingPrompt {
-  const items = pending.followUp;
-  if (index < 0 || index >= items.length) return pending;
-  const text = items[index]!;
-  return {
-    steering: [...pending.steering, text],
-    followUp: items.filter((_, itemIndex) => itemIndex !== index),
-  };
-}
+import {
+  type QueuedPromptKind,
+  promoteQueuedFollowUp,
+  queuedPromptKey,
+  removeQueuedItem,
+  replaceQueuedItem,
+} from "./chat-input-queue-model";
 
 export function ChatInputQueue({
   pending,
@@ -58,23 +28,22 @@ export function ChatInputQueue({
         {count === 1 ? "1 queued message" : `${count} queued messages`}
       </p>
       <ul aria-label="Queued messages" className="flex w-full min-w-0 flex-col gap-0.5">
-        {pending.steering.map((text, index) => (
+        {pending.steering.map((text, position) => (
           <ChatInputQueueItem
-            key={`steering:${index}:${text}`}
+            key={queuedPromptKey("steering", pending.steering, position)}
             kind="steering"
             text={text}
-            onRemove={() => onReplace(removeQueuedItem(pending, "steering", index))}
-            onSave={(next) => onReplace(replaceQueuedItem(pending, "steering", index, next))}
+            onRemove={() => onReplace(removeQueuedItem(pending, "steering", position))}
           />
         ))}
-        {pending.followUp.map((text, index) => (
+        {pending.followUp.map((text, position) => (
           <ChatInputQueueItem
-            key={`followUp:${index}:${text}`}
+            key={queuedPromptKey("followUp", pending.followUp, position)}
             kind="followUp"
             text={text}
-            onPromote={() => onReplace(promoteQueuedFollowUp(pending, index))}
-            onRemove={() => onReplace(removeQueuedItem(pending, "followUp", index))}
-            onSave={(next) => onReplace(replaceQueuedItem(pending, "followUp", index, next))}
+            onPromote={() => onReplace(promoteQueuedFollowUp(pending, position))}
+            onRemove={() => onReplace(removeQueuedItem(pending, "followUp", position))}
+            onSave={(next) => onReplace(replaceQueuedItem(pending, "followUp", position, next))}
           />
         ))}
       </ul>
@@ -93,7 +62,7 @@ function ChatInputQueueItem({
   text: string;
   onPromote?: () => void;
   onRemove: () => void;
-  onSave: (text: string) => void;
+  onSave?: (text: string) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const trimmed = draft?.trim() ?? "";
@@ -108,12 +77,13 @@ function ChatInputQueueItem({
           onSubmit={(event) => {
             event.preventDefault();
             if (trimmed.length === 0) return;
-            onSave(trimmed);
+            onSave?.(trimmed);
             setDraft(null);
           }}
         >
           <Input
             aria-label="Edit queued message"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- focus the editor after the user starts editing
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -149,15 +119,17 @@ function ChatInputQueueItem({
             Send
           </Button>
         ) : null}
-        <Button
-          aria-label="Edit queued message"
-          onClick={() => setDraft(text)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <PencilIcon />
-        </Button>
+        {onSave ? (
+          <Button
+            aria-label="Edit queued message"
+            onClick={() => setDraft(text)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <PencilIcon />
+          </Button>
+        ) : null}
         <Button
           aria-label="Remove queued message"
           onClick={onRemove}

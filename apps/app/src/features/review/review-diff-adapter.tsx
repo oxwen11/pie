@@ -11,6 +11,9 @@ import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from
 const DIFF_UNSAFE_CSS = `
   :host {
     --diffs-font-family: var(--font-mono);
+    --diffs-header-font-family: var(--font-sans);
+    font-size: inherit;
+    line-height: inherit;
     --diffs-light-bg: var(--background);
     --diffs-dark-bg: var(--background);
     --diffs-light: var(--foreground);
@@ -73,7 +76,7 @@ export function ReviewDiffAdapter({
     getAppThemeType,
     () => "light" as const,
   );
-  const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
+  const codeViewRef = useRef<CodeViewHandle<undefined, undefined>>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [appliedLocate, setAppliedLocate] = useState(locateRequest);
   if (locateRequest !== appliedLocate) {
@@ -89,7 +92,7 @@ export function ReviewDiffAdapter({
     [diffs],
   );
 
-  const items = useMemo<ReadonlyArray<CodeViewItem>>(
+  const items = useMemo<ReadonlyArray<CodeViewItem<undefined>>>(
     () =>
       fileDiffs.map(({ path, fileDiff }) => ({
         id: path,
@@ -100,7 +103,7 @@ export function ReviewDiffAdapter({
     [collapsed, fileDiffs],
   );
 
-  const options = useMemo<CodeViewReactOptions>(
+  const options = useMemo<CodeViewReactOptions<undefined, undefined>>(
     () => ({
       overflow: "scroll",
       stickyHeaders: true,
@@ -138,7 +141,12 @@ export function ReviewDiffAdapter({
 
   return (
     <div className="h-full min-h-0 w-full">
-      <CodeView className="h-full w-full" items={items} options={options} ref={codeViewRef} />
+      <CodeView
+        className="h-full w-full overflow-auto"
+        items={items}
+        options={options}
+        ref={codeViewRef}
+      />
     </div>
   );
 }

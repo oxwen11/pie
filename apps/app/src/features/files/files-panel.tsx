@@ -1,20 +1,13 @@
 import type { Project } from "@getpie/contract";
-import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { FilesIcon, FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
@@ -31,8 +24,8 @@ export const filesPanel = definePanel({
 });
 
 function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const projectId = instance.sessionRef.projectId;
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -43,7 +36,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
     ),
   });
   const panel = useContentPanel();
-  const workspace = { ref: instance.sessionRef };
+  const workspace = { ref: instance.sessionRef.ref };
   const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
   const openFile = useCallback(
@@ -56,9 +49,9 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
 
   if (panel === null) {
     return (
-      <WorkspaceState title="Workspace unavailable">
+      <PanelEmptyState icon={FilesIcon} title="Workspace unavailable">
         This session no longer resolves to an imported project.
-      </WorkspaceState>
+      </PanelEmptyState>
     );
   }
 
@@ -88,34 +81,5 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
       tree={treePane}
       treeLabel={workspaceName}
     />
-  );
-}
-
-function WorkspaceState({
-  title,
-  children,
-  onRetry,
-}: {
-  title: string;
-  children: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <Empty className="py-8 md:py-8">
-      <EmptyMedia variant="icon">
-        <FilesIcon />
-      </EmptyMedia>
-      <EmptyContent>
-        <div>
-          <EmptyTitle className="text-base">{title}</EmptyTitle>
-          <EmptyDescription>{children}</EmptyDescription>
-        </div>
-        {onRetry ? (
-          <Button onClick={onRetry} size="sm" variant="outline">
-            Try again
-          </Button>
-        ) : null}
-      </EmptyContent>
-    </Empty>
   );
 }

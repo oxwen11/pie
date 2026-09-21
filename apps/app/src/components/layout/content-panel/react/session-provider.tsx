@@ -1,5 +1,6 @@
-import type { SessionRef } from "@getpie/contract";
 import { type ReactNode, useMemo } from "react";
+
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { ContentPanel } from "../model/content-panel";
 import { ContentPanelContext } from "./context";
@@ -13,10 +14,10 @@ import type { AnyPanelView } from "./view";
  * The ref is identity, not an ambient data bag: panel-specific values such as a
  * workspace path or git ref still belong in that panel's own payload/model.
  */
-export interface ContentPanelSessionProviderProps {
+interface ContentPanelSessionProviderProps {
   readonly contentPanel: ContentPanel<AnyPanelView>;
   /** null off a session route; every panel hook below degrades to a no-op. */
-  readonly sessionRef: SessionRef | null;
+  readonly sessionRef: EnvironmentSessionRef | null;
   readonly children: ReactNode;
 }
 

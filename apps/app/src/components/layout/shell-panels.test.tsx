@@ -1,71 +1,54 @@
-// @vitest-environment jsdom
 import { SidebarProvider } from "@getpie/ui/components/sidebar";
 import { domAnimation, LazyMotion } from "motion/react";
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { Group } from "react-resizable-panels";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { render } from "vitest-browser-react";
+import { page } from "vitest/browser";
 
 import { ResizablePanel } from "./resizable-panel";
 import { ShellContentPanel, ShellGroup, ShellSidebarPanel } from "./shell-panels";
 import { notifyUserLayoutListeners, resolveSidebarUserLayout } from "./shell-user-layout";
 
-Object.assign(globalThis, {
-  IS_REACT_ACT_ENVIRONMENT: true,
-  ResizeObserver: class {
-    disconnect(): void {}
-    observe(): void {}
-    unobserve(): void {}
-  },
-});
-
 window.matchMedia = (query) => ({
-  addEventListener() {},
-  addListener() {},
+  addEventListener() {
+    /* tests drive layout through notifyUserLayoutListeners */
+  },
+  addListener() {
+    /* MediaQueryList still types this deprecated alias */
+  },
   dispatchEvent: () => false,
   matches: false,
   media: query,
   onchange: null,
-  removeEventListener() {},
-  removeListener() {},
-});
-
-let root: Root | undefined;
-let container: HTMLDivElement | undefined;
-
-afterEach(() => {
-  act(() => root?.unmount());
-  container?.remove();
-  root = undefined;
-  container = undefined;
+  removeEventListener() {
+    /* tests drive layout through notifyUserLayoutListeners */
+  },
+  removeListener() {
+    /* MediaQueryList still types this deprecated alias */
+  },
 });
 
 describe("shell panels", () => {
-  it("keeps the settled sidebar drawer bound to the live panel width", () => {
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+  it("keeps the settled sidebar drawer bound to the live panel width", async () => {
+    await render(
+      <SidebarProvider defaultOpen>
+        <LazyMotion features={domAnimation}>
+          <ShellGroup hasContentPanel={false} hasSidebar>
+            <ShellSidebarPanel>
+              <div>Sidebar</div>
+            </ShellSidebarPanel>
+            <ResizablePanel id="main">Main</ResizablePanel>
+          </ShellGroup>
+        </LazyMotion>
+      </SidebarProvider>,
+    );
 
-    act(() => {
-      root?.render(
-        <SidebarProvider defaultOpen>
-          <LazyMotion features={domAnimation}>
-            <ShellGroup hasContentPanel={false} hasSidebar>
-              <ShellSidebarPanel>
-                <div>Sidebar</div>
-              </ShellSidebarPanel>
-              <ResizablePanel id="main">Main</ResizablePanel>
-            </ShellGroup>
-          </LazyMotion>
-        </SidebarProvider>,
-      );
-    });
-
-    const drawer = container.querySelector<HTMLElement>("[data-slot=sidebar-drawer]");
-
-    expect(drawer?.dataset.state).toBe("open");
-    expect(drawer?.style.width).toBe("100%");
-    expect(drawer?.style.transform).toBe("none");
+    await expect.element(page.getByText("Sidebar")).toBeVisible();
+    const drawer = page.getByText("Sidebar").element().closest("[data-slot=sidebar-drawer]");
+    expect(drawer).toBeInstanceOf(HTMLElement);
+    expect((drawer as HTMLElement).dataset.state).toBe("open");
+    expect((drawer as HTMLElement).style.width).toBe("100%");
+    expect((drawer as HTMLElement).style.transform).toBe("none");
   });
 
   it("notifies width memory only for completed user layouts", () => {
@@ -88,30 +71,24 @@ describe("shell panels", () => {
     });
   });
 
-  it("clips the resizable panel content wrapper", () => {
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+  it("clips the resizable panel content wrapper", async () => {
+    await render(
+      <Group orientation="horizontal">
+        <ShellContentPanel>
+          <div>Content</div>
+        </ShellContentPanel>
+        <ResizablePanel id="filler" style={{ color: "red", overflow: "visible" }}>
+          <div>Filler</div>
+        </ResizablePanel>
+      </Group>,
+    );
 
-    act(() => {
-      root?.render(
-        <Group orientation="horizontal">
-          <ShellContentPanel>
-            <div>Content</div>
-          </ShellContentPanel>
-          <ResizablePanel id="filler" style={{ color: "red", overflow: "visible" }}>
-            <div>Filler</div>
-          </ResizablePanel>
-        </Group>,
-      );
-    });
+    const panel = page.getByTestId("content").element();
+    const contentWrapper = panel.firstElementChild as HTMLElement | null;
+    const fillerWrapper = page.getByTestId("filler").element()
+      .firstElementChild as HTMLElement | null;
 
-    const panel = container.querySelector<HTMLElement>("[data-testid=content]");
-    const contentWrapper = panel?.firstElementChild as HTMLElement | null;
-    const fillerWrapper = container.querySelector<HTMLElement>("[data-testid=filler]")
-      ?.firstElementChild as HTMLElement | null;
-
-    expect(panel?.parentElement?.dataset.group).toBe("true");
+    expect(panel.parentElement?.dataset.group).toBe("true");
     expect(contentWrapper?.style.overflow).toBe("hidden");
     expect(fillerWrapper?.style.overflow).toBe("hidden");
     expect(fillerWrapper?.style.color).toBe("red");

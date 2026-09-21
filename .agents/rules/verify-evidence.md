@@ -33,30 +33,18 @@ pnpm exec pie-verify web evidence screenshot <feature>-before
 pnpm exec pie-verify web evidence screenshot <feature>-after
 ```
 
-**Video** — one recording that covers the whole drive, from the first
-interaction to the state you claim as proof. Start it before the first click,
-stop it after the last assertion. Save it in the evidence directory next to the
-screenshots.
+**Video** — the Verify `agent-browser` shim automatically records the complete
+drive at 60 fps. The first browser command starts
+`evidence/<run-id>/recording-001.webm` on the current page; later commands retain
+the same take. Start each additional validation with `evidence init`: it stops
+the current take and advances to `recording-002.webm`, `recording-003.webm`, and
+so on. Do not call `record start`, `restart`, or `stop`. Normal Verify cleanup
+stops and flushes the current recording before removing the run.
+
+Write down what each automatic clip shows:
 
 ```bash
-EVIDENCE="$(pnpm exec pie-verify web evidence path)"
-agent-browser record start "$EVIDENCE/<feature>.webm"   # from the current page
-# …drive…
-agent-browser record stop
-```
-
-`record start` opens a fresh browser context on the current URL (cookies and
-localStorage carry over), so `open` the page and settle it first, then start
-recording, then act. Use `record restart <path>` to split a long drive into
-several clips. Desktop drives through CDP (`pie-verify desktop`); if
-`record start` refuses on that attached session, capture the run's display
-instead (`ffmpeg -f x11grab -i "$DISPLAY" …` on the Xvfb the launcher started)
-and note the fallback with `evidence note`.
-
-Then write down what the clip shows:
-
-```bash
-pnpm exec pie-verify web evidence note "<feature>.webm: import → dialog → Import this folder → sidebar row"
+pnpm exec pie-verify web evidence note "recording-001.webm: import → dialog → Import this folder → sidebar row"
 ```
 
 Replace `web` with `desktop` for the Electron surface. `pie-verify cli` has no
@@ -69,13 +57,16 @@ browser and no UI evidence requirement.
   gitignored — never commit screenshots or videos.
 - A UI PR, issue, or comment must carry the image(s) **and** the video:
   `gh pr|issue create|edit|comment --attach <png> --attach <webm>`.
-- Name files after the feature you proved (`import-project-before.png`,
-  `import-project-after.png`, `import-project.webm`), not `screen.png`.
+- Name screenshots after the feature you proved (`import-project-before.png`,
+  `import-project-after.png`), not `screen.png`. The automatic video is always
+  numbered `recording-<NNN>.webm` files.
 
 ## Non-negotiables
 
-- No screenshots of a mocked or hand-seeded state — drive the real user path
-  (see the Evidence standards in each `verify-pie*` skill).
+- No screenshots of mocked or manually edited state. Verify's default run-local
+  sample Project is approved setup for features other than Import project. For
+  Import project, launch with `--replace --empty-projects` and drive the real
+  import path (see the Evidence standards in each `verify-pie*` skill).
 - Do not swap the video for a snapshot series or a description of what happened.
 - A green Playwright e2e run (`apps/desktop/e2e/`, test mode) does not replace
   this evidence for a UI change.

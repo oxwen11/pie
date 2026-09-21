@@ -1,4 +1,9 @@
-import { AgentRequestSchema, TokenUsageSchema, TurnErrorSchema } from "@getpie/contract";
+import {
+  AgentRequestSchema,
+  PromptPartSchema,
+  TokenUsageSchema,
+  TurnErrorSchema,
+} from "@getpie/contract";
 import type { UIMessageChunk } from "ai";
 import { Schema } from "effect";
 
@@ -31,6 +36,14 @@ export function defineEvent<const T extends string, const F extends Schema.Struc
 
 const sid = { sessionId: Schema.String };
 
+export const SessionPromptSubmitted = defineEvent({
+  type: "session.prompt.submitted",
+  schema: {
+    ...sid,
+    messageId: Schema.String,
+    parts: Schema.Array(PromptPartSchema),
+  },
+});
 export const SessionTurnStarted = defineEvent({
   type: "session.turn.started",
   schema: { ...sid, turnId: Schema.String },
@@ -91,6 +104,7 @@ export const ProjectUpdated = defineEvent({
 });
 
 export const SessionEventDefs = [
+  SessionPromptSubmitted,
   SessionTurnStarted,
   SessionTurnEnded,
   SessionRequestAsked,

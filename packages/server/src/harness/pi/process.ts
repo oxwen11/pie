@@ -21,14 +21,13 @@ import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
-import { createPiTransform } from "./transform";
+import { createPiTransform, type PiStreamItem } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
-import type { PiUIMessageChunk } from "./ui-message";
 
-// Pi facade: one `pi --mode rpc` child per session (pi's RPC mode hosts a
-// single session), unlike codex's shared app-server with thread demuxing.
-// Crash isolation therefore comes for free — a dead child only takes down its
-// own session — and there is no transport-generation bookkeeping.
+// Pi facade: one pie-pi-process per session (the process hosts a single
+// AgentSession), unlike codex's shared app-server with thread demuxing. Crash
+// isolation therefore comes for free — a dead process only takes down its own
+// session — and there is no transport-generation bookkeeping.
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
@@ -47,23 +46,23 @@ type PiTurnState =
       readonly ended: Deferred.Deferred<void>;
       readonly abandoned: boolean;
       readonly interrupted: boolean;
-    }
-  | {
-      readonly _tag: "Finishing";
-      readonly turnId: string;
-      readonly ended: Deferred.Deferred<void>;
     };
 
-type FinishTransition = {
-  readonly deliver: boolean;
-  readonly ended: Deferred.Deferred<void> | undefined;
-  readonly interrupted: boolean;
+type PiTurnChunk = {
+  readonly chunk: PiStreamItem;
+  readonly runEnd: boolean;
 };
+type PiTurnOutput = PiTurnChunk | { readonly runEnd: true };
 
-type TurnDecision =
-  | { readonly _tag: "Start"; readonly turnId: string; readonly ended: Deferred.Deferred<void> }
-  | { readonly _tag: "Steer"; readonly turn: Extract<PiTurnState, { _tag: "Active" }> }
-  | { readonly _tag: "Wait"; readonly ended: Deferred.Deferred<void> };
+const hasTurnChunk = (output: PiTurnOutput): output is PiTurnChunk => "chunk" in output;
+
+type RunEndTransition =
+  | {
+      readonly abandoned: true;
+      readonly ended: Deferred.Deferred<void>;
+      readonly interrupted: boolean;
+    }
+  | { readonly abandoned: false; readonly ended: undefined; readonly interrupted: boolean };
 
 export type PiSessionFailure = PiTransportFailure | AgentOperationError;
 
@@ -72,7 +71,7 @@ type SessionState = {
   readonly scope: Scope.Closeable;
   readonly transport: PiTransport;
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
-  readonly chunks: Queue.Queue<PiUIMessageChunk, Cause.Done | AgentOperationError>;
+  readonly chunks: Queue.Queue<PiTurnOutput, Cause.Done | AgentOperationError>;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
@@ -84,6 +83,8 @@ type SessionState = {
 export interface PiProcessOptions {
   readonly executable?: PiExecutable;
   readonly args?: ReadonlyArray<string>;
+  readonly onSpawn?: (sessionId: string, pid: number) => void;
+  readonly onExit?: (sessionId: string, pid: number) => void;
 }
 
 export interface PiProcessDependencies<R> {
@@ -92,6 +93,8 @@ export interface PiProcessDependencies<R> {
     readonly cwd?: string;
     readonly args?: ReadonlyArray<string>;
   }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
+  readonly onSpawn?: (sessionId: string, pid: number) => void;
+  readonly onExit?: (sessionId: string, pid: number) => void;
 }
 
 export interface PiProcess {
@@ -105,8 +108,8 @@ export interface PiProcess {
       readonly sessionId: string;
       readonly cwd?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
-    // When the session is already running: `followUp` queues after the current
-    // run's tools; omitted/`steer` injects before the next LLM call.
+    // Pi decides whether to start or queue. `followUp` is the default;
+    // `steer` injects before the next LLM call.
     readonly prompt: (input: {
       readonly sessionId: string;
       readonly text: string;
@@ -115,7 +118,7 @@ export interface PiProcess {
       {
         readonly turnId: string;
         readonly started: boolean;
-        readonly output: Stream.Stream<PiUIMessageChunk, AgentOperationError>;
+        readonly output: Stream.Stream<PiStreamItem, AgentOperationError>;
       },
       HarnessSessionNotFound | PiTransportFailure | AgentOperationError | TurnAlreadyRunning
     >;
@@ -243,7 +246,10 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(Queue.end(session.requests)),
             Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(
-              Queue.offer(session.chunks, { type: "error", errorText: failure.message }),
+              Queue.offer(session.chunks, {
+                chunk: { type: "error", errorText: failure.message },
+                runEnd: false,
+              }),
             ),
             Effect.flatMap((accepted) =>
               accepted
@@ -273,44 +279,40 @@ export const makePiProcessWithDependencies = <R>(
           return;
         }
 
-        for (const chunk of session.transform(event)) {
-          if (chunk.type === "finish") {
-            const transition = yield* Ref.modify<PiTurnState, FinishTransition>(
+        const transformed: Array<PiStreamItem | undefined> = Array.from(session.transform(event));
+        if (event.type === "agent_settled" && transformed.length === 0) {
+          transformed.push(undefined);
+        }
+        for (const [index, chunk] of transformed.entries()) {
+          const runEnd = event.type === "agent_settled" && index === transformed.length - 1;
+          if (runEnd) {
+            const transition = yield* Ref.modify<PiTurnState, RunEndTransition>(
               session.turnState,
-              (current) => {
-                if (current._tag !== "Active") {
-                  return [
-                    { deliver: false, ended: undefined, interrupted: false },
-                    current,
-                  ] as const;
-                }
-                return current.abandoned
+              (current) =>
+                current._tag === "Active" && current.abandoned
                   ? ([
-                      {
-                        deliver: false,
-                        ended: current.ended,
-                        interrupted: current.interrupted,
-                      },
+                      { abandoned: true, ended: current.ended, interrupted: current.interrupted },
                       { _tag: "Idle" } as const,
                     ] as const)
                   : ([
                       {
-                        deliver: true,
+                        abandoned: false,
                         ended: undefined,
-                        interrupted: current.interrupted,
+                        interrupted: current._tag === "Active" && current.interrupted,
                       },
-                      {
-                        _tag: "Finishing",
-                        turnId: current.turnId,
-                        ended: current.ended,
-                      } as const,
-                    ] as const);
-              },
+                      current,
+                    ] as const),
             );
-            if (transition.ended) yield* Deferred.succeed(transition.ended, undefined);
-            if (!transition.deliver) continue;
+            if (transition.abandoned) {
+              yield* drainQueue(session.chunks);
+              if (transition.ended) yield* Deferred.succeed(transition.ended, undefined);
+              continue;
+            }
             if (transition.interrupted) {
-              const accepted = yield* Queue.offer(session.chunks, { type: "abort" });
+              const accepted = yield* Queue.offer(session.chunks, {
+                chunk: { type: "abort" },
+                runEnd: false,
+              });
               if (!accepted) {
                 yield* evictOverflowedSession(session);
                 return;
@@ -318,7 +320,10 @@ export const makePiProcessWithDependencies = <R>(
             }
           }
 
-          const accepted = yield* Queue.offer(session.chunks, chunk);
+          const accepted = yield* Queue.offer(
+            session.chunks,
+            chunk === undefined ? { runEnd: true } : { chunk, runEnd },
+          );
           if (!accepted) {
             yield* evictOverflowedSession(session);
             return;
@@ -378,6 +383,7 @@ export const makePiProcessWithDependencies = <R>(
       ).pipe(
         Effect.flatMap((result) =>
           session.transport
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mapUiResponse/declineUiResponse return RpcExtensionUIResponse
             .respondUi(result as RpcExtensionUIResponse)
             .pipe(Effect.catch(() => Effect.void)),
         ),
@@ -398,6 +404,11 @@ export const makePiProcessWithDependencies = <R>(
               ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : undefined),
             })
             .pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(buildContext));
+          dependencies.onSpawn?.(sessionId, transport.pid);
+          yield* Scope.addFinalizer(
+            scope,
+            Effect.sync(() => dependencies.onExit?.(sessionId, transport.pid)),
+          );
 
           // Readiness handshake: pi's CLI front-end resolves the session (and
           // may exit with a human-readable error) before the RPC loop starts.
@@ -419,7 +430,7 @@ export const makePiProcessWithDependencies = <R>(
             scope,
             transport,
             termination: yield* Deferred.make<never, PiSessionFailure>(),
-            chunks: yield* Queue.dropping<PiUIMessageChunk, Cause.Done | AgentOperationError>(
+            chunks: yield* Queue.dropping<PiTurnOutput, Cause.Done | AgentOperationError>(
               SESSION_QUEUE_CAPACITY,
             ),
             requests: yield* Queue.bounded<AgentRequest, Cause.Done>(SESSION_QUEUE_CAPACITY),
@@ -454,7 +465,7 @@ export const makePiProcessWithDependencies = <R>(
             error instanceof PiTransportError ||
             error instanceof AgentOperationError ||
             (typeof error === "object" && error !== null && "_tag" in error)
-              ? (error as PiTransportFailure)
+              ? error
               : new PiTransportError({ operation: "open-session", cause: error }),
           ),
           Effect.onError(() => Scope.close(scope, Exit.void)),
@@ -504,38 +515,39 @@ export const makePiProcessWithDependencies = <R>(
         prompt: (input) =>
           Effect.gen(function* () {
             const session = yield* getSession(input.sessionId);
-
-            const prepareTurn = (): Effect.Effect<
-              {
-                readonly turnId: string;
-                readonly started: boolean;
-                readonly output: Stream.Stream<PiUIMessageChunk, AgentOperationError>;
-              },
-              PiTransportFailure | AgentOperationError | TurnAlreadyRunning
-            > =>
+            return yield* session.requestGate.withPermit(
               Effect.uninterruptibleMask((restore) =>
                 Effect.gen(function* () {
-                  const turnId = uuid();
-                  const ended = yield* Deferred.make<void>();
-                  const decision = yield* Ref.modify<PiTurnState, TurnDecision>(
-                    session.turnState,
-                    (current) => {
-                      switch (current._tag) {
-                        case "Idle":
-                          return [
-                            { _tag: "Start", turnId, ended },
-                            { _tag: "Active", turnId, ended, abandoned: false, interrupted: false },
-                          ];
-                        case "Active":
-                          return [{ _tag: "Steer", turn: current }, current];
-                        case "Finishing":
-                          return [{ _tag: "Wait", ended: current.ended }, current];
-                      }
-                    },
+                  const before = yield* Ref.get(session.turnState);
+                  if (before._tag === "Idle") yield* drainQueue(session.chunks);
+
+                  const admission = yield* restore(
+                    session.transport.command<{ readonly started: boolean }>({
+                      type: "prompt",
+                      message: input.text,
+                      streamingBehavior: input.delivery ?? "followUp",
+                    }),
                   );
 
-                  if (decision._tag === "Wait") {
-                    yield* restore(Deferred.await(decision.ended)).pipe(
+                  if (!admission.started) {
+                    const active = yield* Ref.get(session.turnState);
+                    if (active._tag === "Active") {
+                      return {
+                        turnId: active.turnId,
+                        started: false,
+                        output: Stream.empty,
+                      };
+                    }
+                    return yield* new AgentOperationError({
+                      sessionId: input.sessionId,
+                      operation: "prompt-admission-state",
+                      cause: new Error("Pi queued a prompt without an active server turn"),
+                    });
+                  }
+
+                  const previous = yield* Ref.get(session.turnState);
+                  if (previous._tag === "Active") {
+                    yield* restore(Deferred.await(previous.ended)).pipe(
                       Effect.timeoutOrElse({
                         duration: "2 seconds",
                         orElse: () =>
@@ -548,59 +560,23 @@ export const makePiProcessWithDependencies = <R>(
                           ),
                       }),
                     );
-                    return yield* Effect.suspend(prepareTurn);
-                  }
-                  if (decision._tag === "Steer") {
-                    const command =
-                      input.delivery === "followUp"
-                        ? ({ type: "follow_up", message: input.text } as const)
-                        : ({ type: "steer", message: input.text } as const);
-                    const queued = yield* restore(session.transport.command(command)).pipe(
-                      Effect.as(true),
-                      Effect.catch(() => Effect.succeed(false)),
-                    );
-                    if (queued) {
-                      return {
-                        turnId: decision.turn.turnId,
-                        started: false,
-                        output: Stream.empty,
-                      };
-                    }
-                    yield* restore(Deferred.await(decision.turn.ended)).pipe(
-                      Effect.timeoutOrElse({
-                        duration: "2 seconds",
-                        orElse: () =>
-                          Effect.fail(
-                            new AgentOperationError({
-                              sessionId: input.sessionId,
-                              operation: "wait-for-stale-turn",
-                              cause: new Error("Timed out waiting for the previous Pi turn"),
-                            }),
-                          ),
-                      }),
-                    );
-                    return yield* Effect.suspend(prepareTurn);
                   }
 
-                  yield* drainQueue(session.chunks);
-                  yield* session.transport
-                    .command({ type: "prompt", message: input.text })
-                    .pipe(
-                      Effect.tapError(() =>
-                        Ref.update(session.turnState, (current) =>
-                          current._tag !== "Idle" && current.turnId === turnId
-                            ? ({ _tag: "Idle" } as const)
-                            : current,
-                        ).pipe(Effect.andThen(Deferred.succeed(ended, undefined))),
-                      ),
-                    );
+                  const turnId = uuid();
+                  const ended = yield* Deferred.make<void>();
+                  yield* Ref.set(session.turnState, {
+                    _tag: "Active",
+                    turnId,
+                    ended,
+                    abandoned: false,
+                    interrupted: false,
+                  });
 
-                  const finishConsumed = Ref.modify(session.turnState, (current) => {
-                    if (current._tag !== "Idle" && current.turnId === turnId) {
-                      return [current.ended, { _tag: "Idle" } as const] as const;
-                    }
-                    return [undefined, current] as const;
-                  }).pipe(
+                  const finishConsumed = Ref.modify(session.turnState, (current) =>
+                    current._tag === "Active" && current.turnId === turnId
+                      ? ([current.ended, { _tag: "Idle" } as const] as const)
+                      : ([undefined, current] as const),
+                  ).pipe(
                     Effect.flatMap((pendingEnd) =>
                       pendingEnd
                         ? Deferred.succeed(pendingEnd, undefined).pipe(Effect.asVoid)
@@ -608,39 +584,28 @@ export const makePiProcessWithDependencies = <R>(
                     ),
                   );
 
-                  const abandonTurn = Ref.modify(session.turnState, (current) => {
-                    if (current._tag === "Idle" || current.turnId !== turnId) {
-                      return [undefined, current] as const;
-                    }
-                    if (current._tag === "Finishing") {
-                      return [current.ended, { _tag: "Idle" } as const] as const;
-                    }
-                    return [undefined, { ...current, abandoned: true } as const] as const;
-                  }).pipe(
-                    Effect.flatMap((pendingEnd) =>
-                      pendingEnd
-                        ? Deferred.succeed(pendingEnd, undefined).pipe(Effect.asVoid)
-                        : Effect.void,
-                    ),
+                  const abandonTurn = Ref.update(session.turnState, (current) =>
+                    current._tag === "Active" && current.turnId === turnId
+                      ? { ...current, abandoned: true }
+                      : current,
                   );
 
                   return {
                     turnId,
                     started: true,
                     output: streamFromQueueOne(session.chunks).pipe(
-                      Stream.tap((chunk) =>
-                        chunk.type === "finish" ? finishConsumed : Effect.void,
-                      ),
-                      Stream.takeUntil((chunk) => chunk.type === "finish"),
+                      Stream.tap((output) => (output.runEnd ? finishConsumed : Effect.void)),
+                      Stream.takeUntil((output) => output.runEnd),
+                      Stream.filter(hasTurnChunk),
+                      Stream.map((output) => output.chunk),
                       Stream.ensuring(abandonTurn),
                     ),
                   };
                 }),
-              );
-
-            return yield* prepareTurn().pipe(
-              Effect.onInterrupt(() =>
-                interrupt(input.sessionId).pipe(Effect.catch(() => Effect.void)),
+              ).pipe(
+                Effect.onInterrupt(() =>
+                  interrupt(input.sessionId).pipe(Effect.catch(() => Effect.void)),
+                ),
               ),
             );
           }),
@@ -713,11 +678,13 @@ export const makePiProcessWithDependencies = <R>(
         setModel: (sessionId, model) =>
           getSession(sessionId).pipe(
             Effect.flatMap((session) =>
-              session.transport.command<PiModel>({
-                type: "set_model",
-                provider: model.provider,
-                modelId: model.modelId,
-              }),
+              session.requestGate.withPermit(
+                session.transport.command<PiModel>({
+                  type: "set_model",
+                  provider: model.provider,
+                  modelId: model.modelId,
+                }),
+              ),
             ),
             Effect.map(toAgentModel),
           ),
@@ -729,6 +696,8 @@ export const makePiProcess = (
   options: PiProcessOptions = {},
 ): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
   makePiProcessWithDependencies({
+    onSpawn: options.onSpawn,
+    onExit: options.onExit,
     makeTransport: (config) => {
       const args = [...(options.args ?? []), ...(config.args ?? [])];
       return makePiTransport({

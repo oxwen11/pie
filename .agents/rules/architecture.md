@@ -2,18 +2,21 @@
 
 `core ← server|cli|desktop`, `contract ← server ← cli|desktop`, and
 `contract ← client ← app ← desktop`.
+Desktop also depends on `@getpie/ssh` for SSH-launched remote daemons (loopback tunnel only) and `@getpie/tailscale` for MagicDNS host discovery plus optional Serve.
 
-| dir                 | name                      | role                                                                                                           |
-| ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `packages/core`     | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
-| `packages/contract` | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it. |
-| `packages/server`   | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                |
-| `packages/client`   | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                             |
-| `packages/ui`       | `@getpie/ui`              | React components. Subpath-only exports, no barrel.                                                             |
-| `apps/app`          | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.    |
-| `apps/desktop`      | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                              |
-| `packages/pie`      | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                  |
-| `tools/verify` | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run's native env). Not the product CLI. |
+| dir                  | name                      | role                                                                                                            |
+| -------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `packages/core`      | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
+| `packages/contract`  | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it.  |
+| `packages/server`    | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                 |
+| `packages/ssh`       | `@getpie/ssh`             | Desktop SSH launch + loopback tunnel. No Electron, renderer, or oRPC.                                           |
+| `packages/tailscale` | `@getpie/tailscale`       | Tailscale CLI: PATH probe, `status --json` peers, Serve. No Electron, renderer, or oRPC. Never logs CLI stderr. |
+| `packages/client`    | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                              |
+| `packages/ui`        | `@getpie/ui`              | React components. Subpath-only exports, no barrel.                                                              |
+| `apps/app`           | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.     |
+| `apps/desktop`       | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                               |
+| `packages/pie`       | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                   |
+| `tools/verify`       | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run's native env). Not the product CLI. |
 
 `tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
 
@@ -84,8 +87,8 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
 - Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
   not the CLI. `packages/server/src/config/paths.ts` is the only place that names
   persistent roots: `resolvePieHome` for server data, `resolveDaemonDirectory`
-  for lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`. The daemon
-  directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
+  for `$PIE_HOME/daemon` lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`.
+  The daemon directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
   `Paths` includes `logsDir`; directory `0700` and files `0600` are
   part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
   The process-owned observability Layer appends to `logsDir/pie.log` and
@@ -95,7 +98,9 @@ workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   the process context captured after that provide; `mergeAll` leaves fibers forked
   during `AgentRuntimeLayer` construction on Effect's default logger. Tests that
   do not write a log file provide `Observability.discard` so `Effect.log*` does
-  not leak to stdout. The single-daemon invariant is keyed on the daemon
-  directory, so every front door resolves it there and passes it down —
+  not leak to stdout. The single-daemon invariant is keyed on `$PIE_HOME/daemon`,
+  so every front door resolves the home and derives the directory —
   `packages/server/src/daemon/paths.ts` names files inside a directory it is
-  handed and deliberately has no default of its own.
+  handed and deliberately has no default of its own. Tests and verify runs set
+  their own `$PIE_HOME`; they must not use `~/.pie`, `~/.pie_dev`, or
+  `~/.pie_<branch>`.

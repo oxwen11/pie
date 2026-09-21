@@ -5,8 +5,11 @@ import type {
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
+  PieUIMessage,
+  PieUIMessageChunk,
 } from "@getpie/contract";
-import { generateId, readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
+import type { JSONContent } from "@tiptap/react";
+import { generateId, readUIMessageStream } from "ai";
 import type { StoreApi } from "zustand/vanilla";
 
 import type { AgentRequest, AgentResponse } from "./agent-requests";
@@ -43,16 +46,17 @@ function statusFromPhase(phase: SessionPhase): "streaming" | "ready" | "error" {
 }
 
 /** Wire prompt parts → the user UIMessage every client renders. */
-const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): UIMessage => ({
+const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): PieUIMessage => ({
   id: messageId,
   role: "user",
   parts: parts.map((part) =>
     part.type === "data-inspector" ? { type: "data-inspector", data: part.data } : part,
-  ) as UIMessage["parts"],
+  ),
 });
 
-const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
+const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- data-retry payload is untyped JSON
   const data = chunk.data as {
     readonly errorMessage?: unknown;
     readonly attempt?: unknown;
@@ -74,7 +78,7 @@ const retryNoticeFrom = (chunk: UIMessageChunk): string | undefined => {
 // own reducer (readUIMessageStream — the same machinery the server-side
 // history folds use) turns them into evolving UIMessage snapshots.
 type TurnFold = {
-  readonly enqueue: (chunk: UIMessageChunk) => void;
+  readonly enqueue: (chunk: PieUIMessageChunk) => void;
   readonly close: () => void;
 };
 
@@ -94,6 +98,16 @@ export class Chat {
   readonly #state: ChatState;
   readonly #transport: ChatSessionTransport;
   readonly #onTerminated: (() => void) | undefined;
+  /** Unsent TipTap JSON for this session — survives route switches with the Chat cache. */
+  #composerDraft: JSONContent | undefined;
+
+  get composerDraft(): JSONContent | undefined {
+    return this.#composerDraft;
+  }
+
+  setComposerDraft(doc: JSONContent | undefined): void {
+    this.#composerDraft = doc;
+  }
   readonly #unsubscribe: () => void;
   readonly #turnFolds = new Map<string, TurnFold>();
   // Turns whose live rendering was abandoned (buffer truncated, replay gap):
@@ -177,8 +191,8 @@ export class Chat {
           this.#state.error = undefined;
         }
         break;
-      // The server rejected a prompt whose submitted event already broadcast:
-      // drop the phantom user message (the sender's optimistic copy included).
+      // The server rejected the prompt before it started: drop the sender's
+      // optimistic user message. Other clients normally never saw it.
       case "session.prompt.rejected":
         this.#state.messages = this.#state.messages.filter(
           (message) => message.id !== event.messageId,
@@ -457,7 +471,7 @@ export class Chat {
     // fabricate a seamless-looking transcript, so it abandons the live view
     // and recovers the whole turn at its end instead.
     const contiguous = head !== undefined && head.seq <= this.#cursor + 1;
-    let chunks: UIMessageChunk[];
+    let chunks: PieUIMessageChunk[];
     if (!activeTurn.truncated || contiguous) {
       chunks = unseen.map((chunkEvent) => chunkEvent.chunk);
     } else if (this.#cursor === 0) {
@@ -490,7 +504,7 @@ export class Chat {
   // Shared handlers
   // ---------------------------------------------------------------------
 
-  #observeChunk(chunk: UIMessageChunk): void {
+  #observeChunk(chunk: PieUIMessageChunk): void {
     const retryNotice = retryNoticeFrom(chunk);
     if (retryNotice !== undefined) {
       this.#state.error = undefined;
@@ -560,22 +574,21 @@ export class Chat {
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
-    let controller: ReadableStreamDefaultController<UIMessageChunk> | undefined;
-    const stream = new ReadableStream<UIMessageChunk>({
+    let controller: ReadableStreamDefaultController<PieUIMessageChunk> | undefined;
+    const stream = new ReadableStream<PieUIMessageChunk>({
       start(c) {
         controller = c;
       },
     });
     void (async () => {
       try {
-        // Seed the fold with a turn-derived id: a start chunk that carries no
-        // messageId (claude-code) would otherwise leave the reader's constant
-        // default id on every folded message, and two turns would upsert into
-        // each other's slot. A start chunk that does carry one (pi) still
-        // overrides this seed.
-        const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as UIMessage;
+        // Seed the fold with a turn-derived id: a start chunk without a
+        // messageId would otherwise leave the reader's constant default id on
+        // every folded message, and two turns would upsert into each other's
+        // slot. A start chunk with one still overrides this seed.
+        const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as PieUIMessage;
         for await (const message of readUIMessageStream({ message: seed, stream })) {
-          this.#state.upsertMessage(message as UIMessage);
+          this.#state.upsertMessage(message);
         }
       } catch (foldError) {
         console.error("Failed to fold turn", foldError);
@@ -607,7 +620,7 @@ export class Chat {
   // Fire-and-forget: idle prompts push an optimistic user message; a turn
   // already in flight is a Pi queue write (no transcript bubble — only
   // `session.queue.updated` updates `pendingPrompt`). Default delivery is
-  // follow-up; the composer passes `steer` when the user clicks Steer.
+  // follow-up; queue-row promote is the UI that passes `steer`.
   prompt = async (text: string, delivery?: "steer" | "followUp"): Promise<void> => {
     const messageId = generateId();
     const parts: PromptPart[] = [{ type: "text", text }];
@@ -635,10 +648,13 @@ export class Chat {
     this.#setStatus("submitted");
     this.#promptsInFlight += 1;
     try {
-      await this.#transport.prompt({
+      const receipt = await this.#transport.prompt({
         messageId,
         parts,
       });
+      if (!receipt.started) {
+        this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      }
     } catch (promptError) {
       this.#state.error =
         promptError instanceof Error ? promptError : new Error(String(promptError));

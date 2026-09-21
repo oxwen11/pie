@@ -14,6 +14,8 @@
 @source ".";
 
 :root {
+  color-scheme: light;
+
   --sidebar: hsl(0 0% 98%);
 
   --sidebar-foreground: hsl(240 5.3% 26.1%);
@@ -40,6 +42,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --sidebar: hsl(240 5.9% 10%);
 
   --sidebar-foreground: hsl(240 4.8% 95.9%);
@@ -128,10 +132,111 @@
   height: 0;
 }
 
+form:has(> [data-slot="chat-input"]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"]) {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+[data-slot="card-frame"]:has([data-slot="chat-input"])::before {
+  box-shadow: none;
+}
+
+form:has(> [data-slot="chat-input"]):focus-within {
+  z-index: 1;
+  clip-path: none;
+  border-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+
+/* Inline widget: a bit taller than the 1em box (ZWSP + line-height), still
+ * centered — half-leading grows both sides. Not leading-5. Width 0 so typing
+ * is not shifted; the bar is the border. */
+.chat-input-caret {
+  display: inline-block;
+  width: 0;
+  line-height: 1.2;
+  margin-right: -2px;
+  border-right: 2px solid var(--foreground);
+  pointer-events: none;
+  animation: var(--animate-caret-blink);
+}
+
+.tiptap.chat-thick-caret {
+  caret-color: transparent;
+}
+
+.tiptap.chat-thick-caret:not(.ProseMirror-focused) .chat-input-caret,
+.tiptap.chat-thick-caret[data-composing] .chat-input-caret {
+  visibility: hidden;
+}
+
+.tiptap.chat-thick-caret[data-composing] {
+  caret-color: currentColor;
+}
+
+@property --chat-input-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --chat-input-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@supports (animation-timeline: scroll()) {
+  .chat-input-scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black var(--chat-input-fade-top) calc(100% - var(--chat-input-fade-bottom)),
+      transparent
+    );
+    animation: chat-input-scroll-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+
+@keyframes chat-input-scroll-fade {
+  0%,
+  1% {
+    --chat-input-fade-top: 0px;
+    --chat-input-fade-bottom: 12px;
+  }
+  99%,
+  100% {
+    --chat-input-fade-top: 12px;
+    --chat-input-fade-bottom: 0px;
+  }
+}
+
 /* Thin, theme-aware scrollbar for the chat transcript. Applied where the
    Conversation component is used, via its `scrollClassName` prop, so the
    visual style lives in the app rather than in @getpie/ui. */
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--foreground) 20%, transparent) transparent;
+}
+
+/* Frameless Electron titlebar: drag the strip, dig buttons/inputs/links out.
+   Attribute, not a class: shadcn lint only allows Tailwind classes on chrome. */
+[data-drag-region] {
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-drag-region] button,
+[data-drag-region] input,
+[data-drag-region] textarea,
+[data-drag-region] select,
+[data-drag-region] a {
+  -webkit-app-region: no-drag;
 }

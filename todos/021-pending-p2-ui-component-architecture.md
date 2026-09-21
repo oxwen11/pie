@@ -39,7 +39,7 @@ The UI already uses compound components in several places, but the architecture 
 - Run `pnpm turbo run typecheck --filter=@getpie/app` after each app-level stack item.
 - Run `pnpm turbo run test --filter=@getpie/app` after each app-level stack item.
 - Run the corresponding `@getpie/ui` typecheck/test commands for changes under `packages/ui`.
-- Run `npx react-doctor@latest --verbose --scope changed` before committing React changes and confirm no regression.
+- Run `pnpm exec react-doctor --yes --verbose --scope changed` from `apps/app` before committing React changes and confirm no regression. Strict SPA opt-in lives in repo-root `doctor.config.json`.
 - Inspect the final diff for scope creep and confirm there are no staged files before creating each stacked PR.
 - Use `pnpm exec pie-verify web` for runtime checks when a change affects a user-facing web flow.
 

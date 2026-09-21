@@ -6,16 +6,34 @@ import { expectMeta, readRunMeta } from "../meta.ts";
 import {
   applyBrowserEnv,
   browserConfigForEnv,
+  browserNeedsIsolation,
   ensureBrowserEnvDirs,
+  ensureAutoRecording,
   formatBrowserEnv,
   resolveAgentBrowserBin,
   resolveBrowserEnv,
+  stopAutoRecording,
+  teardownOwnedBrowser,
   type BrowserEnvVars,
 } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
 import { currentRun, writeJson, writeText } from "../runtime/fs.ts";
 import { runCommandInherit } from "../runtime/process.ts";
 import type { Surface } from "../surface.ts";
+
+const RECORDING_SEQUENCE_FILE = "agent-browser-recording-sequence";
+
+function recordingSequence(runDir: string): number {
+  const file = path.join(runDir, RECORDING_SEQUENCE_FILE);
+  if (!fs.existsSync(file)) return 1;
+  const value = Number(fs.readFileSync(file, "utf8").trim());
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function recordingPath(skillDir: string, runId: string, runDir: string): string {
+  const sequence = String(recordingSequence(runDir)).padStart(3, "0");
+  return path.join(skillDir, "evidence", runId, `recording-${sequence}.webm`);
+}
 
 export function parseEnvArgs(args: string[]) {
   let exportMode = false;
@@ -46,6 +64,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         appUrl: web.appUrl,
+        recordingPath: recordingPath(identity.skillDir, web.runId, runDir),
         runDir,
       });
     }
@@ -54,6 +73,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
       return resolveBrowserEnv({
         session: identity.browserSession,
         cdpPort: desktop.cdpPort,
+        recordingPath: recordingPath(identity.skillDir, desktop.runId, runDir),
         runDir,
       });
     }
@@ -76,11 +96,53 @@ export function writeBrowserEnvFile(identity: SurfaceIdentity, runDir: string): 
   writeIsolationShim(identity);
 }
 
+export function rotateAutoRecordingForRun(identity: SurfaceIdentity, runDir: string): void {
+  if (identity.id === "cli") return;
+  const vars = browserEnvForRun(identity, runDir);
+  const current = vars.PIE_VERIFY_RECORDING_PATH;
+  if (current === undefined || !fs.existsSync(current)) return;
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  applyBrowserEnv(vars, env);
+  const error = stopAutoRecording(vars.AGENT_BROWSER, {}, env);
+  if (error !== undefined) throw new Error(`automatic recording stop failed: ${error}`);
+
+  const { runId } = readRunMeta(path.join(runDir, "meta.json"));
+  const dest = path.join(identity.skillDir, "evidence", runId);
+  let sequence = recordingSequence(runDir) + 1;
+  while (fs.existsSync(path.join(dest, `recording-${String(sequence).padStart(3, "0")}.webm`))) {
+    sequence += 1;
+  }
+  writeText(path.join(runDir, RECORDING_SEQUENCE_FILE), `${sequence}\n`);
+  writeBrowserEnvFile(identity, runDir);
+}
+
+/** Always tear down the owned agent-browser session for this run. */
+export async function teardownOwnedBrowserForRun(
+  identity: SurfaceIdentity,
+  runDir: string,
+): Promise<void> {
+  if (identity.id === "cli") return;
+  try {
+    const vars = browserEnvForRun(identity, runDir);
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    applyBrowserEnv(vars, env);
+    for (const error of await teardownOwnedBrowser(vars.AGENT_BROWSER, env, {
+      socketDir: vars.AGENT_BROWSER_SOCKET_DIR,
+      session: vars.AGENT_BROWSER_SESSION,
+    })) {
+      console.error(`${identity.logPrefix}: owned browser teardown: ${error}`);
+    }
+  } catch (error) {
+    console.error(`${identity.logPrefix}: owned browser teardown failed: ${String(error)}`);
+  }
+}
+
 export function writeIsolationShim(
   identity: Extract<SurfaceIdentity, { id: "web" | "desktop" }>,
 ): void {
   const envFile = path.join(identity.currentLink, "agent-browser.env");
   const dest = path.join(identity.root, "bin/agent-browser");
+  const entry = path.resolve(import.meta.dirname, "../../bin/agent-browser");
   writeText(
     dest,
     `#!/bin/sh
@@ -92,7 +154,9 @@ if [ ! -f "$env_file" ]; then
 fi
 # shellcheck disable=SC1090
 . "$env_file"
-exec "$AGENT_BROWSER" "$@"
+export PIE_VERIFY_SURFACE=${identity.id}
+export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"
+exec ${JSON.stringify(entry)} "$@"
 `,
   );
   fs.chmodSync(dest, 0o755);
@@ -121,9 +185,8 @@ export function resolveActiveBrowserEnv(
   input: ActiveBrowserEnvInput = {},
 ): BrowserEnvVars | undefined {
   const surface = parseSurfaceOverride(input.surface ?? process.env.PIE_VERIFY_SURFACE);
-  const webRun = input.webRun !== undefined ? input.webRun : currentRun(WEB.currentLink);
-  const desktopRun =
-    input.desktopRun !== undefined ? input.desktopRun : currentRun(DESKTOP.currentLink);
+  const webRun = input.webRun ?? currentRun(WEB.currentLink);
+  const desktopRun = input.desktopRun ?? currentRun(DESKTOP.currentLink);
   if (surface === "web") {
     if (webRun === undefined) {
       throw new Error(`no current run. Launch first: ${WEB.bin} launch`);
@@ -165,6 +228,13 @@ export function execIsolatedAgentBrowser(args: string[]): void {
   if (active !== undefined) {
     ensureBrowserEnvDirs(active);
     applyBrowserEnv(active, env);
+  }
+  if (active !== undefined && browserNeedsIsolation(args[0]) && !args.includes("record")) {
+    if (args.includes("close")) {
+      stopAutoRecording(real, {}, env);
+    } else {
+      ensureAutoRecording(real, {}, env);
+    }
   }
   const status = runCommandInherit(real, args, { env });
   if (status !== 0) {

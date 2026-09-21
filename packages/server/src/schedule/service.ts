@@ -70,18 +70,42 @@ export const ScheduleServiceLayer: Layer.Layer<
       Context.add(ScheduleRuntime, runtime),
     );
     // Shape stays R-free. Modules yield* services; this seam provides them.
-    const provide = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E> =>
-      effect.pipe(Effect.provide(env)) as Effect.Effect<A, E>;
+    type ScheduleEnv =
+      | ScheduleRepository
+      | ProjectService
+      | PiAgentSessionService
+      | Crypto.Crypto
+      | ScheduleRuntime;
+    const provide = <A, E>(effect: Effect.Effect<A, E, ScheduleEnv>): Effect.Effect<A, E> =>
+      effect.pipe(Effect.provide(env));
     return {
-      list: () => provide(mutations.list()),
-      get: (id) => provide(mutations.get(id)),
-      create: (input) => provide(mutations.create(input)),
-      update: (input) => provide(mutations.update(input)),
-      delete: (id) => provide(mutations.remove(id)),
-      runNow: (id) => provide(mutations.runNow(id)),
-      tick: () => provide(tick()),
-      recover: () => provide(mutations.recover()),
-      nextWakeDelay: () => provide(mutations.nextWakeDelay()),
+      list: Effect.fn("ScheduleService.list")(function* () {
+        return yield* provide(mutations.list());
+      }),
+      get: Effect.fn("ScheduleService.get")(function* (id: string) {
+        return yield* provide(mutations.get(id));
+      }),
+      create: Effect.fn("ScheduleService.create")(function* (input: CreateScheduleInput) {
+        return yield* provide(mutations.create(input));
+      }),
+      update: Effect.fn("ScheduleService.update")(function* (input: UpdateScheduleInput) {
+        return yield* provide(mutations.update(input));
+      }),
+      delete: Effect.fn("ScheduleService.delete")(function* (id: string) {
+        return yield* provide(mutations.remove(id));
+      }),
+      runNow: Effect.fn("ScheduleService.runNow")(function* (id: string) {
+        return yield* provide(mutations.runNow(id));
+      }),
+      tick: Effect.fn("ScheduleService.tick")(function* () {
+        return yield* provide(tick());
+      }),
+      recover: Effect.fn("ScheduleService.recover")(function* () {
+        return yield* provide(mutations.recover());
+      }),
+      nextWakeDelay: Effect.fn("ScheduleService.nextWakeDelay")(function* () {
+        return yield* provide(mutations.nextWakeDelay());
+      }),
     };
   }),
 ).pipe(Layer.provide(ScheduleRuntimeLayer));

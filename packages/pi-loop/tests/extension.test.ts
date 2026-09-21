@@ -7,6 +7,14 @@ import { LOOP_CUSTOM_TYPE } from "../src/prompt";
 
 type Handler = (...args: never[]) => unknown;
 
+function requireGet<K, V>(map: Map<K, V>, key: K): V {
+  const value = map.get(key);
+  if (value === undefined) {
+    throw new Error(`expected ${String(key)}`);
+  }
+  return value;
+}
+
 function fakePi() {
   const commands = new Map<string, { description?: string; handler: Handler }>();
   const tools = new Map<string, { description: string; parameters: unknown; execute: Handler }>();
@@ -63,7 +71,7 @@ describe("extension contract", () => {
 
   it("uses snake_case schemas and rejects extra properties", () => {
     const { tools } = fakePi();
-    const schema = tools.get("cron_create")!.parameters as {
+    const schema = requireGet(tools, "cron_create").parameters as {
       additionalProperties?: boolean;
       properties?: Record<string, unknown>;
     };
@@ -84,23 +92,27 @@ describe("extension contract", () => {
       isProjectTrusted: () => false,
       ui: { notify: () => undefined },
     };
-    await events.get("session_start")!(undefined as never, ctx as never);
-    await commands.get("loop")!.handler("5m ping" as never, ctx as never);
+    await requireGet(events, "session_start")(undefined as never, ctx as never);
+    await requireGet(commands, "loop").handler("5m ping" as never, ctx as never);
     expect(sent).toHaveLength(0);
-    await events.get("session_shutdown")!(undefined as never);
-    await events.get("session_start")!(undefined as never, ctx as never);
-    await commands.get("loop")!.handler("check CI" as never, ctx as never);
+    await requireGet(events, "session_shutdown")(undefined as never);
+    await requireGet(events, "session_start")(undefined as never, ctx as never);
+    await requireGet(commands, "loop").handler("check CI" as never, ctx as never);
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.message.customType).toBe(packageJson.name);
-    expect(sent[0]!.message.customType).toBe(LOOP_CUSTOM_TYPE);
-    expect(sent[0]!.options).toEqual({ triggerTurn: true });
-    expect(sent[0]!.message.display).toBe(true);
-    const details = sent[0]!.message.details as { prompt: string; taskId: string; kind: string };
+    const first = sent[0];
+    if (first === undefined) {
+      throw new Error("expected sent message");
+    }
+    expect(first.message.customType).toBe(packageJson.name);
+    expect(first.message.customType).toBe(LOOP_CUSTOM_TYPE);
+    expect(first.options).toEqual({ triggerTurn: true });
+    expect(first.message.display).toBe(true);
+    const details = first.message.details as { prompt: string; taskId: string; kind: string };
     expect(details.prompt).toBe("check CI");
     expect(details.kind).toBe("dynamic");
     expect(details.taskId).toEqual(expect.any(String));
-    expect(String(sent[0]!.message.content)).not.toContain("<system-reminder>");
-    expect(String(sent[0]!.message.content)).not.toContain("<");
+    expect(String(first.message.content)).not.toContain("<system-reminder>");
+    expect(String(first.message.content)).not.toContain("<");
     expect(userMessages).toHaveLength(0);
   });
 });

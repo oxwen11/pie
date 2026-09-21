@@ -388,6 +388,10 @@ export const makePiAgentSession = (
             case "Start":
             case "Await":
               return Deferred.await(decision.ticket);
+            default: {
+              const exhaustive: never = decision;
+              return exhaustive;
+            }
           }
         }),
       );

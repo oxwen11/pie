@@ -34,9 +34,13 @@ export type KeyPathValue<T, P extends string> = P extends `${infer Head}.${infer
     ? T[P]
     : never;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 /** @internal Runtime walk; the path is compile-time validated, so no guards. */
 export const getAtPath = (value: unknown, path: string): unknown =>
-  path.split(".").reduce<unknown>((acc, key) => (acc as Record<string, unknown>)[key], value);
+  path.split(".").reduce<unknown>((acc, key) => (isRecord(acc) ? acc[key] : undefined), value);
 
 /** @internal Immutably rebuild the spine along `segments`, replacing the leaf. */
 export const setAtPath = (
@@ -48,6 +52,6 @@ export const setAtPath = (
   if (head === undefined) {
     return leaf;
   }
-  const record = value as Record<string, unknown>;
+  const record = isRecord(value) ? value : {};
   return Object.assign({}, record, { [head]: setAtPath(record[head], rest, leaf) });
 };

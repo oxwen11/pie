@@ -5,6 +5,7 @@ import { agentBrowserIsolation, isManagedAgentBrowserSocketDir } from "../runtim
 import { clearCurrentRun, currentRun, isUnder, realPath, removePath } from "../runtime/fs.ts";
 import { removeScaffold } from "../runtime/scaffold.ts";
 import type { Surface } from "../surface.ts";
+import { teardownOwnedBrowserForRun } from "./env.ts";
 
 function sampleProjectOf(meta: RunMeta | undefined): string | undefined {
   switch (meta?.surface) {
@@ -32,17 +33,13 @@ export async function cleanup(surface: Surface, args: string[]): Promise<void> {
   }
 
   const meta = tryReadRunMeta(path.join(runDir, "meta.json"));
+  await teardownOwnedBrowserForRun(identity, runDir);
   await surface.stop(runDir, meta);
 
   switch (identity.id) {
     case "web":
     case "desktop": {
       removeScaffold(sampleProjectOf(meta), identity.sample.marker, identity.logPrefix);
-      removeScaffold(
-        path.join(process.env.HOME ?? "", identity.sample.name),
-        identity.sample.marker,
-        identity.logPrefix,
-      );
       const socketDir = agentBrowserIsolation(runDir).socketDir;
       if (isManagedAgentBrowserSocketDir(socketDir)) {
         removePath(socketDir);

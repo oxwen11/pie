@@ -1,9 +1,10 @@
 import type { SessionRef } from "@getpie/contract";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
+
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 export function useSessionModels(ref: SessionRef) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useEnvironmentOrpc();
   const queryClient = useQueryClient();
 
   const modelsQuery = useQuery(
@@ -14,6 +15,7 @@ export function useSessionModels(ref: SessionRef) {
   );
 
   const setModel = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.setModel.key(),
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>
       orpcQueryUtils.agent.session.setModel.call({ ref, provider, modelId }),
     onSuccess: () => {

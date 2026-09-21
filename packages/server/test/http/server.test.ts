@@ -8,6 +8,7 @@ import { WebSocket } from "ws";
 
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";
+import { ResourceMonitoring, ResourceMonitoringDisabled } from "../../src/observability/resources";
 import type { RpcRuntime } from "../../src/rpc";
 import { structured, type LogRecord } from "../log-record";
 import { discardContext } from "../platform";
@@ -38,6 +39,32 @@ describe("createServer auth", () => {
     const base = await start({ authToken: TOKEN });
     const response = await fetch(`${base}/api/health`);
     expect(response.status).toBe(200);
+  });
+
+  it("accepts bounded authenticated Electron resource registration", async () => {
+    const registrations: unknown[] = [];
+    const effectContext = Context.add(await discardContext(), ResourceMonitoring, {
+      ...ResourceMonitoringDisabled,
+      enabled: true,
+      registerElectron: (registration) => registrations.push(registration),
+    });
+    const base = await start({ authToken: TOKEN, effectContext });
+    const response = await fetch(`${base}/api/resources/electron`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        instanceId: "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61",
+        revision: 1,
+        root: { pid: 123 },
+        processes: [{ process: { pid: 124 }, role: "electron-renderer" }],
+      }),
+    });
+    expect(response.status).toBe(204);
+    expect(registrations).toHaveLength(1);
   });
 
   it("does not expose an HTTP RPC endpoint", async () => {
@@ -143,7 +170,10 @@ describe("createServer CORS", () => {
 describe("createServer anti DNS-rebinding", () => {
   it("refuses a request whose Host is not loopback, even /api/health", async () => {
     await start({});
-    const { port } = server!.address() as AddressInfo;
+    if (server === undefined) {
+      throw new Error("expected server");
+    }
+    const { port } = server.address() as AddressInfo;
     const status = await new Promise<number>((resolve) => {
       const req = http.request(
         { host: "127.0.0.1", port, path: "/api/health", headers: { host: "evil.example" } },
@@ -268,6 +298,48 @@ describe("createServer WebSocket ticket", () => {
     await expect(connect(base, "", "/ws/rpc", { origin: "https://evil.example" })).resolves.toBe(
       403,
     );
+  });
+});
+
+describe("createServer allow-host", () => {
+  it("lets the operator trust a published Host without restarting", async () => {
+    const base = await start({ authToken: TOKEN });
+    if (server === undefined) throw new Error("expected server");
+    const { port } = server.address() as AddressInfo;
+    const health = (host: string) =>
+      new Promise<number>((resolve) => {
+        const req = http.request(
+          { host: "127.0.0.1", port, path: "/api/health", headers: { host } },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on("error", () => resolve(0));
+        req.end();
+      });
+    await expect(health("box.ts.net")).resolves.toBe(403);
+    const allow = await fetch(`${base}/api/allow-host`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ host: "https://box.ts.net:8443" }),
+    });
+    expect(allow.status).toBe(200);
+    await expect(allow.json()).resolves.toEqual({ host: "box.ts.net" });
+    await expect(health("box.ts.net")).resolves.toBe(200);
+  });
+
+  it("rejects allow-host without the daemon token", async () => {
+    const base = await start({ authToken: TOKEN });
+    const response = await fetch(`${base}/api/allow-host`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ host: "box.ts.net" }),
+    });
+    expect(response.status).toBe(401);
   });
 });
 

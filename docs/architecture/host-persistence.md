@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-04.
+Last audited: 2026-09-20.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -16,7 +16,7 @@ in `.agents/rules/architecture.md` under **Host-write design gate**.
 There are four persistence owners. Their data must not be merged casually:
 
 1. **Pie server data** under `$PIE_HOME`.
-2. **Daemon lifecycle state** under `$PIE_DAEMON_DIR`.
+2. **Daemon lifecycle state** under `$PIE_HOME/daemon`.
 3. **Browser/Electron profile state** owned by the renderer origin or Chromium.
 4. **Pi and the agent's tools**, which write outside Pie-owned storage under
    Pi's own data root and the selected workspace.
@@ -25,13 +25,18 @@ There are four persistence owners. Their data must not be merged casually:
 roots:
 
 - `$PIE_HOME` overrides the home.
-- Otherwise production uses `~/.pie` and `NODE_ENV=development` uses
-  `~/.pie-dev`.
-- `$PIE_DAEMON_DIR` overrides daemon lifecycle storage; otherwise it is
-  `$PIE_HOME/daemon`.
-- Development front doors may scope lifecycle state to
-  `$PIE_HOME/daemons/<checkout-scope>` while retaining one shared development
-  data home.
+- Otherwise the default is chosen from the running code's on-disk location
+  (not `process.cwd()`):
+  - installed binary, not inside a Git checkout → `~/.pie`;
+  - Git checkout (dev, or a build launched from the repo) →
+    `~/.pie_<sanitized-branch>` (`main` → `~/.pie_main`, `feat/foo` →
+    `~/.pie_feat--foo`; `/` becomes `--` so it does not collide with `-`;
+    detached HEAD uses the short SHA);
+  - checkout whose branch cannot be read → `~/.pie_dev`.
+- `NODE_ENV` does not choose the home. Isolation is a different `$PIE_HOME`;
+  tests and verify runs must set their own and must not use `~/.pie`,
+  `~/.pie_dev`, or `~/.pie_<branch>`.
+- Daemon lifecycle storage is always `$PIE_HOME/daemon`.
 
 The Desktop Electron `userData` directory is separate from `$PIE_HOME`.
 Changing one does not relocate the other.
@@ -40,15 +45,35 @@ Changing one does not relocate the other.
 
 ```text
 $PIE_HOME/
+├── settings.json
 ├── storage/
 │   ├── projects.json
 │   ├── sessions/<projectId>/<sessionId>.json
 │   └── schedules/<scheduleId>.json
 ├── worktrees/<repository-basename>/<four-character-key>/
-└── logs/
-    ├── pie.log
-    └── daemon-stdio.log
+├── logs/
+│   ├── pie.log
+│   └── daemon-stdio.log
+└── daemon/
+    ├── daemon.pid
+    ├── daemon.lock
+    └── daemon.stopped
 ```
+
+### User settings
+
+| Property      | Current contract                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/settings.json`                                                                                                                           |
+| Owner         | `SettingsRepository` (server). Desktop Main may **read** the file for the window background before the renderer loads; it does not write.           |
+| Data          | Bare JSON, no envelope. `appearance.theme` is `system`, `light`, or `dark`. Root keys are settings pages.                                           |
+| Write points  | `settings.update` only. Missing file is in-memory defaults and is not created on `settings.get`.                                                    |
+| Compatibility | Missing keys take defaults. Invalid known values, corrupt JSON, and unreadable files fail without reset. Unknown keys are dropped on the next save. |
+| Extension     | Add fields under `appearance` or a new page-named root object. A breaking change may add a sibling `"version"` later.                               |
+| Retention     | Retained with `$PIE_HOME`. No separate uninstall. Permissions follow umask, like `projects.json`.                                                   |
+| Atomicity     | `writeFileAtomic` (sibling temp + rename). Process-local write semaphore. One daemon writer per `$PIE_HOME`.                                        |
+
+Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (see Browser-owned state). Server is the source after attach.
 
 ### Common JSON storage contract
 
@@ -83,7 +108,7 @@ $PIE_HOME/
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Path          | `$PIE_HOME/storage/projects.json`                                                                                                                                                    |
 | Owner         | `ProjectRepository`                                                                                                                                                                  |
-| Data          | `Project[]`; each item is `{ id, name, path, createdAt }`                                                                                                                            |
+| Data          | `Project[]`; each item is `{ id, name, path, createdAt, type? }`. `type: "chat"` is set by `project.allocateChatProjectDir`; omitted means imported                                  |
 | Write points  | First repository open seeds `[]`; project create/remove rewrites the whole array                                                                                                     |
 | Compatibility | A pre-envelope bare `Project[]` is adopted and rewritten as version 1 on first read                                                                                                  |
 | Extension     | Add fields through `ProjectSchema`; a shape change after version 1 requires an explicit migration                                                                                    |
@@ -91,6 +116,27 @@ $PIE_HOME/
 
 `path` is an absolute registered workspace path and is the only persisted
 `projectId -> path` mapping.
+
+### Allocated project folders
+
+A draft send with no selected Project calls `project.allocateChatProjectDir`, which creates
+an empty folder and then registers it through `ProjectService.create` (the
+same `projects.json` write as import).
+
+| Property      | Current contract                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `~/Pie/<YYYY-MM-DD>/Chat-<n>/`                                                                                                                                                                          |
+| Owner         | The user. Pie creates the directory; Pi and agent tools write inside it afterwards. `ProjectRepository` only stores the registered `path`                                                               |
+| Root          | `~/Pie` via `Paths.chatProjectsDir` in `packages/server/src/config/paths.ts` — user data, not `$PIE_HOME`                                                                                               |
+| Name          | Date parent is local-calendar `YYYY-MM-DD`. Leaf is `Chat-1`, then `Chat-2`, `Chat-3`, … (not the first prompt). Exclusive mkdir on the leaf. At most 100 attempts. `Project.name` is the leaf basename |
+| Write points  | `ProjectService.allocateChatProjectDir` mkdir of the root (recursive, first use), the date parent (recursive), and the leaf (exclusive). No files are placed in the new folder                          |
+| Permissions   | Umask, same as imported project folders. No owner-only mode is pinned                                                                                                                                   |
+| Compatibility | New folders only. Existing Projects and imported paths are unchanged                                                                                                                                    |
+| Extension     | Change the Paths field or the naming helper (date segment + leaf); do not add a caller-supplied allocate path on the wire                                                                               |
+| Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie`                                                                                                           |
+
+Tests use `layerPaths(home)` so the chat root sits under the temp `$PIE_HOME`.
+Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
 
 ### Session metadata
 
@@ -100,7 +146,7 @@ $PIE_HOME/
 | Owner         | `PiAgentSessionRepository`                                                                                                           |
 | Data          | One record per session, addressed by the same project/session ids carried in the body                                                |
 | Write points  | Create, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, and remembered pull-request refs |
-| Compatibility | No envelope migration chain or pre-envelope adoption is currently configured                                                         |
+| Compatibility | No envelope migration chain. A legacy `gitBranch` string is lifted to `worktree: { branch }` on read and is never written back       |
 | Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration  |
 | Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything         |
 
@@ -113,7 +159,7 @@ Current record fields:
   agentSessionId?: string;
   createdAt: string;
   cwd?: string;
-  gitBranch?: string;
+  worktree?: { branch: string };
   pullRequestRefs?: Array<{ host; owner; repository; number }>;
   provider?: string;
   modelId?: string;
@@ -152,6 +198,28 @@ session id, error/skip details, missed count, and a snapshot of the schedule
 inputs used for that run. Only the newest 20 runs remain in `runs`;
 `firedCount` is the durable counter when older runs fall out of that window.
 
+## Pi package settings and installs
+
+Package configuration is Pi-owned state outside `$PIE_HOME`. Pie exposes it in
+the Plugins UI through `PackageService`; it does not duplicate the configuration
+under Pie storage.
+
+| Property      | Current contract                                                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PI_CODING_AGENT_DIR/settings.json`; Pi defaults the directory to `~/.pi/agent`.                                                                                                                                                                               |
+| Owner         | Pi SDK `SettingsManager` / `DefaultPackageManager`. Pie's `PackageService` invokes those APIs for user-scope packages only.                                                                                                                                     |
+| Data          | Pi's bare settings JSON. This feature changes only the `packages` array and preserves other current file fields. New entries are package source strings accepted by Pi, such as `npm:name`, `git:https://host/owner/repo`, or a local path.                     |
+| Write points  | `packages.add` and `packages.remove`. Both await Pi's settings write queue before RPC success and surface persistence failures. They update settings only; they do not install or uninstall package files immediately.                                          |
+| Compatibility | Pi owns settings parsing and migrations. Missing settings start from `{}`. Corrupt or unreadable settings refuse the change without overwrite. Pi merges the modified `packages` field into the latest locked file contents so unrelated settings are retained. |
+| Atomicity     | Pi serializes each manager's write queue and uses `proper-lockfile` across processes, then rewrites the JSON file directly; there is no sibling-temp rename. Effective file and directory permissions follow umask.                                             |
+| Retention     | Removing a source removes only its settings entry. Existing package files remain under Pi's managed `npm/` or `git/` directories until Pi or the user removes them. Clearing `$PIE_HOME` does not remove Pi settings or installed packages.                     |
+
+At the next Pi session start, Pi resolves configured sources and may use its
+configured npm command or Git to install missing content below the same agent
+directory. Those delegated package-manager writes use Pi's existing layout and
+lifecycle; Pie Desktop does not require or spawn a separately installed `pi`
+CLI.
+
 ## Git worktrees and repository metadata
 
 A session or Schedule may request a worktree. `WorktreeService` then:
@@ -163,8 +231,15 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
-The session record persists the resulting `cwd` and `gitBranch`; there is no
-separate worktree manifest.
+The session record persists the resulting `cwd` and `worktree: { branch }` so a
+removed checkout can be restored at that path. There is no separate worktree
+manifest. Checkouts must stay under `$PIE_HOME/worktrees/`. `prepare` and prompt do not re-create a worktree checkout or require `HEAD`
+to match the stored branch. When the stored `cwd` directory is gone,
+`prepare` fails with `WORKTREE_MISSING` for worktree sessions and otherwise
+creates the directory. `session.restoreWorktree` is the explicit worktree
+write: `git worktree prune` then `git worktree add <cwd> <branch>` at the
+stored path. It does not mint a new key or branch. If the directory already
+exists it is a no-op.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and
@@ -178,7 +253,7 @@ explicit future cleanup path or manual Git cleanup.
 The default lifecycle tree is:
 
 ```text
-$PIE_DAEMON_DIR/               # defaults to $PIE_HOME/daemon
+$PIE_HOME/daemon/
 ├── daemon.pid
 ├── daemon.lock
 └── daemon.stopped
@@ -203,10 +278,77 @@ The daemon directory itself uses normal mkdir/umask behavior.
 Stopping Desktop does not stop or delete the detached daemon, its state, or its
 logs.
 
+## Proposed resource diagnostics (not implemented)
+
+[Resource monitoring design](../design/resource-monitoring.md) proposes independent
+sidecar OS sampling and separate runtime writers. This is a **pending host-write
+review**, not a change to the current log inventory above. The user has confirmed
+**default-on at process startup**: an unset `PIE_RESOURCE_LOGGING` or `1` enables
+monitoring; `0` disables it. Module imports and unit-test construction do not
+implicitly start writers. The [code architecture proposal](../design/resource-monitoring-code-architecture.md)
+locates the process composition and shared writer modules.
+
+| Proposed path                                                     | Owner / scope                                                                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `$PIE_HOME/logs/resources/os/<UTC-created-at>.jsonl`              | Sidecar; relevant local process OS samples                                                                                                                               |
+| `$PIE_HOME/logs/resources/daemon/<UTC-created-at>.jsonl`          | Daemon or foreground server; its runtime memory and event-loop samples                                                                                                   |
+| `$PIE_HOME/logs/resources/electron/<UTC-created-at>.jsonl`        | Electron main; runtime memory and Electron process metrics                                                                                                               |
+| `$PIE_HOME/logs/resources/{os,daemon,electron}/.writer.lock`      | Proposed per-source exclusive writer/cleanup ownership: Rust platform file lock for os, SQLite BEGIN IMMEDIATE in each TS file worker for daemon/electron; not telemetry |
+| `$PIE_HOME/logs/resources/{daemon,electron}/.writer.lock-journal` | Possible bounded SQLite rollback-journal metadata; same owner-only permissions as the lock; no WAL or metric database                                                    |
+
+Roots would be derived only from `config/paths.ts` / `Paths.logsDir`, retaining
+existing `PIE_HOME` override rules. The proposal uses date-named JSONL, no runId
+subdirectories, exclusive file creation, owner-only directory/file permissions,
+versioned numeric/process-identity records, per-file retention headers and
+sample-completeness markers, and no commands, content, paths, or credentials.
+The optimized proposal admits at most one sample round in flight (1 MiB encoded),
+keeps the whole round in one JSONL file, and skips new rounds while busy instead
+of queuing history. Explicit partial coverage and end markers remain necessary:
+one submission is not an atomic disk transaction. Business logs remain unchanged.
+
+The user has confirmed seven-day maximum retention with expiry deletion and
+rolling logs: 16 MiB per file, 64 MiB per source (192 MiB total JSONL). Writers
+evict the oldest closed files and continue writing; normal budget exhaustion
+must not disable logging. File headers track the earliest permitted sample time,
+not mtime, so appends/touch cannot extend retention. Known-name files with invalid
+retention headers are conservatively evicted. Writer errors retry automatically;
+external files, lock metadata and filesystem overhead are not a disk-wide quota.
+Whole-round rotation can leave less than 1 MiB unused at the end of a file;
+this trades packing efficiency for simpler retention and reading.
+
+Cleanup runs only while the source is enabled and owns its lock, with startup
+cleanup before new writes; it cannot delete on schedule during shutdown, sleep,
+logging disablement or I/O failure. The proposed timing defaults, per-source lock
+backends/metadata, non-owner behavior, permissions, compatibility, corrupt/newer-data
+handling, shutdown behavior and uninstall policy are specified in design sections
+3–9 and require confirmation under section 12 before implementation. Older
+releases ignore this new subtree; no business-data or Pi-transcript migration is
+proposed. Inventory status changes to shipped only in the slice that actually
+enables the corresponding verified host writes, not in the contracts-only slice.
+
 ## Browser-owned state
 
 Browser storage is scoped by origin. The web development/served origins and the
 Desktop `pie://app` origin therefore do not share state.
+
+### Theme preference
+
+| Property      | Current contract                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key           | localStorage `pie:theme`; `ThemeProvider.storageKey` may override it                                                                        |
+| Owner         | `ThemeProvider`                                                                                                                             |
+| Data          | One string: `"system"`, `"light"`, or `"dark"`                                                                                              |
+| Write points  | `setTheme` writes the selected preference directly with browser-managed, origin-scoped last-writer-wins behavior                            |
+| Compatibility | Missing, inaccessible, or unrecognized values fall back to `defaultTheme` without rewriting storage; there is no version or migration chain |
+| Retention     | Retained until browser site data or the Electron profile is cleared; Pie has no separate cleanup or uninstall path                          |
+
+The current application roots and their build-generated early bootstrap share
+the default key from `theme.ts`, so a stored renderer preference is applied
+before React mounts without duplicating the decision logic in each HTML file.
+After the client attaches, `settings.get` is the source and the cache is
+rewritten to match. Electron Main reads `$PIE_HOME/settings.json` once when
+creating the window and paints `backgroundColor` from `appearance.theme`
+(system / missing / unreadable → OS `nativeTheme`).
 
 ### Content panel
 
@@ -251,6 +393,98 @@ controls are delegated to the rendering library and browser download handling;
 they are user-initiated output, not Pie application state, and have no Pie-owned
 migration or retention policy.
 
+## Verify project picker isolation
+
+Web and Desktop Verify runs create one disposable sample workspace beneath the
+run's only `$PIE_HOME`:
+
+```text
+$PIE_HOME/workspace/verify-pie[-desktop]-sample/
+├── .verify-pie[-desktop]-scaffold
+└── README.md
+```
+
+Verify owns these non-sensitive, umask-permissioned files and sets
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and `HOME=$PIE_HOME/home` for the
+run's server (so `~/Pie` resolves to `$PIE_HOME/home/Pie`). When
+`PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
+reports no parent there, and resolves real paths before rejecting traversal or
+symlinks outside it. An unset or blank browse root preserves the production
+default of the operator's home directory. Verify overwrites an inherited `HOME`
+with its own run path; parallel runs therefore do not share this boundary.
+
+The sample has no independent schema or migration. Its marker retains the
+existing cleanup compatibility check. Fresh Web and Desktop runs also seed the
+normal version-1 `$PIE_HOME/storage/projects.json` envelope with this sample;
+the server remains the schema owner. `launch --empty-projects` skips that file
+only for import-flow verification. Normal cleanup removes the sample and then
+the whole run; it no longer probes the operator's home for a same-named legacy
+sample. Interrupted runs are retained with the rest of `$PIE_HOME` until normal
+Verify cleanup. Uninstall behavior is unchanged.
+
+## Development Electron installation
+
+Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
+Electron's official `install-electron` before starting electron-vite. This
+materializes `dist/` and `path.txt` in the resolved Electron dependency package
+and uses the installer's download cache and environment overrides. These are
+dependency-owned artifacts, not Pie application data: Electron owns their
+format, version checks, extraction permissions and retry behavior. Pie adds no
+storage schema, migration or concurrent-install lock. Verification cleanup
+leaves the installed binary and shared download cache intact; packaged startup
+is unchanged.
+
+Verify prepares Electron before starting its service-readiness timeout. Both
+preparation and Desktop append to the existing run-local `logs/electron-vite.log`.
+The existing decimal `pids/electron-vite.pid` tracks the active launch phase:
+installer first, removed on successful installation, then replaced by the Desktop
+launcher pid. Paths, permissions and file formats are unchanged; older cleanup
+code can still stop the recorded process. Installation/startup failure or
+SIGINT/SIGTERM uses the normal run cleanup and failure-log retention, without
+removing Electron's dependency-owned binary or download cache.
+
+## Verify Desktop browser binding
+
+Verify uses agent-browser's existing native binding, not a second lock or target
+store. Fresh Desktop launch selects the existing renderer and then pins it;
+Doctor, reuse and evidence retain that binding. Runs without a usable binding
+must be cleaned up and relaunched, not automatically rebound.
+
+The native owner writes `{ targetId, url, pinned }` to
+`<socketDir>/namespaces/<session>/run/<session>.target`. The socket directory is
+normally `/tmp/pvs-<run-hash>`, derived from the run's real path; the existing
+`VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override remains caller-owned configuration
+and must not be shared by parallel runs. Agent-browser strips URL credentials,
+query and fragment, writes mode `0600` via a synced temporary file and rename,
+and restores the binding across its daemon restarts. Corrupt or unreadable
+bindings fail closed. Native format evolution and backward compatibility remain
+agent-browser-owned; Verify does not read or rewrite this file. Run metadata,
+browser config formats and permissions are unchanged. Existing cleanup removes
+managed socket trees with the run; no migration or separate uninstall is added.
+
+## Verify automatic browser recording
+
+Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
+before its first browser command and retains the same take for later commands:
+
+```text
+.agents/skills/verify-pie[-desktop]/evidence/<run-id>/recording-<NNN>.webm
+```
+
+`evidence init` stops the current take and advances the run-local
+`agent-browser-recording-sequence` integer before the next browser command.
+Verify owns that ephemeral pointer, the output path, and the fixed 60 fps
+policy; agent-browser and ffmpeg own the WebM/VP8 bytes. The file follows the process umask and may contain sensitive UI
+content, local paths, or typed input, so it is gitignored and must only be
+uploaded as deliberate evidence. Parallel runs write different run-id paths.
+An already-active take is reused rather than replaced.
+
+Normal cleanup asks agent-browser to stop and flush the file before terminating
+the browser or Electron, then retains it with the other evidence. A crash may
+leave an incomplete WebM. There is no Pie schema, migration, retention limit, or
+uninstall removal for evidence files; upgrading agent-browser changes future
+recordings only.
+
 ## Electron profile storage
 
 Packaged Desktop leaves Electron's standard `userData` path unchanged. For the
@@ -273,8 +507,8 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches the external Pi executable with `--mode rpc`, the session cwd, and
-optionally `--session-id`. From that boundary onward there are two classes of
+Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)
+with the session cwd and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 
 1. **Pi native data.** Pi owns transcript and agent configuration formats. Pie
@@ -315,4 +549,4 @@ new designs:
   is outside that envelope system.
 - Server data JSON permissions and the daemon SQLite lock mode rely on umask.
 - JSON coordination is not cross-process, so one `$PIE_HOME` assumes one active
-  server writer even when lifecycle directories are split.
+  server writer.

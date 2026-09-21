@@ -7,7 +7,7 @@ lifecycle and connection topology**.
 It sits between two existing designs and should be read with them:
 
 - [`2026-07-14-desktop-embedding-comparison.md`](./2026-07-14-desktop-embedding-comparison.md) — how the UI gets into the Electron window (out of scope here).
-- [`2026-07-19-remote-ssh-server-design.md`](./2026-07-19-remote-ssh-server-design.md) — the **SSH-tunnel remote model** (v1 implemented on branch `t3code/multi-server-ssh`). This document defers to it for everything "remote" and only unifies the _local_ launch path with it.
+- [`2026-08-26-remote-ssh-server-design.md`](./2026-08-26-remote-ssh-server-design.md) — the **SSH-tunnel remote model**. This document defers to it for everything "remote" and only unifies the _local_ launch path with it.
 
 ## The problem (local plane)
 
@@ -34,23 +34,23 @@ instances with different configs and no coordination:
 
 ## The key realization: the remote plane already got this right
 
-The SSH-remote design (already landing) treats a remote `pie serve` as a
+The SSH-remote design treats a remote `pie daemon` as a
 **single-instance daemon discovered through files**:
-`~/.pie/ssh-launch/<stateKey>/` holds `pid`, `port`, and `token`, and the
-launch script _reuses_ a healthy running server instead of starting a second one.
-The client reaches it purely over `ssh -L` and only ever talks to `127.0.0.1`.
-"Internet from anywhere" is already solved there by **SSH + Tailscale** (a tailnet
-MagicDNS host is just an ordinary SSH host) — no relay, no inbound ports, leaning
-entirely on the user's existing SSH trust.
+`~/.pie/daemon/daemon.pid` holds pid, address, and token (same as local).
+`~/.pie/ssh-launch/<stateKey>/` holds only the runner script and log. The
+launch script _reuses_ a healthy running daemon instead of starting a second
+one. The client reaches it purely over `ssh -L` and only ever talks to
+`127.0.0.1`. "Internet from anywhere" is already solved there by **SSH +
+Tailscale** (a tailnet MagicDNS host is just an ordinary SSH host) — no relay,
+no inbound ports, leaning entirely on the user's existing SSH trust.
 
 So the topology principle is not new — it is **already implemented remotely** and
 merely missing locally:
 
 > **Every pie server — local or remote — is a single-instance daemon per
-> daemon directory, discovered through a file, and attached-to rather than
-> re-spawned.** Locally that directory is `$PIE_DAEMON_DIR`, defaulting to
-> `$PIE_HOME/daemon`. "Reach" is a separate concern layered on top: loopback
-> for local, `ssh -L` for remote.
+> `$PIE_HOME`, discovered through a file, and attached-to rather than
+> re-spawned.** Locally that directory is `$PIE_HOME/daemon`. "Reach" is a
+> separate concern layered on top: loopback for local, `ssh -L` for remote.
 
 The local plane is the one that's behind. This design brings desktop and CLI up to
 the discipline the remote path already has, and unifies the launch seam so
@@ -63,7 +63,7 @@ remote server" are the same shape.
                          one oRPC/WS handler + harness runtime per server
                          ┌───────────────────────────────────────────┐
                          │            @getpie/server (daemon)          │
-   local reach           │  lock on $PIE_DAEMON_DIR                 │   remote reach
+   local reach           │  lock on $PIE_HOME/daemon                │   remote reach
  127.0.0.1:<port> ─────▶ │  writes discovery file (pid/addr/token)     │ ◀───── ssh -L
    discovery: daemon.pid│  auth token + CORS + WS ticket (existing)   │        (existing
                          └───────────────────────────────────────────┘         SSH design)
@@ -98,24 +98,18 @@ as just another `RunningServerProcess` to the same supervisor.
 ### Discovery and single-instance (local plane)
 
 The daemon binds `127.0.0.1:<port>` and atomically writes
-`$PIE_DAEMON_DIR/daemon.pid` (`0600`) — by default
-`$PIE_HOME/daemon/daemon.pid` — the local mirror of the remote
+`$PIE_HOME/daemon/daemon.pid` (`0600`) — the local mirror of the remote
 `ssh-launch/<stateKey>/{pid,port,token}`:
 
 ```jsonc
 { "pid": 12345, "address": "http://127.0.0.1:41234", "token": "…", "startedAt": … }
 ```
 
-Daemon lifecycle files live together under `$PIE_DAEMON_DIR`. When the
-variable is absent, the directory defaults to `$PIE_HOME/daemon/`. No daemon
-lifecycle files are written directly under `$PIE_HOME`.
+Daemon lifecycle files live together under `$PIE_HOME/daemon/`. No daemon
+lifecycle files are written directly under `$PIE_HOME`. Isolation is a
+different `$PIE_HOME`; tests and verify runs must set their own.
 
-The override is primarily a development escape hatch. Pointing multiple daemon
-directories at the same `$PIE_HOME` preserves Projects and Sessions, but the
-current JSON repositories do not provide cross-process transactions; concurrent
-mutations remain the caller's responsibility.
-
-It holds a single-instance lock keyed on `$PIE_DAEMON_DIR`. Every local
+It holds a single-instance lock keyed on `$PIE_HOME/daemon`. Every local
 front-door runs the same `resolveOrSpawnServer()`:
 
 1. Read `daemon.pid` → health-check `address`.
@@ -151,9 +145,8 @@ instead of over SSH.
   and containers (systemd, Docker), for the SSH remote runner
   (`nohup pie serve`), and for debugging. Interactive local use just never runs it
   directly — the launcher does.
-- **Desktop must attach the same daemon directory as the CLI** for the normal
-  topology, rather than spawning a die-with-app child. An explicit
-  `PIE_DAEMON_DIR` deliberately selects a separate daemon namespace.
+- **Desktop must attach the same `$PIE_HOME` as the CLI** for the normal
+  topology, rather than spawning a die-with-app child.
   Consequence: **the local server survives quitting the desktop app** (agents keep
   running) — consistent with the remote/CLI semantics, but a behavior change from
   today's managed child.
@@ -255,8 +248,7 @@ _additional plane_, added when wanted, with no rework of the current work.
    electron-builder asar path — needs a packaged-build check.**
 2. **✅ Landed (CLI) — Add the daemon launcher (a layer above the server, not inside
    it).** A shared `resolveOrSpawnDaemon` (`@getpie/server/daemon`) that reads/writes
-   `$PIE_DAEMON_DIR/daemon.pid` (default
-   `$PIE_HOME/daemon/daemon.pid`), does the pid-alive + health-check reuse,
+   `$PIE_HOME/daemon/daemon.pid`, does the pid-alive + health-check reuse,
    spawns the foreground server detached (stdio streamed to
    `$PIE_HOME/logs/daemon-stdio.log`, alongside the `pie.log` process log),
    and applies two-signal
@@ -320,7 +312,7 @@ Phases 1–4.
 
 ## References
 
-- [`2026-07-19-remote-ssh-server-design.md`](./2026-07-19-remote-ssh-server-design.md) — the authoritative remote model this design defers to.
+- [`2026-08-26-remote-ssh-server-design.md`](./2026-08-26-remote-ssh-server-design.md) — the authoritative remote model this design defers to.
 - [`2026-07-14-desktop-embedding-comparison.md`](./2026-07-14-desktop-embedding-comparison.md) — UI-into-window; port/readiness/auth per project.
 - Prior art read from source: opencode (`packages/server` + `lildax` split,
   `utilityProcess` sidecar), paseo (`@getpaseo/server` resident daemon,

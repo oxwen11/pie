@@ -1,115 +1,132 @@
+import type { PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import { isToolUIPart, type UIMessage } from "ai";
-import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
-import { useMemo } from "react";
+import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import { isChildToolPart } from "./tool/bucket";
+import { formatWorkedFor, splitWork, timestampOf, workedSeconds } from "./message-view.logic";
 import { UserMessage } from "./user-message";
 
-type Part = UIMessage["parts"][number];
+const NO_UNSUBSCRIBE = () => {
+  /* useSyncExternalStore requires an unsubscribe even when the store has none. */
+};
 
 export function MessageView({
   message,
   isStreaming,
+  previousTimestamp,
 }: {
-  message: UIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
+  previousTimestamp?: string;
 }) {
   if (message.role === "assistant") {
-    return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
+    return (
+      <CollapsibleAssistantMessage
+        message={message}
+        isStreaming={isStreaming}
+        previousTimestamp={previousTimestamp}
+      />
+    );
   }
   return <UserMessage message={message} />;
 }
 
-// Once a turn settles with a final answer, its tool/reasoning work folds
-// behind a summary trigger and only the answer stays visible. Simplified from
-// neo's summary-collapse: no result data parts exist here, so "settled with
-// work followed by a trailing answer" is the collapse condition.
 function CollapsibleAssistantMessage({
   message,
   isStreaming,
+  previousTimestamp,
 }: {
-  message: UIMessage;
+  message: PieUIMessage;
   isStreaming: boolean;
+  previousTimestamp?: string;
 }) {
-  const summary = useMemo(() => splitSummary(message.parts), [message.parts]);
-  if (isStreaming || !summary) {
+  const summary = useMemo(
+    () => splitWork(message.parts, isStreaming),
+    [message.parts, isStreaming],
+  );
+  const historySeconds = workedSeconds(previousTimestamp, timestampOf(message.metadata));
+  const elapsed = useElapsedSeconds(isStreaming);
+  const [openWhileStreaming, setOpenWhileStreaming] = useState(true);
+  const [openWhenSettled, setOpenWhenSettled] = useState(false);
+
+  if (!summary) {
     return <AssistantMessage parts={message.parts} isStreaming={isStreaming} />;
   }
+
   return (
     <div>
-      <Collapsible className="not-prose w-full py-1">
-        <SummaryTrigger label={summary.label} />
+      <Collapsible
+        className="not-prose w-full py-1"
+        open={isStreaming ? openWhileStreaming : openWhenSettled}
+        onOpenChange={isStreaming ? setOpenWhileStreaming : setOpenWhenSettled}
+      >
+        <SummaryTrigger label={formatWorkedFor(historySeconds ?? elapsed)} />
         {/* Flush left, unlike a tool card's body: what folds here is whole
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
         <CollapsibleContent className="mt-2 space-y-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
-          <AssistantMessage parts={summary.workParts} isStreaming={false} showActions={false} />
+          <AssistantMessage
+            parts={summary.workParts}
+            isStreaming={isStreaming && summary.answerParts.length === 0}
+            showActions={false}
+          />
         </CollapsibleContent>
       </Collapsible>
-      <AssistantMessage parts={summary.answerParts} isStreaming={false} />
+      {summary.answerParts.length > 0 && (
+        <AssistantMessage parts={summary.answerParts} isStreaming={isStreaming} />
+      )}
     </div>
   );
 }
 
-// The turn's icon swaps to a +/- box on hover or once open, the same
-// affordance ToolHeader gives a tool card. Local rather than borrowed: this
-// row summarises a turn, not a tool call, so it doesn't belong to that family.
+function useElapsedSeconds(active: boolean): number {
+  const secondsRef = useRef(0);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!active) return NO_UNSUBSCRIBE;
+      const startedAt = Date.now() - secondsRef.current * 1000;
+      const tick = () => {
+        const next = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        if (next === secondsRef.current) return;
+        secondsRef.current = next;
+        onChange();
+      };
+      tick();
+      const id = setInterval(tick, 1000);
+      return () => {
+        tick();
+        clearInterval(id);
+      };
+    },
+    [active],
+  );
+  const getSnapshot = useCallback(() => secondsRef.current, []);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// +/- on hover or keyboard focus; Timer stays visible while open. Local rather than
+// borrowed: this row is elapsed time, not a tool batch (ListCollapse).
 function SummaryTrigger({ label }: { label: string }) {
   return (
     <CollapsibleTrigger
       className="group"
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
-          <span className="relative">
-            <ListTreeIcon className="size-4 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
-            <div className="absolute inset-0 size-4 opacity-0 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+          <span className="relative flex size-4 shrink-0 items-center justify-center">
+            <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
             </div>
           </span>
-          <span className="truncate text-sm">{label}</span>
+          <span className="min-w-0 truncate text-sm leading-none">{label}</span>
         </div>
       }
     />
   );
-}
-
-function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return count === 1 ? singular : pluralForm;
-}
-
-function splitSummary(
-  parts: readonly Part[],
-): { workParts: Part[]; answerParts: Part[]; label: string } | null {
-  let lastWorkIndex = -1;
-  let toolCallCount = 0;
-  let reasoningCount = 0;
-  for (const [index, part] of parts.entries()) {
-    if (isToolUIPart(part)) {
-      if (!isChildToolPart(part)) toolCallCount += 1;
-      lastWorkIndex = index;
-    } else if (part.type === "reasoning") {
-      reasoningCount += 1;
-      lastWorkIndex = index;
-    }
-  }
-  if (lastWorkIndex < 0) return null;
-  const workParts = parts.slice(0, lastWorkIndex + 1);
-  const answerParts = parts.slice(lastWorkIndex + 1);
-  if (!answerParts.some((part) => part.type === "text" && part.text.trim())) return null;
-  const messageCount = workParts.filter((part) => part.type === "text" && part.text.trim()).length;
-  const label = [
-    toolCallCount > 0 ? `${toolCallCount} tool ${plural(toolCallCount, "call")}` : null,
-    reasoningCount > 0 ? `${reasoningCount} ${plural(reasoningCount, "thought")}` : null,
-    messageCount > 0 ? `${messageCount} ${plural(messageCount, "message")}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return { workParts, answerParts, label };
 }

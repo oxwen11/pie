@@ -1,25 +1,42 @@
-import { Context, Crypto, Effect, Layer, Semaphore } from "effect";
+import { Context, Crypto, Effect, HashSet, Layer, Ref, Scope, Semaphore } from "effect";
 
 import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import { ScheduleRepository } from "./repository";
 
 export type ScheduleRuntimeShape = {
-  readonly inFlight: Set<string>;
+  readonly inFlight: Ref.Ref<HashSet.HashSet<string>>;
   readonly tickGate: Semaphore.Semaphore;
+  readonly scope: Scope.Scope;
 };
 
 export class ScheduleRuntime extends Context.Service<ScheduleRuntime, ScheduleRuntimeShape>()(
   "ScheduleRuntime",
 ) {}
 
-export const ScheduleRuntimeLayer: Layer.Layer<ScheduleRuntime> = Layer.sync(
+export const ScheduleRuntimeLayer: Layer.Layer<ScheduleRuntime> = Layer.effect(
   ScheduleRuntime,
-  () => ({
-    inFlight: new Set<string>(),
-    tickGate: Semaphore.makeUnsafe(1),
+  Effect.gen(function* () {
+    const scope = yield* Scope.Scope;
+    const inFlight = yield* Ref.make(HashSet.empty<string>());
+    const tickGate = yield* Semaphore.make(1);
+    return { inFlight, tickGate, scope };
   }),
 );
+
+export const claimInFlight = (id: string): Effect.Effect<boolean, never, ScheduleRuntime> =>
+  Effect.gen(function* () {
+    const runtime = yield* ScheduleRuntime;
+    return yield* Ref.modify(runtime.inFlight, (set) =>
+      HashSet.has(set, id) ? ([false, set] as const) : ([true, HashSet.add(set, id)] as const),
+    );
+  });
+
+export const releaseInFlight = (id: string): Effect.Effect<void, never, ScheduleRuntime> =>
+  Effect.gen(function* () {
+    const runtime = yield* ScheduleRuntime;
+    yield* Ref.update(runtime.inFlight, (set) => HashSet.remove(set, id));
+  });
 
 export type ScheduleServiceEnv =
   | ScheduleRepository

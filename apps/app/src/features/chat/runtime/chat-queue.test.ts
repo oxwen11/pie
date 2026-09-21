@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { makeChat } from "./chat-test-helpers";
+import { defined, makeChat } from "./chat-test-helpers";
 
 describe("Chat pending prompt", () => {
   it("sends a follow-up while streaming without a transcript bubble or local queue write", async () => {
@@ -9,7 +9,7 @@ describe("Chat pending prompt", () => {
     await chat.prompt("hello there");
     live(1, {
       type: "session.prompt.submitted",
-      messageId: transport.promptCalls[0]!.messageId,
+      messageId: defined(transport.promptCalls[0]).messageId,
       parts: [{ type: "text", text: "hello there" }],
       phase: "idle",
     });
@@ -31,7 +31,7 @@ describe("Chat pending prompt", () => {
     await chat.prompt("hello there");
     live(1, {
       type: "session.prompt.submitted",
-      messageId: transport.promptCalls[0]!.messageId,
+      messageId: defined(transport.promptCalls[0]).messageId,
       parts: [{ type: "text", text: "hello there" }],
       phase: "idle",
     });
@@ -71,13 +71,23 @@ describe("Chat pending prompt", () => {
     expect(chat.store.getState().pendingPrompt.followUp).toEqual(["held"]);
   });
 
+  it("removes an optimistic bubble when Pi queues an idle-looking prompt", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({});
+    transport.promptStarted = false;
+
+    await chat.prompt("raced into the queue");
+
+    expect(chat.store.getState().messages).toEqual([]);
+  });
+
   it("keeps the queue empty when a follow-up races to a real prompt", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});
     await chat.prompt("hello there");
     live(1, {
       type: "session.prompt.submitted",
-      messageId: transport.promptCalls[0]!.messageId,
+      messageId: defined(transport.promptCalls[0]).messageId,
       parts: [{ type: "text", text: "hello there" }],
       phase: "idle",
     });
@@ -85,7 +95,7 @@ describe("Chat pending prompt", () => {
     await chat.prompt("and then this");
     live(3, {
       type: "session.prompt.submitted",
-      messageId: transport.promptCalls[1]!.messageId,
+      messageId: defined(transport.promptCalls[1]).messageId,
       parts: [{ type: "text", text: "and then this" }],
       phase: "running",
     });
@@ -99,7 +109,7 @@ describe("Chat pending prompt", () => {
     await chat.prompt("hello there");
     live(1, {
       type: "session.prompt.submitted",
-      messageId: transport.promptCalls[0]!.messageId,
+      messageId: defined(transport.promptCalls[0]).messageId,
       parts: [{ type: "text", text: "hello there" }],
       phase: "idle",
     });

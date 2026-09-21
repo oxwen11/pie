@@ -76,6 +76,8 @@ export type ScheduleFormValues = {
   readonly reuseSession: boolean;
   readonly sessionPick: ScheduleSessionPick;
   readonly sessionId: string;
+  /** Absent until the user picks; the server's default model applies until then. */
+  readonly model: { readonly provider: string; readonly modelId: string } | undefined;
 };
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -103,6 +105,7 @@ export function defaultScheduleForm(projectId: string): ScheduleFormValues {
     reuseSession: false,
     sessionPick: "create",
     sessionId: "",
+    model: undefined,
   };
 }
 
@@ -194,7 +197,7 @@ export function everyMsFromForm(amount: string, unit: ScheduleEveryUnit): number
   return n * DAY_MS;
 }
 
-export type SplitEveryMs = {
+type SplitEveryMs = {
   readonly amount: string;
   readonly unit: ScheduleEveryUnit;
 };
@@ -293,5 +296,4 @@ export {
   formatSkipReason,
   formatSpec,
   summarizeRuns,
-  type ScheduleRunSummary,
 } from "./format";

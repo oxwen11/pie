@@ -15,6 +15,7 @@ import {
   use,
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -56,7 +57,10 @@ const ShellLayoutContext = createContext<SubscribeToUserLayout | null>(null);
 function useUserLayoutChanged(listener: UserLayoutListener): void {
   const subscribe = use(ShellLayoutContext);
   if (subscribe === null) throw new Error("Shell panels must be rendered inside ShellGroup");
-  useEffect(() => subscribe(listener), [listener, subscribe]);
+  // Registration is the Effect's sync concern; the listener reads latest
+  // committed values (e.g. `open`) at event time, so it must not re-subscribe.
+  const onUserLayoutChanged = useEffectEvent(listener);
+  useEffect(() => subscribe(onUserLayoutChanged), [subscribe]);
 }
 
 export function ShellGroup({
@@ -122,7 +126,7 @@ export function ShellSeparator({
   return (
     <Separator
       className={cn(
-        "relative bg-transparent [-webkit-app-region:no-drag] md:my-1",
+        "relative bg-transparent md:my-1",
         joined ? "bg-border w-px" : "w-1",
         "after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width]",
         "hover:after:via-foreground/20 data-[separator=focus]:after:via-foreground/20 data-[separator=active]:after:via-foreground/30 hover:after:opacity-100 data-[separator=active]:after:w-0.5 data-[separator=active]:after:opacity-100 data-[separator=focus]:after:opacity-100",
@@ -130,7 +134,7 @@ export function ShellSeparator({
         locked && "pointer-events-none",
         className,
       )}
-      disabled={disabled || locked}
+      disabled={disabled === true || locked}
       {...props}
     />
   );
@@ -217,12 +221,12 @@ function useSidebarDrawer(
 
   useEffect(() => {
     const panel = panelRef.current;
-    if (panel === null || !laidOut.current) return;
+    if (panel === null || !laidOut.current) return undefined;
 
     if (skipNextAnimation.current) {
       skipNextAnimation.current = false;
       animatedWidth.jump(open ? expandedWidth.get() : 0);
-      return;
+      return undefined;
     }
 
     if (reduceMotion) {
@@ -233,7 +237,7 @@ function useSidebarDrawer(
       } else if (!panel.isCollapsed()) {
         panel.collapse();
       }
-      return;
+      return undefined;
     }
 
     const controls = animate(animatedWidth, open ? expandedWidth.get() : 0, {
@@ -266,7 +270,7 @@ function useSidebarDrawer(
     }
   };
 
-  const rememberUserLayout = useCallback(() => {
+  const rememberUserLayout = () => {
     const panel = panelRef.current;
     if (panel === null) return;
 
@@ -282,7 +286,7 @@ function useSidebarDrawer(
     if (layout.expandedWidth === undefined) return;
     expandedWidth.set(layout.expandedWidth);
     animatedWidth.jump(layout.expandedWidth);
-  }, [animatedWidth, expandedWidth, open, panelElementRef, panelRef, setOpen]);
+  };
   useUserLayoutChanged(rememberUserLayout);
 
   return {
@@ -305,6 +309,7 @@ export function ShellSidebarPanel({
   const panelRef = usePanelRef();
   const panelElementRef = useRef<HTMLDivElement>(null);
   const drawer = useSidebarDrawer(open, setOpen, panelRef, panelElementRef);
+  const handleSidebarResize = drawer.onResize;
 
   return (
     <>
@@ -318,7 +323,7 @@ export function ShellSidebarPanel({
         id={PANEL_IDS.sidebar}
         maxSize="30rem"
         minSize={drawer.minSize}
-        onResize={drawer.onResize}
+        onResize={handleSidebarResize}
         panelRef={panelRef}
       >
         <m.div

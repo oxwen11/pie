@@ -1,3 +1,4 @@
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentModel } from "@getpie/contract";
 
 /**
@@ -20,4 +21,10 @@ export function resolveDefaultPiModel(
     if (match) return match;
   }
   return models[0];
+}
+
+export async function persistDefaultPiModel(provider: string, modelId: string): Promise<void> {
+  const settings = SettingsManager.create(process.cwd());
+  settings.setDefaultModelAndProvider(provider, modelId);
+  await settings.flush();
 }

@@ -5,6 +5,9 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 const DIFF_UNSAFE_CSS = `
   :host {
     --diffs-font-family: var(--font-mono);
+    --diffs-header-font-family: var(--font-sans);
+    font-size: inherit;
+    line-height: inherit;
     --diffs-light-bg: var(--background);
     --diffs-dark-bg: var(--background);
     --diffs-light: var(--foreground);
@@ -56,7 +59,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
     [patch],
   );
 
-  const items = useMemo<ReadonlyArray<CodeViewItem>>(
+  const items = useMemo<ReadonlyArray<CodeViewItem<undefined>>>(
     () =>
       fileDiffs.map((fileDiff) => ({
         id: fileDiff.name,
@@ -67,7 +70,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
     [collapsed, fileDiffs],
   );
 
-  const options = useMemo<CodeViewReactOptions>(
+  const options = useMemo<CodeViewReactOptions<undefined, undefined>>(
     () => ({
       overflow: "scroll",
       stickyHeaders: true,
@@ -99,7 +102,7 @@ export function PullRequestDiffAdapter({ patch }: { patch: string }) {
 
   return (
     <div className="h-full min-h-0 w-full">
-      <CodeView className="h-full w-full" items={items} options={options} />
+      <CodeView className="h-full w-full overflow-auto" items={items} options={options} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -12,11 +13,12 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
-import { Clock, GitPullRequestIcon, SquarePen } from "lucide-react";
+import { Clock, GitPullRequestIcon, Puzzle, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
-import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
+import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
+import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
@@ -42,7 +44,24 @@ function PullRequestsNavItem() {
     <SidebarMenuItem>
       <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
         <GitPullRequestIcon />
-        <span>Pull Request</span>
+        <span>Pull requests</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PluginsNavItem() {
+  const active =
+    useMatch({
+      from: "/plugins",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/plugins" />}>
+        <Puzzle />
+        <span>Plugins</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -65,6 +84,23 @@ function SchedulesNavItem() {
   );
 }
 
+function SettingsNavItem() {
+  const active =
+    useMatch({
+      from: "/settings",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/settings" />}>
+        <Settings />
+        <span>Settings</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const platform = usePlatform();
   const desktop = isDesktopHost(platform);
@@ -80,12 +116,17 @@ export function AppSidebar() {
     >
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
       <SidebarHeader
-        className={cn(SHELL_TITLEBAR_HEADER_CLASS, desktop && "px-0", "[-webkit-app-region:drag]")}
+        className={cn(
+          // Keep this literal so require-static-classes can validate it.
+          "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
+          desktop && "px-0",
+        )}
+        data-drag-region=""
       >
         {isDesktopMacosHost(platform) ? null : (
           <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
         )}
-        {!desktop && expanded ? <SidebarTrigger className="[-webkit-app-region:no-drag]" /> : null}
+        {!desktop && expanded ? <SidebarTrigger /> : null}
       </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
@@ -95,12 +136,21 @@ export function AppSidebar() {
               <NewChatNavItem />
               <SchedulesNavItem />
               <PullRequestsNavItem />
+              <PluginsNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <RecentList />
         <ProjectList />
       </SidebarContent>
+
+      <SidebarFooter className="[-webkit-app-region:no-drag]">
+        {platform.ssh ? <ConnectionSwitcher /> : null}
+        <SidebarMenu>
+          <SettingsNavItem />
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

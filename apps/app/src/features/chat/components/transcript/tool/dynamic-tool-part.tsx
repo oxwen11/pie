@@ -1,11 +1,10 @@
 import { CodeBlock } from "@getpie/ui/ai-elements/code-block";
 import { Tool, ToolContent, ToolHeader } from "@getpie/ui/ai-elements/tool";
-import type { DynamicToolUIPart, ToolUIPart } from "ai";
+import type { DynamicToolUIPart } from "ai";
 import { WrenchIcon } from "lucide-react";
 
-type AnyToolPart = ToolUIPart | DynamicToolUIPart;
-
-// dynamic-tool input/output shapes are unconstrained (any MCP server can feed
+// Generic card for `dynamic-tool` parts — extension/custom tools outside pi's
+// built-in set. Their input shapes are unconstrained (any extension can feed
 // them); JSON.stringify can throw on cycles — fall back to a placeholder
 // instead of letting the card crash.
 function serialize(value: unknown): string {
@@ -13,16 +12,12 @@ function serialize(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
-    return "Failed to render tool output";
+    return "Failed to render tool input";
   }
 }
 
-// Fallback tool card for any tool-* / dynamic-tool part with no dedicated
-// component (unknown MCP tools). Purely presentational and name-agnostic —
-// `name` is injected by the caller; provider-specific display-name derivation
-// stays in each provider dir.
-export function DynamicToolPart({ part, name }: { part: AnyToolPart; name: string }) {
-  const input = part.input as Record<string, unknown> | undefined;
+export function DynamicToolPart({ part, name }: { part: DynamicToolUIPart; name: string }) {
+  const input = typeof part.input === "object" && part.input !== null ? part.input : undefined;
   return (
     <Tool>
       <ToolHeader icon={WrenchIcon}>{name}</ToolHeader>
@@ -31,12 +26,6 @@ export function DynamicToolPart({ part, name }: { part: AnyToolPart; name: strin
           <div className="space-y-1.5">
             <span className="text-muted-foreground text-xs font-medium">Input</span>
             <CodeBlock code={serialize(input)} language="json" />
-          </div>
-        )}
-        {part.output != null && (
-          <div className="space-y-1.5">
-            <span className="text-muted-foreground text-xs font-medium">Output</span>
-            <CodeBlock code={serialize(part.output)} language="json" />
           </div>
         )}
       </ToolContent>

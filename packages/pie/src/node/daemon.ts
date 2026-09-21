@@ -1,5 +1,5 @@
 import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
-import { resolveDaemonLocation, resolveOrSpawnDaemon } from "@getpie/server/daemon";
+import { resolveOrSpawnDaemon, resolvePieHome } from "@getpie/server/daemon";
 
 /** Re-launch this CLI in foreground `serve` mode as the detached daemon. */
 const serverArgv = (): string[] => [
@@ -10,10 +10,16 @@ const serverArgv = (): string[] => [
 ];
 
 /** The single CLI seam for attaching to or starting its local daemon. */
-export const resolveCliDaemon = (port: number) =>
+export const resolveCliDaemon = (
+  port: number,
+  environment?: NodeJS.ProcessEnv,
+  replaceIncompatible?: boolean,
+) =>
   resolveOrSpawnDaemon({
-    ...resolveDaemonLocation(),
+    home: resolvePieHome(),
     requiredCompatibilityKey: embeddedDaemonCompatibilityKey(),
     serverArgv: serverArgv(),
     port,
+    ...(environment === undefined ? undefined : { environment }),
+    ...(replaceIncompatible === true ? { replaceIncompatible: true } : undefined),
   });

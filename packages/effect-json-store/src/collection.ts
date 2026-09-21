@@ -105,14 +105,9 @@ export const makeJsonCollection = <
   Effect.gen(function* () {
     type A = Latest["Type"];
     const { dir, schema } = options;
-    const migrations = (options.migrations ?? []) as ReadonlyArray<MigrationStep<AnySchema>>;
+    const migrations = options.migrations ?? [];
     const fs = yield* FileSystem.FileSystem;
-    const codec = makeFileCodec(
-      fs,
-      schema,
-      migrations,
-      options.legacy as MigrationStep<AnySchema> | undefined,
-    );
+    const codec = makeFileCodec(fs, schema, migrations, options.legacy);
 
     const isValidId = (id: string): boolean =>
       id.length > 0 &&

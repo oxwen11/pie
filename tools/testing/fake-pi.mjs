@@ -3,6 +3,14 @@
 import fs from "node:fs";
 import readline from "node:readline";
 
+if (process.argv.includes("--list-models")) {
+  process.stdout.write(`provider       model         context
+xai            grok-4.3      1M
+cliproxyapi    gpt-5.6-sol   272K
+`);
+  process.exit(0);
+}
+
 const send = (frame) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 
 const logPath = process.env["PIE_E2E_PI_LOG"];
@@ -40,7 +48,7 @@ const assistant = (over = {}) => ({
 const upd = (ev) =>
   send({ type: "message_update", message: assistant(), assistantMessageEvent: ev });
 const settle = (last) => {
-  send({ type: "agent_end", messages: [last || assistant()], willRetry: false });
+  send({ type: "agent_end", messages: [last ?? assistant()], willRetry: false });
   send({ type: "agent_settled" });
 };
 
@@ -55,6 +63,20 @@ rl.on("line", (line) => {
       command: "get_state",
       success: true,
       data: { sessionId },
+    });
+    return;
+  }
+
+  // Instant turns never persist a session file. An empty tree is still a
+  // finished read — without this reply, attach waits forever on get_entries
+  // and live events stay queued behind the history floor.
+  if (msg.type === "get_entries") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "get_entries",
+      success: true,
+      data: { entries: [], leafId: null },
     });
     return;
   }
@@ -85,7 +107,13 @@ rl.on("line", (line) => {
 
   if (msg.type !== "prompt") return;
 
-  send({ id: msg.id, type: "response", command: "prompt", success: true });
+  send({
+    id: msg.id,
+    type: "response",
+    command: "prompt",
+    success: true,
+    data: { started: true },
+  });
   send({ type: "agent_start" });
   upd({ type: "start" });
   upd({ type: "text_start", contentIndex: 0 });

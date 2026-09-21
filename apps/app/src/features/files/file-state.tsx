@@ -1,20 +1,13 @@
-import { Button } from "@getpie/ui/components/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { FileCodeIcon, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { PanelEmptyState } from "@/components/layout/panel-empty-state";
 
 export function FileState({
   title,
   children,
   onRetry,
-  icon: Icon = FileCodeIcon,
+  icon = FileCodeIcon,
   prominentIcon = false,
 }: {
   title: string;
@@ -24,21 +17,8 @@ export function FileState({
   prominentIcon?: boolean;
 }) {
   return (
-    <Empty className="py-8 md:py-8">
-      <EmptyHeader>
-        <EmptyMedia className={prominentIcon ? "size-12" : undefined} variant="icon">
-          <Icon className={prominentIcon ? "size-6" : undefined} />
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{children}</EmptyDescription>
-      </EmptyHeader>
-      {onRetry ? (
-        <EmptyContent>
-          <Button onClick={onRetry} size="sm" variant="outline">
-            Try again
-          </Button>
-        </EmptyContent>
-      ) : null}
-    </Empty>
+    <PanelEmptyState icon={icon} onRetry={onRetry} prominentIcon={prominentIcon} title={title}>
+      {children}
+    </PanelEmptyState>
   );
 }

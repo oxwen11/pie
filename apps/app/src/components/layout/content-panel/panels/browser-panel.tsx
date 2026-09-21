@@ -31,14 +31,15 @@ interface BrowserExtra {
 
 type BrowserInstance = PanelInstance<BrowserPayload, BrowserExtra>;
 
-let nextTab = 0;
-
 export const browserPanel = definePanelFamily({
   type: "browser",
   key: (payload: BrowserPayload) => payload.tabId,
   label: (payload) => hostOf(payload.url),
   title: "Browser",
-  newPayload: () => ({ tabId: `tab-${++nextTab}`, url: "http://localhost:5173" }),
+  newPayload: (): BrowserPayload => ({
+    tabId: crypto.randomUUID(),
+    url: "http://localhost:5173",
+  }),
   parse: (raw) => {
     const { tabId, url } = asRecord(raw) ?? {};
     return typeof tabId === "string" && typeof url === "string" ? { tabId, url } : null;
@@ -84,17 +85,12 @@ function BrowserPanelView({ instance }: { instance: BrowserInstance }) {
           if (typeof draft === "string") instance.navigate(draft);
         }}
       >
-        <Input
-          name="url"
-          defaultValue={instance.payload.url}
-          className="h-7 text-xs"
-          aria-label="Address"
-        />
+        <Input name="url" defaultValue={instance.payload.url} size="sm" aria-label="Address" />
         <Button type="submit" variant="ghost" size="icon-xs" aria-label="Reload">
           <RotateCwIcon className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
         </Button>
       </form>
-      <div className="bg-muted/30 text-muted-foreground flex min-h-0 flex-1 items-center justify-center text-xs">
+      <div className="bg-muted/30 text-muted-foreground flex min-h-0 flex-1 items-center justify-center">
         {loading ? "Loading…" : `Rendered ${title}`}
       </div>
     </div>

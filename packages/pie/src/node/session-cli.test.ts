@@ -8,7 +8,7 @@ import type { SessionRef, SubscribeStreamEvent } from "@getpie/contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CONNECT_HINT, createPieClientFromEndpoint } from "./connect";
-import { printTurn } from "./session-cli";
+import { awaitTurn, parseDuration } from "./session-cli";
 
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
@@ -24,8 +24,18 @@ const ref: SessionRef = {
   sessionId: "11111111-2222-3333-4444-555555555555",
 };
 
-describe("printTurn", () => {
-  it("prints user text and assistant deltas until the turn ends", async () => {
+describe("parseDuration", () => {
+  it("parses s/m/h/ms", () => {
+    expect(parseDuration("30")).toBe(30_000);
+    expect(parseDuration("5s")).toBe(5_000);
+    expect(parseDuration("2m")).toBe(120_000);
+    expect(parseDuration("1h")).toBe(3_600_000);
+    expect(parseDuration("250ms")).toBe(250);
+  });
+});
+
+describe("awaitTurn", () => {
+  it("returns idle on turn.ended", async () => {
     async function* stream(): AsyncIterable<SubscribeStreamEvent> {
       yield {
         type: "event",
@@ -42,28 +52,36 @@ describe("printTurn", () => {
         event: {
           ref,
           seq: 2,
-          type: "session.message.chunk",
-          turnId: "t1",
-          chunk: { type: "text-delta", id: "x", delta: "pong" },
-          phase: "running",
-        },
-      };
-      yield {
-        type: "event",
-        event: {
-          ref,
-          seq: 3,
           type: "session.turn.ended",
           turnId: "t1",
           outcome: "completed",
         },
       };
     }
-    let output = "";
-    await printTurn(stream(), (text) => {
-      output += text;
-    });
-    expect(output).toBe("user: hello\nassistant: pong\n");
+    await expect(awaitTurn(stream())).resolves.toEqual({ kind: "idle" });
+  });
+
+  it("returns request on session.request.asked", async () => {
+    async function* stream(): AsyncIterable<SubscribeStreamEvent> {
+      yield {
+        type: "event",
+        event: {
+          ref,
+          seq: 1,
+          type: "session.request.asked",
+          request: {
+            type: "tool",
+            id: "req-1",
+            toolName: "bash",
+            input: {},
+            actions: [{ id: "allow", label: "Allow", behavior: "allow" }],
+            native: {},
+          },
+        },
+      };
+    }
+    const state = await awaitTurn(stream());
+    expect(state).toMatchObject({ kind: "request", requestId: "req-1" });
   });
 });
 
@@ -71,7 +89,6 @@ function pieEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv 
   return {
     ...process.env,
     PIE_HOME: home,
-    PIE_DAEMON_DIR: path.join(home, "daemon"),
     PIE_PORT: "0",
     PIE_E2E: "1",
     PIE_E2E_PI_EXECUTABLE: fakePi,
@@ -98,14 +115,20 @@ function runCli(args: string[], env: NodeJS.ProcessEnv): string {
   return result.stdout;
 }
 
-function parseCreated(stdout: string) {
-  const match = stdout.match(/created session ([0-9a-f-]{36}) project ([0-9a-f-]{36})/i);
-  const sessionId = match?.[1];
-  const projectId = match?.[2];
-  if (sessionId === undefined || projectId === undefined) {
-    throw new Error(`no session identity in stdout:\n${stdout}`);
+function parseRefLine(stdout: string) {
+  const line = stdout
+    .split("\n")
+    .map((part) => part.trim())
+    .find((part) => part.length > 0);
+  if (line === undefined) throw new Error(`no ref line in stdout:\n${stdout}`);
+  if (line.includes("\t")) {
+    const [sessionId, projectId] = line.split("\t");
+    if (sessionId === undefined || projectId === undefined) {
+      throw new Error(`bad ref line:\n${stdout}`);
+    }
+    return { sessionId, projectId };
   }
-  return { sessionId, projectId };
+  return { sessionId: line, projectId: undefined };
 }
 
 function parseDaemonAddress(status: string): string {
@@ -224,8 +247,8 @@ describe("pie run against live serve", () => {
   });
 
   it("reuses the project registered at --cwd", () => {
-    const first = parseCreated(runCli(["run", "--cwd", workspace, "CLI_CWD_A"], env));
-    const second = parseCreated(runCli(["run", "--cwd", workspace, "CLI_CWD_B"], env));
+    const first = parseRefLine(runCli(["run", "--cwd", workspace, "CLI_CWD_A"], env));
+    const second = parseRefLine(runCli(["run", "--cwd", workspace, "CLI_CWD_B"], env));
     expect(first.projectId).toBe(projectId);
     expect(second.projectId).toBe(projectId);
     expect(first.sessionId).not.toBe(second.sessionId);
@@ -233,12 +256,12 @@ describe("pie run against live serve", () => {
 
   it("creates a project when --cwd is not yet registered", () => {
     const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-new-proj-"));
-    const created = parseCreated(runCli(["run", "--cwd", fresh, "CLI_NEW_CWD"], env));
+    const created = parseRefLine(runCli(["run", "--cwd", fresh, "CLI_NEW_CWD"], env));
     expect(created.projectId).not.toBe(projectId);
   }, 60_000);
 
   it("honors PIE_URL without passing --url", () => {
-    const created = parseCreated(runCli(["run", "--project-id", projectId, "CLI_PIE_URL"], env));
+    const created = parseRefLine(runCli(["run", "--project-id", projectId, "CLI_PIE_URL"], env));
     expect(created.projectId).toBe(projectId);
   }, 60_000);
 
@@ -248,8 +271,8 @@ describe("pie run against live serve", () => {
       ["run", "--url", address, "--project-id", projectId, "CLI_CREATE_B"],
       env,
     );
-    const a = parseCreated(first);
-    const b = parseCreated(second);
+    const a = parseRefLine(first);
+    const b = parseRefLine(second);
     expect(a.projectId).toBe(projectId);
     expect(b.projectId).toBe(projectId);
     expect(a.sessionId).not.toBe(b.sessionId);
@@ -260,34 +283,25 @@ describe("pie run against live serve", () => {
     );
   }, 60_000);
 
-  it("pie run creates a session, prompts, and prints the turn", () => {
+  it("pie run prints ids; -q prints only sessionId; reuse keeps the same session", () => {
     const first = runCli(
       ["run", "--url", address, "--project-id", projectId, "CLI_RUN_ALPHA"],
       env,
     );
-    const second = runCli(
-      [
-        "run",
-        "--url",
-        address,
-        "--project-id",
-        projectId,
-        "--provider",
-        "fake",
-        "--model-id",
-        "fake-pi",
-        "CLI_RUN_BETA",
-      ],
-      env,
-    );
-    expect(first).toContain("user: CLI_RUN_ALPHA");
-    expect(first).toContain(FAKE_REPLY);
-    expect(second).toContain("user: CLI_RUN_BETA");
-    expect(second).toContain(FAKE_REPLY);
-    const a = parseCreated(first);
-    const b = parseCreated(second);
+    const a = parseRefLine(first);
     expect(a.projectId).toBe(projectId);
-    expect(b.sessionId).not.toBe(a.sessionId);
+
+    // fake-pi does not persist history, so logs is an empty list — still valid JSON.
+    const logs = JSON.parse(
+      runCli(["logs", a.sessionId, "--project-id", projectId, "--json"], env),
+    ) as { messages: unknown[] };
+    expect(Array.isArray(logs.messages)).toBe(true);
+
+    const quiet = runCli(
+      ["run", "-q", "--url", address, "--project-id", projectId, "CLI_RUN_BETA"],
+      env,
+    ).trim();
+    expect(quiet).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
     const followUp = runCli(
       [
@@ -302,9 +316,34 @@ describe("pie run against live serve", () => {
       ],
       env,
     );
-    expect(followUp).toContain("user: CLI_RUN_GAMMA");
-    expect(followUp).toContain(FAKE_REPLY);
-    expect(followUp).not.toContain("created session");
+    expect(parseRefLine(followUp).sessionId).toBe(a.sessionId);
+  }, 60_000);
+
+  it("supports --no-wait then wait/send", () => {
+    const created = parseRefLine(
+      runCli(
+        ["run", "--no-wait", "-q", "--url", address, "--project-id", projectId, "CLI_BG"],
+        env,
+      ),
+    );
+    const waited = runCli(
+      ["wait", created.sessionId, "--project-id", projectId, "--timeout", "30s"],
+      env,
+    ).trim();
+    expect(waited).toBe("idle");
+
+    const sent = parseRefLine(
+      runCli(
+        ["send", created.sessionId, "CLI_SEND", "--project-id", projectId, "--timeout", "30s"],
+        env,
+      ),
+    );
+    expect(sent.sessionId).toBe(created.sessionId);
+
+    const interrupted = parseRefLine(
+      runCli(["interrupt", created.sessionId, "--project-id", projectId], env),
+    );
+    expect(interrupted.sessionId).toBe(created.sessionId);
   }, 60_000);
 
   it("syncs prompts both ways over the session subscribe stream", async () => {
@@ -333,7 +372,7 @@ describe("pie run against live serve", () => {
         }
       });
 
-      const cliTurn = runCli(
+      runCli(
         [
           "run",
           "--url",
@@ -346,8 +385,6 @@ describe("pie run against live serve", () => {
         ],
         env,
       );
-      expect(cliTurn).toContain("user: CLI_USER_ALPHA");
-      expect(cliTurn).toContain(FAKE_REPLY);
 
       await observer.agent.session.prompt({
         ref: created.ref,
@@ -360,6 +397,13 @@ describe("pie run against live serve", () => {
           observed.some((line) => line.includes("CLI_USER_ALPHA")) &&
           observed.some((line) => line.includes("OBS_USER_GAMMA")) &&
           observed.some((line) => line.includes(FAKE_REPLY)),
+      );
+      expect(observed).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("CLI_USER_ALPHA"),
+          expect.stringContaining("OBS_USER_GAMMA"),
+          expect.stringContaining(FAKE_REPLY),
+        ]),
       );
     } finally {
       observerHandle.close();
@@ -402,8 +446,8 @@ describe("pie run against the daemon", () => {
   it("reuses the daemon without --url", () => {
     const first = runCli(["run", "--cwd", workspace, "CLI_DAEMON_A"], env);
     const second = runCli(["run", "--cwd", workspace, "CLI_DAEMON_B"], env);
-    const a = parseCreated(first);
-    const b = parseCreated(second);
+    const a = parseRefLine(first);
+    const b = parseRefLine(second);
     expect(a.sessionId).not.toBe(b.sessionId);
     expect(a.projectId).toBe(projectId);
     expect(b.projectId).toBe(projectId);
@@ -412,7 +456,7 @@ describe("pie run against the daemon", () => {
   it("reuses the daemon record token when --url matches the local daemon", () => {
     const address = parseDaemonAddress(runCli(["daemon", "status"], env));
     const created = runCli(["run", "--url", address, "--cwd", workspace, "CLI_DAEMON_URL"], env);
-    expect(parseCreated(created).sessionId).toMatch(
+    expect(parseRefLine(created).sessionId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
   }, 60_000);
@@ -429,11 +473,15 @@ describe("pie run against the daemon", () => {
     expect(combined).toContain(CONNECT_HINT);
   }, 60_000);
 
-  it("pie run against the daemon prints the live turn", () => {
+  it("pie run against the daemon prints ids and settles", () => {
     const output = runCli(["run", "--cwd", workspace, "CLI_DAEMON_RUN"], env);
-    expect(output).toContain("user: CLI_DAEMON_RUN");
-    expect(output).toContain(FAKE_REPLY);
-    expect(output).toContain("created session");
+    const created = parseRefLine(output);
+    expect(created.projectId).toBe(projectId);
+    const waited = runCli(
+      ["wait", created.sessionId, "--project-id", projectId, "--timeout", "10s"],
+      env,
+    ).trim();
+    expect(waited).toBe("idle");
   }, 60_000);
 
   it("a second client sees sessions created on the token daemon", async () => {
@@ -454,7 +502,7 @@ describe("pie run against the daemon", () => {
           }
         }
       });
-      const created = parseCreated(runCli(["run", "--cwd", workspace, "CLI_DAEMON_PEER"], env));
+      const created = parseRefLine(runCli(["run", "--cwd", workspace, "CLI_DAEMON_PEER"], env));
       await waitFor("daemon observer session.created", () => seen.includes(created.sessionId));
       expect(seen).toContain(created.sessionId);
     } finally {
@@ -464,12 +512,18 @@ describe("pie run against the daemon", () => {
 
   it("creates a git worktree when --worktree is set", () => {
     initGitRepo(workspace);
-    const output = runCli(["run", "--cwd", workspace, "--worktree", "CLI_DAEMON_WORKTREE"], env);
-    expect(output).toContain("user: CLI_DAEMON_WORKTREE");
-    expect(output).toContain(FAKE_REPLY);
-    expect(output).toMatch(/worktree \S+ branch pie\/[0-9a-f]{8}/);
-    const created = parseCreated(output);
-    expect(created.projectId).toBe(projectId);
+    const output = runCli(
+      ["run", "--json", "--cwd", workspace, "--worktree", "CLI_DAEMON_WORKTREE"],
+      env,
+    );
+    const payload = JSON.parse(output) as {
+      sessionId: string;
+      projectId: string;
+      worktree?: { cwd: string; branch: string };
+    };
+    expect(payload.projectId).toBe(projectId);
+    expect(payload.worktree?.branch).toMatch(/^pie\/[0-9a-f]{8}$/);
+    expect(payload.worktree?.cwd).toBeTruthy();
   }, 60_000);
 });
 

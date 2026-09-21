@@ -1,53 +1,59 @@
-import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
+  daemonDirectory,
   daemonStdioLogPath,
-  developmentDaemonEnvironment,
+  defaultPieHomeDir,
   logsDirectory,
   resolveDaemonDirectory,
   resolvePieHome,
+  resolveProjectBrowseRoot,
+  resourceSourceDirectory,
   pieLogPath,
 } from "../src/config/paths";
 
-describe("resolvePieHome", () => {
-  it("prefers an explicit PIE_HOME over any default", () => {
-    expect(resolvePieHome({ PIE_HOME: "/tmp/custom", NODE_ENV: "development" })).toBe(
-      "/tmp/custom",
-    );
+describe("defaultPieHomeDir", () => {
+  it("uses .pie when the binary is not in a Git checkout", () => {
+    expect(defaultPieHomeDir({ inGit: false })).toBe(".pie");
   });
 
-  it("defaults to ~/.pie outside development", () => {
-    expect(resolvePieHome({})).toBe(path.join(os.homedir(), ".pie"));
-    expect(resolvePieHome({ NODE_ENV: "production" })).toBe(path.join(os.homedir(), ".pie"));
+  it("uses .pie_<branch>, encoding slashes as --", () => {
+    expect(defaultPieHomeDir({ inGit: true, branch: "main" })).toBe(".pie_main");
+    expect(defaultPieHomeDir({ inGit: true, branch: "feat/pie-home" })).toBe(".pie_feat--pie-home");
+    expect(defaultPieHomeDir({ inGit: true, branch: "feat-pie-home" })).toBe(".pie_feat-pie-home");
   });
 
-  it("defaults to ~/.pie-dev under NODE_ENV=development", () => {
-    expect(resolvePieHome({ NODE_ENV: "development" })).toBe(path.join(os.homedir(), ".pie-dev"));
-  });
-
-  it("treats an empty PIE_HOME as unset", () => {
-    expect(resolvePieHome({ PIE_HOME: "" })).toBe(path.join(os.homedir(), ".pie"));
-    expect(resolvePieHome({ PIE_HOME: "   " })).toBe(path.join(os.homedir(), ".pie"));
+  it("falls back to .pie_dev when the checkout has no readable branch", () => {
+    expect(defaultPieHomeDir({ inGit: true, branch: undefined })).toBe(".pie_dev");
   });
 });
 
-describe("developmentDaemonEnvironment", () => {
-  it("isolates only daemon lifecycle state under the canonical development home", () => {
-    const environment = developmentDaemonEnvironment(
-      { PIE_HOME: "/tmp/pie-home", NODE_ENV: "development" },
-      "pie-a1b2c3d4",
-    );
-
-    expect(environment.PIE_HOME).toBe("/tmp/pie-home");
-    expect(environment.PIE_DAEMON_DIR).toBe(path.join("/tmp/pie-home", "daemons", "pie-a1b2c3d4"));
+describe("resolvePieHome", () => {
+  it("prefers an explicit PIE_HOME over any default", () => {
+    expect(resolvePieHome({ PIE_HOME: "/tmp/custom" })).toBe("/tmp/custom");
   });
 
-  it("preserves an explicitly selected daemon directory", () => {
-    const environment = { PIE_DAEMON_DIR: "/tmp/explicit-daemon" };
-    expect(developmentDaemonEnvironment(environment, "scope")).toBe(environment);
+  it("treats an empty PIE_HOME as unset", () => {
+    expect(resolvePieHome({ PIE_HOME: "" })).toBe(resolvePieHome({}));
+    expect(resolvePieHome({ PIE_HOME: "   " })).toBe(resolvePieHome({}));
+  });
+});
+
+describe("resolveProjectBrowseRoot", () => {
+  it("uses only an explicit non-empty project picker root", () => {
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: "/tmp/picker" })).toBe(
+      "/tmp/picker",
+    );
+    expect(resolveProjectBrowseRoot({})).toBeUndefined();
+    expect(resolveProjectBrowseRoot({ PIE_PROJECT_BROWSE_ROOT: " " })).toBeUndefined();
+  });
+});
+
+describe("daemonDirectory", () => {
+  it("is always $PIE_HOME/daemon", () => {
+    expect(daemonDirectory("/tmp/data")).toBe(path.join("/tmp/data", "daemon"));
   });
 });
 
@@ -60,34 +66,34 @@ describe("logsDirectory", () => {
   });
 });
 
-describe("resolveDaemonDirectory", () => {
-  it("prefers an explicit PIE_DAEMON_DIR", () => {
-    expect(
-      resolveDaemonDirectory({
-        PIE_HOME: "/tmp/data",
-        PIE_DAEMON_DIR: "/tmp/daemon-state",
-      }),
-    ).toBe("/tmp/daemon-state");
+describe("resourceSourceDirectory", () => {
+  it("keeps each source under $PIE_HOME/logs/resources", () => {
+    const logsDir = logsDirectory("/tmp/data");
+    expect(resourceSourceDirectory(logsDir, "os")).toBe(
+      path.join("/tmp/data", "logs", "resources", "os"),
+    );
+    expect(resourceSourceDirectory(logsDir, "daemon")).toBe(
+      path.join("/tmp/data", "logs", "resources", "daemon"),
+    );
+    expect(resourceSourceDirectory(logsDir, "electron")).toBe(
+      path.join("/tmp/data", "logs", "resources", "electron"),
+    );
   });
+});
 
-  it("defaults to the daemon directory under PIE_HOME", () => {
+describe("resolveDaemonDirectory", () => {
+  it("is the daemon directory under PIE_HOME", () => {
     expect(resolveDaemonDirectory({ PIE_HOME: "/tmp/data" })).toBe(
       path.join("/tmp/data", "daemon"),
     );
   });
 
-  it("follows the development PIE_HOME default", () => {
-    expect(resolveDaemonDirectory({ NODE_ENV: "development" })).toBe(
-      path.join(os.homedir(), ".pie-dev", "daemon"),
-    );
-  });
-
-  it("treats an empty PIE_DAEMON_DIR as unset", () => {
-    expect(resolveDaemonDirectory({ PIE_HOME: "/tmp/data", PIE_DAEMON_DIR: "" })).toBe(
-      path.join("/tmp/data", "daemon"),
-    );
-    expect(resolveDaemonDirectory({ PIE_HOME: "/tmp/data", PIE_DAEMON_DIR: "  " })).toBe(
-      path.join("/tmp/data", "daemon"),
-    );
+  it("ignores PIE_DAEMON_DIR", () => {
+    expect(
+      resolveDaemonDirectory({
+        PIE_HOME: "/tmp/data",
+        PIE_DAEMON_DIR: "/tmp/daemon-state",
+      }),
+    ).toBe(path.join("/tmp/data", "daemon"));
   });
 });

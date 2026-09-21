@@ -1,14 +1,35 @@
 import path from "node:path";
 
-import { Context, Crypto, Effect, Layer } from "effect";
+import { Context, Crypto, Effect, FileSystem, Layer, type PlatformError } from "effect";
 
-import { ProjectNotFound, type StoreReadError, type StoreWriteError } from "../errors";
+import { Paths } from "../config/paths";
+import {
+  ProjectFolderConflict,
+  ProjectFolderCreateError,
+  ProjectNotFound,
+  type StoreReadError,
+  type StoreWriteError,
+  WorkspaceNotDirectory,
+  WorkspaceReadError,
+} from "../errors";
 import type { Project } from "../types";
+import { ALLOCATE_FOLDER_ATTEMPTS, allocateProjectFolderName } from "./allocate-folder";
 import { ProjectRepository } from "./repository";
 
+export type AllocateProjectError =
+  | StoreReadError
+  | StoreWriteError
+  | WorkspaceNotDirectory
+  | WorkspaceReadError
+  | ProjectFolderCreateError
+  | ProjectFolderConflict;
+
+const isAlreadyExists = (error: PlatformError.PlatformError): boolean =>
+  error.reason._tag === "AlreadyExists";
+
 /**
- * `project` module: list / create (path-dedup) / remove / findById. Business
- * rules live here; persistence is delegated to the repo.
+ * `project` module: list / create (path-dedup) / allocateChatProjectDir / remove / findById.
+ * Business rules live here; persistence is delegated to the repo.
  */
 export class ProjectService extends Context.Service<
   ProjectService,
@@ -20,8 +41,16 @@ export class ProjectService extends Context.Service<
     /** `name` defaults to the folder's basename. */
     readonly create: (input: {
       readonly name?: string;
+      readonly type?: Project["type"];
       readonly path: string;
     }) => Effect.Effect<Project, StoreReadError | StoreWriteError>;
+    /**
+     * Mint an empty folder under the chat-project root and register it as
+     * `type: "chat"`. `now` is for tests; the RPC always uses the clock at the call.
+     */
+    readonly allocateChatProjectDir: (input?: {
+      readonly now?: Date;
+    }) => Effect.Effect<Project, AllocateProjectError>;
     readonly remove: (
       id: string,
     ) => Effect.Effect<void, StoreReadError | StoreWriteError | ProjectNotFound>;
@@ -31,12 +60,14 @@ export class ProjectService extends Context.Service<
 export const ProjectServiceLayer: Layer.Layer<
   ProjectService,
   never,
-  ProjectRepository | Crypto.Crypto
+  ProjectRepository | Crypto.Crypto | FileSystem.FileSystem | Paths
 > = Layer.effect(
   ProjectService,
   Effect.gen(function* () {
     const repo = yield* ProjectRepository;
     const crypto = yield* Crypto.Crypto;
+    const fs = yield* FileSystem.FileSystem;
+    const paths = yield* Paths;
     // A platform RNG that cannot produce a uuid is a defect, not a domain
     // failure — keep it out of the service's error channel. Tag-specific so a
     // future recoverable error on this channel stays typed instead of dying.
@@ -46,53 +77,101 @@ export const ProjectServiceLayer: Layer.Layer<
       ),
     );
 
+    const create = Effect.fn("ProjectService.create")(function* (input: {
+      readonly name?: string;
+      readonly type?: Project["type"];
+      readonly path: string;
+    }) {
+      const normalized = path.resolve(input.path);
+      const projects = yield* repo.list();
+      // Reuse an existing project pointing at the same path.
+      const existing = projects.find((p) => path.resolve(p.path) === normalized);
+      if (existing !== undefined) return existing;
+
+      const id = yield* newId;
+      const name = input.name ?? path.basename(normalized);
+      const createdAt = new Date().toISOString();
+      const project: Project =
+        input.type === "chat"
+          ? { id, name, path: normalized, createdAt, type: "chat" }
+          : { id, name, path: normalized, createdAt };
+      yield* repo.save([...projects, project]);
+      return project;
+    });
+
+    const ensureRoot = Effect.fn("ProjectService.ensureRoot")(function* (root: string) {
+      yield* fs.makeDirectory(root, { recursive: true }).pipe(
+        Effect.catchIf(isAlreadyExists, () => Effect.void),
+        Effect.mapError((cause) => new ProjectFolderCreateError({ path: root, cause })),
+      );
+      const info = yield* fs
+        .stat(root)
+        .pipe(Effect.mapError((cause) => new WorkspaceReadError({ path: root, cause })));
+      if (info.type !== "Directory") {
+        return yield* new WorkspaceNotDirectory({ path: root });
+      }
+      return root;
+    });
+
+    const tryCreateFolder = (folder: string) =>
+      fs.makeDirectory(folder).pipe(
+        Effect.as(true),
+        Effect.catchIf(isAlreadyExists, () => Effect.succeed(false)),
+        Effect.mapError((cause) => new ProjectFolderCreateError({ path: folder, cause })),
+      );
+
     return {
       list: () => repo.list(),
 
-      findById: (id) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const found = projects.find((p) => p.id === id);
-          if (found === undefined) {
-            return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
+      findById: Effect.fn("ProjectService.findById")(function* (id: string) {
+        const projects = yield* repo.list();
+        const found = projects.find((p) => p.id === id);
+        if (found === undefined) {
+          return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
+        }
+        return found;
+      }),
+
+      findByPath: Effect.fn("ProjectService.findByPath")(function* (workspace: string) {
+        const projects = yield* repo.list();
+        const target = path.resolve(workspace);
+        return projects.find((p) => path.resolve(p.path) === target);
+      }),
+
+      create,
+
+      allocateChatProjectDir: Effect.fn("ProjectService.allocateChatProjectDir")(
+        function* (input?: { readonly now?: Date }) {
+          const root = yield* ensureRoot(paths.chatProjectsDir);
+          const now = input?.now ?? new Date();
+          for (let attempt = 1; attempt <= ALLOCATE_FOLDER_ATTEMPTS; attempt++) {
+            const name = allocateProjectFolderName(now, attempt);
+            const folder = path.resolve(root, name);
+            const parent = path.dirname(folder);
+            yield* fs.makeDirectory(parent, { recursive: true }).pipe(
+              Effect.catchIf(isAlreadyExists, () => Effect.void),
+              Effect.mapError((cause) => new ProjectFolderCreateError({ path: parent, cause })),
+            );
+            if (yield* tryCreateFolder(folder)) {
+              return yield* create({ type: "chat", path: folder });
+            }
           }
-          return found;
-        }),
+          return yield* new ProjectFolderConflict({
+            root,
+            name: allocateProjectFolderName(now, ALLOCATE_FOLDER_ATTEMPTS),
+          });
+        },
+      ),
 
-      findByPath: (workspace) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const target = path.resolve(workspace);
-          return projects.find((p) => path.resolve(p.path) === target);
-        }),
-
-      create: (input) =>
-        Effect.gen(function* () {
-          const normalized = path.resolve(input.path);
-          const projects = yield* repo.list();
-          // Reuse an existing project pointing at the same path.
-          const existing = projects.find((p) => path.resolve(p.path) === normalized);
-          if (existing !== undefined) return existing;
-
-          const project: Project = {
-            id: yield* newId,
-            name: input.name ?? path.basename(normalized),
-            path: normalized,
-            createdAt: new Date().toISOString(),
-          };
-          yield* repo.save([...projects, project]);
-          return project;
-        }),
-
-      remove: (id) =>
-        Effect.gen(function* () {
-          const projects = yield* repo.list();
-          const target = projects.find((p) => p.id === id);
-          if (target === undefined) {
-            return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
-          }
-          yield* repo.save(projects.filter((p) => p.id !== id));
-        }),
+      remove: Effect.fn("ProjectService.remove")(function* (id: string) {
+        const projects = yield* repo.list();
+        const target = projects.find((p) => p.id === id);
+        if (target === undefined) {
+          return yield* Effect.fail(new ProjectNotFound({ projectId: id }));
+        }
+        yield* repo.save(projects.filter((p) => p.id !== id));
+        return undefined;
+      }),
     };
   }),
 );

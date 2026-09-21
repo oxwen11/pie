@@ -31,7 +31,7 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 [-webkit-app-region:no-drag] md:rounded-[16px] dark:border-white/8",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 md:rounded-2xl dark:border-white/8",
         presentation === "docked"
           ? "md:rounded-s-none md:border-s-0"
           : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
@@ -67,7 +67,10 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12">
+    <div
+      className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12"
+      data-drag-region=""
+    >
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
@@ -124,7 +127,7 @@ function Tab({
       // finds the tab to scroll into view.
       data-active={active || undefined}
       className={cn(
-        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1 text-xs",
+        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
@@ -149,7 +152,7 @@ function Tab({
       </button>
       <button
         type="button"
-        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${panel.label}`}
         onClick={() => session.close(panel.id)}
       >

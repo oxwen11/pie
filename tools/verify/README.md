@@ -30,13 +30,20 @@ agent-browser get title
 pnpm exec pie-verify desktop cleanup
 ```
 
+Fresh Web and Desktop runs register their isolated sample Project by default.
+Use `launch --replace --empty-projects` only when proving the first-import flow.
+
 After launch, **drive with `agent-browser`**. Launch writes a native env file
 (`session`, `namespace`, sockets, screenshots/downloads, idle timeout off,
-plus Chrome args for web or CDP + `PIN_TAB` for desktop). The repo shim
+plus forced headless Chrome for web or CDP + `PIN_TAB` for desktop). Use
+`PIE_VERIFY_BROWSER_HEADED=1` on Web `launch --replace` for an explicit visible
+browser. Desktop Verify sets `PIE_DESKTOP_BACKGROUND=1`, keeping Electron hidden
+and non-activating; set it to `0` with `launch --replace` for a visible run. The repo shim
 (`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads that
-env and execs the mise binary (`aqua:vercel-labs/agent-browser`) with your
-argv unchanged. `pie-verify` does not wrap or forward agent-browser commands.
-Always pass an explicit `open` URL. `web env` / `desktop env` remain an
+env, ensures one numbered run-local recording is active at 60 fps, then
+forwards your command unchanged to the mise-managed agent-browser 0.37.1.
+Each `evidence init` stops the current clip and selects the next number; cleanup
+stops and flushes the current recording. Always pass an explicit `open` URL. `web env` / `desktop env` remain an
 optional dump. `cli` has no page.
 
 Cold-start recipes and feature maps stay in the skill trees

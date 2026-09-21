@@ -1,9 +1,9 @@
 export {
-  type DaemonLocation,
-  developmentDaemonEnvironment,
+  daemonDirectory,
   resolveDaemonDirectory,
-  resolveDaemonLocation,
   resolvePieHome,
+  settingsFile,
+  sshEnvironmentsFile,
 } from "../config/paths";
 export { DaemonLaunchError, DaemonStoppedError } from "./errors";
 export {

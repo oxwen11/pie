@@ -1,7 +1,7 @@
+import type { PiTools } from "@getpie/contract";
 import type { InferUIMessageChunk, UIMessage } from "ai";
 
 import type { SessionMessageEntry } from "./protocol";
-import type { PiTools } from "./tools";
 
 type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role: "assistant" }>;
 
@@ -12,6 +12,8 @@ export type PiMetadata = {
   // stream never surfaces usage/model, so live/history metadata is asymmetric
   // by design (docs/design/pi-history-read-design.md §5). Values come from the
   // segment's last assistant entry; `usage.cost` carries the cost breakdown.
+  // `timestamp` is the JSONL entry timestamp, copied as-is.
+  timestamp?: SessionMessageEntry["timestamp"];
   model?: PiAssistantHistoryMessage["model"];
   provider?: PiAssistantHistoryMessage["provider"];
   stopReason?: PiAssistantHistoryMessage["stopReason"];

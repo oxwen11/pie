@@ -8,7 +8,7 @@ import { layer } from "@effect/vitest";
 import { makeGitHashDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Deferred, Effect, Fiber, FileSystem } from "effect";
 
-import { resolveDaemonLocation } from "../../src/config/paths";
+import { daemonDirectory } from "../../src/config/paths";
 import { DaemonStoppedError } from "../../src/daemon/errors";
 import {
   type ResolveDaemonOptions,
@@ -48,26 +48,23 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
   "resolveOrSpawnDaemon",
   (it) => {
     /**
-     * A temp `$PIE_HOME` and the pair a front door would resolve for it —
-     * through the real resolver, so these tests never restate where the default
-     * daemon directory is (`test/paths.test.ts` owns that). Bound to the test's
-     * scope, and finalizers run LIFO, so the daemon is stopped before the
-     * directory holding its record goes away — however the test ends, which is
-     * what the old `afterEach` could only do on the happy path.
+     * A temp `$PIE_HOME`. Bound to the test's scope, and finalizers run LIFO,
+     * so the daemon is stopped before the directory holding its record goes
+     * away — however the test ends.
      */
     const tempHome = Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-" });
-      const location = resolveDaemonLocation({ PIE_HOME: home });
-      yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(location.daemonDir)));
-      return location;
+      const daemonDir = daemonDirectory(home);
+      yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(daemonDir)));
+      return { home, daemonDir };
     });
 
     it.effect("spawns a daemon, records it, then attaches on the next call", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const { home, daemonDir } = yield* tempHome;
-        const spawned = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const spawned = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         assert.equal(spawned.reused, false);
         assert.match(spawned.address, /^http:\/\/127\.0\.0\.1:\d+$/);
         assert.ok(pidAlive(spawned.pid));
@@ -91,7 +88,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(record?.token, spawned.token);
         assert.equal(record?.compatibilityKey, TEST_KEY);
 
-        const attached = yield* resolve({ home, daemonDir, port: 0 });
+        const attached = yield* resolve({ home, port: 0 });
         assert.equal(attached.reused, true);
         assert.equal(attached.pid, spawned.pid);
         assert.equal(attached.address, spawned.address);
@@ -130,7 +127,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const attached = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 2_000,
         });
@@ -139,34 +135,37 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       }),
     );
 
-    it.effect("isolates lifecycle state in an explicit daemon directory", () =>
+    it.effect("keeps lifecycle files under $PIE_HOME/daemon even when PIE_DAEMON_DIR is set", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
-        const { home, daemonDir: defaultDir } = yield* tempHome;
-        const daemonDir = path.join(home, "isolated-daemon");
-        yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(daemonDir)));
-
+        const { home, daemonDir } = yield* tempHome;
+        const decoy = path.join(home, "decoy-daemon");
         const spawned = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
+          environment: { ...process.env, PIE_HOME: home, PIE_DAEMON_DIR: decoy },
         });
         assert.equal((yield* readRecord(daemonDir))?.pid, spawned.pid);
-        // Nothing leaks into the default directory, nor into `$PIE_HOME`.
-        assert.equal(yield* readRecord(defaultDir), undefined);
+        assert.equal(yield* readRecord(decoy), undefined);
         for (const file of ["daemon.pid", "daemon.lock", "daemon.stopped"]) {
           assert.equal(yield* fs.exists(path.join(home, file)), false);
-          assert.equal(yield* fs.exists(path.join(defaultDir, file)), false);
         }
-        // Logging is deliberately NOT isolated per daemon directory: one
-        // `$PIE_HOME` means one place to read, and every line carries the
-        // `pid` that wrote it.
         assert.ok(yield* fs.exists(path.join(home, "logs", "daemon-stdio.log")));
+      }),
+    );
 
-        assert.equal(yield* stopDaemon(daemonDir), "stopped");
-        assert.ok(yield* fs.exists(path.join(daemonDir, "daemon.stopped")));
-        assert.equal(yield* fs.exists(path.join(home, "daemon.stopped")), false);
+    it.effect("refuses to replace a healthy daemon with a different compatibility key", () =>
+      Effect.gen(function* () {
+        const { home } = yield* tempHome;
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
+        const error = yield* resolve({
+          home,
+          port: 0,
+          requiredCompatibilityKey: NEXT_KEY,
+        }).pipe(Effect.flip);
+        assert.match(error.message, /already running with a different version/);
+        assert.equal(pidAlive(first.pid), true);
       }),
     );
 
@@ -174,14 +173,14 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const { home, daemonDir } = yield* tempHome;
-        const first = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
 
         const replacement = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         }).pipe(Effect.provide(Observability.layerForHome(home)));
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -196,9 +195,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const attached = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         });
         assert.equal(attached.reused, true);
         assert.equal(attached.pid, replacement.pid);
@@ -209,7 +208,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const { home, daemonDir } = yield* tempHome;
-        const first = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         const record = yield* readRecord(daemonDir);
         assert.ok(record);
         const { compatibilityKey: _, ...legacyRecord } = record;
@@ -217,9 +216,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const replacement = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
+          replaceIncompatible: true,
         });
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -231,7 +230,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const { home, daemonDir } = yield* tempHome;
-        const first = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         const record = yield* readRecord(daemonDir);
         assert.ok(record);
         yield* fs.writeFileString(
@@ -241,9 +240,9 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
         const replacement = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
+          replaceIncompatible: true,
         });
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -254,7 +253,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
     it.effect("reports status and stops the daemon", () =>
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
-        const spawned = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const spawned = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
 
         const running = yield* statusDaemon(daemonDir);
         assert.equal(running.running, true);
@@ -270,11 +269,11 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
     it.effect("respawns when the recorded daemon is dead", () =>
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
-        const first = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         yield* stopDaemon(daemonDir);
         assert.equal(pidAlive(first.pid), false);
 
-        const second = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const second = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         assert.equal(second.reused, false);
         assert.notEqual(second.pid, first.pid);
         assert.ok(pidAlive(second.pid));
@@ -290,15 +289,15 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
 
     it.effect("respawns after a crash that left the record behind", () =>
       Effect.gen(function* () {
-        const { home, daemonDir } = yield* tempHome;
-        const first = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const { home } = yield* tempHome;
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
 
         // Simulate a crash: kill the process without stopDaemon, so the stale
         // record (pid dead) stays and must be replaced, not attached to.
         process.kill(first.pid, "SIGKILL");
         yield* Effect.sleep("20 millis").pipe(Effect.repeat({ while: () => pidAlive(first.pid) }));
 
-        const second = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const second = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         assert.equal(second.reused, false);
         assert.notEqual(second.pid, first.pid);
         assert.ok(pidAlive(second.pid));
@@ -316,7 +315,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           resolveOrSpawnDaemon({
             serverArgv: [process.execPath, "-e", "setInterval(() => {}, 1000)"],
             home,
-            daemonDir,
             requiredCompatibilityKey: TEST_KEY,
             port: 0,
             readyTimeoutMs: 500,
@@ -331,7 +329,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
         const wedged = childProcess.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-        const wedgedPid = wedged.pid!;
+        const wedgedPid = wedged.pid;
+        if (wedgedPid === undefined) {
+          throw new Error("expected spawned pid");
+        }
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             if (pidAlive(wedgedPid)) process.kill(wedgedPid, "SIGKILL");
@@ -344,9 +345,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           startedAt: 0,
         });
 
-        const error = yield* Effect.flip(
-          resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 }),
-        );
+        const error = yield* Effect.flip(resolve({ home, port: 0, readyTimeoutMs: 15_000 }));
         assert.match(error.message, /Refusing to replace/);
         assert.equal(pidAlive(wedgedPid), true);
         assert.equal((yield* readRecord(daemonDir))?.pid, wedgedPid);
@@ -358,7 +357,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const fs = yield* FileSystem.FileSystem;
         const { daemonDir } = yield* tempHome;
         const wedged = childProcess.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-        const wedgedPid = wedged.pid!;
+        const wedgedPid = wedged.pid;
+        if (wedgedPid === undefined) {
+          throw new Error("expected spawned pid");
+        }
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => {
             if (pidAlive(wedgedPid)) process.kill(wedgedPid, "SIGKILL");
@@ -383,28 +385,28 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       Effect.gen(function* () {
         const { home, daemonDir } = yield* tempHome;
         const fs = yield* FileSystem.FileSystem;
-        yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         yield* stopDaemon(daemonDir);
         assert.ok(yield* fs.exists(path.join(daemonDir, "daemon.stopped")));
 
-        const error = yield* Effect.flip(resolve({ home, daemonDir, port: 0, autoRespawn: true }));
+        const error = yield* Effect.flip(resolve({ home, port: 0, autoRespawn: true }));
         assert.ok(error instanceof DaemonStoppedError);
 
         // An explicit start clears the tombstone; auto-respawn works again after.
-        const restarted = yield* resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 });
+        const restarted = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
         assert.equal(restarted.reused, false);
-        const attached = yield* resolve({ home, daemonDir, port: 0, autoRespawn: true });
+        const attached = yield* resolve({ home, port: 0, autoRespawn: true });
         assert.equal(attached.pid, restarted.pid);
       }),
     );
 
     it.effect("serializes concurrent launchers onto a single daemon", () =>
       Effect.gen(function* () {
-        const { home, daemonDir } = yield* tempHome;
+        const { home } = yield* tempHome;
         const [a, b] = yield* Effect.all(
           [
-            resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 }),
-            resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 }),
+            resolve({ home, port: 0, readyTimeoutMs: 15_000 }),
+            resolve({ home, port: 0, readyTimeoutMs: 15_000 }),
           ],
           { concurrency: 2 },
         );
@@ -419,7 +421,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const { home, daemonDir } = yield* tempHome;
         const old = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
           environment: { ...process.env, PIE_TEST_SHUTDOWN_DELAY_MS: "750" },
@@ -428,17 +429,17 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const replacementFiber = yield* Effect.forkChild(
           resolve({
             home,
-            daemonDir,
             port: 0,
             readyTimeoutMs: 15_000,
             requiredCompatibilityKey: NEXT_KEY,
+            replaceIncompatible: true,
           }),
         );
         while (pidAlive(old.pid)) yield* Effect.sleep(10);
 
         const oldKeyDone = yield* Deferred.make<void>();
         const oldKeyFiber = yield* Effect.forkChild(
-          resolve({ home, daemonDir, port: 0, readyTimeoutMs: 15_000 }).pipe(
+          resolve({ home, port: 0, readyTimeoutMs: 15_000 }).pipe(
             Effect.ensuring(Deferred.succeed(oldKeyDone, undefined)),
           ),
         );
@@ -446,11 +447,11 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(yield* Deferred.isDone(oldKeyDone), false);
 
         const replacement = yield* Fiber.join(replacementFiber);
-        const final = yield* Fiber.join(oldKeyFiber);
+        const final = yield* Fiber.join(oldKeyFiber).pipe(Effect.flip);
         assert.notEqual(replacement.pid, old.pid);
-        assert.notEqual(final.pid, old.pid);
-        assert.notEqual(final.pid, replacement.pid);
-        assert.equal((yield* readRecord(daemonDir))?.compatibilityKey, TEST_KEY);
+        assert.match(final.message, /already running with a different version/);
+        assert.equal(pidAlive(replacement.pid), true);
+        assert.equal((yield* readRecord(daemonDir))?.compatibilityKey, NEXT_KEY);
       }),
     );
 
@@ -460,7 +461,6 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const { home, daemonDir } = yield* tempHome;
         const old = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
           environment: { ...process.env, PIE_TEST_SHUTDOWN_DELAY_MS: "750" },
@@ -469,10 +469,10 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const replacementFiber = yield* Effect.forkChild(
           resolve({
             home,
-            daemonDir,
             port: 0,
             readyTimeoutMs: 15_000,
             requiredCompatibilityKey: NEXT_KEY,
+            replaceIncompatible: true,
           }),
         );
         while (pidAlive(old.pid)) yield* Effect.sleep(10);
@@ -491,17 +491,16 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const { home, daemonDir } = yield* tempHome;
         const old = yield* resolve({
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
           environment: { ...process.env, PIE_TEST_SHUTDOWN_DELAY_MS: "750" },
         });
         const next = {
           home,
-          daemonDir,
           port: 0,
           readyTimeoutMs: 15_000,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         };
 
         const [a, b] = yield* Effect.all([resolve(next), resolve(next)], { concurrency: 2 });

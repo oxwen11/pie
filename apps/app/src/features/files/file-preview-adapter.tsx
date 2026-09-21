@@ -16,6 +16,9 @@ import {
 const PREVIEW_UNSAFE_CSS = `
   :host {
     --diffs-font-family: var(--font-mono);
+    --diffs-header-font-family: var(--font-sans);
+    font-size: inherit;
+    line-height: inherit;
     --diffs-light-bg: var(--background);
     --diffs-dark-bg: var(--background);
     --diffs-light: var(--foreground);
@@ -62,9 +65,9 @@ function TargetLineScroller({
   useLayoutEffect(() => {
     if (targetKey === null || targetLine === undefined) {
       lastScrolledTarget.current = null;
-      return;
+      return undefined;
     }
-    if (virtualizer === undefined || lastScrolledTarget.current === targetKey) return;
+    if (virtualizer === undefined || lastScrolledTarget.current === targetKey) return undefined;
 
     let scrollFrame = 0;
     const renderFrame = requestAnimationFrame(() => {
@@ -118,7 +121,7 @@ export function FilePreviewAdapter({
     () => (validTargetLine === undefined ? null : { start: validTargetLine, end: validTargetLine }),
     [validTargetLine],
   );
-  const options = useMemo<FileOptions<undefined>>(
+  const options = useMemo<FileOptions<undefined, undefined>>(
     () => ({
       disableFileHeader: true,
       overflow: "scroll",

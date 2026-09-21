@@ -22,6 +22,14 @@ if ! command -v mise >/dev/null; then
   curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh
 fi
 
+# node-pty 1.1.0 has no Linux prebuild; compile on the runner like t3code's WSL job.
+# lsof backs tools/verify port checks (desktop launch tests).
+# xvfb + xauth back Desktop Playwright under Code check.
+if command -v apt-get >/dev/null; then
+  apt-get update -qq
+  apt-get install -y --no-install-recommends build-essential lsof python3 xvfb xauth
+fi
+
 # Warm toolchain when the repo is already checked out on the runner.
 REPO_DIR="${RUNNER_ROOT}/_work/pie/pie"
 if [[ ! -f "${REPO_DIR}/mise.toml" ]]; then

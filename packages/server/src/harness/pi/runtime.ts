@@ -1,11 +1,11 @@
-import type {
-  AgentResponse,
-  AgentModelState,
-  SessionCapabilities,
-  SessionPendingPrompt,
+import {
+  SessionCapabilitiesSchema,
+  type AgentModelState,
+  type AgentResponse,
+  type SessionCapabilities,
+  type SessionPendingPrompt,
+  type PieUIMessage,
 } from "@getpie/contract";
-import { SessionCapabilitiesSchema } from "@getpie/contract";
-import type { UIMessage } from "ai";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -79,7 +79,7 @@ export type PiAgentRuntime = {
     CapabilityUnsupported | AgentOperationError
   >;
   readonly getMessages: Effect.Effect<
-    ReadonlyArray<UIMessage>,
+    ReadonlyArray<PieUIMessage>,
     SessionClosed | AgentOperationError
   >;
   readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
@@ -179,6 +179,7 @@ export const makePiAgentRuntime = (
       yield* process.session
         .interrupt(sessionId)
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
+      return undefined;
     });
 
     const replaceQueue: PiAgentRuntime["replaceQueue"] = (pending) =>
@@ -187,6 +188,7 @@ export const makePiAgentRuntime = (
         yield* process.session
           .replaceQueue(sessionId, pending)
           .pipe(Effect.mapError((cause) => operationError(sessionId, "replace-queue", cause)));
+        return undefined;
       });
 
     yield* Scope.addFinalizer(scope, close);
@@ -234,40 +236,38 @@ export const makePiAgentRuntime = (
             yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
           }
 
-          const finished = yield* Ref.make(false);
+          const lastChunkWasFinish = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
           const pump = Stream.runForEach(prompt.output, (chunk) =>
-            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
-              Effect.andThen(emit(chunk)),
-              Effect.andThen(
-                chunk.type === "finish"
-                  ? Ref.set(finished, true).pipe(
-                      Effect.andThen(Ref.get(outcome)),
-                      Effect.flatMap((turnOutcome) =>
-                        emit({
-                          type: "session.turn.ended",
-                          sessionId,
-                          turnId: prompt.turnId,
-                          outcome: turnOutcome,
-                        }).pipe(
-                          Effect.andThen(
-                            Ref.update(activeTurn, (current) =>
-                              current === prompt.turnId ? undefined : current,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Effect.void,
-              ),
-            ),
+            chunk.type === "session.prompt.submitted"
+              ? emit(chunk)
+              : Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
+                  Effect.andThen(
+                    chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void,
+                  ),
+                  Effect.andThen(emit(chunk)),
+                ),
           ).pipe(
-            Effect.flatMap(() => Ref.get(finished)),
-            Effect.flatMap((didFinish) =>
-              prompt.started && !didFinish
-                ? crash(new Error("Pi turn ended without a finish event"))
-                : Effect.void,
-            ),
+            Effect.flatMap(() => Ref.get(lastChunkWasFinish)),
+            Effect.flatMap((didFinish) => {
+              if (!prompt.started) return Effect.void;
+              if (!didFinish) return crash(new Error("Pi turn ended without a finish event"));
+              return Ref.get(outcome).pipe(
+                Effect.flatMap((turnOutcome) =>
+                  emit({
+                    type: "session.turn.ended",
+                    sessionId,
+                    turnId: prompt.turnId,
+                    outcome: turnOutcome,
+                  }),
+                ),
+                Effect.andThen(
+                  Ref.update(activeTurn, (current) =>
+                    current === prompt.turnId ? undefined : current,
+                  ),
+                ),
+              );
+            }),
             Effect.catch(crash),
           );
           yield* Effect.forkIn(pump, scope);

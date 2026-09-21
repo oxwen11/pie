@@ -57,12 +57,13 @@ export interface AppShellMainProps {
 export function AppShellMain({ children }: AppShellMainProps) {
   const { isMobile } = useSidebar();
   const { contentPanel } = useAppShell();
+  const handleCollapsedChange = contentPanel.setMaximized;
   return (
     <ShellMainPanel
       hasContentPanel={contentPanel.visible}
       collapsed={contentPanel.maximized}
       collapsible={contentPanel.maximized || (contentPanel.visible && !isMobile)}
-      onCollapsedChange={contentPanel.setMaximized}
+      onCollapsedChange={handleCollapsedChange}
     >
       {children}
     </ShellMainPanel>
@@ -126,16 +127,22 @@ export function AppShellBody({ children }: AppShellBodyProps) {
     <AppShellContext value={context}>
       <ShellGroup hasContentPanel={hasVisibleContentPanel} hasSidebar={!isMobile}>
         {children}
-        {hasVisibleContentPanel && (
-          <>
-            <ShellSeparator joined />
-            <ShellContentPanel>
-              <ContentPanelOutlet />
-            </ShellContentPanel>
-          </>
-        )}
       </ShellGroup>
       <ShellContentPanelToggle />
     </AppShellContext>
+  );
+}
+
+/** Session-scoped column beside chat; mount under the same EnvironmentOrpcProvider as Main. */
+export function AppShellSessionPanel(): ReactNode {
+  const { contentPanel } = useAppShell();
+  if (!contentPanel.visible) return null;
+  return (
+    <>
+      <ShellSeparator joined />
+      <ShellContentPanel>
+        <ContentPanelOutlet />
+      </ShellContentPanel>
+    </>
   );
 }
