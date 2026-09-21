@@ -16,6 +16,7 @@ import { Link, useMatch } from "@tanstack/react-router";
 import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
+import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
@@ -99,17 +100,16 @@ export function AppSidebar() {
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
       <SidebarHeader
         className={cn(
-          // Same string as SHELL_TITLEBAR_HEADER_CLASS — imported
-          // constants are unreadable to require-static-classes.
+          // Keep this literal so require-static-classes can validate it.
           "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
           desktop && "px-0",
-          "[-webkit-app-region:drag]",
         )}
+        data-drag-region=""
       >
         {isDesktopMacosHost(platform) ? null : (
           <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
         )}
-        {!desktop && expanded ? <SidebarTrigger className="[-webkit-app-region:no-drag]" /> : null}
+        {!desktop && expanded ? <SidebarTrigger /> : null}
       </SidebarHeader>
 
       <SidebarContent className="[-webkit-app-region:no-drag]">
@@ -128,6 +128,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="[-webkit-app-region:no-drag]">
+        {platform.ssh ? <ConnectionSwitcher /> : null}
         <SidebarMenu>
           <SettingsNavItem />
         </SidebarMenu>

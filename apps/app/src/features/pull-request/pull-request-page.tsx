@@ -17,7 +17,6 @@ import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { ChevronRight, SearchIcon } from "lucide-react";
 import { useState } from "react";
 import { Group, Separator } from "react-resizable-panels";
@@ -25,6 +24,7 @@ import { toast } from "sonner";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
 import Loader from "@/components/loader";
+import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
 import { pullRequestActionError } from "./pull-request-action-error";
@@ -39,7 +39,7 @@ import {
 } from "./pull-request-presentation";
 
 export function PullRequestPage() {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useLocalOrpc();
   const [selectedRef, setSelectedRef] = useState<PullRequestRef | null>(null);
   const list = useQuery(orpcQueryUtils.pullRequest.list.queryOptions());
   const items = list.data ?? [];
@@ -67,6 +67,7 @@ export function PullRequestPage() {
     void diff.refetch();
   };
   const action = useMutation({
+    mutationKey: orpcQueryUtils.pullRequest.runAction.key(),
     mutationFn: (input: PullRequestActionInput) => orpcQueryUtils.pullRequest.runAction.call(input),
     onMutate: () => setPostActionRefreshFailed(false),
     onSuccess: () => {

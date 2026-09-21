@@ -28,9 +28,7 @@ const fakeReply = () => pieE2E().fakeReply;
 describe("import and draft", () => {
   it("imports a project from the empty draft via the sidebar", async () => {
     await mountApp();
-    await waitForComposer();
-    await expect.element(page.getByTitle("New chat")).toBeVisible();
-    await expect.element(page.getByText("Choose project").first()).toBeVisible();
+    await waitForText("Import your first project");
 
     await openImportDialog();
     await importFolder(sample());

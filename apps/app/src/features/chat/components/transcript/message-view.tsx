@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
+import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
@@ -109,23 +109,22 @@ function useElapsedSeconds(active: boolean): number {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-// The turn's icon swaps to a +/- box on hover or once open, the same
-// affordance ToolHeader gives a tool card. Local rather than borrowed: this
-// row summarises a turn, not a tool call, so it doesn't belong to that family.
+// +/- on hover or keyboard focus; Timer stays visible while open. Local rather than
+// borrowed: this row is elapsed time, not a tool batch (ListCollapse).
 function SummaryTrigger({ label }: { label: string }) {
   return (
     <CollapsibleTrigger
       className="group"
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
-          <span className="relative">
-            <ListTreeIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
-            <div className="absolute inset-0 size-4 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+          <span className="relative flex size-4 shrink-0 items-center justify-center">
+            <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
             </div>
           </span>
-          <span className="truncate text-sm">{label}</span>
+          <span className="min-w-0 truncate text-sm leading-none">{label}</span>
         </div>
       }
     />

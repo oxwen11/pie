@@ -15,6 +15,7 @@ import { Route as PullRequestsRouteImport } from './routes/pull-requests'
 import { Route as SchedulesRouteImport } from './routes/schedules'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SessionSessionIdRouteImport } from './routes/session/$sessionId'
+import { Route as SessionFallbackRouteImport } from './routes/session/fallback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const SessionSessionIdRoute = SessionSessionIdRouteImport.update({
   path: '/session/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SessionFallbackRoute = SessionFallbackRouteImport.update({
+  id: '/session/fallback',
+  path: '/session/fallback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
+  '/session/fallback': typeof SessionFallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
+  '/session/fallback': typeof SessionFallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
+  '/session/fallback': typeof SessionFallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/schedules'
     | '/settings'
     | '/session/$sessionId'
+    | '/session/fallback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/schedules'
     | '/settings'
     | '/session/$sessionId'
+    | '/session/fallback'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/schedules'
     | '/settings'
     | '/session/$sessionId'
+    | '/session/fallback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   SchedulesRoute: typeof SchedulesRoute
   SettingsRoute: typeof SettingsRoute
   SessionSessionIdRoute: typeof SessionSessionIdRoute
+  SessionFallbackRoute: typeof SessionFallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/session/fallback': {
+      id: '/session/fallback'
+      path: '/session/fallback'
+      fullPath: '/session/fallback'
+      preLoaderRoute: typeof SessionFallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   SchedulesRoute: SchedulesRoute,
   SettingsRoute: SettingsRoute,
   SessionSessionIdRoute: SessionSessionIdRoute,
+  SessionFallbackRoute: SessionFallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

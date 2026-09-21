@@ -1,4 +1,4 @@
-import type { SessionRef } from "@getpie/contract";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 /**
  * The panel vocabulary. Zero React on purpose: everything here is data or a
@@ -22,7 +22,7 @@ import type { SessionRef } from "@getpie/contract";
  */
 export interface PanelHandle<Payload> {
   readonly id: string;
-  readonly sessionRef: SessionRef;
+  readonly sessionRef: EnvironmentSessionRef;
   readonly payload: Payload;
   activate(): void;
   close(): void;
@@ -86,7 +86,7 @@ export interface PanelDefinition<
    * Close, replace, and forget call this with the persisted payload even if
    * the instance was never materialized. Live resources still go on `dispose`.
    */
-  readonly onClose?: (sessionRef: SessionRef, payload: Payload) => void;
+  readonly onClose?: (sessionRef: EnvironmentSessionRef, payload: Payload) => void;
   /** The host never reads this; the React layer narrows it to `PanelView`. */
   readonly view: View;
 }

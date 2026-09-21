@@ -10,13 +10,13 @@ import {
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { GitCompareIcon } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { ReviewDiffPane } from "./review-diff-pane";
 import { isReviewMode, reviewHeading } from "./review-file-status";
@@ -73,8 +73,8 @@ export const reviewPanel = definePanel({
 });
 
 function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const projectId = instance.sessionRef.projectId;
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -84,7 +84,7 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
       [projectId],
     ),
   });
-  const gitWorkspace = { ref: instance.sessionRef };
+  const gitWorkspace = { ref: instance.sessionRef.ref };
   const panel = useContentPanel();
   const mode = instance.payload.mode ?? "uncommitted";
   const branch = useQuery({

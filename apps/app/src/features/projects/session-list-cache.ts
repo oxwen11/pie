@@ -18,6 +18,7 @@ export const applySessionListEvent = (
   for (const archived of [false, true]) {
     void queryClient.invalidateQueries({
       queryKey: listKeyFor(event.ref.projectId, archived),
+      refetchType: "all",
     });
   }
 };

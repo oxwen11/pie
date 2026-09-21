@@ -49,6 +49,12 @@ export class WorktreeService extends Context.Service<
       cwd: string,
       input?: { readonly base?: string },
     ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
+    /** Re-create a pie worktree at `worktreePath` from an existing `branch`. */
+    readonly restore: (
+      repoCwd: string,
+      worktreePath: string,
+      branch: string,
+    ) => Effect.Effect<GitWorktreeCreateResult, GitWorktreeFailure>;
     readonly remove: (path: string) => Effect.Effect<void, GitFailure>;
   }
 >()("WorktreeService") {}
@@ -92,6 +98,14 @@ export const WorktreeServiceLayer: Layer.Layer<
           Effect.catchTag("PlatformError", dieRng("worktree branch")),
         );
 
+    const addCheckout = (repoRoot: string, worktreePath: string, argv: readonly string[]) =>
+      fs
+        .makeDirectory(path.dirname(worktreePath), { recursive: true })
+        .pipe(
+          Effect.mapError(readError(worktreePath)),
+          Effect.andThen(raw(repoRoot, ["worktree", "add", ...argv])),
+        );
+
     return {
       create: Effect.fn("WorktreeService.create")(function* (
         cwd: string,
@@ -130,14 +144,47 @@ export const WorktreeServiceLayer: Layer.Layer<
         if (refs.all.includes(branch)) {
           return yield* new GitBranchExists({ cwd: realRoot, branch });
         }
-        yield* fs
-          .makeDirectory(path.dirname(worktreePath), { recursive: true })
-          .pipe(
-            Effect.mapError(readError(worktreePath)),
-            Effect.andThen(
-              raw(repoRoot, ["worktree", "add", "-b", branch, worktreePath, startPoint]),
-            ),
-          );
+        yield* addCheckout(repoRoot, worktreePath, ["-b", branch, worktreePath, startPoint]);
+        return { path: worktreePath, branch };
+      }),
+
+      restore: Effect.fn("WorktreeService.restore")(function* (
+        repoCwd: string,
+        worktreePath: string,
+        branch: string,
+      ) {
+        if (!isValidBranchName(branch) || isUnsafeRef(branch)) {
+          return yield* new GitInvalidBranchName({ branch });
+        }
+        if (!path.isAbsolute(worktreePath)) {
+          return yield* new WorkspacePathEscape({ cwd: repoCwd, path: worktreePath });
+        }
+        const realRoot = yield* resolveRoot(repoCwd);
+        const exists = yield* fs
+          .exists(worktreePath)
+          .pipe(Effect.mapError(readError(worktreePath)));
+        if (exists) {
+          const realPath = yield* fs
+            .realPath(worktreePath)
+            .pipe(Effect.mapError(readError(worktreePath)));
+          const realHome = yield* fs
+            .realPath(paths.worktreesDir)
+            .pipe(Effect.mapError(readError(".")));
+          if (!contains(realHome, realPath)) {
+            return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+          }
+          return { path: worktreePath, branch };
+        }
+        if (!contains(paths.worktreesDir, worktreePath)) {
+          return yield* new WorkspacePathEscape({ cwd: realRoot, path: worktreePath });
+        }
+        const repoRoot = yield* resolveRepoRoot(realRoot);
+        const refs = yield* listRefs(realRoot);
+        if (!refs.all.includes(branch)) {
+          return yield* new GitRefNotFound({ ref: branch });
+        }
+        yield* raw(repoRoot, ["worktree", "prune"]);
+        yield* addCheckout(repoRoot, worktreePath, [worktreePath, branch]);
         return { path: worktreePath, branch };
       }),
 

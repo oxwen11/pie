@@ -155,6 +155,20 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       }),
     );
 
+    it.effect("refuses to replace a healthy daemon with a different compatibility key", () =>
+      Effect.gen(function* () {
+        const { home } = yield* tempHome;
+        const first = yield* resolve({ home, port: 0, readyTimeoutMs: 15_000 });
+        const error = yield* resolve({
+          home,
+          port: 0,
+          requiredCompatibilityKey: NEXT_KEY,
+        }).pipe(Effect.flip);
+        assert.match(error.message, /already running with a different version/);
+        assert.equal(pidAlive(first.pid), true);
+      }),
+    );
+
     it.effect("replaces a healthy daemon with a different compatibility key exactly once", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -166,6 +180,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           port: 0,
           readyTimeoutMs: 15_000,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         }).pipe(Effect.provide(Observability.layerForHome(home)));
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -182,6 +197,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           home,
           port: 0,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         });
         assert.equal(attached.reused, true);
         assert.equal(attached.pid, replacement.pid);
@@ -202,6 +218,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           home,
           port: 0,
           readyTimeoutMs: 15_000,
+          replaceIncompatible: true,
         });
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -225,6 +242,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           home,
           port: 0,
           readyTimeoutMs: 15_000,
+          replaceIncompatible: true,
         });
         assert.equal(replacement.reused, false);
         assert.notEqual(replacement.pid, first.pid);
@@ -414,6 +432,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
             port: 0,
             readyTimeoutMs: 15_000,
             requiredCompatibilityKey: NEXT_KEY,
+            replaceIncompatible: true,
           }),
         );
         while (pidAlive(old.pid)) yield* Effect.sleep(10);
@@ -428,11 +447,11 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         assert.equal(yield* Deferred.isDone(oldKeyDone), false);
 
         const replacement = yield* Fiber.join(replacementFiber);
-        const final = yield* Fiber.join(oldKeyFiber);
+        const final = yield* Fiber.join(oldKeyFiber).pipe(Effect.flip);
         assert.notEqual(replacement.pid, old.pid);
-        assert.notEqual(final.pid, old.pid);
-        assert.notEqual(final.pid, replacement.pid);
-        assert.equal((yield* readRecord(daemonDir))?.compatibilityKey, TEST_KEY);
+        assert.match(final.message, /already running with a different version/);
+        assert.equal(pidAlive(replacement.pid), true);
+        assert.equal((yield* readRecord(daemonDir))?.compatibilityKey, NEXT_KEY);
       }),
     );
 
@@ -453,6 +472,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
             port: 0,
             readyTimeoutMs: 15_000,
             requiredCompatibilityKey: NEXT_KEY,
+            replaceIncompatible: true,
           }),
         );
         while (pidAlive(old.pid)) yield* Effect.sleep(10);
@@ -480,6 +500,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           port: 0,
           readyTimeoutMs: 15_000,
           requiredCompatibilityKey: NEXT_KEY,
+          replaceIncompatible: true,
         };
 
         const [a, b] = yield* Effect.all([resolve(next), resolve(next)], { concurrency: 2 });

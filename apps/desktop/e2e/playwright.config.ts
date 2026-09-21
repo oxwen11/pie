@@ -16,5 +16,8 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "on-first-retry",
+    launchOptions: {
+      args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    },
   },
 });
