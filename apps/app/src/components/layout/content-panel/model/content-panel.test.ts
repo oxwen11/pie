@@ -1,7 +1,6 @@
-import type { SessionRef } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
 
-import { sessionRefKey } from "@/lib/session-ref";
+import { type EnvironmentSessionRef, sessionRefKey } from "@/lib/session-ref";
 
 import { ContentPanel } from "./content-panel";
 import { definePanel, definePanelFamily, type PanelHandle } from "./panel";
@@ -19,14 +18,18 @@ const file = definePanelFamily({
   view: null,
 });
 
-const ref = (overrides: Partial<SessionRef> = {}): SessionRef => ({
-  projectId: "11111111-1111-4111-8111-111111111111",
-  sessionId: "session-1",
-  ...overrides,
+const ref = (
+  overrides: Partial<{ environmentId: string; projectId: string; sessionId: string }> = {},
+): EnvironmentSessionRef => ({
+  environmentId: overrides.environmentId ?? "env-1",
+  ref: {
+    projectId: overrides.projectId ?? "11111111-1111-4111-8111-111111111111",
+    sessionId: overrides.sessionId ?? "session-1",
+  },
 });
 const S = ref();
 
-const snapshotOf = (host: ContentPanel<null>, sessionRef: SessionRef | null = S) =>
+const snapshotOf = (host: ContentPanel<null>, sessionRef: EnvironmentSessionRef | null = S) =>
   host.snapshot(host.store.getState(), sessionRef);
 
 const withPanels = (...definitions: Parameters<ContentPanel<null>["register"]>[0][]) => {
@@ -395,18 +398,16 @@ describe("ContentPanel", () => {
     expect(snapshotOf(host).panels.map((panel) => panel.id)).toEqual(["counted:1"]);
   });
 
-  it("scopes panels by the complete SessionRef", () => {
+  it("scopes panels by Environment and session", () => {
     const host = withPanels(diff);
-    const sameIdOtherProject = ref({
-      projectId: "22222222-2222-4222-8222-222222222222",
-    });
+    const otherEnvironment = ref({ environmentId: "env-2" });
     const handle = host.open(S, diff);
-    host.open(sameIdOtherProject, diff);
-    host.close(sameIdOtherProject, "diff");
+    host.open(otherEnvironment, diff);
+    host.close(otherEnvironment, "diff");
 
     expect(handle.sessionRef).toEqual(S);
     expect(snapshotOf(host).panels).toHaveLength(1);
-    expect(snapshotOf(host, sameIdOtherProject).panels).toHaveLength(0);
+    expect(snapshotOf(host, otherEnvironment).panels).toHaveLength(0);
   });
 
   it("forget drops a session and disposes its instances", () => {
@@ -469,6 +470,26 @@ describe("ContentPanel", () => {
     expect(snapshotOf(host).panels).toHaveLength(0);
     expect(host.instanceFor(S, "counted:1")).toBeUndefined();
     expect(host.instanceFor(S, "counted:2")).toBeUndefined();
+  });
+
+  it("forgetAllForEnvironment drops every session on that Environment", () => {
+    let disposed = 0;
+    const disposable = definePanel({
+      type: "disposable",
+      label: "Disposable",
+      create: () => ({ dispose: () => void disposed++ }),
+      view: null,
+    });
+    const host = withPanels(disposable);
+    const other = ref({ environmentId: "env-2", sessionId: "s-2" });
+    host.open(S, disposable);
+    host.open(other, disposable);
+
+    host.forgetAllForEnvironment("env-1");
+
+    expect(disposed).toBe(1);
+    expect(snapshotOf(host).panels).toHaveLength(0);
+    expect(snapshotOf(host, other).panels).toHaveLength(1);
   });
 
   it("no session means no panels", () => {

@@ -7,7 +7,7 @@ export function ScheduleItem({ className, ...props }: ScheduleItemProps) {
   return (
     <li
       className={cn(
-        "hover:bg-accent/50 has-data-checked:border-primary/48 has-data-checked:bg-accent/50 flex items-center gap-6 rounded-lg border p-3",
+        "hover:bg-accent/50 data-[state=selected]:bg-accent/50 flex w-full items-center gap-3 rounded-lg py-2.5",
         className,
       )}
       data-slot="schedule-item"

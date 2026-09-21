@@ -84,11 +84,8 @@ export const sessionRouter = orpc.router({
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
-    const preparedWorkspace = yield* sessions.prepare(input.ref).pipe(
-      Effect.map((sessionWorkspace) => ({
-        ref: input.ref,
-        workspace: sessionWorkspace,
-      })),
+    return yield* sessions.prepare(input.ref).pipe(
+      Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
         SessionNotFound: (e) =>
           Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
@@ -96,9 +93,34 @@ export const sessionRouter = orpc.router({
           Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
         SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
         AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        WorktreeCheckoutMissing: (e) =>
+          Effect.fail(
+            errors.WORKTREE_MISSING({
+              data: { sessionId: e.sessionId, projectId: e.projectId, branch: e.branch },
+            }),
+          ),
       }),
+      mapGitWorktreeErrors(errors),
     );
-    return preparedWorkspace;
+  }),
+  restoreWorktree: orpc.restoreWorktree.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.restoreWorktree(input.ref).pipe(
+      Effect.map((workspace) => ({ ref: input.ref, workspace })),
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        SessionNotWorktree: (e) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({
+              message: `session ${e.sessionId} is not a worktree session`,
+            }),
+          ),
+      }),
+      mapGitWorktreeErrors(errors),
+    );
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;

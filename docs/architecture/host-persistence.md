@@ -232,10 +232,14 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
 The session record persists the resulting `cwd` and `worktree: { branch }` so a
-worktree session can still be opened after that checkout is gone. There is no
-separate worktree manifest. Checkouts must stay under `$PIE_HOME/worktrees/`.
-`prepare` and prompt do not re-create the checkout or require `HEAD` to match
-the stored branch.
+removed checkout can be restored at that path. There is no separate worktree
+manifest. Checkouts must stay under `$PIE_HOME/worktrees/`. `prepare` and prompt do not re-create a worktree checkout or require `HEAD`
+to match the stored branch. When the stored `cwd` directory is gone,
+`prepare` fails with `WORKTREE_MISSING` for worktree sessions and otherwise
+creates the directory. `session.restoreWorktree` is the explicit worktree
+write: `git worktree prune` then `git worktree add <cwd> <branch>` at the
+stored path. It does not mint a new key or branch. If the directory already
+exists it is a no-op.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and

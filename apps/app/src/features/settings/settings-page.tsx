@@ -2,9 +2,9 @@ import type { Settings, ThemePreference } from "@getpie/contract";
 import { Label } from "@getpie/ui/components/label";
 import { Radio, RadioGroup } from "@getpie/ui/components/radio-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
+import { useLocalOrpc } from "@/lib/environment-orpc";
 import { isThemePreference } from "@/theme";
 import { useTheme } from "@/theme-provider";
 
@@ -15,7 +15,7 @@ const THEME_OPTIONS: ReadonlyArray<{ readonly value: ThemePreference; readonly l
 ];
 
 export function SettingsPage(): ReactElement {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useLocalOrpc();
   const queryClient = useQueryClient();
   const { setTheme, theme } = useTheme();
   const settingsQuery = useQuery({
@@ -23,6 +23,7 @@ export function SettingsPage(): ReactElement {
   });
   const settingsQueryKey = orpcQueryUtils.settings.get.queryOptions().queryKey;
   const updateSettings = useMutation({
+    mutationKey: orpcQueryUtils.settings.update.key(),
     mutationFn: (next: Settings) => orpcQueryUtils.settings.update.call(next),
     onSuccess: (data) => {
       queryClient.setQueryData(settingsQueryKey, data);

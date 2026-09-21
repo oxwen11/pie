@@ -1,14 +1,21 @@
-import type { SessionPendingPrompt, SessionRef } from "@getpie/contract";
+import type { SessionPendingPrompt } from "@getpie/contract";
 import { describe, expect, it } from "vitest";
+
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import type { AgentResponse } from "./agent-requests";
 import { ChatManager } from "./chat-manager";
 import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-port";
 
-const refFor = (sessionId: string, overrides: Partial<SessionRef> = {}): SessionRef => ({
-  projectId: "project-1",
-  sessionId,
-  ...overrides,
+const refFor = (
+  sessionId: string,
+  overrides: Partial<{ environmentId: string; projectId: string; sessionId: string }> = {},
+): EnvironmentSessionRef => ({
+  environmentId: overrides.environmentId ?? "env-1",
+  ref: {
+    projectId: overrides.projectId ?? "project-1",
+    sessionId: overrides.sessionId ?? sessionId,
+  },
 });
 
 class FakeTransport implements ChatSessionTransport {
@@ -44,7 +51,7 @@ describe("ChatManager", () => {
     const first = manager.chatFor(refFor("session-1"));
     expect(manager.chatFor(refFor("session-1"))).toBe(first);
     expect(manager.chatFor(refFor("session-2"))).not.toBe(first);
-    expect(manager.chatFor(refFor("session-1", { projectId: "project-2" }))).not.toBe(first);
+    expect(manager.chatFor(refFor("session-1", { environmentId: "env-2" }))).not.toBe(first);
     expect(transports).toHaveLength(3);
   });
 
@@ -73,6 +80,18 @@ describe("ChatManager", () => {
     expect(reopened).not.toBe(closed);
     expect(transports).toHaveLength(2);
     expect(reopened.store.getState().error).toBeUndefined();
+  });
+
+  it("forgets every Chat on an Environment so reconnect gets a new transport", () => {
+    const { manager, transports } = makeManager();
+    const first = manager.chatFor(refFor("session-1"));
+    manager.chatFor(refFor("session-2"));
+    manager.chatFor(refFor("session-1", { environmentId: "env-2" }));
+    manager.forgetEnvironment("env-1");
+    const reopened = manager.chatFor(refFor("session-1"));
+    expect(reopened).not.toBe(first);
+    expect(manager.chatFor(refFor("session-1", { environmentId: "env-2" }))).toBeDefined();
+    expect(transports).toHaveLength(4);
   });
 
   it("evicts once even if the stream closes twice", () => {

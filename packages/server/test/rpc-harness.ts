@@ -130,7 +130,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
   );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
     settingsRepositoryLayer,
