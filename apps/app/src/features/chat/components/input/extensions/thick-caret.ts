@@ -3,8 +3,8 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 
 // 2px caret as a widget decoration (TipTap/ProseMirror), not a measured overlay.
-// Height is 1em in CSS — the glyph box — so it tracks font-size instead of
-// leading / coordsAtPos. Native caret during IME (`data-composing`).
+// ZWSP so the inline-block shares the text baseline; CSS line-height 1 = 1em.
+// Native caret during IME (`data-composing`).
 export function createThickCaretExtension() {
   return Extension.create({
     name: "chatThickCaret",
@@ -50,5 +50,6 @@ function caretEl() {
   const el = document.createElement("span");
   el.className = "chat-input-caret";
   el.ariaHidden = "true";
+  el.textContent = "\u200b";
   return el;
 }
