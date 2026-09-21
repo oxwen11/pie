@@ -9,7 +9,7 @@ import { makeGitHashDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Deferred, Effect, Fiber, FileSystem } from "effect";
 
 import { daemonDirectory } from "../../src/config/paths";
-import { DaemonCompatibilityMismatchError, DaemonStoppedError } from "../../src/daemon/errors";
+import { DaemonStoppedError } from "../../src/daemon/errors";
 import {
   type ResolveDaemonOptions,
   resolveOrSpawnDaemon,
@@ -164,8 +164,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
           port: 0,
           requiredCompatibilityKey: NEXT_KEY,
         }).pipe(Effect.flip);
-        assert.equal(error._tag, "DaemonCompatibilityMismatchError");
-        assert.ok(error instanceof DaemonCompatibilityMismatchError);
+        assert.match(error.message, /already running with a different version/);
         assert.equal(pidAlive(first.pid), true);
       }),
     );
@@ -450,7 +449,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
         const replacement = yield* Fiber.join(replacementFiber);
         const final = yield* Fiber.join(oldKeyFiber).pipe(Effect.flip);
         assert.notEqual(replacement.pid, old.pid);
-        assert.equal(final._tag, "DaemonCompatibilityMismatchError");
+        assert.match(final.message, /already running with a different version/);
         assert.equal(pidAlive(replacement.pid), true);
         assert.equal((yield* readRecord(daemonDir))?.compatibilityKey, NEXT_KEY);
       }),

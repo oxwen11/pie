@@ -5,12 +5,7 @@ export {
   settingsFile,
   sshEnvironmentsFile,
 } from "../config/paths";
-export {
-  DAEMON_VERSION_MISMATCH_MESSAGE,
-  DaemonCompatibilityMismatchError,
-  DaemonLaunchError,
-  DaemonStoppedError,
-} from "./errors";
+export { DaemonLaunchError, DaemonStoppedError } from "./errors";
 export {
   type DaemonHandle,
   type DaemonLauncherError,

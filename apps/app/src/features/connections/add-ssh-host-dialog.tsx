@@ -26,9 +26,6 @@ import { usePlatform } from "@/platform-context";
 
 import { composeSshConnectTarget } from "./ssh-connect-target";
 
-const isRemoteDaemonReplaceRequired = (error: unknown): boolean =>
-  error instanceof Error && error.message.includes("already running with a different version");
-
 function discoveredHostAddress(host: DiscoveredSshHost): string {
   const authority = host.username ? `${host.username}@${host.hostname}` : host.hostname;
   return host.port === null ? authority : `${authority}:${String(host.port)}`;
@@ -105,14 +102,18 @@ export function AddSshHostDialog({ onClose }: { onClose: () => void }): ReactEle
     setPending(true);
     setReplaceTarget(null);
     void ssh
-      .connect(target, replace ? { replace: true } : undefined)
+      .connect(target, { replace })
       .then(() => {
         onClose();
         return undefined;
       })
       .catch((error: unknown) => {
         setPending(false);
-        if (!replace && isRemoteDaemonReplaceRequired(error)) {
+        if (
+          !replace &&
+          error instanceof Error &&
+          error.message.includes("already running with a different version")
+        ) {
           setReplaceTarget(target);
           return undefined;
         }

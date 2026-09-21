@@ -11,12 +11,7 @@ import {
   LOGS_DIRECTORY_MODE,
   logsDirectory,
 } from "../config/paths";
-import {
-  DAEMON_VERSION_MISMATCH_MESSAGE,
-  DaemonCompatibilityMismatchError,
-  DaemonLaunchError,
-  DaemonStoppedError,
-} from "./errors";
+import { DaemonLaunchError, DaemonStoppedError } from "./errors";
 import { daemonAlive, healthy, pidAlive } from "./liveness";
 import { acquireLock } from "./lock";
 import { reservePort } from "./port";
@@ -71,10 +66,7 @@ export type ResolveDaemonOptions = {
   readonly readyTimeoutMs?: number;
 };
 
-export type DaemonLauncherError =
-  | DaemonLaunchError
-  | DaemonStoppedError
-  | DaemonCompatibilityMismatchError;
+export type DaemonLauncherError = DaemonLaunchError | DaemonStoppedError;
 
 /**
  * The platform services the launcher's file state runs on. Provided at each
@@ -259,8 +251,9 @@ const resolveLocked = (
       }
     } else if (existing !== undefined && existingHealthy) {
       if (options.replaceIncompatible !== true) {
-        return yield* new DaemonCompatibilityMismatchError({
-          message: DAEMON_VERSION_MISMATCH_MESSAGE,
+        return yield* new DaemonLaunchError({
+          message:
+            "pie daemon is already running with a different version. Restart it with: pie daemon start --replace",
         });
       }
       yield* Effect.logInfo("Replacing incompatible pie daemon").pipe(

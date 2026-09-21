@@ -44,7 +44,7 @@ const startDaemon = (input: DaemonStartInput) =>
     const handle = yield* resolveCliDaemon(
       config.port,
       daemonServeEnvironment(process.env, config),
-      input.replace ? { replaceIncompatible: true } : undefined,
+      input.replace === true,
     );
     console.log(
       handle.reused

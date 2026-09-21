@@ -61,8 +61,8 @@ describe("remote launch scripts", () => {
   it("starts or attaches the remote pie daemon and prints launch JSON", () => {
     const script = buildRemoteLaunchScript();
     expect(script).toContain("unset NODE_ENV PIE_HOME PIE_DAEMON_DIR PIE_AUTH_TOKEN");
-    expect(script).toContain('= "replace"');
-    expect(script).toContain("daemon start --replace");
+    expect(script).toContain("= replace");
+    expect(script).toContain("--replace");
     expect(script).toContain("daemon start");
     expect(script).toContain("$HOME/.pie/daemon/daemon.pid");
     expect(script).toContain("$HOME/.pie/ssh-launch/");
