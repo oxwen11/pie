@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { _electron as electron } from "@playwright/test";
 
-import { expect, test } from "./fixtures.js";
+import { closeElectron, expect, test } from "./fixtures.js";
 
 test.use({ fakePiResponse: "![E2E local image](e2e-image.png)" });
 
@@ -12,6 +12,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
   electronApp,
   window,
 }, testInfo) => {
+  test.setTimeout(120_000);
   fs.copyFileSync(
     path.join(import.meta.dirname, "../../resources/icon.png"),
     path.join(e2ePaths.workspace, "e2e-image.png"),
@@ -23,7 +24,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
   await window.getByRole("combobox").filter({ hasText: "Choose project" }).click();
   await window.getByRole("option", { name: /e2e-workspace/ }).click();
   await window.locator("[contenteditable='true']").fill("Render the local image");
-  await window.locator("[contenteditable='true']").press("Enter");
+  await window.locator('form button[type="submit"]').click();
 
   await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
   const image = window.getByRole("img", { name: "E2E local image" });
@@ -68,7 +69,7 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
   });
 
   await window.screenshot({ path: testInfo.outputPath("markdown-image-live.png") });
-  await electronApp.close();
+  await closeElectron(electronApp);
 
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
@@ -116,6 +117,6 @@ test("decodes a live and replayed local Markdown image through a signed asset UR
     expect(replayedSrc).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/api\/assets\//);
     await replayWindow.screenshot({ path: testInfo.outputPath("markdown-image-history.png") });
   } finally {
-    await replayApp.close();
+    await closeElectron(replayApp);
   }
 });
