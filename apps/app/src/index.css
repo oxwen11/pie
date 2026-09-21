@@ -144,6 +144,8 @@ form:has(> [data-slot="chat-input"]) {
 }
 
 form:has(> [data-slot="chat-input"]):focus-within {
+  z-index: 1;
+  clip-path: none;
   border-color: color-mix(in srgb, var(--ring) 50%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
 }
