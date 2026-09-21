@@ -3,7 +3,7 @@ import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
-import { ExternalLinkIcon, GitPullRequestIcon, RefreshCwIcon } from "lucide-react";
+import { GitPullRequestIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 

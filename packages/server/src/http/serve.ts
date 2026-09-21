@@ -40,16 +40,10 @@ export function daemonServeEnvironment(
   env: NodeJS.ProcessEnv,
   config: ServeConfig,
 ): NodeJS.ProcessEnv {
-  return {
-    ...env,
-    PIE_HOST: config.host,
-    ...(config.corsOrigins.length > 0
-      ? { PIE_CORS_ORIGINS: config.corsOrigins.join(",") }
-      : {}),
-    ...(config.allowedHosts.length > 0
-      ? { PIE_ALLOWED_HOSTS: config.allowedHosts.join(",") }
-      : {}),
-  };
+  const result: NodeJS.ProcessEnv = { ...env, PIE_HOST: config.host };
+  if (config.corsOrigins.length > 0) result.PIE_CORS_ORIGINS = config.corsOrigins.join(",");
+  if (config.allowedHosts.length > 0) result.PIE_ALLOWED_HOSTS = config.allowedHosts.join(",");
+  return result;
 }
 
 export const serveFlags = {
@@ -161,8 +155,12 @@ const serveWith = (input: ServeInput) =>
       onNone: () => undefined,
       onSome: Redacted.value,
     });
-    const { port: requestedPort, host, corsOrigins, allowedHosts } =
-      yield* resolveServeConfig(input);
+    const {
+      port: requestedPort,
+      host,
+      corsOrigins,
+      allowedHosts,
+    } = yield* resolveServeConfig(input);
     if (!isLoopbackBind(host) && authToken === undefined) {
       return yield* new ServerStartupError({
         phase: "create",
