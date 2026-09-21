@@ -39,7 +39,7 @@ function KeyedApp({
   const initial = use(promise.current);
   /* oxlint-enable react/refs */
   const [connection, setConnection] = useState(initial);
-  const tokenHolder = useRef(initial.token);
+  const tokenHolder = useRef(initial.token ?? "");
 
   // The daemon mints a fresh token on every respawn, so the startup connection
   // dies with the first server restart. The feed only emits transitions, so
@@ -52,7 +52,7 @@ function KeyedApp({
       void load()
         .then((fresh) => {
           if (!cancelled) {
-            tokenHolder.current = fresh.token;
+            tokenHolder.current = fresh.token ?? "";
             setConnection((current) => (sameConnection(current, fresh) ? current : fresh));
           }
           return undefined;
