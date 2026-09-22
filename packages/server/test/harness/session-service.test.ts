@@ -65,40 +65,6 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
-  it.effect("backfills a missing source once and publishes an update", () =>
-    Effect.gen(function* () {
-      const result = yield* run({}, (fixture) =>
-        Effect.scoped(
-          Effect.gen(function* () {
-            const { ref } = yield* fixture.service.create({
-              projectId: "proj-a",
-              cwd: "/tmp/pie-app",
-            });
-            const stream = yield* fixture.bus.subscribe({ kind: "global" });
-            const source = {
-              kind: "schedule" as const,
-              scheduleId: "11111111-1111-4111-8111-111111111111",
-            };
-            yield* fixture.service.rememberSource(ref, source);
-            yield* fixture.service.rememberSource(ref, source);
-            const events = yield* Stream.runCollect(Stream.take(stream, 1));
-            const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-            return { events: Array.from(events), stored };
-          }),
-        ),
-      );
-
-      assert.deepEqual(result.stored.source, {
-        kind: "schedule",
-        scheduleId: "11111111-1111-4111-8111-111111111111",
-      });
-      assert.equal(
-        result.events[0]?.type === "event" ? result.events[0].event.type : undefined,
-        "session.updated",
-      );
-    }),
-  );
-
   it.effect("appends unique pull request refs without replacing earlier ones", () =>
     Effect.gen(function* () {
       const first = {

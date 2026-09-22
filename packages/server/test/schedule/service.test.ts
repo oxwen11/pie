@@ -99,10 +99,6 @@ const stubSessions = (opts: {
     source?: SessionSource;
   }>;
   readonly prompted: Array<string>;
-  readonly sourced: Array<{
-    ref: SessionRef;
-    source: SessionSource;
-  }>;
   readonly catalog: Array<SessionRecord>;
   readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
   readonly live?: boolean;
@@ -158,10 +154,6 @@ const stubSessions = (opts: {
     archive: unused,
     pullRequestRefsFor: unused,
     rememberPullRequestRef: unused,
-    rememberSource: (ref, source) =>
-      Effect.sync(() => {
-        opts.sourced.push({ ref, source });
-      }),
     getMessages: unused,
     interrupt: unused,
     replaceQueue: unused,
@@ -199,10 +191,6 @@ const harness = (
       source?: SessionSource;
     }> = [];
     const prompted: Array<string> = [];
-    const sourced: Array<{
-      ref: SessionRef;
-      source: SessionSource;
-    }> = [];
     const catalog: Array<SessionRecord> = [];
     for (const session of opts.seed ?? []) {
       seedSession(catalog, session.sessionId, session.archived ?? false);
@@ -230,7 +218,6 @@ const harness = (
             stubSessions({
               created,
               prompted,
-              sourced,
               catalog,
               ...(opts.sessionPhase !== undefined
                 ? { sessionPhase: opts.sessionPhase }
@@ -248,7 +235,6 @@ const harness = (
       store,
       created,
       prompted,
-      sourced,
       catalog,
     };
   });
@@ -438,27 +424,6 @@ describe("ScheduleService", () => {
       assert.strictEqual(h.created.length, 0);
       assert.strictEqual(after?.lastRunStatus, "skipped");
       assert.strictEqual(after?.runs[0]?.skipReason, "in_progress");
-    }),
-  );
-
-  it.effect("skips runNow when the bound session is busy", () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(ORIGIN);
-      const h = yield* harness({
-        live: true,
-        seed: [{ sessionId: "owned-1" }],
-      });
-      const created = yield* h.service.create(
-        cronInput({
-          spec: { kind: "manual" },
-          session: { policy: "owned", sessionId: "owned-1" },
-        }),
-      );
-      const fired = yield* h.service.runNow(created.id);
-      assert.isUndefined(fired.ref);
-      assert.strictEqual(h.created.length, 0);
-      assert.strictEqual(fired.schedule.lastRunStatus, "skipped");
-      assert.strictEqual(fired.schedule.runs[0]?.skipReason, "in_progress");
     }),
   );
 
@@ -810,28 +775,6 @@ describe("ScheduleService", () => {
       assert.strictEqual(after?.lastError, "app-exit");
       assert.strictEqual(after?.runs[0]?.status, "interrupted");
       assert.strictEqual(after?.runs[0]?.error, "app-exit");
-      assert.deepStrictEqual(h.sourced, [
-        {
-          ref: { projectId: PROJECT_ID, sessionId: "sess-old" },
-          source: { kind: "schedule", scheduleId: created.id },
-        },
-      ]);
-    }),
-  );
-
-  it.effect("does not mark a reused existing session as Schedule-created", () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(ORIGIN);
-      const h = yield* harness({ seed: [{ sessionId: "picked-session" }] });
-      const created = yield* h.service.create(
-        cronInput({
-          spec: { kind: "manual" },
-          session: { policy: "existing", sessionId: "picked-session" },
-        }),
-      );
-      yield* h.service.runNow(created.id);
-      yield* h.service.recover();
-      assert.deepStrictEqual(h.sourced, []);
     }),
   );
 

@@ -191,13 +191,7 @@ export type PiAgentSessionServiceShape = {
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
 } & Pick<
   SessionMetadataShape,
-  | "workspaceFor"
-  | "rename"
-  | "archive"
-  | "pullRequestRefsFor"
-  | "rememberPullRequestRef"
-  | "rememberSource"
-  | "list"
+  "workspaceFor" | "rename" | "archive" | "pullRequestRefsFor" | "rememberPullRequestRef" | "list"
 >;
 
 export class PiAgentSessionService extends Context.Service<
@@ -680,7 +674,6 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       archive: sessionMetadata.archive,
       pullRequestRefsFor: sessionMetadata.pullRequestRefsFor,
       rememberPullRequestRef: sessionMetadata.rememberPullRequestRef,
-      rememberSource: sessionMetadata.rememberSource,
       list: sessionMetadata.list,
     } satisfies PiAgentSessionServiceShape;
   }),

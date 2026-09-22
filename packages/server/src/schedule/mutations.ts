@@ -13,7 +13,6 @@ import {
 import { Clock, Effect } from "effect";
 
 import { ScheduleLimitReached } from "../errors";
-import { PiAgentSessionService } from "../harness";
 import { ProjectService } from "../project";
 import { fire } from "./fire";
 import { iso, nextWakeDelayMs } from "./next-run";
@@ -21,23 +20,6 @@ import { ScheduleRepository } from "./repository";
 import { compareSchedules, tryNextRun, tryValidate } from "./run-record";
 import { logSchedule, newScheduleId, releaseInFlight } from "./runtime";
 import { trySession } from "./session";
-
-const createdSessionIdsOf = (schedule: Schedule): ReadonlySet<string> => {
-  const ids = new Set<string>();
-  const current = scheduleSessionOf(schedule);
-  if (current.policy === "owned" && current.sessionId !== undefined) ids.add(current.sessionId);
-  if (current.policy === "isolated" && schedule.lastSessionId !== undefined) {
-    ids.add(schedule.lastSessionId);
-  }
-  for (const run of schedule.runs) {
-    if (run.sessionId === undefined) continue;
-    const session = scheduleSessionOf(run.snapshot ?? {});
-    if (session.policy !== "existing" || session.sessionId !== run.sessionId) {
-      ids.add(run.sessionId);
-    }
-  }
-  return ids;
-};
 
 export const list = () =>
   Effect.gen(function* () {
@@ -224,7 +206,6 @@ export const runNow = (id: string) =>
 export const recover = () =>
   Effect.gen(function* () {
     const repo = yield* ScheduleRepository;
-    const sessions = yield* PiAgentSessionService;
     const tickedAt = yield* Clock.currentTimeMillis;
     const finishedAt = new Date(tickedAt).toISOString();
     const schedules = yield* repo.list();
@@ -257,22 +238,6 @@ export const recover = () =>
         annotations: { recovered },
       });
     }
-    yield* Effect.forEach(
-      schedules,
-      (schedule) =>
-        Effect.forEach(
-          createdSessionIdsOf(schedule),
-          (sessionId) =>
-            sessions
-              .rememberSource(
-                { projectId: schedule.projectId, sessionId },
-                { kind: "schedule", scheduleId: schedule.id },
-              )
-              .pipe(Effect.catchTag("SessionNotFound", () => Effect.void)),
-          { concurrency: 1, discard: true },
-        ),
-      { concurrency: 1, discard: true },
-    );
   });
 
 export const nextWakeDelay = () =>
