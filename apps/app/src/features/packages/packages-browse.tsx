@@ -215,7 +215,6 @@ function Marketplace({
   const pageSize = catalog.data?.pageSize ?? 50;
   const { pageCount, pageEnd, pageStart } = catalogPageRange(catalogPage, pageSize, catalogTotal);
   const catalogError = catalog.isError ? catalog.error.message : null;
-  const isPending = catalog.isPending && catalog.data === undefined;
 
   return (
     <>
@@ -239,99 +238,254 @@ function Marketplace({
         </div>
       </form>
       {children(catalogItems)}
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-base font-medium">Marketplace</h2>
-          <p className="text-muted-foreground text-xs">
-            {catalog.isFetching ? (
-              <span className="inline-flex items-center gap-2">
-                <Spinner className="size-3.5" />
-                Searching…
-              </span>
-            ) : catalogTotal > 0 ? (
-              `${pageStart}-${pageEnd} / ${catalogTotal}`
-            ) : null}
+      <MarketplaceResults
+        addingSource={addingSource}
+        catalogError={catalogError}
+        catalogItems={catalogItems}
+        catalogPage={catalogPage}
+        catalogTotal={catalogTotal}
+        fetching={catalog.isFetching}
+        items={items}
+        onAdd={onAdd}
+        onDetailChange={onDetailChange}
+        onPageChange={setCatalogPage}
+        pageCount={pageCount}
+        pageEnd={pageEnd}
+        pageStart={pageStart}
+        pending={catalog.isPending && catalog.data === undefined}
+      />
+    </>
+  );
+}
+
+function MarketplaceResults({
+  addingSource,
+  catalogError,
+  catalogItems,
+  catalogPage,
+  catalogTotal,
+  fetching,
+  items,
+  onAdd,
+  onDetailChange,
+  onPageChange,
+  pageCount,
+  pageEnd,
+  pageStart,
+  pending,
+}: {
+  addingSource: string | undefined;
+  catalogError: string | null;
+  catalogItems: ReadonlyArray<PackageCatalogItem>;
+  catalogPage: number;
+  catalogTotal: number;
+  fetching: boolean;
+  items: ReadonlyArray<PackageItem>;
+  onAdd: (source: string) => void;
+  onDetailChange: (detail: PackageDetail) => void;
+  onPageChange: (page: number) => void;
+  pageCount: number;
+  pageEnd: number;
+  pageStart: number;
+  pending: boolean;
+}): ReactElement {
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 className="text-base font-medium">Marketplace</h2>
+        <MarketplaceRange
+          end={pageEnd}
+          fetching={fetching}
+          start={pageStart}
+          total={catalogTotal}
+        />
+      </div>
+      <MarketplaceBody
+        addingSource={addingSource}
+        catalogError={catalogError}
+        catalogItems={catalogItems}
+        catalogPage={catalogPage}
+        fetching={fetching}
+        items={items}
+        onAdd={onAdd}
+        onDetailChange={onDetailChange}
+        onPageChange={onPageChange}
+        pageCount={pageCount}
+        pending={pending}
+      />
+    </section>
+  );
+}
+
+function MarketplaceRange({
+  end,
+  fetching,
+  start,
+  total,
+}: {
+  end: number;
+  fetching: boolean;
+  start: number;
+  total: number;
+}): ReactElement | null {
+  if (fetching) {
+    return (
+      <p className="text-muted-foreground text-xs">
+        <span className="inline-flex items-center gap-2">
+          <Spinner className="size-3.5" />
+          Searching…
+        </span>
+      </p>
+    );
+  }
+  if (total === 0) return null;
+  return (
+    <p className="text-muted-foreground text-xs">
+      {start}-{end} / {total}
+    </p>
+  );
+}
+
+function MarketplaceBody({
+  addingSource,
+  catalogError,
+  catalogItems,
+  catalogPage,
+  fetching,
+  items,
+  onAdd,
+  onDetailChange,
+  onPageChange,
+  pageCount,
+  pending,
+}: {
+  addingSource: string | undefined;
+  catalogError: string | null;
+  catalogItems: ReadonlyArray<PackageCatalogItem>;
+  catalogPage: number;
+  fetching: boolean;
+  items: ReadonlyArray<PackageItem>;
+  onAdd: (source: string) => void;
+  onDetailChange: (detail: PackageDetail) => void;
+  onPageChange: (page: number) => void;
+  pageCount: number;
+  pending: boolean;
+}): ReactElement {
+  if (pending) return <Loader />;
+  if (catalogError !== null) return <p className="text-destructive text-sm">{catalogError}</p>;
+  if (catalogItems.length === 0 && !fetching) {
+    return <p className="text-muted-foreground text-sm">No packages matched.</p>;
+  }
+  return (
+    <>
+      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {catalogItems.map((item) => (
+          <MarketplaceHit
+            adding={addingSource === item.source}
+            addDisabled={addingSource !== undefined}
+            configured={isConfigured(items, item.name)}
+            item={item}
+            key={item.name}
+            onAdd={onAdd}
+            onDetailChange={onDetailChange}
+          />
+        ))}
+      </ul>
+      <MarketplacePager
+        fetching={fetching}
+        onPageChange={onPageChange}
+        page={catalogPage}
+        pageCount={pageCount}
+      />
+    </>
+  );
+}
+
+function MarketplaceHit({
+  addDisabled,
+  adding,
+  configured,
+  item,
+  onAdd,
+  onDetailChange,
+}: {
+  addDisabled: boolean;
+  adding: boolean;
+  configured: boolean;
+  item: PackageCatalogItem;
+  onAdd: (source: string) => void;
+  onDetailChange: (detail: PackageDetail) => void;
+}): ReactElement {
+  const downloads = formatDownloads(item.downloadsMonthly);
+  return (
+    <li className="bg-muted/50 hover:bg-muted/70 flex items-center rounded-2xl">
+      <button
+        className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left"
+        onClick={() => onDetailChange(detailFromCatalog(item))}
+        type="button"
+      >
+        <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl text-sm">
+          {packageInitial(item.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{item.name}</p>
+          {item.description ? (
+            <p className="text-muted-foreground line-clamp-1 text-xs">{item.description}</p>
+          ) : null}
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {[item.version, item.publisher, downloads].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {isPending ? (
-          <Loader />
-        ) : catalogError ? (
-          <p className="text-destructive text-sm">{catalogError}</p>
-        ) : catalogItems.length === 0 && !catalog.isFetching ? (
-          <p className="text-muted-foreground text-sm">No packages matched.</p>
-        ) : (
-          <>
-            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {catalogItems.map((item) => {
-                const configured = isConfigured(items, item.name);
-                const downloads = formatDownloads(item.downloadsMonthly);
-                const adding = addingSource === item.source;
-                return (
-                  <li
-                    className="bg-muted/50 hover:bg-muted/70 flex items-center rounded-2xl"
-                    key={item.name}
-                  >
-                    <button
-                      className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left"
-                      onClick={() => onDetailChange(detailFromCatalog(item))}
-                      type="button"
-                    >
-                      <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-xl text-sm">
-                        {packageInitial(item.name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{item.name}</p>
-                        {item.description ? (
-                          <p className="text-muted-foreground line-clamp-1 text-xs">
-                            {item.description}
-                          </p>
-                        ) : null}
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          {[item.version, item.publisher, downloads].filter(Boolean).join(" · ")}
-                        </p>
-                      </div>
-                    </button>
-                    <Button
-                      className="mr-3 rounded-full"
-                      disabled={configured || addingSource !== undefined}
-                      onClick={() => onAdd(item.source)}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      {adding ? <Spinner className="size-4" /> : null}
-                      {configured ? "Added" : "Install"}
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                disabled={catalogPage <= 1 || catalog.isFetching}
-                onClick={() => setCatalogPage(Math.max(1, catalogPage - 1))}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                Previous
-              </Button>
-              <span className="text-muted-foreground text-xs">
-                Page {catalogPage} / {pageCount}
-              </span>
-              <Button
-                disabled={catalogPage >= pageCount || catalog.isFetching}
-                onClick={() => setCatalogPage(catalogPage + 1)}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                Next
-              </Button>
-            </div>
-          </>
-        )}
-      </section>
-    </>
+      </button>
+      <Button
+        className="mr-3 rounded-full"
+        disabled={configured || addDisabled}
+        onClick={() => onAdd(item.source)}
+        size="sm"
+        type="button"
+        variant="secondary"
+      >
+        {adding ? <Spinner className="size-4" /> : null}
+        {configured ? "Added" : "Install"}
+      </Button>
+    </li>
+  );
+}
+
+function MarketplacePager({
+  fetching,
+  onPageChange,
+  page,
+  pageCount,
+}: {
+  fetching: boolean;
+  onPageChange: (page: number) => void;
+  page: number;
+  pageCount: number;
+}): ReactElement {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <Button
+        disabled={page <= 1 || fetching}
+        onClick={() => onPageChange(Math.max(1, page - 1))}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        Previous
+      </Button>
+      <span className="text-muted-foreground text-xs">
+        Page {page} / {pageCount}
+      </span>
+      <Button
+        disabled={page >= pageCount || fetching}
+        onClick={() => onPageChange(page + 1)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        Next
+      </Button>
+    </div>
   );
 }
