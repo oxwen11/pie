@@ -74,6 +74,7 @@ describe("remote launch scripts", () => {
     expect(script).toContain("/ssh-launch/");
     expect(script).toContain("remotePort: port");
     expect(script).toContain("token: token");
+    expect(script).toContain("compatibilityKey: compatibilityKey");
     expect(script).toContain("os.hostname()");
     expect(script).not.toContain("serverKind");
     expect(script).not.toContain("@@PIE_");
@@ -251,6 +252,7 @@ nvm() { :; }
           address: `http://127.0.0.1:${String(listened.port)}`,
           token: "secret-token",
           startedAt: 1,
+          compatibilityKey: "githash:aaaaaaaa",
         }),
       );
 
@@ -258,6 +260,7 @@ nvm() { :; }
       expect(result.status).toBe(0);
       expect(result.stdout).toContain(`"remotePort":${String(listened.port)}`);
       expect(result.stdout).toContain('"token":"secret-token"');
+      expect(result.stdout).toContain('"compatibilityKey":"githash:aaaaaaaa"');
       await expect(fs.stat(path.join(home, "pie-called"))).rejects.toThrow(/ENOENT/);
     } finally {
       server.close();
