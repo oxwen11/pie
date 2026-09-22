@@ -4,6 +4,7 @@ import { Effect } from "effect";
 import { ScheduleService } from "../schedule";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
+import { catchScheduleNotFound, projectNotFound, scheduleNotFound } from "./wire";
 
 const orpc = implement(scheduleContract).$context<RpcContext>();
 
@@ -14,22 +15,18 @@ export const scheduleRouter = orpc.router({
   }),
   get: orpc.get.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
-    return yield* schedules.get(input.id).pipe(
-      Effect.catchTags({
-        ScheduleNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `schedule ${e.scheduleId} not found` })),
-      }),
-    );
+    return yield* schedules.get(input.id).pipe(catchScheduleNotFound(errors));
   }),
   create: orpc.create.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
     return yield* schedules.create(input).pipe(
       Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        InvalidSchedule: (e) => Effect.fail(errors.INVALID_ARGUMENT({ message: e.reason })),
-        ScheduleLimitReached: (e) =>
-          Effect.fail(errors.INVALID_ARGUMENT({ message: `already have ${e.limit} schedules` })),
+        ProjectNotFound: projectNotFound(errors),
+        InvalidSchedule: (error) => Effect.fail(errors.INVALID_ARGUMENT({ message: error.reason })),
+        ScheduleLimitReached: (error) =>
+          Effect.fail(
+            errors.INVALID_ARGUMENT({ message: `already have ${error.limit} schedules` }),
+          ),
       }),
     );
   }),
@@ -37,29 +34,18 @@ export const scheduleRouter = orpc.router({
     const schedules = yield* ScheduleService;
     return yield* schedules.update(input).pipe(
       Effect.catchTags({
-        ScheduleNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `schedule ${e.scheduleId} not found` })),
-        InvalidSchedule: (e) => Effect.fail(errors.INVALID_ARGUMENT({ message: e.reason })),
+        ScheduleNotFound: scheduleNotFound(errors),
+        InvalidSchedule: (error) => Effect.fail(errors.INVALID_ARGUMENT({ message: error.reason })),
       }),
     );
   }),
   delete: orpc.delete.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
-    yield* schedules.delete(input.id).pipe(
-      Effect.catchTags({
-        ScheduleNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `schedule ${e.scheduleId} not found` })),
-      }),
-    );
+    yield* schedules.delete(input.id).pipe(catchScheduleNotFound(errors));
   }),
   runNow: orpc.runNow.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
-    return yield* schedules.runNow(input.id).pipe(
-      Effect.catchTags({
-        ScheduleNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `schedule ${e.scheduleId} not found` })),
-      }),
-    );
+    return yield* schedules.runNow(input.id).pipe(catchScheduleNotFound(errors));
   }),
 });
 

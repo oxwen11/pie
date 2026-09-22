@@ -2,19 +2,15 @@ import type { WorkspaceQuery } from "@getpie/contract";
 import { Effect } from "effect";
 
 import { ProjectNotFound, SessionNotFound, StoreReadError } from "../errors";
-import { PiAgentSessionService } from "../harness";
+import { SessionMetadata } from "../harness/session-metadata";
 
 export const resolveWorkspaceCwd = (
   input: WorkspaceQuery,
-): Effect.Effect<
-  string,
-  SessionNotFound | ProjectNotFound | StoreReadError,
-  PiAgentSessionService
-> =>
+): Effect.Effect<string, SessionNotFound | ProjectNotFound | StoreReadError, SessionMetadata> =>
   Effect.gen(function* () {
     if ("ref" in input) {
-      const sessions = yield* PiAgentSessionService;
-      const workspace = yield* sessions.workspaceFor(input.ref);
+      const metadata = yield* SessionMetadata;
+      const workspace = yield* metadata.workspaceFor(input.ref);
       return workspace.cwd;
     }
     return input.cwd;

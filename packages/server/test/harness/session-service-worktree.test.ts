@@ -118,7 +118,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
               cwd: "/tmp/pie-app",
               worktree: {},
             });
-            yield* fixture.service.archive(created.ref, true);
+            yield* fixture.metadata.archive(created.ref, true);
             const workspace = yield* fixture.service.prepare(created.ref);
             return { created, workspace };
           }),
@@ -222,7 +222,7 @@ layer(NodePlatformLayer)("PiAgentSessionService worktree create", (it) => {
           const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
           const { cwd: _dropped, ...withoutCwd } = stored;
           yield* fixture.repo.write(withoutCwd);
-          const workspace = yield* fixture.service.workspaceFor(ref);
+          const workspace = yield* fixture.metadata.workspaceFor(ref);
           const after = yield* fixture.repo.read(ref.projectId, ref.sessionId);
           return { workspace, cwd: after.cwd };
         }),

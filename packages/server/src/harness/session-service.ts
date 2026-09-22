@@ -53,7 +53,6 @@ import {
   modelStateFromMetadata,
   SessionMetadata,
   SessionMetadataLayer,
-  type SessionMetadataShape,
   type SessionWithCwd,
   toSessionWorkspace,
 } from "./session-metadata";
@@ -187,10 +186,7 @@ export type PiAgentSessionServiceShape = {
   >;
   readonly getStatus: (ref: SessionRef) => Effect.Effect<SessionStatus>;
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
-} & Pick<
-  SessionMetadataShape,
-  "workspaceFor" | "rename" | "archive" | "pullRequestRefsFor" | "rememberPullRequestRef" | "list"
->;
+};
 
 export class PiAgentSessionService extends Context.Service<
   PiAgentSessionService,
@@ -345,6 +341,19 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     ): Effect.Effect<A, ResumeSessionError | SessionClosed | AgentOperationError | E> =>
       manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
 
+    /** Cold path when the session has never opened a Pi process; otherwise ensure cwd and run. */
+    const withEnsuredSession = <A, ECold, ELive>(
+      metadata: Session,
+      cold: Effect.Effect<A, ECold>,
+      live: (agentSessionId: string, cwd: string) => Effect.Effect<A, ELive>,
+    ): Effect.Effect<A, ECold | ELive | ProjectNotFound | StoreReadError | StoreWriteError> => {
+      if (metadata.agentSessionId === undefined) return cold;
+      const agentSessionId = metadata.agentSessionId;
+      return ensureCwd(metadata).pipe(
+        Effect.flatMap((resolved) => live(agentSessionId, resolved.cwd)),
+      );
+    };
+
     return {
       create: (input) =>
         newSessionId.pipe(
@@ -389,9 +398,11 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   Effect.tap(() => {
                     const model = input.model;
                     if (model === undefined) return Effect.void;
-                    return Effect.tryPromise(() =>
-                      persistDefaultPiModel(model.provider, model.modelId),
-                    ).pipe(Effect.ignore);
+                    return persistDefaultPiModel(
+                      model.provider,
+                      model.modelId,
+                      sessionWorkspace.cwd,
+                    );
                   }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
@@ -495,14 +506,12 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       getMessages: (ref: SessionRef) =>
         readMetadata(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed<ReadonlyArray<PieUIMessage>>([]);
-            }
-            const agentSessionId = metadata.agentSessionId;
-            return ensureCwd(metadata).pipe(
-              Effect.flatMap((resolved) =>
-                readHistory(ref, agentSessionId, resolved.cwd).pipe(
+          Effect.flatMap((metadata) =>
+            withEnsuredSession(
+              metadata,
+              Effect.succeed<ReadonlyArray<PieUIMessage>>([]),
+              (agentSessionId, cwd) =>
+                readHistory(ref, agentSessionId, cwd).pipe(
                   Effect.flatMap((messages) =>
                     manager.status(ref).pipe(
                       Effect.map((status) => {
@@ -515,9 +524,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
+            ),
+          ),
           inSession(ref),
         ),
 
@@ -593,22 +601,14 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
       getModelState: (ref: SessionRef) =>
         readMetadata(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed(modelStateFromMetadata(metadata));
-            }
-            const agentSessionId = metadata.agentSessionId;
-            return ensureCwd(metadata).pipe(
-              Effect.flatMap((resolved) =>
-                withLiveRuntime(
-                  ref,
-                  agentSessionId,
-                  resolved.cwd,
-                  (runtime) => runtime.getModelState,
-                ),
-              ),
-            );
-          }),
+          Effect.flatMap((metadata) =>
+            withEnsuredSession(
+              metadata,
+              Effect.succeed(modelStateFromMetadata(metadata)),
+              (agentSessionId, cwd) =>
+                withLiveRuntime(ref, agentSessionId, cwd, (runtime) => runtime.getModelState),
+            ),
+          ),
           inSession(ref),
         ),
 
@@ -616,73 +616,63 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         withMetadataMutation(
           ref,
           readMetadata(ref).pipe(
-            Effect.flatMap((metadata) => {
-              const persistModel = repo
-                .write({
-                  ...metadata,
-                  provider: model.provider,
-                  modelId: model.modelId,
-                })
-                .pipe(
-                  Effect.tap(() =>
-                    Effect.tryPromise(() =>
-                      persistDefaultPiModel(model.provider, model.modelId),
-                    ).pipe(Effect.ignore),
-                  ),
-                );
-              if (metadata.agentSessionId === undefined) {
-                return persistModel.pipe(Effect.as(model satisfies AgentModelState));
-              }
-              const agentSessionId = metadata.agentSessionId;
-              return ensureCwd(metadata).pipe(
-                Effect.flatMap((resolved) =>
-                  persistModel.pipe(
+            Effect.flatMap((metadata) =>
+              ensureCwd(metadata).pipe(
+                Effect.flatMap((resolved) => {
+                  const persisted = repo
+                    .write({
+                      ...resolved,
+                      provider: model.provider,
+                      modelId: model.modelId,
+                    })
+                    .pipe(
+                      Effect.tap(() =>
+                        persistDefaultPiModel(model.provider, model.modelId, resolved.cwd),
+                      ),
+                    );
+                  if (metadata.agentSessionId === undefined) {
+                    return persisted.pipe(Effect.as(model satisfies AgentModelState));
+                  }
+                  const agentSessionId = metadata.agentSessionId;
+                  return persisted.pipe(
                     Effect.andThen(
                       withLiveRuntime(ref, agentSessionId, resolved.cwd, (runtime) =>
                         runtime.setModel(model),
                       ),
                     ),
-                  ),
-                ),
-              );
-            }),
+                  );
+                }),
+              ),
+            ),
           ),
         ).pipe(inSession(ref)),
 
       getSessionInfo: (ref: SessionRef) =>
         readMetadata(ref).pipe(
-          Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed<SessionInfoResult>({ _tag: "unsupported" });
-            }
-            const agentSessionId = metadata.agentSessionId;
-            return ensureCwd(metadata).pipe(
-              Effect.flatMap((resolved) => pi.getSessionInfo(agentSessionId, resolved.cwd)),
-            );
-          }),
+          Effect.flatMap((metadata) =>
+            withEnsuredSession(
+              metadata,
+              Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
+              (agentSessionId, cwd) => pi.getSessionInfo(agentSessionId, cwd),
+            ),
+          ),
           inSession(ref),
         ),
 
       getStatus: (ref: SessionRef) => manager.status(ref),
       getSnapshot: (ref: SessionRef) => manager.snapshot(ref),
-
-      workspaceFor: sessionMetadata.workspaceFor,
-      rename: sessionMetadata.rename,
-      archive: sessionMetadata.archive,
-      pullRequestRefsFor: sessionMetadata.pullRequestRefsFor,
-      rememberPullRequestRef: sessionMetadata.rememberPullRequestRef,
-      list: sessionMetadata.list,
     } satisfies PiAgentSessionServiceShape;
   }),
 );
 
 /**
- * Production face. Provides metadata, per-ref locks, and the session
- * repository. `rpc/runtime.ts` still supplies manager, Pi, EventBus,
- * ProjectService, Paths, WorktreeService, and platform Crypto/FS.
+ * Production face. Metadata stays in the output context so RPC can call
+ * record CRUD without going through this service. Locks and the repository
+ * stay hidden. `rpc/runtime.ts` supplies manager, Pi, EventBus, ProjectService,
+ * Paths, WorktreeService, and platform Crypto/FS.
  */
 export const PiAgentSessionServiceLayer: Layer.Layer<
-  PiAgentSessionService,
+  PiAgentSessionService | SessionMetadata,
   never,
   | PiAgentSessionManager
   | PiAgent
@@ -693,7 +683,7 @@ export const PiAgentSessionServiceLayer: Layer.Layer<
   | Crypto.Crypto
   | FileSystem.FileSystem
 > = PiAgentSessionServiceCoreLayer.pipe(
-  Layer.provide(SessionMetadataLayer),
+  Layer.provideMerge(SessionMetadataLayer),
   Layer.provide(SessionMetadataLocksLayer),
   Layer.provide(PiAgentSessionRepositoryLayer),
 );

@@ -17,6 +17,7 @@ import { Clock, Crypto, Effect } from "effect";
 
 import type { StoreReadError, StoreWriteError } from "../errors";
 import { PiAgentSessionService } from "../harness";
+import type { SessionMetadata } from "../harness/session-metadata";
 import { ProjectService } from "../project";
 import { ScheduleRepository } from "./repository";
 import { record, snapshotOf } from "./run-record";
@@ -232,7 +233,11 @@ const conclude = (
 
 const decide = (
   schedule: Schedule,
-): Effect.Effect<FireDecision, never, PiAgentSessionService | ProjectService | ScheduleRuntime> =>
+): Effect.Effect<
+  FireDecision,
+  never,
+  PiAgentSessionService | ProjectService | ScheduleRuntime | SessionMetadata
+> =>
   Effect.gen(function* () {
     if (reachedMaxRuns(schedule)) {
       return { kind: "skip", skipReason: "max_runs", pauseReason: "max_runs" };
@@ -283,7 +288,12 @@ export const fire = (
 ): Effect.Effect<
   FireResult,
   StoreReadError | StoreWriteError,
-  ScheduleRepository | PiAgentSessionService | ProjectService | ScheduleRuntime | Crypto.Crypto
+  | ScheduleRepository
+  | PiAgentSessionService
+  | SessionMetadata
+  | ProjectService
+  | ScheduleRuntime
+  | Crypto.Crypto
 > =>
   Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis;

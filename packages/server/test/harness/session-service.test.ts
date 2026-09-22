@@ -43,7 +43,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             title: "Morning review",
           });
           const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
-          const listed = yield* fixture.service.list("proj-a", false);
+          const listed = yield* fixture.metadata.list("proj-a", false);
           return { stored, listed };
         }),
       );
@@ -76,11 +76,11 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
-          yield* fixture.service.rememberPullRequestRef(ref, first);
-          yield* fixture.service.rememberPullRequestRef(ref, first);
-          yield* fixture.service.rememberPullRequestRef(ref, second);
+          yield* fixture.metadata.rememberPullRequestRef(ref, first);
+          yield* fixture.metadata.rememberPullRequestRef(ref, first);
+          yield* fixture.metadata.rememberPullRequestRef(ref, second);
           return {
-            listed: yield* fixture.service.pullRequestRefsFor(ref),
+            listed: yield* fixture.metadata.pullRequestRefsFor(ref),
             stored: yield* fixture.repo.read(ref.projectId, ref.sessionId),
           };
         }),
@@ -226,7 +226,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             agentSessionId: "native-1",
           });
           yield* fixture.service.close(ref);
-          const workspace = yield* fixture.service.workspaceFor(ref);
+          const workspace = yield* fixture.metadata.workspaceFor(ref);
           const messages = yield* fixture.service.getMessages(ref);
           return { workspace, messages };
         }),
@@ -273,7 +273,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             cwd: "/tmp/pie-app",
           });
           yield* fixture.service.delete(ref);
-          const listed = yield* fixture.service.list("proj-a", false);
+          const listed = yield* fixture.metadata.list("proj-a", false);
           const lockSize = yield* fixture.locks.size;
           return { listed, closeSpy: fixture.spy.close, lockSize };
         }),
@@ -298,7 +298,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           });
           const stored = yield* fixture.repo.read(a.projectId, a.sessionId);
           yield* fixture.repo.write({ ...stored, agentSessionId: "native-a" });
-          const listed = yield* fixture.service.list("proj-a", false);
+          const listed = yield* fixture.metadata.list("proj-a", false);
           return { a, b, listed };
         }),
       );
@@ -333,13 +333,13 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           return yield* Effect.scoped(
             Effect.gen(function* () {
               const stream = yield* fixture.bus.subscribe({ kind: "global" });
-              yield* fixture.service.archive(ref, true);
-              const archived = yield* fixture.service.list("proj-a", true);
-              const activeWhileArchived = yield* fixture.service.list("proj-a", false);
-              yield* fixture.service.archive(ref, true); // idempotent: no duplicate event
-              yield* fixture.service.archive(ref, false);
-              const restored = yield* fixture.service.list("proj-a", false);
-              const archivedAfterRestore = yield* fixture.service.list("proj-a", true);
+              yield* fixture.metadata.archive(ref, true);
+              const archived = yield* fixture.metadata.list("proj-a", true);
+              const activeWhileArchived = yield* fixture.metadata.list("proj-a", false);
+              yield* fixture.metadata.archive(ref, true); // idempotent: no duplicate event
+              yield* fixture.metadata.archive(ref, false);
+              const restored = yield* fixture.metadata.list("proj-a", false);
+              const archivedAfterRestore = yield* fixture.metadata.list("proj-a", true);
               const items = yield* Stream.runCollect(Stream.take(stream, 2));
               return {
                 archived,
@@ -448,9 +448,9 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "go" }] });
           yield* Effect.yieldNow;
           yield* waitForTurn(fixture, ref, (turn) => turn !== null && !turn.complete);
-          yield* fixture.service.archive(ref, true);
-          const active = yield* fixture.service.list("proj-a", false);
-          const archived = yield* fixture.service.list("proj-a", true);
+          yield* fixture.metadata.archive(ref, true);
+          const active = yield* fixture.metadata.list("proj-a", false);
+          const archived = yield* fixture.metadata.list("proj-a", true);
           return { active, archived, closed: fixture.spy.close.slice() };
         }),
       );
@@ -621,7 +621,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           yield* restarted.service.prepare(ref);
           const status = yield* restarted.service.getStatus(ref);
           const snapshot = yield* restarted.service.getSnapshot(ref);
-          const listed = yield* restarted.service.list("proj-a", false);
+          const listed = yield* restarted.metadata.list("proj-a", false);
           const messages = yield* restarted.service.getMessages(ref);
           return { ref, status, snapshot, listed, messages, spy: fixture.spy };
         }),
@@ -683,7 +683,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             parts: [{ type: "text", text: "  Fix the  login  bug " }],
           });
           yield* Effect.yieldNow;
-          return yield* fixture.service.list("proj-a", false);
+          return yield* fixture.metadata.list("proj-a", false);
         }),
       );
       assert.equal(listed.length, 1);
@@ -994,7 +994,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           yield* Effect.yieldNow;
           yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "second" }] });
           yield* Effect.yieldNow;
-          return yield* fixture.service.list("proj-a", false);
+          return yield* fixture.metadata.list("proj-a", false);
         }),
       );
       assert.equal(listed[0]?.title, "first");
@@ -1006,7 +1006,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       const listed = yield* run({}, (fixture) =>
         Effect.gen(function* () {
           yield* fixture.service.create({ projectId: "proj-a", cwd: "/tmp/pie-app" });
-          return yield* fixture.service.list("proj-a", false);
+          return yield* fixture.metadata.list("proj-a", false);
         }),
       );
       assert.equal(listed.length, 1);
@@ -1027,7 +1027,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
-          yield* fixture.service.archive(ref, true);
+          yield* fixture.metadata.archive(ref, true);
           yield* fixture.service.delete(ref);
         }).pipe(
           Effect.provide(
@@ -1121,10 +1121,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
-          yield* fixture.service.rename(ref, "Login bug");
-          const listed = yield* fixture.service.list("proj-a", false);
+          yield* fixture.metadata.rename(ref, "Login bug");
+          const listed = yield* fixture.metadata.list("proj-a", false);
           const restarted = yield* fixture.restart;
-          return { listed, afterRestart: yield* restarted.service.list("proj-a", false) };
+          return { listed, afterRestart: yield* restarted.metadata.list("proj-a", false) };
         }),
       );
       assert.equal(result.listed[0]?.title, "Login bug");
@@ -1173,9 +1173,9 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           return yield* Effect.scoped(
             Effect.gen(function* () {
               const stream = yield* fixture.bus.subscribe({ kind: "global" });
-              yield* fixture.service.rename(ref, "First title");
-              yield* fixture.service.rename(ref, "First title"); // no-op: no event
-              yield* fixture.service.rename(ref, "Second title");
+              yield* fixture.metadata.rename(ref, "First title");
+              yield* fixture.metadata.rename(ref, "First title"); // no-op: no event
+              yield* fixture.metadata.rename(ref, "Second title");
               const items = yield* Stream.runCollect(Stream.take(stream, 2));
               return Array.from(items);
             }),
@@ -1203,10 +1203,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
-          yield* fixture.service.rename(ref, "Login bug");
+          yield* fixture.metadata.rename(ref, "Login bug");
           yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "first" }] });
           yield* Effect.yieldNow;
-          return yield* fixture.service.list("proj-a", false);
+          return yield* fixture.metadata.list("proj-a", false);
         }),
       );
       assert.equal(listed[0]?.title, "Login bug");
@@ -1222,7 +1222,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             cwd: "/tmp/pie-app",
           });
           yield* Effect.all(
-            [fixture.service.rename(ref, "Login bug"), fixture.service.archive(ref, true)],
+            [fixture.metadata.rename(ref, "Login bug"), fixture.metadata.archive(ref, true)],
             { concurrency: "unbounded" },
           );
           return yield* fixture.repo.read(ref.projectId, ref.sessionId);
@@ -1265,7 +1265,7 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             yield* Effect.promise(() => createStarted);
             // archive persists archived:true before manager.close; close then
             // waits on the in-flight create — fork so we can release create.
-            const archiving = yield* Effect.forkChild(fixture.service.archive(ref, true));
+            const archiving = yield* Effect.forkChild(fixture.metadata.archive(ref, true));
             yield* Effect.gen(function* () {
               for (let attempt = 0; attempt < 200; attempt += 1) {
                 const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
@@ -1278,8 +1278,8 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             yield* Fiber.join(archiving);
             yield* Fiber.join(prompting);
             const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
-            const active = yield* fixture.service.list("proj-a", false);
-            const archived = yield* fixture.service.list("proj-a", true);
+            const active = yield* fixture.metadata.list("proj-a", false);
+            const archived = yield* fixture.metadata.list("proj-a", true);
             return { stored, active, archived, closed: fixture.spy.close.slice() };
           }),
       );
@@ -1300,13 +1300,13 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
           });
-          yield* fixture.service.rename(ref, "Login bug");
+          yield* fixture.metadata.rename(ref, "Login bug");
           yield* fixture.service.prompt({
             ref,
             parts: [{ type: "text", text: "automatic title" }],
           });
           yield* Effect.yieldNow;
-          return yield* fixture.service.list("proj-a", false);
+          return yield* fixture.metadata.list("proj-a", false);
         }),
       );
       assert.equal(listed[0]?.title, "Login bug");
@@ -1344,9 +1344,9 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
               projectId: "proj-a",
               cwd: "/tmp/pie-app",
             });
-            const archiving = yield* Effect.forkChild(fixture.service.archive(slow, true));
+            const archiving = yield* Effect.forkChild(fixture.metadata.archive(slow, true));
             yield* Effect.promise(() => closeStarted);
-            yield* fixture.service.rename(other, "Still responsive");
+            yield* fixture.metadata.rename(other, "Still responsive");
             releaseClose();
             yield* Fiber.join(archiving);
             return yield* fixture.repo.read(other.projectId, other.sessionId);
