@@ -3,7 +3,7 @@ import core from "ultracite/oxlint/core";
 import react from "ultracite/oxlint/react";
 import vitest from "ultracite/oxlint/vitest";
 
-import { deferredUltraciteRules, deferredVitestUltraciteRules } from "./oxlint.deferred.mts";
+import { deferredUltraciteRules, deferredVitestUltraciteRules } from "./oxlint-deferred.mts";
 
 const pieIgnorePatterns = [
   "**/routeTree.gen.ts",
@@ -27,7 +27,7 @@ const pieIgnorePatterns = [
 /**
  * Slice 1 of the Ultracite adoption: extend the official oxlint presets and
  * keep the current pie rule surface. New Ultracite rules stay off in
- * `oxlint.deferred.mts` until a later PR deletes that group and fixes hits.
+ * `oxlint-deferred.mts` until a later PR deletes that group and fixes hits.
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
@@ -216,6 +216,7 @@ export default defineConfig({
     ],
     "pie/no-restricted-disable": "error",
     "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
+    "pie/no-dot-filename": "error",
     "import/no-mutable-exports": "error",
     "react/globals": "error",
     "react/purity": "error",
