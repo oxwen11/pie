@@ -11,7 +11,9 @@ import type { PiAssistantMetadata, PiAssistantUIMessage, PiUIMessage } from "./u
 //
 // Fold rules:
 //   • `get_entries` returns the whole session tree; the current branch is
-//     rebuilt by walking `parentId` from `leafId` and reversing.
+//     rebuilt by walking `parentId` from `leafId` toward the root. The latest
+//     compaction stops that walk at `firstKeptEntryId`. Compaction entries are
+//     skipped here — the live stream inserts the UI marker, not cold restore.
 //   • Segmentation is by user entry: a `user` message entry opens a new
 //     message, and the following run of `assistant` / `toolResult` entries
 //     folds into ONE assistant message (steer/follow-up injections open new
@@ -19,7 +21,7 @@ import type { PiAssistantMetadata, PiAssistantUIMessage, PiUIMessage } from "./u
 //   • messageId: the user entry's id, or the segment's first assistant entry
 //     id — pi entry ids are stable across reads, so refreshes reconcile.
 //   • Trimming the active turn is the caller's job (the facade folds the
-//     runtime snapshot in); this function maps everything it is given.
+//     runtime snapshot in); a compaction boundary is itself a settled floor.
 
 type PiMessage = SessionMessageEntry["message"];
 type PiUserMessage = Extract<PiMessage, { role: "user" }>;
@@ -43,7 +45,7 @@ type PendingCall = {
   readonly input: unknown;
 };
 
-/** The current branch, root → leaf. Null/broken/cyclic chains fold to empty. */
+/** The current branch, kept-or-root → leaf. Null/broken/cyclic chains fold to empty. */
 function rebuildBranch(
   entries: ReadonlyArray<SessionEntry>,
   leafId: string | null,
@@ -53,12 +55,22 @@ function rebuildBranch(
   const chain: SessionEntry[] = [];
   const seen = new Set<string>();
   let cursor: string | null = leafId;
+  let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
   while (cursor !== null) {
     if (seen.has(cursor)) return [];
     seen.add(cursor);
     const entry = byId.get(cursor);
     if (entry === undefined) return [];
     chain.push(entry);
+    if (entry.type === "compaction" && compaction === undefined) compaction = entry;
+    // Latest compaction first (leaf→root). A valid kept ancestor is the floor;
+    // missing / self / toolResult anchors keep walking so history is not dropped.
+    const kept =
+      compaction !== undefined &&
+      entry.id === compaction.firstKeptEntryId &&
+      entry.id !== compaction.id &&
+      !(entry.type === "message" && entry.message.role === "toolResult");
+    if (kept) break;
     cursor = entry.parentId;
   }
   // Leaf→root walk, root→leaf fold (toReversed needs es2023, reverse mutates).
@@ -281,27 +293,10 @@ export function entriesToUIMessages(
   const branch = rebuildBranch(entries, leafId);
   let compaction: Extract<SessionEntry, { type: "compaction" }> | undefined;
   for (const entry of branch) if (entry.type === "compaction") compaction = entry;
-  const keptIndex = compaction
-    ? branch.findIndex((entry) => entry.id === compaction.firstKeptEntryId)
-    : -1;
-  const compactionIndex = compaction ? branch.indexOf(compaction) : -1;
-  const kept = branch[keptIndex];
-  // Invalid extension anchors must not discard history or orphan a tool result.
-  const canTrim =
-    keptIndex >= 0 &&
-    keptIndex < compactionIndex &&
-    !(kept?.type === "message" && kept.message.role === "toolResult");
-  for (const entry of canTrim ? branch.slice(keptIndex) : branch) {
+  for (const entry of branch) {
     if (entry.type === "compaction") {
-      if (entry.id === compaction?.id) {
-        assistant = null;
-        messages.push({
-          id: entry.id,
-          role: "assistant",
-          metadata: { sessionId },
-          parts: [{ type: "data-compaction", data: { summary: entry.summary } }],
-        });
-      }
+      // Split the assistant fold across the boundary; do not emit a marker.
+      if (entry.id === compaction?.id) assistant = null;
       continue;
     }
     if (entry.type !== "message") {

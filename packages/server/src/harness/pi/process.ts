@@ -19,7 +19,6 @@ import {
 } from "../errors";
 import { isSessionEvent, type SessionEnvelopeBody } from "../events/framework";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
-import { entriesToUIMessages } from "./history";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
@@ -67,7 +66,6 @@ type SessionState = {
   readonly transport: PiTransport;
   readonly termination: Deferred.Deferred<never, PiSessionFailure>;
   readonly chunks: Queue.Queue<SessionEnvelopeBody, Cause.Done | AgentOperationError>;
-  entryCursor: string | null;
   readonly requests: Queue.Queue<AgentRequest, Cause.Done>;
   readonly queueUpdates: Queue.Queue<SessionPendingPrompt, Cause.Done>;
   readonly pending: Ref.Ref<ReadonlyMap<string, PendingRequest>>;
@@ -281,39 +279,12 @@ export const makePiProcessWithDependencies = <R>(
           return;
         }
         if (event.type === "compaction_end") {
-          let result: CompactionResult;
-          if (event.aborted) result = { outcome: "canceled" };
-          else if (!event.result)
-            result = { outcome: "failed", error: event.errorMessage ?? "Compaction failed" };
-          else {
-            const history = yield* session.transport
-              .command<SessionEntries>({ type: "get_entries" })
-              .pipe(
-                Effect.timeout("10 seconds"),
-                Effect.catch(() => Effect.succeed(null)),
-              );
-            const cursor =
-              history?.entries.findIndex((entry) => entry.id === session.entryCursor) ?? -1;
-            const compacted = history?.entries
-              .slice(cursor + 1)
-              .find(
-                (entry) =>
-                  entry.type === "compaction" &&
-                  entry.firstKeptEntryId === event.result?.firstKeptEntryId &&
-                  entry.summary === event.result?.summary,
-              );
-            if (compacted && history) {
-              session.entryCursor = compacted.id;
-              // Apply the same boundary to the live transform before routing
-              // any later native event (the generator has no output here).
-              Array.from(session.transform(event));
-              result = {
-                outcome: "completed",
-                messages: entriesToUIMessages(history.entries, compacted.id, session.sessionId),
-              };
-            } else
-              result = { outcome: "failed", error: "Could not read the compacted conversation" };
-          }
+          if (event.result && !event.aborted) Array.from(session.transform(event));
+          const result: CompactionResult = event.aborted
+            ? { outcome: "canceled" }
+            : event.result
+              ? { outcome: "completed", summary: event.result.summary }
+              : { outcome: "failed", error: event.errorMessage ?? "Compaction failed" };
           yield* offerChunk(session, {
             type: "session.compaction.ended",
             sessionId: session.sessionId,
@@ -474,13 +445,11 @@ export const makePiProcessWithDependencies = <R>(
             }),
           );
 
-          const history = yield* transport.command<SessionEntries>({ type: "get_entries" });
           const session: SessionState = {
             sessionId,
             scope,
             transport,
             termination: yield* Deferred.make<never, PiSessionFailure>(),
-            entryCursor: history.entries.at(-1)?.id ?? null,
             chunks: yield* Queue.dropping<SessionEnvelopeBody, Cause.Done | AgentOperationError>(
               SESSION_QUEUE_CAPACITY,
             ),

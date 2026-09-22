@@ -7,6 +7,8 @@ import {
 import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { isCompactionData } from "@/features/chat/runtime/chat";
+
 import { AssistantMessage } from "./assistant-message";
 import { CompactionMarker } from "./compaction-marker";
 import { UserMessage } from "./user-message";
@@ -24,15 +26,8 @@ export function MessageView({
   isStreaming: boolean;
 }) {
   const compaction = message.parts.find((part) => part.type === "data-compaction");
-  if (
-    compaction &&
-    "data" in compaction &&
-    typeof compaction.data === "object" &&
-    compaction.data !== null &&
-    "summary" in compaction.data &&
-    typeof compaction.data.summary === "string"
-  ) {
-    return <CompactionMarker summary={compaction.data.summary} />;
+  if (compaction && "data" in compaction && isCompactionData(compaction.data)) {
+    return <CompactionMarker data={compaction.data} />;
   }
   if (message.role === "assistant") {
     return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
