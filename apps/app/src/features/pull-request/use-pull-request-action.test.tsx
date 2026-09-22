@@ -49,7 +49,7 @@ function ActionProbe({
       <button onClick={() => action.run(input)} type="button">
         Run
       </button>
-      <button onClick={action.refresh} type="button">
+      <button onClick={() => action.refresh()} type="button">
         Refresh
       </button>
       <span>{action.postActionRefreshFailed ? "refresh-failed" : "refresh-ok"}</span>
