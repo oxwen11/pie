@@ -1,4 +1,4 @@
-import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
+import { Message } from "@getpie/ui/ai-elements/message";
 import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
 import { useStore } from "zustand";
@@ -18,13 +18,15 @@ import { ModelErrorCard } from "./transcript/model-error-card";
 
 function TranscriptStatusMessage({ label }: { label: string }) {
   return (
-    <Message from="assistant" role="status" aria-live="polite" aria-busy="true">
-      <MessageContent>
-        <div className="text-muted-foreground flex items-center gap-2.5">
-          <PieLoader aria-hidden />
-          <Shimmer>{label}</Shimmer>
-        </div>
-      </MessageContent>
+    <Message
+      from="assistant"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      data-state="loading"
+    >
+      <PieLoader aria-hidden />
+      <Shimmer>{label}</Shimmer>
     </Message>
   );
 }

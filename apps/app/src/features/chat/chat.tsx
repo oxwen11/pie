@@ -9,13 +9,11 @@ export function Chat({ sessionRef }: { sessionRef: EnvironmentSessionRef }) {
     <ChatSessionProvider sessionRef={sessionRef}>
       <div className="mx-auto flex min-h-0 w-full max-w-4xl min-w-80 flex-1 flex-col px-4">
         <ChatTranscript />
-        <div className="shrink-0 pt-2 pb-4">
-          <SessionComposer
-            key={sessionRefKey(sessionRef)}
-            sessionRef={sessionRef}
-            toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
-          />
-        </div>
+        <SessionComposer
+          key={sessionRefKey(sessionRef)}
+          sessionRef={sessionRef}
+          toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
+        />
       </div>
     </ChatSessionProvider>
   );
