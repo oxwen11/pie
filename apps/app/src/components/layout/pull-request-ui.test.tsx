@@ -6,7 +6,6 @@ import type {
   PullRequestStackPreview,
   SessionPullRequestLink,
 } from "@getpie/contract/pull-request";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -105,6 +104,10 @@ const api = {
     message: "Second layer changed.",
   })),
   runAction: vi.fn<() => Promise<void>>(),
+  diff: vi.fn<() => Promise<{ patch: string; truncated: boolean }>>(async () => ({
+    patch: "",
+    truncated: false,
+  })),
 };
 
 beforeEach(() => {
@@ -153,24 +156,30 @@ const panel = () =>
     setPayload() {},
     reopen() {},
   });
+const procedure = (fn: (...args: never[]) => Promise<unknown>) => ({
+  call: fn,
+  key: () => [fn],
+  queryOptions: (options?: { input?: unknown }) => ({
+    queryKey: [fn, options?.input],
+    queryFn: (context: unknown) => fn(options?.input as never, context as never),
+  }),
+});
+
 async function render(children: ReactNode) {
-  const client = {
-    pullRequest: api,
-    agent: {
-      session: {
-        list: async () => [],
-        subscribe: async (_input: unknown, options?: { signal?: AbortSignal }) =>
-          (async function* () {
-            if (options?.signal?.aborted) return;
-            await new Promise<void>((resolve) => {
-              options?.signal?.addEventListener("abort", () => resolve(), { once: true });
-            });
-            yield* [];
-          })(),
-      },
+  const orpc = mockEnvironmentOrpc({
+    pullRequest: {
+      demand: procedure(api.demand),
+      statuses: procedure(api.statuses),
+      detail: procedure(api.detail),
+      diff: procedure(api.diff),
+      current: procedure(api.current),
+      refresh: procedure(api.refresh),
+      exclude: procedure(api.exclude),
+      stackPreview: procedure(api.stackPreview),
+      runStackAction: procedure(api.runStackAction),
+      runAction: procedure(api.runAction),
     },
-  };
-  const orpc = mockEnvironmentOrpc(createTanstackQueryUtils(client));
+  });
   const environmentRpc: EnvironmentRpc = {
     localId: "local",
     queryClient,
