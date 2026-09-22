@@ -1,5 +1,6 @@
 import net from "node:net";
 
+import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Deferred, Duration, Effect, Exit, FileSystem, Schedule, Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -33,6 +34,8 @@ import {
 import {
   buildSshHostSpecEffect,
   parseRemoteLaunchOutput,
+  REMOTE_DAEMON_MISMATCH_MESSAGE,
+  remoteDaemonCompatibilityMatches,
   remoteStateKey,
   type RemoteLaunchResult,
   type SshEnvironmentBootstrap,
@@ -225,6 +228,14 @@ export const launchOrReuseRemoteServer = (
       return yield* new SshLaunchError({
         message: "Remote pie daemon did not report a launch payload.",
         stdout: redactSshErrorOutput(result.stderr || result.stdout),
+      });
+    }
+    if (
+      !remoteDaemonCompatibilityMatches(parsed.compatibilityKey, embeddedDaemonCompatibilityKey())
+    ) {
+      return yield* new SshLaunchError({
+        message: REMOTE_DAEMON_MISMATCH_MESSAGE,
+        stdout: "",
       });
     }
     return parsed;
