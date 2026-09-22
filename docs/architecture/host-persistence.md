@@ -529,6 +529,12 @@ Pie session deletion does not delete Pi native data or undo workspace changes.
 Any design that starts depending on Pi's physical files rather than its public
 runtime behavior requires a new Developer-approved persistence decision.
 
+Background bash logs are OS temp, not a `$PIE_HOME` store:
+`os.tmpdir()/pie/<sessionId>/bash/<pid>.log` (directory `0o700`, file `0o600`).
+A foreground command deletes its log when the tool result already contains the
+output. A background log stays until the OS cleans temp. Session deletion does
+not remove it.
+
 ## Current retention and migration gaps
 
 These are current architecture facts, not implicit approval to preserve them in
