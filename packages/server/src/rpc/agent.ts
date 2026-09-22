@@ -6,9 +6,9 @@ import { Effect } from "effect";
 import { listAvailablePiModels } from "../harness/pi/list-available-models";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
+import { agentOperation, projectNotFound } from "./errors";
 import { implement } from "./orpc";
 import { sessionRouter } from "./session";
-import { agentOperation, projectNotFound } from "./wire";
 
 const orpc = implement(agentContract).$context<RpcContext>();
 

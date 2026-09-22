@@ -7,9 +7,6 @@ import { SessionMetadata } from "../harness/session-metadata";
 import { ProjectService } from "../project";
 import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
-import { implement } from "./orpc";
-import { openScopedSubscription } from "./session-stream";
-import { streamToAsyncGenerator } from "./stream";
 import {
   agentOperation,
   catchGitWorktree,
@@ -20,7 +17,10 @@ import {
   sessionNotFound,
   sessionStoreFailures,
   unsupportedExecutable,
-} from "./wire";
+} from "./errors";
+import { implement } from "./orpc";
+import { openScopedSubscription } from "./session-stream";
+import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
 

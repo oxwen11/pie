@@ -28,6 +28,11 @@ import {
   SessionNotResumable,
 } from "../harness/errors";
 
+/**
+ * Map domain tagged errors onto the oRPC error constructors shared by the
+ * session, schedule, and agent routes. Git routes keep their structured payloads.
+ */
+
 type NotFoundErrors = {
   NOT_FOUND: (input: { message: string }) => unknown;
 };
@@ -44,7 +49,6 @@ type InactiveErrors = {
   SESSION_NOT_ACTIVE: (input: { message: string }) => unknown;
 };
 
-/** Message-shaped oRPC failures shared by session, schedule, and agent routes. */
 export const projectNotFound =
   <E extends NotFoundErrors>(errors: E) =>
   (error: ProjectNotFound) =>
@@ -95,7 +99,7 @@ export const sessionStoreFailures = <E extends InternalErrors>(errors: E) => ({
 
 type LiveAgentErrors = NotFoundErrors & UnsupportedErrors & InternalErrors & InactiveErrors;
 
-/** getMessages / getModelState / setModel share this wire policy. */
+/** getMessages / getModelState / setModel share this mapping. */
 export const catchLiveAgent = <E extends LiveAgentErrors>(errors: E) =>
   Effect.catchTags({
     ProjectNotFound: projectNotFound(errors),

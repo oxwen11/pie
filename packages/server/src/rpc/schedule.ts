@@ -3,8 +3,8 @@ import { Effect } from "effect";
 
 import { ScheduleService } from "../schedule";
 import type { RpcContext } from "./context";
+import { catchScheduleNotFound, projectNotFound, scheduleNotFound } from "./errors";
 import { implement } from "./orpc";
-import { catchScheduleNotFound, projectNotFound, scheduleNotFound } from "./wire";
 
 const orpc = implement(scheduleContract).$context<RpcContext>();
 
