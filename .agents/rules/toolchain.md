@@ -2,6 +2,14 @@
 
 ## Command usage
 
+| Task | Command |
+| --- | --- |
+| Build / typecheck | `pnpm build` / `pnpm typecheck` |
+| Lint + format + typecheck (no tests) | `pnpm check` |
+| Node + browser tests | `pnpm test` |
+| Electron tests | `pnpm e2e` |
+| Runtime verification | `pnpm exec pie-verify web\|cli\|desktop` |
+
 - Build, typecheck, lint, and lint:check must run through Turbo so upstream builds
   (including oxlint plugins) complete first. Scope with
   `pnpm exec turbo run typecheck --filter=@getpie/server`, not package scripts.
@@ -17,6 +25,7 @@
 - Cloud setup is owned by `.cursor/environment.json`, overriding dashboard
   settings: mise installs Node 24 and pnpm, then `pnpm install --frozen-lockfile`.
   Drive Vite on 4190, not the API on 4180 or the daemon on 4000.
+  Follow [the web dev recipe](../skills/verify/SKILL.md) for local setup.
 
 ## Constraints
 

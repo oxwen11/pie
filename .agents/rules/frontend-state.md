@@ -1,5 +1,14 @@
 # Frontend state and routing
 
+## Task guides
+
+- React checks: [react-doctor](../skills/react-doctor/SKILL.md).
+- Runtime performance: [performance](../skills/performance/SKILL.md).
+- Read-only audits and plans: [improve-react](../skills/improve-react/SKILL.md).
+- Test pruning: [prune-tests](../skills/prune-tests/SKILL.md), only when requested.
+
+## State and structure
+
 Derive, don't sync: no `useEffect` mirroring state between sources — compute it
 at render with `useMemo`. Server state stays in TanStack Query, client state in
 Zustand, and selections store an id, not the object.

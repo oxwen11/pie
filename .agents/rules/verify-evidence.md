@@ -4,6 +4,13 @@ Every runtime verification (`pnpm exec pie-verify web|cli|desktop …`, or any
 manual drive of the app) ends with **evidence**, not a sentence. What counts as
 evidence depends on whether the change is UI-related.
 
+## Choose the surface
+
+Use the matching launch/doctor/drive/cleanup recipe:
+[Web](../skills/verify-pie/SKILL.md), [CLI](../skills/verify-pie-cli/SKILL.md),
+or [Desktop](../skills/verify-pie-desktop/SKILL.md).
+For the two-process web dev setup, read [verify](../skills/verify/SKILL.md).
+
 ## UI-related means
 
 Any of these makes the verification UI-related — when in doubt, it is:
