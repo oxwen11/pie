@@ -177,8 +177,8 @@ Recommended scope for the current public GitHub attachment bug:
 1. keep `img-src https:` rather than enumerating GitHub's changing redirect
    hosts;
 2. keep remote `http:` blocked except the signed loopback asset server;
-3. set `referrerPolicy="no-referrer"` on chat images to avoid leaking the chat
-   document URL (implemented in PR #377);
+3. set a document-level `no-referrer` policy so thumbnail and library-generated
+   preview images cannot leak the chat document URL (implemented in PR #377);
 4. retain the existing signed, raster-only asset route for local files;
 5. do not add a generic remote proxy solely for this bug—a local proxy still
    exposes the user's public IP and creates an SSRF surface that must be secured;

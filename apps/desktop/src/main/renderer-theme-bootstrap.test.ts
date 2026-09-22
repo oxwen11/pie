@@ -12,6 +12,19 @@ const desktopHtml = injectThemeBootstrap(desktopSource, { csp: true });
 const webHtml = injectThemeBootstrap(webSource);
 const script = themeBootstrapScript();
 
+function cspDirectiveSources(html: string, directive: string): string[] {
+  const cspMeta = html.match(/<meta[^>]+http-equiv="Content-Security-Policy"[^>]*>/)?.[0];
+  const policy = cspMeta?.match(/content="([^"]+)"/)?.[1];
+  return (
+    policy
+      ?.split(";")
+      .find((value) => value.trim().startsWith(`${directive} `))
+      ?.trim()
+      .split(/\s+/)
+      .slice(1) ?? []
+  );
+}
+
 function bootstrapsDark(storedTheme: string | null, systemPrefersDark: boolean): boolean {
   let dark = false;
   vm.runInNewContext(script, {
@@ -51,17 +64,20 @@ describe("renderer theme bootstrap", () => {
     expect(desktopHtml).not.toContain("__PIE_THEME_BOOTSTRAP_CSP__");
   });
 
-  it("allows HTTPS and blob images without enumerating CDN domains", () => {
-    const policy = desktopHtml.match(/content="([^"]+)"/)?.[1];
-    const imageSources = policy
-      ?.split(";")
-      .find((directive) => directive.trim().startsWith("img-src "))
-      ?.trim()
-      .split(/\s+/)
-      .slice(1);
+  it("uses the exact desktop image source boundary", () => {
+    expect(cspDirectiveSources(desktopHtml, "img-src")).toEqual([
+      "'self'",
+      "data:",
+      "blob:",
+      "http://127.0.0.1:*",
+      "https:",
+    ]);
+  });
 
-    expect(imageSources).toContain("https:");
-    expect(imageSources).toContain("blob:");
+  it("omits referrers from both renderer documents", () => {
+    for (const source of [webSource, desktopSource]) {
+      expect(source).toContain('<meta name="referrer" content="no-referrer" />');
+    }
   });
 
   it("applies a stored preference before falling back to the system theme", () => {

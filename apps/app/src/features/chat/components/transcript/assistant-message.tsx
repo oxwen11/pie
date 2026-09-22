@@ -6,8 +6,9 @@ import { isReasoningUIPart, isToolUIPart, type FileUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
+import { ChatImagePreview } from "./chat-image-preview";
 import { CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown";
-import { ChatImagePreview, ChatMarkdownImage } from "./chat-markdown-image";
+import { ChatMarkdownImage } from "./chat-markdown-image";
 import { ReasoningPart } from "./reasoning-part";
 import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";

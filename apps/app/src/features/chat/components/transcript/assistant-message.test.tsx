@@ -39,7 +39,6 @@ describe("AssistantMessage", () => {
     const image = node.querySelector("img");
     expect(image?.getAttribute("src")).toBe(src);
     expect(image?.getAttribute("alt")).toBe("result.png");
-    expect(image?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(image?.className).toContain("max-h-44");
     expect(image?.className).toContain("sm:max-w-xs");
 
@@ -57,7 +56,9 @@ describe("AssistantMessage", () => {
     });
 
     await vi.waitFor(() => {
-      expect(document.body.querySelector("dialog[open] img")?.getAttribute("src")).toBe(src);
+      const dialog = document.body.querySelector("dialog[open]");
+      expect(dialog?.classList.contains("chat-image-preview-dialog")).toBe(true);
+      expect(dialog?.querySelector("img")?.getAttribute("src")).toBe(src);
     });
   });
 

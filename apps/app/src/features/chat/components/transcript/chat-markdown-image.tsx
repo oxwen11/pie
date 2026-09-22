@@ -1,34 +1,16 @@
-import { cn } from "@getpie/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useRef, useState, type ComponentProps } from "react";
-import Zoom from "react-medium-image-zoom";
-
-import "react-medium-image-zoom/dist/styles.css";
 
 import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { useChatSession } from "../chat-session-context";
+import { ChatImagePreview } from "./chat-image-preview";
 import { classifyMarkdownImageSource, type MarkdownImageSource } from "./chat-markdown";
 
 type MarkdownImageProps = ComponentProps<"img"> & { node?: unknown };
 
 const ASSET_STALE_TIME_MS = 4 * 60 * 1000;
-const imageClassName = "h-auto w-auto max-h-44 max-w-full rounded-md object-contain sm:max-w-xs";
-
-export function ChatImagePreview({ alt, className, src, ...props }: ComponentProps<"img">) {
-  return (
-    <Zoom wrapElement="span" zoomMargin={24}>
-      <img
-        {...props}
-        alt={alt ?? ""}
-        className={cn(imageClassName, className)}
-        referrerPolicy="no-referrer"
-        src={src}
-      />
-    </Zoom>
-  );
-}
 
 export function ChatMarkdownImage({
   alt,
