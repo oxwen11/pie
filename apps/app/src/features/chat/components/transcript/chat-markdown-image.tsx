@@ -19,7 +19,13 @@ const imageClassName = "h-auto w-auto max-h-44 max-w-full rounded-md object-cont
 export function ChatImagePreview({ alt, className, src, ...props }: ComponentProps<"img">) {
   return (
     <Zoom wrapElement="span" zoomMargin={24}>
-      <img {...props} alt={alt ?? ""} className={cn(imageClassName, className)} src={src} />
+      <img
+        {...props}
+        alt={alt ?? ""}
+        className={cn(imageClassName, className)}
+        referrerPolicy="no-referrer"
+        src={src}
+      />
     </Zoom>
   );
 }

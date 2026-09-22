@@ -178,7 +178,7 @@ Recommended scope for the current public GitHub attachment bug:
    hosts;
 2. keep remote `http:` blocked except the signed loopback asset server;
 3. set `referrerPolicy="no-referrer"` on chat images to avoid leaking the chat
-   document URL;
+   document URL (implemented in PR #377);
 4. retain the existing signed, raster-only asset route for local files;
 5. do not add a generic remote proxy solely for this bug—a local proxy still
    exposes the user's public IP and creates an SSRF surface that must be secured;

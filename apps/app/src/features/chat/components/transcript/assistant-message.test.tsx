@@ -39,6 +39,7 @@ describe("AssistantMessage", () => {
     const image = node.querySelector("img");
     expect(image?.getAttribute("src")).toBe(src);
     expect(image?.getAttribute("alt")).toBe("result.png");
+    expect(image?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(image?.className).toContain("max-h-44");
     expect(image?.className).toContain("sm:max-w-xs");
 
