@@ -9,8 +9,8 @@ import {
   type DaemonPlatform,
   healthy,
   pidAlive,
-  resolveDaemonLocation,
   resolveOrSpawnDaemon,
+  resolvePieHome,
 } from "@getpie/server/daemon";
 import { Effect } from "effect";
 
@@ -56,9 +56,9 @@ export function resolveServerRuntimeExecutable(
 
 /**
  * The daemon-backed `SpawnServer`: instead of forking a die-with-app child,
- * attach the daemon selected by `$PIE_DAEMON_DIR` (defaulting under
- * `$PIE_HOME`) via the shared launcher — the same attach-or-spawn the CLI
- * runs, so desktop and CLI with the same environment converge on one backend.
+ * attach the daemon under `$PIE_HOME` via the shared launcher — the same
+ * attach-or-spawn the CLI runs, so desktop and CLI with the same home
+ * converge on one backend.
  * Consequences the supervisor inherits:
  *
  * - The daemon outlives the app: closing this process's scope kills nothing.
@@ -84,14 +84,10 @@ export function makeDaemonServerProcess(
 
     return (config, port) =>
       Effect.gen(function* () {
-        const environment = {
-          ...config.environment,
-          // The daemon runs `node <entry>` via the Electron binary.
-          ELECTRON_RUN_AS_NODE: "1",
-        };
+        const environment = { ...config.environment, ELECTRON_RUN_AS_NODE: "1" };
 
         const handle = yield* resolveOrSpawnDaemon({
-          ...resolveDaemonLocation(config.environment),
+          home: resolvePieHome(config.environment),
           requiredCompatibilityKey,
           serverArgv: [resolveServerRuntimeExecutable(), config.entry],
           // 0 means "no preference" on the first attempt; afterwards the

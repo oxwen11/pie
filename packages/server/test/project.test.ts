@@ -122,6 +122,52 @@ layer(NodePlatformLayer)("ProjectService", (it) => {
     }),
   );
 
+  it.effect("allocates a dated folder under Paths.chatProjectsDir and registers it", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const svc = yield* serviceIn(home);
+      const now = new Date(2026, 8, 16, 12, 0, 0);
+      const created = yield* svc.allocateChatProjectDir({ now });
+      const expected = path.join(home, "Pie", "2026-09-16", "Chat-1");
+      assert.equal(created.path, expected);
+      assert.equal(created.name, "Chat-1");
+      assert.equal(created.type, "chat");
+      assert.equal(yield* fs.exists(expected), true);
+    }),
+  );
+
+  it.effect("allocates a numeric suffix when the leaf already exists", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const now = new Date(2026, 8, 16, 12, 0, 0);
+      yield* fs.makeDirectory(path.join(home, "Pie", "2026-09-16", "Chat-1"), {
+        recursive: true,
+      });
+      const svc = yield* serviceIn(home);
+      const created = yield* svc.allocateChatProjectDir({ now });
+      assert.equal(created.path, path.join(home, "Pie", "2026-09-16", "Chat-2"));
+      assert.equal(created.name, "Chat-2");
+      assert.equal(yield* fs.exists(path.join(home, "Pie", "2026-09-16", "Chat-2")), true);
+    }),
+  );
+
+  it.effect("import under the chat-project root stays without type chat", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const home = yield* tempHome;
+      const folder = path.join(home, "Pie", "my-repo");
+      yield* fs.makeDirectory(folder, { recursive: true });
+      const svc = yield* serviceIn(home);
+      const imported = yield* svc.create({ path: folder });
+      assert.equal(imported.type, undefined);
+      const listed = yield* svc.list();
+      assert.equal(listed.find((p) => p.id === imported.id)?.type, undefined);
+      assert.equal((yield* svc.findById(imported.id)).type, undefined);
+    }),
+  );
+
   it.effect("an RNG failure minting a project id is a contextual defect, not a typed error", () =>
     Effect.gen(function* () {
       // The real Crypto with only `randomUUIDv4` broken: the service treats a

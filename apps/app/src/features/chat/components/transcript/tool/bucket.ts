@@ -1,5 +1,4 @@
-import type { ToolUIPart, UIMessage } from "ai";
-import { isToolUIPart } from "ai";
+import type { PieToolUIPart } from "@getpie/contract";
 
 // The five aggregation buckets. Order here is the order rendered in the
 // trigger phrase (files → lists → searches → edits → commands).
@@ -13,70 +12,37 @@ export const BUCKET_ORDER: readonly BucketKey[] = [
   "commands",
 ] as const;
 
-// Provider-generic `part.type` → bucket, keyed by the AI-SDK tool-part type
-// string. Tools NOT in this map still enter the accordion (see
-// use-tool-batches) but stay silent in the trigger phrase. Subagent
-// invocations opt out of batching entirely via `isStandalone`.
+// `part.type` → bucket, keyed by the AI-SDK tool-part type string. Covers
+// pi's built-in tools (contract piTools); extension tools arrive as
+// `dynamic-tool` and stay silent in the trigger phrase while still entering
+// the accordion (see use-tool-batches).
 interface ToolBucketMap {
   readonly [toolType: string]: BucketKey;
 }
 
 const TOOL_BUCKETS: ToolBucketMap = {
-  "tool-Read": "files",
-  "tool-WebFetch": "files",
-  "tool-Glob": "lists",
-  "tool-Grep": "searches",
-  "tool-WebSearch": "searches",
-  "tool-Edit": "edits",
-  "tool-Write": "edits",
-  "tool-NotebookEdit": "edits",
-  "tool-Bash": "commands",
-  "tool-TaskOutput": "commands",
+  "tool-read": "files",
+  "tool-ls": "lists",
+  "tool-find": "lists",
+  "tool-grep": "searches",
+  "tool-edit": "edits",
+  "tool-write": "edits",
+  "tool-bash": "commands",
 };
 
-// Tools that opt OUT of batching and render as their own item. Subagent
-// invocations carry a description and a nested message tree; collapsing them
-// into a bucket count flattens that hierarchy.
-// `tool-Agent` is the current subagent wire name; `tool-Task` is its legacy
-// alias on replayed transcripts. Both opt out of batching.
-const STANDALONE_TOOL_TYPES = new Set<string>(["tool-Agent", "tool-Task"]);
-
-export function bucketFor(part: ToolUIPart): BucketKey | null {
+export function bucketFor(part: PieToolUIPart): BucketKey | null {
   return TOOL_BUCKETS[part.type] ?? null;
 }
 
-export function isStandalone(type: string): boolean {
-  return STANDALONE_TOOL_TYPES.has(type);
-}
-
-// The file identity a `files`/`edits` tool dedupes on. Reads the provider's
-// typed `input` field; a single trust-boundary cast to the shape we read.
-export function filePathOf(part: ToolUIPart): string | undefined {
-  const input = part.input as { file_path?: unknown; notebook_path?: unknown } | undefined;
+// The file identity a `files`/`edits` tool dedupes on. Typed off the wire
+// generic — `input` is `DeepPartial` while streaming, hence the optional chain.
+export function filePathOf(part: PieToolUIPart): string | undefined {
   switch (part.type) {
-    case "tool-Read":
-    case "tool-Edit":
-    case "tool-Write": {
-      const fp = input?.file_path;
-      return typeof fp === "string" ? fp : undefined;
-    }
-    case "tool-NotebookEdit": {
-      const np = input?.notebook_path;
-      return typeof np === "string" ? np : undefined;
-    }
+    case "tool-read":
+    case "tool-edit":
+    case "tool-write":
+      return part.input?.path;
     default:
       return undefined;
   }
-}
-
-// Claude Code streams a Task subagent's child tool calls as top-level parts
-// tagged with the parent's toolUseId; they render inside the Task card, so the
-// batching layer treats them as transparent. Provider knowledge kept at this
-// trust boundary, not in the generic batcher.
-export function isChildToolPart(part: UIMessage["parts"][number]): boolean {
-  return (
-    isToolUIPart(part) &&
-    typeof (part.callProviderMetadata as { claudeCode?: { parentToolUseId?: unknown } } | undefined)
-      ?.claudeCode?.parentToolUseId === "string"
-  );
 }

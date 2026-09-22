@@ -1,1 +1,1 @@
-export { FileSystemService, FileSystemServiceLayer } from "./service";
+export { FileSystemService, FileSystemServiceLayer, type WorkspaceFilePreview } from "./service";

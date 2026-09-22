@@ -71,7 +71,7 @@ export function createDesktopHost(
         );
         stopVisibility = () => {
           controller.abort();
-          void unsubscribe().catch(() => {});
+          void unsubscribe().catch(() => undefined);
           setVisible(false);
         };
       }
@@ -119,7 +119,9 @@ export function createDesktopHost(
                 console.error("Desktop status stream failed", error);
               }
             },
-            onFinish: () => {},
+            onFinish: () => {
+              /* status stream close is handled by the abort controller */
+            },
           },
         );
 

@@ -1,5 +1,9 @@
 import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequest";
-import { Effect } from "effect";
+import {
+  ElectronRegistrationSchema,
+  type ElectronRegistration,
+} from "@getpie/contract/resource-monitoring";
+import { ByteSize, Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
@@ -8,8 +12,9 @@ import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` must present
-   * `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
+   * When set, every `/api/*` request except `/api/health` and the same-origin
+   * browser bootstrap must present `Authorization: Bearer <token>`.
+   * Unset (browser mode) disables the check.
    */
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
@@ -18,6 +23,7 @@ export type RequestAppOptions = {
   readonly tickets: TicketStore;
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
+  readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -25,6 +31,7 @@ export type RequestAppOptions = {
 const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
 const unauthorized = HttpServerResponse.text("Unauthorized", { status: 401 });
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
+const badRequest = HttpServerResponse.text("Bad Request", { status: 400 });
 
 /**
  * The request half of the server. The WebSocket upgrade half stays on raw
@@ -125,12 +132,38 @@ const route = (
       return withCors(HttpServerResponse.text("ok"));
     }
 
+    // The daemon-served SPA has no native bridge from which to receive the
+    // token. Expose it only on the loopback, same-origin HTTP surface and omit
+    // CORS headers, so cross-origin browser clients cannot read the response.
+    if (
+      request.method === "GET" &&
+      pathname === "/api/bootstrap" &&
+      isLoopbackHost(request.headers.host)
+    ) {
+      return HttpServerResponse.jsonUnsafe({ token: options.authToken ?? null });
+    }
+
     if (
       options.authToken !== undefined &&
       pathname.startsWith("/api/") &&
       !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
     ) {
       return withCors(unauthorized);
+    }
+
+    if (
+      request.method === "POST" &&
+      pathname === "/api/resources/electron" &&
+      options.authToken !== undefined &&
+      options.registerElectron !== undefined
+    ) {
+      const registration = yield* HttpServerRequest.schemaBodyJson(ElectronRegistrationSchema).pipe(
+        Effect.provideService(HttpServerRequest.MaxBodySize, ByteSize.bytes(64 * 1024)),
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (registration === undefined) return withCors(badRequest);
+      options.registerElectron(registration);
+      return withCors(HttpServerResponse.empty({ status: 204 }));
     }
 
     if (
@@ -150,10 +183,11 @@ const route = (
       return withCors(notFound);
     }
 
-    // The dev branch of the UI app writes its own bytes to the raw response, so
-    // a header added to the value it returns would never reach the socket. Set
-    // them on the socket as well; node merges `setHeader` into `writeHead`, so
-    // the static branch below still ends up with exactly one of each.
+    // `options.ui` serves the prebuilt bundle (or a 503) and returns an
+    // `HttpServerResponse`, so `withCors` below is what reaches the socket. The
+    // headers are also stamped on the node response as a belt-and-braces for
+    // any write-through; node merges `setHeader` into `writeHead`, so the
+    // static path still ends up with exactly one of each.
     if (headers) {
       const nodeResponse = NodeHttpServerRequest.toServerResponse(request);
       for (const [name, value] of Object.entries(headers)) {

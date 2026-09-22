@@ -34,7 +34,7 @@ function InputSummary({ input }: { input: unknown }) {
   if (input == null) return null;
   const text =
     typeof input === "object"
-      ? Object.entries(input as Record<string, unknown>)
+      ? Object.entries(input)
           .slice(0, 3)
           .map(([k, v]) => `${k}: ${stringifyInputValue(v)}`)
           .join("\n")
@@ -71,13 +71,15 @@ export function ToolRequestView({
             type="button"
             variant={buttonVariant(action.variant)}
             size="sm"
-            className="h-auto w-full justify-start gap-3 py-1.5 pl-1.5"
+            className="h-auto w-full justify-start"
             onClick={() => onRespond(request.id, buildToolResponse(action))}
           >
-            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums opacity-70">
-              {index + 1}
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums opacity-70">
+                {index + 1}
+              </span>
+              <span className="truncate">{action.label}</span>
             </span>
-            <span className="truncate">{action.label}</span>
           </Button>
         ))}
       </div>

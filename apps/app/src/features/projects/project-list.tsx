@@ -1,9 +1,4 @@
-import type { SessionRef } from "@getpie/contract";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@getpie/ui/components/collapsible";
+import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroup,
   SidebarGroupAction,
@@ -13,54 +8,45 @@ import {
 import { ChevronRight, FolderPlus } from "lucide-react";
 import { useState } from "react";
 
-import { COLLAPSIBLE_PANEL_MOTION } from "@/features/projects/panel-motion";
+import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
+import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import { ProjectSessionsGroup } from "@/features/projects/project-sessions-group";
 import { useProjects } from "@/features/projects/use-projects";
 
 /** Every imported project, each rendering its own session list. */
-export function ProjectList({
-  displayed,
-  isSessionActive,
-  onImport,
-}: {
-  readonly displayed: boolean;
-  readonly isSessionActive: (ref: SessionRef) => boolean;
-  readonly onImport: () => void;
-}) {
+export function ProjectList() {
   const projects = useProjects();
-  const [expanded, setExpanded] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
 
   return (
-    <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <SidebarGroup>
-        <SidebarGroupLabel
-          className="text-sidebar-foreground/70 tracking-wider"
-          render={
-            <CollapsibleTrigger className="group/projects-trigger hover:bg-sidebar-accent/70 cursor-pointer gap-1.5 pe-8" />
-          }
-        >
-          <span>Projects</span>
-          <ChevronRight className="transition-transform group-data-[panel-open]/projects-trigger:rotate-90" />
-        </SidebarGroupLabel>
-        <SidebarGroupAction onClick={onImport} title="Import project">
-          <FolderPlus />
-          <span className="sr-only">Import project</span>
-        </SidebarGroupAction>
-        {/* keepMounted: rebuilding every project's rows on each expand is a long
-            task once the sidebar is real-sized — see panel-motion.ts. */}
-        <CollapsiblePanel className={COLLAPSIBLE_PANEL_MOTION} keepMounted>
-          <SidebarGroupContent className="flex flex-col gap-2">
-            {(projects.data ?? []).map((project) => (
-              <ProjectSessionsGroup
-                key={project.id}
-                displayed={displayed && expanded}
-                isSessionActive={isSessionActive}
-                project={project}
-              />
-            ))}
-          </SidebarGroupContent>
-        </CollapsiblePanel>
-      </SidebarGroup>
-    </Collapsible>
+    <>
+      <Collapsible defaultOpen>
+        <SidebarGroup>
+          <SidebarGroupLabel
+            className="text-sidebar-foreground/70 tracking-wider"
+            render={
+              <CollapsibleTrigger className="group/projects-trigger hover:bg-sidebar-accent/70 cursor-pointer gap-1.5 pe-8" />
+            }
+          >
+            <span>Projects</span>
+            <ChevronRight className="transition-transform group-data-[panel-open]/projects-trigger:rotate-90" />
+          </SidebarGroupLabel>
+          <SidebarGroupAction onClick={() => setImportOpen(true)} title="Import project">
+            <FolderPlus />
+            <span className="sr-only">Import project</span>
+          </SidebarGroupAction>
+          {/* keepMounted: rebuilding every project's rows on each expand is a long
+            task once the sidebar is real-sized — see panel-motion.tsx. */}
+          <KeepMountedCollapsiblePanel>
+            <SidebarGroupContent className="flex flex-col gap-2">
+              {(projects.data ?? []).map((project) => (
+                <ProjectSessionsGroup key={project.id} project={project} />
+              ))}
+            </SidebarGroupContent>
+          </KeepMountedCollapsiblePanel>
+        </SidebarGroup>
+      </Collapsible>
+      {importOpen && <ImportProjectDialog onClose={() => setImportOpen(false)} />}
+    </>
   );
 }

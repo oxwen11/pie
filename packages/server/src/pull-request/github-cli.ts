@@ -1,18 +1,20 @@
-import {
-  pullRequestUrl,
-  type PullRequestAction,
-  type PullRequestMergeMethod,
-  type PullRequestRef,
-  type PullRequestSnapshot,
-  type PullRequestSummary,
-  type PullRequestStack,
-  type PullRequestStackAction,
-  type PullRequestStackExpected,
-  type PullRequestStackPreview,
-  type PullRequestStackActionResult,
+import type {
+  PullRequestAction,
+  PullRequestDiff,
+  PullRequestListItem,
+  PullRequestMergeMethod,
+  PullRequestRef,
+  PullRequestSnapshot,
+  PullRequestStack,
+  PullRequestStackAction,
+  PullRequestStackActionResult,
+  PullRequestStackExpected,
+  PullRequestStackPreview,
+  PullRequestSummary,
 } from "@getpie/contract/pull-request";
-import { Clock, Effect } from "effect";
-import type { ChildProcessSpawner } from "effect/unstable/process";
+import { Clock, Data, Effect, Ref, Result, Stream } from "effect";
+import type { PlatformError } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   PullRequestActionOutcomeUnknown,
@@ -26,15 +28,27 @@ import {
   PullRequestUnsupportedAction,
   PullRequestUnsupportedContext,
 } from "./errors";
-import { executeGitHubCommand, type GitHubCliExecutionError } from "./github-command";
 import { makeGitHubStack } from "./github-stack";
 import {
   SUMMARY_PULL_REQUEST_FIELDS,
-  decodeSummary,
   decodeDiscovery,
+  decodeSummary,
   repositoryFromBranchConfig,
 } from "./github-summary";
-import { normalizeGitHubPullRequestJson } from "./normalization";
+import {
+  normalizeGitHubPullRequestJson,
+  normalizeGitHubViewerPullRequestsJson,
+} from "./normalization";
+
+const COMMAND_TIMEOUT = "30 seconds";
+const DIFF_TIMEOUT = "60 seconds";
+const FORCE_KILL_AFTER = "2 seconds";
+const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const DIFF_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
+export const LIST_PULL_REQUEST_LIMIT = 100;
+
+export const PULL_REQUEST_LIST_QUERY = `query { viewer { pullRequests(first: ${LIST_PULL_REQUEST_LIMIT}, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { number title url isDraft state updatedAt additions deletions headRefName baseRefName author { login } } } } }`;
 
 export const CURRENT_PULL_REQUEST_FIELDS = [
   "number",
@@ -50,12 +64,34 @@ export const CURRENT_PULL_REQUEST_FIELDS = [
   "reviewDecision",
   "autoMergeRequest",
   "updatedAt",
+  "body",
 ] as const;
+
+export const pullRequestViewUrl = (ref: PullRequestRef): string =>
+  `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
 
 export const currentPullRequestArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
   pullRequest === undefined
     ? ["pr", "view", "--json", CURRENT_PULL_REQUEST_FIELDS.join(",")]
-    : ["pr", "view", pullRequestUrl(pullRequest), "--json", CURRENT_PULL_REQUEST_FIELDS.join(",")];
+    : [
+        "pr",
+        "view",
+        pullRequestViewUrl(pullRequest),
+        "--json",
+        CURRENT_PULL_REQUEST_FIELDS.join(","),
+      ];
+
+export const pullRequestListArgs = (): ReadonlyArray<string> => [
+  "api",
+  "graphql",
+  "-f",
+  `query=${PULL_REQUEST_LIST_QUERY}`,
+];
+
+export const pullRequestDiffArgs = (pullRequest?: PullRequestRef): ReadonlyArray<string> =>
+  pullRequest === undefined
+    ? ["pr", "diff", "--color", "never"]
+    : ["pr", "diff", pullRequestViewUrl(pullRequest), "--color", "never"];
 
 const mergeMethodFlag = (method: PullRequestMergeMethod): string => `--${method}`;
 
@@ -81,6 +117,122 @@ export const pullRequestActionArgs = (
   ];
 };
 
+class GitHubCliTimedOut extends Data.TaggedError("GitHubCliTimedOut") {}
+class GitHubCliOutputTooLarge extends Data.TaggedError("GitHubCliOutputTooLarge") {}
+class GitHubCliIoError extends Data.TaggedError("GitHubCliIoError")<{
+  readonly phase: "spawn" | "stdout" | "stderr" | "exit";
+}> {}
+
+class GitHubCliExecutableMissing extends Data.TaggedError("GitHubCliExecutableMissing") {}
+
+type GitHubCliExecutionError =
+  | GitHubCliTimedOut
+  | GitHubCliOutputTooLarge
+  | GitHubCliIoError
+  | GitHubCliExecutableMissing;
+
+interface GitHubCliResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+const concatBytes = (chunks: ReadonlyArray<Uint8Array>, length: number): Uint8Array => {
+  const output = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+};
+
+const isMissingExecutable = (error: PlatformError.PlatformError): boolean =>
+  error.reason._tag === "NotFound" &&
+  error.reason.module === "ChildProcess" &&
+  error.reason.method === "spawn";
+
+const spawnError = (error: PlatformError.PlatformError): GitHubCliExecutionError =>
+  isMissingExecutable(error)
+    ? new GitHubCliExecutableMissing()
+    : new GitHubCliIoError({ phase: "spawn" });
+
+const streamError =
+  (phase: "stdout" | "stderr" | "exit") => (_error: PlatformError.PlatformError) =>
+    new GitHubCliIoError({ phase });
+
+const executeGh = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  args: ReadonlyArray<string>,
+  options?: {
+    readonly cwd?: string;
+    readonly program?: "gh" | "git";
+    readonly timeout?: typeof COMMAND_TIMEOUT | typeof DIFF_TIMEOUT;
+    readonly maxOutputBytes?: number;
+  },
+): Effect.Effect<GitHubCliResult, GitHubCliExecutionError> => {
+  const timeout = options?.timeout ?? COMMAND_TIMEOUT;
+  const maxOutputBytes = options?.maxOutputBytes ?? MAX_OUTPUT_BYTES;
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const child = yield* spawner
+        .spawn(
+          ChildProcess.make(options?.program ?? "gh", args, {
+            ...(options?.cwd === undefined ? undefined : { cwd: options.cwd }),
+            env: { GH_PROMPT_DISABLED: "1" },
+            extendEnv: true,
+            stdin: "ignore",
+            forceKillAfter: FORCE_KILL_AFTER,
+          }),
+        )
+        .pipe(Effect.mapError(spawnError));
+      const totalBytes = yield* Ref.make(0);
+      const stdoutChunks: Uint8Array[] = [];
+      const stderrChunks: Uint8Array[] = [];
+      let stdoutBytes = 0;
+      let stderrBytes = 0;
+
+      const collect = (
+        chunks: Uint8Array[],
+        phase: "stdout" | "stderr",
+      ): Effect.Effect<void, GitHubCliOutputTooLarge | GitHubCliIoError> =>
+        Stream.runForEach(child[phase], (chunk) =>
+          Effect.gen(function* () {
+            const accepted = yield* Ref.modify(totalBytes, (current) => {
+              const next = current + chunk.byteLength;
+              return next > maxOutputBytes ? ([false, current] as const) : ([true, next] as const);
+            });
+            if (!accepted) return yield* new GitHubCliOutputTooLarge();
+            chunks.push(Uint8Array.from(chunk));
+            if (phase === "stdout") stdoutBytes += chunk.byteLength;
+            else stderrBytes += chunk.byteLength;
+            return undefined;
+          }),
+        ).pipe(Effect.catchTag("PlatformError", (error) => Effect.fail(streamError(phase)(error))));
+
+      const results = yield* Effect.all(
+        [
+          collect(stdoutChunks, "stdout"),
+          collect(stderrChunks, "stderr"),
+          child.exitCode.pipe(Effect.mapError(streamError("exit"))),
+        ],
+        { concurrency: "unbounded" },
+      );
+      const decoder = new TextDecoder();
+      return {
+        exitCode: Number(results[2]),
+        stdout: decoder.decode(concatBytes(stdoutChunks, stdoutBytes)),
+        stderr: decoder.decode(concatBytes(stderrChunks, stderrBytes)),
+      };
+    }),
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: timeout,
+      orElse: () => Effect.fail(new GitHubCliTimedOut()),
+    }),
+  );
+};
+
 const isUnauthenticated = (stderr: string): boolean =>
   /not logged into any github hosts|gh auth login|authentication required|bad credentials|http 401/i.test(
     stderr,
@@ -96,6 +248,11 @@ const isUnsupportedContext = (stderr: string): boolean =>
 
 const isNoPullRequest = (stderr: string): boolean =>
   /no pull requests found(?: for branch)?|could not find pull request/i.test(stderr);
+
+const isDiffTooLarge = (stderr: string): boolean =>
+  /http 406|too many files|exceeds.*(?:file|diff).*limit|diff(?:erence)? is too large/i.test(
+    stderr,
+  );
 
 const isUnsupportedHeadFlag = (stderr: string): boolean =>
   /unknown flag:\s*--match-head-commit|unknown shorthand flag.*match-head-commit/i.test(stderr);
@@ -159,13 +316,20 @@ export interface GitHubCliAdapter {
     PullRequestStackActionResult,
     PullRequestReadFailure | PullRequestCliActionFailure
   >;
-
   readonly current: (
     cwd: string,
     pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
+  readonly diff: (cwd: string) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+  readonly diffFor: (
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestDiff, PullRequestReadFailure>;
+  readonly list: () => Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure>;
+  readonly detail: (
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure>;
   readonly runAction: (input: {
-    readonly cwd: string;
+    readonly cwd?: string;
     readonly url: string;
     readonly action: PullRequestAction;
     readonly expectedHeadSha?: string;
@@ -185,13 +349,31 @@ const mapExecutionActionError = (error: GitHubCliExecutionError): PullRequestCli
 export const makeGitHubCliAdapter = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
 ): GitHubCliAdapter => {
+  const mapFailedRead = (result: GitHubCliResult): Effect.Effect<never, PullRequestReadFailure> => {
+    const output = `${result.stderr}\n${result.stdout}`;
+    if (isUnauthenticated(output)) return Effect.fail(new PullRequestUnauthenticated());
+    if (isRateLimited(output)) return Effect.fail(new PullRequestRateLimited());
+    if (isUnsupportedContext(output)) return Effect.fail(new PullRequestUnsupportedContext());
+    return Effect.fail(new PullRequestHostUnavailable());
+  };
+
+  const readStdout = (
+    result: GitHubCliResult,
+  ): Effect.Effect<string | null, PullRequestReadFailure> => {
+    if (result.exitCode !== 0) {
+      if (isNoPullRequest(result.stderr)) return Effect.succeed(null);
+      return mapFailedRead(result);
+    }
+    return Effect.succeed(result.stdout);
+  };
+
   const read = (
     cwd: string,
     args: ReadonlyArray<string>,
     missing = false,
     program: "gh" | "git" = "gh",
   ) =>
-    executeGitHubCommand(spawner, cwd, args, program).pipe(
+    executeGh(spawner, args, { cwd, program }).pipe(
       Effect.mapError(mapExecutionReadError),
       Effect.flatMap((result): Effect.Effect<string | null, PullRequestReadFailure> => {
         if (result.exitCode === 0) return Effect.succeed(result.stdout);
@@ -216,7 +398,7 @@ export const makeGitHubCliAdapter = (
     makeGitHubStack(
       (args, missing) => read(cwd, args, missing).pipe(Effect.flatMap(json)),
       (args) =>
-        executeGitHubCommand(spawner, cwd, args).pipe(
+        executeGh(spawner, args, { cwd }).pipe(
           Effect.mapError(mapExecutionActionError),
           Effect.flatMap((result): Effect.Effect<unknown, PullRequestCliActionFailure> => {
             if (result.exitCode !== 0 || /"errors"\s*:/.test(result.stdout)) {
@@ -235,120 +417,192 @@ export const makeGitHubCliAdapter = (
           }),
         ),
     );
+
+  const current: GitHubCliAdapter["current"] = (cwd, pullRequest) =>
+    executeGh(spawner, currentPullRequestArgs(pullRequest), { cwd }).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(readStdout),
+      Effect.flatMap(
+        (stdout): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
+          if (stdout === null) return Effect.succeed(null);
+          return Effect.try({
+            try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
+    );
+
+  const runDiff = (args: ReadonlyArray<string>, cwd?: string) =>
+    Effect.gen(function* () {
+      const attempted = yield* executeGh(spawner, args, {
+        ...(cwd === undefined ? undefined : { cwd }),
+        timeout: DIFF_TIMEOUT,
+        maxOutputBytes: DIFF_MAX_OUTPUT_BYTES,
+      }).pipe(Effect.result);
+      if (Result.isFailure(attempted)) {
+        if (attempted.failure._tag === "GitHubCliOutputTooLarge") {
+          return { patch: "", truncated: true };
+        }
+        return yield* Effect.fail(mapExecutionReadError(attempted.failure));
+      }
+      const result = attempted.success;
+      if (result.exitCode === 0) return { patch: result.stdout, truncated: false };
+      if (isNoPullRequest(result.stderr)) return { patch: "", truncated: false };
+      if (isUnauthenticated(result.stderr)) {
+        return yield* new PullRequestUnauthenticated();
+      }
+      if (isRateLimited(result.stderr)) return yield* new PullRequestRateLimited();
+      if (isUnsupportedContext(result.stderr)) {
+        return yield* new PullRequestUnsupportedContext();
+      }
+      if (isDiffTooLarge(result.stderr)) return { patch: "", truncated: true };
+      return yield* new PullRequestHostUnavailable();
+    });
+
+  const diff: GitHubCliAdapter["diff"] = (cwd) => runDiff(pullRequestDiffArgs(), cwd);
+  const diffFor: GitHubCliAdapter["diffFor"] = (pullRequest) =>
+    runDiff(pullRequestDiffArgs(pullRequest));
+
+  const list: GitHubCliAdapter["list"] = () =>
+    executeGh(spawner, pullRequestListArgs()).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(
+        (result): Effect.Effect<ReadonlyArray<PullRequestListItem>, PullRequestReadFailure> => {
+          if (result.exitCode !== 0) return mapFailedRead(result);
+          return Effect.try({
+            try: () => normalizeGitHubViewerPullRequestsJson(JSON.parse(result.stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
+    );
+
+  const detail: GitHubCliAdapter["detail"] = (pullRequest) =>
+    executeGh(spawner, currentPullRequestArgs(pullRequest)).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap(readStdout),
+      Effect.flatMap(
+        (stdout): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
+          if (stdout === null) return Effect.succeed(null);
+          return Effect.try({
+            try: () => normalizeGitHubPullRequestJson(JSON.parse(stdout) as unknown),
+            catch: () => new PullRequestInvalidResponse(),
+          });
+        },
+      ),
+    );
+
+  const runAction: GitHubCliAdapter["runAction"] = ({ action, cwd, expectedHeadSha, url }) =>
+    executeGh(spawner, pullRequestActionArgs(url, action, expectedHeadSha), {
+      ...(cwd === undefined ? undefined : { cwd }),
+    }).pipe(
+      Effect.mapError(mapExecutionActionError),
+      Effect.flatMap((result): Effect.Effect<void, PullRequestCliActionFailure> => {
+        if (result.exitCode === 0) return Effect.void;
+        if (isUnauthenticated(result.stderr)) {
+          return Effect.fail(new PullRequestUnauthenticated());
+        }
+        if (isRateLimited(result.stderr)) return Effect.fail(new PullRequestRateLimited());
+        if (isUnsupportedContext(result.stderr)) {
+          return Effect.fail(new PullRequestUnsupportedContext());
+        }
+        if (isUnsupportedHeadFlag(result.stderr)) {
+          return Effect.fail(new PullRequestUnsupportedAction());
+        }
+        if (isStaleHead(result.stderr)) return Effect.fail(new PullRequestStaleContext());
+        if (isConfirmedHostRejection(result.stderr)) {
+          return Effect.fail(new PullRequestHostRejected());
+        }
+        return Effect.fail(new PullRequestActionOutcomeUnknown());
+      }),
+    );
+
+  const summary: GitHubCliAdapter["summary"] = (cwd, ref) =>
+    Effect.gen(function* () {
+      const raw = yield* read(
+        cwd,
+        ["pr", "view", pullRequestViewUrl(ref), "--json", SUMMARY_PULL_REQUEST_FIELDS.join(",")],
+        true,
+      );
+      if (raw === null) return null;
+      const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+      return yield* Effect.try({
+        try: () => decodeSummary(JSON.parse(raw), checkedAt, ref),
+        catch: () => new PullRequestInvalidResponse(),
+      });
+    });
+
+  const discover: GitHubCliAdapter["discover"] = (cwd, branch) =>
+    Effect.gen(function* () {
+      const config = yield* read(
+        cwd,
+        [
+          "config",
+          "--null",
+          "--get-regexp",
+          String.raw`^(remote\..*\.url|branch\..*\.(remote|merge))$`,
+        ],
+        false,
+        "git",
+      );
+      const repo = yield* Effect.try({
+        try: () => repositoryFromBranchConfig(config ?? "", branch),
+        catch: () => new PullRequestUnsupportedContext(),
+      });
+      const url = `https://${repo.host}/${repo.owner}/${repo.repository}`;
+      const metadata = yield* read(cwd, ["repo", "view", url, "--json", "defaultBranchRef"]);
+      const defaultBranch = yield* Effect.try({
+        try: () => {
+          const value: unknown = JSON.parse(metadata ?? "null");
+          if (typeof value !== "object" || value === null || !("defaultBranchRef" in value))
+            throw new Error("Missing default branch");
+          const branchRef = value.defaultBranchRef;
+          if (
+            typeof branchRef !== "object" ||
+            branchRef === null ||
+            !("name" in branchRef) ||
+            typeof branchRef.name !== "string"
+          )
+            throw new Error("Missing default branch");
+          return branchRef.name;
+        },
+        catch: () => new PullRequestInvalidResponse(),
+      });
+      if (branch === defaultBranch) return null;
+      const raw = yield* read(cwd, [
+        "pr",
+        "list",
+        "--repo",
+        url,
+        "--head",
+        branch,
+        "--state",
+        "all",
+        "--limit",
+        "2",
+        "--json",
+        [...SUMMARY_PULL_REQUEST_FIELDS, "headRepository", "headRepositoryOwner"].join(","),
+      ]);
+      const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+      return yield* Effect.try({
+        try: () => decodeDiscovery(JSON.parse(raw ?? "null"), branch, repo, checkedAt),
+        catch: () => new PullRequestUnsupportedContext(),
+      });
+    });
+
   return {
-    summary: (cwd, ref) =>
-      Effect.gen(function* () {
-        const raw = yield* read(
-          cwd,
-          ["pr", "view", pullRequestUrl(ref), "--json", SUMMARY_PULL_REQUEST_FIELDS.join(",")],
-          true,
-        );
-        if (raw === null) return null;
-        const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
-        return yield* Effect.try({
-          try: () => decodeSummary(JSON.parse(raw), checkedAt, ref),
-          catch: () => new PullRequestInvalidResponse(),
-        });
-      }),
-    discover: (cwd, branch) =>
-      Effect.gen(function* () {
-        const config = yield* read(
-          cwd,
-          [
-            "config",
-            "--null",
-            "--get-regexp",
-            String.raw`^(remote\..*\.url|branch\..*\.(remote|merge))$`,
-          ],
-          false,
-          "git",
-        );
-        const repo = yield* Effect.try({
-          try: () => repositoryFromBranchConfig(config ?? "", branch),
-          catch: () => new PullRequestUnsupportedContext(),
-        });
-        const url = `https://${repo.host}/${repo.owner}/${repo.repository}`;
-        const metadata = yield* read(cwd, ["repo", "view", url, "--json", "defaultBranchRef"]);
-        const defaultBranch = yield* Effect.try({
-          try: () => {
-            const value = JSON.parse(metadata ?? "null") as {
-              defaultBranchRef?: { name?: unknown };
-            };
-            if (typeof value?.defaultBranchRef?.name !== "string")
-              throw new Error("Missing default branch");
-            return value.defaultBranchRef.name;
-          },
-          catch: () => new PullRequestInvalidResponse(),
-        });
-        if (branch === defaultBranch) return null;
-        const raw = yield* read(cwd, [
-          "pr",
-          "list",
-          "--repo",
-          url,
-          "--head",
-          branch,
-          "--state",
-          "all",
-          "--limit",
-          "2",
-          "--json",
-          [...SUMMARY_PULL_REQUEST_FIELDS, "headRepository", "headRepositoryOwner"].join(","),
-        ]);
-        const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
-        return yield* Effect.try({
-          try: () => decodeDiscovery(JSON.parse(raw ?? "null"), branch, repo, checkedAt),
-          catch: () => new PullRequestUnsupportedContext(),
-        });
-      }),
+    summary,
+    discover,
     stack: (cwd, ref) => stackFor(cwd).stack(ref),
     stackPreview: (cwd, ref, action) => stackFor(cwd).preview(ref, action),
     runStackAction: (cwd, ref, action, expected, method) =>
       stackFor(cwd).run(ref, action, expected, method),
-    current: (cwd, pullRequest) =>
-      executeGitHubCommand(spawner, cwd, currentPullRequestArgs(pullRequest)).pipe(
-        Effect.mapError(mapExecutionReadError),
-        Effect.flatMap(
-          (result): Effect.Effect<PullRequestSnapshot | null, PullRequestReadFailure> => {
-            if (result.exitCode !== 0) {
-              if (isNoPullRequest(result.stderr)) return Effect.succeed(null);
-              if (isUnauthenticated(result.stderr)) {
-                return Effect.fail(new PullRequestUnauthenticated());
-              }
-              if (isRateLimited(result.stderr)) return Effect.fail(new PullRequestRateLimited());
-              if (isUnsupportedContext(result.stderr)) {
-                return Effect.fail(new PullRequestUnsupportedContext());
-              }
-              return Effect.fail(new PullRequestHostUnavailable());
-            }
-            return Effect.try({
-              try: () => normalizeGitHubPullRequestJson(JSON.parse(result.stdout) as unknown),
-              catch: () => new PullRequestInvalidResponse(),
-            });
-          },
-        ),
-      ),
-    runAction: ({ action, cwd, expectedHeadSha, url }) =>
-      executeGitHubCommand(spawner, cwd, pullRequestActionArgs(url, action, expectedHeadSha)).pipe(
-        Effect.mapError(mapExecutionActionError),
-        Effect.flatMap((result): Effect.Effect<void, PullRequestCliActionFailure> => {
-          if (result.exitCode === 0) return Effect.void;
-          if (isUnauthenticated(result.stderr)) {
-            return Effect.fail(new PullRequestUnauthenticated());
-          }
-          if (isRateLimited(result.stderr)) return Effect.fail(new PullRequestRateLimited());
-          if (isUnsupportedContext(result.stderr)) {
-            return Effect.fail(new PullRequestUnsupportedContext());
-          }
-          if (isUnsupportedHeadFlag(result.stderr)) {
-            return Effect.fail(new PullRequestUnsupportedAction());
-          }
-          if (isStaleHead(result.stderr)) return Effect.fail(new PullRequestStaleContext());
-          if (isConfirmedHostRejection(result.stderr)) {
-            return Effect.fail(new PullRequestHostRejected());
-          }
-          return Effect.fail(new PullRequestActionOutcomeUnknown());
-        }),
-      ),
+    current,
+    diff,
+    diffFor,
+    list,
+    detail,
+    runAction,
   };
 };

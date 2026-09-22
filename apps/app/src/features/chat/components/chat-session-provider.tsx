@@ -17,14 +17,22 @@ export function ChatSessionProvider({
   const turnInProgress = useStore(chat.store, selectTurnInProgress);
 
   const prompt = useCallback(
-    (text: string) => {
-      chat.prompt(text).catch((error: unknown) => {
+    (text: string, delivery?: "steer" | "followUp") => {
+      chat.prompt(text, delivery).catch((error: unknown) => {
         console.error("Failed to prompt", error);
       });
     },
     [chat],
   );
   const interrupt = useCallback(() => chat.interrupt(), [chat]);
+  const replaceQueue = useCallback<ChatSessionValue["replaceQueue"]>(
+    (pending) => {
+      chat.replaceQueue(pending).catch((error: unknown) => {
+        console.error("Failed to replace queue", error);
+      });
+    },
+    [chat],
+  );
   const respondToRequest = useCallback<ChatSessionValue["respondToRequest"]>(
     (requestId, response) => {
       chat.respondToAgentRequest(requestId, response).catch((error: unknown) => {
@@ -40,10 +48,11 @@ export function ChatSessionProvider({
       store: chat.store,
       prompt,
       interrupt,
+      replaceQueue,
       respondToRequest,
       turnInProgress,
     }),
-    [sessionRef.sessionId, chat, prompt, interrupt, respondToRequest, turnInProgress],
+    [sessionRef.sessionId, chat, prompt, interrupt, replaceQueue, respondToRequest, turnInProgress],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

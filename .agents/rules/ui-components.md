@@ -70,8 +70,9 @@ const [value, setValue] = useControllableState({
 
 ## Styling — cn, ordering, CVA
 
-`cn = twMerge(clsx(...))`: clsx for conditionals, tailwind-merge to resolve
-conflicting utilities (last one wins). Class order is fixed:
+`cn` (from the `cn` package, re-exported via `@getpie/ui/lib/utils`) joins
+conditionals and resolves conflicting Tailwind utilities (last one wins). Class
+order is fixed:
 
 ```tsx
 className={cn(

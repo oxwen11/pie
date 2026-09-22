@@ -6,20 +6,25 @@ import { cn } from "@getpie/ui/lib/utils";
 import type { ChatStatus } from "ai";
 import { ArrowUpIcon, SquareIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, KeyboardEventHandler } from "react";
-import { Children, useMemo } from "react";
+import { useMemo } from "react";
+
+const promptInputSurface = cn(
+  "bg-background w-full divide-y rounded-xl",
+  "[--composer-ring:rgba(0,0,0,0.05)] dark:[--composer-ring:rgba(255,255,255,0.08)]",
+  "shadow-[0_18px_47px_0_rgba(0,0,0,0.03),0_7.5px_19px_0_rgba(0,0,0,0.02),0_4px_10.5px_0_rgba(0,0,0,0.02),0_2.3px_5.8px_0_rgba(0,0,0,0.01),0_1.2px_3.1px_0_rgba(0,0,0,0.01),0_0.5px_1.3px_0_rgba(0,0,0,0.01),0_0_0_1px_var(--composer-ring)]",
+);
 
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
-  <form
-    className={cn(
-      "bg-background w-full divide-y rounded-xl",
-      "[--composer-ring:rgba(0,0,0,0.05)] dark:[--composer-ring:rgba(255,255,255,0.08)]",
-      "shadow-[0_18px_47px_0_rgba(0,0,0,0.03),0_7.5px_19px_0_rgba(0,0,0,0.02),0_4px_10.5px_0_rgba(0,0,0,0.02),0_2.3px_5.8px_0_rgba(0,0,0,0.01),0_1.2px_3.1px_0_rgba(0,0,0,0.01),0_0.5px_1.3px_0_rgba(0,0,0,0.01),0_0_0_1px_var(--composer-ring)]",
-      className,
-    )}
-    {...props}
-  />
+  <form className={cn(promptInputSurface, className)} {...props} />
+);
+
+/** Same chrome as PromptInput when the composer already lives inside a form. */
+export type PromptInputBoxProps = HTMLAttributes<HTMLDivElement>;
+
+export const PromptInputBox = ({ className, ...props }: PromptInputBoxProps) => (
+  <div className={cn(promptInputSurface, className)} {...props} />
 );
 
 export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
@@ -78,7 +83,7 @@ export const PromptInputTextarea = ({
 export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputToolbar = ({ className, ...props }: PromptInputToolbarProps) => (
-  <div className={cn("flex items-end justify-between p-2 pt-1", className)} {...props} />
+  <div className={cn("flex items-end justify-end gap-1 p-2 pt-1", className)} {...props} />
 );
 
 export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
@@ -95,26 +100,21 @@ export type PromptInputButtonProps = ComponentProps<typeof Button>;
 export const PromptInputButton = ({
   variant = "ghost",
   className,
-  size,
+  size = "icon-sm",
   ...props
-}: PromptInputButtonProps) => {
-  const newSize = (size ?? Children.count(props.children) > 1) ? "default" : "icon";
-
-  return (
-    <Button
-      className={cn(
-        "shrink-0 gap-1.5 rounded-lg",
-        variant === "ghost" && "text-muted-foreground",
-        newSize === "default" && "px-3",
-        className,
-      )}
-      size={newSize}
-      type="button"
-      variant={variant}
-      {...props}
-    />
-  );
-};
+}: PromptInputButtonProps) => (
+  <Button
+    className={cn(
+      "shrink-0 gap-1.5 rounded-full before:rounded-full",
+      variant === "ghost" && "text-muted-foreground",
+      className,
+    )}
+    size={size}
+    type="button"
+    variant={variant}
+    {...props}
+  />
+);
 
 export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
   status?: ChatStatus;
@@ -123,7 +123,7 @@ export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
 export const PromptInputSubmit = ({
   className,
   variant = "default",
-  size = "sm",
+  size = "icon-sm",
   status,
   children,
   ...props
@@ -146,7 +146,7 @@ export const PromptInputSubmit = ({
       size={size}
       type="submit"
       variant={variant}
-      className={cn("has-[>svg]:px-2", className)}
+      className={cn("rounded-full before:rounded-full", className)}
       {...props}
     >
       {children ?? Icon}

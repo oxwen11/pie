@@ -15,9 +15,10 @@ import {
   tailFile,
 } from "../runtime/fs.ts";
 import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
-import { ensureSampleProject, type SampleProject } from "../runtime/scaffold.ts";
+import { ensureSampleProject, seedSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
+import { writeBrowserEnvFile } from "./env.ts";
 import { recordedPids } from "./pids.ts";
 import { applyPortPlan, portPlan } from "./ports.ts";
 
@@ -25,13 +26,15 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
     allowServe: identity.allowServe,
+    allowEmptyProjects: identity.id !== "cli",
     usage: identity.allowServe
       ? `${identity.bin} launch [--replace] [--serve]`
-      : `${identity.bin} launch [--replace]`,
+      : `${identity.bin} launch [--replace] [--empty-projects]`,
   });
   const repo = findRepoRoot();
   if (
     identity.needsDisplay &&
+    process.platform !== "darwin" &&
     process.env.DISPLAY === undefined &&
     commandOnPath("xvfb-run") === undefined
   ) {
@@ -42,6 +45,9 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   switch (identity.build) {
     case "core":
       ensureCoreBuilt(repo);
+      // pie serve loads TypeScript, but availability stats the bun-built
+      // pie-pi-process entry under @getpie/server/pi-process.
+      ensureServerBuilt(repo);
       break;
     case "server":
       ensureServerBuilt(repo);
@@ -59,6 +65,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     const kind = await classifyRun(surface, existing, meta, request.mode);
     switch (kind) {
       case "reuse":
+        writeBrowserEnvFile(identity, existing);
         return;
       case "live":
         if (request.replace) {
@@ -90,6 +97,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   ensureDir(path.join(runDir, "pids"));
   ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
+  ensureDir(path.join(pieHome, "home"));
   switch (identity.id) {
     case "cli":
     case "desktop":
@@ -112,16 +120,21 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     request,
     env: {
       ...process.env,
+      HOME: path.join(pieHome, "home"),
       PIE_HOME: pieHome,
       PIE_PORT: String(plan.piePort),
       NODE_ENV: "development",
     },
   });
+  if (ctx.surface !== "cli" && ctx.request.seedProject === true) {
+    seedSampleProject(pieHome, ctx.sample);
+  }
   writeRunMeta(path.join(runDir, "meta.json"), initialMeta(ctx));
   setCurrentRun(identity.currentLink, runDir);
 
   try {
     await surface.spawn(ctx);
+    writeBrowserEnvFile(identity, runDir);
   } catch (error) {
     tailFailure(runDir, pieHome);
     copyFailureLogs(runDir, path.join(identity.root, "last-failure"));
@@ -170,34 +183,37 @@ function toLaunchCtx(
   },
 ): LaunchCtx {
   switch (identity.id) {
-    case "web":
+    case "web": {
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "web",
         vitePort: identity.vitePort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
+        env: {
+          ...base.env,
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
+        },
       };
+    }
     case "cli": {
-      const daemonDir = path.join(base.pieHome, "daemon");
       return {
         ...base,
         surface: "cli",
-        daemonDir,
-        env: { ...base.env, PIE_DAEMON_DIR: daemonDir },
       };
     }
     case "desktop": {
-      const daemonDir = path.join(base.pieHome, "daemon");
       const cdpPort = envPort("PIE_REMOTE_DEBUG_PORT", identity.cdpDefault);
+      const projectBrowseRoot = path.join(base.pieHome, "workspace");
       return {
         ...base,
         surface: "desktop",
-        daemonDir,
         cdpPort,
-        sample: scaffold(identity),
+        sample: scaffold(identity, projectBrowseRoot),
         env: {
           ...base.env,
-          PIE_DAEMON_DIR: daemonDir,
+          PIE_DESKTOP_BACKGROUND: process.env.PIE_DESKTOP_BACKGROUND === "0" ? "0" : "1",
+          PIE_PROJECT_BROWSE_ROOT: projectBrowseRoot,
           PIE_REMOTE_DEBUG_PORT: String(cdpPort),
         },
       };
@@ -210,9 +226,12 @@ function toLaunchCtx(
   }
 }
 
-function scaffold(identity: Extract<SurfaceIdentity, { sample: unknown }>): SampleProject {
+function scaffold(
+  identity: Extract<SurfaceIdentity, { sample: unknown }>,
+  projectBrowseRoot: string,
+): SampleProject {
   return ensureSampleProject({
-    home: process.env.HOME ?? "",
+    home: projectBrowseRoot,
     name: identity.sample.name,
     marker: identity.sample.marker,
     readme: identity.sample.readme,

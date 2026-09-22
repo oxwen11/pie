@@ -38,7 +38,7 @@ function QuestionItem({
       <input
         type="text"
         aria-labelledby={labelId}
-        className="border-border/70 text-foreground placeholder:text-muted-foreground/70 focus:ring-ring w-full rounded-md border bg-transparent px-2 py-1.5 text-sm outline-none focus:ring-1"
+        className="border-border/70 text-foreground placeholder:text-muted-foreground/70 focus:ring-ring w-full rounded-md border bg-transparent px-2 py-1.5 text-base outline-none focus:ring-1"
         placeholder="Type your answer…"
         value={value.selected[0] ?? ""}
         onChange={(e) => onChange({ ...value, selected: [e.target.value] })}
@@ -157,7 +157,7 @@ export function QuestionRequestView({
           Cancel
         </Button>
         <Button type="button" size="sm" onClick={handleSubmit}>
-          Submit
+          Submit answers
         </Button>
       </div>
     </div>

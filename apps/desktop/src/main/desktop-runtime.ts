@@ -1,24 +1,37 @@
+import fs from "node:fs";
+
 import * as NodeChildProcessSpawner from "@effect/platform-node/NodeChildProcessSpawner";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { resolveDevelopmentScope } from "@getpie/core/development-scope";
-import { resolvePieHome } from "@getpie/server/daemon";
+import { resolvePieHome, settingsFile } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
-import { app, dialog } from "electron";
+import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";
 import { DesktopApplication } from "./application/desktop-application";
-import { DesktopConfig, makeDesktopConfigLive } from "./desktop-config";
+import { DesktopConfig, makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppProtocol, registerAppScheme } from "./electron/app-protocol";
 import { MainWindow, makeMainWindow, rendererRoot } from "./electron/main-window";
 import { RendererChannel } from "./electron/renderer-channel";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
+import { DesktopResourceMonitoringLive } from "./resources/resource-monitoring-live";
 import { LocalServerLive } from "./server/local-server-live";
 import { formatStartupFailure } from "./startup-failure";
+import { readThemePreference, windowBackgroundColor } from "./window-background";
+
+function resolveWindowBackgroundColor(): string {
+  try {
+    const theme = readThemePreference(fs.readFileSync(settingsFile(resolvePieHome()), "utf8"));
+    return windowBackgroundColor(theme, nativeTheme.shouldUseDarkColors);
+  } catch {
+    return windowBackgroundColor(undefined, nativeTheme.shouldUseDarkColors);
+  }
+}
 
 const MainWindowLive = Layer.effect(
   MainWindow,
@@ -30,6 +43,7 @@ const MainWindowLive = Layer.effect(
     yield* registerAppProtocol(rendererRoot());
     return yield* makeMainWindow({
       devUrl: config.devUrl,
+      backgroundColor: config.windowBackgroundColor,
       connectRenderer: channel.connect,
       onVisibilityChanged: (visible) => {
         runFork(application.setWindowVisible(visible));
@@ -53,12 +67,14 @@ function makeRuntime(devUrl: string | undefined) {
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     devUrl,
+    windowBackgroundColor: resolveWindowBackgroundColor(),
   });
 
   return ManagedRuntime.make(
     MainWindowLive.pipe(
       Layer.provide(RendererChannelLive),
       Layer.provide(DesktopApplicationLive),
+      Layer.provideMerge(DesktopResourceMonitoringLive),
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),
@@ -69,8 +85,8 @@ function makeRuntime(devUrl: string | undefined) {
 }
 
 export function startDesktopRuntime(): void {
-  const isE2E = process.env["PIE_E2E"] === "1";
-  if (isE2E && process.platform === "darwin") app.setActivationPolicy("accessory");
+  const background = startsDesktopInBackground(process.env);
+  if (background && process.platform === "darwin") app.setActivationPolicy("accessory");
 
   // Opt-in CDP remote debugging (agent-browser); isolated userData avoids the
   // single-instance lock.
@@ -78,7 +94,7 @@ export function startDesktopRuntime(): void {
   if (remoteDebugPort) {
     app.commandLine.appendSwitch("remote-debugging-port", remoteDebugPort);
     app.setPath("userData", pieTempPath(`remote-debugging-${remoteDebugPort}`));
-  } else if (is.dev && !isE2E) {
+  } else if (is.dev && process.env["PIE_E2E"] !== "1") {
     // Give dev its own userData so its single-instance lock is independent of an
     // installed build. Key it on the canonical Git checkout identity so
     // parallel worktrees do not share the single-instance lock. E2E is excluded

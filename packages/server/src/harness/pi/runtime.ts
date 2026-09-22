@@ -1,6 +1,11 @@
-import type { AgentResponse, AgentModelState, SessionCapabilities } from "@getpie/contract";
-import { SessionCapabilitiesSchema } from "@getpie/contract";
-import type { UIMessage } from "ai";
+import {
+  SessionCapabilitiesSchema,
+  type AgentModelState,
+  type AgentResponse,
+  type SessionCapabilities,
+  type SessionPendingPrompt,
+  type PieUIMessage,
+} from "@getpie/contract";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -19,6 +24,7 @@ import type {
   CreateSessionInput,
   PromptReceipt,
   ResumeSessionInput,
+  RuntimePromptReceipt,
   UserInput,
 } from "../session-io";
 import { entriesToUIMessages } from "./history";
@@ -57,8 +63,14 @@ export type PiAgentRuntime = {
   readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
   readonly prompt: (
     input: UserInput,
-  ) => Effect.Effect<PromptReceipt, SessionClosed | TurnAlreadyRunning | AgentOperationError>;
+  ) => Effect.Effect<
+    RuntimePromptReceipt,
+    SessionClosed | TurnAlreadyRunning | AgentOperationError
+  >;
   readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
+  readonly replaceQueue: (
+    pending: SessionPendingPrompt,
+  ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly respondToAgentRequest: (
     requestId: string,
     response: AgentResponse,
@@ -67,12 +79,12 @@ export type PiAgentRuntime = {
     SessionCapabilities,
     CapabilityUnsupported | AgentOperationError
   >;
-  readonly getMessages?: Effect.Effect<
-    ReadonlyArray<UIMessage>,
+  readonly getMessages: Effect.Effect<
+    ReadonlyArray<PieUIMessage>,
     SessionClosed | AgentOperationError
   >;
-  readonly getModelState?: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
-  readonly setModel?: (model: {
+  readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  readonly setModel: (model: {
     readonly provider: string;
     readonly modelId: string;
   }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
@@ -90,6 +102,8 @@ export const makePiAgentRuntime = (
     );
     const cursor = yield* Ref.make(0);
     const closed = yield* Ref.make(false);
+    // The turn this runtime has announced on the event queue and not yet ended.
+    // Separate from PiProcess protocol turn state and from the session fold.
     const activeTurn = yield* Ref.make<string | undefined>(undefined);
 
     const emit = (body: PiUIMessageChunk | SessionEvent) =>
@@ -103,27 +117,51 @@ export const makePiAgentRuntime = (
         ),
       );
 
-    const crash = (cause: unknown) =>
+    type ShutdownReason =
+      | { readonly _tag: "Closed" }
+      | { readonly _tag: "Crashed"; readonly cause: unknown };
+
+    const shutdown = (reason: ShutdownReason) =>
       Ref.getAndSet(closed, true).pipe(
         Effect.flatMap((alreadyClosed) =>
           alreadyClosed
             ? Effect.void
             : Ref.getAndSet(activeTurn, undefined).pipe(
-                Effect.flatMap((turnId) =>
-                  emit({ type: "session.crashed", sessionId, reason: String(cause) }).pipe(
-                    Effect.andThen(
-                      turnId
+                Effect.flatMap((turnId) => {
+                  switch (reason._tag) {
+                    case "Crashed": {
+                      const crashed = emit({
+                        type: "session.crashed",
+                        sessionId,
+                        reason: String(reason.cause),
+                      });
+                      if (!turnId) return crashed;
+                      return emit({
+                        type: "session.turn.ended",
+                        sessionId,
+                        turnId,
+                        outcome: "failed",
+                        error: {
+                          message: String(reason.cause),
+                          category: "unknown",
+                        },
+                      }).pipe(Effect.andThen(crashed));
+                    }
+                    case "Closed":
+                      return turnId
                         ? emit({
                             type: "session.turn.ended",
                             sessionId,
                             turnId,
-                            outcome: "failed",
-                            error: { message: String(cause), category: "unknown" },
+                            outcome: "canceled",
                           })
-                        : Effect.void,
-                    ),
-                  ),
-                ),
+                        : Effect.void;
+                    default: {
+                      const exhaustive: never = reason;
+                      return exhaustive;
+                    }
+                  }
+                }),
                 Effect.catch(() => Effect.void),
                 Effect.andThen(
                   process.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
@@ -134,37 +172,25 @@ export const makePiAgentRuntime = (
         ),
       );
 
-    const close = Ref.getAndSet(closed, true).pipe(
-      Effect.flatMap((alreadyClosed) =>
-        alreadyClosed
-          ? Effect.void
-          : Ref.getAndSet(activeTurn, undefined).pipe(
-              Effect.flatMap((turnId) =>
-                turnId
-                  ? emit({
-                      type: "session.turn.ended",
-                      sessionId,
-                      turnId,
-                      outcome: "canceled",
-                    })
-                  : Effect.void,
-              ),
-              Effect.catch(() => Effect.void),
-              Effect.andThen(
-                process.session.abort(sessionId).pipe(Effect.catch(() => Effect.void)),
-              ),
-              Effect.andThen(Queue.end(events)),
-              Effect.asVoid,
-            ),
-      ),
-    );
+    const crash = (cause: unknown) => shutdown({ _tag: "Crashed", cause });
+    const close = shutdown({ _tag: "Closed" });
 
     const interrupt: PiAgentRuntime["interrupt"] = Effect.gen(function* () {
       if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
       yield* process.session
         .interrupt(sessionId)
         .pipe(Effect.mapError((cause) => operationError(sessionId, "interrupt", cause)));
+      return undefined;
     });
+
+    const replaceQueue: PiAgentRuntime["replaceQueue"] = (pending) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        yield* process.session
+          .replaceQueue(sessionId, pending)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "replace-queue", cause)));
+        return undefined;
+      });
 
     yield* Scope.addFinalizer(scope, close);
     yield* process.session.awaitTermination(sessionId).pipe(
@@ -174,6 +200,14 @@ export const makePiAgentRuntime = (
     yield* Stream.runForEach(process.session.requestPermission(sessionId), (request) =>
       emit({ type: "session.request.asked", sessionId, request }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
+    yield* Stream.runForEach(process.session.queueUpdates(sessionId), (queue) =>
+      emit({
+        type: "session.queue.updated",
+        sessionId,
+        steering: queue.steering,
+        followUp: queue.followUp,
+      }),
+    ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
     return {
       sessionId,
@@ -181,8 +215,11 @@ export const makePiAgentRuntime = (
       prompt: (input) =>
         Effect.gen(function* () {
           if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+          const command = { sessionId, text: toPromptText(input) };
           const prompt = yield* process.session
-            .prompt({ sessionId, text: toPromptText(input) })
+            .prompt(
+              input.delivery !== undefined ? { ...command, delivery: input.delivery } : command,
+            )
             .pipe(
               Effect.mapError((cause) =>
                 cause instanceof TurnAlreadyRunning
@@ -200,46 +237,45 @@ export const makePiAgentRuntime = (
             yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
           }
 
-          const finished = yield* Ref.make(false);
+          const lastChunkWasFinish = yield* Ref.make(false);
           const outcome = yield* Ref.make<"completed" | "canceled">("completed");
           const pump = Stream.runForEach(prompt.output, (chunk) =>
-            (chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void).pipe(
-              Effect.andThen(emit(chunk)),
-              Effect.andThen(
-                chunk.type === "finish"
-                  ? Ref.set(finished, true).pipe(
-                      Effect.andThen(Ref.get(outcome)),
-                      Effect.flatMap((turnOutcome) =>
-                        emit({
-                          type: "session.turn.ended",
-                          sessionId,
-                          turnId: prompt.turnId,
-                          outcome: turnOutcome,
-                        }).pipe(
-                          Effect.andThen(
-                            Ref.update(activeTurn, (current) =>
-                              current === prompt.turnId ? undefined : current,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Effect.void,
-              ),
-            ),
+            chunk.type === "session.prompt.submitted"
+              ? emit(chunk)
+              : Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
+                  Effect.andThen(
+                    chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void,
+                  ),
+                  Effect.andThen(emit(chunk)),
+                ),
           ).pipe(
-            Effect.flatMap(() => Ref.get(finished)),
-            Effect.flatMap((didFinish) =>
-              prompt.started && !didFinish
-                ? crash(new Error("Pi turn ended without a finish event"))
-                : Effect.void,
-            ),
+            Effect.flatMap(() => Ref.get(lastChunkWasFinish)),
+            Effect.flatMap((didFinish) => {
+              if (!prompt.started) return Effect.void;
+              if (!didFinish) return crash(new Error("Pi turn ended without a finish event"));
+              return Ref.get(outcome).pipe(
+                Effect.flatMap((turnOutcome) =>
+                  emit({
+                    type: "session.turn.ended",
+                    sessionId,
+                    turnId: prompt.turnId,
+                    outcome: turnOutcome,
+                  }),
+                ),
+                Effect.andThen(
+                  Ref.update(activeTurn, (current) =>
+                    current === prompt.turnId ? undefined : current,
+                  ),
+                ),
+              );
+            }),
             Effect.catch(crash),
           );
           yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
       interrupt,
+      replaceQueue,
       respondToAgentRequest: (requestId, response) =>
         process.session.respondPermission(sessionId, requestId, response).pipe(
           Effect.mapError((cause) =>

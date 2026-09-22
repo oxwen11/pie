@@ -11,19 +11,21 @@
     },
     "build:unpack": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@getpie/server#build"]
     },
     "build:mac": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build", "@getpie/server#build"]
     },
     "e2e": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
     },
     "e2e:headed": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH"]
     },
     "e2e:report": {
       "cache": false,

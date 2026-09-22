@@ -1,8 +1,8 @@
 import { defineRule } from "@oxlint/plugins";
 
-// Forbids eslint/oxlint disable comments on the React effect rules that
-// `.agents/rules/frontend-state.md` treats as non-negotiable. Rewrite the
-// effect (or the store) instead of silencing the diagnostic.
+// Forbids eslint/oxlint disable comments on the frontend-state rules that
+// must be rewritten, not silenced: React effects, compiler purity, and
+// pie/no-let (module-level let).
 
 const DISABLE_DIRECTIVE =
   /^\s*(?<kind>oxlint|eslint)-disable(?<scope>-next-line|-line)?(?:\s+(?<body>[\s\S]*))?$/u;
@@ -10,7 +10,14 @@ const DISABLE_DIRECTIVE =
 const PROTECTED_RULES = new Set([
   "react/exhaustive-deps",
   "react-hooks/exhaustive-deps",
+  "react/globals",
+  "react/purity",
+  "react/immutability",
+  "react/set-state-in-effect",
+  "react/set-state-in-render",
+  "react/rules-of-hooks",
   "pie/no-restricted-disable",
+  "pie/no-let",
 ]);
 
 const PROTECTED_PREFIXES = ["react-you-might-not-need-an-effect/"] as const;
@@ -41,7 +48,7 @@ export const noRestrictedDisable = defineRule({
             context.report({
               node: comment,
               message:
-                "A blanket eslint/oxlint-disable also turns off react-you-might-not-need-an-effect and react/exhaustive-deps. Name the other rules, or rewrite the React effect.",
+                "A blanket eslint/oxlint-disable also turns off pie/no-let, React compiler purity rules, react-you-might-not-need-an-effect, and react/exhaustive-deps. Name the other rules instead of silencing them.",
             });
             continue;
           }

@@ -11,21 +11,24 @@ const TOOL_FOOTER =
 function surfaceLines(id: SurfaceId): string {
   switch (id) {
     case "web":
-      return `  pie-verify web launch [--replace]
+      return `  pie-verify web launch [--replace] [--empty-projects]
   pie-verify web doctor
-  pie-verify web browser open|snapshot|<agent-browser argv…>
+  pie-verify web env [--export]
+  pie-verify web resources live|stall|restart|storage|disabled
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
   pie-verify web cleanup [run-dir]`;
     case "cli":
       return `  pie-verify cli launch [--replace] [--serve]
   pie-verify cli doctor
   pie-verify cli run <pie argv…>
+  pie-verify cli resources live|stall|restart|storage|disabled
   pie-verify cli evidence path|init|curl|note
   pie-verify cli cleanup [run-dir]`;
     case "desktop":
-      return `  pie-verify desktop launch [--replace]
+      return `  pie-verify desktop launch [--replace] [--empty-projects]
   pie-verify desktop doctor
-  pie-verify desktop browser snapshot|connect|<agent-browser argv…>
+  pie-verify desktop env [--export]
+  pie-verify desktop resources live|stall|restart|storage|disabled
   pie-verify desktop evidence path|init|screenshot|snapshot|curl|side-effects|note
   pie-verify desktop cleanup [run-dir]`;
     default: {

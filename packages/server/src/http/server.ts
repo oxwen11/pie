@@ -2,10 +2,11 @@ import type { RequestListener, Server } from "node:http";
 import http from "node:http";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Cause, Context, Data, Effect, Exit, Scope } from "effect";
+import { Cause, Context, Data, Effect, Exit, Option, Scope } from "effect";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
+import { ResourceMonitoring } from "../observability/resources";
 import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
 import { makeRequestApp } from "./app";
 import { createTicketStore, type TicketStore } from "./auth";
@@ -18,9 +19,10 @@ export type ManagedServer = Server & {
 
 export type CreateServerOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` must present
-   * `Authorization: Bearer <token>`, and every WebSocket upgrade must carry a
-   * valid single-use `?ticket=`. Unset (browser mode) disables both.
+   * When set, every `/api/*` request except `/api/health` and the same-origin
+   * browser bootstrap must present `Authorization: Bearer <token>`, and every
+   * WebSocket upgrade must carry a valid single-use `?ticket=`. Unset (browser
+   * mode) disables both.
    */
   authToken?: string | undefined;
   /**
@@ -234,6 +236,7 @@ const buildServer = (
       shutdown,
     } = options;
     const runInContext = Effect.runForkWith(effectContext);
+    const resources = Context.getOption(effectContext, ResourceMonitoring);
 
     const rpcRuntime = yield* Effect.acquireRelease(
       Effect.promise(() => stages.createRpcRuntime(effectContext)),
@@ -253,7 +256,18 @@ const buildServer = (
     const handleRequest = yield* Effect.promise(() =>
       stages.createRequestHandler(
         rpcRuntime,
-        makeRequestApp({ authToken, corsOrigins, allowedHosts, tickets, shutdown, ui }),
+        makeRequestApp({
+          authToken,
+          corsOrigins,
+          allowedHosts,
+          tickets,
+          shutdown,
+          registerElectron:
+            authToken === undefined || Option.isNone(resources)
+              ? undefined
+              : (registration) => resources.value.registerElectron(registration),
+          ui,
+        }),
         requestScope,
       ),
     );

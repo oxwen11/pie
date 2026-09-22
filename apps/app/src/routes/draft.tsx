@@ -1,4 +1,9 @@
-import type { CreateWorktreeInput, ListSessionsOutput, SessionSummary } from "@getpie/contract";
+import type {
+  CreateWorktreeInput,
+  ListSessionsOutput,
+  Project,
+  SessionSummary,
+} from "@getpie/contract";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -7,23 +12,14 @@ import {
 } from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
 import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FolderPlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { DraftModelSelect } from "@/features/chat/components/draft-model-select";
+import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
 import { ChatInput } from "@/features/chat/components/input/chat-input";
+import type { ChatInputController } from "@/features/chat/components/input/chat-input-controller";
 import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
 import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
 import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
@@ -32,7 +28,6 @@ import { useChatInputHasContent } from "@/features/chat/components/input/use-cha
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
-import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 import { useProject, useProjects } from "@/features/projects/use-projects";
@@ -49,8 +44,11 @@ const asText = (value: unknown): string | undefined =>
 const optional = <K extends keyof DraftSearch>(
   key: K,
   value: DraftSearch[K],
-): Pick<DraftSearch, K> | undefined =>
-  value === undefined ? undefined : ({ [key]: value } as Pick<DraftSearch, K>);
+): Partial<Pick<DraftSearch, K>> => {
+  const result: Partial<Pick<DraftSearch, K>> = {};
+  if (value !== undefined) result[key] = value;
+  return result;
+};
 
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
@@ -67,7 +65,6 @@ function DraftRoute() {
   const navigate = useNavigate();
   const chats = useChatManager();
   const queryClient = useQueryClient();
-  const [importOpen, setImportOpen] = useState(false);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
@@ -78,29 +75,27 @@ function DraftRoute() {
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
-
-  useEffect(() => {
-    if (!defaultModel || search.provider || search.modelId) return;
-    navigate({
-      to: "/draft",
-      search: (prev) => ({
-        ...prev,
-        provider: defaultModel.provider,
-        modelId: defaultModel.modelId,
-      }),
-      replace: true,
-    }).catch((error: unknown) => {
-      console.error("Failed to apply default draft model", error);
-    });
-  }, [defaultModel, navigate, search.modelId, search.provider]);
+  const draftModel =
+    search.provider !== undefined && search.modelId !== undefined
+      ? { provider: search.provider, modelId: search.modelId }
+      : defaultModel;
 
   const startSession = useMutation({
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
-      if (!selected) throw new Error("No project selected");
+      let projectId = selected?.id;
+      if (projectId === undefined) {
+        const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
+        const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
+        queryClient.setQueryData<ReadonlyArray<Project>>(projectListKey, (prev) => {
+          if (prev?.some((project) => project.id === allocated.id)) return prev;
+          return [...(prev ?? []), allocated];
+        });
+        projectId = allocated.id;
+      }
       const created = await orpcQueryUtils.agent.session.create.call({
-        projectId: selected.id,
-        ...(search.provider && search.modelId
-          ? { provider: search.provider, modelId: search.modelId }
+        projectId,
+        ...(draftModel !== undefined
+          ? { provider: draftModel.provider, modelId: draftModel.modelId }
           : undefined),
         ...(worktree !== undefined ? { worktree } : undefined),
       });
@@ -110,6 +105,10 @@ function DraftRoute() {
       const listKey = orpcQueryUtils.agent.session.list.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
+
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
         if (prev?.some((session) => session.sessionId === created.ref.sessionId)) return prev;
@@ -154,10 +153,6 @@ function DraftRoute() {
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
-      if (!selected) {
-        toast.error("Pick a project before sending.");
-        return false;
-      }
       if (draftWorktree.gitState === "workspace-unavailable") {
         toast.error("The selected project folder is unavailable.");
         return false;
@@ -185,71 +180,102 @@ function DraftRoute() {
 
   if (projects.isError) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-        <p className="text-muted-foreground text-sm">
-          Couldn&apos;t load your projects: {projects.error.message}
-        </p>
-        <Button onClick={() => void projects.refetch()} size="sm" variant="outline">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (projects.data.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <FolderPlusIcon aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle>
-            <h1>Import your first project</h1>
-          </EmptyTitle>
-          <EmptyDescription>
-            Choose a local folder for your coding agent to work in. You can start a chat right after
-            importing.
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button onClick={() => setImportOpen(true)}>Import project</Button>
-        </EmptyContent>
-        {importOpen && (
-          <ImportProjectDialog
-            onClose={() => setImportOpen(false)}
-            onImported={(project) => {
-              navigate({
-                to: "/draft",
-                search: { projectId: project.id },
-                replace: true,
-              }).catch((error: unknown) => {
-                console.error("Failed to open the imported project", error);
-              });
-            }}
-          />
-        )}
-      </Empty>
+      <DraftProjectsError
+        message={projects.error.message}
+        onRetry={() => void projects.refetch()}
+      />
     );
   }
 
   return (
+    <DraftComposer
+      controller={controller}
+      draftModel={draftModel}
+      draftWorktree={draftWorktree}
+      hasContent={hasContent}
+      models={modelsQuery.data?.models ?? []}
+      onModelChange={(provider, modelId) => {
+        navigate({
+          to: "/draft",
+          search: (prev) => ({ ...prev, provider, modelId }),
+          replace: true,
+        }).catch((error: unknown) => {
+          console.error("Failed to set the draft model", error);
+        });
+      }}
+      onProjectChange={(next) => {
+        navigate({
+          to: "/draft",
+          search: (prev) => {
+            if (next === null) {
+              const { projectId: _removed, ...rest } = prev;
+              return rest;
+            }
+            return { ...prev, projectId: next };
+          },
+          replace: true,
+        }).catch((error: unknown) => {
+          console.error("Failed to select draft project", error);
+        });
+      }}
+      onSchedule={() => {
+        if (selected === null) return;
+        navigate({
+          to: "/schedules",
+          search: { create: true, projectId: selected.id },
+        }).catch((error: unknown) => {
+          console.error("Failed to open the schedule editor", error);
+        });
+      }}
+      projects={projects.data ?? []}
+      selectedId={selected?.id ?? null}
+      startPending={startSession.isPending}
+    />
+  );
+}
+
+function DraftProjectsError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      <p className="text-muted-foreground text-sm">Couldn&apos;t load your projects: {message}</p>
+      <Button onClick={onRetry} size="sm" variant="outline">
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function DraftComposer({
+  controller,
+  draftModel,
+  draftWorktree,
+  hasContent,
+  models,
+  onModelChange,
+  onProjectChange,
+  onSchedule,
+  projects,
+  selectedId,
+  startPending,
+}: {
+  controller: ChatInputController | null;
+  draftModel: { provider: string; modelId: string } | undefined;
+  draftWorktree: ReturnType<typeof useDraftWorktree>;
+  hasContent: boolean;
+  models: Parameters<typeof ModelSelectorPicker>[0]["models"];
+  onModelChange: (provider: string, modelId: string) => void;
+  onProjectChange: (next: string | null) => void;
+  onSchedule: () => void;
+  projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
+  selectedId: string | null;
+  startPending: boolean;
+}) {
+  return (
     <div className="flex h-full items-center justify-center p-4">
       <CardFrame className="w-full max-w-2xl">
         <CardFrameHeader className="py-2">
-          <div className="-mx-5.5 flex min-w-0 flex-wrap items-center gap-0">
-            <ProjectSelect
-              onChange={(next) => {
-                navigate({
-                  to: "/draft",
-                  search: { projectId: next },
-                  replace: true,
-                }).catch((error: unknown) => {
-                  console.error("Failed to select draft project", error);
-                });
-              }}
-              projects={projects.data}
-              value={selected?.id ?? null}
-            />
+          <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
+            <ProjectSelect onChange={onProjectChange} projects={projects} value={selectedId} />
             {draftWorktree.gitState === "not-repository" ? (
               <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
             ) : null}
@@ -257,29 +283,28 @@ function DraftRoute() {
               <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
             ) : null}
             {draftWorktree.gitAvailable ? (
-              <>
-                <DraftWorkspaceSelect
-                  disabled={startSession.isPending || selected === null}
-                  mode={draftWorktree.mode}
-                  onModeChange={draftWorktree.setMode}
-                />
-                {draftWorktree.mode === "worktree" ? (
-                  <DraftWorktreeBaseSelect
-                    branch={draftWorktree.repositoryBranch}
-                    disabled={startSession.isPending || selected === null}
-                    onValueChange={draftWorktree.setWorktreeBaseOverride}
-                    value={draftWorktree.worktreeBase}
-                  />
-                ) : null}
-              </>
+              <DraftWorkspaceControls
+                disabled={startPending || selectedId === null}
+                draftWorktree={draftWorktree}
+              />
             ) : null}
+            <Button
+              className="ms-auto"
+              disabled={selectedId === null}
+              onClick={onSchedule}
+              size="sm"
+              variant="ghost"
+            >
+              Schedule…
+            </Button>
           </div>
         </CardFrameHeader>
         <Card
           render={
             <PromptInput
-              onSubmit={(e) => {
-                e.preventDefault();
+              className="divide-y-0"
+              onSubmit={(event) => {
+                event.preventDefault();
                 void controller?.submit();
               }}
             />
@@ -289,27 +314,18 @@ function DraftRoute() {
             <ChatInput />
             <PromptInputToolbar>
               <PromptInputTools>
-                <DraftModelSelect
-                  projectId={selected?.id}
-                  providerId={search.provider}
-                  modelId={search.modelId}
-                  onChange={(provider, modelId) => {
-                    navigate({
-                      to: "/draft",
-                      search: (prev) => ({ ...prev, provider, modelId }),
-                      replace: true,
-                    }).catch((error: unknown) => {
-                      console.error("Failed to set the draft model", error);
-                    });
-                  }}
+                <ModelSelectorPicker
+                  modelId={draftModel?.modelId}
+                  models={models}
+                  onChange={onModelChange}
+                  providerId={draftModel?.provider}
                 />
               </PromptInputTools>
               <PromptInputSubmit
                 disabled={
                   !hasContent ||
-                  !selected ||
                   draftWorktree.gitState === "workspace-unavailable" ||
-                  startSession.isPending ||
+                  startPending ||
                   (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
                 }
               />
@@ -318,5 +334,33 @@ function DraftRoute() {
         </Card>
       </CardFrame>
     </div>
+  );
+}
+
+function DraftWorkspaceControls({
+  disabled,
+  draftWorktree,
+}: {
+  disabled: boolean;
+  draftWorktree: ReturnType<typeof useDraftWorktree>;
+}) {
+  const handleModeChange = draftWorktree.setMode;
+  const handleValueChange = draftWorktree.setWorktreeBaseOverride;
+  return (
+    <>
+      <DraftWorkspaceSelect
+        disabled={disabled}
+        mode={draftWorktree.mode}
+        onModeChange={handleModeChange}
+      />
+      {draftWorktree.mode === "worktree" ? (
+        <DraftWorktreeBaseSelect
+          branch={draftWorktree.repositoryBranch}
+          disabled={disabled}
+          onValueChange={handleValueChange}
+          value={draftWorktree.worktreeBase}
+        />
+      ) : null}
+    </>
   );
 }

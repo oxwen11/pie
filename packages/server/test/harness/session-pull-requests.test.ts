@@ -117,7 +117,7 @@ layer(NodePlatformLayer)("durable Session associations", (it) => {
       assert.equal((yield* f.service.pullRequestContextFor(f.ref)).branch, "feature");
       assert.equal(yield* f.service.mergePullRequests(f.ref, ordinary, ordinary.links), true);
       const metadata = yield* f.repo.read(f.ref.projectId, f.ref.sessionId);
-      yield* f.repo.write({ ...metadata, ownsWorktree: true });
+      yield* f.repo.write({ ...metadata, worktree: { branch: "feature" } });
       const owned = yield* f.service.pullRequestContextFor(f.ref);
       assert.equal(owned.branch, "other-session-branch");
       f.setBranch("next-worktree-branch");
@@ -136,7 +136,7 @@ layer(NodePlatformLayer)("durable Session associations", (it) => {
   it.effect("captures ordinary branches and does not delete the Project when creation fails", () =>
     Effect.gen(function* () {
       const f = yield* makeFixture;
-      assert.equal((yield* f.service.workspaceFor(f.ref)).gitBranch, "feature");
+      assert.equal((yield* f.service.pullRequestContextFor(f.ref)).branch, "feature");
       f.failWrite(true);
       assert.equal(
         (yield* Effect.result(f.service.create({ projectId: "project", cwd: f.home })))._tag,

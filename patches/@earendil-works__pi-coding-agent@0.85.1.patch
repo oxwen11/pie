@@ -1,0 +1,297 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index e2b640b661a7712fa3f86ed5ecb494b98a6f9e4d..bb75a52bb6f9bb306d73f04eb36e39dd62835551 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,3 +1,5 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
++export { builtInExtensions } from "./extensions/index.ts";
+ export { type Args, parseArgs } from "./cli/args.ts";
+ export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
+ export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
+diff --git a/dist/index.js b/dist/index.js
+index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de222e42b9c 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,3 +1,5 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
++export { builtInExtensions } from "./extensions/index.js";
+ // Core session management
+ export { parseArgs } from "./cli/args.js";
+ // Config paths
+@@ -29,10 +31,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
+ // Tools
+ export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
+ export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
+-// Main entry point
+-export { main } from "./main.js";
+ // Run modes for programmatic SDK usage
+-export { InteractiveMode, RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
++export { RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
+ // UI components for extensions
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
+ // Theme utilities for custom tools and extensions
+diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
+index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..d9de2a14ed33ed6afd2c12f2ae3d959b143f4363 100644
+--- a/dist/modes/interactive/theme/theme.js
++++ b/dist/modes/interactive/theme/theme.js
+@@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
+ import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
+ import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
+ import { stripBom } from "../../../utils/text.js";
++import darkThemeJson from "./dark.json" with { type: "json" };
++import lightThemeJson from "./light.json" with { type: "json" };
+ let themeJsonValidator;
+ /**
+  * Install full theme validation. Without it, documents are accepted as-is, which is what built-in
+@@ -270,13 +272,7 @@ export class Theme {
+ let BUILTIN_THEMES;
+ function getBuiltinThemes() {
+     if (!BUILTIN_THEMES) {
+-        const themesDir = getThemesDir();
+-        const darkPath = path.join(themesDir, "dark.json");
+-        const lightPath = path.join(themesDir, "light.json");
+-        BUILTIN_THEMES = {
+-            dark: JSON.parse(stripBom(fs.readFileSync(darkPath, "utf-8"))),
+-            light: JSON.parse(stripBom(fs.readFileSync(lightPath, "utf-8"))),
+-        };
++        BUILTIN_THEMES = { dark: darkThemeJson, light: lightThemeJson };
+     }
+     return BUILTIN_THEMES;
+ }
+diff --git a/dist/utils/image-resize.js b/dist/utils/image-resize.js
+index 686c9f32ea6ae5858ab560014bdfe102edd78804..b07fabb23ea2ffa4db1d5896a609f357302e1586 100644
+--- a/dist/utils/image-resize.js
++++ b/dist/utils/image-resize.js
+@@ -1,4 +1,5 @@
+ import { Worker } from "node:worker_threads";
++import { isBunBinary } from "../config.js";
+ import { resizeImageInProcess } from "./image-resize-core.js";
+ function toTransferableBytes(input) {
+     // Transfer detaches the buffer, so transfer a worker-owned copy and leave the
+@@ -70,7 +71,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
+     // Bun compiled executables resolve worker entrypoints by string path, not via
+     // new URL(..., import.meta.url). Try the string path first under Bun so the
+     // release binary uses the embedded worker instead of falling back in-process.
+-    if (typeof process.versions.bun === "string") {
++    if (isBunBinary) {
+         try {
+             return await resizeImageInWorker("./src/utils/image-resize-worker.ts", inputBytes, mimeType, options);
+         }
+diff --git a/dist/utils/photon.js b/dist/utils/photon.js
+index 3078895bedba898ce26c439b6123425834ca2586..586fab202f3bae969c0d44fd67a7db84bfee9bd3 100644
+--- a/dist/utils/photon.js
++++ b/dist/utils/photon.js
+@@ -33,6 +33,7 @@ function pathOrNull(file) {
+ function getFallbackWasmPaths() {
+     const execDir = path.dirname(process.execPath);
+     return [
++        path.join(path.dirname(fileURLToPath(import.meta.url)), WASM_FILENAME),
+         path.join(execDir, WASM_FILENAME),
+         path.join(execDir, "photon", WASM_FILENAME),
+         path.join(process.cwd(), WASM_FILENAME),
+diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
+index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c283092335f2e66ce 100644
+--- a/dist/utils/syntax-highlight.js
++++ b/dist/utils/syntax-highlight.js
+@@ -1,177 +1,4 @@
+-import hljs from "highlight.js/lib/core.js";
+-import bash from "highlight.js/lib/languages/bash.js";
+-import c from "highlight.js/lib/languages/c.js";
+-import cpp from "highlight.js/lib/languages/cpp.js";
+-import csharp from "highlight.js/lib/languages/csharp.js";
+-import dart from "highlight.js/lib/languages/dart.js";
+-import go from "highlight.js/lib/languages/go.js";
+-import groovy from "highlight.js/lib/languages/groovy.js";
+-import java from "highlight.js/lib/languages/java.js";
+-import javascript from "highlight.js/lib/languages/javascript.js";
+-import kotlin from "highlight.js/lib/languages/kotlin.js";
+-import lua from "highlight.js/lib/languages/lua.js";
+-import nix from "highlight.js/lib/languages/nix.js";
+-import perl from "highlight.js/lib/languages/perl.js";
+-import php from "highlight.js/lib/languages/php.js";
+-import python from "highlight.js/lib/languages/python.js";
+-import ruby from "highlight.js/lib/languages/ruby.js";
+-import rust from "highlight.js/lib/languages/rust.js";
+-import scala from "highlight.js/lib/languages/scala.js";
+-import swift from "highlight.js/lib/languages/swift.js";
+-import typescript from "highlight.js/lib/languages/typescript.js";
+-import { decodeHtmlEntityAt } from "./html.js";
+-const eagerLanguages = {
+-    python,
+-    java,
+-    go,
+-    javascript,
+-    cpp,
+-    typescript,
+-    php,
+-    ruby,
+-    c,
+-    csharp,
+-    nix,
+-    bash,
+-    rust,
+-    scala,
+-    kotlin,
+-    swift,
+-    dart,
+-    groovy,
+-    perl,
+-    lua,
+-};
+-for (const [name, language] of Object.entries(eagerLanguages)) {
+-    hljs.registerLanguage(name, language);
+-}
+-let allLanguagesPromise;
+-export function loadAllHighlightLanguages() {
+-    if (!allLanguagesPromise) {
+-        allLanguagesPromise = new Promise((resolve) => {
+-            setImmediate(() => {
+-                void import("highlight.js/lib/index.js").then(() => resolve(), () => {
+-                    // Eager languages and plaintext fallback remain available.
+-                    resolve();
+-                });
+-            });
+-        });
+-    }
+-    return allLanguagesPromise;
+-}
+-const SPAN_CLOSE = "</span>";
+-const HIGHLIGHT_CLASS_PREFIX = "hljs-";
+-function getScopeFromSpanTag(tag) {
+-    const match = /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag);
+-    const classValue = match?.[1] ?? match?.[2];
+-    if (!classValue) {
+-        return undefined;
+-    }
+-    for (const className of classValue.split(/\s+/)) {
+-        if (className.startsWith(HIGHLIGHT_CLASS_PREFIX)) {
+-            return className.slice(HIGHLIGHT_CLASS_PREFIX.length);
+-        }
+-    }
+-    return undefined;
+-}
+-function getScopeFormatter(scope, theme) {
+-    const exact = theme[scope];
+-    if (exact) {
+-        return exact;
+-    }
+-    const dotIndex = scope.indexOf(".");
+-    if (dotIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dotIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    const dashIndex = scope.indexOf("-");
+-    if (dashIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dashIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    return undefined;
+-}
+-function getActiveFormatter(scopes, theme) {
+-    for (let i = scopes.length - 1; i >= 0; i--) {
+-        const scope = scopes[i];
+-        if (!scope) {
+-            continue;
+-        }
+-        const formatter = getScopeFormatter(scope, theme);
+-        if (formatter) {
+-            return formatter;
+-        }
+-    }
+-    return theme.default;
+-}
+-function isSpanOpenTagStart(html, index) {
+-    if (!html.startsWith("<span", index)) {
+-        return false;
+-    }
+-    const nextChar = html[index + "<span".length];
+-    return nextChar === ">" || nextChar === " " || nextChar === "\t" || nextChar === "\n" || nextChar === "\r";
+-}
+-export function renderHighlightedHtml(html, theme = {}) {
+-    let output = "";
+-    let textBuffer = "";
+-    const scopes = [];
+-    const flushText = () => {
+-        if (!textBuffer) {
+-            return;
+-        }
+-        const formatter = getActiveFormatter(scopes, theme);
+-        output += formatter ? formatter(textBuffer) : textBuffer;
+-        textBuffer = "";
+-    };
+-    let index = 0;
+-    while (index < html.length) {
+-        if (isSpanOpenTagStart(html, index)) {
+-            const tagEndIndex = html.indexOf(">", index + 5);
+-            if (tagEndIndex !== -1) {
+-                flushText();
+-                const tag = html.slice(index, tagEndIndex + 1);
+-                const scope = getScopeFromSpanTag(tag);
+-                scopes.push(scope);
+-                index = tagEndIndex + 1;
+-                continue;
+-            }
+-        }
+-        if (html.startsWith(SPAN_CLOSE, index)) {
+-            flushText();
+-            if (scopes.length > 0) {
+-                scopes.pop();
+-            }
+-            index += SPAN_CLOSE.length;
+-            continue;
+-        }
+-        if (html[index] === "&") {
+-            const decoded = decodeHtmlEntityAt(html, index);
+-            if (decoded) {
+-                textBuffer += decoded.text;
+-                index += decoded.length;
+-                continue;
+-            }
+-        }
+-        textBuffer += html[index];
+-        index++;
+-    }
+-    flushText();
+-    return output;
+-}
+-export function highlight(code, options = {}) {
+-    const html = options.language
+-        ? hljs.highlight(code, {
+-            language: options.language,
+-            ignoreIllegals: options.ignoreIllegals,
+-        }).value
+-        : hljs.highlightAuto(code, options.languageSubset).value;
+-    return renderHighlightedHtml(html, options.theme);
+-}
+-export function supportsLanguage(name) {
+-    return hljs.getLanguage(name) !== undefined;
+-}
+-//# sourceMappingURL=syntax-highlight.js.map
+\ No newline at end of file
++export function loadAllHighlightLanguages() { return Promise.resolve(); }
++export function renderHighlightedHtml(html, _theme = {}) { return html; }
++export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
++export function supportsLanguage(_name) { return false; }
+diff --git a/package.json b/package.json
+index 572af1e947bf8b827389ecafae428a13b4957fa9..7db1f4a78341ae95109020586a622f173457a34e 100644
+--- a/package.json
++++ b/package.json
+@@ -16,6 +16,14 @@
+ 			"types": "./dist/index.d.ts",
+ 			"import": "./dist/index.js"
+ 		},
++		"./bun/sandbox-env-setup": {
++			"types": "./dist/bun/sandbox-env-setup.d.ts",
++			"import": "./dist/bun/sandbox-env-setup.js"
++		},
++		"./bun/runtime-setup": {
++			"types": "./dist/bun/runtime-setup.d.ts",
++			"import": "./dist/bun/runtime-setup.js"
++		},
+ 		"./rpc-entry": {
+ 			"import": "./dist/bundle/rpc-entry.js"
+ 		},

@@ -29,10 +29,10 @@ export interface Session {
    * path when that create requested `worktree`.
    */
   readonly cwd?: string;
-  /** Branch captured at creation; shared-directory checkout changes never replace it. */
+  /** Branch captured at creation for a session on the project path. Checkout changes never replace it. */
   readonly gitBranch?: string;
-  /** This Session created its own worktree; only then may discovery follow its checkout. */
-  readonly ownsWorktree?: boolean;
+  /** Pie-created git worktree at `cwd`. Absent for sessions on the project path. */
+  readonly worktree?: { readonly branch: string };
   /** GitHub pull requests associated with this session, newest last. */
   readonly pullRequests?: ReadonlyArray<SessionPullRequestLink>;
   /** Model selected at create; applied when Pi opens on the first prompt. */

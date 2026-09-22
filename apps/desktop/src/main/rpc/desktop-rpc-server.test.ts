@@ -40,7 +40,7 @@ function makeHarness(
         }),
       ]),
     ),
-  ) as Context.Context<never>;
+  );
 
   const server: LocalServer["Service"] = {
     connection: Effect.succeed({

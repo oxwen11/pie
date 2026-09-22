@@ -47,14 +47,18 @@ const runtimeFrom = (
 ): PiAgentRuntime => ({
   sessionId: nativeId,
   events: streamFromQueueOne(queue).pipe(Stream.map((body) => ({ sessionId: nativeId, body }))),
-  prompt: () => Effect.succeed({ turnId: "turn-1" }),
+  prompt: () => Effect.succeed({ turnId: "turn-1", started: true }),
   interrupt: Effect.void,
+  replaceQueue: () => Effect.void,
   respondToAgentRequest: () => Effect.void,
   getCapabilities: Effect.succeed({
     supportsResume: true,
     supportsSteering: false,
     supportsPermissions: false,
   }),
+  getMessages: Effect.succeed([]),
+  getModelState: Effect.succeed({}),
+  setModel: (model) => Effect.succeed(model),
   close: options.closes ? Ref.update(options.closes, (count) => count + 1) : Effect.void,
 });
 
@@ -103,6 +107,7 @@ it.effect("a session that never had a runtime reads as idle at cursor 0", () =>
       assert.equal(snapshot.activeTurn, null);
       assert.equal(snapshot.activePrompt, null);
       assert.deepEqual(snapshot.pendingRequests, []);
+      assert.deepEqual(snapshot.pendingPrompt, { steering: [], followUp: [] });
     }),
   ),
 );
@@ -259,6 +264,24 @@ it.effect("a chunk after turn.ended is dropped without consuming a seq", () =>
       assert.equal(snapshot.cursor, 3);
       assert.equal(snapshot.activeTurn?.turnId, "turn-2");
       assert.deepEqual(snapshot.activeTurn?.chunks, []);
+    }),
+  ),
+);
+
+it.effect("projects session.queue.updated into the snapshot pending prompt", () =>
+  run(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue)));
+      yield* Queue.offer(queue, {
+        type: "session.queue.updated",
+        sessionId: nativeId,
+        steering: ["steer"],
+        followUp: ["later"],
+      });
+      const snapshot = yield* awaitCursor(session, 1);
+      assert.deepEqual(snapshot.pendingPrompt, { steering: ["steer"], followUp: ["later"] });
     }),
   ),
 );

@@ -6,7 +6,7 @@ The desktop window must leave the splash and talk to the isolated daemon. Title 
 
 - **Splash** — `aria-label="Starting Pie"` (`<main>`). Unmounts after the first successful server connection **and** the ~1s startup animation (`prefers-reduced-motion` skips the delay).
 - **Connected shell** — same draft / sidebar as web once the splash is gone.
-- **CDP** — `pnpm exec pie-verify desktop browser connect` attaches to the window.
+- **CDP** — doctor attaches agent-browser (`connect` to the run's CDP port). After launch, `agent-browser get title` uses that session.
 
 ## Scripted path (Playwright, test mode)
 
@@ -28,10 +28,13 @@ pnpm exec pie-verify desktop doctor
 pnpm exec pie-verify desktop evidence init
 ```
 
-Doctor attaches with `pie-verify desktop browser connect`. Then:
+Doctor already attached session `pie-verify-desktop`. Then:
 
 ```bash
-pnpm exec pie-verify desktop browser snapshot
+agent-browser get title
+agent-browser get url
+# if doctor did not run:
+# agent-browser connect 9223
 ```
 
 Snapshot must not show **Pie could not start**. After connect + animation, splash `Starting Pie` is gone. Title is **Pie**. `get url` may show `http://localhost:5173/…` — that is the renderer origin inside Electron, not a page to open in a separate browser.

@@ -1,3 +1,4 @@
+import type { FilePreview } from "@getpie/contract/fs";
 import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
@@ -20,7 +21,7 @@ export function FilePreviewPane({
   refreshing,
   onRefresh,
 }: {
-  file: UseQueryResult<string>;
+  file: UseQueryResult<FilePreview>;
   path: string;
   line?: number;
   navigationRequest: number;
@@ -51,6 +52,14 @@ export function FilePreviewPane({
         <FileState title={fileErrorTitle(file.error)} onRetry={() => void file.refetch()}>
           {fileErrorMessage(file.error)}
         </FileState>
+      ) : file.data?.kind === "image" ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <img
+            alt={path.split(/[\\/]/).at(-1) || path}
+            className="max-h-full max-w-full object-contain"
+            src={`data:${file.data.mimeType};base64,${file.data.data}`}
+          />
+        </div>
       ) : (
         <div className="min-h-0 flex-1">
           <Suspense
@@ -61,7 +70,7 @@ export function FilePreviewPane({
             }
           >
             <FilePreviewAdapter
-              content={file.data ?? ""}
+              content={file.data?.content ?? ""}
               navigationRequest={navigationRequest}
               path={path}
               targetLine={line}
@@ -95,9 +104,19 @@ function fileErrorMessage(error: Error): string {
     case "BINARY_FILE":
       return "Binary preview unavailable.";
     case "FILE_TOO_LARGE": {
-      const data = error.data as { size?: number; limit?: number } | undefined;
-      const size = data?.size;
-      const limit = data?.limit;
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- ORPCError.data is untyped
+      const data: unknown = error.data;
+      const size =
+        typeof data === "object" && data !== null && "size" in data && typeof data.size === "number"
+          ? data.size
+          : undefined;
+      const limit =
+        typeof data === "object" &&
+        data !== null &&
+        "limit" in data &&
+        typeof data.limit === "number"
+          ? data.limit
+          : undefined;
       if (size !== undefined && limit !== undefined) {
         return `${formatBytes(size)} exceeds the ${formatBytes(limit)} preview limit.`;
       }

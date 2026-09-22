@@ -39,6 +39,10 @@ function toQuestion(request: PiUiRequest): AgentRequestQuestion {
     case "input":
     case "editor":
       return { id: request.id, question: request.title, kind: "freeText" };
+    default: {
+      const exhaustive: never = request;
+      return exhaustive;
+    }
   }
 }
 
@@ -82,6 +86,10 @@ export function mapUiResponse(
       return value !== undefined
         ? { type: "extension_ui_response", id: request.id, value }
         : declineUiResponse(request);
+    }
+    default: {
+      const exhaustive: never = request;
+      return exhaustive;
     }
   }
 }

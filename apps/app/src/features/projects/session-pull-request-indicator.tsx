@@ -13,26 +13,18 @@ import {
 
 const presentations = {
   open: {
-    color:
-      "text-pull-request-open hover:text-pull-request-open peer-hover/menu-button:text-pull-request-open",
     Icon: GitPullRequestIcon,
     label: "Open pull request",
   },
   draft: {
-    color:
-      "text-pull-request-draft hover:text-pull-request-draft peer-hover/menu-button:text-pull-request-draft",
     Icon: GitPullRequestDraftIcon,
     label: "Draft pull request",
   },
   closed: {
-    color:
-      "text-pull-request-closed hover:text-pull-request-closed peer-hover/menu-button:text-pull-request-closed",
     Icon: GitPullRequestClosedIcon,
     label: "Closed pull request",
   },
   merged: {
-    color:
-      "text-pull-request-merged hover:text-pull-request-merged peer-hover/menu-button:text-pull-request-merged",
     Icon: GitMergeIcon,
     label: "Pull request merged",
   },
@@ -49,14 +41,21 @@ export function SessionPullRequestIndicator({
   if (!link) return null;
   const lifecycle = projection.lifecycle;
   const state = lifecycle?.type === "open" && lifecycle.draft ? "draft" : lifecycle?.type;
-  const { color, Icon, label } =
+  const { Icon, label } =
     state === undefined
-      ? {
-          color: "text-muted-foreground",
-          Icon: GitPullRequestIcon,
-          label: "Pull request status unknown",
-        }
+      ? { Icon: GitPullRequestIcon, label: "Pull request status unknown" }
       : presentations[state];
+  // Complete literals — a computed `presentations[state].color` looks dynamic.
+  const color =
+    state === "open"
+      ? "text-pull-request-open hover:text-pull-request-open peer-hover/menu-button:text-pull-request-open"
+      : state === "draft"
+        ? "text-pull-request-draft hover:text-pull-request-draft peer-hover/menu-button:text-pull-request-draft"
+        : state === "closed"
+          ? "text-pull-request-closed hover:text-pull-request-closed peer-hover/menu-button:text-pull-request-closed"
+          : state === "merged"
+            ? "text-pull-request-merged hover:text-pull-request-merged peer-hover/menu-button:text-pull-request-merged"
+            : "text-muted-foreground hover:text-muted-foreground peer-hover/menu-button:text-muted-foreground";
   const badge =
     projection.badge === "stack"
       ? `Stack · ${projection.count}`
@@ -66,7 +65,7 @@ export function SessionPullRequestIndicator({
 
   return (
     <SidebarMenuAction
-      className={`${color} w-auto max-w-24 px-1 text-[10px]`}
+      className={`${color} w-auto max-w-24 px-1 text-xs`}
       render={
         <a
           aria-label={description}

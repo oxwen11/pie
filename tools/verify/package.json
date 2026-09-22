@@ -4,6 +4,7 @@
   "private": true,
   "description": "Isolated launch/doctor/drive/cleanup for pie web, CLI, and desktop proofs (bin pie-verify)",
   "bin": {
+    "agent-browser": "./bin/agent-browser",
     "pie-verify": "./bin/pie-verify.mjs"
   },
   "type": "module",
@@ -18,6 +19,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "dependencies": {
+    "@getpie/contract": "workspace:*",
+    "effect": "catalog:effect"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",

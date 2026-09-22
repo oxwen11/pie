@@ -3,15 +3,29 @@ import url from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
-import { Crypto, Effect, FileSystem, Stream } from "effect";
+import { Context, Crypto, Effect, FileSystem, Layer, Stream } from "effect";
 import { afterEach, vi } from "vitest";
 
-import { makeEventBus } from "../../../src/events/event-bus";
-import { makePiAgent } from "../../../src/harness/pi/agent";
+import { EventBus, makeEventBus } from "../../../src/events/event-bus";
+import { GitService } from "../../../src/git/service";
+import { WorktreeService } from "../../../src/git/worktree-service";
+import { makePiAgent, PiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
-import { makePiAgentSessionManager } from "../../../src/harness/session-manager";
-import { makePiAgentSessionRepository } from "../../../src/harness/session-repository";
-import { makePiAgentSessionService } from "../../../src/harness/session-service";
+import { SessionMetadataLocksLayer } from "../../../src/harness/session-locks";
+import {
+  makePiAgentSessionManager,
+  PiAgentSessionManager,
+} from "../../../src/harness/session-manager";
+import { SessionMetadataLayer } from "../../../src/harness/session-metadata";
+import {
+  makePiAgentSessionRepository,
+  PiAgentSessionRepository,
+} from "../../../src/harness/session-repository";
+import {
+  PiAgentSessionService,
+  PiAgentSessionServiceCoreLayer,
+} from "../../../src/harness/session-service";
+import { ProjectService } from "../../../src/project/service";
 import { makePullRequestCoordinator } from "../../../src/pull-request/coordinator";
 
 const cli = url.fileURLToPath(
@@ -55,18 +69,46 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const bus = yield* makeEventBus();
           const manager = yield* makePiAgentSessionManager(pi, bus);
           const repo = yield* makePiAgentSessionRepository(`${home}/metadata`);
-          const service = makePiAgentSessionService({
-            pi,
-            manager,
-            bus,
-            repo,
-            newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
-            projectPathFor: () => Effect.succeed(home),
-            worktrees: {
-              create: () => Effect.die("Unexpected worktree creation"),
-              remove: () => Effect.die("Unexpected worktree removal"),
-            },
+          const projects = ProjectService.of({
+            list: () => Effect.succeed([]),
+            findById: () =>
+              Effect.succeed({
+                id: "project",
+                name: "project",
+                path: home,
+                createdAt: "1970-01-01T00:00:00.000Z",
+              }),
+            findByPath: () => Effect.succeed(undefined),
+            create: () => Effect.die("unused"),
+            allocateChatProjectDir: () => Effect.die("unused"),
+            remove: () => Effect.die("unused"),
           });
+          const git = GitService.of({
+            status: () => Effect.die("unexpected git status"),
+            branch: () => Effect.succeed({ kind: "not-repository" as const }),
+            review: () => Effect.die("unexpected git review"),
+            diff: () => Effect.die("unexpected git diff"),
+          });
+          const worktrees = WorktreeService.of({
+            create: () => Effect.die("Unexpected worktree creation"),
+            remove: () => Effect.die("Unexpected worktree removal"),
+          });
+          const locksLayer = SessionMetadataLocksLayer;
+          const context = yield* Layer.build(
+            Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
+              Layer.provide(SessionMetadataLayer),
+              Layer.provide(locksLayer),
+              Layer.provide(Layer.succeed(PiAgentSessionRepository, repo)),
+              Layer.provide(Layer.succeed(PiAgentSessionManager, manager)),
+              Layer.provide(Layer.succeed(PiAgent, pi)),
+              Layer.provide(Layer.succeed(EventBus, bus)),
+              Layer.provide(Layer.succeed(ProjectService, projects)),
+              Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+              Layer.provide(Layer.succeed(GitService, git)),
+              Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
+            ),
+          );
+          const service = Context.get(context, PiAgentSessionService);
           let remoteReads = 0;
           const remote = Effect.sync(() => {
             remoteReads++;

@@ -2,6 +2,7 @@ import type {
   AgentRequest,
   PromptPart,
   SessionMessageChunkEvent,
+  SessionPendingPrompt,
   SessionPhase,
   SessionRef,
   SessionRuntimeSnapshot,
@@ -10,14 +11,14 @@ import type {
   SessionStatus,
 } from "@getpie/contract";
 
-import { isSessionEvent, type SessionEnvelopeBody, type SessionEvent } from "./events/framework";
+import { isSessionEvent, type SessionEnvelopeBody } from "./events/framework";
 
 /**
  * The server-side truth a session's native event stream sheds, as a pure fold.
  * Harness agents stream native-`sessionId`-keyed drafts; this module turns a
  * draft into the wire {@link SessionScopedEvent} body and folds that event into
  * {@link SessionState} — the phase machine, the active-turn buffer, the pending
- * requests, and the cursor that snapshot/status read.
+ * requests, the Pi message queue, and the cursor that snapshot/status read.
  *
  * Everything here is synchronous and total: no Effect, no clock, no I/O. The
  * stamping, publishing and locking that surround it belong to the caller.
@@ -42,9 +43,9 @@ const EVICT_TO_BYTES = Math.floor(MAX_BUFFERED_BYTES * 0.75);
 /** Cheap size estimate: the delta/text payload for streaming chunks, a
  * serialization for the (rare, potentially large) structured ones. */
 const chunkBytes = (chunk: WireChunk): number => {
-  const delta = (chunk as { delta?: unknown }).delta;
+  const delta = "delta" in chunk ? chunk.delta : undefined;
   if (typeof delta === "string") return delta.length + 32;
-  const text = (chunk as { text?: unknown }).text;
+  const text = "text" in chunk ? chunk.text : undefined;
   if (typeof text === "string") return text.length + 32;
   try {
     return JSON.stringify(chunk).length;
@@ -79,7 +80,10 @@ export type SessionState = {
   readonly activeTurn: ActiveTurn | null;
   readonly activePrompt: ActivePrompt | null;
   readonly pendingRequests: ReadonlyMap<string, AgentRequest>;
+  readonly pendingPrompt: SessionPendingPrompt;
 };
+
+const emptyPendingPrompt: SessionPendingPrompt = { steering: [], followUp: [] };
 
 export const initialSessionState: SessionState = {
   seq: 0,
@@ -88,6 +92,7 @@ export const initialSessionState: SessionState = {
   activeTurn: null,
   activePrompt: null,
   pendingRequests: new Map(),
+  pendingPrompt: emptyPendingPrompt,
 };
 
 /** Native control body → wire body (drops the native `sessionId`); chunk → `session.message.chunk`. */
@@ -98,10 +103,16 @@ export const toWireBody = (
   if (!isSessionEvent(body)) {
     // A UI chunk with no active turn is unexpected; drop rather than mislabel it.
     if (activeTurnId === undefined) return null;
-    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body as WireChunk };
+    return { type: "session.message.chunk", turnId: activeTurnId, chunk: body };
   }
-  const event = body as SessionEvent;
+  const event = body;
   switch (event.type) {
+    case "session.prompt.submitted":
+      return {
+        type: "session.prompt.submitted",
+        messageId: event.messageId,
+        parts: event.parts,
+      };
     case "session.turn.started":
       return { type: "session.turn.started", turnId: event.turnId };
     case "session.turn.ended":
@@ -116,20 +127,24 @@ export const toWireBody = (
       return { type: "session.request.asked", request: event.request };
     case "session.request.replied":
       return { type: "session.request.replied", requestId: event.requestId };
-    case "session.request.rejected":
+    case "session.queue.updated":
       return {
-        type: "session.request.rejected",
-        requestId: event.requestId,
-        ...(event.reason !== undefined ? { reason: event.reason } : undefined),
+        type: "session.queue.updated",
+        steering: event.steering,
+        followUp: event.followUp,
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 
 const startChunkMessageId = (chunk: WireChunk): string | null =>
-  chunk.type === "start" && typeof (chunk as { messageId?: unknown }).messageId === "string"
-    ? (chunk as { messageId: string }).messageId
+  chunk.type === "start" && "messageId" in chunk && typeof chunk.messageId === "string"
+    ? chunk.messageId
     : null;
 
 // In-place append under the caps (see the ActiveTurn comment); overflow evicts
@@ -232,6 +247,11 @@ export const foldSessionEvent = (
         pendingRequests.size > 0 ? "requires_action" : current.activeTurn ? "running" : "idle";
       return { ...base, phase, pendingRequests };
     }
+    case "session.queue.updated":
+      return {
+        ...base,
+        pendingPrompt: { steering: event.steering, followUp: event.followUp },
+      };
     case "session.crashed":
       return {
         ...base,
@@ -239,7 +259,12 @@ export const foldSessionEvent = (
         activeTurn: null,
         activePrompt: null,
         pendingRequests: new Map(),
+        pendingPrompt: emptyPendingPrompt,
       };
+    default: {
+      const exhaustive: never = event;
+      return exhaustive;
+    }
   }
 };
 
@@ -254,6 +279,7 @@ export const toSnapshot = (ref: SessionRef, state: SessionState): SessionRuntime
   ref,
   status: toStatus(state),
   pendingRequests: [...state.pendingRequests.values()],
+  pendingPrompt: state.pendingPrompt,
   activeTurn: state.activeTurn
     ? {
         turnId: state.activeTurn.turnId,

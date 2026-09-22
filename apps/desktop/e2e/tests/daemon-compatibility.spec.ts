@@ -53,13 +53,12 @@ async function waitForConnectedUi(
       PIE_E2E: "1",
       PIE_E2E_PI_EXECUTABLE: fakePiPath,
       PIE_HOME: pieHome,
-      PIE_DAEMON_DIR: path.join(pieHome, "daemon"),
     },
   });
   try {
     const window = await app.firstWindow({ timeout: 30_000 });
     await expect(window.locator("#root")).toBeVisible({ timeout: 30_000 });
-    await expect(window.getByRole("combobox").filter({ hasText: "Select a project" })).toBeVisible({
+    await expect(window.getByRole("combobox").filter({ hasText: "Choose project" })).toBeVisible({
       timeout: 30_000,
     });
     await expect(window.getByText("Pie could not start")).toHaveCount(0);

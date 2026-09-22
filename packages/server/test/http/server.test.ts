@@ -8,6 +8,7 @@ import { WebSocket } from "ws";
 
 import { createServer, type ManagedServer } from "../../src/http/server";
 import type { UIApp } from "../../src/http/ui";
+import { ResourceMonitoring, ResourceMonitoringDisabled } from "../../src/observability/resources";
 import type { RpcRuntime } from "../../src/rpc";
 import { structured, type LogRecord } from "../log-record";
 import { discardContext } from "../platform";
@@ -40,6 +41,32 @@ describe("createServer auth", () => {
     expect(response.status).toBe(200);
   });
 
+  it("accepts bounded authenticated Electron resource registration", async () => {
+    const registrations: unknown[] = [];
+    const effectContext = Context.add(await discardContext(), ResourceMonitoring, {
+      ...ResourceMonitoringDisabled,
+      enabled: true,
+      registerElectron: (registration) => registrations.push(registration),
+    });
+    const base = await start({ authToken: TOKEN, effectContext });
+    const response = await fetch(`${base}/api/resources/electron`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        instanceId: "0195b4b3-6dc4-7d41-a9ce-3ab5dcb6cc61",
+        revision: 1,
+        root: { pid: 123 },
+        processes: [{ process: { pid: 124 }, role: "electron-renderer" }],
+      }),
+    });
+    expect(response.status).toBe(204);
+    expect(registrations).toHaveLength(1);
+  });
+
   it("does not expose an HTTP RPC endpoint", async () => {
     const base = await start({ authToken: TOKEN });
     const response = await fetch(`${base}/api/rpc`, {
@@ -67,6 +94,28 @@ describe("createServer auth", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { ticket: string };
     expect(body.ticket).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("bootstraps the daemon-served SPA without making Origin an auth credential", async () => {
+    const base = await start({ authToken: TOKEN });
+    const bootstrap = await fetch(`${base}/api/bootstrap`);
+    expect(bootstrap.status).toBe(200);
+    await expect(bootstrap.json()).resolves.toEqual({ token: TOKEN });
+
+    const ticket = await fetch(`${base}/api/ws-ticket`, {
+      method: "POST",
+      headers: { origin: "http://localhost:4190" },
+    });
+    expect(ticket.status).toBe(401);
+  });
+
+  it("does not expose bootstrap through an allowed cross-origin response", async () => {
+    const base = await start({ authToken: TOKEN, corsOrigins: ["https://example.test"] });
+    const response = await fetch(`${base}/api/bootstrap`, {
+      headers: { origin: "https://example.test" },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
 
   it("invokes shutdown only through the authenticated daemon route", async () => {
@@ -121,7 +170,10 @@ describe("createServer CORS", () => {
 describe("createServer anti DNS-rebinding", () => {
   it("refuses a request whose Host is not loopback, even /api/health", async () => {
     await start({});
-    const { port } = server!.address() as AddressInfo;
+    if (server === undefined) {
+      throw new Error("expected server");
+    }
+    const { port } = server.address() as AddressInfo;
     const status = await new Promise<number>((resolve) => {
       const req = http.request(
         { host: "127.0.0.1", port, path: "/api/health", headers: { host: "evil.example" } },

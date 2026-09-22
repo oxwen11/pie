@@ -23,4 +23,21 @@ describe("project router", () => {
       await h.dispose();
     }
   });
+
+  it("allocates a folder under Paths.chatProjectsDir and lists the project", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-"));
+    const h = await makeRpcTestHarness(home);
+    try {
+      const created = await h.client.project.allocateChatProjectDir();
+      expect(created.path.startsWith(path.join(home, "Pie") + path.sep)).toBe(true);
+      expect(created.name).toMatch(/^Chat-\d+$/);
+      expect(created.type).toBe("chat");
+      expect(path.basename(created.path)).toBe(created.name);
+      expect(path.basename(path.dirname(created.path))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(fs.existsSync(created.path)).toBe(true);
+      await expect(h.client.project.list()).resolves.toEqual([created]);
+    } finally {
+      await h.dispose();
+    }
+  });
 });

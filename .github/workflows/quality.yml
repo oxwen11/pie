@@ -3,8 +3,9 @@ name: Code check
 on:
   push:
     branches: ["main"]
+  # No base-branch filter: stacked PRs target the layer below them, not main,
+  # and still need the same gate before they can be merged bottom-up.
   pull_request:
-    branches: ["main"]
 
 permissions:
   contents: read
@@ -13,7 +14,7 @@ env:
   CI: "true"
 
 # A newer commit makes older runs for the same PR or branch obsolete. Cancel it
-# before it consumes another slot on the single self-hosted runner.
+# before it consumes another slot on a pie self-hosted runner.
 concurrency:
   group: quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -26,7 +27,8 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    runs-on: [self-hosted, Linux, X64, ubuntu-24.04, rn, pie]
+    runs-on: [self-hosted, pie]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,14 +53,24 @@ jobs:
           } >> "$GITHUB_PATH"
           export PATH="/usr/local/bin:${HOME}/.local/share/mise/shims:${PATH}"
           mise install --locked
+          # mise's rust backend delegates to the shared ambient rustup, and
+          # `mise install` is a no-op once the toolchain directory exists — a
+          # lost rustup default (concurrent jobs, toolchain churn on the box)
+          # then breaks every cargo invocation with "no default is
+          # configured". Re-assert the pin and fail fast here instead of deep
+          # inside the build.
+          if command -v rustup >/dev/null; then
+            rustup default "$(mise current rust)"
+          fi
+          cargo --version
         shell: bash
 
       - name: Verify CI environment
         run: |
           source /etc/os-release
-          test "$ID" = "ubuntu"
-          test "$VERSION_ID" = "24.04"
+          test "$(uname -s)" = "Linux"
           test "$(uname -m)" = "x86_64"
+          printf 'host: %s %s\n' "$ID" "$VERSION_ID"
 
           expected_node="$(mise current node)"
           actual_node="$(node --version)"
@@ -71,25 +83,60 @@ jobs:
           test "$metadata_pnpm" = "$expected_pnpm"
           test "$actual_pnpm" = "$expected_pnpm"
 
-          printf 'Ubuntu %s, Node %s, pnpm %s, %s\n' \
-            "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
+          printf '%s %s, Node %s, pnpm %s, %s\n' \
+            "$ID" "$VERSION_ID" "$actual_node" "$actual_pnpm" "$(uname -m)"
+        shell: bash
+
+      - name: Native toolchain (node-pty)
+        run: bash .github/scripts/ensure-native-toolchain.sh
+        shell: bash
+
+      - name: Ensure lsof (verify desktop tests)
+        run: |
+          # tools/verify port checks shell out to lsof; install it when the
+          # self-hosted runner does not provide it.
+          if command -v lsof >/dev/null; then
+            exit 0
+          fi
+          if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends lsof
+            exit 0
+          fi
+          echo "desktop verify tests need lsof on PATH." >&2
+          exit 1
         shell: bash
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
-      # `build` / `test` / `typecheck` / `lint:check` all go through turbo.
-      # `lint:check` depends on `@getpie/oxlint#build` so
-      # `@getpie/oxlint/<plugin>` resolves to dist files. Format only
-      # needs node_modules and stays parallel with the turbo graph.
+      - name: Install Playwright Chromium
+        run: |
+          browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"
+          mkdir -p "$browsers"
+          echo "PLAYWRIGHT_BROWSERS_PATH=${browsers}" >> "$GITHUB_ENV"
+          PLAYWRIGHT_BROWSERS_PATH="$browsers" pnpm exec playwright install chromium chromium-headless-shell
+        shell: bash
+
+      # `build` / `typecheck` / `lint:check` go through turbo in one graph
+      # so `@getpie/app#build` is not restored a second time. A follow-up
+      # `turbo run typecheck` hits `@getpie/desktop` → `^build` →
+      # `@getpie/app#build` and replaces `apps/app/dist` while
+      # `package-artifact.test.ts` reads it (actual client vs expected []).
+      # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
+      # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e).
+      # Desktop Playwright (`pnpm e2e`) stays local — Electron + xvfb is too
+      # heavy for the self-hosted Check job.
+      # Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
           set -euo pipefail
 
-          pnpm turbo run build test typecheck lint:check &
+          pnpm turbo run build typecheck lint:check &
           turbo_pid=$!
 
           pnpm run format:check &
           format_pid=$!
 
           wait "$turbo_pid"
+          pnpm test
           wait "$format_pid"

@@ -10,15 +10,33 @@ export {
 } from "./daemon.ts";
 export type { DaemonRecord } from "./daemon.ts";
 export {
+  AGENT_BROWSER_UNIX_SOCKET_MAX,
   agentBrowser,
+  agentBrowserDaemonPidPath,
+  agentBrowserDaemonSocketPath,
+  agentBrowserIsolation,
+  applyBrowserEnv,
+  browserConfigForEnv,
   browserNeedsIsolation,
   buildAgentBrowserArgv,
-  forwardAgentBrowser,
+  ensureBrowserEnvDirs,
+  formatBrowserEnv,
+  isManagedAgentBrowserSocketDir,
   resolveAgentBrowserBin,
+  resolveBrowserEnv,
+  resolveIsolatedChromeExecutable,
   saveScreenshot,
   saveSnapshot,
+  shortAgentBrowserSocketDir,
+  teardownOwnedBrowser,
 } from "./browser.ts";
-export type { AgentBrowserOptions, AgentBrowserTarget } from "./browser.ts";
+export type {
+  AgentBrowserConfig,
+  AgentBrowserOptions,
+  AgentBrowserTarget,
+  BrowserEnvInput,
+  BrowserEnvVars,
+} from "./browser.ts";
 export { appendNote, copySideEffects, evidenceDir, stampEvidence } from "./evidence.ts";
 export { VerifyError, fail, usage } from "./fail.ts";
 export {

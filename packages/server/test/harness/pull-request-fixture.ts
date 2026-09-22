@@ -1,12 +1,26 @@
 import type { PullRequestSummary } from "@getpie/contract/pull-request";
-import { Crypto, Effect, FileSystem, Stream } from "effect";
+import { Context, Crypto, Effect, FileSystem, Layer, Stream } from "effect";
 
 import { StoreReadError, StoreWriteError } from "../../src/errors";
-import { makeEventBus } from "../../src/events/event-bus";
-import type { PiAgentShape } from "../../src/harness/pi/agent";
-import { makePiAgentSessionManager } from "../../src/harness/session-manager";
-import { makePiAgentSessionRepository } from "../../src/harness/session-repository";
-import { makePiAgentSessionService } from "../../src/harness/session-service";
+import { EventBus, makeEventBus } from "../../src/events/event-bus";
+import { GitService } from "../../src/git/service";
+import { WorktreeService } from "../../src/git/worktree-service";
+import { PiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
+import { SessionMetadataLocksLayer } from "../../src/harness/session-locks";
+import {
+  makePiAgentSessionManager,
+  PiAgentSessionManager,
+} from "../../src/harness/session-manager";
+import { SessionMetadataLayer } from "../../src/harness/session-metadata";
+import {
+  makePiAgentSessionRepository,
+  PiAgentSessionRepository,
+} from "../../src/harness/session-repository";
+import {
+  PiAgentSessionService,
+  PiAgentSessionServiceCoreLayer,
+} from "../../src/harness/session-service";
+import { ProjectService } from "../../src/project/service";
 import type { PullRequestSummaryReader } from "../../src/pull-request/coordinator";
 
 export const prRef = { host: "github.com", owner: "getpie", repository: "pie", number: 42 };
@@ -50,14 +64,18 @@ export const makeFixture = Effect.gen(function* () {
         return {
           sessionId: "native",
           events: Stream.never,
-          prompt: () => Effect.succeed({ turnId: "turn" }),
+          prompt: () => Effect.succeed({ turnId: "turn", started: true }),
           interrupt: Effect.void,
+          replaceQueue: () => Effect.void,
           respondToAgentRequest: () => Effect.void,
           getCapabilities: Effect.succeed({
             supportsResume: true,
             supportsSteering: false,
             supportsPermissions: false,
           }),
+          getMessages: Effect.succeed([]),
+          getModelState: Effect.succeed({}),
+          setModel: (model) => Effect.succeed(model),
           close: Effect.void,
         };
       }),
@@ -66,26 +84,59 @@ export const makeFixture = Effect.gen(function* () {
   };
   const bus = yield* makeEventBus();
   const manager = yield* makePiAgentSessionManager(pi, bus);
-  const service = makePiAgentSessionService({
-    manager,
-    pi,
-    repo,
-    bus,
-    newSessionId: crypto.randomUUIDv4.pipe(Effect.orDie),
-    projectPathFor: () => Effect.succeed(home),
-    branchFor: () =>
+  const projects = ProjectService.of({
+    list: () => Effect.succeed([]),
+    findById: () =>
+      Effect.succeed({
+        id: "project",
+        name: "project",
+        path: home,
+        createdAt: "1970-01-01T00:00:00.000Z",
+      }),
+    findByPath: () => Effect.succeed(undefined),
+    create: () => Effect.die("unused"),
+    allocateChatProjectDir: () => Effect.die("unused"),
+    remove: () => Effect.die("unused"),
+  });
+  const git = GitService.of({
+    status: () => Effect.die("unexpected git status"),
+    branch: () =>
       Effect.sync(() => {
         calls.branch++;
-        return branch;
+        return {
+          kind: "repository" as const,
+          current: branch,
+          defaultBranch: "main",
+          branches: [branch],
+          remotes: [],
+        };
       }),
-    worktrees: {
-      create: () => Effect.die("unexpected worktree"),
-      remove: () =>
-        Effect.sync(() => {
-          calls.remove++;
-        }),
-    },
+    review: () => Effect.die("unexpected git review"),
+    diff: () => Effect.die("unexpected git diff"),
   });
+  const worktrees = WorktreeService.of({
+    create: () => Effect.die("unexpected worktree"),
+    remove: () =>
+      Effect.sync(() => {
+        calls.remove++;
+      }),
+  });
+  const locksLayer = SessionMetadataLocksLayer;
+  const context = yield* Layer.build(
+    Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
+      Layer.provide(SessionMetadataLayer),
+      Layer.provide(locksLayer),
+      Layer.provide(Layer.succeed(PiAgentSessionRepository, repo)),
+      Layer.provide(Layer.succeed(PiAgentSessionManager, manager)),
+      Layer.provide(Layer.succeed(PiAgent, pi)),
+      Layer.provide(Layer.succeed(EventBus, bus)),
+      Layer.provide(Layer.succeed(ProjectService, projects)),
+      Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+      Layer.provide(Layer.succeed(GitService, git)),
+      Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
+    ),
+  );
+  const service = Context.get(context, PiAgentSessionService);
   const created = yield* service.create({ projectId: "project", cwd: home });
   const github: PullRequestSummaryReader = {
     summary: () => Effect.succeed(summary),

@@ -1,6 +1,6 @@
 # Daemon reuse
 
-A second CLI against the same `$PIE_HOME` / `$PIE_DAEMON_DIR` must attach, not spawn a second listener.
+A second CLI against the same `$PIE_HOME` must attach, not spawn a second listener.
 
 ## How to get to it
 

@@ -14,7 +14,9 @@ import type { ChatStoreState, HistoryStatus } from "@/features/chat/runtime/chat
 import { useChatSession } from "./chat-session-context";
 import { AgentRequestView } from "./transcript/agent-request";
 import { MessageView } from "./transcript/message-view";
+import { timestampOf } from "./transcript/message-view.logic";
 import { ModelErrorCard } from "./transcript/model-error-card";
+
 // What an empty transcript means, in one place: nothing until the settled
 // history floor has landed, so an unread session shows the read rather than a
 // verdict about the conversation. "settled" renders nothing — a session with no
@@ -43,16 +45,31 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
 // pending agent request cards. Only the last message can be streaming, so only
 // it gets streaming affordances.
 function ChatTranscriptView({
+  sessionId,
   snapshot,
   onRespond,
 }: {
+  sessionId: string;
   snapshot: ChatStoreState;
   onRespond: (requestId: string, response: AgentResponse) => void;
 }) {
+  // StickToBottom's first growth uses `initial`, later growth uses `resize`.
+  // Keep the scroller off-tree until the history floor lands so the dump is
+  // that first growth — same path as opening a session that already has data.
+  if (snapshot.historyStatus === "loading") {
+    return (
+      <div className="relative flex-1 overflow-y-auto">
+        <div className="p-4">
+          <EmptyTranscript historyStatus="loading" />
+        </div>
+      </div>
+    );
+  }
+
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
   return (
-    <Conversation>
+    <Conversation key={sessionId}>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
           the panel edge instead of hugging the centered column. */}
       <ConversationContent
@@ -67,6 +84,7 @@ function ChatTranscriptView({
             key={message.id}
             message={message}
             isStreaming={turnInProgress && index === lastIndex}
+            previousTimestamp={timestampOf(snapshot.messages[index - 1]?.metadata)}
           />
         ))}
         {snapshot.status === "submitted" && (
@@ -97,7 +115,9 @@ function ChatTranscriptView({
 // message updates re-render only the transcript, never its siblings (the
 // composer subscribes narrowly on its own).
 export function ChatTranscript() {
-  const { store, respondToRequest } = useChatSession();
+  const { sessionId, store, respondToRequest } = useChatSession();
   const snapshot = useStore(store);
-  return <ChatTranscriptView snapshot={snapshot} onRespond={respondToRequest} />;
+  return (
+    <ChatTranscriptView sessionId={sessionId} snapshot={snapshot} onRespond={respondToRequest} />
+  );
 }

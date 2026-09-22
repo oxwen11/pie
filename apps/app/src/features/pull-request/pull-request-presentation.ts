@@ -3,11 +3,62 @@ import type {
   PullRequestAction,
   PullRequestActionInput,
   PullRequestCheckStatus,
+  PullRequestListItem,
   PullRequestMergeMethod,
+  PullRequestRef,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 
-export type PullRequestSessionState = "open" | "draft" | "closed" | "merged";
+type PullRequestSessionState = "open" | "draft" | "closed" | "merged";
+
+export function samePullRequestRef(left: PullRequestRef, right: PullRequestRef): boolean {
+  return (
+    left.host === right.host &&
+    left.owner === right.owner &&
+    left.repository === right.repository &&
+    left.number === right.number
+  );
+}
+
+export function pullRequestRepositoryLabel(ref: PullRequestRef): string {
+  return `${ref.owner}/${ref.repository}`;
+}
+
+export function filterPullRequestItems(
+  items: ReadonlyArray<PullRequestListItem>,
+  query: string,
+): ReadonlyArray<PullRequestListItem> {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) return items;
+  return items.filter((item) => {
+    const haystack = [
+      item.title,
+      item.headBranch,
+      item.baseBranch,
+      pullRequestRepositoryLabel(item.ref),
+      `#${item.ref.number}`,
+      item.authorLogin,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
+/** Compact relative age for list rows (`1h`, `2d`) — matches Codex chrome. */
+export function formatPullRequestAge(iso: string, now = Date.now()): string {
+  const ms = now - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `${Math.max(1, minutes)}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(months / 12)}y`;
+}
 
 export function pullRequestSessionState(
   snapshot: PullRequestSnapshot | null,
@@ -18,7 +69,7 @@ export function pullRequestSessionState(
 }
 
 export const pullRequestActionInput = (
-  ref: SessionRef,
+  ref: SessionRef | PullRequestRef,
   snapshot: PullRequestSnapshot,
   action: PullRequestAction,
 ): PullRequestActionInput => {
@@ -37,6 +88,10 @@ export const pullRequestActionInput = (
       };
     case "disable-auto-merge":
       return { ref, expected: { pullRequest: snapshot.ref }, action };
+    default: {
+      const exhaustive: never = action;
+      return exhaustive;
+    }
   }
 };
 
@@ -56,6 +111,10 @@ export const pullRequestReviewLabel = (snapshot: PullRequestSnapshot): string =>
       return "Review required";
     case "none":
       return "No review decision";
+    default: {
+      const exhaustive: never = snapshot.reviewDecision;
+      return exhaustive;
+    }
   }
 };
 
@@ -95,6 +154,14 @@ export function checkStatusLabel(status: PullRequestCheckStatus): string {
       return exhaustive;
     }
   }
+}
+
+export function countDiffFiles(patch: string): number {
+  let count = 0;
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("diff --git ")) count += 1;
+  }
+  return count;
 }
 
 export function mergeMethodLabel(method: PullRequestMergeMethod): string {

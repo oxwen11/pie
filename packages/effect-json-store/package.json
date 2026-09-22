@@ -19,7 +19,8 @@
   "devDependencies": {
     "@effect/platform-node": "catalog:effect",
     "@effect/vitest": "catalog:effect",
-    "@getpie/typescript": "workspace:*"
+    "@getpie/typescript": "workspace:*",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24 <25"

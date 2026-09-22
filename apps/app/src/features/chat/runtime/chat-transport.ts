@@ -1,7 +1,12 @@
 import type { PieClient } from "@getpie/client";
-import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@getpie/contract";
+import type {
+  PromptPart,
+  SessionPendingPrompt,
+  SessionRef,
+  PieUIMessage,
+  SubscribeStreamEvent,
+} from "@getpie/contract";
 import { ORPCError } from "@orpc/client";
-import type { UIMessage } from "ai";
 
 import { exponentialBackoffMs } from "@/lib/utils";
 
@@ -17,7 +22,7 @@ type PieSessionClient = PieClient["agent"]["session"];
 
 type SessionClient = Pick<
   PieSessionClient,
-  "prompt" | "interrupt" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
+  "prompt" | "interrupt" | "replaceQueue" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
 > & {
   subscribe: (
     ...args: Parameters<PieSessionClient["subscribe"]>
@@ -63,19 +68,27 @@ export class OrpcChatSessionTransport implements ChatSessionTransport {
   prompt = async (input: {
     readonly messageId: string;
     readonly parts: ReadonlyArray<PromptPart>;
-  }): Promise<{ readonly turnId: string }> => {
-    return this.client.session.prompt({
+    readonly delivery?: "steer" | "followUp";
+  }): Promise<{ readonly turnId: string; readonly started: boolean }> => {
+    const payload = {
       ref: this.#ref,
       parts: input.parts,
       messageId: input.messageId,
-    });
+    };
+    return this.client.session.prompt(
+      input.delivery !== undefined ? { ...payload, delivery: input.delivery } : payload,
+    );
   };
 
   interrupt = async (): Promise<void> => {
     await this.client.session.interrupt({ ref: this.#ref });
   };
 
-  getMessages = async (): Promise<readonly UIMessage[] | null> => {
+  replaceQueue = async (pending: SessionPendingPrompt): Promise<void> => {
+    await this.client.session.replaceQueue({ ref: this.#ref, ...pending });
+  };
+
+  getMessages = async (): Promise<readonly PieUIMessage[] | null> => {
     try {
       const result = await this.client.session.getMessages({ ref: this.#ref });
       return result.messages;

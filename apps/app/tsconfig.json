@@ -6,5 +6,14 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.browser.config.ts",
+    "vitest.shared.ts",
+    "../../tools/testing/vitest-browser.ts",
+    "../../tools/testing/browser-locators.ts"
+  ]
 }

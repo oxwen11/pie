@@ -13,6 +13,7 @@ import {
   ServerErrorCodes,
   isSessionScopedEvent,
   PromptInputSchema,
+  PromptOutputSchema,
   SessionRefSchema,
   SessionScopedEventTypes,
   SubscribeInputSchema,
@@ -112,6 +113,37 @@ describe("PromptInput", () => {
         parts: [{ type: "file", mediaType: "image/png", url: "https://x/y.png" }],
       }),
     ).toBe(true);
+  });
+
+  it("accepts an optional followUp delivery", () => {
+    expect(
+      accepts(PromptInputSchema, {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        delivery: "followUp",
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects an unknown delivery", () => {
+    expect(
+      accepts(PromptInputSchema, {
+        ref,
+        parts: [{ type: "text", text: "hi" }],
+        delivery: "later",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("PromptOutput", () => {
+  it("accepts a turn receipt with started", () => {
+    expect(accepts(PromptOutputSchema, { turnId: "t1", started: true })).toBe(true);
+    expect(accepts(PromptOutputSchema, { turnId: "t1", started: false })).toBe(true);
+  });
+
+  it("rejects a receipt missing started", () => {
+    expect(accepts(PromptOutputSchema, { turnId: "t1" })).toBe(false);
   });
 });
 

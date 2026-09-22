@@ -259,6 +259,7 @@ export const makePiAgentSession = (
               activeTurn: null,
               activePrompt: null,
               pendingRequests: new Map(),
+              pendingPrompt: initialSessionState.pendingPrompt,
             }
           : current,
       ),
@@ -368,6 +369,10 @@ export const makePiAgentSession = (
             case "Start":
             case "Await":
               return Deferred.await(decision.ticket);
+            default: {
+              const exhaustive: never = decision;
+              return exhaustive;
+            }
           }
         }),
       );
@@ -394,7 +399,9 @@ export const makePiAgentSession = (
 
     return {
       ref,
-      snapshot: Ref.get(state).pipe(Effect.map((current) => toSnapshot(ref, current))),
+      snapshot: applyLock.withPermit(
+        Ref.get(state).pipe(Effect.map((current) => toSnapshot(ref, current))),
+      ),
       status: Ref.get(state).pipe(Effect.map(toStatus)),
       emit: (body) => applyWith(() => body),
       peekRuntime: Ref.get(lifecycle).pipe(Effect.map((current) => current.held?.runtime)),

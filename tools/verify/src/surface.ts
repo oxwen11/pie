@@ -5,6 +5,7 @@ import type { SampleProject } from "./runtime/scaffold.ts";
 export type LaunchRequest = {
   replace: boolean;
   mode?: "daemon" | "serve";
+  seedProject?: boolean;
 };
 
 export type PortPlan = {
@@ -25,10 +26,9 @@ type LaunchBase = {
 
 export type LaunchCtx =
   | (LaunchBase & { surface: "web"; vitePort: number; sample: SampleProject })
-  | (LaunchBase & { surface: "cli"; daemonDir: string })
+  | (LaunchBase & { surface: "cli" })
   | (LaunchBase & {
       surface: "desktop";
-      daemonDir: string;
       cdpPort: number;
       sample: SampleProject;
     });
@@ -45,22 +45,30 @@ export type Surface = {
   stop: (runDir: string, meta: RunMeta | undefined) => Promise<void>;
 };
 
+function isSurfaceLaunch<S extends SurfaceId>(
+  ctx: LaunchCtx,
+  surface: S,
+): ctx is Extract<LaunchCtx, { surface: S }> {
+  return ctx.surface === surface;
+}
+
 export function expectLaunch<S extends SurfaceId>(
   ctx: LaunchCtx,
   surface: S,
 ): Extract<LaunchCtx, { surface: S }> {
-  if (ctx.surface !== surface) {
+  if (!isSurfaceLaunch(ctx, surface)) {
     throw new TypeError(`expected ${surface} launch ctx, got ${ctx.surface}`);
   }
-  return ctx as Extract<LaunchCtx, { surface: S }>;
+  return ctx;
 }
 
 export function parseLaunchArgs(
   args: string[],
-  options: { allowServe?: boolean; usage: string },
+  options: { allowServe?: boolean; allowEmptyProjects?: boolean; usage: string },
 ): LaunchRequest {
   let replace = false;
   let mode: "daemon" | "serve" = "daemon";
+  let seedProject = options.allowEmptyProjects === true;
   for (const arg of args) {
     switch (arg) {
       case "--replace":
@@ -72,9 +80,16 @@ export function parseLaunchArgs(
         }
         mode = "serve";
         break;
+      case "--empty-projects":
+        if (options.allowEmptyProjects !== true) {
+          throw new Error(`unknown arg ${arg}\n  usage: ${options.usage}`);
+        }
+        seedProject = false;
+        break;
       default:
         throw new Error(`unknown arg ${arg}\n  usage: ${options.usage}`);
     }
   }
-  return options.allowServe === true ? { replace, mode } : { replace };
+  if (options.allowServe === true) return { replace, mode };
+  return options.allowEmptyProjects === true ? { replace, seedProject } : { replace };
 }

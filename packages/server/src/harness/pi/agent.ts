@@ -1,5 +1,5 @@
-import type { UIMessage } from "ai";
-import { Context, Effect, Layer, Option, type FileSystem, type Scope } from "effect";
+import type { PieUIMessage } from "@getpie/contract";
+import { Context, Effect, Option, type FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
@@ -36,7 +36,7 @@ export type PiAgentShape = {
   readonly getMessages?: (
     agentSessionId: string,
     cwd?: string,
-  ) => Effect.Effect<ReadonlyArray<UIMessage>, AgentOperationError>;
+  ) => Effect.Effect<ReadonlyArray<PieUIMessage>, AgentOperationError>;
   readonly getSessionInfo: (
     agentSessionId: string,
     cwd?: string,
@@ -60,17 +60,19 @@ type MutableAvailability = {
 };
 
 export const makePiAgent = (
-  process: PiProcess,
+  piProcess: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
 ): PiAgentShape => {
   const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(options.executable ?? { command: "pi", prefixArgs: [] }),
+    availability: checkPiAvailability(
+      options.executable ?? { command: process.execPath, prefixArgs: [] },
+    ),
     create: (input) =>
       whenAvailable(
         pi.availability,
         Effect.serviceOption(PiSessionTools).pipe(
           Effect.flatMap((tools) =>
-            createPiAgentRuntime(process, input, Option.getOrUndefined(tools)),
+            createPiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
           ),
         ),
       ),
@@ -79,7 +81,7 @@ export const makePiAgent = (
         pi.availability,
         Effect.serviceOption(PiSessionTools).pipe(
           Effect.flatMap((tools) =>
-            resumePiAgentRuntime(process, input, Option.getOrUndefined(tools)),
+            resumePiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
           ),
         ),
       ),
@@ -97,5 +99,3 @@ export const cachePiAgentAvailability = (
     (pi as MutableAvailability).availability = Effect.uninterruptible(cachedCheck);
     return pi;
   });
-
-export const PiAgentLayer = (pi: PiAgentShape): Layer.Layer<PiAgent> => Layer.succeed(PiAgent, pi);

@@ -1,5 +1,6 @@
-import type { UIMessage, UIMessageChunk } from "ai";
 import { Schema } from "effect";
+
+import type { PieUIMessage, PieUIMessageChunk } from "./pi-tools";
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -194,6 +195,7 @@ export const SessionScopedEventTypes = [
   "session.request.asked",
   "session.request.replied",
   "session.request.rejected",
+  "session.queue.updated",
   "session.crashed",
 ] as const;
 export type SessionScopedEventType = (typeof SessionScopedEventTypes)[number];
@@ -213,23 +215,19 @@ export type SessionScopedEventBody =
   | {
       readonly type: "session.message.chunk";
       readonly turnId: string;
-      readonly chunk: UIMessageChunk;
+      readonly chunk: PieUIMessageChunk;
     }
-  // A user prompt was accepted for this session. Published by the session
-  // service *before* the harness call, so it always precedes the turn's own
-  // events in seq order; `messageId` echoes the client-supplied id (or a
-  // server-minted one), letting the prompting client dedupe its optimistic
-  // message while every other client appends it. If the harness then rejects
-  // the prompt, `session.prompt.rejected` compensates.
+  // A user prompt entered the transcript. For a new turn, `messageId` echoes
+  // the client-supplied id (or a server-minted one); queued prompts emit this
+  // only when Pi consumes their native user message. Until then they are
+  // represented only by `session.queue.updated`.
   | {
       readonly type: "session.prompt.submitted";
       readonly messageId: string;
       readonly parts: ReadonlyArray<PromptPart>;
     }
-  // Compensates a `session.prompt.submitted` whose harness call was then
-  // rejected (turn already running, session closed, harness error): clients
-  // drop the message with this id, and the runtime clears the retained
-  // activePrompt so a mid-turn joiner never hydrates a prompt that never ran.
+  // The harness rejected the prompt before it started. The sender drops its
+  // optimistic message with this id; other clients normally never saw it.
   | {
       readonly type: "session.prompt.rejected";
       readonly messageId: string;
@@ -249,6 +247,13 @@ export type SessionScopedEventBody =
       readonly type: "session.request.rejected";
       readonly requestId: string;
       readonly reason?: string;
+    }
+  // Pi's native message queue, projected from `queue_update`. Full replace
+  // (no item ids): `steering` then `followUp`, matching Pi TUI order.
+  | {
+      readonly type: "session.queue.updated";
+      readonly steering: ReadonlyArray<string>;
+      readonly followUp: ReadonlyArray<string>;
     }
   | { readonly type: "session.crashed"; readonly reason: string };
 
@@ -351,10 +356,11 @@ export type ActiveTurnSnapshot = {
   readonly truncated: boolean;
 };
 
-// The latest accepted prompt, retained like the active turn's buffer:
-// `session.prompt.submitted` is never re-sent, so a client attaching mid-turn
-// recovers the user message from here. `seq` is the submit event's seq — replay
-// gates on it, so a client that saw the live event never renders it twice.
+// The latest prompt that entered the transcript, retained like the active
+// turn's buffer: `session.prompt.submitted` is never re-sent, so a client
+// attaching mid-turn recovers the user message from here. `seq` is the submit
+// event's seq — replay gates on it, so a client that saw the live event never
+// renders it twice.
 export type ActivePromptSnapshot = {
   readonly messageId: string;
   readonly parts: ReadonlyArray<PromptPart>;
@@ -365,10 +371,20 @@ export type ActivePromptSnapshot = {
 // Runtime snapshot
 // ---------------------------------------------------------------------------
 
+// Pi's in-memory message queue as this server last saw it. Always present
+// (empty arrays when idle). Not persisted — a server restart drops it; a
+// browser refresh hydrates it from the live snapshot while the Pi child lives.
+export const SessionPendingPromptSchema = Schema.Struct({
+  steering: Schema.Array(Schema.String),
+  followUp: Schema.Array(Schema.String),
+});
+export type SessionPendingPrompt = typeof SessionPendingPromptSchema.Type;
+
 export type SessionRuntimeSnapshot = {
   readonly ref: SessionRef;
   readonly status: SessionStatus;
   readonly pendingRequests: ReadonlyArray<AgentRequest>;
+  readonly pendingPrompt: SessionPendingPrompt;
   readonly activeTurn: ActiveTurnSnapshot | null;
   readonly activePrompt: ActivePromptSnapshot | null;
   // Last session-scoped seq folded into this snapshot; 0 before any event.
@@ -380,7 +396,7 @@ export type SessionRuntimeSnapshot = {
 // ---------------------------------------------------------------------------
 
 export type SessionMessages = {
-  readonly messages: ReadonlyArray<UIMessage>;
+  readonly messages: ReadonlyArray<PieUIMessage>;
 };
 
 // ---------------------------------------------------------------------------
@@ -418,6 +434,9 @@ export const CreateWorktreeInputSchema = Schema.Struct({
 });
 export type CreateWorktreeInput = typeof CreateWorktreeInputSchema.Type;
 
+export const PromptDeliverySchema = Schema.Literals(["steer", "followUp"]);
+export type PromptDelivery = typeof PromptDeliverySchema.Type;
+
 export const PromptInputSchema = Schema.Struct({
   ref: SessionRefSchema,
   parts: Schema.Array(PromptPartSchema).check(Schema.isNonEmpty()),
@@ -425,11 +444,29 @@ export const PromptInputSchema = Schema.Struct({
   // `session.prompt.submitted` so the sender can recognise (and skip) its own
   // prompt while other clients render it. Absent → the server mints one.
   messageId: Schema.optionalKey(Schema.NonEmptyString),
+  // Pi decides whether to start or queue the prompt. While running,
+  // `followUp` waits until current work finishes and `steer` injects before
+  // the next LLM call. Absent defaults to `followUp`.
+  delivery: Schema.optionalKey(PromptDeliverySchema),
 });
 export type PromptInput = typeof PromptInputSchema.Type;
 
-export const PromptOutputSchema = Schema.Struct({ turnId: Schema.String });
+export const PromptOutputSchema = Schema.Struct({
+  turnId: Schema.String,
+  // Whether this call opened a new turn. Queued follow-ups/steers are false.
+  started: Schema.Boolean,
+});
 export type PromptOutput = typeof PromptOutputSchema.Type;
+
+// Full replace of Pi's native queue (clear_queue, then steer / follow_up
+// each remaining line). Items have no ids — address them by index in these
+// arrays. Empty arrays clear the queue.
+export const ReplaceQueueInputSchema = Schema.Struct({
+  ref: SessionRefSchema,
+  steering: Schema.Array(Schema.String),
+  followUp: Schema.Array(Schema.String),
+});
+export type ReplaceQueueInput = typeof ReplaceQueueInputSchema.Type;
 
 // ---------------------------------------------------------------------------
 // Session capabilities
@@ -454,7 +491,7 @@ export const SessionCapabilitiesSchema = Schema.Struct({
 export type SessionCapabilities = typeof SessionCapabilitiesSchema.Type;
 
 // ---------------------------------------------------------------------------
-// Agent model (owned by Pi; queried via the live RPC child)
+// Agent model (owned by Pi; queried via live pie-pi-process)
 // ---------------------------------------------------------------------------
 
 export const AgentModelSchema = Schema.Struct({
@@ -498,6 +535,8 @@ export const ProjectSchema = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   createdAt: Schema.String,
+  /** Only `"chat"` is set today; omitted means a normal imported folder. */
+  type: Schema.optionalKey(Schema.Literal("chat")),
 });
 export type Project = typeof ProjectSchema.Type;
 
@@ -541,7 +580,7 @@ export type CreateSessionInput = typeof CreateSessionInputSchema.Type;
 /** Absolute directory Pi runs in for one session. */
 export const SessionWorkspaceSchema = Schema.Struct({
   cwd: Schema.String,
-  gitBranch: Schema.optionalKey(Schema.NonEmptyString),
+  worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.NonEmptyString })),
 });
 export type SessionWorkspace = typeof SessionWorkspaceSchema.Type;
 

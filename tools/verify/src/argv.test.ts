@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSurface, parsePieVerifyArgv } from "./argv.ts";
+import { isSurface, parsePieVerifyArgv, surfaceUsage } from "./argv.ts";
 import { VerifyError } from "./runtime/fail.ts";
 
 describe("isSurface", () => {
@@ -38,5 +38,15 @@ describe("parsePieVerifyArgv", () => {
 
   it("rejects an unknown first token", () => {
     expect(() => parsePieVerifyArgv(["launch"])).toThrow(VerifyError);
+  });
+});
+
+describe("surfaceUsage", () => {
+  it("lists env and does not advertise a browser forward", () => {
+    expect(surfaceUsage("web")).toMatch(/pie-verify web env \[--export\]/);
+    expect(surfaceUsage("desktop")).toMatch(/pie-verify desktop env \[--export\]/);
+    expect(surfaceUsage("web")).not.toMatch(/\bbrowser\b/);
+    expect(surfaceUsage("desktop")).not.toMatch(/\bbrowser\b/);
+    expect(surfaceUsage("cli")).not.toMatch(/\benv\b/);
   });
 });

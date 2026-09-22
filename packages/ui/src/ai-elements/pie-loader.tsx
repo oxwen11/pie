@@ -29,10 +29,12 @@ type PieLoaderStyle = CSSProperties & {
 export type PieLoaderProps = HTMLAttributes<HTMLSpanElement> & {
   /** Outer mark size in px. Omit to follow the `--dot-grid-size` theme variable. */
   size?: number;
+  /** Animate the dots (default). `false` renders the frozen pie mark. */
+  animated?: boolean;
 };
 
 /** 4×4 pie-mark loader. Layout is Tailwind; motion keyframes live in `pie-loader.css`. */
-export function PieLoader({ className, size, style, ...props }: PieLoaderProps) {
+export function PieLoader({ animated = true, className, size, style, ...props }: PieLoaderProps) {
   const hidden = props["aria-hidden"] === true || props["aria-hidden"] === "true";
   const markStyle: PieLoaderStyle | undefined =
     size == null
@@ -60,8 +62,8 @@ export function PieLoader({ className, size, style, ...props }: PieLoaderProps) 
           key={animation}
           data-slot="pie-dot"
           className={cn(
-            "size-[70%] min-h-0 min-w-0 place-self-center rounded-full bg-current motion-reduce:animate-none motion-reduce:opacity-100",
-            animation,
+            "size-[70%] min-h-0 min-w-0 place-self-center rounded-full bg-current opacity-100 motion-reduce:animate-none",
+            animated && animation,
             SOUTH_EAST_DOTS.has(i) && "translate-x-[10cqw] translate-y-[10cqh]",
           )}
         />

@@ -84,6 +84,7 @@ export const PullRequestSnapshotSchema = Schema.Struct({
   autoMerge: Schema.Union([Schema.Struct({ method: PullRequestMergeMethodSchema }), Schema.Null]),
   offeredActions: Schema.Array(PullRequestOfferedActionSchema),
   updatedAt: Schema.String,
+  body: Schema.String,
 });
 export type PullRequestSnapshot = typeof PullRequestSnapshotSchema.Type;
 
@@ -180,10 +181,11 @@ const ExpectedPullRequestHeadSchema = Schema.Struct({
   pullRequest: PullRequestRefSchema,
   headSha: Schema.String,
 });
+const PullRequestActionRefSchema = Schema.Union([SessionRefSchema, PullRequestRefSchema]);
 
 export const PullRequestActionInputSchema = Schema.Union([
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("merge"),
@@ -191,7 +193,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestHeadSchema,
     action: Schema.Struct({
       type: Schema.Literal("enable-auto-merge"),
@@ -199,7 +201,7 @@ export const PullRequestActionInputSchema = Schema.Union([
     }),
   }),
   Schema.Struct({
-    ref: SessionRefSchema,
+    ref: PullRequestActionRefSchema,
     expected: ExpectedPullRequestSchema,
     action: Schema.Struct({ type: Schema.Literal("disable-auto-merge") }),
   }),
@@ -215,12 +217,41 @@ export const PullRequestActionAppliedSchema = Schema.Struct({
 });
 export type PullRequestActionApplied = typeof PullRequestActionAppliedSchema.Type;
 
+export const PullRequestListItemSchema = Schema.Struct({
+  ref: PullRequestRefSchema,
+  title: Schema.String,
+  url: Schema.String,
+  authorLogin: Schema.String,
+  headBranch: Schema.String,
+  baseBranch: Schema.String,
+  lifecycle: PullRequestLifecycleSchema,
+  additions: Schema.Number,
+  deletions: Schema.Number,
+  updatedAt: Schema.String,
+});
+export type PullRequestListItem = typeof PullRequestListItemSchema.Type;
+
+export const PullRequestDiffSchema = Schema.Struct({
+  patch: Schema.String,
+  truncated: Schema.Boolean,
+});
+export type PullRequestDiff = typeof PullRequestDiffSchema.Type;
+
 const sessionNotFound = {
   data: toStandardSchema(Schema.Struct({ message: Schema.String })),
 };
 
 const currentErrors = {
   SESSION_NOT_FOUND: sessionNotFound,
+  MISSING_GH: {},
+  UNAUTHENTICATED: {},
+  RATE_LIMITED: {},
+  UNSUPPORTED_CONTEXT: {},
+  HOST_UNAVAILABLE: {},
+  INVALID_RESPONSE: {},
+};
+
+const listErrors = {
   MISSING_GH: {},
   UNAUTHENTICATED: {},
   RATE_LIMITED: {},
@@ -248,6 +279,15 @@ export const pullRequestContract = {
     .input(Schema.Struct({ ref: SessionRefSchema }))
     .errors(currentErrors)
     .output(Schema.Union([PullRequestSnapshotSchema, Schema.Null])),
+  diff: oc
+    .input(
+      Schema.Union([
+        Schema.Struct({ ref: SessionRefSchema }),
+        Schema.Struct({ pullRequest: PullRequestRefSchema }),
+      ]),
+    )
+    .errors(currentErrors)
+    .output(PullRequestDiffSchema),
   statuses: oc
     .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
     .errors(currentErrors)
@@ -264,8 +304,14 @@ export const pullRequestContract = {
     .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
     .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
     .output(Schema.Void),
+  list: oc.errors(listErrors).output(Schema.Array(PullRequestListItemSchema)),
   detail: oc
-    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
+    .input(
+      Schema.Union([
+        Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }),
+        Schema.Struct({ pullRequest: PullRequestRefSchema }),
+      ]),
+    )
     .errors({ ...currentErrors, STALE_CONTEXT: {} })
     .output(Schema.NullOr(PullRequestSnapshotSchema)),
   stackPreview: oc
@@ -347,8 +393,12 @@ export const projectSessionPullRequests = (
   const unfinished = (link: SessionPullRequestLink) =>
     link.snapshot === null || link.snapshot.lifecycle.type === "open";
   const chain = groups.length === 1 && groups[0]?.type === "native" ? groups[0] : undefined;
+  const lastUnfinished = chain?.links.reduceRight<SessionPullRequestLink | undefined>(
+    (found, link) => found ?? (unfinished(link) ? link : undefined),
+    undefined,
+  );
   const representative = chain
-    ? (chain.links.findLast(unfinished) ?? chain.links.at(-1) ?? null)
+    ? (lastUnfinished ?? chain.links.at(-1) ?? null)
     : (visible.find(unfinished) ?? visible[0] ?? null);
   const lifecycle = visible.some((link) => link.snapshot === null)
     ? null

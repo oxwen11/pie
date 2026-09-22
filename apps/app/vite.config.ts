@@ -7,6 +7,8 @@ import { isRunningFromAgent } from "agent-cli-detector";
 import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig } from "vite";
 
+import { themeBootstrapPlugin } from "./theme-bootstrap-plugin";
+
 /**
  * The dev server the browser talks to. The pie server no longer embeds Vite,
  * so this proxies the two prefixes it owns — which also keeps the app
@@ -51,9 +53,14 @@ export default defineConfig({
   },
   resolve: {
     tsconfigPaths: true,
-    alias: { "@": url.fileURLToPath(new URL("./src", import.meta.url)) },
+    alias: {
+      "@": url.fileURLToPath(new URL("./src", import.meta.url)),
+      clsx: "cn",
+      "tailwind-merge": "cn",
+    },
   },
   plugins: [
+    themeBootstrapPlugin(),
     codeInspectorPlugin({ bundler: "vite" }),
     tanstackRouter({
       target: "react",

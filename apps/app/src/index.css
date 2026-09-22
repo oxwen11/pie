@@ -14,6 +14,8 @@
 @source ".";
 
 :root {
+  color-scheme: light;
+
   --sidebar: hsl(0 0% 98%);
 
   --sidebar-foreground: hsl(240 5.3% 26.1%);
@@ -40,6 +42,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --sidebar: hsl(240 5.9% 10%);
 
   --sidebar-foreground: hsl(240 4.8% 95.9%);
@@ -126,6 +130,64 @@
   color: var(--muted-foreground);
   pointer-events: none;
   height: 0;
+}
+
+form:has(> [data-slot="chat-input"]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(16px);
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+form:has(> [data-slot="chat-input"]):focus-within {
+  border-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+
+.chat-input-scroll-fade {
+  font-weight: 430;
+}
+
+@property --chat-input-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --chat-input-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@supports (animation-timeline: scroll()) {
+  .chat-input-scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black var(--chat-input-fade-top) calc(100% - var(--chat-input-fade-bottom)),
+      transparent
+    );
+    animation: chat-input-scroll-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+
+@keyframes chat-input-scroll-fade {
+  0%,
+  1% {
+    --chat-input-fade-top: 0px;
+    --chat-input-fade-bottom: 12px;
+  }
+  99%,
+  100% {
+    --chat-input-fade-top: 12px;
+    --chat-input-fade-bottom: 0px;
+  }
 }
 
 /* Thin, theme-aware scrollbar for the chat transcript. Applied where the

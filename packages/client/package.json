@@ -18,6 +18,7 @@
     "@orpc/contract": "catalog:orpc"
   },
   "devDependencies": {
-    "@getpie/typescript": "workspace:*"
+    "@getpie/typescript": "workspace:*",
+    "vitest": "catalog:"
   }
 }

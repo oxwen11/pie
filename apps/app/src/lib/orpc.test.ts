@@ -1,25 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ServerConnection } from "@/server-connection";
-
 import { createAppClients } from "./orpc";
 
 describe("createAppClients", () => {
-  it("creates clients for a resolved external server", () => {
-    const server: ServerConnection = {
-      httpBaseUrl: "http://127.0.0.1:43123",
-      wsBaseUrl: "ws://127.0.0.1:43123",
-      token: "desktop-token",
-    };
-
-    const clients = createAppClients(server);
-
-    expect(clients.orpcClient).toBeDefined();
-    expect(clients.orpcClient.agent.session).toBeDefined();
-    expect(clients.orpcQueryUtils).toBeDefined();
-    clients.queryClient.clear();
-  });
-
   it("keeps cache policy on the query client instead of per-query options", () => {
     const { queryClient, orpcQueryUtils } = createAppClients();
 
@@ -38,7 +21,16 @@ describe("createAppClients", () => {
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.current.key())).toMatchObject(
       pullRequestDefaults,
     );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.diff.key())).toMatchObject(
+      pullRequestDefaults,
+    );
     expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.statuses.key())).toMatchObject(
+      pullRequestDefaults,
+    );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.list.key())).toMatchObject(
+      pullRequestDefaults,
+    );
+    expect(queryClient.getQueryDefaults(orpcQueryUtils.pullRequest.detail.key())).toMatchObject(
       pullRequestDefaults,
     );
 
@@ -52,6 +44,7 @@ describe("createAppClients", () => {
       orpcQueryUtils.git.review.key(),
       orpcQueryUtils.git.diff.key(),
       orpcQueryUtils.fs.readTree.key(),
+      orpcQueryUtils.fs.readFileString.key(),
     ]) {
       expect(queryClient.getQueryDefaults(key).meta).toEqual({ errorMode: "inline" });
     }

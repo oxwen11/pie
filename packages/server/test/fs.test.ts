@@ -63,8 +63,11 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
     it.effect("reads regular files and in-workspace file symlinks", () =>
       Effect.gen(function* () {
         const { cwd } = yield* workspace;
-        assert.equal(yield* readFile(cwd, "a.txt"), "hello\nworld");
-        assert.equal(yield* readFile(cwd, "internal-link"), "hello\nworld");
+        assert.deepEqual(yield* readFile(cwd, "a.txt"), { kind: "text", content: "hello\nworld" });
+        assert.deepEqual(yield* readFile(cwd, "internal-link"), {
+          kind: "text",
+          content: "hello\nworld",
+        });
       }),
     );
 
@@ -92,6 +95,19 @@ layer(FileSystemServiceLayer.pipe(Layer.provideMerge(NodePlatformLayer)))(
         const fs = yield* FileSystem.FileSystem;
         yield* fs.writeFile(path.join(cwd, "large.txt"), new Uint8Array(2 * 1024 * 1024 + 1));
         assert.equal(yield* readError(cwd, "large.txt"), "WorkspaceFileTooLarge");
+      }),
+    );
+
+    it.effect("previews png bytes as an image instead of rejecting them", () =>
+      Effect.gen(function* () {
+        const { cwd } = yield* workspace;
+        const fs = yield* FileSystem.FileSystem;
+        const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00);
+        yield* fs.writeFile(path.join(cwd, "dot.png"), png);
+        const preview = yield* readFile(cwd, "dot.png");
+        assert.equal(preview.kind, "image");
+        if (preview.kind !== "image") return;
+        assert.equal(preview.mimeType, "image/png");
       }),
     );
 

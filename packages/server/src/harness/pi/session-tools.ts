@@ -3,7 +3,16 @@ import path from "node:path";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import type { PullRequestRef, SessionPullRequestLink } from "@getpie/contract/pull-request";
-import { Context, Crypto, Deferred, Effect, FileSystem, Schema, type Scope } from "effect";
+import {
+  ByteSize,
+  Context,
+  Crypto,
+  Deferred,
+  Effect,
+  FileSystem,
+  Schema,
+  type Scope,
+} from "effect";
 import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { PiTransportError } from "../errors";
@@ -37,13 +46,17 @@ export function parseSessionPullRequestUrl(value: string): PullRequestRef {
     /^https:\/\/github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38}))\/([a-zA-Z0-9_.-]{1,100})\/pull\/([1-9][0-9]*)\/?$/.exec(
       value,
     );
-  if (!match || match[2] === "." || match[2] === "..") throw new Error("Invalid GitHub PR URL");
-  const number = Number(match[3]);
+  const owner = match?.[1];
+  const repository = match?.[2];
+  const rawNumber = match?.[3];
+  if (!owner || !repository || !rawNumber || repository === "." || repository === "..")
+    throw new Error("Invalid GitHub PR URL");
+  const number = Number(rawNumber);
   if (!Number.isSafeInteger(number)) throw new Error("Invalid GitHub PR number");
   return {
     host: "github.com",
-    owner: match[1]!.toLowerCase(),
-    repository: match[2]!.toLowerCase(),
+    owner: owner.toLowerCase(),
+    repository: repository.toLowerCase(),
     number,
   };
 }
@@ -76,7 +89,7 @@ export const makePiSessionToolsBridge = (
       port: 0,
       gracefulShutdownTimeout: "1 second",
     });
-    if (server.address._tag !== "TcpAddress") return yield* Effect.die("Expected TCP bridge");
+    if (server.address._tag !== "InetAddressV4") return yield* Effect.die("Expected TCP bridge");
     const host = `127.0.0.1:${server.address.port}`;
     const app = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
@@ -119,7 +132,7 @@ export const makePiSessionToolsBridge = (
       }
       return HttpServerResponse.empty({ status: 404 });
     }).pipe(
-      Effect.provideService(HttpIncomingMessage.MaxBodySize, FileSystem.Size(4096)),
+      Effect.provideService(HttpIncomingMessage.MaxBodySize, ByteSize.bytes(4096)),
       // Never expose repository errors, paths, or credentials to the child.
       Effect.catchCause(() => Effect.succeed(HttpServerResponse.empty({ status: 400 }))),
     );

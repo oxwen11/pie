@@ -1,8 +1,17 @@
 import { v7 as uuid } from "uuid";
 
+import type { SessionEvent } from "../events/framework";
 import type { AgentSessionEvent } from "./protocol";
 import { isDynamicPiTool } from "./tools";
 import type { PiUIMessageChunk } from "./ui-message";
+
+type PiPromptSubmitted = Extract<SessionEvent, { type: "session.prompt.submitted" }>;
+type PiUserMessage = Extract<
+  Extract<AgentSessionEvent, { type: "message_start" }>["message"],
+  { role: "user" }
+>;
+
+export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 
 // Pi RPC event → UI-chunk transform, the pi analog of createCodexTransform.
 // Same house generator-factory style: call once per session; the returned
@@ -17,53 +26,69 @@ import type { PiUIMessageChunk } from "./ui-message";
 //     assistantMessageEvent `start` delta never appears on this wire)
 //   • a `message_start role=user` after assistant output is a delivered steer
 //     (pi injects it as a real user entry — see ADR 0003): close the open
-//     UIMessage and start a fresh one, so live segmentation matches the
-//     persisted history fold. The echo of the *prompting* input arrives
-//     before any assistant message and is skipped.
+//     assistant UIMessage, emit the existing prompt-submitted event for the
+//     user UIMessage, then start a fresh assistant UIMessage. The echo of the
+//     *prompting* input arrives before any assistant message and is skipped.
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
-//     The AI-SDK tool chunks are generic, so args/results forward whole; the
-//     PiTools types still discriminate `message.parts` downstream.
+//     Successful read output drops file content because the UI only renders
+//     its input path; other tool results forward whole.
 //   • message_end / compaction / auto_retry_end → skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
+//   • queue_update → skipped here; the process offers it on `queueUpdates`
+//     and the runtime emits `session.queue.updated`
 //   • agent_start/agent_settled → `start`/`finish`; a retry re-emits
 //     agent_start, so `start` is guarded to fire once per turn.
 
-type AssistantMessage = Extract<
-  Extract<AgentSessionEvent, { type: "message_end" }>["message"],
-  { role: "assistant" }
->;
-
 /** A tool result's display text: the concatenated text blocks of its content. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function toolResultText(result: unknown): string {
-  const content = (result as { content?: unknown } | undefined)?.content;
+  const content = isRecord(result) ? result.content : undefined;
   if (!Array.isArray(content)) return "";
   return content
     .filter(
       (block): block is { type: "text"; text: string } =>
-        typeof block === "object" &&
-        block !== null &&
-        (block as { type?: unknown }).type === "text" &&
-        typeof (block as { text?: unknown }).text === "string",
+        isRecord(block) && block.type === "text" && typeof block.text === "string",
     )
     .map((block) => block.text)
     .join("\n");
 }
 
+export function stripReadDetailsContent(details: unknown) {
+  if (!isRecord(details) || !isRecord(details.truncation)) return details;
+  const { content: _content, ...truncation } = details.truncation;
+  return { ...details, truncation };
+}
+
 /** Per-session render transform factory: one `createPiTransform()` call per session. */
+function promptParts(message: PiUserMessage): PiPromptSubmitted["parts"] {
+  if (typeof message.content === "string") return [{ type: "text", text: message.content }];
+  return message.content.map((block) =>
+    block.type === "text"
+      ? { type: "text" as const, text: block.text }
+      : {
+          type: "file" as const,
+          mediaType: block.mimeType,
+          url: `data:${block.mimeType};base64,${block.data}`,
+        },
+  );
+}
+
 export function createPiTransform(
   sessionId: string,
-): (event: AgentSessionEvent) => Generator<PiUIMessageChunk> {
+): (event: AgentSessionEvent) => Generator<PiStreamItem> {
   let turnOpen = false;
   // Ordinal of the assistant message within the run; pi's contentIndex restarts
   // per message, so block ids need both to stay unique inside one UIMessage.
   // Doubles as "has this run produced assistant output yet" (> 0), which is
   // what tells a delivered steer apart from the prompting input's echo.
   let messageOrdinal = 0;
-  // A steered user message landed mid-run: split before the next assistant
-  // message rather than eagerly, so an interrupt right after delivery doesn't
-  // leave an empty trailing UIMessage.
-  let pendingSplit = false;
+  // A steered user message landed mid-run. The next assistant message needs a
+  // fresh start; if the run settles first, no empty assistant message is emitted.
+  let pendingAssistantStart = false;
   // Block ids that streamed at least one delta, so *_end can recover text that
   // only arrived whole (the no-delta fallback, mirroring codex).
   const streamedBlocks = new Set<string>();
@@ -72,7 +97,7 @@ export function createPiTransform(
 
   function* onAssistantDelta(
     event: Extract<AgentSessionEvent, { type: "message_update" }>,
-  ): Generator<PiUIMessageChunk> {
+  ): Generator<PiStreamItem> {
     const delta = event.assistantMessageEvent;
     switch (delta.type) {
       case "text_start":
@@ -115,14 +140,14 @@ export function createPiTransform(
     }
   }
 
-  return function* transform(event: AgentSessionEvent): Generator<PiUIMessageChunk> {
+  return function* transform(event: AgentSessionEvent): Generator<PiStreamItem> {
     switch (event.type) {
       case "agent_start":
         // Retries re-enter the run loop; the turn's UIMessage opens only once.
         if (!turnOpen) {
           turnOpen = true;
           messageOrdinal = 0;
-          pendingSplit = false;
+          pendingAssistantStart = false;
           yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
         }
         break;
@@ -130,14 +155,20 @@ export function createPiTransform(
       case "message_start":
         if (!turnOpen) break;
         if (event.message.role === "assistant") {
-          if (pendingSplit) {
-            pendingSplit = false;
-            yield { type: "finish" };
+          if (pendingAssistantStart) {
+            pendingAssistantStart = false;
             yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
           }
           messageOrdinal += 1;
         } else if (event.message.role === "user" && messageOrdinal > 0) {
-          pendingSplit = true;
+          if (!pendingAssistantStart) yield { type: "finish" };
+          pendingAssistantStart = true;
+          yield {
+            type: "session.prompt.submitted",
+            sessionId,
+            messageId: uuid(),
+            parts: promptParts(event.message),
+          };
         }
         break;
 
@@ -156,12 +187,20 @@ export function createPiTransform(
         };
         break;
 
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const result =
+          event.toolName === "read" && !event.isError
+            ? {
+                ...event.result,
+                content: [],
+                details: stripReadDetailsContent(event.result.details),
+              }
+            : event.result;
         if (event.isError) {
           yield {
             type: "tool-output-error",
             toolCallId: event.toolCallId,
-            errorText: toolResultText(event.result) || "Tool execution failed",
+            errorText: toolResultText(result) || "Tool execution failed",
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
@@ -169,12 +208,13 @@ export function createPiTransform(
           yield {
             type: "tool-output-available",
             toolCallId: event.toolCallId,
-            output: event.result,
+            output: result,
             providerExecuted: true,
             dynamic: isDynamicPiTool(event.toolName),
           };
         }
         break;
+      }
 
       case "agent_end": {
         // A model-level failure surfaces as the run's last assistant message
@@ -182,7 +222,7 @@ export function createPiTransform(
         // events follow): emit a transient retry chunk so the UI can show it,
         // and only a terminal failure becomes an error chunk. The finish
         // always comes from agent_settled.
-        const last = event.messages.at(-1) as AssistantMessage | undefined;
+        const last = event.messages.at(-1);
         if (last?.role === "assistant" && last.stopReason === "error") {
           const errorMessage = last.errorMessage ?? "Pi run failed";
           if (event.willRetry) {
@@ -209,9 +249,9 @@ export function createPiTransform(
       case "agent_settled":
         if (turnOpen) {
           turnOpen = false;
-          pendingSplit = false;
+          if (!pendingAssistantStart) yield { type: "finish" };
+          pendingAssistantStart = false;
           streamedBlocks.clear();
-          yield { type: "finish" };
         }
         break;
 
@@ -225,7 +265,6 @@ export function createPiTransform(
           | "tool_execution_update"
           | "turn_start"
           | "turn_end"
-          | "queue_update"
           | "entry_appended"
           | "session_info_changed"
           | "thinking_level_changed"
@@ -235,7 +274,8 @@ export function createPiTransform(
           | "summarization_retry_scheduled"
           | "summarization_retry_attempt_start"
           | "summarization_retry_finished"
-          | "bash_execution_update");
+          | "bash_execution_update"
+          | "queue_update");
     }
   };
 }
