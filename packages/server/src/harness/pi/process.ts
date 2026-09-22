@@ -18,6 +18,7 @@ import {
 } from "../errors";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
+import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
@@ -31,7 +32,6 @@ import { makePiTransport, type PiTransport, type PiTransportFailure } from "./tr
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
-
 type PendingRequest = {
   readonly deferred: Deferred.Deferred<unknown>;
   readonly declineValue: unknown;
@@ -505,13 +505,13 @@ export const makePiProcessWithDependencies = <R>(
     return {
       session: {
         create: (config) => {
-          const spawnArgs =
+          const modelArgs =
             config.provider && config.modelId
               ? ["--provider", config.provider, "--model", config.modelId]
-              : undefined;
-          return openSession(uuid(), config.cwd, spawnArgs);
+              : [];
+          return openSession(uuid(), config.cwd, [...modelArgs, ...PI_PROJECT_PROCESS_ARGS]);
         },
-        resume: (config) => openSession(config.sessionId, config.cwd),
+        resume: (config) => openSession(config.sessionId, config.cwd, PI_PROJECT_PROCESS_ARGS),
         prompt: (input) =>
           Effect.gen(function* () {
             const session = yield* getSession(input.sessionId);
