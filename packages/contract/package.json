@@ -16,6 +16,7 @@
     "./resource-monitoring": "./src/resource-monitoring.ts",
     "./session": "./src/session.ts",
     "./agent": "./src/agent.ts",
+    "./assets": "./src/assets.ts",
     "./session-events": "./src/session-events.ts",
     "./schedule": "./src/schedule.ts",
     "./settings": "./src/settings.ts",
