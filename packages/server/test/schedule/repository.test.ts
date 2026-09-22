@@ -73,7 +73,7 @@ describe("ScheduleRepository", () => {
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* TestScheduleRepository;
-        yield* repo.write(expected);
+        yield* repo.create(expected);
         return yield* repo.read(SCHEDULE_ID);
       }),
     );
@@ -94,8 +94,10 @@ describe("ScheduleRepository", () => {
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* TestScheduleRepository;
-        yield* repo.write(schedule([runRecord("run-1"), runRecord("run-0")]));
-        yield* repo.write(schedule([runRecord("run-2"), runRecord("run-1", "succeeded")]));
+        const current = schedule([runRecord("run-1"), runRecord("run-0")]);
+        const next = schedule([runRecord("run-2"), runRecord("run-1", "succeeded")]);
+        yield* repo.create(current);
+        yield* repo.replace(current, next);
         return yield* repo.read(SCHEDULE_ID);
       }),
     );
@@ -104,6 +106,28 @@ describe("ScheduleRepository", () => {
     expect(read.runs[1]?.status).toBe("succeeded");
     await expect(
       fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-0.json")),
+    ).rejects.toThrow("ENOENT");
+  });
+
+  it("ignores and cleans an unreferenced corrupt Run during replacement", async () => {
+    const current = schedule([runRecord("run-1")]);
+    const next = { ...current, name: "Updated review" };
+
+    const read = await run(
+      Effect.gen(function* () {
+        const repo = yield* TestScheduleRepository;
+        yield* repo.create(current);
+        yield* Effect.promise(() =>
+          fs.writeFile(path.join(schedulesDir, SCHEDULE_ID, "runs", "orphan.json"), "not json"),
+        );
+        yield* repo.replace(current, next);
+        return yield* repo.read(SCHEDULE_ID);
+      }),
+    );
+
+    expect(read.name).toBe("Updated review");
+    await expect(
+      fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "orphan.json")),
     ).rejects.toThrow("ENOENT");
   });
 
@@ -131,7 +155,7 @@ describe("ScheduleRepository", () => {
     await run(
       Effect.gen(function* () {
         const repo = yield* TestScheduleRepository;
-        yield* repo.write(schedule([runRecord("run-1")]));
+        yield* repo.create(schedule([runRecord("run-1")]));
         yield* repo.remove(SCHEDULE_ID);
       }),
     );

@@ -34,7 +34,8 @@ export class ScheduleRepository extends Context.Service<
   {
     readonly list: () => Effect.Effect<ReadonlyArray<Schedule>, StoreReadError>;
     readonly read: (id: string) => Effect.Effect<Schedule, StoreReadError | ScheduleNotFound>;
-    readonly write: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
+    readonly create: (schedule: Schedule) => Effect.Effect<void, StoreWriteError>;
+    readonly replace: (current: Schedule, next: Schedule) => Effect.Effect<void, StoreWriteError>;
     readonly remove: (id: string) => Effect.Effect<void, StoreWriteError>;
   }
 >()("ScheduleRepository") {}
@@ -45,9 +46,19 @@ const isSafeId = (id: string): boolean =>
 export const makeScheduleRepository = (schedulesDir: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    const schedules = yield* makeJsonCollection({
+      dir: schedulesDir,
+      schema: StoredScheduleSchema,
+    });
+    const runs = yield* makeJsonCollection({
+      dir: schedulesDir,
+      schema: ScheduleRunSchema,
+    });
     const locks = new Map<string, Semaphore.Semaphore>();
     const scheduleDir = (id: string) => path.join(schedulesDir, id);
-    const runsDir = (id: string) => path.join(scheduleDir(id), "runs");
+    const scheduleKey = (id: string) => `${id}/schedule`;
+    const runPrefix = (id: string) => `${id}/runs`;
+    const runKey = (id: string, runId: string) => `${runPrefix(id)}/${runId}`;
     const asReadError = (error: JsonStoreLoadError) =>
       new StoreReadError({ file: error.file, cause: error });
     const asWriteError = (error: { readonly file: string }) =>
@@ -61,37 +72,25 @@ export const makeScheduleRepository = (schedulesDir: string) =>
         }
         return lock.withPermit(effect);
       });
-    const stores = (id: string) =>
-      Effect.all({
-        schedule: makeJsonCollection({
-          dir: scheduleDir(id),
-          schema: StoredScheduleSchema,
-        }),
-        runs: makeJsonCollection({
-          dir: runsDir(id),
-          schema: ScheduleRunSchema,
-        }),
-      }).pipe(Effect.provideService(FileSystem.FileSystem, fs));
 
     const readUnlocked = (id: string) =>
       Effect.gen(function* () {
-        const store = yield* stores(id);
-        const found = yield* store.schedule.get("schedule").pipe(Effect.mapError(asReadError));
+        const found = yield* schedules.get(scheduleKey(id)).pipe(Effect.mapError(asReadError));
         if (Option.isNone(found)) {
           return yield* Effect.fail(new ScheduleNotFound({ scheduleId: id }));
         }
         const stored = found.value;
-        const runs = yield* Effect.forEach(
+        const storedRuns = yield* Effect.forEach(
           stored.runIds,
           (runId) =>
-            store.runs.get(runId).pipe(
+            runs.get(runKey(id, runId)).pipe(
               Effect.mapError(asReadError),
               Effect.flatMap(
                 Option.match({
                   onNone: () =>
                     Effect.fail(
                       new StoreReadError({
-                        file: path.join(runsDir(id), `${runId}.json`),
+                        file: path.join(scheduleDir(id), "runs", `${runId}.json`),
                         cause: new Error(`schedule run ${runId} is missing`),
                       }),
                     ),
@@ -101,7 +100,7 @@ export const makeScheduleRepository = (schedulesDir: string) =>
             ),
           { concurrency: 16 },
         );
-        return fromStored(stored, runs);
+        return fromStored(stored, storedRuns);
       });
 
     const read = (id: string) =>
@@ -109,32 +108,67 @@ export const makeScheduleRepository = (schedulesDir: string) =>
         ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
         : withLock(id, readUnlocked(id));
 
+    const collectScheduleIds = schedules.ids().pipe(
+      Effect.mapError(asReadError),
+      Effect.map((ids) =>
+        ids.flatMap((id) => {
+          const [scheduleId, file, extra] = id.split("/");
+          return scheduleId !== undefined &&
+            file === "schedule" &&
+            extra === undefined &&
+            isSafeId(scheduleId)
+            ? [scheduleId]
+            : [];
+        }),
+      ),
+    );
+
+    const garbageCollectRuns = (schedule: Schedule) => {
+      const retained = new Set(schedule.runs.map((run) => runKey(schedule.id, run.id)));
+      return runs.ids({ under: runPrefix(schedule.id) }).pipe(
+        Effect.mapError(asWriteError),
+        Effect.flatMap((ids) =>
+          Effect.forEach(
+            ids,
+            (id) =>
+              retained.has(id) ? Effect.void : runs.remove(id).pipe(Effect.mapError(asWriteError)),
+            { concurrency: 16, discard: true },
+          ),
+        ),
+        Effect.catch((error) =>
+          Effect.logWarning("schedule run cleanup failed").pipe(
+            Effect.annotateLogs({
+              event: "schedule.run_cleanup_failed",
+              scheduleId: schedule.id,
+              file: error.file,
+            }),
+          ),
+        ),
+      );
+    };
+
+    const commit = (current: Schedule | undefined, next: Schedule) => {
+      const previous = new Map<string, ScheduleRun>();
+      for (const run of current?.runs ?? []) previous.set(run.id, run);
+      return Effect.gen(function* () {
+        yield* Effect.forEach(
+          next.runs,
+          (run) =>
+            util.isDeepStrictEqual(previous.get(run.id), run)
+              ? Effect.void
+              : runs.put(runKey(next.id, run.id), run).pipe(Effect.mapError(asWriteError)),
+          { concurrency: 16, discard: true },
+        );
+        yield* schedules
+          .put(scheduleKey(next.id), toStored(next))
+          .pipe(Effect.mapError(asWriteError));
+        yield* garbageCollectRuns(next);
+      });
+    };
+
     return {
       list: () =>
-        fs.readDirectory(schedulesDir).pipe(
-          Effect.catch((error) =>
-            error.reason._tag === "NotFound"
-              ? Effect.succeed([])
-              : Effect.fail(new StoreReadError({ file: schedulesDir, cause: error })),
-          ),
-          Effect.flatMap((names) =>
-            Effect.forEach(
-              names.filter(isSafeId),
-              (id) =>
-                fs.stat(scheduleDir(id)).pipe(
-                  Effect.map((info) =>
-                    info.type === "Directory" ? Option.some(id) : Option.none(),
-                  ),
-                  Effect.catch((error) =>
-                    error.reason._tag === "NotFound"
-                      ? Effect.succeed(Option.none<string>())
-                      : Effect.fail(new StoreReadError({ file: scheduleDir(id), cause: error })),
-                  ),
-                ),
-              { concurrency: 16 },
-            ),
-          ),
-          Effect.map((ids) => ids.flatMap((id) => (Option.isSome(id) ? [id.value] : []))),
+        collectScheduleIds.pipe(
           Effect.flatMap((ids) =>
             Effect.forEach(
               ids,
@@ -151,37 +185,18 @@ export const makeScheduleRepository = (schedulesDir: string) =>
           Effect.map((items) => items.flatMap((item) => (Option.isSome(item) ? [item.value] : []))),
         ),
       read,
-      write: (schedule) =>
+      create: (schedule) =>
         !isSafeId(schedule.id)
           ? Effect.die(new Error(`invariant: invalid schedule id ${JSON.stringify(schedule.id)}`))
-          : withLock(
-              schedule.id,
-              Effect.gen(function* () {
-                const store = yield* stores(schedule.id);
-                const existing = yield* store.runs.list().pipe(Effect.mapError(asWriteError));
-                const existingById = new Map(existing.map((entry) => [entry.id, entry.data]));
-                const retained = new Set(schedule.runs.map((run) => run.id));
-                yield* Effect.forEach(
-                  schedule.runs,
-                  (run) =>
-                    util.isDeepStrictEqual(existingById.get(run.id), run)
-                      ? Effect.void
-                      : store.runs.put(run.id, run).pipe(Effect.mapError(asWriteError)),
-                  { concurrency: 1, discard: true },
-                );
-                yield* store.schedule
-                  .put("schedule", toStored(schedule))
-                  .pipe(Effect.mapError(asWriteError));
-                yield* Effect.forEach(
-                  existing,
-                  (entry) =>
-                    retained.has(entry.id)
-                      ? Effect.void
-                      : store.runs.remove(entry.id).pipe(Effect.mapError(asWriteError)),
-                  { concurrency: 1, discard: true },
-                );
-              }),
-            ),
+          : withLock(schedule.id, commit(undefined, schedule)),
+      replace: (current, next) =>
+        !isSafeId(next.id) || current.id !== next.id
+          ? Effect.die(
+              new Error(
+                `invariant: cannot replace schedule ${JSON.stringify(current.id)} with ${JSON.stringify(next.id)}`,
+              ),
+            )
+          : withLock(next.id, commit(current, next)),
       remove: (id) =>
         !isSafeId(id)
           ? Effect.void
