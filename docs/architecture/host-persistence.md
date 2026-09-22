@@ -49,7 +49,9 @@ $PIE_HOME/
 ├── storage/
 │   ├── projects.json
 │   ├── sessions/<projectId>/<sessionId>.json
-│   └── schedules/<scheduleId>.json
+│   └── schedules/<scheduleId>/
+│       ├── schedule.json
+│       └── runs/<runId>.json
 ├── worktrees/<repository-basename>/<four-character-key>/
 ├── logs/
 │   ├── pie.log
@@ -140,15 +142,15 @@ Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
 
 ### Session metadata
 
-| Property      | Current contract                                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Path          | `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json`                                                                            |
-| Owner         | `PiAgentSessionRepository`                                                                                                           |
-| Data          | One record per session, addressed by the same project/session ids carried in the body                                                |
-| Write points  | Create, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, and remembered pull-request refs |
-| Compatibility | No envelope migration chain. A legacy `gitBranch` string is lifted to `worktree: { branch }` on read and is never written back       |
-| Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration  |
-| Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything         |
+| Property      | Current contract                                                                                                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json`                                                                                                                                          |
+| Owner         | `PiAgentSessionRepository`                                                                                                                                                                         |
+| Data          | One record per session, addressed by the same project/session ids carried in the body                                                                                                              |
+| Write points  | Create (including Schedule source), Schedule-source startup backfill, first Pi open, cwd backfill, first-title stamp, rename, archive/unarchive, model selection, and remembered pull-request refs |
+| Compatibility | No envelope migration chain. A legacy `gitBranch` string is lifted to `worktree: { branch }` on read and is never written back                                                                     |
+| Extension     | Add persisted fields to `SessionSchema` and the `toStorage`/`fromStorage` mapping; incompatible changes require a version migration                                                                |
+| Retention     | Session delete removes this file only; it does not remove a worktree or Pi's native transcript. Archiving retains everything                                                                       |
 
 Current record fields:
 
@@ -161,6 +163,9 @@ Current record fields:
   cwd?: string;
   worktree?: { branch: string };
   pullRequestRefs?: Array<{ host; owner; repository; number }>;
+  source?:
+    | { kind: "schedule"; scheduleId: string }
+    | { kind: "hub"; executionId: string };
   provider?: string;
   modelId?: string;
   title?: string;
@@ -172,31 +177,39 @@ Current record fields:
 
 `agentSessionId` is Pi's native id. Old records where
 `agentSessionId === sessionId` are interpreted as unopened, but that
-normalization is not a versioned disk migration. A missing `cwd` is backfilled
+normalization is not a versioned disk migration. Existing Session records need
+no schema migration when `source` is absent. Schedule daemon startup backfills
+recoverable creation provenance from each existing Schedule's bound Session,
+`lastSessionId`, and retained run snapshots; associations already lost to the
+20-run window or a deleted Schedule cannot be reconstructed. A missing `cwd` is backfilled
 from the Project and persisted by session preparation; read-only workspace
 resolution does not write the backfill.
 
 ### Schedules
 
-| Property      | Current contract                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Path          | `$PIE_HOME/storage/schedules/<scheduleId>.json`                                                                                |
-| Owner         | `ScheduleRepository`                                                                                                           |
-| Data          | One complete `Schedule` per file                                                                                               |
-| Write points  | Create/update/delete, run start/settle, pause/enable, next-run advancement, failure-circuit changes, and startup recovery      |
-| Compatibility | No envelope migration chain or pre-envelope adoption is currently configured; stored run status `started` decodes as `running` |
-| Extension     | `ScheduleSchema` is the source of truth; incompatible changes require a version migration                                      |
-| Retention     | Delete removes only the schedule file. Sessions, worktrees, and Pi history created by prior runs remain                        |
+| Property      | Current contract                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/schedules/<scheduleId>/schedule.json` plus `runs/<runId>.json`                                                                                                                               |
+| Owner         | `ScheduleRepository`                                                                                                                                                                                            |
+| Data          | `schedule.json` stores Schedule state plus ordered `runIds`; each retained Run is a separate file                                                                                                               |
+| Write points  | Create/update/delete, run start/settle, pause/enable, next-run advancement, failure-circuit changes, and startup recovery                                                                                       |
+| Compatibility | Breaking layout: the retired flat `schedules/<scheduleId>.json` files are ignored; there is no migration or adoption path                                                                                       |
+| Extension     | `ScheduleStateSchema`, `ScheduleRunSchema`, and the repository's stored Schedule schema are the sources of truth; incompatible changes require an explicit future migration                                     |
+| Atomicity     | Each JSON file is atomic, but a Schedule and its Runs are not one transaction. Runs land first to avoid missing references; a crash may expose an advanced or orphaned Run. One daemon serializes each Schedule |
+| Retention     | Only the newest 20 Run files remain. Deleting a Schedule removes its directory; Sessions, worktrees, and Pi history created by prior runs remain                                                                |
 
-The current Schedule contains identity and prompt (`id`, `name`, `projectId`,
+`schedule.json` contains identity and prompt (`id`, `name`, `projectId`,
 `prompt`), cadence (`spec`, `nextRunAt`, optional `expiresAt`/`maxRuns`), session
 policy and optional worktree/model selection, enable/pause/failure counters,
-timestamps and last-run summary, plus `runs`.
+timestamps, last-run summary, and the ordered ids of retained Runs. It does not
+embed Run bodies.
 
-Each run contains `{ id, startedAt, reason, status }` plus optional finish time,
-session id, error/skip details, missed count, and a snapshot of the schedule
-inputs used for that run. Only the newest 20 runs remain in `runs`;
-`firedCount` is the durable counter when older runs fall out of that window.
+Each Run file contains `{ id, startedAt, reason, status }` plus optional finish
+time, session id, error/skip details, missed count, and a snapshot of the
+Schedule inputs used for that Run. Only the newest 20 Run files remain;
+`firedCount` is the durable counter when older Runs fall out of that window.
+An interrupted write may leave an unreferenced Run file, which reads ignore and
+the next successful write removes.
 
 ## Pi package settings and installs
 

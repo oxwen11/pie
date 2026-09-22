@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import {
   ScheduleSchema,
   scheduleSessionOf,
-  collectFiredSessionIds,
   countFiredRuns,
   CreateScheduleInputSchema,
   CAPABILITY_UNAVAILABLE_TAG,
@@ -127,25 +126,6 @@ describe("ScheduleSession helpers", () => {
       sessionId: UUID,
     });
     expect(bindScheduleSession({ policy: "isolated" }, UUID)).toBeUndefined();
-  });
-});
-
-describe("collectFiredSessionIds", () => {
-  it("collects last, reused, and run session ids", () => {
-    expect(
-      collectFiredSessionIds([
-        {
-          lastSessionId: "sess-last",
-          session: { policy: "existing", sessionId: "sess-reuse" },
-          runs: [{ sessionId: "sess-run" }],
-        },
-        { runs: [] },
-      ]),
-    ).toEqual(new Set(["sess-last", "sess-reuse", "sess-run"]));
-  });
-
-  it("returns an empty set when no session ids are recorded", () => {
-    expect(collectFiredSessionIds([{ runs: [] }]).size).toBe(0);
   });
 });
 

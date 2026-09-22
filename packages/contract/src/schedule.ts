@@ -85,26 +85,6 @@ export function reuseSessionIdOf(session: ScheduleSession): string | undefined {
   return session.policy === "isolated" ? undefined : session.sessionId;
 }
 
-/** Session ids a Schedule has created or reused. Origin lives here, not on the session. */
-export function collectFiredSessionIds(
-  schedules: ReadonlyArray<{
-    readonly lastSessionId?: string;
-    readonly session?: ScheduleSession;
-    readonly runs: ReadonlyArray<{ readonly sessionId?: string }>;
-  }>,
-): ReadonlySet<string> {
-  const ids = new Set<string>();
-  for (const schedule of schedules) {
-    if (schedule.lastSessionId !== undefined) ids.add(schedule.lastSessionId);
-    const reuseSessionId = reuseSessionIdOf(scheduleSessionOf(schedule));
-    if (reuseSessionId !== undefined) ids.add(reuseSessionId);
-    for (const run of schedule.runs) {
-      if (run.sessionId !== undefined) ids.add(run.sessionId);
-    }
-  }
-  return ids;
-}
-
 export function persistScheduleSession(session: ScheduleSession | undefined): {
   readonly session?: ScheduleSession;
 } {
@@ -201,7 +181,7 @@ const scheduleMaxRuns = Schema.Number.check(
   Schema.isLessThanOrEqualTo(MAX_SCHEDULE_MAX_RUNS),
 );
 
-export const ScheduleSchema = Schema.Struct({
+export const ScheduleStateSchema = Schema.Struct({
   id: Schema.String.check(Schema.isUUID()),
   name: Schema.String,
   projectId: Schema.String.check(Schema.isUUID()),
@@ -226,6 +206,11 @@ export const ScheduleSchema = Schema.Struct({
   lastRunStatus: Schema.optionalKey(ScheduleRunStatusSchema),
   lastSessionId: Schema.optionalKey(Schema.String),
   lastError: Schema.optionalKey(Schema.String),
+});
+export type ScheduleState = typeof ScheduleStateSchema.Type;
+
+export const ScheduleSchema = Schema.Struct({
+  ...ScheduleStateSchema.fields,
   runs: Schema.Array(ScheduleRunSchema),
 });
 export type Schedule = typeof ScheduleSchema.Type;
