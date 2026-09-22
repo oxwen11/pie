@@ -1,20 +1,29 @@
-# Cost of correction
+# Design and review by cost of correction
 
-Apply during design, code review, and test acceptance. Correction cost includes
-user/caller coordination, existing data, recovery, and verification — not just
-editing code.
+Spend effort where mistakes are expensive to undo: user/caller coordination,
+existing data, irreversible effects, and recovery — not just editing code.
 
-- **Design:** Keep reversible internal changes simple; refactor when needed,
-  not for hypothetical requirements. Before implementing high-cost decisions
-  (external contracts, storage formats, irreversible effects), confirm tradeoffs,
-  compatibility, migration/recovery, and acceptance criteria with the Developer.
-- **Review:** Check those agreements and concrete failure risks. Separate optional
-  refactoring from blockers; confirm newly discovered high-cost decisions.
-- **Acceptance:** Verify changed behavior and each high-cost risk with evidence.
-  Cover compatibility, migration, and recovery where relevant. Report gaps;
-  unverified required criteria are not a pass.
+## Required
 
-Never trade away correctness, security, or data integrity. The host-write gate
-in [architecture.md](architecture.md) and evidence requirements in
-[verify-evidence.md](verify-evidence.md) still apply. Use existing plans and
-review summaries, not extra process documents.
+- Before implementing high-cost decisions, confirm tradeoffs, compatibility,
+  migration/recovery, and acceptance criteria with the Developer. For host writes,
+  follow [persistence.md](persistence.md) before proposing a plan.
+- Review actual behavior, affected callers, and failure paths against the agreed
+  requirements. Confirm newly discovered high-cost decisions.
+- Verify changed behavior and each high-cost risk with evidence. Cover existing
+  clients/data, migration, and recovery where relevant; report unverified criteria
+  as incomplete. See [verify-evidence.md](verify-evidence.md).
+
+## Engineering judgment
+
+- Prefer existing code, platform features, and installed dependencies before
+  adding machinery. Keep reversible changes simple and local.
+- Abstractions, hooks, exports, component shapes, and empty-state presentation
+  depend on their consumers. No fixed number of callers or universal pattern
+  decides whether they are worthwhile.
+- Keep optional improvements separate from blockers. A blocking design finding
+  needs a concrete failure, compatibility cost, unmet requirement, or applicable
+  tool constraint — not just a preference for another implementation.
+- Cite automated diagnostics rather than restating their rules. Do not weaken
+  checks just to pass; propose a targeted rule change if it enforces a preference
+  without a useful benefit. Use existing plans/reviews, not extra paperwork.

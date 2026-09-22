@@ -1,106 +1,49 @@
-# Package layout and boundaries
+# Architecture
 
-`core ← server|cli|desktop`, `contract ← server ← cli|desktop`, and
+## Package boundaries
+
+Dependencies flow from app/runtime packages toward shared leaves, not back:
+`core ← server|cli|desktop`, `contract ← server ← cli|desktop`,
 `contract ← client ← app ← desktop`.
-Desktop also depends on `@getpie/ssh` for SSH-launched remote daemons (loopback tunnel only) and `@getpie/tailscale` for MagicDNS host discovery plus optional Serve.
 
-| dir                  | name                      | role                                                                                                            |
-| -------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `packages/core`      | `@getpie/core`            | Dependency-light shared process/build primitives that are not wire vocabulary, such as daemon compatibility keys. Leaf; nothing may point back at it. |
-| `packages/contract`  | `@getpie/contract`        | oRPC contract + Effect `Schema` domain types — the shared wire vocabulary. Leaf; nothing may point back at it.  |
-| `packages/server`    | `@getpie/server`          | All runtime: domain services, Pi session runtime, oRPC router, HTTP/WS, daemon.                                 |
-| `packages/ssh`       | `@getpie/ssh`             | Desktop SSH launch + loopback tunnel. No Electron, renderer, or oRPC.                                           |
-| `packages/tailscale` | `@getpie/tailscale`       | Tailscale CLI: PATH probe, `status --json` peers, Serve. No Electron, renderer, or oRPC. Never logs CLI stderr. |
-| `packages/client`    | `@getpie/client`          | ~60-LOC factory for a typed oRPC WebSocket client.                                                              |
-| `packages/ui`        | `@getpie/ui`              | React components. Subpath-only exports, no barrel.                                                              |
-| `apps/app`           | `@getpie/app`             | The SPA — **also a library**: Desktop mounts `PlatformProvider` + `AppInterface` from the root export only.     |
-| `apps/desktop`       | `desktop` (unscoped)      | Electron shell supervising a forked server over MessagePort oRPC.                                               |
-| `packages/pie`       | `@getpie/cli` (bin `pie`) | Thin CLI over `@getpie/server/{daemon,http}`.                                                                   |
-| `tools/verify`       | `@getpie/verify` (bin `pie-verify`) | Isolated proof helper for web / CLI / desktop. Surfaces: `pie-verify web|cli|desktop`. After launch, drive the page with `agent-browser` (repo shim loads the current run's native env). Not the product CLI. |
+| Location | Responsibility |
+| --- | --- |
+| `packages/core` | Shared process/build primitives; no runtime/app dependencies |
+| `packages/contract` | Shared wire vocabulary and Effect schemas; no runtime/app dependencies |
+| `packages/server` | Domain services, Pi runtime, RPC, HTTP/WS, daemon |
+| `packages/client` | Typed oRPC WebSocket client |
+| `packages/ui` | Shared UI; import through package subpaths |
+| `packages/ssh` | SSH launch and loopback tunnels; no Electron, renderer, or oRPC |
+| `packages/tailscale` | Discovery/Serve integration; no Electron, renderer, or oRPC; never log CLI stderr |
+| `apps/app` | SPA, also mounted by Desktop through its public root exports |
+| `apps/desktop` | Electron host; read its [AGENTS.md](../../apps/desktop/AGENTS.md) before editing |
+| `packages/pie` | Product CLI (`pie`); delegates runtime to the server |
+| `tools/` | Build, lint, and verification tooling, not product runtime |
 
-`tools/` is repo toolchain (oxlint plugins, tsconfig presets, verify helpers), not product runtime. Do not fold proof helpers into `@getpie/cli`.
+The app uses client/contract, not server imports. HTTP security and transport
+belong to the server, not a second implementation in the CLI. Respect package
+exports and existing ownership; internal module decomposition is a design choice.
 
-## Host-write design gate
+## Session invariants
 
-Treat every design that adds or changes writes on the user's host as a
-Developer decision, including application data, browser storage/cookies,
-Electron profiles/caches, logs and lifecycle files, worktrees/repository state,
-and writes delegated to child processes or agent tools.
+- Pi is the only agent. `SessionRef` is `{ projectId, sessionId }`; Pi receives
+  `cwd`, not `projectId`. Do not add a harness registry or agent selector on the wire.
+- `PiAgentSessionManager` owns one live session per ref and calls
+  `PiAgent.create`/`resume`. Observing a session does not itself start a process.
+- `PiAgentSessionService` owns orchestration, native-id translation, metadata,
+  validation, and collection events. The RPC router resolves workspace context
+  and maps errors; avoid duplicating that domain logic there.
+- `packages/server/src/rpc/runtime.ts` composes the runtime. Session code lives
+  under `packages/server/src/harness/`; the directory name is legacy, not support
+  for multiple agents. Layer lifetime constraints are in [stack.md](stack.md).
 
-Before proposing the design or implementation plan, read
-`docs/architecture/host-persistence.md` and confirm all of these with the
-Developer:
+Read [CONTEXT.md](../../CONTEXT.md) for domain names and [ADRs](../../docs/adr/)
+for settled decisions. Streaming changes also require the
+[streaming map](../../docs/wayfinder/session-streaming-refactor/map.md).
 
-1. the owner, exact location, scope, and override rules;
-2. the persisted data structure, sensitivity, permissions, atomicity, and
-   concurrency model;
-3. how the structure can be extended while preserving backward and rollback
-   compatibility;
-4. migration/adoption behavior, corrupt/newer-data behavior, retention,
-   cleanup, and uninstall semantics.
+## Specialized ownership
 
-Do not choose these silently or defer them to implementation. A change to any
-host write must update the inventory document in the same slice.
-
-Repo skills live in `.agents/skills/<name>`. `.cursor/skills`, `.claude/skills`,
-and `.codex/skills` hold relative symlinks to that tree so each client discovers
-the same files. Do not copy a skill into `.cursor/skills` as a second original.
-
-## Boundaries
-
-- **Pi is the only agent.** The server talks to one Pi child process per live
-  session. There is no harness registry, no `harnessAgentId`, and no agent
-  selection on the wire. `SessionRef` is `{ projectId, sessionId }`.
-- **`packages/server/src/harness/`** holds the session domain and the Pi
-  implementation under `harness/pi/` (`process.ts`, `runtime.ts`, `agent.ts`,
-  `transport.ts`, …). The folder name is legacy; the code is Pi-only.
-- **The session domain has four public roles** (no registry): `PiAgent`
-  (Effect Context — create/resume/cold reads at the composition root),
-  `PiAgentRuntime` (live child handle), `PiAgentSessionManager` (sole owner of
-  live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
-  and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
-  translation, metadata persistence, wire vocabulary validation, collection
-  events). Persistable session state is `PiAgentSessionRepository` (disk) plus
-  `SessionMetadata` (record CRUD) and `SessionMetadataLocks` (per-ref
-  semaphore); those three are Context services like `ProjectRepository`.
-  Orchestration stays on `PiAgentSessionService` — not a `SessionLifecycle` /
-  `SessionTurn` split. `session.ts` and `session-fold.ts` stay
-  private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
-  optionally owns a runtime: observing a session costs no process until a prompt
-  or history read acquires one. The RPC router contributes only `projectId →
-workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
-  never `projectId`.
-- **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiProcessLayer`
-  constructs `PiProcess`, `PiAgent` wraps it with `cachePiAgentAvailability` (one
-  `--version` probe per server lifetime), then the session manager and service
-  layers consume `PiAgent` directly.
-- `EventBusLayer` must stay a single Layer reference across publish and
-  subscribe wiring — Effect memoizes layers by reference, and a second
-  reference (or `Layer.fresh`) silently splits the bus.
-- `packages/ui/src/components/*` is vendored from the coss registry and refreshed
-  with `--overwrite`, so edits there get discarded. Fix in the `ai-elements/` or
-  `claude-code/` wrappers, or upstream (`docs/adr/0001`). `carousel` and
-  `splitter` are the local exceptions.
-- `apps/desktop/AGENTS.md` holds that app's own layering contract (allowed and
-  forbidden imports per directory, single composition root, `ipcRenderer` only in
-  `src/preload/`). Read it before touching `apps/desktop/src`.
-- Port binding, auth, CORS, ticketing, static serving → `packages/server/src/http`,
-  not the CLI. `packages/server/src/config/paths.ts` is the only place that names
-  persistent roots: `resolvePieHome` for server data, `resolveDaemonDirectory`
-  for `$PIE_HOME/daemon` lifecycle state, and `logsDirectory` for `$PIE_HOME/logs`.
-  The daemon directory holds only `daemon.pid`, `daemon.lock`, and `daemon.stopped`.
-  `Paths` includes `logsDir`; directory `0700` and files `0600` are
-  part of that contract (`LOGS_DIRECTORY_MODE` / `LOG_FILE_MODE` in `paths.ts`).
-  The process-owned observability Layer appends to `logsDir/pie.log` and
-  requires FileSystem, Crypto, and Paths — bound at `runServe` / `NodeServices.layer`.
-  Do not seal a platform layer inside the observability module, and do not name
-  the log directory a second time. The RPC `ManagedRuntime` must `provideMerge`
-  the process context captured after that provide; `mergeAll` leaves fibers forked
-  during `AgentRuntimeLayer` construction on Effect's default logger. Tests that
-  do not write a log file provide `Observability.discard` so `Effect.log*` does
-  not leak to stdout. The single-daemon invariant is keyed on `$PIE_HOME/daemon`,
-  so every front door resolves the home and derives the directory —
-  `packages/server/src/daemon/paths.ts` names files inside a directory it is
-  handed and deliberately has no default of its own. Tests and verify runs set
-  their own `$PIE_HOME`; they must not use `~/.pie`, `~/.pie_dev`, or
-  `~/.pie_<branch>`.
+- Host writes and stored data: [persistence.md](persistence.md), before design.
+- Vendored versus local UI: [ui-components.md](ui-components.md).
+- Skills have one source in `.agents/skills/`; client-specific skill directories
+  use relative symlinks, not independent copies.
