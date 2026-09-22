@@ -66,7 +66,9 @@ export const main = async (): Promise<void> => {
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
         extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
-        additionalExtensionPaths: [bundledFff],
+        // pie-pi-process does not use package `runRpcMode`, so CLI `--extension`
+        // (session tools) must be loaded here or the ready handshake never fires.
+        additionalExtensionPaths: [bundledFff, ...(parsed.extensions ?? [])],
       },
     });
     const resolved = resolveCliModel({
