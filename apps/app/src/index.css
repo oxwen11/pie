@@ -230,6 +230,15 @@ form:has(> [data-slot="chat-input"]):focus-within {
   scrollbar-color: color-mix(in srgb, var(--foreground) 20%, transparent) transparent;
 }
 
+/* Same resize-left/right mark as the seam glyph. Hotspot is the
+   center of the 32px cursor. col-resize is the fallback. */
+[data-slot="shell-gutter"] {
+  cursor:
+    url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAmklEQVR4nO2U4QqAMAiEVfb+r2wsNojIy9nGfuT3q/D0LtCIkiRJAmijPvZXCiK0GQn0oK/V1QF0kiYUQFdoizmhLRYz+xxV9aY9+/t+sjGoWAORsTdU16IjYdAbPq0RLzHdQepa+3D6vgAVrwkK9Ba2WIWHpYFpmv6qYc++CKzePFZoZWCodzCv/hXzLPNogKnI7wMkSUK7OQD/KT4Ok1/S8wAAAABJRU5ErkJggg==")
+      16 16,
+    col-resize;
+}
+
 /* Frameless Electron titlebar: drag the strip, dig buttons/inputs/links out.
    Attribute, not a class: shadcn lint only allows Tailwind classes on chrome. */
 [data-drag-region] {

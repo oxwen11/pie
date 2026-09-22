@@ -57,9 +57,9 @@ export function shellProviderStyle(platform: Platform): ShellProviderStyle {
   };
 }
 
-/** Resize gutter between shell columns. */
+/** Resize gutter between shell columns. The hit pad lives in `ShellGutter`. */
 export const SHELL_GUTTER_CLASS =
-  "relative bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1 after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width] hover:after:via-foreground/20 hover:after:opacity-100";
+  "relative z-30 touch-none bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1";
 
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =
