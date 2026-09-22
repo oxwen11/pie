@@ -65,10 +65,8 @@ function ChatTranscriptView({
   // that first growth — same path as opening a session that already has data.
   if (snapshot.historyStatus === "loading") {
     return (
-      <div className="relative flex-1 overflow-y-auto">
-        <div className="py-4">
-          <EmptyTranscript historyStatus="loading" />
-        </div>
+      <div className="relative flex-1 overflow-y-auto py-4">
+        <EmptyTranscript historyStatus="loading" />
       </div>
     );
   }
