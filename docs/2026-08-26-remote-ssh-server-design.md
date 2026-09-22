@@ -60,14 +60,19 @@ Application code depends on the `DesktopSsh` Tag, not on `@getpie/ssh` directly.
 1. `parseSshInput` then `ssh -G` (`resolveSshInput`). Typed user/port win;
    hostname always from `-G`.
 2. `ssh` stdin = generated script; remote argv `sh -l -s <stateKey>`.
-3. Script `unset`s `NODE_ENV` / `PIE_*` so a desktop-dev client cannot push the
-   remote into `~/.pie-dev`, bootstraps Node 24 onto PATH, writes
-   `~/.pie/ssh-launch/<stateKey>/run-pie.sh`, runs `pie daemon start` (or
-   `npx @getpie/cli@latest daemon start`).
-4. Reads `~/.pie/daemon/daemon.pid` and prints
-   `{ remotePort, token, serverKind: "daemon" }`. Local parser takes the last
-   `{…}` and requires `serverKind === "daemon"`. Token fields are redacted in
-   error stdout.
+3. The local `ssh` child strips `PIE_HOME` so a desktop-dev client cannot push
+   its home over SendEnv. The script keeps the remote login shell's `PIE_HOME`,
+   otherwise `$HOME/.pie`, bootstraps Node 24 onto PATH, and reads
+   `$PIE_HOME/daemon/daemon.pid`. A live pid whose `GET /api/health` body is `ok`
+   prints the launch JSON (including `compatibilityKey`) and exits, without writing
+   `ssh-launch/<stateKey>/` or running `pie`. The client opens the tunnel only when
+   that key matches its own. A mismatch does not connect; Pie on that machine must
+   be upgraded to match.
+4. Otherwise it writes `ssh-launch/<stateKey>/run-pie.sh` under that same home, runs
+   `pie daemon start` (or `npx @getpie/cli@latest daemon start`), reads the
+   record, and prints `{ remotePort, token, hostname, compatibilityKey }`. The same
+   key check applies before the tunnel opens. Local parser takes the last `{…}`.
+   Token fields are redacted in error stdout.
 5. Reserve a local loopback port, `ssh -N -L` with `ExitOnForwardFailure`,
    keepalives, `BatchMode=yes`. Poll `GET /api/health` until the body is exactly
    `ok` (unauthenticated, as locally).
