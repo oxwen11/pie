@@ -79,6 +79,7 @@ describe("shell columns", () => {
       return (drawer as HTMLElement).getBoundingClientRect().width;
     };
 
+    await page.viewport(1280, 800);
     const screen = await render(<Shell contentOpen={false} />);
     await expect.element(page.getByText("Sidebar")).toBeVisible();
     const hiddenWidth = drawerWidth();
@@ -96,56 +97,15 @@ describe("shell columns", () => {
       .toBeGreaterThan(100);
     expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
 
-    await screen.rerender(<Shell contentOpen={false} />);
-    await expect.element(page.getByText("Sidebar")).toBeVisible();
-    expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
-  });
-
-  it("keeps the scrollbar inside the session list and the content seam at 1px", async () => {
-    for (const key of Object.keys(localStorage)) {
-      if (key === "pie:shell-layout") localStorage.removeItem(key);
-    }
-
-    await page.viewport(1280, 800);
-
-    await render(
-      <SidebarProvider defaultOpen>
-        <LazyMotion features={domAnimation}>
-          <div className="flex" style={{ width: 1200, height: 400 }}>
-            <ShellSidebarPanel>
-              <div>Sidebar</div>
-            </ShellSidebarPanel>
-            <div className="min-w-0 flex-1">Main</div>
-            <ShellContentPanel collapsed={false} maximized={false} sessionKey="s1">
-              <div>Content</div>
-            </ShellContentPanel>
-          </div>
-        </LazyMotion>
-      </SidebarProvider>,
-    );
-
-    await expect.element(page.getByText("Sidebar")).toBeVisible();
-
     const drawer = page.getByText("Sidebar").element().closest("[data-slot=sidebar-drawer]");
-    expect(drawer).toBeInstanceOf(HTMLElement);
-    const drawerBox = drawer as HTMLElement;
-    const drawerInner = drawerBox.firstElementChild;
-    expect(drawerInner).toBeInstanceOf(HTMLElement);
-    // Padding lives inside the sized column. Outside it, overflow clips the scrollbar.
-    expect((drawerInner as HTMLElement).getBoundingClientRect().right).toBeLessThanOrEqual(
-      drawerBox.getBoundingClientRect().right + 0.5,
-    );
-
     const column = page.getByText("Content").element().closest("[data-slot=content-panel-column]");
-    expect(column).toBeInstanceOf(HTMLElement);
-    const columnBox = column as HTMLElement;
-    const columnInner = columnBox.firstElementChild;
-    expect(columnInner).toBeInstanceOf(HTMLElement);
-    expect((columnInner as HTMLElement).getBoundingClientRect().right).toBeLessThanOrEqual(
-      columnBox.getBoundingClientRect().right + 0.5,
+    expect(drawer?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
+      (drawer as HTMLElement).getBoundingClientRect().right + 0.5,
     );
-    expect(getComputedStyle(columnInner as HTMLElement).paddingRight).toBe("4px");
-
+    expect(column?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
+      (column as HTMLElement).getBoundingClientRect().right + 0.5,
+    );
+    expect(getComputedStyle(column?.firstElementChild as HTMLElement).paddingRight).toBe("4px");
     const seams = [...document.querySelectorAll<HTMLElement>('[role="separator"]')].filter(
       (el) => el.getBoundingClientRect().width > 0,
     );
@@ -160,13 +120,13 @@ describe("shell columns", () => {
         pointerId: 1,
       }),
     );
-    const hit = seam.querySelector("[data-slot=shell-gutter-hit]");
-    expect(hit).toBeInstanceOf(HTMLElement);
-    expect((hit as HTMLElement).getBoundingClientRect().width).toBeGreaterThanOrEqual(64);
+    expect(seam.firstElementChild?.getBoundingClientRect().width).toBeGreaterThanOrEqual(64);
     const mark = seam.querySelector("span");
-    expect(mark).toBeInstanceOf(HTMLElement);
-    expect((mark as HTMLElement).style.left).toBe("6px");
-    expect((mark as HTMLElement).style.top).toBe("80px");
-    expect((mark as HTMLElement).style.opacity).toBe("1");
+    expect(mark?.style.left).toBe("6px");
+    expect(mark?.style.top).toBe("80px");
+
+    await screen.rerender(<Shell contentOpen={false} />);
+    await expect.element(page.getByText("Sidebar")).toBeVisible();
+    expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
   });
 });

@@ -57,10 +57,6 @@ export function shellProviderStyle(platform: Platform): ShellProviderStyle {
   };
 }
 
-/** Resize gutter between shell columns. The hit pad lives in `ShellGutter`. */
-export const SHELL_GUTTER_CLASS =
-  "relative z-30 cursor-col-resize touch-none bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1";
-
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =
   "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4" as const;

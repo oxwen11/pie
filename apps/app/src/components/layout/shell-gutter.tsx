@@ -1,21 +1,6 @@
 import { cn } from "@getpie/ui/lib/utils";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
 
-import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-chrome";
-
-/** Apple resizeLeftRight: a vertical bar with arrows at the midpoint. */
-function ResizeLeftRightMark(): ReactNode {
-  return (
-    <svg aria-hidden className="size-7 drop-shadow" fill="none" viewBox="0 0 28 28">
-      <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75">
-        <path d="M14 4v20" />
-        <path d="M14 14H4.5M4.5 14l4.5-4.5M4.5 14l4.5 4.5" />
-        <path d="M14 14h9.5M23.5 14l-4.5-4.5M23.5 14l-4.5 4.5" />
-      </g>
-    </svg>
-  );
-}
-
 export function ShellGutter({
   className,
   disabled = false,
@@ -51,7 +36,11 @@ export function ShellGutter({
       aria-disabled={disabled || undefined}
       aria-label={label}
       aria-orientation="vertical"
-      className={cn(SHELL_GUTTER_CLASS, "text-foreground", disabled && "w-0", className)}
+      className={cn(
+        "text-foreground relative z-30 w-1 cursor-col-resize touch-none bg-transparent [-webkit-app-region:no-drag] md:my-1",
+        disabled && "w-0",
+        className,
+      )}
       data-slot="shell-gutter"
       onLostPointerCapture={onPointerUp}
       onPointerDown={onPointerDown}
@@ -64,15 +53,18 @@ export function ShellGutter({
       onPointerUp={onPointerUp}
       role="separator"
     >
-      <div
-        className={cn("absolute -inset-x-8 inset-y-0", disabled && "hidden")}
-        data-slot="shell-gutter-hit"
-      />
+      <div className={cn("absolute -inset-x-8 inset-y-0", disabled && "hidden")} />
       <span
-        className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 opacity-0"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-0"
         ref={grip}
       >
-        <ResizeLeftRightMark />
+        <svg aria-hidden className="size-7 drop-shadow" fill="none" viewBox="0 0 28 28">
+          <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75">
+            <path d="M14 4v20" />
+            <path d="M14 14H4.5M4.5 14l4.5-4.5M4.5 14l4.5 4.5" />
+            <path d="M14 14h9.5M23.5 14l-4.5-4.5M23.5 14l-4.5 4.5" />
+          </g>
+        </svg>
       </span>
     </div>
   );
