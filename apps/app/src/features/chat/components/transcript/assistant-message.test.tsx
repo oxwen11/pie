@@ -4,6 +4,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import "@/index.css";
+
 import { AssistantMessage } from "./assistant-message";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -24,12 +26,14 @@ function renderParts(parts: PieUIMessage["parts"]): HTMLDivElement {
 afterEach(() => {
   act(() => root?.unmount());
   container?.remove();
+  document.documentElement.classList.remove("dark");
   root = undefined;
   container = undefined;
 });
 
 describe("AssistantMessage", () => {
-  it("renders compact AI SDK raster file parts that open a preview", async () => {
+  it("renders compact AI SDK raster file parts that open a themed preview", async () => {
+    document.documentElement.classList.add("dark");
     const src =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXkAAAAASUVORK5CYII=";
     const node = renderParts([
@@ -57,8 +61,18 @@ describe("AssistantMessage", () => {
 
     await vi.waitFor(() => {
       const dialog = document.body.querySelector("dialog[open]");
+      const overlay = dialog?.querySelector('[data-rmiz-modal-overlay="visible"]');
+      const unzoom = dialog?.querySelector("[data-rmiz-btn-unzoom]");
       expect(dialog?.classList.contains("chat-image-preview-dialog")).toBe(true);
       expect(dialog?.querySelector("img")?.getAttribute("src")).toBe(src);
+      if (!(overlay instanceof HTMLElement) || !(unzoom instanceof HTMLElement)) {
+        throw new Error("Image preview did not finish opening");
+      }
+      expect(getComputedStyle(overlay).backgroundColor).toBe(
+        getComputedStyle(document.body).backgroundColor,
+      );
+      expect(getComputedStyle(unzoom).width).toBe("44px");
+      expect(getComputedStyle(unzoom).height).toBe("44px");
     });
   });
 
