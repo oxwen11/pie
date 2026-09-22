@@ -274,7 +274,7 @@ function ScheduleFormFields({
               onChange={(event) =>
                 setForm((current) => ({ ...current, prompt: event.target.value }))
               }
-              placeholder="Ask Pi anything..."
+              placeholder="Describe what Pie should do"
               required
               value={form.prompt}
             />
