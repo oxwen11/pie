@@ -41,6 +41,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
             title: "Morning review",
+            source: {
+              kind: "schedule",
+              scheduleId: "11111111-1111-4111-8111-111111111111",
+            },
           });
           const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
           const listed = yield* fixture.service.list("proj-a", false);
@@ -49,15 +53,49 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       );
 
       assert.equal(result.stored.title, "Morning review");
-      assert.equal("schedule" in result.stored, false);
-      assert.equal("scheduleId" in result.stored, false);
-      assert.equal("automation" in result.stored, false);
-      assert.equal("automationId" in result.stored, false);
+      assert.deepEqual(result.stored.source, {
+        kind: "schedule",
+        scheduleId: "11111111-1111-4111-8111-111111111111",
+      });
       assert.equal(result.listed[0]?.title, "Morning review");
-      assert.equal("schedule" in result.listed[0], false);
-      assert.equal("scheduleId" in result.listed[0], false);
-      assert.equal("automation" in result.listed[0], false);
-      assert.equal("automationId" in result.listed[0], false);
+      assert.deepEqual(result.listed[0]?.source, {
+        kind: "schedule",
+        scheduleId: "11111111-1111-4111-8111-111111111111",
+      });
+    }),
+  );
+
+  it.effect("backfills a missing source once and publishes an update", () =>
+    Effect.gen(function* () {
+      const result = yield* run({}, (fixture) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const { ref } = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+            });
+            const stream = yield* fixture.bus.subscribe({ kind: "global" });
+            const source = {
+              kind: "schedule" as const,
+              scheduleId: "11111111-1111-4111-8111-111111111111",
+            };
+            yield* fixture.service.rememberSource(ref, source);
+            yield* fixture.service.rememberSource(ref, source);
+            const events = yield* Stream.runCollect(Stream.take(stream, 1));
+            const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+            return { events: Array.from(events), stored };
+          }),
+        ),
+      );
+
+      assert.deepEqual(result.stored.source, {
+        kind: "schedule",
+        scheduleId: "11111111-1111-4111-8111-111111111111",
+      });
+      assert.equal(
+        result.events[0]?.type === "event" ? result.events[0].event.type : undefined,
+        "session.updated",
+      );
     }),
   );
 

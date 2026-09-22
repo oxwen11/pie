@@ -1,5 +1,4 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import { collectFiredSessionIds } from "@getpie/contract";
 import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 import { useRouteContext, useRouter } from "@tanstack/react-router";
@@ -61,11 +60,6 @@ export function useProjectSessionRows(project: Project) {
     select: selectPullRequest,
   });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
-  const firedSessionIds = useQuery({
-    ...orpcQueryUtils.schedule.list.queryOptions(),
-    select: collectFiredSessionIds,
-    refetchInterval: 10_000,
-  });
 
   return {
     environmentId: localEnvironmentId,
@@ -76,6 +70,5 @@ export function useProjectSessionRows(project: Project) {
       const value = active ? (activePullRequest.data ?? listed) : listed;
       return value ?? undefined;
     },
-    createdBySchedule: (sessionId: string) => firedSessionIds.data?.has(sessionId) === true,
   };
 }

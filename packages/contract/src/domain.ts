@@ -14,6 +14,18 @@ export const SessionRefSchema = Schema.Struct({
 });
 export type SessionRef = typeof SessionRefSchema.Type;
 
+export const SessionSourceSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("schedule"),
+    scheduleId: Schema.String.check(Schema.isUUID()),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("hub"),
+    executionId: Schema.NonEmptyString,
+  }),
+]);
+export type SessionSource = typeof SessionSourceSchema.Type;
+
 /** Absolute workspace directory, or a session whose stored `cwd` the server resolves. */
 export const WorkspaceCwdQuerySchema = Schema.Struct({ cwd: Schema.String });
 export const WorkspaceRefQuerySchema = Schema.Struct({ ref: SessionRefSchema });
@@ -613,6 +625,7 @@ export type SessionSummary = {
   readonly createdAt: string;
   readonly updatedAt?: string;
   readonly historyAvailable: boolean;
+  readonly source?: SessionSource;
   readonly status?: SessionStatus;
 };
 

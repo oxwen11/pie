@@ -58,8 +58,7 @@ export function RecentList() {
 }
 
 function RecentProjectSessions({ project }: { readonly project: Project }) {
-  const { createdBySchedule, environmentId, isSessionActive, pullRequestFor, rows } =
-    useProjectSessionRows(project);
+  const { environmentId, isSessionActive, pullRequestFor, rows } = useProjectSessionRows(project);
 
   return (
     <>
@@ -69,7 +68,6 @@ function RecentProjectSessions({ project }: { readonly project: Project }) {
           <ProjectSessionRow
             key={session.sessionId}
             active={active}
-            createdBySchedule={createdBySchedule(session.sessionId)}
             environmentId={environmentId}
             isActive={() => isSessionActive(session)}
             pullRequest={pullRequestFor(session, active)}

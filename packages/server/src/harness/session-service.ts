@@ -8,6 +8,7 @@ import type {
   SessionCapabilities,
   SessionRef,
   SessionRuntimeSnapshot,
+  SessionSource,
   SessionStatus,
   PieUIMessage,
   SessionWorkspace,
@@ -64,6 +65,7 @@ export type CreatePiSessionInput = {
   readonly cwd: string;
   readonly model?: { readonly provider: string; readonly modelId: string };
   readonly worktree?: CreateWorktreeInput;
+  readonly source?: SessionSource;
   /** Display title written at create so the sidebar can name the row before the first prompt. */
   readonly title?: string;
 };
@@ -189,7 +191,13 @@ export type PiAgentSessionServiceShape = {
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
 } & Pick<
   SessionMetadataShape,
-  "workspaceFor" | "rename" | "archive" | "pullRequestRefsFor" | "rememberPullRequestRef" | "list"
+  | "workspaceFor"
+  | "rename"
+  | "archive"
+  | "pullRequestRefsFor"
+  | "rememberPullRequestRef"
+  | "rememberSource"
+  | "list"
 >;
 
 export class PiAgentSessionService extends Context.Service<
@@ -377,6 +385,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   ...(input.model !== undefined
                     ? { provider: input.model.provider, modelId: input.model.modelId }
                     : undefined),
+                  ...(input.source !== undefined ? { source: input.source } : undefined),
                   ...(input.title !== undefined ? { title: input.title } : undefined),
                   archived: false,
                 };
@@ -671,6 +680,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       archive: sessionMetadata.archive,
       pullRequestRefsFor: sessionMetadata.pullRequestRefsFor,
       rememberPullRequestRef: sessionMetadata.rememberPullRequestRef,
+      rememberSource: sessionMetadata.rememberSource,
       list: sessionMetadata.list,
     } satisfies PiAgentSessionServiceShape;
   }),
