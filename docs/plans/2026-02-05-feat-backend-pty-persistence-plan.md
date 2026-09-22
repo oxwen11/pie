@@ -294,7 +294,7 @@ apps/desktop/src/renderer/src/components/terminal/terminal-view.tsx
 
 ## Documentation Plan
 
-- [ ] Update terminal section in CLAUDE.md if needed
+- [ ] Update terminal section in AGENTS.md if needed
 - [ ] Add inline code comments for complex logic
 - [ ] Document shell configuration for OSC-7 in README
 
