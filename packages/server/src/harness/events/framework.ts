@@ -2,11 +2,11 @@ import {
   AgentRequestSchema,
   CompactionReasonSchema,
   type CompactionResult,
+  type PieUIMessageChunk,
   PromptPartSchema,
   TokenUsageSchema,
   TurnErrorSchema,
 } from "@getpie/contract";
-import type { PieUIMessageChunk } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
