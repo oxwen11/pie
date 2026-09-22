@@ -66,7 +66,7 @@ describe("Chat compaction", () => {
   it.each(["canceled", "failed"] as const)(
     "keeps the active fold when compaction is %s",
     async (outcome) => {
-      const { chat, attach, live } = makeChat();
+      const { chat, attach, live, transport } = makeChat();
       await attach({});
       live(1, {
         type: "session.message.chunk",
@@ -84,6 +84,20 @@ describe("Chat compaction", () => {
       for (const [i, chunk] of textChunks("after", "after").entries()) {
         live(7 + i, { type: "session.message.chunk", turnId: "t", chunk });
       }
+      await settle();
+      transport.history = [
+        {
+          id: "answer",
+          role: "assistant",
+          parts: [{ type: "text", text: "beforeafter" }],
+        },
+      ];
+      live(10, {
+        type: "session.turn.ended",
+        turnId: "t",
+        outcome,
+        phase: "idle",
+      });
       await settle();
       expect(chat.store.getState().messages).toHaveLength(2);
       expect(chat.store.getState().messages[0]?.id).toBe("answer");

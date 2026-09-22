@@ -594,7 +594,15 @@ export class Chat {
       if (this.#promptsInFlight > 0) return;
       if (this.#state.status === "streaming" || this.#state.status === "submitted") return;
       if (this.#turnFolds.size > 0) return;
-      this.#state.messages = Array.from(history);
+      // Cold history deliberately omits live compaction rows. Keep them when a
+      // canceled or failed turn reconciles its settled transcript.
+      const compactions = this.#state.messages.filter((message) =>
+        message.parts.some(
+          (part) =>
+            part.type === "data-compaction" && "data" in part && isCompactionData(part.data),
+        ),
+      );
+      this.#state.messages = [...history, ...compactions];
       this.#needsReconcile = false;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
