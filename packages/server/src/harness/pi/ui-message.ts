@@ -1,35 +1,28 @@
-import type { PiTools } from "@getpie/contract";
+import type {
+  PieAssistantMetadata,
+  PieDataTypes,
+  PieUserMetadata,
+  PiTools,
+} from "@getpie/contract";
 import type { InferUIMessageChunk, UIMessage } from "ai";
 
 import type { SessionMessageEntry } from "./protocol";
 
 type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role: "assistant" }>;
 
-export type PiMetadata = {
-  /** Pi session id (a uuid we assign via `--session-id`). */
-  sessionId: string;
-  // History enrichment: only messages folded from disk carry these — the live
-  // stream never surfaces usage/model, so live/history metadata is asymmetric
-  // by design (docs/design/pi-history-read-design.md §5). Values come from the
-  // segment's last assistant entry; `usage.cost` carries the cost breakdown.
-  // `timestamp` is the JSONL entry timestamp, copied as-is.
-  timestamp?: SessionMessageEntry["timestamp"];
+// model/usage are history-only (docs/design/pi-history-read-design.md §5).
+export type PiAssistantMetadata = PieAssistantMetadata & {
   model?: PiAssistantHistoryMessage["model"];
   provider?: PiAssistantHistoryMessage["provider"];
   stopReason?: PiAssistantHistoryMessage["stopReason"];
   usage?: PiAssistantHistoryMessage["usage"];
 };
 
-// Retry is transient UI status, not transcript. Compaction and assistant
-// summaries stay off the chunk track. Pi's message queue is a session
-// event (`session.queue.updated`), not a UI-message data part.
-export type PiDataTypes = {
-  retry: {
-    errorMessage: string;
-    attempt?: number;
-    maxAttempts?: number;
-  };
+export type PiUserUIMessage = UIMessage<PieUserMetadata, PieDataTypes, PiTools> & {
+  role: "user";
 };
-
-export type PiUIMessage = UIMessage<PiMetadata, PiDataTypes, PiTools>;
+export type PiAssistantUIMessage = UIMessage<PiAssistantMetadata, PieDataTypes, PiTools> & {
+  role: "assistant";
+};
+export type PiUIMessage = PiUserUIMessage | PiAssistantUIMessage;
 export type PiUIMessageChunk = InferUIMessageChunk<PiUIMessage>;

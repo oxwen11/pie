@@ -1,4 +1,4 @@
-import type { PieUIMessage } from "@getpie/contract";
+import type { PieAssistantMetadata, PieUIMessage } from "@getpie/contract";
 import { isToolUIPart } from "ai";
 
 type Part = PieUIMessage["parts"][number];
@@ -39,17 +39,12 @@ export function formatWorkedFor(seconds: number): string {
   return rest === 0 ? `Worked for ${minutes}m` : `Worked for ${minutes}m ${rest}s`;
 }
 
-export function timestampOf(metadata: unknown): string | undefined {
-  if (typeof metadata !== "object" || metadata === null || !("timestamp" in metadata)) {
-    return undefined;
-  }
-  return typeof metadata.timestamp === "string" ? metadata.timestamp : undefined;
-}
-
+/** Settled span: messageEndTimestamp minus messageStartTimestamp, in whole seconds. */
 export function workedSeconds(
-  from: string | undefined,
-  to: string | undefined,
+  metadata: Pick<PieAssistantMetadata, "messageStartTimestamp" | "messageEndTimestamp"> | undefined,
 ): number | undefined {
+  const from = metadata?.messageStartTimestamp;
+  const to = metadata?.messageEndTimestamp;
   if (from === undefined || to === undefined) return undefined;
   const start = Date.parse(from);
   const end = Date.parse(to);

@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { readUIMessageStream, type UIMessageChunk } from "ai";
+import { readUIMessageStream } from "ai";
 import { describe, expect, it } from "vitest";
 
 import { entriesToUIMessages } from "../../../src/harness/pi/history";
@@ -119,7 +119,8 @@ describe("entriesToUIMessages", () => {
         provider: "anthropic",
         stopReason: "stop",
         usage,
-        timestamp: "t",
+        messageStartTimestamp: "1970-01-01T00:00:00.000Z",
+        messageEndTimestamp: "t",
       },
       parts: [{ type: "text", text: "hello", state: "done" }],
     });
@@ -416,7 +417,7 @@ describe("entriesToUIMessages", () => {
           "a1",
           "u1",
           [toolCall("c1", "bash", { command: "ls" })],
-          {},
+          { timestamp: Date.parse("2026-07-26T11:45:20.000Z") },
           "2026-07-26T11:45:24.683Z",
         ),
         toolResultEntry(
@@ -436,8 +437,13 @@ describe("entriesToUIMessages", () => {
       "a2",
       "s1",
     );
-    expect(messages[0]?.metadata?.timestamp).toBe("2026-07-26T11:45:17.114Z");
-    expect(messages[1]?.metadata?.timestamp).toBe("2026-07-26T11:45:28.158Z");
+    expect(messages[0]?.metadata).toMatchObject({
+      timestamp: "2026-07-26T11:45:17.114Z",
+    });
+    expect(messages[1]?.metadata).toMatchObject({
+      messageStartTimestamp: "2026-07-26T11:45:20.000Z",
+      messageEndTimestamp: "2026-07-26T11:45:28.158Z",
+    });
   });
 
   it("folds a run of assistant and toolResult entries into one message", () => {
@@ -457,7 +463,7 @@ describe("entriesToUIMessages", () => {
     expect(messages).toHaveLength(2);
     // messageId is the segment's first assistant entry; metadata is the last's.
     expect(messages[1]?.id).toBe("a1");
-    expect(messages[1]?.metadata?.model).toBe("m2");
+    expect(messages[1]?.metadata).toMatchObject({ model: "m2" });
     expect(messages[1]?.parts.map((part) => part.type)).toEqual(["text", "tool-bash", "text"]);
   });
 
@@ -578,7 +584,7 @@ describe("entriesToUIMessages", () => {
     const chunks = liveEvents
       .flatMap((liveEvent) => [...transform(liveEvent)])
       .filter((item): item is PiUIMessageChunk => item.type !== "session.prompt.submitted");
-    const stream = new ReadableStream<UIMessageChunk>({
+    const stream = new ReadableStream<PiUIMessageChunk>({
       start(controller) {
         for (const chunk of chunks) controller.enqueue(chunk);
         controller.close();
