@@ -1,4 +1,4 @@
-import type { PieUIMessage } from "@getpie/contract";
+import type { PieAssistantMetadata, PieAssistantUIMessage, PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
@@ -8,8 +8,8 @@ import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import { formatWorkedFor, splitWork, timestampOf, workedSeconds } from "./message-view.logic";
 import { UserMessage } from "./user-message";
+import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
 
 const NO_UNSUBSCRIBE = () => {
   /* useSyncExternalStore requires an unsubscribe even when the store has none. */
@@ -18,20 +18,12 @@ const NO_UNSUBSCRIBE = () => {
 export function MessageView({
   message,
   isStreaming,
-  previousTimestamp,
 }: {
   message: PieUIMessage;
   isStreaming: boolean;
-  previousTimestamp?: string;
 }) {
   if (message.role === "assistant") {
-    return (
-      <CollapsibleAssistantMessage
-        message={message}
-        isStreaming={isStreaming}
-        previousTimestamp={previousTimestamp}
-      />
-    );
+    return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
   }
   return <UserMessage message={message} />;
 }
@@ -39,18 +31,15 @@ export function MessageView({
 function CollapsibleAssistantMessage({
   message,
   isStreaming,
-  previousTimestamp,
 }: {
-  message: PieUIMessage;
+  message: PieAssistantUIMessage;
   isStreaming: boolean;
-  previousTimestamp?: string;
 }) {
   const summary = useMemo(
     () => splitWork(message.parts, isStreaming),
     [message.parts, isStreaming],
   );
-  const historySeconds = workedSeconds(previousTimestamp, timestampOf(message.metadata));
-  const elapsed = useElapsedSeconds(isStreaming);
+  const seconds = useWorkedSeconds(isStreaming, message.metadata);
   const [openWhileStreaming, setOpenWhileStreaming] = useState(true);
   const [openWhenSettled, setOpenWhenSettled] = useState(false);
 
@@ -65,7 +54,7 @@ function CollapsibleAssistantMessage({
         open={isStreaming ? openWhileStreaming : openWhenSettled}
         onOpenChange={isStreaming ? setOpenWhileStreaming : setOpenWhenSettled}
       >
-        <SummaryTrigger label={formatWorkedFor(historySeconds ?? elapsed)} />
+        <SummaryTrigger label={formatWorkedFor(seconds)} />
         {/* Flush left, unlike a tool card's body: what folds here is whole
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
@@ -84,12 +73,21 @@ function CollapsibleAssistantMessage({
   );
 }
 
-function useElapsedSeconds(active: boolean): number {
+// Open: now minus messageStartTimestamp, so a remount keeps counting.
+// Settled: messageEndTimestamp minus messageStartTimestamp. No start: count from mount.
+function useWorkedSeconds(active: boolean, metadata: PieAssistantMetadata | undefined): number {
+  const settled = active ? undefined : workedSeconds(metadata);
+  const elapsed = useElapsedSeconds(active, metadata?.messageStartTimestamp);
+  return settled ?? elapsed;
+}
+
+function useElapsedSeconds(active: boolean, start?: string): number {
   const secondsRef = useRef(0);
+  const startMs = start === undefined ? Number.NaN : Date.parse(start);
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!active) return NO_UNSUBSCRIBE;
-      const startedAt = Date.now() - secondsRef.current * 1000;
+      const startedAt = Number.isFinite(startMs) ? startMs : Date.now() - secondsRef.current * 1000;
       const tick = () => {
         const next = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         if (next === secondsRef.current) return;
@@ -103,7 +101,7 @@ function useElapsedSeconds(active: boolean): number {
         clearInterval(id);
       };
     },
-    [active],
+    [active, startMs],
   );
   const getSnapshot = useCallback(() => secondsRef.current, []);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

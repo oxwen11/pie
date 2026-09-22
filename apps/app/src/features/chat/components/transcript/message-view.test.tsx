@@ -49,11 +49,44 @@ describe("MessageView worked-for", () => {
     await rerender(
       <MessageView
         isStreaming={false}
-        previousTimestamp="2026-01-01T00:00:00.000Z"
-        message={{ ...toolMessage, metadata: { timestamp: "2026-01-01T00:00:11.000Z" } }}
+        message={{
+          ...toolMessage,
+          metadata: {
+            sessionId: "s1",
+            messageStartTimestamp: "2026-01-01T00:00:00.000Z",
+            messageEndTimestamp: "2026-01-01T00:00:11.000Z",
+          },
+        }}
       />,
     );
     await expect.element(trigger).toHaveTextContent("Worked for 11s");
     await expect.element(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("counts from messageStartTimestamp and keeps that start across remount", async () => {
+    vi.setSystemTime(new Date("2026-01-01T00:00:05.000Z"));
+    const streaming = (
+      <MessageView
+        isStreaming
+        message={{
+          ...toolMessage,
+          metadata: {
+            sessionId: "s1",
+            messageStartTimestamp: "2026-01-01T00:00:00.000Z",
+          },
+        }}
+      />
+    );
+    const first = await render(streaming);
+    const trigger = page.getBySlot("collapsible-trigger");
+    await expect.element(trigger).toHaveTextContent("Worked for 5s");
+
+    await first.unmount();
+    const second = await render(streaming);
+    await expect.element(page.getBySlot("collapsible-trigger")).toHaveTextContent("Worked for 5s");
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await second.rerender(streaming);
+    await expect.element(page.getBySlot("collapsible-trigger")).toHaveTextContent("Worked for 7s");
   });
 });

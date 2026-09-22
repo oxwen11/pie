@@ -1,7 +1,7 @@
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@getpie/ui/ai-elements/reasoning";
 import type { ReasoningUIPart } from "ai";
 
-import { shouldRenderReasoningPart } from "./reasoning-part.logic";
+import { shouldRenderReasoningPart } from "./should-render-reasoning";
 
 // Renders one assistant reasoning block. Empty settled blocks are dropped;
 // streaming blocks stay visible so the "Thinking..." trigger can show.

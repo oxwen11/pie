@@ -178,7 +178,15 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "text-end", "finish"],
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "message-metadata",
+          "finish",
+        ],
       );
       yield* agent.session.abort(sessionId);
     }),
@@ -310,7 +318,15 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(first.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "text-end", "finish", "session.prompt.submitted"],
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "finish",
+          "session.prompt.submitted",
+        ],
       );
       yield* agent.session.abort(sessionId);
     }),
@@ -506,7 +522,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "error"],
+        ["start", "message-metadata", "text-start", "text-delta", "error"],
       );
 
       yield* Effect.eventually(
@@ -638,9 +654,11 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         [
           "session.turn.started",
           "start",
+          "message-metadata",
           "text-start",
           "text-delta",
           "text-end",
+          "message-metadata",
           "finish",
           "session.turn.ended",
         ],

@@ -32,7 +32,10 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //   • tool_execution_start/end → tool-input-available + tool-output-available.
 //     Successful read output drops file content because the UI only renders
 //     its input path; other tool results forward whole.
-//   • message_end / compaction / auto_retry_end → skipped
+//   • the first assistant message_start of a segment stamps `messageStartTimestamp`
+//     on message-metadata (message.timestamp). A steered segment's `start` stays
+//     `{ sessionId }`. Each later assistant / toolResult message_end stamps
+//     `messageEndTimestamp` at receipt. Compaction / auto_retry_end are skipped
 //   • willRetry / auto_retry_start → transient `data-retry` (UI status, not
 //     transcript)
 //   • queue_update → skipped here; the process offers it on `queueUpdates`
@@ -41,6 +44,10 @@ export type PiStreamItem = PiUIMessageChunk | PiPromptSubmitted;
 //     agent_start, so `start` is guarded to fire once per turn.
 
 /** A tool result's display text: the concatenated text blocks of its content. */
+function isoTime(ms: number): string {
+  return new Date(ms).toISOString();
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -155,9 +162,19 @@ export function createPiTransform(
       case "message_start":
         if (!turnOpen) break;
         if (event.message.role === "assistant") {
+          const firstInSegment = pendingAssistantStart || messageOrdinal === 0;
           if (pendingAssistantStart) {
             pendingAssistantStart = false;
             yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
+          }
+          if (firstInSegment) {
+            yield {
+              type: "message-metadata",
+              messageMetadata: {
+                sessionId,
+                messageStartTimestamp: isoTime(event.message.timestamp),
+              },
+            };
           }
           messageOrdinal += 1;
         } else if (event.message.role === "user" && messageOrdinal > 0) {
@@ -171,6 +188,17 @@ export function createPiTransform(
           };
         }
         break;
+
+      case "message_end": {
+        if (!turnOpen || pendingAssistantStart) break;
+        const role = event.message.role;
+        if (role !== "assistant" && role !== "toolResult") break;
+        yield {
+          type: "message-metadata",
+          messageMetadata: { sessionId, messageEndTimestamp: new Date().toISOString() },
+        };
+        break;
+      }
 
       case "message_update":
         yield* onAssistantDelta(event);
@@ -261,7 +289,6 @@ export function createPiTransform(
       // it's routed or listed.
       default:
         void (event.type satisfies
-          | "message_end"
           | "tool_execution_update"
           | "turn_start"
           | "turn_end"
