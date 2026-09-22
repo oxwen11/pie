@@ -21,31 +21,18 @@ export function ShellContentPanel({
   );
   const docked = stored ?? CONTENT_DEFAULT_PX;
   const canDrag = sessionKey !== null && !collapsed && !maximized;
-  const drag = useRef<{ maxWidth: number; startX: number; startWidth: number } | null>(null);
+  const drag = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (!canDrag) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    const main = event.currentTarget.previousElementSibling;
-    const content = event.currentTarget.nextElementSibling;
-    const startWidth = content instanceof HTMLElement ? content.offsetWidth : docked;
-    const mainWidth = main instanceof HTMLElement ? main.offsetWidth : 0;
-    const mainMinWidth =
-      main instanceof HTMLElement ? Number.parseFloat(getComputedStyle(main).minWidth) || 0 : 0;
-    drag.current = {
-      maxWidth: startWidth + Math.max(0, mainWidth - mainMinWidth),
-      startX: event.clientX,
-      startWidth,
-    };
+    drag.current = { startX: event.clientX, startWidth: docked };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (drag.current === null || sessionKey === null) return;
     shellLayout.setContentWidth(
       sessionKey,
-      Math.min(
-        drag.current.maxWidth,
-        drag.current.startWidth - (event.clientX - drag.current.startX),
-      ),
+      drag.current.startWidth - (event.clientX - drag.current.startX),
     );
   };
   const onPointerUp = (): void => {
