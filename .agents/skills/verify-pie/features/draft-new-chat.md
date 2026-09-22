@@ -44,7 +44,7 @@ Choose project path (`launch --replace --empty-projects`, or leave the picker on
 2. Type `allocate ping` and click submit.
 3. URL becomes `/session/<uuid>?projectId=<uuid>`.
 4. Sidebar **Recent** lists a session titled with the prompt. **Projects** does not list the allocate leaf.
-5. That directory exists under `$PIE_HOME/home/Pie/<YYYY-MM-DD>/`. Session `cwd` is that path. `verify-pie evidence side-effects`.
+5. That directory exists under `$PIE_HOME/Pie/<YYYY-MM-DD>/`. Session `cwd` is that path. `verify-pie evidence side-effects`.
 
 Worktree path (only if the imported folder is a git repo): switch the workspace select to **New worktree**, pick a base branch, send. Create must fail closed on git errors (no session file). Success writes `cwd` under `$PIE_HOME/worktrees/<repo>/<key>/`.
 
@@ -54,4 +54,4 @@ Worktree path (only if the imported folder is a git repo): switch the workspace 
 - Send is disabled when: input empty, workspace unavailable, create in flight, or worktree mode with no base branch. It is **not** disabled for Choose project.
 - Model select missing ≠ broken draft. Pi unavailable ⇒ empty list ⇒ component returns `null`.
 - After adding/renaming routes, load `/` through Vite before typechecking (`routeTree.gen.ts` is plugin-generated).
-- Verify sets `HOME=$PIE_HOME/home`, so `~/Pie` means `$PIE_HOME/home/Pie` in an isolated run.
+- Verify sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie`. `HOME` and `~/.pi/agent` stay the operator's.
