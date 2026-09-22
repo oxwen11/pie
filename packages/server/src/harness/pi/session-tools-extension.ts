@@ -1,36 +1,21 @@
-import module from "node:module";
-
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
-type Typebox = {
-  Type: {
-    Object: (properties: Record<string, unknown>) => never;
-    String: (options?: { description: string }) => never;
-    Boolean: (options?: { description: string }) => never;
-    Optional: (schema: unknown) => never;
-  };
-};
+type ToolParameters = Parameters<Parameters<ExtensionFactory>[0]["registerTool"]>[0]["parameters"];
 
-const isTypebox = (value: unknown): value is Typebox =>
-  typeof value === "object" &&
-  value !== null &&
-  "Type" in value &&
-  typeof value.Type === "object" &&
-  value.Type !== null;
-
-const typebox = (): Typebox => {
-  const require = module.createRequire(import.meta.resolve("@earendil-works/pi-coding-agent"));
-  const loaded: unknown = require("typebox");
-  if (!isTypebox(loaded)) throw new Error("typebox is unavailable to session tools");
-  return loaded;
-};
+const stringParam = (description: string) => ({ type: "string", description });
+const objectParam = (
+  properties: Record<string, { type: string; description: string }>,
+  required: string[],
+): ToolParameters => ({ type: "object", properties, required, additionalProperties: false });
 
 /** pie-pi-process does not run package `runRpcMode`, so CLI `--extension` never loads. */
 export const sessionToolsExtensionFactory: ExtensionFactory = async (pi) => {
   const endpoint = process.env.PIE_SESSION_BRIDGE_URL;
   const token = process.env.PIE_SESSION_BRIDGE_TOKEN;
-  if (!endpoint || !token) return;
-  const { Type } = typebox();
+  if (!endpoint || !token) {
+    console.error("session tools: bridge env missing");
+    return;
+  }
   const shutdown = new AbortController();
   pi.on("session_shutdown", () => shutdown.abort());
   pi.on("session_before_switch", () => ({ cancel: true }));
@@ -53,28 +38,30 @@ export const sessionToolsExtensionFactory: ExtensionFactory = async (pi) => {
     name: "session_register_pull_request",
     label: "Register session PR",
     description: "Persist a known GitHub PR association for this session without querying GitHub.",
-    parameters: Type.Object({
-      url: Type.String({ description: "Exact HTTPS GitHub pull request URL" }),
-      restore: Type.Optional(
-        Type.Boolean({ description: "Only true for an explicitly requested restoration" }),
-      ),
-    }),
+    parameters: objectParam(
+      {
+        url: stringParam("Exact HTTPS GitHub pull request URL"),
+        restore: {
+          type: "boolean",
+          description: "Only true for an explicitly requested restoration",
+        },
+      },
+      ["url"],
+    ),
     execute: (_id, input) => call("register", input),
   });
   pi.registerTool({
     name: "session_list_pull_requests",
     label: "List session PRs",
     description: "Read this session's saved PR associations, including exclusions.",
-    parameters: Type.Object({}),
+    parameters: objectParam({}, []),
     execute: (_id, input) => call("list", input),
   });
   pi.registerTool({
     name: "session_exclude_pull_request",
     label: "Exclude session PR",
     description: "Persist an exclusion for a PR in this session. Does not close the GitHub PR.",
-    parameters: Type.Object({
-      url: Type.String({ description: "Exact HTTPS GitHub pull request URL" }),
-    }),
+    parameters: objectParam({ url: stringParam("Exact HTTPS GitHub pull request URL") }, ["url"]),
     execute: (_id, input) => call("exclude", input),
   });
   await call("ready", {});
