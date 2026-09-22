@@ -53,7 +53,7 @@ export function ShellGutter({
       onPointerUp={onPointerUp}
       role="separator"
     >
-      <div className={cn("absolute -inset-x-8 inset-y-0", disabled && "hidden")} />
+      <div className={cn("absolute inset-y-0 -right-8 left-0", disabled && "hidden")} />
       <span
         className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-0"
         ref={grip}

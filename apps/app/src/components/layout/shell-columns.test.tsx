@@ -118,7 +118,7 @@ describe("shell columns", () => {
         pointerId: 1,
       }),
     );
-    expect(seam.firstElementChild?.getBoundingClientRect().width).toBeGreaterThanOrEqual(64);
+    expect(seam.firstElementChild?.getBoundingClientRect().width).toBeGreaterThanOrEqual(32);
     const mark = seam.querySelector("span");
     expect(mark?.style.left).toBe("6px");
     expect(mark?.style.top).toBe("80px");
