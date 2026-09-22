@@ -18,7 +18,7 @@ Users cannot tell from the sidebar whether a background session is actively gene
 
 - `apps/app/src/features/projects/project-session-row.tsx` — only checks `running | requires_action`, same visual for both
 - `crashed` phase is folded server-side (`session-fold.ts`) and propagated via firehose, but sidebar ignores it
-- Design doc (`docs/design/session-agent-design.md` §6.7) defines four phases; UI only distinguishes two visually
+- The original session design defined four phases; UI only distinguished two visually. Current runtime decisions: [ADR 0009](../docs/adr/0009-pi-session-runtime-and-recovery.md).
 
 ## Proposed Solutions
 
