@@ -51,6 +51,19 @@ describe("renderer theme bootstrap", () => {
     expect(desktopHtml).not.toContain("__PIE_THEME_BOOTSTRAP_CSP__");
   });
 
+  it("allows HTTPS and blob images without enumerating CDN domains", () => {
+    const policy = desktopHtml.match(/content="([^"]+)"/)?.[1];
+    const imageSources = policy
+      ?.split(";")
+      .find((directive) => directive.trim().startsWith("img-src "))
+      ?.trim()
+      .split(/\s+/)
+      .slice(1);
+
+    expect(imageSources).toContain("https:");
+    expect(imageSources).toContain("blob:");
+  });
+
   it("applies a stored preference before falling back to the system theme", () => {
     expect(bootstrapsDark("dark", false)).toBe(true);
     expect(bootstrapsDark("light", true)).toBe(false);
