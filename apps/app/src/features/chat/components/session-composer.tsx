@@ -1,11 +1,5 @@
-import {
-  PromptInput,
-  PromptInputButton,
-  PromptInputSubmit,
-  PromptInputToolbar,
-  PromptInputTools,
-} from "@getpie/ui/ai-elements/prompt-input";
-import { Card, CardFrame, CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
+import { PromptInputButton, PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
+import { CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { useQuery } from "@tanstack/react-query";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -16,24 +10,18 @@ import { useLatestRef } from "@/hooks/use-latest-ref";
 import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
+import { ChatComposerFrame } from "./chat-composer-frame";
 import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
-import { ChatInput } from "./input/chat-input";
-import { ChatInputProvider } from "./input/chat-input-provider";
-import { createChatBaseExtensions } from "./input/extensions/chat-base-extensions";
-import { createSubmitKeymap } from "./input/extensions/keymaps";
-import { useChatInputController } from "./input/use-chat-input-controller";
+import { useChatComposerController } from "./input/use-chat-composer-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
 import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 
-// Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
-// handled by the submit keymap) / Shift+Enter breaks the line. Stop and Send
-// are mutually exclusive: empty streaming → Stop; any draft (or idle) → Send
-// (queues a follow-up while a turn is in flight). prompt comes from
-// ChatSessionProvider — not props. The CardFrame header lists queued prompts
-// as editable rows (steering first); the footer shows the session workspace's
-// git availability and current branch.
-export function ChatInputComposer({
+// Live-session input bar. Stop and Send are mutually exclusive: empty streaming
+// → Stop; any draft (or idle) → Send (queues a follow-up while a turn is in
+// flight). prompt comes from ChatSessionProvider. The header lists queued
+// prompts; the footer shows the workspace's git availability and branch.
+export function SessionComposer({
   sessionRef,
   toolbar,
 }: {
@@ -55,18 +43,11 @@ export function ChatInputComposer({
   const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
-  const controller = useChatInputController({
+  const controller = useChatComposerController({
     initialContent: chat.composerDraft,
     onDispose: (doc) => {
       chat.setComposerDraft(doc);
     },
-    // Order is a hard constraint: base extensions first, submit keymap last —
-    // otherwise bare Enter is consumed by the default newline behavior before
-    // the keymap ever sees it.
-    extensions: (self) => [
-      ...createChatBaseExtensions(),
-      createSubmitKeymap({ onSubmit: () => void self.submit() }),
-    ],
     onSubmit: (text) => {
       // Missing workspace: don't send, don't clear. A running turn still
       // accepts the send as a follow-up.
@@ -81,46 +62,36 @@ export function ChatInputComposer({
   const multiline = useChatInputMultiline(controller);
 
   return (
-    <CardFrame>
-      {hasQueued ? (
-        <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
-          <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
-        </CardFrameHeader>
-      ) : null}
-      <Card
-        render={
-          <PromptInput
-            className="divide-y-0"
-            data-layout={multiline ? undefined : "inline"}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void controller?.submit();
-            }}
+    <ChatComposerFrame
+      controller={controller}
+      footer={
+        <CardFrameFooter className="px-3 py-2">
+          <ChatComposerGitStatus
+            currentBranch={currentBranch}
+            isPending={branch.isPending}
+            kind={branch.data?.kind}
+            workspaceUnavailable={workspaceUnavailable}
           />
-        }
-      >
-        <ChatInputProvider controller={controller}>
-          <ChatInput />
-          <PromptInputToolbar>
-            <PromptInputTools>{toolbar}</PromptInputTools>
-            <ChatComposerActions
-              canInterrupt={canInterrupt}
-              hasContent={hasContent}
-              interrupt={interrupt}
-              workspaceUnavailable={workspaceUnavailable}
-            />
-          </PromptInputToolbar>
-        </ChatInputProvider>
-      </Card>
-      <CardFrameFooter className="px-3 py-2">
-        <ChatComposerGitStatus
-          currentBranch={currentBranch}
-          isPending={branch.isPending}
-          kind={branch.data?.kind}
+        </CardFrameFooter>
+      }
+      layout={multiline ? undefined : "inline"}
+      header={
+        hasQueued ? (
+          <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
+            <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
+          </CardFrameHeader>
+        ) : undefined
+      }
+      submit={
+        <ChatComposerActions
+          canInterrupt={canInterrupt}
+          hasContent={hasContent}
+          interrupt={interrupt}
           workspaceUnavailable={workspaceUnavailable}
         />
-      </CardFrameFooter>
-    </CardFrame>
+      }
+      toolbar={toolbar}
+    />
   );
 }
 

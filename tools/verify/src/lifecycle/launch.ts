@@ -97,7 +97,6 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   ensureDir(path.join(runDir, "pids"));
   ensureDir(path.join(runDir, "logs"));
   ensureDir(pieHome);
-  ensureDir(path.join(pieHome, "home"));
   switch (identity.id) {
     case "cli":
     case "desktop":
@@ -120,8 +119,8 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
     request,
     env: {
       ...process.env,
-      HOME: path.join(pieHome, "home"),
       PIE_HOME: pieHome,
+      PIE_CHAT_PROJECTS_DIR: path.join(pieHome, "Pie"),
       PIE_PORT: String(plan.piePort),
       NODE_ENV: "development",
     },
