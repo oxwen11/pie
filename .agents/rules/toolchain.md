@@ -1,5 +1,25 @@
 # Toolchain constraints
 
+## Command usage
+
+- Build, typecheck, lint, and lint:check must run through Turbo so upstream builds
+  (including oxlint plugins) complete first. Scope with
+  `pnpm exec turbo run typecheck --filter=@getpie/server`, not package scripts.
+  Typecheck is cached: use `--force` after changing inputs outside its hash.
+- `pnpm check` runs lint:check, format:check, and typecheck — no tests.
+  `pnpm lint` and `pnpm format` rewrite files; `:check` variants only report.
+  Formatting is root-only oxfmt, not a Turbo task.
+- `pnpm test` runs node then browser Vitest; a single package may use
+  `pnpm --filter @getpie/server test`. `pnpm e2e` runs Electron Playwright through
+  Turbo with build dependencies.
+- `pnpm clean` runs Turbo clean, then `git clean -xdf node_modules dist .turbo`;
+  it is not a repo-wide clean.
+- Cloud setup is owned by `.cursor/environment.json`, overriding dashboard
+  settings: mise installs Node 24 and pnpm, then `pnpm install --frozen-lockfile`.
+  Drive Vite on 4190, not the API on 4180 or the daemon on 4000.
+
+## Constraints
+
 - **Dependencies:** `pnpm-workspace.yaml` has six catalogs (`catalog:`,
   `catalog:effect`, `catalog:orpc`, `catalog:react`, `catalog:tailwind`,
   `catalog:tiptap`) plus `overrides` that pull _transitive_ deps onto catalog

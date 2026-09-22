@@ -1,40 +1,42 @@
-# pie
+# Pie
 
-In-browser tooling for the Pi coding agent: a web chat UI over local `pi`,
-served by a local Node daemon and also shipped as an Electron app. pnpm +
-Turborepo, TypeScript everywhere.
+Web UI and Electron app for the local Pi coding agent. TypeScript, pnpm, Turborepo.
+
+## Working principles
+
+Use the simplest solution that meets current requirements. Spend effort in
+proportion to the cost of correcting a mistake, including its impact on users,
+callers, and existing data:
+
+- **Design:** Keep reversible internal changes simple. Before implementing
+  high-cost decisions (external contracts, storage formats, irreversible effects),
+  confirm tradeoffs, compatibility, migration/recovery, and acceptance criteria
+  with the Developer.
+- **Review:** Check those agreements and concrete failure risks. Separate optional
+  refactoring from blockers; confirm newly discovered high-cost decisions.
+- **Acceptance:** Verify changed behavior and each high-cost risk with evidence.
+  Cover compatibility, migration, and recovery where relevant. Report gaps;
+  unverified required criteria are not a pass.
+
+Never trade away correctness, security, or data integrity. Existing host-write
+and verification requirements still apply; no extra process documents needed.
 
 ## Commands
 
-Run workspace tasks through turbo, not `pnpm --filter <pkg> <task>`: `build`,
-`typecheck`, and `lint:check` declare turbo `dependsOn`, so bypassing turbo
-skips the upstream tsdown build (including the oxlint plugins). `pnpm test`
-is two Vitest processes: node packages (`vitest.config.mts`, excludes `ui`)
-then browser (`vitest.browser.config.mts`: UI components + app product flows
-mounted in Chromium). `pnpm e2e` is Playwright Desktop (Electron).
+| Task                                 | Command                                  |
+| ------------------------------------ | ---------------------------------------- |
+| Build / typecheck                    | `pnpm build` / `pnpm typecheck`          |
+| Lint + format + typecheck (no tests) | `pnpm check`                             |
+| Node + browser tests                 | `pnpm test`                              |
+| Electron tests                       | `pnpm e2e`                               |
+| Runtime verification                 | `pnpm exec pie-verify web\|cli\|desktop` |
 
-|                                 |                                                                                                |
-| ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `pnpm test`                     | node Vitest + browser (components + app e2e); one package: `pnpm --filter @getpie/server test` |
-| `pnpm e2e`                      | Playwright Desktop (Electron)                                                                  |
-| `pnpm typecheck` / `pnpm build` | scope with `turbo run typecheck --filter=@getpie/server`                                       |
-| `pnpm check`                    | lint:check + format:check + typecheck — **no tests**                                           |
-| `pnpm lint` / `pnpm format`     | rewrite files; the `:check` variants only report                                               |
+Run build, typecheck, and lint through Turbo, including scoped runs:
+`pnpm exec turbo run typecheck --filter=@getpie/server`. Do not bypass dependency
+builds with `pnpm --filter <pkg> <task>`. Tests and formatting are exceptions;
+see `.agents/rules/toolchain.md` for commands and caveats.
 
-`format` is root-only (oxfmt) and not a turbo task. `test` is two root
-Vitest processes, not a turbo task. `e2e` is Playwright Electron through turbo
-(`@getpie/desktop`, `dependsOn: ["build"]`).
-`lint` / `lint:check` go through turbo
-so they wait on `@getpie/oxlint#build` (the oxlint tsdown plugins).
-`typecheck` is cached, so re-run with `--force` after changing something
-outside its hash inputs. `pnpm clean` runs `turbo run clean` then
-`git clean -xdf node_modules dist .turbo` — not a repo-wide `git clean -xdf`.
-Runtime UI checks use `pnpm exec pie-verify web|cli|desktop` (`@getpie/verify`).
-Skill recipes live in `.agents/skills/verify-pie{,-cli,-desktop}`
-(`.cursor/skills/…` are symlinks). `.agents/skills/verify` is the short
-two-process note.
-
-## Rules
+## Repository rules
 
 @.agents/rules/architecture.md
 @.agents/rules/stack.md
@@ -45,111 +47,26 @@ two-process note.
 @.agents/rules/ponytail.md
 @.agents/rules/cli.md
 
-`apps/desktop/src` has its own layering contract in `apps/desktop/AGENTS.md` —
-read it before touching that app.
+Read `apps/desktop/AGENTS.md` before changing `apps/desktop/src`.
+Read `CONTEXT.md` before naming session-domain concepts; `docs/adr/` records
+settled decisions. Streaming decisions: `docs/wayfinder/session-streaming-refactor/map.md`.
 
-## Design, review, and acceptance by cost of correction
+## Delivery
 
-During rapid development, spend design, code review, and test acceptance effort
-in proportion to how expensive a decision is to correct:
+- One concern per PR. Split large work into named, ordered slices before coding;
+  use `gh stack init` → `gh stack add` → `gh stack submit --auto` for multiple
+  slices. After trunk moves, use `gh stack sync` or `gh stack rebase`.
+- Squash merge only (`gh stack merge --squash` for stacks). When asked to review
+  and merge PRs, follow `.agents/rules/review-and-merge-pr.md`.
+- UI changes require screenshots **and** video attached to the issue or PR via
+  `gh issue|pr create|edit|comment --attach <file>`. Follow
+  `.agents/rules/verify-evidence.md`; never commit evidence files.
 
-- For internal implementations that are cheap to change, locally verifiable,
-  and reversible, use the simplest solution that meets current requirements.
-  Refactor later; do not block delivery merely because the design is imperfect
-  or add abstractions for hypothetical needs.
-- Before implementing costly-to-correct decisions — external contracts,
-  persistent formats, compatibility and migration behavior, or irreversible
-  side effects — explain the tradeoffs to the Developer and obtain confirmation.
-  “We can refactor later” is not a substitute for this design work.
-- Correction cost includes user and caller coordination, existing-data handling,
-  recovery from effects already produced, and verification effort — not just
-  time spent editing code.
-- When uncertain, keep changes local and defer external commitments rather than
-  building a general framework. Never waive correctness, security, or data
-  integrity. The host-write design gate in `.agents/rules/architecture.md`
-  still applies.
+## Task guides
 
-Apply this principle throughout the change, using the existing plan, review,
-and acceptance summary rather than creating separate process documents:
-
-- **Design:** Identify costly-to-correct decisions, who or what depends on them,
-  and the compatibility, migration, and recovery strategy (including any limits
-  to rollback). Agree with the Developer on tradeoffs and acceptance criteria
-  before implementation. For low-cost changes, a brief approach and focused
-  verification plan suffice.
-- **Code review:** Check the implementation against those decisions and trace
-  affected callers, existing data, and failure paths. Prioritize concrete risks
-  over structural preferences; distinguish blocking correctness, safety, and
-  compatibility issues from optional refactoring suggestions. Newly discovered
-  high-cost decisions require Developer confirmation, not silent acceptance.
-- **Test acceptance:** Match each identified high-cost risk to a runnable check
-  and its observed result. Where relevant, cover existing clients/data,
-  migration, interrupted or repeated operations, and rollback or recovery —
-  not only the happy path on a fresh install. Low-cost changes need focused
-  behavioral verification, not speculative test suites. Report checks run,
-  evidence, and gaps; unverified required criteria remain incomplete.
-  Follow `.agents/rules/verify-evidence.md`; this principle does not replace
-  existing test or runtime evidence requirements.
-
-## Pull requests
-
-Split large changes and requirements into small slices **before coding**.
-Name the slices and their order first. One concern per PR — a reviewer
-should not need the rest of the feature in their head. Typical seams:
-contract/types → server → UI; extract → rewire → delete. Don't mix
-unrelated fixes, refactors, or docs. A one-line bugfix stays one PR.
-
-For anything that needs more than one slice, land it as a **stack** with
-`gh stack` — not one giant PR, and not disconnected `gh pr create` calls.
-
-```bash
-gh stack init feat/thing       # first slice, based on main
-# commit that slice
-gh stack add feat/thing-ui     # next branch on top
-# commit the next slice
-gh stack submit --auto         # push and open/update the stacked PRs
-```
-
-`gh stack submit` is the create/update step (`--auto` when unattended).
-After trunk moves: `gh stack sync` or `gh stack rebase`. Inspect with
-`gh stack view`.
-
-Use **squash merge** — one commit per PR keeps `main` readable. Merge a
-stack with `gh stack merge --squash` (`--yes` unattended). Don't mix
-merge-commit / rebase merges in the repo. Squash rewrites the branch tip
-out of `main`'s history, so deleting the local feature branch needs
-`git branch -D` — the changes are already on `main`, so it's safe.
-
-A UI change or UI bug needs screenshots **and** a short video on the GitHub
-issue, PR, or comment: `gh issue|pr create|edit|comment --attach <file>` (`gh`
-≥ 2.99.0). Capture with `pie-verify web|desktop evidence screenshot` and
-`agent-browser record start|stop` per `.agents/rules/verify-evidence.md`; do
-not commit the files.
-
-## Cursor Cloud specific instructions
-
-Repo-managed Cloud Agent setup lives in `.cursor/environment.json` and
-overrides any dashboard personal/team environment. `install` is mise (Node
-24 + pnpm from `mise.toml`) then `pnpm install --frozen-lockfile`.
-
-The environment starts two terminals: pie server on `:4180` and Vite on
-`:4190`. Drive `http://localhost:4190/` — not 4180 (built bundle / 503) and
-not 4000 (daemon). See `.agents/skills/verify`.
-
-## Going deeper
-
-- `CONTEXT.md` — glossary. Read it before naming anything in the session domain;
-  it also lists the words to avoid.
-- `docs/adr/` — settled decisions (component vendoring; session field ownership,
-  which supersedes the older `docs/design/session-agent-design.md` on `cwd`)
-- `docs/design/`, `docs/2026-*.md` — designs in flight
-- `docs/wayfinder/session-streaming-refactor/map.md` — streaming decisions that
-  are closed for debate
-- `.agents/skills/verify` — short build/launch notes for the two-process web dev pair
-- `.agents/skills/verify-pie` — web recipe; invoke `pnpm exec pie-verify web`
-- `.agents/skills/verify-pie-cli` — `pie` / `pie daemon` / `pie serve` recipe; invoke `pnpm exec pie-verify cli`
-- `.agents/skills/verify-pie-desktop` — Electron + token daemon recipe; invoke `pnpm exec pie-verify desktop`
-- `tools/verify` — `@getpie/verify` (root `devDependency`, bin `pie-verify`) implements all three surfaces
-- `.agents/skills/react-doctor` — React health check; `doctor.config.json` enables every 0.9.14 rule at error (three stack mismatches off); CI fails on warning and error. Sibling skills: `performance` (`scan` on `:4190`), `improve-react` (read-only audit/plans)
-- `.agents/skills/prune-tests` — recurring playbook for deleting meaningless tests; user-invoked only
-- `todos/` — numbered security/perf remediation tickets
+- Runtime checks: `.agents/skills/verify-pie{,-cli,-desktop}/SKILL.md`.
+  Web dev setup: `.agents/skills/verify/SKILL.md`; open `http://localhost:4190/`,
+  not API port 4180 or daemon port 4000. Cloud setup: `.cursor/environment.json`.
+- React checks and audits: `.agents/skills/react-doctor`, `performance`,
+  `improve-react`. Run `prune-tests` only when requested.
+- In-progress designs: `docs/design/`, `docs/2026-*.md`. Remediation: `todos/`.
