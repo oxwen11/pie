@@ -98,6 +98,7 @@ export function createPiTransform(
   // A steered user message landed mid-run. The next assistant message needs a
   // fresh start; if the run settles first, no empty assistant message is emitted.
   let pendingAssistantStart = false;
+  let pendingRestart = false;
   // Block ids that streamed at least one delta, so *_end can recover text that
   // only arrived whole (the no-delta fallback, mirroring codex).
   const streamedBlocks = new Set<string>();
@@ -164,6 +165,10 @@ export function createPiTransform(
       case "message_start":
         if (!turnOpen) break;
         if (event.message.role === "assistant") {
+          if (pendingRestart) {
+            pendingRestart = false;
+            yield { type: "start", messageId: uuid(), messageMetadata: { sessionId } };
+          }
           const firstInSegment = pendingAssistantStart || messageOrdinal === 0;
           if (pendingAssistantStart) {
             pendingAssistantStart = false;
@@ -278,7 +283,19 @@ export function createPiTransform(
         };
         break;
 
+      case "compaction_end":
+        if (event.result && !event.aborted) {
+          // The client resets its fold at the lifecycle event. A continuation
+          // is a new UI message, NOT a finished agent turn.
+          pendingRestart = turnOpen;
+          pendingAssistantStart = false;
+          messageOrdinal = 0;
+          streamedBlocks.clear();
+        }
+        break;
+
       case "agent_settled":
+        pendingRestart = false;
         if (turnOpen) {
           turnOpen = false;
           if (!pendingAssistantStart) yield { type: "finish" };
@@ -300,7 +317,6 @@ export function createPiTransform(
           | "session_info_changed"
           | "thinking_level_changed"
           | "compaction_start"
-          | "compaction_end"
           | "auto_retry_end"
           | "summarization_retry_scheduled"
           | "summarization_retry_attempt_start"
