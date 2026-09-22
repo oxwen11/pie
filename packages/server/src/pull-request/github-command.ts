@@ -87,7 +87,7 @@ export const executeGitHubCommand = (
                 ? ([false, current] as const)
                 : ([true, next] as const);
             });
-            if (!accepted) return yield* new GitHubCliOutputTooLarge();
+            if (!accepted) yield* new GitHubCliOutputTooLarge();
             chunks.push(Uint8Array.from(chunk));
             if (phase === "stdout") stdoutBytes += chunk.byteLength;
             else stderrBytes += chunk.byteLength;

@@ -202,7 +202,8 @@ layer(NodeServices.layer, { excludeTestServices: true })("scoped session bridge"
       const bridge = yield* makePiSessionToolsBridge(emptyTools).pipe(
         Effect.provideService(Scope.Scope, scope),
       );
-      const extension = bridge.args[1]!;
+      const extension = bridge.args[1];
+      if (!extension) throw new Error("missing extension");
       assert.equal((yield* fs.stat(extension)).mode & 0o777, 0o600);
       assert.equal((yield* fs.stat(path.dirname(extension))).mode & 0o777, 0o700);
       yield* Scope.close(scope, Exit.void);

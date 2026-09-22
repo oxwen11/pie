@@ -281,7 +281,7 @@ export const makeGitHubStack = (read: Read, write: Write) => {
           const accepted = yield* parse(() =>
             Schema.decodeUnknownSync(AsyncMergeAccepted)(acceptedRaw),
           );
-          if (accepted.status === "merged" || accepted.details?.sha) return;
+          if (accepted.status === "merged" || accepted.details?.sha) return yield* Effect.void;
           const uuid = accepted.uuid ?? accepted.details?.uuid;
           if (!uuid) return yield* new PullRequestInvalidResponse();
           for (let attempt = 0; attempt < 30; attempt++) {
@@ -291,7 +291,7 @@ export const makeGitHubStack = (read: Read, write: Write) => {
             const polled = yield* parse(() =>
               Schema.decodeUnknownSync(AsyncMergeResult)(polledRaw),
             );
-            if (polled.status === "merged" || polled.details?.sha) return;
+            if (polled.status === "merged" || polled.details?.sha) return yield* Effect.void;
             if (polled.status === "failed" || polled.status === "error")
               return yield* new PullRequestHostRejected();
             yield* Effect.sleep("1 second");
@@ -361,7 +361,7 @@ export const makeGitHubStack = (read: Read, write: Write) => {
             );
             const branch = permissions.branches[index];
             if (!branch?.baseRef?.compare) return yield* new PullRequestUnsupportedAction();
-            if (branch.baseRef.compare.behindBy === 0) return;
+            if (branch.baseRef.compare.behindBy === 0) return yield* Effect.void;
             submitted = true;
             const response = yield* write(
               api(ref, [
@@ -383,6 +383,7 @@ export const makeGitHubStack = (read: Read, write: Write) => {
             observed.members = observed.members.map((member, memberIndex) =>
               memberIndex === index ? { ...member, headSha: head } : member,
             );
+            return yield* Effect.void;
           }),
         );
         if (step._tag === "Failure") {

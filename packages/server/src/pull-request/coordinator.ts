@@ -163,12 +163,14 @@ export const makePullRequestCoordinator = (deps: {
         }
         if (entry.flight) return yield* Fiber.join(entry.flight);
         if (entry.error && entry.retryAt > now) return yield* entry.error;
+        const cached = entry.value;
         if (
           !entry.dirty &&
+          cached !== undefined &&
           entry.checkedAt !== undefined &&
-          now < entry.checkedAt + ttl(entry.value as A)
+          now < entry.checkedAt + ttl(cached)
         )
-          return entry.value as A;
+          return cached;
         if ((cooldowns.get("*") ?? 0) > now || (cooldowns.get(host) ?? 0) > now)
           return yield* new PullRequestHostUnavailable();
         const current = entry;
@@ -302,14 +304,15 @@ export const makePullRequestCoordinator = (deps: {
               permitted,
             ),
           );
+          const discoveredRef = discovered?.value?.ref;
           if (
-            discovered?.value &&
+            discoveredRef &&
             !expected.links.some(
-              (link) => pullRequestKey(link.ref) === pullRequestKey(discovered.value!.ref),
+              (link) => pullRequestKey(link.ref) === pullRequestKey(discoveredRef),
             )
           ) {
             candidates.push({
-              ref: discovered.value.ref,
+              ref: discoveredRef,
               source: "branch",
               linkedAt: new Date(yield* Clock.currentTimeMillis).toISOString(),
               excluded: false,
@@ -522,7 +525,9 @@ export const makePullRequestCoordinator = (deps: {
         if (state.flight) yield* Fiber.join(state.flight);
         yield* Fiber.join(yield* start(state, true));
         const result = yield* statuses([ref]);
-        return result[0]!;
+        const status = result[0];
+        if (!status) return yield* Effect.die("missing pull request status");
+        return status;
       });
     const events = yield* deps.bus.subscribe({ kind: "global" });
     yield* events.pipe(

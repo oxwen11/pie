@@ -48,11 +48,11 @@ describe("association projection", () => {
       id: "S",
       number: 4,
       baseBranch: "main",
-      layers: [b, a].map((item) => ({
-        ref: item.ref,
-        headBranch: item.snapshot!.headBranch,
-        lifecycle: item.snapshot!.lifecycle,
-      })),
+      layers: [b, a].map((item) => {
+        const snapshot = item.snapshot;
+        if (!snapshot) throw new Error("missing snapshot");
+        return { ref: item.ref, headBranch: snapshot.headBranch, lifecycle: snapshot.lifecycle };
+      }),
     };
     const projection = projectSessionPullRequests([{ ...a, stack }, b]);
     expect(projection.badge).toBe("stack");

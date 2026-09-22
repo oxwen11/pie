@@ -379,8 +379,10 @@ layer(NodePlatformLayer)("demand coordinator", (it) => {
       const refs = [f.ref];
       for (let number = 1; number < 6; number++)
         refs.push((yield* f.service.create({ projectId: "project", cwd: f.home })).ref);
-      for (let index = 0; index < refs.length; index++)
-        yield* f.service.registerPullRequest(refs[index]!, { ...prRef, number: index + 1 });
+      for (const [index, ref] of refs.entries()) {
+        if (!ref) throw new Error("missing session");
+        yield* f.service.registerPullRequest(ref, { ...prRef, number: index + 1 });
+      }
       const lease = yield* f.coordinator.demand({ version: 0, refs });
       yield* Deferred.await(started);
       yield* Effect.eventually(
@@ -422,8 +424,10 @@ layer(NodePlatformLayer)("demand coordinator", (it) => {
       const refs = [f.ref];
       for (let index = 0; index < 7; index++)
         refs.push((yield* f.service.create({ projectId: "project", cwd: f.home })).ref);
-      for (let index = 0; index < refs.length; index++)
-        yield* f.service.registerPullRequest(refs[index]!, { ...prRef, number: index + 1 });
+      for (const [index, ref] of refs.entries()) {
+        if (!ref) throw new Error("missing session");
+        yield* f.service.registerPullRequest(ref, { ...prRef, number: index + 1 });
+      }
       yield* f.coordinator.demand({ version: 0, refs });
       yield* Deferred.await(started);
       assert.equal(maximum, 4);

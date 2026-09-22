@@ -122,8 +122,8 @@ export const repositoryFromBranchConfig = (raw: string, branch: string): Reposit
   const selected = tracking[0]
     ? remotes.filter(([key]) => key === `remote.${tracking[0]?.[1]}.url`)
     : remotes;
-  if (selected.length !== 1) throw new Error("Ambiguous repository remote");
-  const rawUrl = selected[0]![1];
+  const rawUrl = selected[0]?.[1];
+  if (selected.length !== 1 || rawUrl === undefined) throw new Error("Ambiguous repository remote");
   const scp = /^git@([^:]+):([^/]+)\/(.+)$/.exec(rawUrl);
   const url = new URL(scp ? `ssh://git@${scp[1]}/${scp[2]}/${scp[3]}` : rawUrl);
   if (
@@ -139,7 +139,14 @@ export const repositoryFromBranchConfig = (raw: string, branch: string): Reposit
     .replace(/\.git$/, "")
     .split("/")
     .filter(Boolean);
-  if (parts.length !== 2 || !parts.every((part) => /^[A-Za-z0-9._-]+$/.test(part)))
+  const owner = parts[0];
+  const repository = parts[1];
+  if (
+    parts.length !== 2 ||
+    !owner ||
+    !repository ||
+    !parts.every((part) => /^[A-Za-z0-9._-]+$/.test(part))
+  )
     throw new Error("Unsupported repository path");
-  return { host: url.hostname, owner: parts[0]!, repository: parts[1]! };
+  return { host: url.hostname, owner, repository };
 };
