@@ -2,7 +2,6 @@ import type {
   AgentModelState,
   PromptInput,
   SessionRef,
-  SessionSource,
   SessionSummary,
   SessionWorkspace,
 } from "@getpie/contract";
@@ -71,10 +70,6 @@ export type SessionMetadataShape = {
   readonly rememberPullRequestRef: (
     ref: SessionRef,
     pullRequest: PullRequestRef,
-  ) => Effect.Effect<void, SessionNotFound | StoreReadError | StoreWriteError>;
-  readonly rememberSource: (
-    ref: SessionRef,
-    source: SessionSource,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | StoreWriteError>;
   readonly list: (
     projectId: string,
@@ -205,24 +200,6 @@ export const SessionMetadataLayer: Layer.Layer<
                 pullRequestRefs: [...existing, pullRequest],
               });
             }),
-          ),
-        ).pipe(inSession(ref));
-      }),
-
-      rememberSource: Effect.fn("SessionMetadata.rememberSource")(function* (
-        ref: SessionRef,
-        source: SessionSource,
-      ) {
-        yield* withMetadataMutation(
-          ref,
-          readMetadata(ref).pipe(
-            Effect.flatMap((metadata) =>
-              metadata.source === undefined
-                ? repo
-                    .write({ ...metadata, source })
-                    .pipe(Effect.andThen(bus.publish({ ref, type: "session.updated" })))
-                : Effect.void,
-            ),
           ),
         ).pipe(inSession(ref));
       }),

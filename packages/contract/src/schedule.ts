@@ -75,6 +75,15 @@ export const ScheduleSessionSchema = Schema.Union([
 ]);
 export type ScheduleSession = typeof ScheduleSessionSchema.Type;
 
+const ScheduleSessionInputSchema = Schema.Union([
+  ScheduleSessionIsolatedSchema,
+  Schema.Struct({
+    policy: Schema.Literal("owned"),
+    sessionId: Schema.optionalKey(Schema.Undefined),
+  }),
+  ScheduleSessionExistingSchema,
+]);
+
 export function scheduleSessionOf(schedule: {
   readonly session?: ScheduleSession;
 }): ScheduleSession {
@@ -282,7 +291,7 @@ export const CreateScheduleInputSchema = Schema.Struct({
   prompt: schedulePrompt,
   spec: ScheduleSpecSchema,
   enabled: Schema.optionalKey(Schema.Boolean),
-  session: Schema.optionalKey(ScheduleSessionSchema),
+  session: Schema.optionalKey(ScheduleSessionInputSchema),
   expiresAt: Schema.optionalKey(Schema.String),
   maxRuns: Schema.optionalKey(scheduleMaxRuns),
   runNow: Schema.optionalKey(Schema.Boolean),
@@ -298,7 +307,7 @@ export const UpdateScheduleInputSchema = Schema.Struct({
   prompt: Schema.optionalKey(schedulePrompt),
   spec: Schema.optionalKey(ScheduleSpecSchema),
   enabled: Schema.optionalKey(Schema.Boolean),
-  session: Schema.optionalKey(ScheduleSessionSchema),
+  session: Schema.optionalKey(ScheduleSessionInputSchema),
   expiresAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   maxRuns: Schema.optionalKey(Schema.NullOr(scheduleMaxRuns)),
   worktree: Schema.optionalKey(CreateWorktreeInputSchema),
