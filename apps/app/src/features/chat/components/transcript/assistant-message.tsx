@@ -45,11 +45,9 @@ export function AssistantMessage({
       {items.map((item) => {
         if (item.kind === "tool-batch") {
           return (
-            <ToolBatch
-              key={`batch-${item.parts[0]?.index ?? 0}`}
-              parts={item.parts}
-              shouldShimmer={isStreaming && item.isTrailing}
-            />
+            <div key={`batch-${item.parts[0]?.index ?? 0}`} className="py-0.5">
+              <ToolBatch parts={item.parts} shouldShimmer={isStreaming && item.isTrailing} />
+            </div>
           );
         }
         const { part, index } = item;
