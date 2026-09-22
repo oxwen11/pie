@@ -28,7 +28,7 @@ Electron profiles/caches, logs and lifecycle files, worktrees/repository state,
 and writes delegated to child processes or agent tools.
 
 Before proposing the design or implementation plan, read
-`docs/architecture/host-persistence.md` and confirm all of these with the
+`docs/host-persistence.md` and confirm all of these with the
 Developer:
 
 1. the owner, exact location, scope, and override rules;
