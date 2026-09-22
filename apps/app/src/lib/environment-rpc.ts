@@ -15,6 +15,8 @@ export type EnvironmentRpc = {
   readonly queryClient: QueryClient;
   /** Stable, environment-prefixed oRPC utilities with context injection. */
   for(environmentId: string): EnvironmentOrpc;
+  /** Origin that signed asset paths for this Environment resolve against. */
+  httpBaseUrl(environmentId: string): string;
   /** Upsert live remote links and remove departed Environments. */
   sync(
     live: ReadonlyMap<string, ServerConnection>,
@@ -24,6 +26,7 @@ export type EnvironmentRpc = {
 
 type LinkEntry = {
   readonly connectionKey: string;
+  readonly httpBaseUrl: string;
   readonly link: ClientLink<PieClientContext>;
 };
 
@@ -38,6 +41,7 @@ function disposeLink(link: ClientLink<PieClientContext>): void {
 
 export function createEnvironmentRpc(input: {
   localId: string;
+  localHttpBaseUrl?: string;
   localLink: ClientLink<PieClientContext>;
   queryClient: QueryClient;
   resolveRemote: (environmentId: string) => ServerConnection | undefined;
@@ -45,8 +49,13 @@ export function createEnvironmentRpc(input: {
 }): EnvironmentRpc {
   const createLink =
     input.createRemoteLink ?? ((connection: ServerConnection) => createRemotePieLink(connection));
+  const localHttpBaseUrl =
+    input.localHttpBaseUrl ?? globalThis.location?.origin ?? "http://127.0.0.1";
   const links = new Map<string, LinkEntry>([
-    [input.localId, { connectionKey: "local", link: input.localLink }],
+    [
+      input.localId,
+      { connectionKey: "local", httpBaseUrl: localHttpBaseUrl, link: input.localLink },
+    ],
   ]);
   const environments = new Map<string, EnvironmentOrpc>();
   const removed = new Set<string>();
@@ -70,7 +79,7 @@ export function createEnvironmentRpc(input: {
 
     if (cached !== undefined) disposeLink(cached.link);
     const link = createLink(connection);
-    links.set(environmentId, { connectionKey: key, link });
+    links.set(environmentId, { connectionKey: key, httpBaseUrl: connection.httpBaseUrl, link });
     return link;
   };
 
@@ -106,6 +115,14 @@ export function createEnvironmentRpc(input: {
       environments.set(environmentId, orpc);
       return orpc;
     },
+    httpBaseUrl(environmentId) {
+      const cached = links.get(environmentId);
+      if (cached !== undefined) return cached.httpBaseUrl;
+      resolveLink(environmentId);
+      const created = links.get(environmentId);
+      if (created === undefined) throw new Error(`Environment ${environmentId} is not connected`);
+      return created.httpBaseUrl;
+    },
     sync(live, onRemove) {
       for (const [environmentId, connection] of live) {
         removed.delete(environmentId);
@@ -113,7 +130,11 @@ export function createEnvironmentRpc(input: {
         const cached = links.get(environmentId);
         if (cached?.connectionKey !== key) {
           if (cached !== undefined) disposeLink(cached.link);
-          links.set(environmentId, { connectionKey: key, link: createLink(connection) });
+          links.set(environmentId, {
+            connectionKey: key,
+            httpBaseUrl: connection.httpBaseUrl,
+            link: createLink(connection),
+          });
         }
       }
 
