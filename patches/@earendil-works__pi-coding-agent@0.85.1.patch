@@ -2,9 +2,12 @@ diff --git a/dist/index.d.ts b/dist/index.d.ts
 index e2b640b661a7712fa3f86ed5ecb494b98a6f9e4d..bb75a52bb6f9bb306d73f04eb36e39dd62835551 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,8 @@
 +export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
 +export { builtInExtensions } from "./extensions/index.ts";
++export { getShellEnv, killProcessTree } from "./utils/shell.ts";
++export { waitForChildProcess } from "./utils/child-process.ts";
++export { Type } from "typebox";
  export { type Args, parseArgs } from "./cli/args.ts";
  export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
  export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
@@ -12,9 +15,12 @@ diff --git a/dist/index.js b/dist/index.js
 index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de222e42b9c 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,8 @@
 +export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
 +export { builtInExtensions } from "./extensions/index.js";
++export { getShellEnv, killProcessTree } from "./utils/shell.js";
++export { waitForChildProcess } from "./utils/child-process.js";
++export { Type } from "typebox";
  // Core session management
  export { parseArgs } from "./cli/args.js";
  // Config paths
