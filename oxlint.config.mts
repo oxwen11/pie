@@ -113,7 +113,6 @@ export default defineConfig({
           { pattern: "^CommandItem$", allow: ["layout", "spacing"] },
           { pattern: "^Empty$", allow: ["layout", "spacing"] },
           { pattern: "^Label$", allow: ["layout", "color", "spacing", "shape"] },
-          { pattern: "^LoadingBox$", allow: ["layout", "spacing"] },
           { pattern: "^MenuTrigger$", allow: ["layout", "color", "shape"] },
           { pattern: "^PromptInput$", allow: ["layout", "shape"] },
           { pattern: "^RadioGroup$", allow: ["layout", "spacing"] },

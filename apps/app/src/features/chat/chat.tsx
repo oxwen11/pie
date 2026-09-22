@@ -16,13 +16,15 @@ export function Chat({
   return (
     <ChatSessionProvider sessionRef={sessionRef}>
       <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-        <ChatTranscript />
-        <div className="mx-auto w-full max-w-4xl min-w-80 shrink-0 px-4 pt-2 pb-4">
-          <SessionComposer
-            key={sessionRefKey(sessionRef)}
-            sessionRef={sessionRef}
-            toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
-          />
+        <div className="mx-auto flex min-h-0 w-full max-w-4xl min-w-80 flex-1 flex-col px-4">
+          <ChatTranscript />
+          <div className="shrink-0 pt-2 pb-4">
+            <SessionComposer
+              key={sessionRefKey(sessionRef)}
+              sessionRef={sessionRef}
+              toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
+            />
+          </div>
         </div>
       </div>
     </ChatSessionProvider>
