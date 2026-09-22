@@ -13,6 +13,7 @@ import {
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/components/input-group";
+import { Skeleton } from "@getpie/ui/components/skeleton";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
@@ -23,7 +24,6 @@ import { Group, Separator } from "react-resizable-panels";
 import { toast } from "sonner";
 
 import { ResizablePanel } from "@/components/layout/resizable-panel";
-import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -86,10 +86,7 @@ export function PullRequestPage() {
     },
   });
 
-  if (list.isPending && list.data === undefined) {
-    return <Loader />;
-  }
-
+  const listLoading = list.isPending && list.data === undefined;
   const listError = list.isError ? list.error.message : null;
 
   return (
@@ -108,6 +105,7 @@ export function PullRequestPage() {
           <PullRequestListPane
             error={listError}
             items={items}
+            loading={listLoading}
             onSelect={setSelectedRef}
             selected={selected}
           />
@@ -150,11 +148,13 @@ export function PullRequestPage() {
 function PullRequestListPane({
   error,
   items,
+  loading,
   onSelect,
   selected,
 }: {
   error: string | null;
   items: ReadonlyArray<PullRequestListItem>;
+  loading: boolean;
   onSelect: (ref: PullRequestRef) => void;
   selected: PullRequestListItem | undefined;
 }) {
@@ -185,6 +185,12 @@ function PullRequestListPane({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
         {error !== null ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">{error}</p>
+        ) : loading ? (
+          <ul aria-hidden="true" className="flex flex-col gap-0.5">
+            {Array.from({ length: 8 }, (_, index) => (
+              <PullRequestListSkeletonRow key={index} />
+            ))}
+          </ul>
         ) : visible.length === 0 ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">
             {query.trim().length > 0 ? "No matching pull requests." : "No open pull requests."}
@@ -213,6 +219,28 @@ function PullRequestListPane({
         )}
       </div>
     </>
+  );
+}
+
+function PullRequestListSkeletonRow() {
+  return (
+    <li className="flex gap-2 px-2 py-2">
+      <span className="mt-1.5 size-2 shrink-0 overflow-hidden rounded-full">
+        <Skeleton className="size-full" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-start justify-between gap-2">
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="h-3.5 w-14 shrink-0" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-4 shrink-0 overflow-hidden rounded-full">
+            <Skeleton className="size-full" />
+          </span>
+          <Skeleton className="h-3 w-1/3" />
+        </div>
+      </div>
+    </li>
   );
 }
 
