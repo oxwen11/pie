@@ -129,7 +129,7 @@ export function AppSidebar() {
         {!desktop && expanded ? <SidebarTrigger /> : null}
       </SidebarHeader>
 
-      <SidebarContent className="[-webkit-app-region:no-drag]">
+      <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
