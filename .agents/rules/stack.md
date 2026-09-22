@@ -32,9 +32,8 @@ These differ from what the library names suggest.
 
 New disk, randomness, and child-process code uses `effect/FileSystem`,
 `effect/Crypto`, and `effect/unstable/process`'s `ChildProcessSpawner` — not
-`node:fs` / `node:crypto` / `node:child_process`. `packages/server` was migrated
-wholesale in `docs/2026-07-27-effect-platform-migration.md`; matching the
-surrounding style means matching this.
+`node:fs` / `node:crypto` / `node:child_process`. Match the platform boundaries
+below; the completed migration plan is not a separate source of rules.
 
 ## Where the boundary is
 
