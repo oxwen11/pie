@@ -10,7 +10,7 @@ import type { SessionMessageEntry } from "./protocol";
 
 type PiAssistantHistoryMessage = Extract<SessionMessageEntry["message"], { role: "assistant" }>;
 
-// model/usage are history-only (docs/design/pi-history-read-design.md §5).
+// model/usage are history-only (docs/adr/0003-pi-history-role-segmentation.md).
 export type PiAssistantMetadata = PieAssistantMetadata & {
   model?: PiAssistantHistoryMessage["model"];
   provider?: PiAssistantHistoryMessage["provider"];

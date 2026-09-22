@@ -1,7 +1,8 @@
 # Pie CLI
 
 Normative for `@getpie/cli` (`pie`) and skills that teach it.
-Command surface lives in `docs/design/pie-cli.md`. Nouns: `CONTEXT.md`.
+Implemented commands: `pie --help` and per-command help (`packages/pie/src/node/`).
+Remaining proposals: `docs/rfc/pie-cli.md`. Nouns: `CONTEXT.md`.
 
 ## Who it is for
 
@@ -21,7 +22,8 @@ only** (`--provider` / `--model-id` select a model, never a harness).
 No command for a capability the contract does not expose. New command →
 name the procedure(s); extend the contract in the same stack, or cut the
 command. `pie-verify` stays proof tooling (architecture rules). Hub is a
-separate binary — `pie hub *` enrolls the daemon only (`pie-hub.md`).
+separate proposed binary — `pie hub *` would enroll the daemon only
+(`docs/rfc/pie-hub.md`).
 
 ## Machine interface
 
@@ -58,4 +60,5 @@ Destructive ops are non-interactive (`--yes` when a guard is required).
 
 ## Docs
 
-Change the command surface → update `docs/design/pie-cli.md` in the same change.
+Change the command surface → update command help and skills that teach it.
+When a proposed surface lands, remove that portion from `docs/rfc/pie-cli.md`.

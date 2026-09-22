@@ -5,7 +5,7 @@ import { stripReadDetailsContent, toolResultText } from "./transform";
 import type { PiAssistantMetadata, PiAssistantUIMessage, PiUIMessage } from "./ui-message";
 
 // Pi session-file entries → final-form UIMessages, the history counterpart of
-// createPiTransform (docs/design/pi-history-read-design.md §4/§5). History is
+// createPiTransform (docs/adr/0003-pi-history-role-segmentation.md). History is
 // settled data, so parts are constructed directly — no chunk replay, no stream
 // machinery. `SessionEntry` stops here: callers only ever see `PiUIMessage[]`.
 //
@@ -280,7 +280,7 @@ export function entriesToUIMessages(
 
   for (const entry of rebuildBranch(entries, leafId)) {
     if (entry.type !== "message") {
-      // Skipped entry kinds (§5): bookkeeping, extension state, and the
+      // Skipped entry kinds (ADR 0003): bookkeeping, extension state, and the
       // summaries/custom_message gap deferred to their own ticket. The
       // satisfies keeps the list exhaustive — a new entry type fails
       // typecheck until routed or listed.
@@ -307,7 +307,7 @@ export function entriesToUIMessages(
         onToolResult(entry, message);
         break;
       default:
-        // Custom message roles stay off the transcript this phase (§5).
+        // Custom message roles stay off the transcript (ADR 0003).
         void (message.role satisfies
           | "bashExecution"
           | "custom"
