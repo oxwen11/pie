@@ -1,3 +1,5 @@
+import { Dialog, DialogPopup, DialogTitle, DialogTrigger } from "@getpie/ui/components/dialog";
+import { cn } from "@getpie/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useRouteContext } from "@tanstack/react-router";
 import { useRef, useState, type ComponentProps } from "react";
@@ -10,7 +12,37 @@ import { classifyMarkdownImageSource, type MarkdownImageSource } from "./chat-ma
 type MarkdownImageProps = ComponentProps<"img"> & { node?: unknown };
 
 const ASSET_STALE_TIME_MS = 4 * 60 * 1000;
-const imageClassName = "h-auto w-auto max-h-[32rem] max-w-full rounded-md object-contain";
+const imageClassName = "h-auto w-auto max-h-44 max-w-full rounded-md object-contain sm:max-w-xs";
+
+export function ChatImagePreview({ alt, className, src, ...props }: ComponentProps<"img">) {
+  const label = alt?.trim() ? alt : "Image";
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <button
+            aria-label={`Enlarge ${label}`}
+            className="focus-visible:ring-ring inline-block max-w-full cursor-zoom-in rounded-md align-top focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            type="button"
+          />
+        }
+      >
+        <img {...props} alt={alt ?? ""} className={cn(imageClassName, className)} src={src} />
+      </DialogTrigger>
+      <DialogPopup bottomStickOnMobile={false} className="w-fit max-w-[calc(100vw-2rem)]">
+        <div className="p-2">
+          <DialogTitle className="sr-only">{label}</DialogTitle>
+          <img
+            {...props}
+            alt={alt ?? ""}
+            className="h-auto max-h-[calc(100dvh-3rem)] w-auto max-w-[calc(100vw-3rem)] object-contain"
+            src={src}
+          />
+        </div>
+      </DialogPopup>
+    </Dialog>
+  );
+}
 
 export function ChatMarkdownImage({
   alt,
@@ -22,10 +54,10 @@ export function ChatMarkdownImage({
   const source = classifyMarkdownImageSource(src);
   if (source.type === "direct") {
     return (
-      <img
+      <ChatImagePreview
         {...props}
         alt={alt ?? ""}
-        className={`${imageClassName} ${className ?? ""}`}
+        className={className}
         height={1024}
         src={source.url}
         width={1024}
@@ -92,10 +124,10 @@ function SessionMarkdownImage({
   };
 
   return (
-    <img
+    <ChatImagePreview
       {...props}
       alt={alt ?? ""}
-      className={`${imageClassName} ${className ?? ""}`}
+      className={className}
       height={1024}
       src={resolved}
       width={1024}

@@ -29,14 +29,25 @@ afterEach(() => {
 });
 
 describe("AssistantMessage", () => {
-  it("renders AI SDK raster file parts", () => {
+  it("renders compact AI SDK raster file parts that open a preview", async () => {
     const src = "data:image/png;base64,aGVsbG8=";
     const node = renderParts([
       { type: "file", mediaType: "image/png", filename: "result.png", url: src },
     ]);
 
-    expect(node.querySelector("img")?.getAttribute("src")).toBe(src);
-    expect(node.querySelector("img")?.getAttribute("alt")).toBe("result.png");
+    const image = node.querySelector("img");
+    const trigger = node.querySelector<HTMLButtonElement>(
+      'button[aria-label="Enlarge result.png"]',
+    );
+    expect(image?.getAttribute("src")).toBe(src);
+    expect(image?.getAttribute("alt")).toBe("result.png");
+    expect(image?.className).toContain("max-h-44");
+    expect(image?.className).toContain("sm:max-w-xs");
+    expect(trigger).not.toBeNull();
+
+    await act(async () => trigger?.click());
+
+    expect(document.body.querySelector('[role="dialog"] img')?.getAttribute("src")).toBe(src);
   });
 
   it("does not render SVG file parts", () => {
