@@ -205,6 +205,7 @@ if ! ensure_remote_node_path; then
   exit 1
 fi
 # ~/.pie/daemon/daemon.pid is the one daemon record. Attach when it is healthy.
+# compatibilityKey is for the client: a mismatch must not open a tunnel.
 emit_daemon_record() {
   node - "$DAEMON_RECORD" "$1" <<'NODE'
 const fs = require("node:fs");
@@ -257,7 +258,8 @@ async function main() {
       process.exit(1);
     }
   }
-  process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname() }) + "\\n");
+  const compatibilityKey = typeof record.compatibilityKey === "string" ? record.compatibilityKey : "";
+  process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname(), compatibilityKey: compatibilityKey }) + "\\n");
 }
 main();
 NODE
