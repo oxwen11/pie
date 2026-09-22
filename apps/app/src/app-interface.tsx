@@ -93,7 +93,6 @@ function AppHost({
   environmentId?: string;
   tokenHolder?: { current: string };
 }): ReactElement {
-  usePlatform();
   const identity = server?.httpBaseUrl ?? "default";
   if (environmentId !== undefined) {
     return (
@@ -142,9 +141,11 @@ function AppRuntime({
 }): ReactElement {
   const platform = usePlatform();
   const queryClient = useStable(createAppQueryClient);
+  const localHttpBaseUrl = server?.httpBaseUrl ?? globalThis.location.origin;
   const environmentRpc = useStable(() =>
     createEnvironmentRpc({
       localId: environmentId,
+      localHttpBaseUrl,
       localLink: createLocalPieLink(server, tokenHolder),
       queryClient,
       resolveRemote: (id) =>
@@ -152,7 +153,6 @@ function AppRuntime({
           ?.connection,
     }),
   );
-
   const chatManager = useStable(
     () =>
       new ChatManager((sessionRef) => {

@@ -5,6 +5,7 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { Context, Effect, Layer } from "effect";
 
+import { SessionImageAssetsLayer } from "../assets";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
@@ -92,6 +93,9 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
 );
 
 const PiAgentServiceProvided = PiAgentServiceLayer;
+const SessionImageAssetsProvided = SessionImageAssetsLayer.pipe(
+  Layer.provide(PiAgentSessionServiceProvided),
+);
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
 const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
@@ -109,6 +113,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
+  SessionImageAssetsProvided,
   ProjectServiceProvided,
   SettingsRepositoryProvided,
   ScheduleServiceProvided,
