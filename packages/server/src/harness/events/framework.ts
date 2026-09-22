@@ -1,10 +1,12 @@
 import {
   AgentRequestSchema,
+  CompactionReasonSchema,
+  type CompactionResult,
+  type PieUIMessageChunk,
   PromptPartSchema,
   TokenUsageSchema,
   TurnErrorSchema,
 } from "@getpie/contract";
-import type { PieUIMessageChunk } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
@@ -74,6 +76,21 @@ export const SessionQueueUpdated = defineEvent({
     followUp: Schema.Array(Schema.String),
   },
 });
+export const SessionCompactionStarted = defineEvent({
+  type: "session.compaction.started",
+  schema: { ...sid, reason: CompactionReasonSchema },
+});
+export const SessionCompactionEnded = defineEvent({
+  type: "session.compaction.ended",
+  schema: {
+    ...sid,
+    // Produced by the Pi adapter, like UIMessage chunks; not caller input.
+    result: Schema.declare<CompactionResult>(
+      (value): value is CompactionResult =>
+        typeof value === "object" && value !== null && "outcome" in value,
+    ),
+  },
+});
 export const SessionCrashed = defineEvent({
   type: "session.crashed",
   schema: { ...sid, reason: Schema.String },
@@ -106,6 +123,8 @@ export const SessionEventDefs = [
   SessionRequestAsked,
   SessionRequestReplied,
   SessionQueueUpdated,
+  SessionCompactionStarted,
+  SessionCompactionEnded,
   SessionCrashed,
 ] as const;
 export type SessionEvent = EventValue<(typeof SessionEventDefs)[number]>;

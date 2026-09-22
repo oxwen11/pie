@@ -18,7 +18,7 @@ import {
   SessionNotResumable,
   TurnAlreadyRunning,
 } from "../errors";
-import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
+import type { SessionEnvelopeBody, SessionEnvelopeDraft } from "../events/framework";
 import { streamFromQueueOne } from "../queue-stream";
 import type {
   CreateSessionInput,
@@ -29,7 +29,6 @@ import type {
 } from "../session-io";
 import { entriesToUIMessages } from "./history";
 import type { PiProcess } from "./process";
-import type { PiUIMessageChunk } from "./ui-message";
 
 export {
   CreateSessionInput,
@@ -105,7 +104,7 @@ export const makePiAgentRuntime = (
     // Separate from PiProcess protocol turn state and from the session fold.
     const activeTurn = yield* Ref.make<string | undefined>(undefined);
 
-    const emit = (body: PiUIMessageChunk | SessionEvent) =>
+    const emit = (body: SessionEnvelopeBody) =>
       Queue.offer(events, { sessionId, body }).pipe(
         Effect.flatMap((accepted) =>
           accepted
@@ -208,6 +207,15 @@ export const makePiAgentRuntime = (
       }),
     ).pipe(Effect.catch(crash), Effect.forkIn(scope));
 
+    yield* Stream.runForEach(process.session.events(sessionId), (body) =>
+      Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return;
+        if (body.type === "session.turn.started") yield* Ref.set(activeTurn, body.turnId);
+        yield* emit(body);
+        if (body.type === "session.turn.ended") yield* Ref.set(activeTurn, undefined);
+      }),
+    ).pipe(Effect.catch(crash), Effect.forkIn(scope));
+
     return {
       sessionId,
       events: streamFromQueueOne(events),
@@ -231,46 +239,6 @@ export const makePiAgentRuntime = (
             cursor: yield* Ref.get(cursor),
             started: prompt.started,
           };
-          if (prompt.started) {
-            yield* Ref.set(activeTurn, prompt.turnId);
-            yield* emit({ type: "session.turn.started", sessionId, turnId: prompt.turnId });
-          }
-
-          const lastChunkWasFinish = yield* Ref.make(false);
-          const outcome = yield* Ref.make<"completed" | "canceled">("completed");
-          const pump = Stream.runForEach(prompt.output, (chunk) =>
-            chunk.type === "session.prompt.submitted"
-              ? emit(chunk)
-              : Ref.set(lastChunkWasFinish, chunk.type === "finish").pipe(
-                  Effect.andThen(
-                    chunk.type === "abort" ? Ref.set(outcome, "canceled") : Effect.void,
-                  ),
-                  Effect.andThen(emit(chunk)),
-                ),
-          ).pipe(
-            Effect.flatMap(() => Ref.get(lastChunkWasFinish)),
-            Effect.flatMap((didFinish) => {
-              if (!prompt.started) return Effect.void;
-              if (!didFinish) return crash(new Error("Pi turn ended without a finish event"));
-              return Ref.get(outcome).pipe(
-                Effect.flatMap((turnOutcome) =>
-                  emit({
-                    type: "session.turn.ended",
-                    sessionId,
-                    turnId: prompt.turnId,
-                    outcome: turnOutcome,
-                  }),
-                ),
-                Effect.andThen(
-                  Ref.update(activeTurn, (current) =>
-                    current === prompt.turnId ? undefined : current,
-                  ),
-                ),
-              );
-            }),
-            Effect.catch(crash),
-          );
-          yield* Effect.forkIn(pump, scope);
           return receipt;
         }),
       interrupt,
