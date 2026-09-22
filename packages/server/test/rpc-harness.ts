@@ -33,6 +33,9 @@ import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
+const bridge = process.env.PIE_SESSION_BRIDGE_URL;
+const bridgeToken = process.env.PIE_SESSION_BRIDGE_TOKEN;
+if (bridge && bridgeToken) fetch(bridge + "/ready", { method: "POST", headers: { authorization: "Bearer " + bridgeToken, "content-type": "application/json" }, body: "{}" }).catch(() => {});
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
