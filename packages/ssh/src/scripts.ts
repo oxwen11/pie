@@ -191,22 +191,85 @@ exit 1
 `;
 
 export const REMOTE_LAUNCH_SCRIPT = `set -eu
-# Drop client-side SendEnv leaks so the remote daemon uses ~/.pie, not ~/.pie-dev.
-unset NODE_ENV PIE_HOME PIE_DAEMON_DIR PIE_AUTH_TOKEN PIE_PORT PIE_CORS_ORIGINS || true
+# Drop client port and token leaks. Keep the remote login shell's PIE_HOME:
+# the local ssh child already strips it, and a test home is not ~/.pie.
+unset NODE_ENV PIE_DAEMON_DIR PIE_AUTH_TOKEN PIE_PORT PIE_CORS_ORIGINS || true
 @@PIE_NODE_ENV_SCRIPT@@
 STATE_KEY="$1"
-STATE_DIR="$HOME/.pie/ssh-launch/$STATE_KEY"
-DAEMON_RECORD="$HOME/.pie/daemon/daemon.pid"
+PIE_RUNTIME_HOME="\${PIE_HOME:-$HOME/.pie}"
+STATE_DIR="$PIE_RUNTIME_HOME/ssh-launch/$STATE_KEY"
+DAEMON_RECORD="$PIE_RUNTIME_HOME/daemon/daemon.pid"
 LOG_FILE="$STATE_DIR/server.log"
 RUNNER_FILE="$STATE_DIR/run-pie.sh"
+if ! ensure_remote_node_path; then
+  exit 1
+fi
+# ~/.pie/daemon/daemon.pid is the one daemon record. Attach when it is healthy.
+emit_daemon_record() {
+  node - "$DAEMON_RECORD" "$1" <<'NODE'
+const fs = require("node:fs");
+const os = require("node:os");
+const recordPath = process.argv[2] ?? "";
+const attach = process.argv[3] === "attach";
+function fail(message) {
+  if (!attach) process.stderr.write(message);
+  process.exit(1);
+}
+function alive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error !== null && typeof error === "object" && error.code === "EPERM";
+  }
+}
+async function main() {
+  let record;
+  try {
+    record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+  } catch (cause) {
+    fail("Remote pie daemon did not write a valid discovery record at " + recordPath + ".\\n");
+  }
+  const address = String(record.address ?? "");
+  let url;
+  try {
+    url = new URL(address);
+  } catch (cause) {
+    fail("Remote pie daemon.pid is missing a loopback port or token.\\n");
+  }
+  const port = Number(url.port);
+  const token = String(record.token ?? "");
+  if (!Number.isInteger(port) || port <= 0 || token.length === 0) {
+    fail("Remote pie daemon.pid is missing a loopback port or token.\\n");
+  }
+  if (!["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
+    fail("Remote pie daemon is not bound to loopback.\\n");
+  }
+  if (attach) {
+    if (!alive(record.pid)) process.exit(1);
+    try {
+      const response = await fetch(new URL("/api/health", address), {
+        signal: AbortSignal.timeout(1000),
+      });
+      if (!response.ok || (await response.text()) !== "ok") process.exit(1);
+    } catch (cause) {
+      process.exit(1);
+    }
+  }
+  process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname() }) + "\\n");
+}
+main();
+NODE
+}
+if emit_daemon_record attach; then
+  exit 0
+fi
 mkdir -p "$STATE_DIR"
 cat >"$RUNNER_FILE" <<'SH'
 @@PIE_RUNNER_SCRIPT@@
 SH
 chmod 700 "$RUNNER_FILE"
-if ! ensure_remote_node_path; then
-  exit 1
-fi
 if ! "$RUNNER_FILE" daemon start >>"$LOG_FILE" 2>&1; then
   printf 'Remote pie daemon failed to start. Last log:\\n' >&2
   if [ -s "$LOG_FILE" ]; then
@@ -216,30 +279,7 @@ if ! "$RUNNER_FILE" daemon start >>"$LOG_FILE" 2>&1; then
   fi
   exit 1
 fi
-node - "$DAEMON_RECORD" <<'NODE'
-const fs = require("node:fs");
-const os = require("node:os");
-const recordPath = process.argv[2] ?? "";
-try {
-  const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
-  const address = String(record.address ?? "");
-  const url = new URL(address);
-  const port = Number(url.port);
-  const token = String(record.token ?? "");
-  if (!Number.isInteger(port) || port <= 0 || token.length === 0) {
-    process.stderr.write("Remote pie daemon.pid is missing a loopback port or token.\\n");
-    process.exit(1);
-  }
-  if (!["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
-    process.stderr.write("Remote pie daemon is not bound to loopback.\\n");
-    process.exit(1);
-  }
-  process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname() }) + "\\n");
-} catch (cause) {
-  process.stderr.write("Remote pie daemon did not write a valid discovery record at " + recordPath + ".\\n");
-  process.exit(1);
-}
-NODE
+emit_daemon_record publish
 `;
 
 export function buildRemoteNodeEnvScript(): string {
