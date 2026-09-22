@@ -8,9 +8,9 @@ export const workspaceReadError = (relativePath: string) => (cause: unknown) =>
   new WorkspaceReadError({ path: relativePath, cause });
 
 /**
- * Resolve a workspace cwd to its real, absolute directory path. Rejects
- * relative input, follows symlinks once, and fails when the target is not a
- * directory — the shared front door for every service that confines paths.
+ * Resolve a directory to its real absolute path. Rejects relative input,
+ * follows symlinks once, and fails when the target is not a directory.
+ * Every service that confines paths starts here.
  */
 export const resolveWorkspaceRoot = (fs: FileSystem.FileSystem) => (cwd: string) =>
   Effect.gen(function* () {

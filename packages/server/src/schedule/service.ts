@@ -10,6 +10,7 @@ import type {
   StoreWriteError,
 } from "../errors";
 import { PiAgentSessionService } from "../harness";
+import { SessionMetadata } from "../harness/session-metadata";
 import { ProjectService } from "../project";
 import type { FireResult } from "./fire";
 import * as mutations from "./mutations";
@@ -52,20 +53,22 @@ export class ScheduleService extends Context.Service<ScheduleService, ScheduleSe
 export const ScheduleServiceLayer: Layer.Layer<
   ScheduleService,
   never,
-  ScheduleRepository | ProjectService | PiAgentSessionService | Crypto.Crypto
+  ScheduleRepository | ProjectService | PiAgentSessionService | SessionMetadata | Crypto.Crypto
 > = Layer.effect(
   ScheduleService,
   Effect.gen(function* () {
     const repo = yield* ScheduleRepository;
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
+    const metadata = yield* SessionMetadata;
     const crypto = yield* Crypto.Crypto;
     const runtime = yield* ScheduleRuntime;
-    // Only these five — do not capture Logger/Clock from layer build, or
-    // TestClock / captureLogs lose to the frozen context.
+    // Do not capture Logger/Clock from layer build, or TestClock / captureLogs
+    // lose to the frozen context.
     const env = Context.make(ScheduleRepository, repo).pipe(
       Context.add(ProjectService, projects),
       Context.add(PiAgentSessionService, sessions),
+      Context.add(SessionMetadata, metadata),
       Context.add(Crypto.Crypto, crypto),
       Context.add(ScheduleRuntime, runtime),
     );
@@ -74,6 +77,7 @@ export const ScheduleServiceLayer: Layer.Layer<
       | ScheduleRepository
       | ProjectService
       | PiAgentSessionService
+      | SessionMetadata
       | Crypto.Crypto
       | ScheduleRuntime;
     const provide = <A, E>(effect: Effect.Effect<A, E, ScheduleEnv>): Effect.Effect<A, E> =>

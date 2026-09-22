@@ -1,61 +1,28 @@
 import { sessionContract } from "@getpie/contract/session";
 import { Effect } from "effect";
 
-import {
-  GitBranchExists,
-  GitError,
-  GitInvalidBranchName,
-  GitInvalidWorktreeKey,
-  GitNotRepository,
-  GitRefNotFound,
-  GitWorktreePathExists,
-  WorkspaceNotDirectory,
-  WorkspacePathEscape,
-  WorkspaceReadError,
-} from "../errors";
 import { EventBus } from "../events";
 import { PiAgentSessionService } from "../harness";
+import { SessionMetadata } from "../harness/session-metadata";
 import { ProjectService } from "../project";
 import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
+import {
+  agentOperation,
+  catchGitWorktree,
+  catchLiveAgent,
+  projectNotFound,
+  resumeFailures,
+  sessionClosed,
+  sessionNotFound,
+  sessionStoreFailures,
+  unsupportedExecutable,
+} from "./errors";
 import { implement } from "./orpc";
 import { openScopedSubscription } from "./session-stream";
 import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(sessionContract).$context<RpcContext>();
-
-const mapGitWorktreeErrors = <
-  E extends {
-    NOT_FOUND: (input: { message: string }) => unknown;
-    CONFLICT: (input: { message: string }) => unknown;
-    INVALID_ARGUMENT: (input: { message: string }) => unknown;
-    FORBIDDEN: (input: { message: string }) => unknown;
-    INTERNAL: (input: { message: string }) => unknown;
-  },
->(
-  errors: E,
-) =>
-  Effect.catchTags({
-    GitRefNotFound: (e: GitRefNotFound) =>
-      Effect.fail(errors.NOT_FOUND({ message: `git ref ${e.ref} not found` })),
-    GitBranchExists: (e: GitBranchExists) =>
-      Effect.fail(errors.CONFLICT({ message: `branch ${e.branch} already exists` })),
-    GitWorktreePathExists: (e: GitWorktreePathExists) =>
-      Effect.fail(errors.CONFLICT({ message: `worktree path ${e.path} already exists` })),
-    GitInvalidBranchName: (e: GitInvalidBranchName) =>
-      Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid branch name ${e.branch}` })),
-    GitInvalidWorktreeKey: (e: GitInvalidWorktreeKey) =>
-      Effect.fail(errors.INVALID_ARGUMENT({ message: `invalid worktree key ${e.worktreeKey}` })),
-    GitNotRepository: (e: GitNotRepository) =>
-      Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.cwd} is not a git repository` })),
-    WorkspacePathEscape: (e: WorkspacePathEscape) =>
-      Effect.fail(errors.FORBIDDEN({ message: `path ${e.path} escapes ${e.cwd}` })),
-    WorkspaceNotDirectory: (e: WorkspaceNotDirectory) =>
-      Effect.fail(errors.INVALID_ARGUMENT({ message: `${e.path} is not a directory` })),
-    WorkspaceReadError: (e: WorkspaceReadError) =>
-      Effect.fail(errors.INTERNAL({ message: `failed to read ${e.path}` })),
-    GitError: (e: GitError) => Effect.fail(errors.INTERNAL({ message: `git failed in ${e.cwd}` })),
-  });
 
 export const sessionRouter = orpc.router({
   create: orpc.create.effect(function* ({ input, errors }) {
@@ -76,10 +43,9 @@ export const sessionRouter = orpc.router({
         }),
       ),
       Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        ProjectNotFound: projectNotFound(errors),
       }),
-      mapGitWorktreeErrors(errors),
+      catchGitWorktree(errors),
     );
   }),
   prepare: orpc.prepare.effect(function* ({ input, errors }) {
@@ -87,20 +53,22 @@ export const sessionRouter = orpc.router({
     return yield* sessions.prepare(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        WorktreeCheckoutMissing: (e) =>
+        SessionNotFound: sessionNotFound(errors),
+        ProjectNotFound: projectNotFound(errors),
+        SessionNotResumable: resumeFailures(errors).SessionNotResumable,
+        AgentOperationError: agentOperation(errors),
+        WorktreeCheckoutMissing: (error) =>
           Effect.fail(
             errors.WORKTREE_MISSING({
-              data: { sessionId: e.sessionId, projectId: e.projectId, branch: e.branch },
+              data: {
+                sessionId: error.sessionId,
+                projectId: error.projectId,
+                branch: error.branch,
+              },
             }),
           ),
       }),
-      mapGitWorktreeErrors(errors),
+      catchGitWorktree(errors),
     );
   }),
   restoreWorktree: orpc.restoreWorktree.effect(function* ({ input, errors }) {
@@ -108,56 +76,50 @@ export const sessionRouter = orpc.router({
     return yield* sessions.restoreWorktree(input.ref).pipe(
       Effect.map((workspace) => ({ ref: input.ref, workspace })),
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotWorktree: (e) =>
+        SessionNotFound: sessionNotFound(errors),
+        ProjectNotFound: projectNotFound(errors),
+        SessionNotWorktree: (error) =>
           Effect.fail(
             errors.INVALID_ARGUMENT({
-              message: `session ${e.sessionId} is not a worktree session`,
+              message: `session ${error.sessionId} is not a worktree session`,
             }),
           ),
       }),
-      mapGitWorktreeErrors(errors),
+      catchGitWorktree(errors),
     );
   }),
   close: orpc.close.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     yield* sessions.close(input.ref).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionNotFound: sessionNotFound(errors),
       }),
     );
   }),
 
   list: orpc.list.effect(function* ({ input, errors }) {
     const projects = yield* ProjectService;
-    const sessions = yield* PiAgentSessionService;
+    const metadata = yield* SessionMetadata;
     return yield* projects.findById(input.projectId).pipe(
-      Effect.andThen(sessions.list(input.projectId, input.archived ?? false)),
+      Effect.andThen(metadata.list(input.projectId, input.archived ?? false)),
       Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        ProjectNotFound: projectNotFound(errors),
       }),
     );
   }),
   rename: orpc.rename.effect(function* ({ input, errors }) {
-    const sessions = yield* PiAgentSessionService;
-    yield* sessions.rename(input.ref, input.title).pipe(
+    const metadata = yield* SessionMetadata;
+    yield* metadata.rename(input.ref, input.title).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionNotFound: sessionNotFound(errors),
       }),
     );
   }),
   archive: orpc.archive.effect(function* ({ input, errors }) {
-    const sessions = yield* PiAgentSessionService;
-    yield* sessions.archive(input.ref, input.archived).pipe(
+    const metadata = yield* SessionMetadata;
+    yield* metadata.archive(input.ref, input.archived).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionNotFound: sessionNotFound(errors),
       }),
     );
   }),
@@ -166,8 +128,7 @@ export const sessionRouter = orpc.router({
     const terminals = yield* TerminalManager;
     yield* sessions.delete(input.ref).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionNotFound: sessionNotFound(errors),
       }),
     );
     yield* terminals.closeAll(input.ref);
@@ -176,28 +137,15 @@ export const sessionRouter = orpc.router({
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.getMessages(input.ref).pipe(
       Effect.map((messages) => ({ messages })),
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
+      catchLiveAgent(errors),
     );
   }),
   resolveRef: orpc.resolveRef.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     return yield* sessions.resolveRef(input.sessionId).pipe(
       Effect.catchTags({
-        SessionRefNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionRefNotFound: (error) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${error.sessionId} not found` })),
       }),
     );
   }),
@@ -207,44 +155,35 @@ export const sessionRouter = orpc.router({
     return yield* sessions.prompt(input).pipe(
       Effect.catchTags({
         // Metadata gone → NOT_FOUND; native session not open → SESSION_NOT_ACTIVE.
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        StoreReadError: (e) =>
-          Effect.fail(errors.INTERNAL({ message: `session store read failed: ${e.file}` })),
-        StoreWriteError: (e) =>
-          Effect.fail(errors.INTERNAL({ message: `session store write failed: ${e.file}` })),
-        HarnessSessionNotFound: (e) =>
+        SessionNotFound: sessionNotFound(errors),
+        ProjectNotFound: projectNotFound(errors),
+        ...sessionStoreFailures(errors),
+        HarnessSessionNotFound: (error) =>
           Effect.fail(
-            errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is not active` }),
+            errors.SESSION_NOT_ACTIVE({ message: `session ${error.sessionId} is not active` }),
           ),
-        UnsupportedPromptPart: (e) =>
-          Effect.fail(errors.UNSUPPORTED({ message: `unsupported prompt part: ${e.kind}` })),
-        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        TurnAlreadyRunning: (e) =>
+        UnsupportedPromptPart: (error) =>
+          Effect.fail(errors.UNSUPPORTED({ message: `unsupported prompt part: ${error.kind}` })),
+        ...unsupportedExecutable(errors),
+        SessionNotResumable: resumeFailures(errors).SessionNotResumable,
+        AgentOpenError: resumeFailures(errors).AgentOpenError,
+        SessionClosed: sessionClosed(errors),
+        TurnAlreadyRunning: (error) =>
           Effect.fail(
-            errors.CONFLICT({ message: `a turn is already running in session ${e.sessionId}` }),
+            errors.CONFLICT({ message: `a turn is already running in session ${error.sessionId}` }),
           ),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        AgentOperationError: agentOperation(errors),
       }),
-      mapGitWorktreeErrors(errors),
+      catchGitWorktree(errors),
     );
   }),
   interrupt: orpc.interrupt.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     yield* sessions.interrupt(input.ref).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotFound: sessionNotFound(errors),
+        SessionClosed: sessionClosed(errors),
+        AgentOperationError: agentOperation(errors),
       }),
     );
   }),
@@ -252,11 +191,9 @@ export const sessionRouter = orpc.router({
     const sessions = yield* PiAgentSessionService;
     yield* sessions.replaceQueue(input).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotFound: sessionNotFound(errors),
+        SessionClosed: sessionClosed(errors),
+        AgentOperationError: agentOperation(errors),
       }),
     );
   }),
@@ -264,11 +201,10 @@ export const sessionRouter = orpc.router({
     const sessions = yield* PiAgentSessionService;
     yield* sessions.respondToAgentRequest(input.ref, input.requestId, input.response).pipe(
       Effect.catchTags({
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        AgentRequestUnavailable: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `request ${e.requestId} is not pending` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+        SessionNotFound: sessionNotFound(errors),
+        AgentRequestUnavailable: (error) =>
+          Effect.fail(errors.NOT_FOUND({ message: `request ${error.requestId} is not pending` })),
+        AgentOperationError: agentOperation(errors),
       }),
     );
   }),
@@ -284,22 +220,7 @@ export const sessionRouter = orpc.router({
 
   getModelState: orpc.getModelState.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
-    return yield* sessions.getModelState(input.ref).pipe(
-      Effect.catchTags({
-        ProjectNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-        SessionNotFound: (e) =>
-          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-        AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-        HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        SessionClosed: (e) =>
-          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-      }),
-    );
+    return yield* sessions.getModelState(input.ref).pipe(catchLiveAgent(errors));
   }),
   setModel: orpc.setModel.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
@@ -308,22 +229,7 @@ export const sessionRouter = orpc.router({
         provider: input.provider,
         modelId: input.modelId,
       })
-      .pipe(
-        Effect.catchTags({
-          ProjectNotFound: (e) =>
-            Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
-          SessionNotFound: (e) =>
-            Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
-          AgentUnavailable: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-          ExecutableNotFound: (e) => Effect.fail(errors.UNSUPPORTED({ message: e.message })),
-          HarnessSessionNotFound: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-          SessionNotResumable: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-          AgentOpenError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-          SessionClosed: (e) =>
-            Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
-          AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
-        }),
-      );
+      .pipe(catchLiveAgent(errors));
   }),
 
   subscribe: orpc.subscribe.effect(function* ({ input }) {

@@ -2,7 +2,7 @@ import { TokenUsageSchema, TurnErrorSchema } from "@getpie/contract";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { defineEvent } from "../../../src/harness/events/framework";
+import { defineEvent } from "../../../src/harness/events/session-events";
 
 const decodeTokenUsage = Schema.decodeUnknownSync(TokenUsageSchema);
 const decodeTurnError = Schema.decodeUnknownSync(TurnErrorSchema);

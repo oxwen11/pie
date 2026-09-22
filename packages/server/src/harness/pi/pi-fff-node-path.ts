@@ -1,8 +1,9 @@
 import path from "node:path";
 
 /**
- * Sibling `fff/node_modules` next to pie-pi-process. Do not import
- * `@ff-labs/pi-fff` from this module — bun-build must not inline the FFI graph.
+ * Path to the copied `@ff-labs/pi-fff` install: a sibling `fff/node_modules`
+ * next to pie-pi-process. Do not import `@ff-labs/pi-fff` from this module —
+ * bun-build must not inline the FFI graph.
  */
 
 export const FFF_OVERRIDE_FLAGS = new Map<string, boolean | string>([

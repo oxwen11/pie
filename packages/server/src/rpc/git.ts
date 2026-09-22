@@ -17,7 +17,7 @@ import {
 import { GitService } from "../git";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-cwd";
 
 const orpc = implement(gitContract).$context<RpcContext>();
 

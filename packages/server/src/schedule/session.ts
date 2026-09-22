@@ -14,7 +14,8 @@ import {
   type StoreWriteError,
 } from "../errors";
 import type { GitWorktreeFailure } from "../git/worktree-service";
-import { type PiAgentSessionServiceShape, PiAgentSessionService } from "../harness";
+import { PiAgentSessionService } from "../harness";
+import { SessionMetadata, type SessionMetadataShape } from "../harness/session-metadata";
 import { ProjectService } from "../project";
 import { titleFromName } from "./run-record";
 
@@ -26,15 +27,15 @@ export const isBusy = (phase: SessionPhase): boolean =>
   phase === "running" || phase === "requires_action";
 
 export const findSession = (
-  sessions: PiAgentSessionServiceShape,
+  metadata: SessionMetadataShape,
   ref: SessionRef,
 ): Effect.Effect<FoundSession | null, StoreReadError> =>
   Effect.gen(function* () {
-    const open = yield* sessions.list(ref.projectId, false);
+    const open = yield* metadata.list(ref.projectId, false);
     if (open.some((session) => session.sessionId === ref.sessionId)) {
       return { archived: false };
     }
-    const archived = yield* sessions.list(ref.projectId, true);
+    const archived = yield* metadata.list(ref.projectId, true);
     if (archived.some((session) => session.sessionId === ref.sessionId)) {
       return { archived: true };
     }
@@ -44,14 +45,14 @@ export const findSession = (
 export const trySession = (
   projectId: string,
   session: ScheduleSession | undefined,
-): Effect.Effect<void, StoreReadError | InvalidSchedule, PiAgentSessionService> => {
+): Effect.Effect<void, StoreReadError | InvalidSchedule, SessionMetadata> => {
   const sessionId = session === undefined ? undefined : reuseSessionIdOf(session);
   if (sessionId === undefined) {
     return Effect.void;
   }
   return Effect.gen(function* () {
-    const sessions = yield* PiAgentSessionService;
-    const found = yield* findSession(sessions, { projectId, sessionId });
+    const metadata = yield* SessionMetadata;
+    const found = yield* findSession(metadata, { projectId, sessionId });
     if (found === null) {
       return yield* Effect.fail(new InvalidSchedule({ reason: "session not found" }));
     }
@@ -67,16 +68,17 @@ export const fireSession = (
 ): Effect.Effect<
   SessionRef,
   ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure,
-  ProjectService | PiAgentSessionService
+  ProjectService | PiAgentSessionService | SessionMetadata
 > =>
   Effect.gen(function* () {
     const projects = yield* ProjectService;
     const sessions = yield* PiAgentSessionService;
+    const metadata = yield* SessionMetadata;
     const project = yield* projects.findById(snapshot.projectId);
     const reuseSessionId = reuseSessionIdOf(scheduleSessionOf(snapshot));
     if (reuseSessionId !== undefined) {
       const ref = { projectId: snapshot.projectId, sessionId: reuseSessionId };
-      const found = yield* findSession(sessions, ref);
+      const found = yield* findSession(metadata, ref);
       if (found !== null && !found.archived) {
         return ref;
       }

@@ -2,7 +2,7 @@ import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from 
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
-import { fffNodePathEnv } from "./fff";
+import { fffNodePathEnv } from "./pi-fff-node-path";
 import {
   isBlockingUiRequest,
   type AgentSessionEvent,

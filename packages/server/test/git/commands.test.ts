@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseRefNames } from "../../src/git/shared";
+import { parseRefNames } from "../../src/git/commands";
 
 describe("parseRefNames", () => {
   it("splits mixed local and remote refs, local first in all", () => {

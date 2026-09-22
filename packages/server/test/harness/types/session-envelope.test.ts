@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSessionEvent } from "../../../src/harness/events/framework";
+import { isSessionEvent } from "../../../src/harness/events/session-events";
 
 describe("isSessionEvent", () => {
   it("routes dotted event types to the control plane", () => {

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentModel } from "@getpie/contract";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -79,7 +80,7 @@ describe("resolveDefaultPiModel", () => {
     });
 
     it("persistDefaultPiModel writes the pair listModels will resolve", async () => {
-      await persistDefaultPiModel("anthropic", "claude-sonnet-4-5");
+      await Effect.runPromise(persistDefaultPiModel("anthropic", "claude-sonnet-4-5", agentDir));
       const reread = SettingsManager.create(agentDir);
       expect(resolveDefaultPiModel(models, reread)).toEqual(models[1]);
     });

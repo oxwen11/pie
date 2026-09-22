@@ -26,7 +26,11 @@ import {
   makePiAgentSessionManager,
   PiAgentSessionManager,
 } from "../../src/harness/session-manager";
-import { SessionMetadataLayer } from "../../src/harness/session-metadata";
+import {
+  SessionMetadata,
+  SessionMetadataLayer,
+  type SessionMetadataShape,
+} from "../../src/harness/session-metadata";
 import {
   type PiAgentSessionRepositoryShape,
   makePiAgentSessionRepository,
@@ -48,6 +52,7 @@ export type Spy = {
 
 export type Fixture = {
   readonly service: PiAgentSessionServiceShape;
+  readonly metadata: SessionMetadataShape;
   readonly repo: PiAgentSessionRepositoryShape;
   readonly bus: EventBusShape;
   readonly locks: SessionMetadataLocksShape;
@@ -286,9 +291,9 @@ export const run = <A, E>(
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
       });
       const locksLayer = SessionMetadataLocksLayer;
-      const graph = Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
-        Layer.provide(SessionMetadataLayer),
-        Layer.provide(locksLayer),
+      const graph = PiAgentSessionServiceCoreLayer.pipe(
+        Layer.provideMerge(SessionMetadataLayer),
+        Layer.provideMerge(locksLayer),
         Layer.provide(Layer.succeed(PiAgentSessionRepository, repo)),
         Layer.provide(Layer.succeed(PiAgentSessionManager, manager)),
         Layer.provide(Layer.succeed(PiAgent, pi)),
@@ -301,6 +306,7 @@ export const run = <A, E>(
       const context = yield* Layer.build(graph);
       return {
         service: Context.get(context, PiAgentSessionService),
+        metadata: Context.get(context, SessionMetadata),
         repo,
         bus,
         locks: Context.get(context, SessionMetadataLocks),

@@ -16,7 +16,7 @@ import { daemonAlive, healthy, pidAlive } from "./liveness";
 import { acquireLock } from "./lock";
 import { reservePort } from "./port";
 import { type DaemonRecord, readRecord, removeRecord, writeRecord } from "./record";
-import { clearTombstone, hasTombstone, writeTombstone } from "./tombstone";
+import { clearStoppedMarker, hasStoppedMarker, writeStoppedMarker } from "./stopped-marker";
 
 const DEFAULT_PORT = 4000;
 const READY_TIMEOUT_MS = 30_000;
@@ -56,7 +56,7 @@ export type ResolveDaemonOptions = {
   readonly environment?: NodeJS.ProcessEnv;
   /**
    * Set by automatic supervision loops (the desktop's exit-triggered respawn).
-   * While the `daemon.stopped` tombstone is present, an autoRespawn caller
+   * While the `daemon.stopped` marker is present, an autoRespawn caller
    * fails with `DaemonStoppedError` instead of resurrecting a daemon the user
    * explicitly stopped. Explicit front-doors leave this unset.
    */
@@ -95,7 +95,7 @@ export const resolveOrSpawnDaemon = (
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
     const daemonDir = daemonDirectory(options.home);
-    if (options.autoRespawn === true && (yield* hasTombstone(daemonDir))) {
+    if (options.autoRespawn === true && (yield* hasStoppedMarker(daemonDir))) {
       return yield* daemonStopped();
     }
 
@@ -118,9 +118,9 @@ export const statusDaemon = (
   });
 
 /**
- * Stop the daemon and leave a `daemon.stopped` tombstone so automatic
+ * Stop the daemon and leave a `daemon.stopped` marker so automatic
  * supervision (the desktop's respawn loop) does not resurrect it. The
- * tombstone is written before the kill so a respawn racing the stop still
+ * marker is written before the kill so a respawn racing the stop still
  * sees it. Returns whether anything was running.
  */
 export const stopDaemon = (
@@ -140,7 +140,7 @@ export const stopDaemon = (
         return "not-running" as const;
       }
 
-      yield* writeTombstone(daemonDir);
+      yield* writeStoppedMarker(daemonDir);
       if (!(yield* terminateRecordedDaemon(record))) {
         return yield* Effect.fail(
           new DaemonLaunchError({
@@ -229,10 +229,10 @@ const resolveLocked = (
 ): Effect.Effect<DaemonHandle, DaemonLauncherError, DaemonPlatform> =>
   Effect.gen(function* () {
     const daemonDir = daemonDirectory(options.home);
-    if (options.autoRespawn === true && (yield* hasTombstone(daemonDir))) {
+    if (options.autoRespawn === true && (yield* hasStoppedMarker(daemonDir))) {
       return yield* daemonStopped();
     }
-    yield* clearTombstone(daemonDir);
+    yield* clearStoppedMarker(daemonDir);
 
     const existing = yield* readRecord(daemonDir);
     const existingHealthy = existing !== undefined && (yield* daemonAlive(existing));

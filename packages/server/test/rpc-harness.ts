@@ -10,11 +10,7 @@ import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
 import { GitServiceLayer, WorktreeServiceLayer } from "../src/git";
-import {
-  PiAgentServiceLayer,
-  PiAgentSessionManagerLayer,
-  PiAgentSessionServiceLayer,
-} from "../src/harness";
+import { PiAgentSessionManagerLayer, PiAgentSessionServiceLayer } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import type { PiExecutable } from "../src/harness/pi/resolve-executable";
@@ -130,7 +126,6 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
   );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
     settingsRepositoryLayer,

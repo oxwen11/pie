@@ -57,28 +57,35 @@ function toItem(pm: DefaultPackageManager, source: string): PackageItem {
   };
 }
 
-const NpmSearchResponseSchema = Schema.Struct({
-  objects: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        downloads: Schema.optionalKey(
-          Schema.Struct({ monthly: Schema.optionalKey(Schema.Number) }),
-        ),
-        package: Schema.optionalKey(
-          Schema.Struct({
-            name: Schema.optionalKey(Schema.String),
-            description: Schema.optionalKey(Schema.String),
-            version: Schema.optionalKey(Schema.String),
-            publisher: Schema.optionalKey(
-              Schema.Struct({ username: Schema.optionalKey(Schema.String) }),
-            ),
-          }),
-        ),
-      }),
+const decodeNpmSearchResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    objects: Schema.optionalKey(
+      Schema.Array(
+        Schema.Struct({
+          downloads: Schema.optionalKey(
+            Schema.Struct({ monthly: Schema.optionalKey(Schema.Number) }),
+          ),
+          package: Schema.optionalKey(
+            Schema.Struct({
+              name: Schema.optionalKey(Schema.String),
+              description: Schema.optionalKey(Schema.String),
+              version: Schema.optionalKey(Schema.String),
+              publisher: Schema.optionalKey(
+                Schema.Struct({ username: Schema.optionalKey(Schema.String) }),
+              ),
+            }),
+          ),
+        }),
+      ),
     ),
-  ),
-  total: Schema.optionalKey(Schema.Number),
-});
+    total: Schema.optionalKey(Schema.Number),
+  }),
+);
+
+const catalogUnavailable = (cause: unknown) =>
+  new PackageCatalogUnavailable({
+    reason: cause instanceof Error ? cause.message : String(cause),
+  });
 
 type MutableCatalogItem = {
   name: string;
@@ -89,10 +96,10 @@ type MutableCatalogItem = {
   downloadsMonthly?: number;
 };
 
-async function searchNpmPiPackages(
+function searchNpmPiPackages(
   input: { readonly query?: string; readonly page?: number },
   fetchImpl: typeof fetch,
-): Promise<PackageCatalogPage> {
+): Effect.Effect<PackageCatalogPage, PackageCatalogUnavailable> {
   const requestedPage = input.page ?? 0;
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? Math.floor(requestedPage) : 1;
   const trimmed = input.query?.trim() ?? "";
@@ -101,31 +108,42 @@ async function searchNpmPiPackages(
   url.searchParams.set("text", text);
   url.searchParams.set("size", String(NPM_SEARCH_PAGE_SIZE));
   url.searchParams.set("from", String((page - 1) * NPM_SEARCH_PAGE_SIZE));
-  const response = await fetchImpl(url);
-  if (!response.ok) {
-    throw new Error(`npm search failed: ${response.status}`);
-  }
-  const body = Schema.decodeUnknownSync(NpmSearchResponseSchema)(await response.json());
-  const items: PackageCatalogItem[] = [];
-  for (const hit of body.objects ?? []) {
-    const name = hit.package?.name?.trim();
-    const version = hit.package?.version?.trim();
-    if (!name || !version) continue;
-    const description = hit.package?.description?.trim();
-    const publisher = hit.package?.publisher?.username?.trim();
-    const downloadsMonthly = hit.downloads?.monthly;
-    const item: MutableCatalogItem = { name, version, source: `npm:${name}` };
-    if (description) item.description = description;
-    if (publisher) item.publisher = publisher;
-    if (typeof downloadsMonthly === "number") item.downloadsMonthly = downloadsMonthly;
-    items.push(item);
-  }
-  return {
-    items,
-    total: typeof body.total === "number" ? body.total : items.length,
-    page,
-    pageSize: NPM_SEARCH_PAGE_SIZE,
-  };
+  return Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () => fetchImpl(url),
+      catch: catalogUnavailable,
+    });
+    if (!response.ok) {
+      return yield* new PackageCatalogUnavailable({
+        reason: `npm search failed: ${response.status}`,
+      });
+    }
+    const json: unknown = yield* Effect.tryPromise({
+      try: () => response.json(),
+      catch: catalogUnavailable,
+    });
+    const body = yield* decodeNpmSearchResponse(json).pipe(Effect.mapError(catalogUnavailable));
+    const items: PackageCatalogItem[] = [];
+    for (const hit of body.objects ?? []) {
+      const name = hit.package?.name?.trim();
+      const version = hit.package?.version?.trim();
+      if (!name || !version) continue;
+      const description = hit.package?.description?.trim();
+      const publisher = hit.package?.publisher?.username?.trim();
+      const downloadsMonthly = hit.downloads?.monthly;
+      const item: MutableCatalogItem = { name, version, source: `npm:${name}` };
+      if (description) item.description = description;
+      if (publisher) item.publisher = publisher;
+      if (typeof downloadsMonthly === "number") item.downloadsMonthly = downloadsMonthly;
+      items.push(item);
+    }
+    return {
+      items,
+      total: typeof body.total === "number" ? body.total : items.length,
+      page,
+      pageSize: NPM_SEARCH_PAGE_SIZE,
+    };
+  });
 }
 
 /** Settings-only package ops. Session start auto-installs missing packages. */
@@ -174,14 +192,7 @@ export function makePackageService(
         });
         return { removed: true as const };
       }),
-    search: (input) =>
-      Effect.tryPromise({
-        try: () => searchNpmPiPackages(input, fetchImpl),
-        catch: (cause) =>
-          new PackageCatalogUnavailable({
-            reason: cause instanceof Error ? cause.message : String(cause),
-          }),
-      }),
+    search: (input) => searchNpmPiPackages(input, fetchImpl),
   };
 }
 

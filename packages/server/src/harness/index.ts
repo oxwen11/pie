@@ -5,7 +5,6 @@ export {
   type CreatePiSessionInput,
 } from "./session-service";
 export { PiAgentSessionManager, PiAgentSessionManagerLayer } from "./session-manager";
-export { PiAgentService, PiAgentServiceLayer } from "./agent-service";
 export { PiAgent, type PiAgentShape, cachePiAgentAvailability, makePiAgent } from "./pi/agent";
 
 export {
@@ -16,7 +15,7 @@ export {
   type SessionEvent,
   SessionEventDefs,
   GlobalEventDefs,
-} from "./events/framework";
+} from "./events/session-events";
 export { type PiAgentRuntime } from "./pi/runtime";
 
 export * from "./errors";

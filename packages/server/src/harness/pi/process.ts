@@ -4,7 +4,7 @@ import type {
   AgentModelState,
   SessionPendingPrompt,
 } from "@getpie/contract";
-import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
+import { Context, Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
@@ -163,6 +163,9 @@ export interface PiProcess {
     ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
   };
 }
+
+/** Live Pi child-process table. The composition root builds the layer. */
+export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 
 /** @internal */
 export const makePiProcessWithDependencies = <R>(

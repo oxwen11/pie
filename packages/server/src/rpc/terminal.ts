@@ -5,7 +5,7 @@ import { TerminalNotRunning, TerminalSpawnFailed } from "../errors";
 import { TerminalManager } from "../terminal";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { resolveWorkspaceCwd } from "./resolve-workspace";
+import { resolveWorkspaceCwd } from "./resolve-cwd";
 import { streamToAsyncGenerator } from "./stream";
 
 const orpc = implement(terminalContract).$context<RpcContext>();

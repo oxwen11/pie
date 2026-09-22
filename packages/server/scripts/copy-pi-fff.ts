@@ -29,7 +29,7 @@ const packageDir = (name: string): string => {
       }
     }
     const parent = path.dirname(current);
-    if (parent === current) throw new Error(`copy-fff: cannot resolve ${name}`);
+    if (parent === current) throw new Error(`copy-pi-fff: cannot resolve ${name}`);
     current = parent;
   }
 };
@@ -60,7 +60,7 @@ const platformBin = (): string => {
 };
 
 /** Copy pi-fff + fff-bun + the current platform bin into `dest/node_modules`. */
-export function copyFffIsland(dest: string): void {
+export function copyPiFffNodeModules(dest: string): void {
   const destNodeModules = path.join(dest, "node_modules");
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(destNodeModules, { recursive: true });

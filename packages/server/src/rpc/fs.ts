@@ -10,7 +10,7 @@ import { FileSystemService } from "../fs";
 import { contains } from "../path-safety";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-cwd";
 
 const orpc = implement(fsContract).$context<RpcContext>();
 

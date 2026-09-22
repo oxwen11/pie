@@ -8,12 +8,10 @@ import type { PieUIMessageChunk } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
- * Harness-internal event vocabulary. The public `@getpie/contract` wire model is
- * a flat tagged union (`SessionScopedEvent` keyed by `SessionRef`); this module
- * keeps the harness's own ergonomic `defineEvent`/`SessionEnvelope` shape, keyed
- * by the agent-native `sessionId`. `HarnessAgentSession` translates these
- * drafts into the wire model at the fan-out boundary (attaching the `SessionRef`
- * and stamping the per-session `seq`).
+ * Server-internal session and global events. The public contract event is the
+ * flat `SessionScopedEvent` union keyed by `SessionRef`. This module keeps
+ * `defineEvent` and `SessionEnvelope`, keyed by the Pi session id. The session
+ * attaches the `SessionRef` and stamps `seq` when it publishes.
  */
 
 export interface EventDef<

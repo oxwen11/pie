@@ -58,22 +58,26 @@ the same files. Do not copy a skill into `.cursor/skills` as a second original.
   (Effect Context — create/resume/cold reads at the composition root),
   `PiAgentRuntime` (live child handle), `PiAgentSessionManager` (sole owner of
   live state — one session per ref; the only caller of `PiAgent.create`/`resume`),
-  and `PiAgentSessionService` (outward face: SessionRef ↔ `agentSessionId`
-  translation, metadata persistence, wire vocabulary validation, collection
-  events). Persistable session state is `PiAgentSessionRepository` (disk) plus
-  `SessionMetadata` (record CRUD) and `SessionMetadataLocks` (per-ref
-  semaphore); those three are Context services like `ProjectRepository`.
-  Orchestration stays on `PiAgentSessionService` — not a `SessionLifecycle` /
-  `SessionTurn` split. `session.ts` and `session-fold.ts` stay
+  and `PiAgentSessionService` (orchestration: SessionRef ↔ `agentSessionId`
+  translation, live runtime, wire vocabulary validation, collection events).
+  Persistable session state is `PiAgentSessionRepository` (disk) plus
+  `SessionMetadata` (the outward record-CRUD face: list, rename, archive,
+  workspace, pull-request refs) and `SessionMetadataLocks` (per-ref semaphore);
+  those three are Context services like `ProjectRepository`. RPC and schedules
+  call `SessionMetadata` for that CRUD. Orchestration stays on
+  `PiAgentSessionService` — not a `SessionLifecycle` / `SessionTurn` split. `session.ts` and `session-fold.ts` stay
   private collaborators — no Context tags. `PiAgentSession` (`session.ts`)
   optionally owns a runtime: observing a session costs no process until a prompt
   or history read acquires one. The RPC router contributes only `projectId →
 workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   never `projectId`.
 - **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiProcessLayer`
-  constructs `PiProcess`, `PiAgent` wraps it with `cachePiAgentAvailability` (one
-  `--version` probe per server lifetime), then the session manager and service
-  layers consume `PiAgent` directly.
+  constructs `PiProcess` (`PiProcessTag` lives next to the process module),
+  `PiAgent` wraps it with `cachePiAgentAvailability` (one `--version` probe per
+  server lifetime), then the session manager and service layers consume
+  `PiAgent` directly. Platform layers (`FileSystem`, `Path`, `Crypto`,
+  `ChildProcessSpawner`, `Paths`) are provided once, at this root, by a single
+  layer reference.
 - `EventBusLayer` must stay a single Layer reference across publish and
   subscribe wiring — Effect memoizes layers by reference, and a second
   reference (or `Layer.fresh`) silently splits the bus.

@@ -4,7 +4,7 @@ import { Effect, FileSystem } from "effect";
 import { simpleGit } from "simple-git";
 
 import { GitError, GitNotRepository } from "../errors";
-import { resolveWorkspaceRoot, workspaceReadError } from "../workspace-root";
+import { resolveWorkspaceRoot, workspaceReadError } from "../real-directory";
 
 /** Reject anything that is not a listed ref name — no `../`, flags, or rev magic. */
 export const isUnsafeRef = (ref: string): boolean =>

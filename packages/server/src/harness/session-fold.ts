@@ -11,7 +11,7 @@ import type {
   SessionStatus,
 } from "@getpie/contract";
 
-import { isSessionEvent, type SessionEnvelopeBody } from "./events/framework";
+import { isSessionEvent, type SessionEnvelopeBody } from "./events/session-events";
 
 /**
  * The server-side truth a session's native event stream sheds, as a pure fold.

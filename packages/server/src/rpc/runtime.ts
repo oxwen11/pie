@@ -3,19 +3,16 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { Context, Effect, Layer } from "effect";
+import { Effect, Layer } from "effect";
+import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer } from "../events";
 import { FileSystemServiceLayer } from "../fs";
 import { GitServiceLayer, WorktreeServiceLayer } from "../git";
-import {
-  PiAgentSessionManagerLayer,
-  PiAgentServiceLayer,
-  PiAgentSessionServiceLayer,
-} from "../harness";
+import { PiAgentSessionManagerLayer, PiAgentSessionServiceLayer } from "../harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
-import { makePiProcess, type PiProcess } from "../harness/pi/process";
+import { makePiProcess, PiProcessTag } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ResourceMonitoring } from "../observability/resources";
 import { PackageServiceLayer } from "../packages";
@@ -26,7 +23,7 @@ import { SettingsRepositoryLayer } from "../settings";
 import { SkillServiceLayer } from "../skills";
 import { TerminalManagerLayer } from "../terminal";
 
-export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
+export { PiProcessTag };
 
 const PlatformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, NodeCrypto.layer);
 
@@ -35,7 +32,11 @@ const NodeProcessLayer = NodeChildProcessSpawner.layer.pipe(Layer.provide(Platfo
 const piExecutable = resolvePiExecutable();
 const piProcessOptions = { executable: piExecutable };
 
-export const PiProcessLayer: Layer.Layer<PiProcessTag, never, ResourceMonitoring> = Layer.effect(
+export const PiProcessLayer: Layer.Layer<
+  PiProcessTag,
+  never,
+  ResourceMonitoring | ChildProcessSpawner.ChildProcessSpawner
+> = Layer.effect(
   PiProcessTag,
   Effect.gen(function* () {
     const resources = yield* ResourceMonitoring;
@@ -45,83 +46,60 @@ export const PiProcessLayer: Layer.Layer<PiProcessTag, never, ResourceMonitoring
       onExit: (sessionId, pid) => resources.unregisterPi(sessionId, { pid }),
     });
   }),
-).pipe(Layer.provide(NodeProcessLayer));
+);
 
-const PiAgentProvided = Layer.effect(
+const PiAgentLayer = Layer.effect(
   PiAgent,
   Effect.gen(function* () {
     const process = yield* PiProcessTag;
-    const pi = yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
-    return pi;
+    return yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
   }),
-).pipe(Layer.provide(PiProcessLayer), Layer.provide(PlatformLayer));
-
-const PiAgentSessionManagerProvided = PiAgentSessionManagerLayer.pipe(
-  Layer.provide(PiAgentProvided),
-  Layer.provide(EventBusLayer),
-  Layer.provide(PlatformLayer),
-);
-const GitProvided = GitServiceLayer.pipe(
-  Layer.provide(FileSystemServiceLayer),
-  Layer.provide(PlatformLayer),
-);
-const WorktreeProvided = WorktreeServiceLayer.pipe(
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
-);
-
-const ProjectServiceProvided = ProjectServiceLayer.pipe(
-  Layer.provide(ProjectRepositoryLayer),
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
-);
-
-const SettingsRepositoryProvided = SettingsRepositoryLayer.pipe(
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
-);
-
-const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
-  Layer.provide(PiAgentSessionManagerProvided),
-  Layer.provide(PiAgentProvided),
-  Layer.provide(EventBusLayer),
-  Layer.provide(ProjectServiceProvided),
-  Layer.provide(PathsLayer),
-  Layer.provide(WorktreeProvided),
-  Layer.provide(PlatformLayer),
-);
-
-const PiAgentServiceProvided = PiAgentServiceLayer;
-const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
-
-const ScheduleServiceProvided = ScheduleServiceLayer.pipe(
-  Layer.provide(ScheduleRepositoryLayer),
-  Layer.provide(ProjectServiceProvided),
-  Layer.provide(PiAgentSessionServiceProvided),
-  Layer.provide(PathsLayer),
-  Layer.provide(PlatformLayer),
 );
 
 const ScheduleDaemonLayer = Layer.effectDiscard(runScheduleLoop.pipe(Effect.forkScoped)).pipe(
-  Layer.provide(ScheduleServiceProvided),
+  Layer.provide(ScheduleServiceLayer),
 );
+
+/**
+ * One reference per shared layer. `mergeAll` does not wire siblings, so each
+ * dependency is `provide`d again with that same reference — Effect memoizes
+ * layers by identity, and a second reference would split EventBus, Pi, and
+ * the schedule daemon from the services RPC calls.
+ *
+ * Platform services are provided only here. `ResourceMonitoring` stays in `R`
+ * so `createRpcRuntime` can supply the process monitor.
+ */
 export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
-  PiAgentServiceProvided,
-  PiAgentSessionServiceProvided,
-  ProjectServiceProvided,
-  SettingsRepositoryProvided,
-  ScheduleServiceProvided,
+  PiAgentSessionServiceLayer,
+  ProjectServiceLayer,
+  SettingsRepositoryLayer,
+  ScheduleServiceLayer,
   ScheduleDaemonLayer,
   PackageServiceLayer,
   SkillServiceLayer,
-  PiAgentProvided,
+  PiAgentLayer,
   PiProcessLayer,
-  FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),
-  GitProvided,
-  WorktreeProvided,
-  PullRequestServiceProvided,
+  FileSystemServiceLayer,
+  GitServiceLayer,
+  WorktreeServiceLayer,
+  PullRequestServiceLayer,
   TerminalManagerLayer,
   PlatformLayer,
   NodeHttpPlatform.layer,
+).pipe(
+  Layer.provide(ScheduleServiceLayer),
+  Layer.provide(PiAgentSessionServiceLayer),
+  Layer.provide(ProjectServiceLayer),
+  Layer.provide(WorktreeServiceLayer),
+  Layer.provide(PiAgentSessionManagerLayer),
+  Layer.provide(PiAgentLayer),
+  Layer.provide(PiProcessLayer),
+  Layer.provide(EventBusLayer),
+  Layer.provide(FileSystemServiceLayer),
+  Layer.provide(ProjectRepositoryLayer),
+  Layer.provide(ScheduleRepositoryLayer),
+  Layer.provide(PathsLayer),
+  Layer.provide(PlatformLayer),
+  Layer.provide(NodeProcessLayer),
 );

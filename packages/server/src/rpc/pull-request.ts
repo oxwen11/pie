@@ -2,11 +2,11 @@ import { pullRequestContract } from "@getpie/contract/pull-request";
 import { Effect } from "effect";
 
 import { SessionNotFound } from "../errors";
-import { PiAgentSessionService } from "../harness";
+import { SessionMetadata } from "../harness/session-metadata";
 import { PullRequestService } from "../pull-request";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-cwd";
 
 const orpc = implement(pullRequestContract).$context<RpcContext>();
 
@@ -42,11 +42,11 @@ const catchCurrentRead = <E extends PullRequestReadErrors>(errors: E) =>
 export const pullRequestRouter = orpc.router({
   current: orpc.current.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
-    const sessions = yield* PiAgentSessionService;
+    const metadata = yield* SessionMetadata;
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
     const snapshot = yield* service.current(cwd).pipe(catchCurrentRead(errors));
     if (snapshot !== null) {
-      yield* sessions.rememberPullRequestRef(input.ref, snapshot.ref).pipe(
+      yield* metadata.rememberPullRequestRef(input.ref, snapshot.ref).pipe(
         Effect.catchTags({
           SessionNotFound: () => Effect.void,
           StoreReadError: () => Effect.void,
@@ -66,11 +66,11 @@ export const pullRequestRouter = orpc.router({
   }),
   statuses: orpc.statuses.effect(function* ({ input, errors }) {
     const service = yield* PullRequestService;
-    const sessions = yield* PiAgentSessionService;
+    const metadata = yield* SessionMetadata;
     const workspaces = yield* Effect.forEach(input.refs, (ref) =>
       Effect.gen(function* () {
         const cwd = yield* resolveWorkspaceCwdOrFail({ ref }, errors);
-        const pullRequestRefs = yield* sessions.pullRequestRefsFor(ref).pipe(
+        const pullRequestRefs = yield* metadata.pullRequestRefsFor(ref).pipe(
           Effect.catchTags({
             SessionNotFound: (error: SessionNotFound) =>
               Effect.fail(

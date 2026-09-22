@@ -12,6 +12,7 @@ import { TestClock } from "effect/testing";
 
 import { ProjectNotFound, ScheduleNotFound, StoreWriteError } from "../../src/errors";
 import { PiAgentSessionService, type PiAgentSessionServiceShape } from "../../src/harness";
+import { SessionMetadata } from "../../src/harness/session-metadata";
 import { ProjectService } from "../../src/project";
 import { runScheduleLoop } from "../../src/schedule/daemon";
 import { ScheduleRepository } from "../../src/schedule/repository";
@@ -101,13 +102,6 @@ const stubSessions = (opts: {
     input: Parameters<PiAgentSessionServiceShape["prompt"]>[0],
   ) => Effect.Effect<{ readonly turnId: string; readonly started: boolean }, unknown>;
 }): PiAgentSessionServiceShape => {
-  const summary = (session: SessionRecord): SessionSummary => ({
-    projectId: session.projectId,
-    sessionId: session.sessionId,
-    archived: session.archived,
-    createdAt: ORIGIN_ISO,
-    historyAvailable: false,
-  });
   return {
     create: (input) =>
       Effect.sync(() => {
@@ -133,21 +127,10 @@ const stubSessions = (opts: {
       Effect.succeed({
         phase: opts.sessionPhase?.(ref) ?? (opts.live === true ? "running" : "idle"),
       }),
-    list: (projectId, archived) =>
-      Effect.succeed(
-        opts.catalog
-          .filter((session) => session.projectId === projectId && session.archived === archived)
-          .map(summary),
-      ),
     prepare: unused,
     restoreWorktree: unused,
-    workspaceFor: unused,
     close: unused,
     delete: unused,
-    rename: unused,
-    archive: unused,
-    pullRequestRefsFor: unused,
-    rememberPullRequestRef: unused,
     getMessages: unused,
     interrupt: unused,
     replaceQueue: unused,
@@ -160,6 +143,31 @@ const stubSessions = (opts: {
     resolveRef: unused,
   };
 };
+
+const stubMetadata = (catalog: Array<SessionRecord>): SessionMetadata["Service"] => ({
+  list: (projectId, archived) =>
+    Effect.succeed(
+      catalog
+        .filter((session) => session.projectId === projectId && session.archived === archived)
+        .map(
+          (session): SessionSummary => ({
+            projectId: session.projectId,
+            sessionId: session.sessionId,
+            archived: session.archived,
+            createdAt: ORIGIN_ISO,
+            historyAvailable: false,
+          }),
+        ),
+    ),
+  readMetadata: unused,
+  ensureCwd: unused,
+  workspaceFor: unused,
+  rename: unused,
+  archive: unused,
+  pullRequestRefsFor: unused,
+  rememberPullRequestRef: unused,
+  readAndStampTitleFromFirstPrompt: unused,
+});
 
 const seedSession = (catalog: Array<SessionRecord>, sessionId: string, archived = false): void => {
   catalog.push({ projectId: PROJECT_ID, sessionId, archived });
@@ -202,6 +210,7 @@ const harness = (
           ),
         ),
         Layer.provide(Layer.succeed(ProjectService, stubProjects(opts.missingProject === true))),
+        Layer.provide(Layer.succeed(SessionMetadata, stubMetadata(catalog))),
         Layer.provide(
           Layer.succeed(
             PiAgentSessionService,

@@ -27,7 +27,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { piBashExtension } from "../bash";
-import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../fff";
+import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../pi-fff-node-path";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
