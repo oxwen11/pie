@@ -24,6 +24,7 @@ import { createChatBaseExtensions } from "./input/extensions/chat-base-extension
 import { createSubmitKeymap } from "./input/extensions/keymaps";
 import { useChatInputController } from "./input/use-chat-input-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
+import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 
 // Live-session input bar on the TipTap chat-input kit: Enter sends (IME-safe,
 // handled by the submit keymap) / Shift+Enter breaks the line. Stop and Send
@@ -77,6 +78,7 @@ export function ChatInputComposer({
   });
 
   const hasContent = useChatInputHasContent(controller);
+  const multiline = useChatInputMultiline(controller);
 
   return (
     <CardFrame>
@@ -89,6 +91,7 @@ export function ChatInputComposer({
         render={
           <PromptInput
             className="divide-y-0"
+            data-layout={multiline ? undefined : "inline"}
             onSubmit={(e) => {
               e.preventDefault();
               void controller?.submit();

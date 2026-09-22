@@ -132,10 +132,15 @@
   height: 0;
 }
 
-form:has(> [data-slot="chat-input"]) {
+/* Session one-line row. Draft (no data-layout) stays a column. */
+form[data-layout="inline"]:has(> [data-slot="chat-input"]) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+
+  [data-slot="chat-input"] .tiptap {
+    padding-bottom: 0.75rem;
+  }
 }
 
 [data-slot="card-frame"]:has([data-slot="chat-input"]) {
