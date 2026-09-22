@@ -400,13 +400,14 @@ $PIE_HOME/workspace/verify-pie[-desktop]-sample/
 ```
 
 Verify owns these non-sensitive, umask-permissioned files and sets
-`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and `HOME=$PIE_HOME/home` for the
-run's server (so `~/Pie` resolves to `$PIE_HOME/home/Pie`). When
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and
+`PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` for the run's server. It does not change
+`HOME`, so `~/.pi/agent` stays the operator's model catalog. When
 `PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
 reports no parent there, and resolves real paths before rejecting traversal or
 symlinks outside it. An unset or blank browse root preserves the production
-default of the operator's home directory. Verify overwrites an inherited `HOME`
-with its own run path; parallel runs therefore do not share this boundary.
+default of the operator's home directory. Parallel runs do not share a
+`$PIE_HOME`; they do share `~/.pi/agent`.
 
 The sample has no independent schema or migration. Its marker retains the
 existing cleanup compatibility check. Fresh Web and Desktop runs also seed the
