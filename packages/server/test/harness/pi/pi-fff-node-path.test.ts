@@ -7,8 +7,8 @@ import url from "node:url";
 
 import { describe, it } from "vitest";
 
-import { copyFffIsland } from "../../../scripts/copy-fff";
-import { fffNodePathEnv } from "../../../src/harness/pi/fff";
+import { copyPiFffNodeModules } from "../../../scripts/copy-pi-fff";
+import { fffNodePathEnv } from "../../../src/harness/pi/pi-fff-node-path";
 
 const processBundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
@@ -35,7 +35,7 @@ const readJsonl = (text: string): Array<Record<string, unknown>> => {
 describe("bundled fff island", () => {
   it("copies pi-fff and one platform bin, then overrides find/grep under Bun", () => {
     const dest = fs.mkdtempSync(path.join(os.tmpdir(), "pie-fff-island-"));
-    copyFffIsland(dest);
+    copyPiFffNodeModules(dest);
     const island = path.join(dest, "node_modules");
     assert.equal(fs.existsSync(path.join(island, "@ff-labs", "pi-fff", "src", "index.ts")), true);
     const bins = fs

@@ -7,7 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Effect, FileSystem } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import { copyFffIsland } from "./scripts/copy-fff";
+import { copyPiFffNodeModules } from "./scripts/copy-pi-fff";
 
 const piEntry = url.fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
 const piDir = path.dirname(path.dirname(piEntry));
@@ -69,7 +69,7 @@ NodeRuntime.runMain(
     // Sibling island — not inside pi-process/, so bun-build cannot inline
     // the fff FFI graph and the CLI artifact test can still diff that tree.
     yield* Effect.sync(() => {
-      copyFffIsland(path.join(path.dirname(outDir), "fff"));
+      copyPiFffNodeModules(path.join(path.dirname(outDir), "fff"));
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );

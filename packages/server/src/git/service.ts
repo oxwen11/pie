@@ -26,8 +26,8 @@ import {
 } from "../errors";
 import { FileSystemService } from "../fs";
 import { contains, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
+import { isUnsafeRef, makeGitHelpers, parseRefNames } from "./commands";
 import { parseNameStatus, parseNulPaths } from "./name-status";
-import { isUnsafeRef, makeGitHelpers, parseRefNames } from "./shared";
 
 /** GitService always runs against a resolved absolute cwd — not a session ref. */
 export type GitReviewCwdQuery = {

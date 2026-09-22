@@ -83,7 +83,7 @@ export function resolveProjectBrowseRoot(env: NodeJS.ProcessEnv = process.env): 
   return raw === undefined || raw.trim() === "" ? undefined : path.resolve(raw);
 }
 
-/** `$PIE_HOME/daemon` — pid, lock, and stop tombstone. */
+/** `$PIE_HOME/daemon` — pid, lock, and the explicit-stop marker. */
 export const daemonDirectory = (home: string): string => path.join(home, "daemon");
 
 /** `$PIE_HOME/daemon` from the same home `resolvePieHome` would pick. */

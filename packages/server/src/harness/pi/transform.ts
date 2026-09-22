@@ -1,6 +1,6 @@
 import { v7 as uuid } from "uuid";
 
-import type { SessionEvent } from "../events/framework";
+import type { SessionEvent } from "../events/session-events";
 import type { AgentSessionEvent } from "./protocol";
 import { isDynamicPiTool } from "./tools";
 import type { PiUIMessageChunk } from "./ui-message";

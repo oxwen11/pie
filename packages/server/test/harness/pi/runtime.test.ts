@@ -4,7 +4,7 @@ import { it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Queue, Ref, Stream } from "effect";
 
 import { AgentOperationError } from "../../../src/harness/errors";
-import type { SessionEnvelopeDraft } from "../../../src/harness/events/framework";
+import type { SessionEnvelopeDraft } from "../../../src/harness/events/session-events";
 import type { PiProcess } from "../../../src/harness/pi/process";
 import { makePiAgentRuntime } from "../../../src/harness/pi/runtime";
 import type { PiStreamItem } from "../../../src/harness/pi/transform";

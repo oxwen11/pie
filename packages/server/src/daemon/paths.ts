@@ -18,5 +18,5 @@ export const daemonRecordPath = (daemonDir: string): string => path.join(daemonD
 export const daemonLockPath = (daemonDir: string): string => path.join(daemonDir, "daemon.lock");
 
 /** Written by an explicit stop so supervision does not resurrect the daemon. */
-export const daemonTombstonePath = (daemonDir: string): string =>
+export const daemonStoppedMarkerPath = (daemonDir: string): string =>
   path.join(daemonDir, "daemon.stopped");

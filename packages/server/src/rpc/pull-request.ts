@@ -6,7 +6,7 @@ import { SessionMetadata } from "../harness/session-metadata";
 import { PullRequestService } from "../pull-request";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
+import { resolveWorkspaceCwdOrFail } from "./resolve-cwd";
 
 const orpc = implement(pullRequestContract).$context<RpcContext>();
 

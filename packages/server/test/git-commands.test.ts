@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isUnsafeRef } from "../src/git/shared";
+import { isUnsafeRef } from "../src/git/commands";
 
 describe("isUnsafeRef", () => {
   it("rejects a leading dash", () => {

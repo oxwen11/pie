@@ -9,4 +9,4 @@ export {
   SessionTurnEnded,
   SessionTurnStarted,
   SessionUpdated,
-} from "./framework";
+} from "./session-events";

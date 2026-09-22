@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unnecessary-type-parameters -- E preserves the caller's oRPC error constructor
 import type { WorkspaceQuery } from "@getpie/contract";
 import { Effect } from "effect";
 

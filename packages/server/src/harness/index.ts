@@ -15,7 +15,7 @@ export {
   type SessionEvent,
   SessionEventDefs,
   GlobalEventDefs,
-} from "./events/framework";
+} from "./events/session-events";
 export { type PiAgentRuntime } from "./pi/runtime";
 
 export * from "./errors";

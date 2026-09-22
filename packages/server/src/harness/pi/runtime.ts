@@ -18,7 +18,7 @@ import {
   SessionNotResumable,
   TurnAlreadyRunning,
 } from "../errors";
-import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
+import type { SessionEnvelopeDraft, SessionEvent } from "../events/session-events";
 import { streamFromQueueOne } from "../queue-stream";
 import type {
   CreateSessionInput,

@@ -12,8 +12,8 @@ import {
   WorkspacePathEscape,
 } from "../errors";
 import { contains } from "../path-safety";
+import { isUnsafeRef, makeGitHelpers } from "./commands";
 import type { GitFailure } from "./service";
-import { isUnsafeRef, makeGitHelpers } from "./shared";
 import {
   generateWorktreeBranchName,
   isValidBranchName,

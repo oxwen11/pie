@@ -13,7 +13,7 @@ import {
   WorkspaceReadError,
 } from "../errors";
 import { contains, detectImageMimeType, hasBinaryMagicPrefix, toPosixPath } from "../path-safety";
-import { resolveWorkspaceRoot, workspaceReadError } from "../workspace-root";
+import { resolveWorkspaceRoot, workspaceReadError } from "../real-directory";
 
 /** Largest file we will render as text; larger files are rejected, not truncated. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;

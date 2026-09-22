@@ -7,7 +7,7 @@ export class DaemonLaunchError extends Data.TaggedError("DaemonLaunchError")<{
 }> {}
 
 /**
- * The user explicitly stopped the daemon (`daemon.stopped` tombstone present):
+ * The user explicitly stopped the daemon (`daemon.stopped` marker present):
  * auto-respawn callers must not undo that. An explicit start clears it.
  */
 export class DaemonStoppedError extends Data.TaggedError("DaemonStoppedError")<{
