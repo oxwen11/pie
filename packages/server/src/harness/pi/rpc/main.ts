@@ -28,6 +28,7 @@ import {
 
 import { piBashExtension } from "../bash";
 import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../fff";
+import { sessionToolsExtensionFactory } from "../session-tools-extension";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -65,10 +66,12 @@ export const main = async (): Promise<void> => {
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
-        extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
-        // pie-pi-process does not use package `runRpcMode`, so CLI `--extension`
-        // (session tools) must be loaded here or the ready handshake never fires.
-        additionalExtensionPaths: [bundledFff, ...(parsed.extensions ?? [])],
+        extensionFactories: [
+          ...builtInExtensions,
+          piBashExtension(options.cwd),
+          sessionToolsExtensionFactory,
+        ],
+        additionalExtensionPaths: [bundledFff],
       },
     });
     const resolved = resolveCliModel({
