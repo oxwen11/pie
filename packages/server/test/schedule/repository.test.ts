@@ -109,6 +109,28 @@ describe("ScheduleRepository", () => {
     ).rejects.toThrow("ENOENT");
   });
 
+  it("rolls Run files back when the Schedule commit fails", async () => {
+    const current = schedule([runRecord("run-1")]);
+    const next = schedule([runRecord("run-1", "succeeded")]);
+    const scheduleFile = path.join(schedulesDir, SCHEDULE_ID, "schedule.json");
+
+    const error = await run(
+      Effect.gen(function* () {
+        const repo = yield* TestScheduleRepository;
+        yield* repo.create(current);
+        yield* Effect.promise(() => fs.rm(scheduleFile));
+        yield* Effect.promise(() => fs.mkdir(scheduleFile));
+        return yield* Effect.flip(repo.replace(current, next));
+      }),
+    );
+
+    expect(error._tag).toBe("StoreWriteError");
+    const storedRun = JSON.parse(
+      await fs.readFile(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-1.json"), "utf8"),
+    ) as { readonly data: ScheduleRun };
+    expect(storedRun.data.status).toBe("running");
+  });
+
   it("ignores and cleans an unreferenced corrupt Run during replacement", async () => {
     const current = schedule([runRecord("run-1")]);
     const next = { ...current, name: "Updated review" };

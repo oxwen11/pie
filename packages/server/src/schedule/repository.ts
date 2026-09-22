@@ -150,20 +150,38 @@ export const makeScheduleRepository = (schedulesDir: string) =>
     const commit = (current: Schedule | undefined, next: Schedule) => {
       const previous = new Map<string, ScheduleRun>();
       for (const run of current?.runs ?? []) previous.set(run.id, run);
-      return Effect.gen(function* () {
+      const changed = next.runs.filter((run) => !util.isDeepStrictEqual(previous.get(run.id), run));
+      const rollbackRuns = Effect.forEach(
+        changed,
+        (run) => {
+          const before = previous.get(run.id);
+          return before === undefined
+            ? runs.remove(runKey(next.id, run.id)).pipe(Effect.mapError(asWriteError))
+            : runs.put(runKey(next.id, run.id), before).pipe(Effect.mapError(asWriteError));
+        },
+        { concurrency: 16, discard: true },
+      ).pipe(
+        Effect.catch((error) =>
+          Effect.logError("schedule run rollback failed").pipe(
+            Effect.annotateLogs({
+              event: "schedule.run_rollback_failed",
+              scheduleId: next.id,
+              file: error.file,
+            }),
+          ),
+        ),
+      );
+      const apply = Effect.gen(function* () {
         yield* Effect.forEach(
-          next.runs,
-          (run) =>
-            util.isDeepStrictEqual(previous.get(run.id), run)
-              ? Effect.void
-              : runs.put(runKey(next.id, run.id), run).pipe(Effect.mapError(asWriteError)),
+          changed,
+          (run) => runs.put(runKey(next.id, run.id), run).pipe(Effect.mapError(asWriteError)),
           { concurrency: 16, discard: true },
         );
         yield* schedules
           .put(scheduleKey(next.id), toStored(next))
           .pipe(Effect.mapError(asWriteError));
-        yield* garbageCollectRuns(next);
-      });
+      }).pipe(Effect.tapError(() => rollbackRuns));
+      return apply.pipe(Effect.andThen(garbageCollectRuns(next)));
     };
 
     return {
