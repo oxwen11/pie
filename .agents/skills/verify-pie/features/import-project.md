@@ -22,14 +22,14 @@ pnpm exec pie-verify web launch --replace --empty-projects
 pnpm exec pie-verify web doctor
 agent-browser open http://localhost:4190/
 # wait for the draft composer — not a first-project empty heading
-agent-browser wait --text "Ask Pi anything..."
+agent-browser wait --text "Do Anything, / for skills, @ for context"
 agent-browser find role button --name "Import project" click
 agent-browser wait --text "Import this folder"
 ```
 
 Empty home:
 
-1. Snapshot must show the draft composer (**Ask Pi anything...**, picker **Choose project**). Card heading is **New chat**. There is no **Import your first project** heading.
+1. Snapshot must show the draft composer (**Do Anything, / for skills, @ for context**, picker **Choose project**). Card heading is **New chat**. There is no **Import your first project** heading.
 2. Click sidebar **Import project**.
 3. Snapshot: textbox **Search folders or enter a full path...**, only the isolated sample directory, footer path = `$PIE_HOME/workspace`, button **Import this folder**.
 4. Type `verify-pie-sample` in the search box (filters current listing by label or full path). Click the **verify-pie-sample** row to **enter** it — do not import `$HOME`.
@@ -39,7 +39,7 @@ Empty home:
 Proof (all of these):
 
 - Dialog is gone.
-- Draft composer is visible: placeholder **Ask Pi anything...**. The project picker still says **Choose project** until you choose the imported row (sidebar import does not write `?projectId=`).
+- Draft composer is visible: placeholder **Do Anything, / for skills, @ for context**. The project picker still says **Choose project** until you choose the imported row (sidebar import does not write `?projectId=`).
 - Sidebar **Projects** lists **verify-pie-sample**.
 - `$PIE_HOME/storage/projects.json` `data[]` has `name: "verify-pie-sample"` and `path` equal to that folder. Use `verify-pie evidence side-effects`.
 

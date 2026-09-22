@@ -174,9 +174,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
 
   const controller = useChatInputController({
     extensions: (self) => [
-      ...createChatBaseExtensions({
-        placeholder: () => "Ask Pi anything...",
-      }),
+      ...createChatBaseExtensions(),
       createSubmitKeymap({ onSubmit: () => void self.submit() }),
     ],
     onSubmit: (text) => {
@@ -377,7 +375,7 @@ function DraftComposer({
           }
         >
           <ChatInputProvider controller={controller}>
-            <ChatInput />
+            <ChatInput minRows={2} />
             <PromptInputToolbar>
               <PromptInputTools>
                 <ModelSelectorPicker
