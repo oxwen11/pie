@@ -5,7 +5,6 @@ import {
   use,
   useCallback,
   useEffect,
-  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -13,6 +12,7 @@ import {
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
 import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { usePlatform } from "@/platform-context";
+import { useStable } from "@/use-stable";
 
 import { PullRequestDemand } from "./pull-request-demand";
 import { RendererVisibility } from "./renderer-visibility";
@@ -28,7 +28,7 @@ export function PullRequestDemandProvider({ children }: { children: ReactNode })
   const orpc = useCatalogOrpc();
   const queryClient = useQueryClient();
   const platform = usePlatform();
-  const [runtime] = useState(() => {
+  const runtime = useStable(() => {
     const demand = new PullRequestDemand((input) =>
       orpc.pullRequest.demand.call(input, { signal: AbortSignal.timeout(15_000) }),
     );

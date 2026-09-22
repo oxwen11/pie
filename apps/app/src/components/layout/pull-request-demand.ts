@@ -78,32 +78,42 @@ export class PullRequestDemand {
     this.running = true;
     this.clearTimer();
     try {
-      while (this.pending) {
-        this.pending = false;
-        const refs = this.desired();
-        if (this.lease && Date.parse(this.lease.expiresAt) <= Date.now()) this.lease = undefined;
-        if (refs.length === 0 && !this.lease) continue;
-        const leaseId = this.lease?.leaseId;
-        try {
-          const result = await this.send({
-            ...(leaseId ? { leaseId } : undefined),
-            version: ++this.version,
-            refs,
-          });
-          this.lease = refs.length === 0 ? undefined : result;
-        } catch (error) {
-          if (error instanceof ORPCError && error.code === "INVALID_LEASE") {
-            this.lease = undefined;
-            // A rejected capability is never reused; recheck visibility before acquiring.
-            if (leaseId && this.desired().length > 0) this.pending = true;
-          }
-          // Network failure uses the one renewal timer. A hidden renderer has
-          // no retry loop; the server expires an unreachable lease after 90s.
-        }
-      }
+      await this.drain();
     } finally {
       this.running = false;
-      if (this.desired().length > 0) this.timer = setTimeout(() => this.enqueue(), RENEW_MS);
     }
+    if (this.pending) {
+      this.enqueue();
+      return;
+    }
+    if (this.desired().length > 0) this.timer = setTimeout(() => this.enqueue(), RENEW_MS);
+  }
+
+  /** One lease write, then the next queued replacement. Ordered; not parallel. */
+  private async drain(): Promise<void> {
+    if (!this.pending) return;
+    this.pending = false;
+    const refs = this.desired();
+    if (this.lease && Date.parse(this.lease.expiresAt) <= Date.now()) this.lease = undefined;
+    if (!(refs.length === 0 && !this.lease)) {
+      const leaseId = this.lease?.leaseId;
+      try {
+        const result = await this.send({
+          ...(leaseId ? { leaseId } : undefined),
+          version: ++this.version,
+          refs,
+        });
+        this.lease = refs.length === 0 ? undefined : result;
+      } catch (error) {
+        if (error instanceof ORPCError && error.code === "INVALID_LEASE") {
+          this.lease = undefined;
+          // A rejected capability is never reused; recheck visibility before acquiring.
+          if (leaseId && this.desired().length > 0) this.pending = true;
+        }
+        // Network failure uses the one renewal timer. A hidden renderer has
+        // no retry loop; the server expires an unreachable lease after 90s.
+      }
+    }
+    await this.drain();
   }
 }

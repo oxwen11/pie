@@ -39,10 +39,10 @@ export class VisibleSessionRows {
   }
 
   private publish(): void {
-    this.replace(
-      Array.from(this.rows.values())
-        .filter((row) => row.visible)
-        .map((row) => row.ref),
-    );
+    const refs: SessionRef[] = [];
+    for (const row of this.rows.values()) {
+      if (row.visible) refs.push(row.ref);
+    }
+    this.replace(refs);
   }
 }
