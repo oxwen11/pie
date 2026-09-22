@@ -9,6 +9,8 @@ import type { Extensions } from "@tiptap/react";
 import { createPastePlainTextExtension } from "./paste-plain-text";
 import { createThickCaretExtension } from "./thick-caret";
 
+const chatInputPlaceholder = "Do Anything, / for skills, @ for context";
+
 // Base extensions for the chat input: a self-owned minimal set (explicitly
 // listed and maintained here instead of the StarterKit aggregate) — plain-text
 // schema (Document/Paragraph/Text) + HardBreak (Shift+Enter newline) + UndoRedo
@@ -21,7 +23,7 @@ export function createChatBaseExtensions(opts: { placeholder?: () => string } = 
     Text,
     HardBreak,
     UndoRedo,
-    Placeholder.configure({ placeholder: () => opts.placeholder?.() ?? "" }),
+    Placeholder.configure({ placeholder: () => opts.placeholder?.() ?? chatInputPlaceholder }),
     createPastePlainTextExtension(),
     createThickCaretExtension(),
   ];

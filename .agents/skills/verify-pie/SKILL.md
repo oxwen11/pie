@@ -93,7 +93,7 @@ Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use
 ### UI rules
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Choose project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Choose project`, `Do Anything, / for skills, @ for context`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
 3. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
 4. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
@@ -108,7 +108,7 @@ Stable handles (from source, not guesses):
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
 | Draft project picker | one combobox: folder icon then **Choose project** until a project is chosen. Open list: folder basenames, then button **Don't work in a project**. After a project is chosen: trigger shows the name; hovering the picker shows **X** (**Clear project**) |
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
-| Draft composer | contenteditable; placeholder **Ask Pi anything...** |
+| Draft composer | contenteditable; placeholder **Do Anything, / for skills, @ for context** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
 | Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |

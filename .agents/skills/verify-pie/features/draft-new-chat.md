@@ -8,7 +8,7 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 - **Project picker** — default **Choose project** (no `?projectId=`). The folder icon is part of the trigger. Choosing a project writes `?projectId=` (replace). Hovering the picker shows **X** in place of the folder icon; click **X** clears `?projectId=` back to Choose project without opening the list. Opening the list shows projects, then a **Don't work in a project** button (same clear).
 - **Choose project send** — `project.allocate` creates `<root>/<YYYY-MM-DD>/Chat-1/` (then `Chat-2`, …), registers it as a Project with `type: "chat"`, then `session.create`. Sidebar **Recent** lists the session (title is the prompt). **Projects** does not show the chat leaf. The picker still lists imported folders only.
 - **Workspace mode** (git repos only, after a real Project is selected): **Current directory** vs **New worktree**. Worktree requires a **base branch** (`aria-label="Base branch for worktree"`). Non-git shows **Not a Git repository**. Missing folder shows **Workspace unavailable** and blocks send.
-- **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**. Hidden when the model list is empty (`models.length === 0`). Default model is written into `?provider=&modelId=` once.
+- **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**, including when the model list is empty. Default model is written into `?provider=&modelId=` once.
 - **Send** — creates the session (cwd persisted, worktree materialized if requested), then `prompt(text)` without waiting for Pi to spawn, then navigates. Enabled with content even when no project is selected.
 
 ## How to get to it (user POV)
@@ -23,11 +23,11 @@ Prerequisite for the imported-project path: a Project. Ordinary isolated launch 
 
 ```bash
 agent-browser open http://localhost:4190/draft
-agent-browser wait --text "Ask Pi anything..."
+agent-browser wait --text "Do Anything, / for skills, @ for context"
 ```
 
 1. Confirm the project picker. Default without `?projectId=` is **Choose project**. Open it: **verify-pie-sample**, then button **Don't work in a project**. Choose the sample for the imported-project path. Re-open: the same button is still last. Click it to clear back to **Choose project**.
-2. Click the contenteditable (placeholder **Ask Pi anything...**). `keyboard type` a distinctive prompt, e.g. `verify-pie ping`.
+2. Click the contenteditable (placeholder **Do Anything, / for skills, @ for context**). `keyboard type` a distinctive prompt, e.g. `verify-pie ping`.
 3. Snapshot: submit is now enabled. **Click it** — do not press Enter.
 4. Wait for the URL to become `/session/<uuid>?projectId=<uuid>`.
 
