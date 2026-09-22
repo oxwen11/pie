@@ -2,7 +2,7 @@
 import type { PieUIMessage } from "@getpie/contract";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AssistantMessage } from "./assistant-message";
 
@@ -30,24 +30,34 @@ afterEach(() => {
 
 describe("AssistantMessage", () => {
   it("renders compact AI SDK raster file parts that open a preview", async () => {
-    const src = "data:image/png;base64,aGVsbG8=";
+    const src =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXkAAAAASUVORK5CYII=";
     const node = renderParts([
       { type: "file", mediaType: "image/png", filename: "result.png", url: src },
     ]);
 
     const image = node.querySelector("img");
-    const trigger = node.querySelector<HTMLButtonElement>(
-      'button[aria-label="Enlarge result.png"]',
-    );
     expect(image?.getAttribute("src")).toBe(src);
     expect(image?.getAttribute("alt")).toBe("result.png");
     expect(image?.className).toContain("max-h-44");
     expect(image?.className).toContain("sm:max-w-xs");
-    expect(trigger).not.toBeNull();
 
-    await act(async () => trigger?.click());
+    let trigger: HTMLButtonElement | null = null;
+    await act(async () => {
+      await image?.decode();
+      await new Promise(requestAnimationFrame);
+    });
+    await act(async () => {
+      await vi.waitFor(() => {
+        trigger = node.querySelector('button[aria-label="Expand image: result.png"]');
+        expect(trigger).not.toBeNull();
+      });
+      trigger?.click();
+    });
 
-    expect(document.body.querySelector('[role="dialog"] img')?.getAttribute("src")).toBe(src);
+    await vi.waitFor(() => {
+      expect(document.body.querySelector("dialog[open] img")?.getAttribute("src")).toBe(src);
+    });
   });
 
   it("does not render SVG file parts", () => {
