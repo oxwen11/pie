@@ -15,6 +15,7 @@ import { ChatInputQueue } from "./chat-input-queue";
 import { useChatSession } from "./chat-session-context";
 import { useChatComposerController } from "./input/use-chat-composer-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
+import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 
 // Live-session input bar. Stop and Send are mutually exclusive: empty streaming
 // → Stop; any draft (or idle) → Send (queues a follow-up while a turn is in
@@ -58,6 +59,7 @@ export function SessionComposer({
   });
 
   const hasContent = useChatInputHasContent(controller);
+  const multiline = useChatInputMultiline(controller);
 
   return (
     <ChatComposerFrame
@@ -72,6 +74,7 @@ export function SessionComposer({
           />
         </CardFrameFooter>
       }
+      layout={multiline ? undefined : "inline"}
       header={
         hasQueued ? (
           <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">

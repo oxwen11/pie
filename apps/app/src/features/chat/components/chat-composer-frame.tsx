@@ -16,6 +16,8 @@ export function ChatComposerFrame({
   controller,
   footer,
   header,
+  layout,
+  minRows,
   submit,
   toolbar,
 }: {
@@ -23,6 +25,8 @@ export function ChatComposerFrame({
   readonly controller: ChatInputController | null;
   readonly footer?: ReactNode;
   readonly header?: ReactNode;
+  readonly layout?: "inline";
+  readonly minRows?: number;
   readonly submit: ReactNode;
   readonly toolbar?: ReactNode;
 }) {
@@ -33,6 +37,7 @@ export function ChatComposerFrame({
         render={
           <PromptInput
             className="divide-y-0"
+            data-layout={layout}
             onSubmit={(event) => {
               event.preventDefault();
               void controller?.submit();
@@ -41,7 +46,7 @@ export function ChatComposerFrame({
         }
       >
         <ChatInputProvider controller={controller}>
-          <ChatInput />
+          <ChatInput minRows={minRows} />
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
             {submit}

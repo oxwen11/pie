@@ -244,7 +244,7 @@ function ScheduleFormFields({
             id="schedule-prompt"
             maxLength={MAX_SCHEDULE_PROMPT_CHARS}
             onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-            placeholder="Ask Pi anything..."
+            placeholder="Describe what Pie should do"
             required
             value={form.prompt}
           />

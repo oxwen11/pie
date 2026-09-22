@@ -7,7 +7,10 @@ import { ModelSelectorPicker } from "@/components/model-selector/model-selector-
 import { ChatComposerFrame } from "@/features/chat/components/chat-composer-frame";
 import { useChatComposerController } from "@/features/chat/components/input/use-chat-composer-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
-import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
+import {
+  DraftWorkspaceSelect,
+  type DraftWorkspaceMode,
+} from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
 import { ProjectSelect } from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
@@ -33,7 +36,6 @@ export function DraftComposer({
 }) {
   const draftWorktree = useDraftWorktree(selected);
   const controller = useChatComposerController({
-    placeholder: "Ask Pi anything...",
     onSubmit: (text) => {
       if (draftWorktree.gitState === "workspace-unavailable") {
         toast.error("The selected project folder is unavailable.");
@@ -56,6 +58,7 @@ export function DraftComposer({
       <ChatComposerFrame
         className="w-full max-w-2xl"
         controller={controller}
+        minRows={2}
         header={
           <CardFrameHeader className="py-2">
             <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
@@ -105,18 +108,24 @@ function DraftWorkspaceControls({
   disabled: boolean;
   draftWorktree: ReturnType<typeof useDraftWorktree>;
 }) {
+  const handleModeChange = (mode: DraftWorkspaceMode): void => {
+    draftWorktree.setMode(mode);
+  };
+  const handleValueChange = (value: string | null): void => {
+    draftWorktree.setWorktreeBaseOverride(value);
+  };
   return (
     <>
       <DraftWorkspaceSelect
         disabled={disabled}
         mode={draftWorktree.mode}
-        onModeChange={draftWorktree.setMode}
+        onModeChange={handleModeChange}
       />
       {draftWorktree.mode === "worktree" ? (
         <DraftWorktreeBaseSelect
           branch={draftWorktree.repositoryBranch}
           disabled={disabled}
-          onValueChange={draftWorktree.setWorktreeBaseOverride}
+          onValueChange={handleValueChange}
           value={draftWorktree.worktreeBase}
         />
       ) : null}
