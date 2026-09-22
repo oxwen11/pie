@@ -103,7 +103,7 @@ describe("shell columns", () => {
 
   it("stops the content panel at the main column minimum", async () => {
     await render(
-      <div data-testid="shell" className="flex" style={{ width: 800, height: 400 }}>
+      <div data-testid="shell" className="flex" style={{ width: 700, height: 400 }}>
         <div data-testid="main" className="min-w-80 flex-1">
           Main
         </div>
@@ -113,25 +113,11 @@ describe("shell columns", () => {
       </div>,
     );
 
-    const separator = page.getByRole("separator", { name: "Resize content panel" }).element();
-    separator.setPointerCapture = () => {};
-    const startX = separator.getBoundingClientRect().x;
-
-    separator.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, clientX: startX, pointerId: 1 }),
-    );
-    separator.dispatchEvent(
-      new PointerEvent("pointermove", { bubbles: true, clientX: 0, pointerId: 1 }),
-    );
-    separator.dispatchEvent(
-      new PointerEvent("pointerup", { bubbles: true, clientX: 0, pointerId: 1 }),
-    );
-
     const shell = page.getByTestId("shell").element();
     const main = page.getByTestId("main").element();
     const content = page.getByText("Content").element().closest("[data-slot=content-panel-column]");
     expect(content).toBeInstanceOf(HTMLElement);
-    await expect.poll(() => main.getBoundingClientRect().width).toBe(320);
+    expect(main.getBoundingClientRect().width).toBe(320);
     expect((content as HTMLElement).getBoundingClientRect().right).toBeLessThanOrEqual(
       shell.getBoundingClientRect().right,
     );

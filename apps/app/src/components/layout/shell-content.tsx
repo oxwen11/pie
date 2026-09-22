@@ -57,14 +57,14 @@ export function ShellContentPanel({
       <aside
         className={cn(
           "flex min-h-0 flex-col overflow-hidden md:py-1 md:pe-1",
-          maximized ? "min-w-0 flex-1" : "min-w-0 shrink",
+          maximized ? "min-w-0 flex-1" : "min-w-0",
         )}
         data-slot="content-panel-column"
         data-state={collapsed ? "hidden" : maximized ? "maximized" : "docked"}
         inert={collapsed}
         style={maximized ? undefined : { width: collapsed ? 0 : docked }}
       >
-        <div className="flex h-full min-h-0 w-full flex-col">{children}</div>
+        {children}
       </aside>
     </>
   );
