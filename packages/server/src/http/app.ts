@@ -6,21 +6,28 @@ import {
 import { ByteSize, Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
+import { SessionImageAssets } from "../assets";
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
 import { corsHeaders, isLoopbackHost } from "./cors";
+import { parsePairingExchange, type PairingStore } from "./pairing";
 import type { UIApp } from "./ui";
 
 export type RequestAppOptions = {
   /**
-   * When set, every `/api/*` request except `/api/health` and the same-origin
-   * browser bootstrap must present `Authorization: Bearer <token>`.
-   * Unset (browser mode) disables the check.
+   * When set, every `/api/*` request except `/api/health`, signed asset GETs,
+   * and the same-origin browser bootstrap must present
+   * `Authorization: Bearer <token>`. Unset (browser mode) disables the check.
    */
   readonly authToken: string | undefined;
   /** Extra cross-origin allowlist entries on top of the built-in trusted set. */
   readonly corsOrigins: readonly string[];
-  readonly allowedHosts: readonly string[];
+  /** Mutable: Share/Serve/relay attach append Hosts for this process. */
+  readonly allowedHosts: string[];
   readonly tickets: TicketStore;
+  /** Pairing codes → process-lifetime session tokens. Unset when auth is off. */
+  readonly pairing: PairingStore | undefined;
+  /** Stable daemon Environment id. Returned by GET /api/environment. */
+  readonly environmentId: string;
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
   readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
@@ -32,6 +39,30 @@ const forbidden = HttpServerResponse.text("Forbidden", { status: 403 });
 const unauthorized = HttpServerResponse.text("Unauthorized", { status: 401 });
 const notFound = HttpServerResponse.text("Not Found", { status: 404 });
 const badRequest = HttpServerResponse.text("Bad Request", { status: 400 });
+
+export function parseAllowHost(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  try {
+    const url = trimmed.includes("://") ? new URL(trimmed) : new URL(`http://${trimmed}`);
+    const host = url.hostname.toLowerCase();
+    return host.length > 0 ? host : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberAllowedHost(hosts: string[], host: string): void {
+  if (hosts.some((entry) => entry.toLowerCase() === host)) return;
+  hosts.push(host);
+}
+
+function isAuthorized(options: RequestAppOptions, header: string | undefined): boolean {
+  if (options.authToken === undefined) return true;
+  const presented = bearerToken(header);
+  if (tokensMatch(options.authToken, presented)) return true;
+  return options.pairing?.accepts(presented) === true;
+}
 
 /**
  * The request half of the server. The WebSocket upgrade half stays on raw
@@ -47,7 +78,7 @@ export const makeRequestApp = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | SessionImageAssets
 > =>
   route(options).pipe(
     /**
@@ -65,7 +96,10 @@ export const makeRequestApp = (
         ? Effect.void
         : HttpServerRequest.HttpServerRequest.pipe(
             Effect.flatMap((request) => {
-              const path = new URL(request.url, "http://localhost").pathname;
+              const requestPath = new URL(request.url, "http://localhost").pathname;
+              const path = requestPath.startsWith("/api/assets/")
+                ? "/api/assets/<redacted>"
+                : requestPath;
               const annotations = {
                 event: "http.refused",
                 status: response.status,
@@ -98,7 +132,7 @@ const route = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  HttpServerRequest.HttpServerRequest
+  HttpServerRequest.HttpServerRequest | SessionImageAssets
 > =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -132,6 +166,22 @@ const route = (
       return withCors(HttpServerResponse.text("ok"));
     }
 
+    const assetMatch = pathname.match(/^\/api\/assets\/([^/]+)\/[^/]+$/);
+    if (request.method === "GET" && assetMatch?.[1]) {
+      const assets = yield* SessionImageAssets;
+      const content = yield* assets.contentForToken(assetMatch[1]);
+      if (content === null) return withCors(notFound);
+      return withCors(
+        HttpServerResponse.uint8Array(content.bytes, {
+          headers: {
+            "cache-control": "private, no-store",
+            "content-type": content.mediaType,
+            "x-content-type-options": "nosniff",
+          },
+        }),
+      );
+    }
+
     // The daemon-served SPA has no native bridge from which to receive the
     // token. Expose it only on the loopback, same-origin HTTP surface and omit
     // CORS headers, so cross-origin browser clients cannot read the response.
@@ -144,9 +194,64 @@ const route = (
     }
 
     if (
+      options.pairing !== undefined &&
+      request.method === "POST" &&
+      pathname === "/api/pairing/exchange"
+    ) {
+      const raw = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
+      const body = parsePairingExchange(raw);
+      if (body === null) return withCors(badRequest);
+      const session = options.pairing.exchange(body.code);
+      if (session === null) return withCors(unauthorized);
+      return withCors(
+        HttpServerResponse.jsonUnsafe({
+          token: session.token,
+          environmentId: options.environmentId,
+        }),
+      );
+    }
+
+    if (
+      options.pairing !== undefined &&
+      request.method === "POST" &&
+      pathname === "/api/pairing/mint"
+    ) {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
+      return withCors(HttpServerResponse.jsonUnsafe(options.pairing.mint()));
+    }
+
+    if (request.method === "POST" && pathname === "/api/allow-host") {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
+      const raw = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
+      let body: unknown;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        return withCors(badRequest);
+      }
+      const host =
+        typeof body === "object" && body !== null && "host" in body && typeof body.host === "string"
+          ? parseAllowHost(body.host)
+          : null;
+      if (host === null) return withCors(badRequest);
+      rememberAllowedHost(options.allowedHosts, host);
+      return withCors(HttpServerResponse.jsonUnsafe({ host }));
+    }
+
+    if (
       options.authToken !== undefined &&
       pathname.startsWith("/api/") &&
-      !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      !isAuthorized(options, request.headers.authorization)
     ) {
       return withCors(unauthorized);
     }
@@ -171,12 +276,22 @@ const route = (
       pathname === "/api/shutdown" &&
       options.shutdown !== undefined
     ) {
+      if (
+        options.authToken === undefined ||
+        !tokensMatch(options.authToken, bearerToken(request.headers.authorization))
+      ) {
+        return withCors(unauthorized);
+      }
       options.shutdown();
       return withCors(HttpServerResponse.text("shutting down", { status: 202 }));
     }
 
     if (request.method === "POST" && pathname === "/api/ws-ticket") {
       return withCors(HttpServerResponse.jsonUnsafe({ ticket: options.tickets.issue() }));
+    }
+
+    if (request.method === "GET" && pathname === "/api/environment") {
+      return withCors(HttpServerResponse.jsonUnsafe({ id: options.environmentId }));
     }
 
     if (pathname.startsWith("/api/")) {

@@ -4,7 +4,14 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
-import { pieElectronEnv, seedProject, stopDaemonFor, stopProcess } from "./fixtures.js";
+import {
+  closeElectron,
+  linuxElectronArgs,
+  pieElectronEnv,
+  seedProject,
+  stopDaemonFor,
+  stopProcess,
+} from "./fixtures.js";
 
 const LEGACY_SERVER = `
 import fs from "node:fs";
@@ -42,10 +49,11 @@ async function waitForConnectedUi(
   const packagedExecutable = process.env.PIE_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(packagedExecutable === undefined ? undefined : { executablePath: packagedExecutable }),
-    args:
-      packagedExecutable === undefined
-        ? [appPath, `--user-data-dir=${userData}`]
-        : [`--user-data-dir=${userData}`],
+    args: [
+      ...linuxElectronArgs(),
+      ...(packagedExecutable === undefined ? [appPath] : []),
+      `--user-data-dir=${userData}`,
+    ],
     env: pieElectronEnv(pieHome),
   });
   try {
@@ -57,7 +65,7 @@ async function waitForConnectedUi(
     await expect(window.getByText("Pie could not start")).toHaveCount(0);
     return app;
   } catch (error) {
-    await app.close();
+    await closeElectron(app);
     throw error;
   }
 }
@@ -111,7 +119,7 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
     }
     expect(() => process.kill(legacyPid, 0)).toThrow();
 
-    await firstApp.close();
+    await closeElectron(firstApp);
     firstApp = undefined;
 
     secondApp = await waitForConnectedUi(appPath, path.join(root, "user-data-second"), pieHome);
@@ -122,8 +130,8 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
     expect(relaunched.pid).toBe(replacement.pid);
     expect(relaunched.compatibilityKey).toBe(replacement.compatibilityKey);
   } finally {
-    await firstApp?.close();
-    await secondApp?.close();
+    await closeElectron(firstApp);
+    await closeElectron(secondApp);
     await stopDaemonFor(pieHome);
     await stopProcess(legacyPid);
   }

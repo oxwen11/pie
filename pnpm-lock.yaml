@@ -463,6 +463,9 @@ importers:
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      streamdown:
+        specifier: 2.6.0
+        version: 2.6.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@10.2.2)
       tailwindcss:
         specifier: catalog:tailwind
         version: 4.3.3
@@ -539,6 +542,12 @@ importers:
       '@getpie/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@getpie/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
+      '@getpie/tailscale':
+        specifier: workspace:*
+        version: link:../../packages/tailscale
       '@orpc/client':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
@@ -661,6 +670,10 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/core:
+    dependencies:
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*
@@ -714,40 +727,16 @@ importers:
 
   packages/pie:
     dependencies:
+      node-pty:
+        specifier: 1.1.0
+        version: 1.1.0
+    devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
         version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
-      '@orpc/client':
-        specifier: catalog:orpc
-        version: 2.0.0-beta.35
-      '@orpc/contract':
-        specifier: catalog:orpc
-        version: 2.0.0-beta.35
-      '@orpc/server':
-        specifier: catalog:orpc
-        version: 2.0.0-beta.35
-      ai:
-        specifier: 'catalog:'
-        version: 7.0.99(zod@4.6.5)
-      effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
-      node-pty:
-        specifier: 1.1.0
-        version: 1.1.0
-      uuid:
-        specifier: 'catalog:'
-        version: 14.0.2
-      ws:
-        specifier: 'catalog:'
-        version: 8.21.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
       '@effect/vitest':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
@@ -766,12 +755,36 @@ importers:
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
+      '@orpc/client':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.35
+      '@orpc/contract':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.35
+      '@orpc/server':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.35
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
+      ai:
+        specifier: 'catalog:'
+        version: 7.0.99(zod@4.6.5)
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
+      uuid:
+        specifier: 'catalog:'
+        version: 14.0.2
       vitest:
         specifier: 5.0.0
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      ws:
+        specifier: 'catalog:'
+        version: 8.21.3
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
 
   packages/server:
     dependencies:
@@ -805,6 +818,9 @@ importers:
       effect:
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115
+      mdast-util-from-markdown:
+        specifier: 2.0.2
+        version: 2.0.2(supports-color@10.2.2)
       node-pty:
         specifier: 1.1.0
         version: 1.1.0
@@ -824,12 +840,65 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+      '@getpie/client':
+        specifier: workspace:*
+        version: link:../client
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
+      vitest:
+        specifier: 5.0.0
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/ssh:
+    dependencies:
+      '@getpie/core':
+        specifier: workspace:*
+        version: link:../core
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+      '@getpie/typescript':
+        specifier: workspace:*
+        version: link:../../tools/typescript
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.0
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/tailscale:
+    dependencies:
+      '@getpie/core':
+        specifier: workspace:*
+        version: link:../core
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
+    devDependencies:
+      '@effect/platform-node':
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+      '@getpie/typescript':
+        specifier: workspace:*
+        version: link:../../tools/typescript
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
       vitest:
         specifier: 5.0.0
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -849,9 +918,6 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource-variable/geist-mono':
-        specifier: ^5.3.0
-        version: 5.3.0
-      '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
       '@streamdown/code':
@@ -1925,9 +1991,6 @@ packages:
 
   '@fontsource-variable/geist@5.3.0':
     resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
-
-  '@fontsource-variable/inter@5.3.0':
-    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@google/genai@1.52.0':
     resolution: {integrity: sha512-gwSvbpiN/17O9TbsqSsE/OzZcpv5Fo4RQjdngGgogtuB9RsyJ8ZHhX5KjHj1bp5N9snN2eK8LDGXSaWW2hof8Q==}
@@ -10051,8 +10114,6 @@ snapshots:
   '@fontsource-variable/geist-mono@5.3.0': {}
 
   '@fontsource-variable/geist@5.3.0': {}
-
-  '@fontsource-variable/inter@5.3.0': {}
 
   '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)':
     dependencies:

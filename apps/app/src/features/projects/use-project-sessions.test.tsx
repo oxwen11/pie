@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 // oxlint-disable-next-line anti-slop/no-module-mocking -- route context comes from the route tree, not a test seam
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: () => ({
-    orpcQueryUtils: { agent: { session: { list: { queryOptions: mocks.queryOptions } } } },
+    localEnvironmentId: "local",
+    environmentRpc: {
+      for: () => ({ agent: { session: { list: { queryOptions: mocks.queryOptions } } } }),
+    },
   }),
 }));
 

@@ -61,6 +61,8 @@ export type ResolveDaemonOptions = {
    * explicitly stopped. Explicit front-doors leave this unset.
    */
   readonly autoRespawn?: boolean;
+  /** Replace a healthy daemon whose compatibility key does not match. */
+  readonly replaceIncompatible?: boolean;
   readonly readyTimeoutMs?: number;
 };
 
@@ -248,6 +250,12 @@ const resolveLocked = (
         return attach(existing, true);
       }
     } else if (existing !== undefined && existingHealthy) {
+      if (options.replaceIncompatible !== true) {
+        return yield* new DaemonLaunchError({
+          message:
+            "pie daemon is already running with a different version. Restart it with: pie daemon start --replace",
+        });
+      }
       yield* Effect.logInfo("Replacing incompatible pie daemon").pipe(
         Effect.annotateLogs({
           event: "daemon.compatibility_mismatch",

@@ -5,7 +5,15 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, type Page } from "@playwright/test";
 
-import { chatTest, expect, stopDaemonFor, test } from "./fixtures.js";
+import {
+  awaitDesktopReady,
+  chatTest,
+  closeElectron,
+  expect,
+  linuxElectronArgs,
+  stopDaemonFor,
+  test,
+} from "./fixtures.js";
 
 function appPid(electronApp: ElectronApplication): number {
   const pid = electronApp.process().pid;
@@ -62,12 +70,12 @@ async function waitForDaemon(pieHome: string): Promise<number> {
  * These kill tests mean "kill a running server", so wait until the renderer
  * left the splash — that requires the ready handshake to have completed.
  */
-async function waitForConnectedUi(window: Page): Promise<void> {
-  // The splash carries "Starting Pie" as an aria-label, not text content,
-  // and unmounts permanently once the renderer connects.
-  await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
-    timeout: 30_000,
-  });
+async function waitForConnectedUi(window: Page, pieHome?: string): Promise<void> {
+  if (pieHome) {
+    await awaitDesktopReady(window, pieHome);
+    return;
+  }
+  await expect(window.locator("#root")).toBeVisible({ timeout: 30_000 });
 }
 
 async function driveServerToFailed(window: Page, pieHome: string): Promise<void> {
@@ -119,7 +127,7 @@ test("gives a reloaded renderer document a new MessagePort", async ({ window, e2
 
   await window.reload();
   await expect(window).toHaveTitle("Pie");
-  await expect(window.locator("#root")).toBeVisible();
+  await awaitDesktopReady(window, e2ePaths.pieHome);
   await expect(window.getByText("Pie could not start")).toHaveCount(0);
   expect(readDaemonPid(e2ePaths.pieHome)).toBe(pid);
 });
@@ -162,6 +170,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
 
   const app = await electron.launch({
     args: [
+      ...linuxElectronArgs(),
       path.join(import.meta.dirname, "../../dist/main/index.js"),
       `--user-data-dir=${userData}`,
     ],
@@ -179,7 +188,7 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
     await expect(window).toHaveTitle("Pie");
     await expect(window.getByText("Pie could not start")).toHaveCount(0);
   } finally {
-    await app.close();
+    await closeElectron(app);
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
@@ -241,7 +250,7 @@ test("leaves the daemon running through Electron shutdown", async ({
   await expect(window).toHaveTitle("Pie");
   const pid = await waitForDaemon(e2ePaths.pieHome);
 
-  await electronApp.close();
+  await closeElectron(electronApp);
 
   // The server is the shared pie daemon the app attached to (or spawned) —
   // it deliberately outlives Electron so the CLI and the next app launch

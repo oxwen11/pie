@@ -13,9 +13,10 @@ import {
 } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
-import { Clock, GitPullRequestIcon, Settings, SquarePen } from "lucide-react";
+import { Clock, GitPullRequestIcon, Puzzle, Settings, SquarePen } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
+import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
@@ -44,6 +45,23 @@ function PullRequestsNavItem() {
       <SidebarMenuButton isActive={active} render={<Link to="/pull-requests" />}>
         <GitPullRequestIcon />
         <span>Pull requests</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function PluginsNavItem() {
+  const active =
+    useMatch({
+      from: "/plugins",
+      shouldThrow: false,
+    }) !== undefined;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton isActive={active} render={<Link to="/plugins" />}>
+        <Puzzle />
+        <span>Plugins</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -97,28 +115,33 @@ export function AppSidebar() {
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
-      <SidebarHeader
-        className={cn(
-          // Same string as SHELL_TITLEBAR_HEADER_CLASS — imported
-          // constants are unreadable to require-static-classes.
-          "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
-          desktop && "px-0",
-          "[-webkit-app-region:drag]",
-        )}
-      >
-        {isDesktopMacosHost(platform) ? null : (
-          <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
-        )}
-        {!desktop && expanded ? <SidebarTrigger className="[-webkit-app-region:no-drag]" /> : null}
+      <SidebarHeader className="p-0" data-drag-region="">
+        <div
+          className={cn(
+            // Keep this literal so require-static-classes can validate it.
+            "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
+            desktop && "px-0",
+          )}
+        >
+          {isDesktopMacosHost(platform) ? null : (
+            <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
+          )}
+          {!desktop && expanded ? <SidebarTrigger /> : null}
+        </div>
+        {/* Pinned here, outside SidebarContent's ScrollArea, so New chat stays
+          visible while the session list scrolls. */}
+        <SidebarMenu className="px-2 pb-1">
+          <NewChatNavItem />
+        </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="[-webkit-app-region:no-drag]">
+      <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <NewChatNavItem />
               <SchedulesNavItem />
               <PullRequestsNavItem />
+              <PluginsNavItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -128,6 +151,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="[-webkit-app-region:no-drag]">
+        {platform.ssh ? <ConnectionSwitcher /> : null}
         <SidebarMenu>
           <SettingsNavItem />
         </SidebarMenu>

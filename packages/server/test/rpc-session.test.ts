@@ -7,6 +7,7 @@ import { createRouterClient } from "@orpc/server";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { describe, expect, it } from "vitest";
 
+import { SessionImageAssetsLayer } from "../src/assets";
 import { layerPaths } from "../src/config/paths";
 import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
@@ -19,6 +20,7 @@ import {
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
+import { makePackageService, PackageService } from "../src/packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
@@ -26,6 +28,7 @@ import { router } from "../src/rpc/router";
 import { PiProcessTag } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
+import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
@@ -68,7 +71,7 @@ async function setup() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-"));
   const pathsLayer = Layer.provideMerge(layerPaths(home), NodeServices.layer);
 
-  const piExecutable = { command: makeFake(), prefixArgs: [] as const };
+  const piExecutable = { command: makeFake(), prefixArgs: [] };
   const piProcessLayer = Layer.effect(
     PiProcessTag,
     makePiProcess({ executable: piExecutable }),
@@ -109,6 +112,8 @@ async function setup() {
     Layer.provide(NodeServices.layer),
   );
 
+  const sessionImageAssetsLayer = SessionImageAssetsLayer.pipe(Layer.provide(harnessSessionLayer));
+
   const scheduleServiceLayer = ScheduleServiceLayer.pipe(
     Layer.provide(ScheduleRepositoryLayer),
     Layer.provide(projectServiceLayer),
@@ -116,13 +121,24 @@ async function setup() {
     Layer.provide(pathsLayer),
   );
   const settingsRepositoryLayer = SettingsRepositoryLayer.pipe(Layer.provide(pathsLayer));
+  const packageServiceLayer = Layer.succeed(
+    PackageService,
+    makePackageService(() => path.join(home, "pi-agent")),
+  );
+  const skillServiceLayer = Layer.succeed(
+    SkillService,
+    makeSkillService(() => path.join(home, "pi-agent")),
+  );
   const appLayer = Layer.mergeAll(
     EventBusLayer,
-    PiAgentServiceLayer,
+    sessionImageAssetsLayer,
+    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     harnessSessionLayer,
     projectServiceLayer,
     settingsRepositoryLayer,
     scheduleServiceLayer,
+    packageServiceLayer,
+    skillServiceLayer,
     piAgentLayer,
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
@@ -329,9 +345,22 @@ describe("agent.session router", () => {
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
-      const prepared = await client.agent.session.prepare({ ref: created.ref });
-      expect(prepared.workspace).toEqual(created.workspace);
+      await expect(client.agent.session.prepare({ ref: created.ref })).rejects.toMatchObject({
+        code: "WORKTREE_MISSING",
+        data: {
+          sessionId: created.ref.sessionId,
+          projectId: created.ref.projectId,
+          branch: created.workspace.worktree?.branch,
+        },
+      });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
+
+      const restored = await client.agent.session.restoreWorktree({ ref: created.ref });
+      expect(restored.workspace).toEqual(created.workspace);
+      expect(fs.existsSync(created.workspace.cwd)).toBe(true);
+
+      const ready = await client.agent.session.prepare({ ref: created.ref });
+      expect(ready.workspace).toEqual(created.workspace);
 
       await client.agent.session.close({ ref: created.ref });
     } finally {

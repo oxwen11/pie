@@ -24,6 +24,8 @@ const LINUX_CI_SWITCHES = [
   "--disable-dev-shm-usage",
 ];
 
+const FAKE_PI_PATH = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
+
 /** The one seeded project's id — the contract validates projectId as a UUID. */
 export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -115,6 +117,7 @@ function processAlive(pid: number): boolean {
 type E2ePaths = {
   userData: string;
   pieHome: string;
+  workspace: string;
   /** Env overlay for Electron. Default: isolated empty agent dir only. */
   launchEnv: Record<string, string>;
 };
@@ -126,11 +129,13 @@ function makePaths(
   const output = testInfo.outputPath();
   fs.mkdirSync(output, { recursive: true });
   const pieHome = path.join(output, "pie-home");
+  const workspace = path.join(output, "workspace");
   fs.mkdirSync(pieHome, { recursive: true });
-  seedProject(pieHome, path.join(output, "workspace"));
+  seedProject(pieHome, workspace);
   return {
     userData: path.join(output, "user-data"),
     pieHome,
+    workspace,
     launchEnv: launchEnv(pieHome),
   };
 }
@@ -139,26 +144,36 @@ function makePaths(
  * Env for any Electron launch in desktop e2e: test mode, isolated home,
  * empty agent dir (seeded over by chat specs' `launchEnv`).
  */
+export function fakePiEnv(pieHome: string) {
+  return {
+    ...e2eIsolatedAgentEnv(pieHome),
+    PIE_E2E_PI_EXECUTABLE: FAKE_PI_PATH,
+    PIE_E2E_PI_LOG: path.join(pieHome, "fake-pi.jsonl"),
+    PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
+  };
+}
+
 export function pieElectronEnv(pieHome: string, extra: Record<string, string> = {}) {
   const nodeExec = process.env.npm_node_execpath ?? process.execPath;
+  const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...launchEnv } = process.env;
+  const linuxCi = process.platform === "linux" && process.env.CI;
   // Leave a breadcrumb for splash-timeout dumps.
   fs.mkdirSync(pieHome, { recursive: true });
   fs.writeFileSync(path.join(pieHome, "e2e-node.txt"), nodeExec);
   return {
-    ...process.env,
+    ...launchEnv,
     NODE_ENV: "test",
     PIE_E2E: "1",
     PIE_HOME: pieHome,
-    // Prefer Node for the daemon under Xvfb; Electron-as-Node can hang pre-health.
+    // Tests use Node for the detached daemon; Electron-as-Node can hang pre-health.
     PIE_E2E_NODE: nodeExec,
     npm_node_execpath: nodeExec,
     ...e2eIsolatedAgentEnv(pieHome),
     ...extra,
-    ...(process.platform === "linux" && process.env.CI
+    ...(linuxCi
       ? {
           // Leave DISPLAY for xvfb-run. Wayland would hide the window from X.
           WAYLAND_DISPLAY: undefined,
-          ELECTRON_RUN_AS_NODE: undefined,
           ELECTRON_OZONE_PLATFORM_HINT: "x11",
           // Read before argv, so a setuid sandbox helper cannot stall launch.
           ELECTRON_DISABLE_SANDBOX: "1",
@@ -168,13 +183,15 @@ export function pieElectronEnv(pieHome: string, extra: Record<string, string> = 
   };
 }
 
+/** Linux runner switches; the Xvfb-specific set stays CI-only. */
+export function linuxElectronArgs(): string[] {
+  if (process.platform !== "linux") return [];
+  return process.env.CI ? LINUX_CI_SWITCHES : ["--no-sandbox", "--disable-dev-shm-usage"];
+}
+
 /** Chromium switches that have to precede the app entry. */
 export function electronAppArgs(appPath: string, userData: string): string[] {
-  return [
-    ...(process.platform === "linux" && process.env.CI ? LINUX_CI_SWITCHES : []),
-    appPath,
-    `--user-data-dir=${userData}`,
-  ];
+  return [...linuxElectronArgs(), appPath, `--user-data-dir=${userData}`];
 }
 
 export function launchPieElectron(
@@ -209,37 +226,68 @@ export function dumpPieHomeDiagnostics(pieHome: string): string {
   return chunks.join("\n");
 }
 
-export async function awaitDesktopReady(window: Page, pieHome: string, timeout = 20_000) {
+export async function awaitDesktopReady(window: Page, pieHome: string, timeout = 30_000) {
   try {
-    await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({ timeout });
+    // The splash may not be mounted when firstWindow resolves, so waiting for
+    // it to be hidden can pass before startup begins. The app root only becomes
+    // visible after the renderer has its MessagePort.
+    await expect(window.locator("#root")).toBeVisible({ timeout });
   } catch (error) {
     const body = await window
       .locator("body")
       .textContent()
       .catch(() => "<no body>");
-    const details = `${error instanceof Error ? error.message : String(error)}\nUI:\n${body}\n${dumpPieHomeDiagnostics(pieHome)}`;
+    const root = await window
+      .locator("#root")
+      .innerHTML()
+      .catch(() => "<no root>");
+    const details = `${error instanceof Error ? error.message : String(error)}\nURL: ${window.url()}\nUI:\n${body}\nROOT:\n${root}\n${dumpPieHomeDiagnostics(pieHome)}`;
     // Test timeout can swallow the thrown Error; always print first.
     console.error(details);
     throw new Error(details, { cause: error });
   }
 }
 
-export async function closePieElectron(app: ElectronApplication | undefined) {
+/**
+ * Runtime disposal can wedge Electron shutdown, especially on Linux. Bound
+ * graceful close, then kill the isolated e2e process so later tests can start.
+ * ponytail: SIGKILL fallback. Drop when runtime disposal is reliably bounded.
+ */
+export async function closeElectron(app: ElectronApplication | undefined): Promise<void> {
   if (!app) return;
+  let pid: number | undefined;
   try {
-    await Promise.race([
-      app.close(),
-      new Promise<void>((_resolve, reject) => {
-        setTimeout(() => reject(new Error("electron close timed out")), 5_000);
-      }),
-    ]);
+    pid = app.process().pid;
   } catch {
+    // Already closed (Quit button / prior close).
+    return;
+  }
+
+  const closed = app.close().then(
+    () => undefined,
+    () => undefined,
+  );
+  const outcome = await Promise.race([
+    closed.then(() => "closed" as const),
+    new Promise<"hung">((resolve) => {
+      setTimeout(() => resolve("hung"), process.platform === "linux" ? 1_000 : 5_000);
+    }),
+  ]);
+  if (outcome === "closed") return;
+
+  if (typeof pid === "number" && processAlive(pid)) {
     try {
-      app.process().kill("SIGKILL");
+      process.kill(pid, "SIGKILL");
     } catch {
-      // already gone
+      // already exited
     }
   }
+  await Promise.race([
+    closed,
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 2_000);
+    }),
+  ]);
 }
 
 async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
@@ -248,8 +296,8 @@ async function launchApp(e2ePaths: E2ePaths): Promise<ElectronApplication> {
 }
 
 /**
- * Default desktop e2e: window / daemon / MessagePort. No fake provider —
- * pie-pi-process is not part of these proofs.
+ * Default desktop e2e: window / daemon / MessagePort. Main's startup queries
+ * need Pi discovery, so use the process-level fake without a model turn.
  */
 export const test = base.extend<{
   e2ePaths: E2ePaths;
@@ -258,7 +306,7 @@ export const test = base.extend<{
 }>({
   // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
   e2ePaths: async ({}, use, testInfo) => {
-    const paths = makePaths(testInfo, e2eIsolatedAgentEnv);
+    const paths = makePaths(testInfo, fakePiEnv);
     await use(paths);
     await stopDaemonFor(paths.pieHome);
   },
@@ -266,7 +314,7 @@ export const test = base.extend<{
   electronApp: async ({ e2ePaths }, use) => {
     const app = await launchApp(e2ePaths);
     await use(app);
-    await app.close();
+    await closeElectron(app);
   },
 
   window: async ({ electronApp }, use) => {
@@ -286,16 +334,12 @@ export const chatTest = test.extend<{
   e2ePaths: E2ePaths;
   fakeReply: string;
 }>({
-  // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
-  e2ePaths: async ({}, use, testInfo) => {
-    const paths = makePaths(testInfo, (pieHome) => e2ePiProcessEnv(pieHome, { reply: CHAT_REPLY }));
+  fakeReply: [CHAT_REPLY, { option: true }],
+
+  e2ePaths: async ({ fakeReply }, use, testInfo) => {
+    const paths = makePaths(testInfo, (pieHome) => e2ePiProcessEnv(pieHome, { reply: fakeReply }));
     await use(paths);
     await stopDaemonFor(paths.pieHome);
-  },
-
-  // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
-  fakeReply: async ({}, use) => {
-    await use(CHAT_REPLY);
   },
 });
 

@@ -5,7 +5,8 @@ import { type ElectronApplication, expect, test } from "@playwright/test";
 
 import {
   awaitDesktopReady,
-  closePieElectron,
+  closeElectron,
+  fakePiEnv,
   launchPieElectron,
   stopDaemonFor,
 } from "./fixtures.js";
@@ -33,6 +34,7 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
   let app: ElectronApplication | undefined;
   try {
     app = await launchPieElectron(appPath, userData, pieHome, {
+      ...fakePiEnv(pieHome),
       PIE_PROJECT_BROWSE_ROOT: browseRoot,
     });
 
@@ -40,11 +42,11 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
     await awaitDesktopReady(window, pieHome);
     // No empty-state control anymore (#288) — the sidebar action is the entry.
     await window.getByTestId("sidebar").getByTitle("Import project").click();
-    await expect(window.getByPlaceholder("Search folders or enter a full path...")).toBeVisible({
-      timeout: 15_000,
-    });
-    await window.getByText(SAMPLE, { exact: true }).click();
-    const importButton = window.getByRole("button", { name: "Import this folder" });
+    await expect(
+      window.getByRole("combobox", { name: "Enter path (e.g. ~/projects/my-app)" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await window.getByRole("option", { name: SAMPLE }).click();
+    const importButton = window.getByRole("button", { name: "Add (Enter)" });
     await expect(importButton).toBeEnabled({ timeout: 10_000 });
     await importButton.click();
 
@@ -54,7 +56,7 @@ test("imports the first project from the empty draft", async ({}, testInfo) => {
     ) as { data: Array<{ name: string; path: string }> };
     expect(projects.data.some((project) => project.name === SAMPLE)).toBe(true);
   } finally {
-    await closePieElectron(app);
+    await closeElectron(app);
     await stopDaemonFor(pieHome);
   }
 });

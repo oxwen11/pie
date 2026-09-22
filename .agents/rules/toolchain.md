@@ -97,7 +97,11 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  Electron — local `pnpm e2e` / `turbo run e2e` only, not CI. Conversation/sync e2e seeds `$PIE_HOME/agent` (`PI_CODING_AGENT_DIR`) with `tools/testing/fake-e2e-provider.ts` and runs real pie-pi-process; connect/daemon/MessagePort e2e does not. `tools/testing/fake-pi.mjs` remains for unit/RPC harnesses that still swap the executable. `@effect/vitest` still peers
+  Electron and runs in Code check (`pnpm e2e` under xvfb). Conversation/sync
+  e2e seeds `$PIE_HOME/agent` (`PI_CODING_AGENT_DIR`) with
+  `tools/testing/fake-e2e-provider.ts` and runs real pie-pi-process;
+  connect/daemon/MessagePort e2e does not. `tools/testing/fake-pi.mjs` remains
+  for unit/RPC harnesses that still swap the executable. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root

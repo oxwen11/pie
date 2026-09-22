@@ -3,7 +3,6 @@
 @import "streamdown/styles.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
-@import "@fontsource-variable/inter";
 @import "./ai-elements/pie-loader.css";
 
 @source "../node_modules/streamdown/dist/*.js";
@@ -150,7 +149,10 @@
 }
 
 :root {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    -apple-system-body, ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica,
+    "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-ui-weight: 430;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
   --font-heading: var(--font-sans);
   --radius: 0.625rem;
@@ -245,8 +247,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-synthesis-weight: none;
+  }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans text-sm antialiased;
+    font-weight: var(--font-ui-weight);
   }
   code,
   kbd,

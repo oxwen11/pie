@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-15.
+Last audited: 2026-09-20.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -198,6 +198,28 @@ session id, error/skip details, missed count, and a snapshot of the schedule
 inputs used for that run. Only the newest 20 runs remain in `runs`;
 `firedCount` is the durable counter when older runs fall out of that window.
 
+## Pi package settings and installs
+
+Package configuration is Pi-owned state outside `$PIE_HOME`. Pie exposes it in
+the Plugins UI through `PackageService`; it does not duplicate the configuration
+under Pie storage.
+
+| Property      | Current contract                                                                                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PI_CODING_AGENT_DIR/settings.json`; Pi defaults the directory to `~/.pi/agent`.                                                                                                                                                                               |
+| Owner         | Pi SDK `SettingsManager` / `DefaultPackageManager`. Pie's `PackageService` invokes those APIs for user-scope packages only.                                                                                                                                     |
+| Data          | Pi's bare settings JSON. This feature changes only the `packages` array and preserves other current file fields. New entries are package source strings accepted by Pi, such as `npm:name`, `git:https://host/owner/repo`, or a local path.                     |
+| Write points  | `packages.add` and `packages.remove`. Both await Pi's settings write queue before RPC success and surface persistence failures. They update settings only; they do not install or uninstall package files immediately.                                          |
+| Compatibility | Pi owns settings parsing and migrations. Missing settings start from `{}`. Corrupt or unreadable settings refuse the change without overwrite. Pi merges the modified `packages` field into the latest locked file contents so unrelated settings are retained. |
+| Atomicity     | Pi serializes each manager's write queue and uses `proper-lockfile` across processes, then rewrites the JSON file directly; there is no sibling-temp rename. Effective file and directory permissions follow umask.                                             |
+| Retention     | Removing a source removes only its settings entry. Existing package files remain under Pi's managed `npm/` or `git/` directories until Pi or the user removes them. Clearing `$PIE_HOME` does not remove Pi settings or installed packages.                     |
+
+At the next Pi session start, Pi resolves configured sources and may use its
+configured npm command or Git to install missing content below the same agent
+directory. Those delegated package-manager writes use Pi's existing layout and
+lifecycle; Pie Desktop does not require or spawn a separately installed `pi`
+CLI.
+
 ## Git worktrees and repository metadata
 
 A session or Schedule may request a worktree. `WorktreeService` then:
@@ -210,10 +232,14 @@ A session or Schedule may request a worktree. `WorktreeService` then:
 This writes both the checkout under `$PIE_HOME` and Git administrative state in
 the source repository, including its branch ref and `.git/worktrees/` metadata.
 The session record persists the resulting `cwd` and `worktree: { branch }` so a
-worktree session can still be opened after that checkout is gone. There is no
-separate worktree manifest. Checkouts must stay under `$PIE_HOME/worktrees/`.
-`prepare` and prompt do not re-create the checkout or require `HEAD` to match
-the stored branch.
+removed checkout can be restored at that path. There is no separate worktree
+manifest. Checkouts must stay under `$PIE_HOME/worktrees/`. `prepare` and prompt do not re-create a worktree checkout or require `HEAD`
+to match the stored branch. When the stored `cwd` directory is gone,
+`prepare` fails with `WORKTREE_MISSING` for worktree sessions and otherwise
+creates the directory. `session.restoreWorktree` is the explicit worktree
+write: `git worktree prune` then `git worktree add <cwd> <branch>` at the
+stored path. It does not mint a new key or branch. If the directory already
+exists it is a no-op.
 
 If session metadata persistence fails during create, Pie attempts
 `git worktree remove --force` as rollback. That removes the checkout and
@@ -340,18 +366,13 @@ not persisted.
 
 ### Shell layout
 
-`react-resizable-panels` owns these localStorage entries:
-
-```text
-react-resizable-panels:pie:shell-layout:<panel-id>:<panel-id>...
-```
-
-The suffix is the active ordered set drawn from `sidebar`, `main`, and
-`content`; the value is a JSON object mapping each panel id to its numeric size.
-The library also has a backward reader for the older group-only key
-`react-resizable-panels:pie:shell-layout`, whose value grouped `{ layout: [] }`
-records by comma-joined panel ids. Pie defines no independent schema version or
-migration for this data.
+| Property      | Current contract                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Key           | localStorage `pie:shell-layout`                                                                                    |
+| Owner         | `ShellLayout`                                                                                                      |
+| Data          | `{ sidebarWidth, contentBySession }`. Sidebar pixels clamped 192–480 (default 256). Content pixels per session key |
+| Compatibility | No version. Unreadable envelopes fall back to defaults                                                             |
+| Retention     | No automatic pruning                                                                                               |
 
 ### Sidebar cookie
 
@@ -379,13 +400,14 @@ $PIE_HOME/workspace/verify-pie[-desktop]-sample/
 ```
 
 Verify owns these non-sensitive, umask-permissioned files and sets
-`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and `HOME=$PIE_HOME/home` for the
-run's server (so `~/Pie` resolves to `$PIE_HOME/home/Pie`). When
+`PIE_PROJECT_BROWSE_ROOT=$PIE_HOME/workspace` and
+`PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` for the run's server. It does not change
+`HOME`, so `~/.pi/agent` stays the operator's model catalog. When
 `PIE_PROJECT_BROWSE_ROOT` is set, the project picker starts at that directory,
 reports no parent there, and resolves real paths before rejecting traversal or
 symlinks outside it. An unset or blank browse root preserves the production
-default of the operator's home directory. Verify overwrites an inherited `HOME`
-with its own run path; parallel runs therefore do not share this boundary.
+default of the operator's home directory. Parallel runs do not share a
+`$PIE_HOME`; they do share `~/.pi/agent`.
 
 The sample has no independent schema or migration. Its marker retains the
 existing cleanup compatibility check. Fresh Web and Desktop runs also seed the

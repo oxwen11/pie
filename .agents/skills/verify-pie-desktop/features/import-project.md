@@ -17,7 +17,7 @@ pnpm exec pie-verify desktop doctor
 
 ```bash
 # doctor already attached; if not: agent-browser connect 9223
-agent-browser wait --text "Ask Pi anything..."
+agent-browser wait --text "Do Anything, / for skills, @ for context"
 agent-browser find role button --name "Import project" click
 ```
 

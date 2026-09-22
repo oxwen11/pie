@@ -3,13 +3,7 @@ import path from "node:path";
 
 import { type ElectronApplication, expect, test } from "@playwright/test";
 
-import {
-  awaitDesktopReady,
-  closePieElectron,
-  launchPieElectron,
-  seedProject,
-  stopDaemonFor,
-} from "./fixtures.js";
+import { closeElectron, launchPieElectron, seedProject, stopDaemonFor } from "./fixtures.js";
 
 test.setTimeout(120_000);
 
@@ -32,16 +26,13 @@ async function launchWindow(
   fs.mkdirSync(userData, { recursive: true });
   const app = await launchPieElectron(appPath, userData, pieHome);
   const window = await app.firstWindow({ timeout: 30_000 });
-  await awaitDesktopReady(window, pieHome);
-  await expect(window.getByRole("combobox").filter({ hasText: "Choose project" })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(window).toHaveTitle("Pie");
   return app;
 }
 
 /**
- * Same `$PIE_HOME` must converge on one daemon — second Desktop attaches,
- * does not spawn a replacement while the first is still up.
+ * The daemon outlives Electron. A later Desktop using the same `$PIE_HOME`
+ * must attach to that daemon instead of spawning a replacement.
  */
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
 test("a second Desktop attaches to the running daemon", async ({}, testInfo) => {
@@ -59,11 +50,17 @@ test("a second Desktop attaches to the running daemon", async ({}, testInfo) => 
     const pid = readDaemonPid(pieHome);
     expect(pid).toBeTruthy();
 
+    await closeElectron(first);
+    first = undefined;
+
     second = await launchWindow(appPath, path.join(root, "user-data-b"), pieHome);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 2_000);
+    });
     expect(readDaemonPid(pieHome)).toBe(pid);
   } finally {
-    await closePieElectron(first);
-    await closePieElectron(second);
+    await closeElectron(first);
+    await closeElectron(second);
     await stopDaemonFor(pieHome);
   }
 });

@@ -1,7 +1,7 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 
-import { AppInterface } from "./app-interface";
+import { PairingGate } from "./pairing-gate";
 import type { Platform } from "./platform";
 import { PlatformProvider } from "./platform-provider";
 
@@ -16,7 +16,9 @@ const platform = {} satisfies Platform;
 createRoot(rootElement).render(
   <StrictMode>
     <PlatformProvider value={platform}>
-      <AppInterface />
+      <Suspense>
+        <PairingGate />
+      </Suspense>
     </PlatformProvider>
   </StrictMode>,
 );

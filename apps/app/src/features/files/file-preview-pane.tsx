@@ -31,7 +31,7 @@ export function FilePreviewPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3">
-        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs" title={path}>
+        <span className="text-muted-foreground min-w-0 flex-1 truncate" title={path}>
           {path}
         </span>
         <Button

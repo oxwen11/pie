@@ -28,6 +28,8 @@ export class Paths extends Context.Service<
     readonly logsDir: string;
     /** `~/Pie` — parent for `project.allocateChatProjectDir` chat folders (`type: "chat"`). */
     readonly chatProjectsDir: string;
+    /** `storage/ssh-environments.json` — Desktop and CLI saved SSH hosts. */
+    readonly sshEnvironmentsFile: string;
   }
 >()("Paths") {}
 
@@ -51,6 +53,7 @@ const resolve = (home: string, chatProjectsDir: string) => ({
   worktreesDir: path.join(home, "worktrees"),
   logsDir: logsDirectory(home),
   chatProjectsDir,
+  sshEnvironmentsFile: sshEnvironmentsFile(home),
 });
 
 /**
@@ -80,6 +83,13 @@ export function resolveProjectBrowseRoot(env: NodeJS.ProcessEnv = process.env): 
   return raw === undefined || raw.trim() === "" ? undefined : path.resolve(raw);
 }
 
+/** `~/Pie`, or `$PIE_CHAT_PROJECTS_DIR` when a verify run isolates allocation. */
+export function resolveChatProjectsDir(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.PIE_CHAT_PROJECTS_DIR;
+  if (raw !== undefined && raw.trim() !== "") return raw;
+  return path.join(os.homedir(), "Pie");
+}
+
 /** `$PIE_HOME/daemon` — pid, lock, and stop tombstone. */
 export const daemonDirectory = (home: string): string => path.join(home, "daemon");
 
@@ -95,6 +105,11 @@ export const logsDirectory = (home: string): string => path.join(home, "logs");
 export const resourceSourceDirectory = (logsDir: string, source: ResourceSource): string =>
   path.join(logsDir, RESOURCE_LOGS_DIRECTORY, source);
 
+/** Saved SSH hosts for Desktop and CLI. Not Electron userData. */
+export function sshEnvironmentsFile(home: string): string {
+  return path.join(home, "storage", "ssh-environments.json");
+}
+
 export const pieLogPath = (logsDir: string): string => path.join(logsDir, PIE_LOG_FILE);
 
 export const daemonStdioLogPath = (logsDir: string): string =>
@@ -104,10 +119,10 @@ export const daemonStdioLogPath = (logsDir: string): string =>
 export const layerPaths = (home: string): Layer.Layer<Paths> =>
   Layer.succeed(Paths, resolve(home, path.join(home, "Pie")));
 
-/** Default: `$PIE_HOME`, else installed `~/.pie` or checkout `~/.pie_<branch>`. Chat root: `~/Pie`. */
+/** Default: `$PIE_HOME`, else installed `~/.pie` or checkout `~/.pie_<branch>`. Chat root: `~/Pie`, unless `PIE_CHAT_PROJECTS_DIR` is set. */
 export const PathsLayer: Layer.Layer<Paths> = Layer.sync(
   Paths,
   // Resolved when the layer is built, not when this module is imported — the
   // daemon sets `PIE_HOME` in the child's environment.
-  () => resolve(resolvePieHome(), path.join(os.homedir(), "Pie")),
+  () => resolve(resolvePieHome(), resolveChatProjectsDir()),
 );

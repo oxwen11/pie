@@ -116,7 +116,7 @@ MemoHr.displayName = "MarkdownHr";
 type StrongProps = WithNode<JSX.IntrinsicElements["span"]>;
 const MemoStrong = memo<StrongProps>(
   ({ children, className, node: _node, ...props }: StrongProps) => (
-    <span className={cn("font-semibold", className)} {...props}>
+    <span className={cn("font-bold", className)} {...props}>
       {children}
     </span>
   ),

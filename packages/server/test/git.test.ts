@@ -64,6 +64,23 @@ layer(NodePlatformLayer)("GitService", (it) => {
     }).pipe(Effect.provide(GitLayer)),
   );
 
+  it.effect("reports an unborn repository without failing", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const dir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-git-unborn-" });
+      yield* Effect.promise(() => simpleGit(dir).raw(["init", "-b", "main"]));
+
+      const git = yield* GitService;
+      assert.deepEqual(yield* git.branch(dir), {
+        kind: "repository",
+        current: "main",
+        defaultBranch: null,
+        branches: [],
+        remotes: [],
+      });
+    }).pipe(Effect.provide(GitLayer)),
+  );
+
   it.effect("lists local and remote-tracking refs without fetching", () =>
     Effect.gen(function* () {
       const dir = yield* repo;

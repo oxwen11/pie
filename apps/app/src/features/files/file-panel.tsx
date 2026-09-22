@@ -1,17 +1,17 @@
 import type { Project } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { FileCodeIcon } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
 
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanelFamily } from "@/components/layout/content-panel/react/view";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
 import { FileState } from "./file-state";
-import { FileWorkspaceLayout } from "./file-workspace-layout";
+import { FileWorkspace } from "./file-workspace";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export interface FilePayload {
@@ -57,8 +57,8 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     instance.navigation.getSnapshot,
     instance.navigation.getSnapshot,
   );
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
-  const projectId = instance.sessionRef.projectId;
+  const orpcQueryUtils = useEnvironmentOrpc();
+  const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
     ...orpcQueryUtils.project.list.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
@@ -69,12 +69,12 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     ),
   });
   const panel = useContentPanel();
-  const workspace = { ref: instance.sessionRef };
+  const workspace = { ref: instance.sessionRef.ref };
   const tree = useQuery(orpcQueryUtils.fs.readTree.queryOptions({ input: workspace }));
   const branch = useQuery(orpcQueryUtils.git.branch.queryOptions({ input: workspace }));
   const file = useQuery(
     orpcQueryUtils.fs.readFileString.queryOptions({
-      input: { ref: instance.sessionRef, path },
+      input: { ref: instance.sessionRef.ref, path },
     }),
   );
   const openFile = useCallback(
@@ -121,5 +121,5 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     />
   );
 
-  return <FileWorkspaceLayout preview={preview} tree={treePane} treeLabel={path} />;
+  return <FileWorkspace label={path} preview={preview} tree={treePane} />;
 }

@@ -1,21 +1,19 @@
-import type { PullRequestAction, PullRequestActionInput } from "@getpie/contract/pull-request";
+import type { PullRequestAction } from "@getpie/contract/pull-request";
 import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitPullRequestIcon } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
-import { pullRequestActionError } from "./pull-request-action-error";
 import { PullRequestInspect } from "./pull-request-inspect";
 import { PullRequestPanelState } from "./pull-request-panel-state";
 import { pullRequestActionInput } from "./pull-request-presentation";
+import { usePullRequestAction } from "./use-pull-request-action";
 
 export const pullRequestPanel = definePanel({
   type: "pull-request",
@@ -27,45 +25,29 @@ export const pullRequestPanel = definePanel({
 });
 
 function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useEnvironmentOrpc();
   const queryClient = useQueryClient();
+  const sessionRef = instance.sessionRef.ref;
   const options = orpcQueryUtils.pullRequest.current.queryOptions({
-    input: { ref: instance.sessionRef },
+    input: { ref: sessionRef },
   });
   const pullRequest = useQuery(options);
   const snapshot = pullRequest.data;
   const diff = useQuery(
     orpcQueryUtils.pullRequest.diff.queryOptions({
-      input: snapshot === null || snapshot === undefined ? skipToken : { ref: instance.sessionRef },
+      input: snapshot === null || snapshot === undefined ? skipToken : { ref: sessionRef },
     }),
   );
-  const [intent, setIntent] = useState<PullRequestActionInput | null>(null);
-  const [postActionRefreshFailed, setPostActionRefreshFailed] = useState(false);
-  const refresh = (): void => {
-    void pullRequest.refetch().then((result) => {
-      if (!result.isError) setPostActionRefreshFailed(false);
-      return undefined;
+  const { intent, pending, postActionRefreshFailed, refresh, run, setIntent } =
+    usePullRequestAction({
+      mutationFn: (input) => orpcQueryUtils.pullRequest.runAction.call(input),
+      mutationKey: orpcQueryUtils.pullRequest.runAction.key(),
+      onApplied: () => {
+        void queryClient.invalidateQueries({ queryKey: options.queryKey, refetchType: "none" });
+      },
+      refetchDetail: () => pullRequest.refetch(),
+      refetchDiff: () => diff.refetch(),
     });
-    void diff.refetch();
-  };
-  const action = useMutation({
-    mutationFn: (input: PullRequestActionInput) => orpcQueryUtils.pullRequest.runAction.call(input),
-    onMutate: () => setPostActionRefreshFailed(false),
-    onSuccess: () => {
-      setIntent(null);
-      toast.success("Pull request action applied");
-      void queryClient.invalidateQueries({ queryKey: options.queryKey, refetchType: "none" });
-      void pullRequest.refetch().then(
-        (result) => setPostActionRefreshFailed(result.isError),
-        () => setPostActionRefreshFailed(true),
-      );
-      void diff.refetch();
-    },
-    onError: (error) => {
-      toast.error(pullRequestActionError(error));
-      if (error instanceof ORPCError && error.code === "STALE_CONTEXT") refresh();
-    },
-  });
 
   if (pullRequest.isPending && pullRequest.data === undefined) {
     return (
@@ -98,13 +80,13 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
   }
 
   const beginAction = (next: PullRequestAction): void => {
-    setIntent(pullRequestActionInput(instance.sessionRef, snapshot, next));
+    setIntent(pullRequestActionInput(sessionRef, snapshot, next));
   };
 
   return (
     <>
       <PullRequestInspect
-        actionPending={action.isPending}
+        actionPending={pending}
         diff={diff}
         onAction={beginAction}
         onRefresh={refresh}
@@ -115,9 +97,9 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
       {intent !== null ? (
         <ConfirmPullRequestAction
           input={intent}
-          loading={action.isPending}
+          loading={pending}
           onCancel={() => setIntent(null)}
-          onConfirm={() => action.mutate(intent)}
+          onConfirm={() => run(intent)}
         />
       ) : null}
     </>
