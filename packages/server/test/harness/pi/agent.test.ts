@@ -714,6 +714,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
             "session.compaction.started",
             "session.compaction.ended",
             "start",
+            "message-metadata",
             "text-start",
             "text-delta",
             "text-end",
