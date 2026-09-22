@@ -108,6 +108,7 @@ describe("shell columns", () => {
     );
     expect(seams.map((el) => el.getBoundingClientRect().width)).toEqual([4, 1]);
     const seam = seams[0];
+    if (seam === undefined) throw new Error("missing seam");
     const box = seam.getBoundingClientRect();
     seam.dispatchEvent(
       new PointerEvent("pointermove", {
