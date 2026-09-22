@@ -102,10 +102,7 @@ describe("shell columns", () => {
     expect(drawer?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
       (drawer as HTMLElement).getBoundingClientRect().right + 0.5,
     );
-    expect(column?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
-      (column as HTMLElement).getBoundingClientRect().right + 0.5,
-    );
-    expect(getComputedStyle(column?.firstElementChild as HTMLElement).paddingRight).toBe("4px");
+    expect(getComputedStyle(column as HTMLElement).paddingRight).toBe("4px");
     const seams = [...document.querySelectorAll<HTMLElement>('[role="separator"]')].filter(
       (el) => el.getBoundingClientRect().width > 0,
     );
@@ -128,5 +125,27 @@ describe("shell columns", () => {
     await screen.rerender(<Shell contentOpen={false} />);
     await expect.element(page.getByText("Sidebar")).toBeVisible();
     expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
+  });
+
+  it("stops the content panel at the main column minimum", async () => {
+    await render(
+      <div data-testid="shell" className="flex" style={{ width: 700, height: 400 }}>
+        <div data-testid="main" className="min-w-80 flex-1">
+          Main
+        </div>
+        <ShellContentPanel collapsed={false} maximized={false} sessionKey="minimum-width">
+          <div>Content</div>
+        </ShellContentPanel>
+      </div>,
+    );
+
+    const shell = page.getByTestId("shell").element();
+    const main = page.getByTestId("main").element();
+    const content = page.getByText("Content").element().closest("[data-slot=content-panel-column]");
+    expect(content).toBeInstanceOf(HTMLElement);
+    expect(main.getBoundingClientRect().width).toBe(320);
+    expect((content as HTMLElement).getBoundingClientRect().right).toBeLessThanOrEqual(
+      shell.getBoundingClientRect().right,
+    );
   });
 });
