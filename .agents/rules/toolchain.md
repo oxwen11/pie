@@ -18,7 +18,7 @@
   emits them to `dist/`; the root `oxlint.config.mts` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package).
   That file extends `ultracite/oxlint/{core,react,vitest}` and overlays pie
-  plugins plus `oxlint.deferred.mts` (Ultracite rules not yet adopted).
+  plugins plus `oxlint-deferred.mts` (Ultracite rules not yet adopted).
   `@shadcn/lint` is registered in `jsPlugins` with `settings.shadcn` pointing
   at `@getpie/ui/components` and `@getpie/ui/ai-elements`. `shadcn/no-restyle`
   is `error` with `allow: ["layout"]` plus contracts for slot/chrome
