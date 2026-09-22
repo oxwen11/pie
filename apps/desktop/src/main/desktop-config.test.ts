@@ -15,12 +15,14 @@ describe("buildDesktopConfig", () => {
       resourcesPath: "/Applications/Pie.app/Contents/Resources",
       devUrl: undefined,
       windowBackgroundColor: "#ffffff",
+      userDataPath: "/tmp/pie-user-data",
     });
 
     expect(config.serverEntry).toBe(
       "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
     );
     expect(config.resourcesPath).toBe("/Applications/Pie.app/Contents/Resources");
+    expect(config.userDataPath).toBe("/tmp/pie-user-data");
   });
 
   it("resolves the dev server entry relative to the package output", () => {
@@ -29,6 +31,7 @@ describe("buildDesktopConfig", () => {
       resourcesPath: "/unused",
       devUrl: undefined,
       windowBackgroundColor: "#ffffff",
+      userDataPath: "/tmp/pie-user-data",
     });
 
     expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.mjs$/);

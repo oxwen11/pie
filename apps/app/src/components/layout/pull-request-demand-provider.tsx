@@ -1,5 +1,5 @@
 import type { SessionRef } from "@getpie/contract";
-import { useRouteContext } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   use,
@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { useSessionListSync } from "@/features/projects/use-session-list-sync";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { usePlatform } from "@/platform-context";
 
 import { PullRequestDemand } from "./pull-request-demand";
@@ -24,11 +25,12 @@ const DemandContext = createContext<{
 } | null>(null);
 
 export function PullRequestDemandProvider({ children }: { children: ReactNode }) {
-  const { orpcClient, orpcQueryUtils, queryClient } = useRouteContext({ from: "__root__" });
+  const orpc = useCatalogOrpc();
+  const queryClient = useQueryClient();
   const platform = usePlatform();
   const [runtime] = useState(() => {
     const demand = new PullRequestDemand((input) =>
-      orpcClient.pullRequest.demand(input, { signal: AbortSignal.timeout(15_000) }),
+      orpc.pullRequest.demand.call(input, { signal: AbortSignal.timeout(15_000) }),
     );
     const source = Symbol();
     return {
@@ -38,9 +40,9 @@ export function PullRequestDemandProvider({ children }: { children: ReactNode })
     };
   });
   const repair = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.statuses.key() });
-    void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.detail.key() });
-  }, [queryClient, orpcQueryUtils]);
+    void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+    void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
+  }, [queryClient, orpc]);
   const onSubscribed = useCallback(() => {
     runtime.demand.reconnect();
     repair();
@@ -80,7 +82,7 @@ export function usePullRequestRow(ref: SessionRef, displayed: boolean) {
   const { projectId, sessionId } = ref;
   return useCallback(
     (element: HTMLLIElement | null) => {
-      if (!element || !displayed) return;
+      if (!element || !displayed) return undefined;
       return rows.observe(element, { projectId, sessionId });
     },
     [rows, displayed, projectId, sessionId],

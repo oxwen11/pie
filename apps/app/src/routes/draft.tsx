@@ -4,36 +4,32 @@ import type {
   Project,
   SessionSummary,
 } from "@getpie/contract";
-import {
-  PromptInput,
-  PromptInputSubmit,
-  PromptInputToolbar,
-  PromptInputTools,
-} from "@getpie/ui/ai-elements/prompt-input";
 import { Button } from "@getpie/ui/components/button";
-import { Card, CardFrame, CardFrameHeader } from "@getpie/ui/components/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { FolderPlusIcon } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import Loader from "@/components/loader";
-import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
-import { ChatInput } from "@/features/chat/components/input/chat-input";
-import type { ChatInputController } from "@/features/chat/components/input/chat-input-controller";
-import { ChatInputProvider } from "@/features/chat/components/input/chat-input-provider";
-import { createChatBaseExtensions } from "@/features/chat/components/input/extensions/chat-base-extensions";
-import { createSubmitKeymap } from "@/features/chat/components/input/extensions/keymaps";
-import { useChatInputController } from "@/features/chat/components/input/use-chat-input-controller";
-import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
-import { DraftWorkspaceSelect } from "@/features/projects/draft-workspace-select";
-import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
-import { ProjectSelect } from "@/features/projects/project-select";
-import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
+import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
 import { useProject, useProjects } from "@/features/projects/use-projects";
+import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
+
+import { DraftComposer } from "./draft-composer";
 
 type DraftSearch = {
   readonly projectId?: string;
+  readonly environmentId?: string;
   readonly provider?: string;
   readonly modelId?: string;
 };
@@ -53,6 +49,7 @@ const optional = <K extends keyof DraftSearch>(
 export const Route = createFileRoute("/draft")({
   validateSearch: (search: Record<string, unknown>): DraftSearch => ({
     ...optional("projectId", asText(search.projectId)),
+    ...optional("environmentId", asText(search.environmentId)),
     ...optional("provider", asText(search.provider)),
     ...optional("modelId", asText(search.modelId)),
   }),
@@ -60,15 +57,26 @@ export const Route = createFileRoute("/draft")({
 });
 
 function DraftRoute() {
-  const { orpcQueryUtils } = Route.useRouteContext();
+  const { localEnvironmentId, environmentRpc } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const environmentId = search.environmentId ?? localEnvironmentId;
+  return (
+    <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+      <DraftPage environmentId={environmentId} />
+    </EnvironmentOrpcProvider>
+  );
+}
+
+function DraftPage({ environmentId }: { readonly environmentId: string }) {
+  const orpcQueryUtils = useCatalogOrpc();
   const search = Route.useSearch();
   const navigate = useNavigate();
   const chats = useChatManager();
   const queryClient = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const projects = useProjects();
   const selected = useProject(search.projectId) ?? null;
-  const draftWorktree = useDraftWorktree(selected);
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
       input: selected?.id ? { projectId: selected.id } : {},
@@ -81,6 +89,7 @@ function DraftRoute() {
       : defaultModel;
 
   const startSession = useMutation({
+    mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.id;
       if (projectId === undefined) {
@@ -126,7 +135,7 @@ function DraftRoute() {
       // Create already persisted cwd (and the worktree, when requested). Prompt
       // only opens Pi — fire-and-forget so spawn does not block the jump.
       void chats
-        .chatFor(created.ref)
+        .chatFor({ environmentId, ref: created.ref })
         .prompt(text)
         .catch((error: unknown) => {
           console.error("Failed to start session prompt", error);
@@ -135,7 +144,7 @@ function DraftRoute() {
       navigate({
         to: "/session/$sessionId",
         params: { sessionId: created.ref.sessionId },
-        search: { projectId: created.ref.projectId },
+        search: { projectId: created.ref.projectId, environmentId },
       }).catch((error: unknown) => {
         console.error("Failed to open the new session", error);
       });
@@ -144,35 +153,6 @@ function DraftRoute() {
       toast.error(`Failed to start session: ${error.message}`);
     },
   });
-
-  const controller = useChatInputController({
-    extensions: (self) => [
-      ...createChatBaseExtensions({
-        placeholder: () => "Ask Pi anything...",
-      }),
-      createSubmitKeymap({ onSubmit: () => void self.submit() }),
-    ],
-    onSubmit: (text) => {
-      if (draftWorktree.gitState === "workspace-unavailable") {
-        toast.error("The selected project folder is unavailable.");
-        return false;
-      }
-      if (startSession.isPending) return false;
-      if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
-        toast.error("Pick a base branch for the worktree.");
-        return false;
-      }
-      startSession.mutate({
-        text,
-        ...(draftWorktree.worktree !== undefined
-          ? { worktree: draftWorktree.worktree }
-          : undefined),
-      });
-      return false;
-    },
-  });
-
-  const hasContent = useChatInputHasContent(controller);
 
   if (projects.isPending) {
     return <Loader />;
@@ -187,12 +167,28 @@ function DraftRoute() {
     );
   }
 
+  if (projects.data.length === 0 && search.projectId === undefined) {
+    return (
+      <DraftEmptyImport
+        importOpen={importOpen}
+        onCloseImport={() => setImportOpen(false)}
+        onImported={(projectId, importedEnvironmentId) => {
+          navigate({
+            to: "/draft",
+            search: { projectId, environmentId: importedEnvironmentId },
+            replace: true,
+          }).catch((error: unknown) => {
+            console.error("Failed to open the imported project", error);
+          });
+        }}
+        onOpenImport={() => setImportOpen(true)}
+      />
+    );
+  }
+
   return (
     <DraftComposer
-      controller={controller}
       draftModel={draftModel}
-      draftWorktree={draftWorktree}
-      hasContent={hasContent}
       models={modelsQuery.data?.models ?? []}
       onModelChange={(provider, modelId) => {
         navigate({
@@ -209,26 +205,23 @@ function DraftRoute() {
           search: (prev) => {
             if (next === null) {
               const { projectId: _removed, ...rest } = prev;
-              return rest;
+              return { ...rest, environmentId };
             }
-            return { ...prev, projectId: next };
+            return { ...prev, projectId: next, environmentId };
           },
           replace: true,
         }).catch((error: unknown) => {
           console.error("Failed to select draft project", error);
         });
       }}
-      onSchedule={() => {
-        if (selected === null) return;
-        navigate({
-          to: "/schedules",
-          search: { create: true, projectId: selected.id },
-        }).catch((error: unknown) => {
-          console.error("Failed to open the schedule editor", error);
+      onStart={(text, worktree) => {
+        startSession.mutate({
+          text,
+          ...(worktree !== undefined ? { worktree } : undefined),
         });
       }}
       projects={projects.data ?? []}
-      selectedId={selected?.id ?? null}
+      selected={selected}
       startPending={startSession.isPending}
     />
   );
@@ -245,122 +238,42 @@ function DraftProjectsError({ message, onRetry }: { message: string; onRetry: ()
   );
 }
 
-function DraftComposer({
-  controller,
-  draftModel,
-  draftWorktree,
-  hasContent,
-  models,
-  onModelChange,
-  onProjectChange,
-  onSchedule,
-  projects,
-  selectedId,
-  startPending,
+function DraftEmptyImport({
+  importOpen,
+  onCloseImport,
+  onImported,
+  onOpenImport,
 }: {
-  controller: ChatInputController | null;
-  draftModel: { provider: string; modelId: string } | undefined;
-  draftWorktree: ReturnType<typeof useDraftWorktree>;
-  hasContent: boolean;
-  models: Parameters<typeof ModelSelectorPicker>[0]["models"];
-  onModelChange: (provider: string, modelId: string) => void;
-  onProjectChange: (next: string | null) => void;
-  onSchedule: () => void;
-  projects: NonNullable<ReturnType<typeof useProjects>["data"]>;
-  selectedId: string | null;
-  startPending: boolean;
+  importOpen: boolean;
+  onCloseImport: () => void;
+  onImported: (projectId: string, environmentId: string) => void;
+  onOpenImport: () => void;
 }) {
   return (
-    <div className="flex h-full items-center justify-center p-4">
-      <CardFrame className="w-full max-w-2xl">
-        <CardFrameHeader className="py-2">
-          <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
-            <ProjectSelect onChange={onProjectChange} projects={projects} value={selectedId} />
-            {draftWorktree.gitState === "not-repository" ? (
-              <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
-            ) : null}
-            {draftWorktree.gitState === "workspace-unavailable" ? (
-              <span className="text-destructive px-2 text-xs">Workspace unavailable</span>
-            ) : null}
-            {draftWorktree.gitAvailable ? (
-              <DraftWorkspaceControls
-                disabled={startPending || selectedId === null}
-                draftWorktree={draftWorktree}
-              />
-            ) : null}
-            <Button
-              className="ms-auto"
-              disabled={selectedId === null}
-              onClick={onSchedule}
-              size="sm"
-              variant="ghost"
-            >
-              Schedule…
-            </Button>
-          </div>
-        </CardFrameHeader>
-        <Card
-          render={
-            <PromptInput
-              className="divide-y-0"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void controller?.submit();
-              }}
-            />
-          }
-        >
-          <ChatInputProvider controller={controller}>
-            <ChatInput />
-            <PromptInputToolbar>
-              <PromptInputTools>
-                <ModelSelectorPicker
-                  modelId={draftModel?.modelId}
-                  models={models}
-                  onChange={onModelChange}
-                  providerId={draftModel?.provider}
-                />
-              </PromptInputTools>
-              <PromptInputSubmit
-                disabled={
-                  !hasContent ||
-                  draftWorktree.gitState === "workspace-unavailable" ||
-                  startPending ||
-                  (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
-                }
-              />
-            </PromptInputToolbar>
-          </ChatInputProvider>
-        </Card>
-      </CardFrame>
-    </div>
-  );
-}
-
-function DraftWorkspaceControls({
-  disabled,
-  draftWorktree,
-}: {
-  disabled: boolean;
-  draftWorktree: ReturnType<typeof useDraftWorktree>;
-}) {
-  const handleModeChange = draftWorktree.setMode;
-  const handleValueChange = draftWorktree.setWorktreeBaseOverride;
-  return (
-    <>
-      <DraftWorkspaceSelect
-        disabled={disabled}
-        mode={draftWorktree.mode}
-        onModeChange={handleModeChange}
-      />
-      {draftWorktree.mode === "worktree" ? (
-        <DraftWorktreeBaseSelect
-          branch={draftWorktree.repositoryBranch}
-          disabled={disabled}
-          onValueChange={handleValueChange}
-          value={draftWorktree.worktreeBase}
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <FolderPlusIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>
+          <h1>Import your first project</h1>
+        </EmptyTitle>
+        <EmptyDescription>
+          Choose a folder for your coding agent to work in. You can start a chat right after
+          importing.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onOpenImport}>Import project</Button>
+      </EmptyContent>
+      {importOpen ? (
+        <ImportProjectDialog
+          onClose={onCloseImport}
+          onImported={(project, importedEnvironmentId) => {
+            onImported(project.id, importedEnvironmentId);
+          }}
         />
       ) : null}
-    </>
+    </Empty>
   );
 }

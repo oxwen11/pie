@@ -18,7 +18,7 @@
   emits them to `dist/`; the root `oxlint.config.mts` loads them as
   `@getpie/oxlint/<plugin>` (root depends on the workspace package).
   That file extends `ultracite/oxlint/{core,react,vitest}` and overlays pie
-  plugins plus `oxlint.deferred.mts` (Ultracite rules not yet adopted).
+  plugins plus `oxlint-deferred.mts` (Ultracite rules not yet adopted).
   `@shadcn/lint` is registered in `jsPlugins` with `settings.shadcn` pointing
   at `@getpie/ui/components` and `@getpie/ui/ai-elements`. `shadcn/no-restyle`
   is `error` with `allow: ["layout"]` plus contracts for slot/chrome
@@ -97,7 +97,7 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  Electron — local `pnpm e2e` / `turbo run e2e` only, not CI. `tools/testing/fake-pi.mjs` is referenced by relative
+  Electron and runs in Code check (`pnpm e2e` under xvfb). `tools/testing/fake-pi.mjs` is referenced by relative
   path from server tests, CLI tests, desktop e2e, and app e2e. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.

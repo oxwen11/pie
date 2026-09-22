@@ -116,6 +116,7 @@ export const makeFixture = Effect.gen(function* () {
   });
   const worktrees = WorktreeService.of({
     create: () => Effect.die("unexpected worktree"),
+    restore: () => Effect.die("unexpected worktree restore"),
     remove: () =>
       Effect.sync(() => {
         calls.remove++;

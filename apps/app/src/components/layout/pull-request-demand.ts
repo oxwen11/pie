@@ -5,7 +5,7 @@ import type {
 } from "@getpie/contract/pull-request";
 import { ORPCError } from "@orpc/client";
 
-import { sessionRefKey } from "@/lib/session-ref";
+const demandKey = (ref: SessionRef): string => `${ref.projectId}\0${ref.sessionId}`;
 
 const RENEW_MS = 30_000;
 
@@ -42,7 +42,7 @@ export class PullRequestDemand {
     if (!this.visible) return [];
     const refs = new Map<string, SessionRef>();
     for (const source of this.sources.values()) {
-      for (const ref of source) refs.set(sessionRefKey(ref), ref);
+      for (const ref of source) refs.set(demandKey(ref), ref);
     }
     return [...refs.entries()]
       .sort(([a], [b]) => a.localeCompare(b))

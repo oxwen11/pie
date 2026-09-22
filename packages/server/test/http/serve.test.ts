@@ -43,6 +43,7 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
     Effect.gen(function* () {
       const config = yield* resolveServeConfig({
         port: Option.some(3000),
+        host: Option.none(),
         corsOrigin: [],
         allowedHost: [],
       }).pipe(Effect.provide(withConfig({ PIE_PORT: "5000" })));
@@ -54,6 +55,7 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
     Effect.gen(function* () {
       const config = yield* resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: [],
         allowedHost: [],
       }).pipe(Effect.provide(withConfig({ PIE_PORT: "5000" })));
@@ -65,12 +67,14 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
     Effect.gen(function* () {
       const production = yield* resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: [],
         allowedHost: [],
       }).pipe(Effect.provide(withConfig({})));
       assert.equal(production.port, 4000);
       const development = yield* resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: [],
         allowedHost: [],
       }).pipe(Effect.provide(withConfig({ NODE_ENV: "development" })));
@@ -82,6 +86,7 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
     Effect.gen(function* () {
       const config = yield* resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: ["https://a.test", "https://b.test"],
         allowedHost: [],
       }).pipe(Effect.provide(withConfig({ PIE_CORS_ORIGINS: "https://env.example" })));
@@ -93,6 +98,7 @@ testLayer(NodePlatformLayer)("resolveServeConfig", (effectIt) => {
     Effect.gen(function* () {
       const config = yield* resolveServeConfig({
         port: Option.none(),
+        host: Option.none(),
         corsOrigin: [],
         allowedHost: [],
       }).pipe(
@@ -120,9 +126,9 @@ describe("runServe", () => {
     process.env.PIE_AUTH_TOKEN = token;
 
     const fiber = Effect.runFork(
-      Effect.scoped(runServe({ port: Option.some(port), corsOrigin: [], allowedHost: [] })).pipe(
-        Effect.provide(NodePlatformLayer),
-      ),
+      Effect.scoped(
+        runServe({ port: Option.some(port), host: Option.none(), corsOrigin: [], allowedHost: [] }),
+      ).pipe(Effect.provide(NodePlatformLayer)),
     );
 
     try {
@@ -169,9 +175,14 @@ describe("runServe", () => {
 
     try {
       const exit = await Effect.runPromiseExit(
-        Effect.scoped(runServe({ port: Option.some(port), corsOrigin: [], allowedHost: [] })).pipe(
-          Effect.provide(NodePlatformLayer),
-        ),
+        Effect.scoped(
+          runServe({
+            port: Option.some(port),
+            host: Option.none(),
+            corsOrigin: [],
+            allowedHost: [],
+          }),
+        ).pipe(Effect.provide(NodePlatformLayer)),
       );
       const error = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
       expect(error).toBeInstanceOf(ServerStartupError);

@@ -97,6 +97,57 @@ function processAlive(pid: number): boolean {
 }
 
 /**
+ * Linux shutdown blocks the Electron main thread inside runtime dispose, so
+ * Playwright's `close()` never returns. Kill the process from this side.
+ * ponytail: SIGKILL instead of a graceful quit on Linux. Drop when dispose yields.
+ */
+export async function closeElectron(app: ElectronApplication): Promise<void> {
+  let pid: number | undefined;
+  try {
+    pid = app.process().pid;
+  } catch {
+    // Already closed (Quit button / prior close).
+    return;
+  }
+
+  if (process.platform !== "linux") {
+    await app.close().catch(() => undefined);
+    return;
+  }
+
+  const closed = app.close().then(
+    () => undefined,
+    () => undefined,
+  );
+  const outcome = await Promise.race([
+    closed.then(() => "closed" as const),
+    new Promise<"hung">((resolve) => {
+      setTimeout(() => resolve("hung"), 1_000);
+    }),
+  ]);
+  if (outcome === "closed") return;
+
+  if (typeof pid === "number" && processAlive(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already exited
+    }
+  }
+  await Promise.race([
+    closed,
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 2_000);
+    }),
+  ]);
+}
+
+/** Linux runners have no Chromium setuid sandbox and a small /dev/shm. */
+export function linuxElectronArgs(): string[] {
+  return process.platform === "linux" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
+}
+
+/**
  * Extended test fixtures for Electron testing
  */
 export const test = base.extend<{
@@ -104,7 +155,9 @@ export const test = base.extend<{
     fakePiLog: string;
     userData: string;
     pieHome: string;
+    workspace: string;
   };
+  fakePiResponse: string;
   electronApp: ElectronApplication;
   window: Page;
 }>({
@@ -114,37 +167,42 @@ export const test = base.extend<{
     fs.mkdirSync(output, { recursive: true });
     const pieHome = path.join(output, "pie-home");
     fs.mkdirSync(pieHome, { recursive: true });
-    seedProject(pieHome, path.join(output, "workspace"));
+    const workspace = path.join(output, "workspace");
+    seedProject(pieHome, workspace);
     await use({
       fakePiLog: path.join(output, "fake-pi.jsonl"),
       userData: path.join(output, "user-data"),
       pieHome,
+      workspace,
     });
 
     await stopDaemonFor(pieHome);
   },
 
+  fakePiResponse: ["Desktop fake Pi reply", { option: true }],
+
   // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
-  electronApp: async ({ e2ePaths }, use) => {
+  electronApp: async ({ e2ePaths, fakePiResponse }, use) => {
     const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
     const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
 
+    const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...launchEnv } = process.env;
     const app = await electron.launch({
-      args: [appPath, `--user-data-dir=${e2ePaths.userData}`],
+      args: [...linuxElectronArgs(), appPath, `--user-data-dir=${e2ePaths.userData}`],
       env: {
-        ...process.env,
+        ...launchEnv,
         NODE_ENV: "test",
         PIE_E2E: "1",
         PIE_E2E_PI_EXECUTABLE: fakePiPath,
         PIE_E2E_PI_LOG: e2ePaths.fakePiLog,
-        PIE_E2E_PI_RESPONSE: "Desktop fake Pi reply",
+        PIE_E2E_PI_RESPONSE: fakePiResponse,
         PIE_HOME: e2ePaths.pieHome,
       },
     });
 
     await use(app);
 
-    await app.close();
+    await closeElectron(app);
   },
 
   window: async ({ electronApp }, use) => {

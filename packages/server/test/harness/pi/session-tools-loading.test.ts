@@ -11,7 +11,6 @@ import { afterEach, vi } from "vitest";
 import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
 import { PiSessionTools, type PiSessionToolsShape } from "../../../src/harness/pi/session-tools";
-import type { PiUIMessageChunk } from "../../../src/harness/pi/ui-message";
 
 const provider = url.fileURLToPath(
   new URL("./fixtures/registration-provider.mjs", import.meta.url),
@@ -30,7 +29,7 @@ const link: SessionPullRequestLink = {
   stack: null,
   stackCheckedAt: null,
 };
-const toolResult = (chunks: readonly PiUIMessageChunk[]) =>
+const toolResult = (chunks: ReadonlyArray<{ readonly type: string }>) =>
   chunks.find(
     (chunk) => chunk.type === "tool-output-available" || chunk.type === "tool-output-error",
   );
@@ -262,18 +261,22 @@ layer(NodeServices.layer, { excludeTestServices: true })("bridge process lifecyc
           tools: callbacks,
         });
         yield* pi.session.abort(first.sessionId);
-        assert.equal(yield* fs.exists(spawned[0]!.extension), false);
+        const opened = spawned[0];
+        if (!opened) throw new Error("missing bridge");
+        assert.equal(yield* fs.exists(opened.extension), false);
         const resumed = yield* pi.session.resume({
           cwd: dir,
           sessionId: first.sessionId,
           tools: callbacks,
         });
-        assert.notEqual(spawned[0]!.token, spawned[1]!.token);
+        const resumedBridge = spawned[1];
+        if (!resumedBridge) throw new Error("missing resumed bridge");
+        assert.notEqual(opened.token, resumedBridge.token);
         const mismatch = yield* Effect.tryPromise(() =>
-          fetch(`${spawned[1]!.endpoint}/list`, {
+          fetch(`${resumedBridge.endpoint}/list`, {
             method: "POST",
             headers: {
-              authorization: `Bearer ${spawned[0]!.token}`,
+              authorization: `Bearer ${opened.token}`,
               "content-type": "application/json",
             },
             body: "{}",
@@ -286,7 +289,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("bridge process lifecyc
         yield* pi.session.awaitTermination(resumed.sessionId).pipe(Effect.ignore);
         // Crash cleanup closes the child scope on a separate owner fiber.
         yield* Effect.sleep("100 millis");
-        assert.equal(yield* fs.exists(spawned[1]!.extension), false);
+        assert.equal(yield* fs.exists(resumedBridge.extension), false);
         const failed = yield* makePiProcess({
           executable: {
             command: globalThis.process.execPath,
@@ -297,7 +300,9 @@ layer(NodeServices.layer, { excludeTestServices: true })("bridge process lifecyc
           yield* failed.session.create({ cwd: dir, tools: callbacks }).pipe(Effect.isFailure),
           true,
         );
-        assert.equal(yield* fs.exists(spawned[2]!.extension), false);
+        const failedBridge = spawned[2];
+        if (!failedBridge) throw new Error("missing failed bridge");
+        assert.equal(yield* fs.exists(failedBridge.extension), false);
         for (const child of spawned) {
           assert.equal(
             yield* Effect.tryPromise(() =>

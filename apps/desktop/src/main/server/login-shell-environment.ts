@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Context, Effect, Option } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const SHELL_TIMEOUT_MS = 5_000;
@@ -29,6 +29,13 @@ export type ShellEnvironmentOptions = {
   readonly shell?: string;
   readonly baseEnv?: NodeJS.ProcessEnv;
 };
+
+export class LoginShellEnvironment extends Context.Service<
+  LoginShellEnvironment,
+  {
+    readonly env: NodeJS.ProcessEnv;
+  }
+>()("desktop/LoginShellEnvironment") {}
 
 function parseEnvironment(stdout: string): NodeJS.ProcessEnv | undefined {
   const openMarker = `\0${OPEN}\0`;

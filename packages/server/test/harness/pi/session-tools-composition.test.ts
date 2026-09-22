@@ -91,6 +91,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           const worktrees = WorktreeService.of({
             create: () => Effect.die("Unexpected worktree creation"),
+            restore: () => Effect.die("Unexpected worktree restore"),
             remove: () => Effect.die("Unexpected worktree removal"),
           });
           const locksLayer = SessionMetadataLocksLayer;

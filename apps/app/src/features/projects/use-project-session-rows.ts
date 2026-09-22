@@ -4,6 +4,7 @@ import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouteContext, useRouter } from "@tanstack/react-router";
 
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
@@ -21,10 +22,14 @@ const selectNewestFirst = (
 
 /** Session rows + PR/schedule adornments for one project's sidebar list. */
 export function useProjectSessionRows(project: Project) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const { localEnvironmentId } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useCatalogOrpc();
   const router = useRouter();
   const isSessionActive = (ref: SessionRef) =>
-    sameSessionRef(ref, sessionRefFromRouterMatches(router.state.matches));
+    sameSessionRef(
+      { environmentId: localEnvironmentId, ref },
+      sessionRefFromRouterMatches(router.state.matches),
+    );
   const sessions = useQuery({
     ...orpcQueryUtils.agent.session.list.queryOptions({
       input: { projectId: project.id, archived: false },
@@ -47,6 +52,7 @@ export function useProjectSessionRows(project: Project) {
   });
 
   return {
+    environmentId: localEnvironmentId,
     isSessionActive,
     rows,
     pullRequestFor: (session: SessionSummary, _active: boolean) =>

@@ -5,6 +5,7 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { Context, Crypto, Effect, Layer } from "effect";
 
+import { SessionImageAssetsLayer } from "../assets";
 import { PathsLayer } from "../config/paths";
 import { EventBusLayer, EventBus } from "../events";
 import { FileSystemServiceLayer } from "../fs";
@@ -19,11 +20,13 @@ import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/ag
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ResourceMonitoring } from "../observability/resources";
+import { PackageServiceLayer } from "../packages";
 import { ProjectRepositoryLayer, ProjectServiceLayer, ProjectService } from "../project";
 import { PullRequestServiceLayer, PullRequestService } from "../pull-request";
 import { makePullRequestCoordinator, PullRequestCoordinator } from "../pull-request/coordinator";
 import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
 import { SettingsRepositoryLayer } from "../settings";
+import { SkillServiceLayer } from "../skills";
 import { TerminalManagerLayer } from "../terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
@@ -45,7 +48,7 @@ export const PiProcessLayer: Layer.Layer<PiProcessTag, never, ResourceMonitoring
       onExit: (sessionId, pid) => resources.unregisterPi(sessionId, { pid }),
     });
   }),
-).pipe(Layer.provide(NodeProcessLayer));
+).pipe(Layer.provide(NodeProcessLayer), Layer.provide(PlatformLayer));
 
 const PiAgentProvided = Layer.effect(
   PiAgent,
@@ -93,6 +96,9 @@ const PiAgentSessionServiceProvided = PiAgentSessionServiceLayer.pipe(
 );
 
 const PiAgentServiceProvided = PiAgentServiceLayer;
+const SessionImageAssetsProvided = SessionImageAssetsLayer.pipe(
+  Layer.provide(PiAgentSessionServiceProvided),
+);
 const PullRequestServiceProvided = PullRequestServiceLayer.pipe(Layer.provide(NodeProcessLayer));
 
 export const PullRequestCoordinatorLayer = Layer.effect(
@@ -135,10 +141,13 @@ export const AgentRuntimeLayer = Layer.mergeAll(
   EventBusLayer,
   PiAgentServiceProvided,
   PiAgentSessionServiceProvided,
+  SessionImageAssetsProvided,
   ProjectServiceProvided,
   SettingsRepositoryProvided,
   ScheduleServiceProvided,
   ScheduleDaemonLayer,
+  PackageServiceLayer,
+  SkillServiceLayer,
   PiAgentProvided,
   PiProcessLayer,
   FileSystemServiceLayer.pipe(Layer.provide(PlatformLayer)),

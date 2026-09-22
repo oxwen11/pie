@@ -236,7 +236,8 @@ export const SessionMetadataLayer: Layer.Layer<
                         sessionId: metadata.sessionId,
                         archived: metadata.archived ?? false,
                         createdAt: metadata.createdAt,
-                        historyAvailable: metadata.historyAvailable ?? true,
+                        historyAvailable:
+                          metadata.historyAvailable ?? metadata.agentSessionId !== undefined,
                         ...(metadata.title !== undefined ? { title: metadata.title } : undefined),
                         ...(metadata.updatedAt !== undefined
                           ? { updatedAt: metadata.updatedAt }

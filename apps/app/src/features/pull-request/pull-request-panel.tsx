@@ -11,7 +11,6 @@ import { Button } from "@getpie/ui/components/button";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { ORPCError } from "@orpc/client";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { GitPullRequestIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -19,6 +18,7 @@ import { toast } from "sonner";
 import type { PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { definePanel } from "@/components/layout/content-panel/react/view";
 import { usePullRequestPanelDemand } from "@/components/layout/pull-request-demand-provider";
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 import { sessionRefKey } from "@/lib/session-ref";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -43,12 +43,13 @@ export const pullRequestPanel = definePanel({
 const selectStatus = (statuses: readonly PullRequestSessionStatus[]) => statuses[0];
 
 function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
-  const visible = usePullRequestPanelDemand(instance.sessionRef);
-  const { orpcQueryUtils, orpcClient } = useRouteContext({ from: "__root__" });
+  const sessionRef = instance.sessionRef.ref;
+  const visible = usePullRequestPanelDemand(sessionRef);
+  const orpc = useEnvironmentOrpc();
   const queryClient = useQueryClient();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const options = orpcQueryUtils.pullRequest.statuses.queryOptions({
-    input: { refs: [instance.sessionRef] },
+  const options = orpc.pullRequest.statuses.queryOptions({
+    input: { refs: [sessionRef] },
   });
   const statuses = useQuery({ ...options, enabled: visible, select: selectStatus });
   const projection = projectSessionPullRequests(statuses.data?.links ?? []);
@@ -57,19 +58,19 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
       .flatMap((group) => group.links)
       .find((link) => pullRequestKey(link.ref) === selectedKey) ?? projection.representative;
   const refresh = useMutation({
-    mutationFn: () => orpcClient.pullRequest.refresh({ ref: instance.sessionRef }),
+    mutationFn: () => orpc.pullRequest.refresh.call({ ref: sessionRef }),
     onSuccess: (status) => {
       queryClient.setQueryData(options.queryKey, [status]);
-      void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.statuses.key() });
-      void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.detail.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
     },
     retry: false,
   });
   const exclude = useMutation({
     mutationFn: (pullRequest: PullRequestRef) =>
-      orpcClient.pullRequest.exclude({ ref: instance.sessionRef, pullRequest }),
+      orpc.pullRequest.exclude.call({ ref: sessionRef, pullRequest }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
     },
     retry: false,
   });
@@ -126,7 +127,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
           />
           <LinkedPullRequestDetail
             key={pullRequestKey(selected.ref)}
-            sessionRef={instance.sessionRef}
+            sessionRef={sessionRef}
             pullRequestRef={selected.ref}
             visible={visible}
             nativeStack={selected.stack !== null}
@@ -158,14 +159,14 @@ function LinkedPullRequestDetail({
   visible: boolean;
   nativeStack: boolean;
 }) {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpc = useEnvironmentOrpc();
   const queryClient = useQueryClient();
-  const options = orpcQueryUtils.pullRequest.detail.queryOptions({
+  const options = orpc.pullRequest.detail.queryOptions({
     input: { ref: sessionRef, pullRequest: pullRequestRef },
   });
   const pullRequest = useQuery({ ...options, enabled: visible });
   const diff = useQuery(
-    orpcQueryUtils.pullRequest.diff.queryOptions({
+    orpc.pullRequest.diff.queryOptions({
       input: visible ? { pullRequest: pullRequestRef } : skipToken,
     }),
   );
@@ -179,7 +180,7 @@ function LinkedPullRequestDetail({
     void diff.refetch();
   };
   const action = useMutation({
-    mutationFn: (input: PullRequestActionInput) => orpcQueryUtils.pullRequest.runAction.call(input),
+    mutationFn: (input: PullRequestActionInput) => orpc.pullRequest.runAction.call(input),
     onMutate: () => setPostActionRefreshFailed(false),
     onSuccess: () => {
       setIntent(null);

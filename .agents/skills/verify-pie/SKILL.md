@@ -41,7 +41,7 @@ What launch also does:
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
 - Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
-- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and Choose project proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `HOME=$PIE_HOME/home` so `~/Pie` resolves under the run and allocate never writes to the operator's real home.
+- Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and Choose project proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` so allocate stays in the run. Does not change `HOME` or `~/.pi/agent`.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
 `PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
@@ -93,7 +93,7 @@ Prefer `find` / `wait --text|--url` / `is` over `snapshot` + clicking `@eN`. Use
 ### UI rules
 
 1. `pnpm exec pie-verify web doctor` — abort if it fails.
-2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Choose project`, `Ask Pi anything...`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
+2. Prefer names from this repo: `New chat`, `Import project`, `Import this folder`, `Choose project`, `Do Anything, / for skills, @ for context`, `Send message`, `Toggle content panel`, `Current directory` / `New worktree`, card heading `New chat`.
 3. **Do not press Enter to send.** CDP Enter does not hit the TipTap submit keymap. Click the composer submit button. Shift+Enter stays in the editor (that path is real).
 4. Follow the feature file you are proving. The map is the source of truth — one convenient entry point is incomplete when the file lists others.
 
@@ -108,7 +108,7 @@ Stable handles (from source, not guesses):
 | Import dialog | textbox **Search folders or enter a full path...**; button **Import this folder**; footer shows the current path |
 | Draft project picker | one combobox: folder icon then **Choose project** until a project is chosen. Open list: folder basenames, then button **Don't work in a project**. After a project is chosen: trigger shows the name; hovering the picker shows **X** (**Clear project**) |
 | Draft workspace | **Current directory** / **New worktree** (only if the folder is a git repo) |
-| Draft composer | contenteditable; placeholder **Ask Pi anything...** |
+| Draft composer | contenteditable; placeholder **Do Anything, / for skills, @ for context** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
 | Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |

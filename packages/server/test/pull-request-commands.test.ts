@@ -266,7 +266,12 @@ it.effect(
           output: [
             {
               ...stack()[0],
-              pull_requests: Array.from({ length: 101 }, () => stack()[0]!.pull_requests[0]),
+              pull_requests: Array.from({ length: 101 }, () => {
+                const layer = stack()[0];
+                const pull = layer?.pull_requests[0];
+                if (!pull) throw new Error("missing stack pull request");
+                return pull;
+              }),
             },
           ],
         },
@@ -530,7 +535,7 @@ it.effect(
         PullRequestService,
       );
       yield* service.runAction(
-        "/workspace",
+        { cwd: "/workspace" },
         { pullRequest: ref, headSha: "expected-sha" },
         { type: "merge", method: "squash" },
       );
@@ -546,7 +551,7 @@ it.effect(
       assert.equal(
         (yield* Effect.flip(
           service.runAction(
-            "/workspace",
+            { cwd: "/workspace" },
             { pullRequest: lower, headSha: "expected-sha" },
             { type: "merge", method: "squash" },
           ),

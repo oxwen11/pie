@@ -15,9 +15,10 @@ import {
   AlertDialogFooter,
 } from "@getpie/ui/components/alert-dialog";
 import { Button } from "@getpie/ui/components/button";
-import { useMutation } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+
+import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 export function PullRequestStackActions({
   sessionRef,
@@ -26,10 +27,11 @@ export function PullRequestStackActions({
   sessionRef: SessionRef;
   pullRequest: PullRequestRef;
 }) {
-  const { orpcClient, orpcQueryUtils, queryClient } = useRouteContext({ from: "__root__" });
+  const orpc = useEnvironmentOrpc();
+  const queryClient = useQueryClient();
   const preview = useMutation({
     mutationFn: (action: PullRequestStackAction) =>
-      orpcClient.pullRequest.stackPreview({ ref: sessionRef, pullRequest, action }),
+      orpc.pullRequest.stackPreview.call({ ref: sessionRef, pullRequest, action }),
     retry: false,
   });
   const action = useMutation({
@@ -40,7 +42,7 @@ export function PullRequestStackActions({
       preview: PullRequestStackPreview;
       method?: PullRequestMergeMethod;
     }) =>
-      orpcClient.pullRequest.runStackAction({
+      orpc.pullRequest.runStackAction.call({
         ref: sessionRef,
         pullRequest: approved.pullRequest,
         action: approved.action,
@@ -51,8 +53,8 @@ export function PullRequestStackActions({
     // Even a lost response can follow a write: consume the preview and refresh.
     onSettled: () => {
       preview.reset();
-      void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.statuses.key() });
-      void queryClient.invalidateQueries({ queryKey: orpcQueryUtils.pullRequest.detail.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
     },
   });
   const completed = action.data?.completed.map(pullRequestKey).join(", ");
@@ -107,7 +109,10 @@ export function PullRequestStackActions({
           preview={preview.data}
           loading={action.isPending}
           onCancel={() => preview.reset()}
-          onConfirm={(method) => action.mutate({ preview: preview.data!, method })}
+          onConfirm={(method) => {
+            const approved = preview.data;
+            if (approved) action.mutate({ preview: approved, method });
+          }}
         />
       ) : null}
     </section>

@@ -20,15 +20,21 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { SessionPullRequestIndicator } from "@/features/projects/session-pull-request-indicator";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
-import type { AppClients } from "@/lib/orpc";
+import { EnvironmentOrpcProvider } from "@/lib/environment-orpc";
+import type { EnvironmentRpc } from "@/lib/environment-rpc";
+import type { EnvironmentOrpc } from "@/lib/orpc";
+
+const mockEnvironmentOrpc = (value: unknown): EnvironmentOrpc => {
+  if (typeof value !== "object" || value === null) throw new Error("mock orpc");
+  return value as EnvironmentOrpc;
+};
 import { PlatformProvider } from "@/platform-provider";
 
 import { PullRequestDemandProvider } from "./pull-request-demand-provider";
 
-type PullRequestApi = AppClients["orpcClient"]["pullRequest"];
-
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const sessionRef = { projectId: "project", sessionId: "session" };
+const environmentSession = { environmentId: "local", ref: sessionRef };
 const ref = (number: number): PullRequestRef => ({
   host: "github.com",
   owner: "pie",
@@ -57,36 +63,48 @@ const snapshot = (pullRequest: PullRequestRef): PullRequestSnapshot => ({
   autoMerge: null,
   offeredActions: [],
   updatedAt: "2026-09-01T00:00:00Z",
+  body: "",
 });
 let root: Root;
 let container: HTMLDivElement;
 let queryClient: QueryClient;
 let current: PullRequestSessionStatus;
 const api = {
-  demand: vi.fn<PullRequestApi["demand"]>(async () => ({
+  demand: vi.fn<() => Promise<{ leaseId: string; expiresAt: string }>>(async () => ({
     leaseId: "lease",
     expiresAt: new Date(Date.now() + 90_000).toISOString(),
   })),
-  statuses: vi.fn<PullRequestApi["statuses"]>(async () => [current]),
-  detail: vi.fn<PullRequestApi["detail"]>(async ({ pullRequest }) => snapshot(pullRequest)),
-  current: vi.fn<PullRequestApi["current"]>(),
-  refresh: vi.fn<PullRequestApi["refresh"]>(async () => current),
-  exclude: vi.fn<PullRequestApi["exclude"]>(async ({ pullRequest }) => {
-    current = {
-      ...current,
-      links: current.links.map((item) =>
-        item.ref.number === pullRequest.number ? { ...item, excluded: true } : item,
-      ),
-    };
-  }),
+  statuses: vi.fn<() => Promise<PullRequestSessionStatus[]>>(async () => [current]),
+  detail: vi.fn<(input: { pullRequest: PullRequestRef }) => Promise<PullRequestSnapshot>>(
+    async ({ pullRequest }) => snapshot(pullRequest),
+  ),
+  current: vi.fn<() => Promise<void>>(),
+  refresh: vi.fn<() => Promise<PullRequestSessionStatus>>(async () => current),
+  exclude: vi.fn<(input: { pullRequest: PullRequestRef }) => Promise<void>>(
+    async ({ pullRequest }) => {
+      current = {
+        ...current,
+        links: current.links.map((item) =>
+          item.ref.number === pullRequest.number ? { ...item, excluded: true } : item,
+        ),
+      };
+    },
+  ),
   stackPreview: vi.fn<() => Promise<PullRequestStackPreview>>(),
-  runStackAction: vi.fn<PullRequestApi["runStackAction"]>(async () => ({
+  runStackAction: vi.fn<
+    () => Promise<{
+      action: "rebase";
+      outcome: "partial";
+      completed: PullRequestRef[];
+      message: string;
+    }>
+  >(async () => ({
     action: "rebase",
     outcome: "partial",
     completed: [ref(1)],
     message: "Second layer changed.",
   })),
-  runAction: vi.fn<PullRequestApi["runAction"]>(),
+  runAction: vi.fn<() => Promise<void>>(),
 };
 
 beforeEach(() => {
@@ -128,7 +146,7 @@ afterEach(async () => {
 const panel = () =>
   pullRequestPanel.view.render({
     id: "pull-request",
-    sessionRef,
+    sessionRef: environmentSession,
     payload: undefined,
     activate() {},
     close() {},
@@ -152,15 +170,21 @@ async function render(children: ReactNode) {
       },
     },
   };
-  const context = {
-    orpcClient: client,
-    orpcQueryUtils: createTanstackQueryUtils(client),
+  const orpc = mockEnvironmentOrpc(createTanstackQueryUtils(client));
+  const environmentRpc: EnvironmentRpc = {
+    localId: "local",
     queryClient,
+    for: () => orpc,
+    httpBaseUrl: () => "http://127.0.0.1",
+    sync: () => undefined,
   };
+  const context = { localEnvironmentId: "local", environmentRpc };
   const routeTree = createRootRouteWithContext<typeof context>()({
     component: () => (
       <PlatformProvider value={{}}>
-        <PullRequestDemandProvider>{children}</PullRequestDemandProvider>
+        <EnvironmentOrpcProvider orpc={orpc}>
+          <PullRequestDemandProvider>{children}</PullRequestDemandProvider>
+        </EnvironmentOrpcProvider>
       </PlatformProvider>
     ),
   });
@@ -184,8 +208,8 @@ async function click(text: string) {
   const button = [...document.querySelectorAll("button")].find((item) =>
     item.textContent?.includes(text),
   );
-  expect(button).toBeDefined();
-  await act(async () => button!.click());
+  if (!button) throw new Error(`missing ${text}`);
+  await act(async () => button.click());
 }
 
 it("reads the selected linked identity, retains unknown links, cancels associations, and retries", async () => {
@@ -202,7 +226,8 @@ it("reads the selected linked identity, retains unknown links, cancels associati
   const cancel = container.querySelector<HTMLButtonElement>(
     '[aria-label="Cancel association with github.com/pie/pie#2"]',
   );
-  await act(async () => cancel!.click());
+  if (!cancel) throw new Error("missing cancel");
+  await act(async () => cancel.click());
   await settle(() => expect(container.textContent).not.toContain("pie/pie#2"));
   expect(api.exclude).toHaveBeenCalledWith({ ref: sessionRef, pullRequest: ref(2) });
   await click("Refresh");

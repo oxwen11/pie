@@ -1,15 +1,15 @@
-import type { PieUIMessage } from "@getpie/contract";
+import type { PieAssistantMetadata, PieAssistantUIMessage, PieUIMessage } from "@getpie/contract";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
-import { ListTreeIcon, SquareMinusIcon, SquarePlusIcon } from "lucide-react";
+import { SquareMinusIcon, SquarePlusIcon, TimerIcon } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { AssistantMessage } from "./assistant-message";
-import { formatWorkedFor, splitWork, timestampOf, workedSeconds } from "./message-view.logic";
 import { UserMessage } from "./user-message";
+import { formatWorkedFor, splitWork, workedSeconds } from "./worked-for";
 
 const NO_UNSUBSCRIBE = () => {
   /* useSyncExternalStore requires an unsubscribe even when the store has none. */
@@ -18,20 +18,12 @@ const NO_UNSUBSCRIBE = () => {
 export function MessageView({
   message,
   isStreaming,
-  previousTimestamp,
 }: {
   message: PieUIMessage;
   isStreaming: boolean;
-  previousTimestamp?: string;
 }) {
   if (message.role === "assistant") {
-    return (
-      <CollapsibleAssistantMessage
-        message={message}
-        isStreaming={isStreaming}
-        previousTimestamp={previousTimestamp}
-      />
-    );
+    return <CollapsibleAssistantMessage message={message} isStreaming={isStreaming} />;
   }
   return <UserMessage message={message} />;
 }
@@ -39,18 +31,15 @@ export function MessageView({
 function CollapsibleAssistantMessage({
   message,
   isStreaming,
-  previousTimestamp,
 }: {
-  message: PieUIMessage;
+  message: PieAssistantUIMessage;
   isStreaming: boolean;
-  previousTimestamp?: string;
 }) {
   const summary = useMemo(
     () => splitWork(message.parts, isStreaming),
     [message.parts, isStreaming],
   );
-  const historySeconds = workedSeconds(previousTimestamp, timestampOf(message.metadata));
-  const elapsed = useElapsedSeconds(isStreaming);
+  const seconds = useWorkedSeconds(isStreaming, message.metadata);
   const [openWhileStreaming, setOpenWhileStreaming] = useState(true);
   const [openWhenSettled, setOpenWhenSettled] = useState(false);
 
@@ -65,7 +54,7 @@ function CollapsibleAssistantMessage({
         open={isStreaming ? openWhileStreaming : openWhenSettled}
         onOpenChange={isStreaming ? setOpenWhileStreaming : setOpenWhenSettled}
       >
-        <SummaryTrigger label={formatWorkedFor(historySeconds ?? elapsed)} />
+        <SummaryTrigger label={formatWorkedFor(seconds)} />
         {/* Flush left, unlike a tool card's body: what folds here is whole
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
@@ -84,12 +73,21 @@ function CollapsibleAssistantMessage({
   );
 }
 
-function useElapsedSeconds(active: boolean): number {
+// Open: now minus messageStartTimestamp, so a remount keeps counting.
+// Settled: messageEndTimestamp minus messageStartTimestamp. No start: count from mount.
+function useWorkedSeconds(active: boolean, metadata: PieAssistantMetadata | undefined): number {
+  const settled = active ? undefined : workedSeconds(metadata);
+  const elapsed = useElapsedSeconds(active, metadata?.messageStartTimestamp);
+  return settled ?? elapsed;
+}
+
+function useElapsedSeconds(active: boolean, start?: string): number {
   const secondsRef = useRef(0);
+  const startMs = start === undefined ? Number.NaN : Date.parse(start);
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!active) return NO_UNSUBSCRIBE;
-      const startedAt = Date.now() - secondsRef.current * 1000;
+      const startedAt = Number.isFinite(startMs) ? startMs : Date.now() - secondsRef.current * 1000;
       const tick = () => {
         const next = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         if (next === secondsRef.current) return;
@@ -103,29 +101,28 @@ function useElapsedSeconds(active: boolean): number {
         clearInterval(id);
       };
     },
-    [active],
+    [active, startMs],
   );
   const getSnapshot = useCallback(() => secondsRef.current, []);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-// The turn's icon swaps to a +/- box on hover or once open, the same
-// affordance ToolHeader gives a tool card. Local rather than borrowed: this
-// row summarises a turn, not a tool call, so it doesn't belong to that family.
+// +/- on hover or keyboard focus; Timer stays visible while open. Local rather than
+// borrowed: this row is elapsed time, not a tool batch (ListCollapse).
 function SummaryTrigger({ label }: { label: string }) {
   return (
     <CollapsibleTrigger
       className="group"
       render={
         <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
-          <span className="relative">
-            <ListTreeIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0 group-data-[panel-open]:opacity-0" />
-            <div className="absolute inset-0 size-4 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[panel-open]:opacity-100">
+          <span className="relative flex size-4 shrink-0 items-center justify-center">
+            <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
               <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
               <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
             </div>
           </span>
-          <span className="truncate text-sm">{label}</span>
+          <span className="min-w-0 truncate text-sm leading-none">{label}</span>
         </div>
       }
     />

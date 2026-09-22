@@ -1,15 +1,16 @@
 import type { SessionRef, SessionSummary } from "@getpie/contract";
 import { useQuery } from "@tanstack/react-query";
-import { useRouteContext } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { sameSessionRef } from "@/lib/session-ref";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 export const selectProjectSessionTitle = (
   sessions: ReadonlyArray<SessionSummary>,
   ref: SessionRef,
 ): string | null | undefined => {
-  const session = sessions.find((candidate) => sameSessionRef(candidate, ref));
+  const session = sessions.find(
+    (candidate) => candidate.projectId === ref.projectId && candidate.sessionId === ref.sessionId,
+  );
   return session === undefined ? undefined : (session.title ?? null);
 };
 
@@ -24,7 +25,7 @@ export const selectProjectSessionTitle = (
  * session-page request.
  */
 export function useProjectSessionTitle(ref: SessionRef | undefined): string | undefined {
-  const { orpcQueryUtils } = useRouteContext({ from: "__root__" });
+  const orpcQueryUtils = useCatalogOrpc();
   const projectId = ref?.projectId;
   const sessionId = ref?.sessionId;
   const enabled = projectId !== undefined && sessionId !== undefined;
