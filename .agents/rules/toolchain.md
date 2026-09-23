@@ -1,8 +1,8 @@
 # Toolchain constraints
 
-- **Dependencies:** `pnpm-workspace.yaml` has six catalogs (`catalog:`,
-  `catalog:effect`, `catalog:orpc`, `catalog:react`, `catalog:tailwind`,
-  `catalog:tiptap`) plus `overrides` that pull _transitive_ deps onto catalog
+- **Dependencies:** `pnpm-workspace.yaml` has seven catalogs (`catalog:`,
+  `catalog:effect`, `catalog:orpc`, `catalog:pi`, `catalog:react`,
+  `catalog:tailwind`, `catalog:tiptap`) plus `overrides` that pull _transitive_ deps onto catalog
   versions — bumping a package's own `package.json` for `vite`, `vitest`,
   `effect`, or `@effect/*` does nothing. Several pins are caret-free because a
   caret breaks the runtime. The reasons are commented inline; read them before

@@ -87,6 +87,11 @@ catalogs:
   tailwind:
     tailwindcss: ^4.3.3
     "@tailwindcss/vite": ^4.3.3
+  # Pi packages move together. Exact pins: the coding-agent patch key below
+  # is version-specific, and a caret would admit a release the patch misses.
+  pi:
+    "@earendil-works/pi-coding-agent": 0.87.1
+    "@earendil-works/pi-tui": 0.87.1
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
@@ -120,8 +125,8 @@ packageExtensions:
   "@ff-labs/pi-fff":
     dependencies:
       "@sinclair/typebox": "*"
-      "@earendil-works/pi-tui": "0.87.1"
-      "@earendil-works/pi-coding-agent": "0.87.1"
+      "@earendil-works/pi-tui": "catalog:pi"
+      "@earendil-works/pi-coding-agent": "catalog:pi"
 # pnpm 11+ defaults minimumReleaseAge to 24h; disable it — the same-day
 # dependency bumps this repo does (e.g. claude-agent-sdk) would be blocked.
 minimumReleaseAge: 0
