@@ -65,7 +65,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               provider,
             ],
           });
-          const pi = makePiAgent(piProcess, { executable });
+          const pi = yield* makePiAgent(piProcess, { executable });
           const bus = yield* makeEventBus();
           const manager = yield* makePiAgentSessionManager(pi, bus);
           const repo = yield* makePiAgentSessionRepository(`${home}/metadata`);

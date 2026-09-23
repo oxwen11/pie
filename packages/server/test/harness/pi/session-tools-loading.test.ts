@@ -161,7 +161,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
               provider,
             ],
           });
-          const pi = makePiAgent(process, {
+          const pi = yield* makePiAgent(process, {
             executable: { command: globalThis.process.execPath, prefixArgs: [cli] },
           });
           const callbacks: PiSessionToolsShape = {

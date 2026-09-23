@@ -487,6 +487,32 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         .ensureRuntime(runtimeInput(agentSessionId, cwd), ref)
         .pipe(withSessionTools(ref), Effect.flatMap(run));
 
+    const prompt = Effect.fn("PiAgentSessionService.prompt")(function* (input: PromptInput) {
+      const userInput = yield* toUserInput(input.parts, input.delivery);
+      yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
+      const messageId = input.messageId ?? (yield* newSessionId);
+
+      const submitted = () =>
+        manager.emit(input.ref, {
+          type: "session.prompt.submitted",
+          messageId,
+          parts: input.parts,
+        });
+
+      const reject = (reason: string) =>
+        manager.emit(input.ref, {
+          type: "session.prompt.rejected",
+          messageId,
+          reason,
+        });
+
+      const receipt = yield* deliverPrompt(input.ref, userInput).pipe(
+        Effect.tapError((error) => reject(error instanceof Error ? error.message : String(error))),
+      );
+      if (receipt.started) yield* submitted();
+      return receipt;
+    });
+
     return {
       create: (input) =>
         newSessionId.pipe(
@@ -677,34 +703,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           inSession(ref),
         ),
 
-      prompt: (input: PromptInput) =>
-        Effect.fn("PiAgentSessionService.prompt")(function* () {
-          const userInput = yield* toUserInput(input.parts, input.delivery);
-          yield* readAndStampTitleFromFirstPrompt(input.ref, input.parts);
-          const messageId = input.messageId ?? (yield* newSessionId);
-
-          const submitted = () =>
-            manager.emit(input.ref, {
-              type: "session.prompt.submitted",
-              messageId,
-              parts: input.parts,
-            });
-
-          const reject = (reason: string) =>
-            manager.emit(input.ref, {
-              type: "session.prompt.rejected",
-              messageId,
-              reason,
-            });
-
-          const receipt = yield* deliverPrompt(input.ref, userInput).pipe(
-            Effect.tapError((error) =>
-              reject(error instanceof Error ? error.message : String(error)),
-            ),
-          );
-          if (receipt.started) yield* submitted();
-          return receipt;
-        })().pipe(inSession(input.ref)),
+      prompt: (input) => prompt(input).pipe(inSession(input.ref)),
 
       interrupt: (ref: SessionRef) =>
         readMetadata(ref).pipe(

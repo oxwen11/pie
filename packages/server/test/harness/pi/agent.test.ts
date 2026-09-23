@@ -367,7 +367,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       let finishCount = 0;
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
@@ -435,7 +436,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const queued = yield* Effect.forkChild(
         Stream.runHead(
           session.events.pipe(
@@ -610,7 +612,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -636,7 +639,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -678,7 +682,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

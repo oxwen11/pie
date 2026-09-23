@@ -17,7 +17,7 @@ import {
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
+import { makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { makePackageService, PackageService } from "../src/packages";
@@ -84,7 +84,7 @@ async function setup() {
     PiAgent,
     Effect.gen(function* () {
       const process = yield* PiProcessTag;
-      return yield* cachePiAgentAvailability(makePiAgent(process, { executable: piExecutable }));
+      return yield* makePiAgent(process, { executable: piExecutable });
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
