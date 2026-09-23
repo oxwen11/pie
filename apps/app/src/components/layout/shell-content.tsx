@@ -2,7 +2,7 @@ import { cn } from "@getpie/ui/lib/utils";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
 import { useStore } from "zustand";
 
-import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-chrome";
+import { ShellGutter } from "@/components/layout/shell-gutter";
 import { CONTENT_DEFAULT_PX, shellLayout } from "@/components/layout/shell-layout";
 
 export function ShellContentPanel({
@@ -43,33 +43,25 @@ export function ShellContentPanel({
 
   return (
     <>
-      <div
-        aria-disabled={!canDrag || undefined}
-        aria-orientation="vertical"
-        aria-label="Resize content panel"
-        className={cn(SHELL_GUTTER_CLASS, !canDrag && "w-0 after:hidden")}
-        onLostPointerCapture={onPointerUp}
+      <ShellGutter
+        className={canDrag ? "bg-border w-px" : undefined}
+        disabled={!canDrag}
+        label="Resize content panel"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        role="separator"
       />
       <aside
         className={cn(
           "flex min-h-0 flex-col overflow-hidden md:py-1 md:pe-1",
-          maximized ? "min-w-0 flex-1" : "shrink-0",
+          maximized ? "min-w-0 flex-1" : "min-w-0",
         )}
         data-slot="content-panel-column"
         data-state={collapsed ? "hidden" : maximized ? "maximized" : "docked"}
         inert={collapsed}
         style={maximized ? undefined : { width: collapsed ? 0 : docked }}
       >
-        <div
-          className="flex h-full min-h-0 flex-col"
-          style={maximized ? undefined : { width: docked }}
-        >
-          {children}
-        </div>
+        {children}
       </aside>
     </>
   );

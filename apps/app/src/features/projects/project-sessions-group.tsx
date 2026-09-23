@@ -1,5 +1,5 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
+import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
   SidebarGroupAction,
@@ -7,7 +7,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
 import { Folder, FolderOpen, SquarePen } from "lucide-react";
 
@@ -24,16 +24,8 @@ const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
 
 const selectPullRequestStatuses = (
   statuses: ReadonlyArray<PullRequestSessionStatus>,
-): ReadonlyMap<string, SessionPullRequest> =>
-  new Map(
-    statuses.map((status) => [
-      status.ref.sessionId,
-      { lifecycle: status.lifecycle, url: status.url },
-    ]),
-  );
-
-const selectPullRequest = (snapshot: PullRequestSnapshot | null): SessionPullRequest | null =>
-  snapshot === null ? null : { lifecycle: snapshot.lifecycle, url: snapshot.url };
+): ReadonlyMap<string, PullRequestSessionStatus> =>
+  new Map(statuses.map((status) => [status.ref.sessionId, status]));
 
 // Newest-first: a session is opened right after it is created. Module scope
 // keeps `select` referentially stable across renders.
@@ -72,13 +64,6 @@ export function ProjectSessionsGroup({
     enabled: refs.length > 0,
     placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
-  });
-  const activeSession = rows.find(isSessionActive);
-  const activePullRequest = useQuery({
-    ...orpcQueryUtils.pullRequest.current.queryOptions({
-      input: activeSession === undefined ? skipToken : { ref: activeSession },
-    }),
-    select: selectPullRequest,
   });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
 
@@ -123,7 +108,7 @@ export function ProjectSessionsGroup({
                     active={active}
                     environmentId={environmentId}
                     isActive={() => isSessionActive(session)}
-                    pullRequest={active ? (activePullRequest.data ?? listed) : listed}
+                    pullRequest={listed}
                     session={session}
                   />
                 );

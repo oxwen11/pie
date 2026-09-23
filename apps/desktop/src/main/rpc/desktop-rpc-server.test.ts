@@ -80,6 +80,7 @@ function makeHarness(
 
   return {
     client,
+    application: base,
     setStatus: (snapshot: ServerStatusSnapshot) =>
       Effect.runPromise(SubscriptionRef.set(statusRef, snapshot)),
     retries: () => retries,
@@ -111,6 +112,44 @@ async function eventually(assertion: () => void | Promise<void>): Promise<void> 
 }
 
 describe("Desktop MessagePort RPC", () => {
+  it("streams native visibility with initial replay and cancellation", async () => {
+    let finalized = false;
+    const h = makeHarness((application) => ({
+      ...application,
+      windowVisibility: application.windowVisibility.pipe(
+        Stream.ensuring(
+          Effect.sync(() => {
+            finalized = true;
+          }),
+        ),
+      ),
+    }));
+    const controller = new AbortController();
+    const received: boolean[] = [];
+    const unsubscribe = consumeEventIterator(
+      h.client.window.visibility(undefined, { signal: controller.signal }),
+      {
+        onEvent: (visible) => received.push(visible),
+        onError: () => {},
+        onFinish: () => {},
+      },
+    );
+    try {
+      await eventually(() => expect(received).toEqual([false]));
+      await Effect.runPromise(h.application.setWindowVisible(true));
+      await eventually(() => expect(received).toEqual([false, true]));
+      await Effect.runPromise(h.application.setWindowVisible(false));
+      await eventually(() => expect(received).toEqual([false, true, false]));
+      controller.abort();
+      await unsubscribe();
+      await eventually(() => expect(finalized).toBe(true));
+    } finally {
+      controller.abort();
+      await unsubscribe();
+      await h.close();
+    }
+  });
+
   it("runs unary procedures through the native oRPC MessagePort codecs", async () => {
     const h = makeHarness();
     try {

@@ -1,5 +1,5 @@
 import type { PieUIMessage } from "@getpie/contract";
-import { Context, Effect, type FileSystem, type Scope } from "effect";
+import { Context, Effect, Option, type FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
@@ -13,6 +13,7 @@ import type { PiProcess } from "./process";
 import { checkPiAvailability } from "./resolve-executable";
 import type { PiExecutable } from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime, type PiAgentRuntime } from "./runtime";
+import { PiSessionTools } from "./session-tools";
 import type { AvailabilityResult, SessionInfoResult } from "./types";
 
 /** Injected PiAgent service — create, resume, and cold reads at the composition root. */
@@ -66,8 +67,24 @@ export const makePiAgent = (
     availability: checkPiAvailability(
       options.executable ?? { command: process.execPath, prefixArgs: [] },
     ),
-    create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(piProcess, input)),
-    resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(piProcess, input)),
+    create: (input) =>
+      whenAvailable(
+        pi.availability,
+        Effect.serviceOption(PiSessionTools).pipe(
+          Effect.flatMap((tools) =>
+            createPiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
+          ),
+        ),
+      ),
+    resume: (input) =>
+      whenAvailable(
+        pi.availability,
+        Effect.serviceOption(PiSessionTools).pipe(
+          Effect.flatMap((tools) =>
+            resumePiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
+          ),
+        ),
+      ),
     getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
   };
   return pi;

@@ -1,27 +1,18 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import type { PullRequestSessionStatus, PullRequestSnapshot } from "@getpie/contract/pull-request";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouteContext, useRouter } from "@tanstack/react-router";
 
-import type { SessionPullRequest } from "@/features/projects/project-session-row";
 import { useCatalogOrpc } from "@/lib/environment-orpc";
 import { sameSessionRef, sessionRefFromRouterMatches } from "@/lib/session-ref";
 
 const EMPTY_SESSIONS: ReadonlyArray<SessionSummary> = [];
-const EMPTY_PULL_REQUEST_STATUSES = new Map<string, SessionPullRequest>();
+const EMPTY_PULL_REQUEST_STATUSES = new Map<string, PullRequestSessionStatus>();
 
 const selectPullRequestStatuses = (
   statuses: ReadonlyArray<PullRequestSessionStatus>,
-): ReadonlyMap<string, SessionPullRequest> =>
-  new Map(
-    statuses.map((status) => [
-      status.ref.sessionId,
-      { lifecycle: status.lifecycle, url: status.url },
-    ]),
-  );
-
-const selectPullRequest = (snapshot: PullRequestSnapshot | null): SessionPullRequest | null =>
-  snapshot === null ? null : { lifecycle: snapshot.lifecycle, url: snapshot.url };
+): ReadonlyMap<string, PullRequestSessionStatus> =>
+  new Map(statuses.map((status) => [status.ref.sessionId, status]));
 
 const selectNewestFirst = (
   sessions: ReadonlyArray<SessionSummary>,
@@ -52,23 +43,13 @@ export function useProjectSessionRows(project: Project) {
     placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,
   });
-  const activeSession = rows.find(isSessionActive);
-  const activePullRequest = useQuery({
-    ...orpcQueryUtils.pullRequest.current.queryOptions({
-      input: activeSession === undefined ? skipToken : { ref: activeSession },
-    }),
-    select: selectPullRequest,
-  });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
 
   return {
     environmentId: localEnvironmentId,
     isSessionActive,
     rows,
-    pullRequestFor: (session: SessionSummary, active: boolean) => {
-      const listed = statusBySessionId.get(session.sessionId);
-      const value = active ? (activePullRequest.data ?? listed) : listed;
-      return value ?? undefined;
-    },
+    pullRequestFor: (session: SessionSummary, _active: boolean) =>
+      statusBySessionId.get(session.sessionId),
   };
 }

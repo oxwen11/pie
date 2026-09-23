@@ -1,17 +1,15 @@
 import type { SessionSummary } from "@getpie/contract";
-import type { PullRequestLifecycle } from "@getpie/contract/pull-request";
+import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { SidebarMenuButton, SidebarMenuItem } from "@getpie/ui/components/sidebar";
 import { useNavigate } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
 
+import { usePullRequestRow } from "@/components/layout/pull-request-demand-provider";
 import { SessionActionsMenu } from "@/features/projects/session-actions-menu";
 import { SessionPullRequestIndicator } from "@/features/projects/session-pull-request-indicator";
 import { SessionStatusIndicator } from "@/features/projects/session-status-indicator";
 
-export type SessionPullRequest = {
-  readonly lifecycle: PullRequestLifecycle;
-  readonly url: string;
-};
+export type SessionPullRequest = PullRequestSessionStatus;
 
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
@@ -28,9 +26,10 @@ export function ProjectSessionRow({
   readonly session: SessionSummary;
 }) {
   const navigate = useNavigate();
+  const observe = usePullRequestRow(session, true);
 
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem ref={observe}>
       <SessionActionsMenu
         environmentId={environmentId}
         isActive={isActive}
@@ -42,7 +41,7 @@ export function ProjectSessionRow({
             className={
               pullRequest === undefined
                 ? "md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
-                : undefined
+                : "pe-24"
             }
             isActive={active}
             onClick={() => {
@@ -65,10 +64,11 @@ export function ProjectSessionRow({
             title="Created by a schedule"
           >
             <Clock aria-hidden className="size-3.5 opacity-70" />
+            <span className="sr-only">Created by a schedule</span>
           </span>
         ) : null}
       </SessionActionsMenu>
-      <SessionPullRequestIndicator lifecycle={pullRequest?.lifecycle} url={pullRequest?.url} />
+      <SessionPullRequestIndicator status={pullRequest} />
     </SidebarMenuItem>
   );
 }
