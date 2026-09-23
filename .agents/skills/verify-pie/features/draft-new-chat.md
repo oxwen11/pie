@@ -4,11 +4,12 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 
 ## Sub-features
 
-- **Centered composer** always: project picker, optional git workspace/worktree controls, model select, TipTap input, submit. Zero projects is not an empty state — the picker stays on **Choose project**. Import remains on the sidebar.
+- **Centered composer** when models are available: project picker, optional git workspace/worktree controls, model select, TipTap input, submit. With no imported projects, the first-project import empty state takes precedence. Import remains on the sidebar.
 - **Project picker** — default **Choose project** (no `?projectId=`). The folder icon is part of the trigger. Choosing a project writes `?projectId=` (replace). Hovering the picker shows **X** in place of the folder icon; click **X** clears `?projectId=` back to Choose project without opening the list. Opening the list shows projects, then a **Don't work in a project** button (same clear).
 - **Choose project send** — `project.allocate` creates `<root>/<YYYY-MM-DD>/Chat-1/` (then `Chat-2`, …), registers it as a Project with `type: "chat"`, then `session.create`. Sidebar **Recent** lists the session (title is the prompt). **Projects** does not show the chat leaf. The picker still lists imported folders only.
 - **Workspace mode** (git repos only, after a real Project is selected): **Current directory** vs **New worktree**. Worktree requires a **base branch** (`aria-label="Base branch for worktree"`). Non-git shows **Not a Git repository**. Missing folder shows **Workspace unavailable** and blocks send.
-- **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**, including when the model list is empty. Default model is written into `?provider=&modelId=` once.
+- **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**. Default model is written into `?provider=&modelId=` once.
+- **No models gate** — until `agent.listModels` succeeds, show a loader (or a retryable error); a loaded-but-empty catalog replaces the composer with **No model provider connected**, guidance to run `pi` and use `/login`, and a **Retry** button. The draft cannot start a session without an available model. To verify this path, launch with `PI_CODING_AGENT_DIR` pointing to an empty run-local directory before launching verify; after the catalog loads, confirm there is no composer or new session file.
 - **Send** — creates the session (cwd persisted, worktree materialized if requested), then `prompt(text)` without waiting for Pi to spawn, then navigates. Enabled with content even when no project is selected.
 
 ## How to get to it (user POV)
@@ -36,9 +37,9 @@ Proof (imported project):
 - User bubble shows the exact prompt text.
 - Sidebar lists a session titled with that prompt under the project.
 - `$PIE_HOME/storage/sessions/<projectId>/<sessionId>.json` exists; `cwd` is the project path; `title` is the prompt. `verify-pie evidence side-effects`.
-- Assistant streaming is **optional**. Without `pi` or provider keys, a **Model request failed** card is still a successful create.
+- With provider credentials, a send creates a session and prompts Pi; if the Pi process fails for another reason, inspect the turn error separately. Without available models, the draft cannot send.
 
-Choose project path (`launch --replace --empty-projects`, or leave the picker on **Choose project**):
+Choose project path (on the ordinary seeded run, leave the picker on **Choose project**):
 
 1. Confirm **Choose project**.
 2. Type `allocate ping` and click submit.
@@ -52,6 +53,6 @@ Worktree path (only if the imported folder is a git repo): switch the workspace 
 
 - CDP Enter does **not** submit. Click the arrow button. Draft submit has **no aria-label** — identify it as the composer submit after the field is non-empty.
 - Send is disabled when: input empty, workspace unavailable, create in flight, or worktree mode with no base branch. It is **not** disabled for Choose project.
-- Model select missing ≠ broken draft. Pi unavailable ⇒ empty list ⇒ component returns `null`.
+- If model discovery is pending or fails, the composer is not shown. A successful but empty model list displays the no-models gate. To recover after configuring credentials, click **Retry**.
 - After adding/renaming routes, load `/` through Vite before typechecking (`routeTree.gen.ts` is plugin-generated).
 - Verify sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie`. `HOME` and `~/.pi/agent` stay the operator's.
