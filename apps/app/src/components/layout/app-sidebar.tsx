@@ -129,14 +129,15 @@ export function AppSidebar() {
           {!desktop && expanded ? <SidebarTrigger /> : null}
         </div>
         {/* Pinned here, outside SidebarContent's ScrollArea, so New chat stays
-          visible while the session list scrolls. */}
+          visible while the session list scrolls. pb-1 + the group's pt-0 below
+          keeps the 4px row rhythm, so the pinned row reads as part of the list. */}
         <SidebarMenu className="px-2 pb-1">
           <NewChatNavItem />
         </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="pt-0">
           <SidebarGroupContent>
             <SidebarMenu>
               <SchedulesNavItem />
