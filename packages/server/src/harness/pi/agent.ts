@@ -1,5 +1,5 @@
 import type { PieUIMessage } from "@getpie/contract";
-import { Context, Effect, type FileSystem, type Scope } from "effect";
+import { Context, Effect, FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
@@ -17,20 +17,20 @@ import type { AvailabilityResult, SessionInfoResult } from "./types";
 
 /** Injected PiAgent service — create, resume, and cold reads at the composition root. */
 export type PiAgentShape = {
-  readonly availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
+  readonly availability: Effect.Effect<AvailabilityResult>;
   readonly create: (
     input: CreateSessionInput,
   ) => Effect.Effect<
     PiAgentRuntime,
     AgentUnavailable | ExecutableNotFound | AgentOpenError,
-    Scope.Scope | FileSystem.FileSystem
+    Scope.Scope
   >;
   readonly resume: (
     input: ResumeSessionInput,
   ) => Effect.Effect<
     PiAgentRuntime,
     SessionNotResumable | AgentUnavailable | ExecutableNotFound | AgentOpenError,
-    Scope.Scope | FileSystem.FileSystem
+    Scope.Scope
   >;
   readonly getMessages?: (
     agentSessionId: string,
@@ -42,43 +42,46 @@ export type PiAgentShape = {
   ) => Effect.Effect<SessionInfoResult, AgentOperationError>;
 };
 
-const whenAvailable = <A, E, R>(
-  availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>,
+const gateOnAvailability = <A, E, R>(
+  availability: Effect.Effect<AvailabilityResult>,
   body: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | AgentUnavailable, R | FileSystem.FileSystem> =>
+): Effect.Effect<A, E | AgentUnavailable, R> =>
   Effect.gen(function* () {
     const result = yield* availability;
     if (!result.available) {
-      return yield* Effect.fail(new AgentUnavailable({ reason: result.reason ?? "Unavailable" }));
+      return yield* new AgentUnavailable({ reason: result.reason ?? "Unavailable" });
     }
     return yield* body;
   });
 
-type MutableAvailability = {
-  availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
-};
+/**
+ * `Effect.cached` stores the first exit forever. Without the uninterruptible
+ * guard, a caller interrupted mid-check stores that interruption and every
+ * later call replays it as a defect until the process restarts.
+ */
+export const cachePiAgentAvailability = <A, E, R>(
+  check: Effect.Effect<A, E, R>,
+): Effect.Effect<Effect.Effect<A, E, R>, never, R> =>
+  Effect.map(Effect.cached(check), (cached) => Effect.uninterruptible(cached));
 
 export const makePiAgent = (
   piProcess: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
-): PiAgentShape => {
-  const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(
-      options.executable ?? { command: process.execPath, prefixArgs: [] },
-    ),
-    create: (input) => whenAvailable(pi.availability, createPiAgentRuntime(piProcess, input)),
-    resume: (input) => whenAvailable(pi.availability, resumePiAgentRuntime(piProcess, input)),
-    getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-  };
-  return pi;
-};
+): Effect.Effect<PiAgentShape, never, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const availability = yield* cachePiAgentAvailability(
+      checkPiAvailability(options.executable ?? { command: process.execPath, prefixArgs: [] }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fileSystem),
+      ),
+    );
+
+    return {
+      availability,
+      create: (input) => gateOnAvailability(availability, createPiAgentRuntime(piProcess, input)),
+      resume: (input) => gateOnAvailability(availability, resumePiAgentRuntime(piProcess, input)),
+      getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
+    };
+  });
 
 export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent") {}
-
-export const cachePiAgentAvailability = (
-  pi: PiAgentShape,
-): Effect.Effect<PiAgentShape, never, FileSystem.FileSystem> =>
-  Effect.map(Effect.cached(pi.availability), (cachedCheck) => {
-    (pi as MutableAvailability).availability = Effect.uninterruptible(cachedCheck);
-    return pi;
-  });

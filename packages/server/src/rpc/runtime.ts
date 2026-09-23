@@ -15,7 +15,7 @@ import {
   PiAgentServiceLayer,
   PiAgentSessionServiceLayer,
 } from "../harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../harness/pi/agent";
+import { makePiAgent, PiAgent } from "../harness/pi/agent";
 import { makePiProcess, type PiProcess } from "../harness/pi/process";
 import { resolvePiExecutable } from "../harness/pi/resolve-executable";
 import { ResourceMonitoring } from "../observability/resources";
@@ -52,7 +52,7 @@ const PiAgentProvided = Layer.effect(
   PiAgent,
   Effect.gen(function* () {
     const process = yield* PiProcessTag;
-    const pi = yield* cachePiAgentAvailability(makePiAgent(process, piProcessOptions));
+    const pi = yield* makePiAgent(process, piProcessOptions);
     return pi;
   }),
 ).pipe(Layer.provide(PiProcessLayer), Layer.provide(PlatformLayer));

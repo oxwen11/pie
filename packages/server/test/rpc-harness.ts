@@ -16,7 +16,7 @@ import {
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
+import { makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import type { PiExecutable } from "../src/harness/pi/resolve-executable";
 import * as Observability from "../src/observability";
@@ -81,7 +81,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     PiAgent,
     Effect.gen(function* () {
       const process = yield* PiProcessTag;
-      return yield* cachePiAgentAvailability(makePiAgent(process, processOptions));
+      return yield* makePiAgent(process, processOptions);
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
