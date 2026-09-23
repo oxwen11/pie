@@ -222,7 +222,6 @@ export const run = <A, E>(
         return yield* body;
       });
     const pi = {
-      availability,
       create: (input) =>
         // Pi sees `cwd` and never a `SessionRef` — this line is the probe
         // for whether the identity reaches it anyway.

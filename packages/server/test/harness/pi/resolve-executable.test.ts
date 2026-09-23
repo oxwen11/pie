@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkPiAvailability,
-  piAvailabilityTarget,
   resolvePiExecutable,
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
@@ -77,16 +76,6 @@ describe("resolvePiExecutable", () => {
         "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-process/pi-process.js",
       ],
     });
-  });
-});
-
-describe("piAvailabilityTarget", () => {
-  it("checks the script path when Pi is run under bun", () => {
-    expect(piAvailabilityTarget({ command: "bun", prefixArgs: ["--no-install", rpc] })).toBe(rpc);
-  });
-
-  it("checks the command name for PATH lookup", () => {
-    expect(piAvailabilityTarget({ command: "bun", prefixArgs: [] })).toBe("bun");
   });
 });
 

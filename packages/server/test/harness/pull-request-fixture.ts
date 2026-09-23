@@ -57,7 +57,6 @@ export const makeFixture = Effect.gen(function* () {
   const calls = { open: 0, remove: 0, branch: 0 };
   let branch = "feature";
   const pi: PiAgentShape = {
-    availability: Effect.succeed({ available: true }),
     create: () =>
       Effect.sync(() => {
         calls.open++;

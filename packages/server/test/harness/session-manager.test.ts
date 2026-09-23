@@ -14,7 +14,6 @@ import type { SessionInfoResult } from "../../src/harness/pi/types";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
 import type { UserInput } from "../../src/harness/session-io";
 import { makePiAgentSessionManager } from "../../src/harness/session-manager";
-import { NodePlatformLayer } from "../platform";
 
 const refFor = (sessionId: string): SessionRef => ({
   projectId: "project-1",
@@ -101,7 +100,6 @@ const makeFixture = Effect.gen(function* () {
     });
 
   const pi = {
-    availability: Effect.succeed({ available: true }),
     create: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
       Ref.update(resumeCalls, (current) => current + 1).pipe(
@@ -112,7 +110,7 @@ const makeFixture = Effect.gen(function* () {
   } satisfies PiAgentShape;
 
   const bus = yield* makeEventBus();
-  const manager = yield* makePiAgentSessionManager(pi, bus).pipe(Effect.provide(NodePlatformLayer));
+  const manager = yield* makePiAgentSessionManager(pi, bus);
 
   return {
     manager,
