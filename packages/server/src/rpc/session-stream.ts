@@ -1,16 +1,24 @@
 import type { SubscribeStreamEvent, SubscriptionScope } from "@getpie/contract";
-import { Stream } from "effect";
+import { Effect, Exit, Scope, Stream } from "effect";
 
 import type { EventBusShape } from "../events";
 
 /**
- * Open a scoped subscription on the {@link EventBusShape}. `Stream.unwrap`
- * runs `subscribe` in the stream's own scope, so a client disconnect (or an
- * interrupt before the first pull) removes the subscriber. A hand-rolled
- * `Scope.make` is not a child of that scope and leaks if the fiber is
- * interrupted after subscribe and before the ensuring stream is returned.
+ * Register a bus subscriber before this effect returns, and remove it when the
+ * stream ends. `Stream.unwrap` waits for the first pull, so an event published
+ * after `subscribe` resolves and before the client reads is lost.
+ * The scope is independent: the RPC effect's scope closes as soon as it
+ * returns the generator. `onInterrupt` covers a disconnect before return.
  */
 export const openScopedSubscription = (
   bus: EventBusShape,
   scope: SubscriptionScope,
-): Stream.Stream<SubscribeStreamEvent> => Stream.unwrap(bus.subscribe(scope));
+): Effect.Effect<Stream.Stream<SubscribeStreamEvent>> =>
+  Effect.gen(function* () {
+    const subscriptionScope = yield* Scope.make();
+    const stream = yield* bus.subscribe(scope).pipe(
+      Effect.provideService(Scope.Scope, subscriptionScope),
+      Effect.onInterrupt(() => Scope.close(subscriptionScope, Exit.void)),
+    );
+    return stream.pipe(Stream.ensuring(Scope.close(subscriptionScope, Exit.void)));
+  });

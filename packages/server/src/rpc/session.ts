@@ -328,7 +328,7 @@ export const sessionRouter = orpc.router({
 
   subscribe: orpc.subscribe.effect(function* ({ input }) {
     const bus = yield* EventBus;
-    const stream = openScopedSubscription(bus, input.scope);
+    const stream = yield* openScopedSubscription(bus, input.scope);
     return streamToAsyncGenerator(stream);
   }),
 });
