@@ -5,9 +5,9 @@ Web UI and Electron app for the local Pi coding agent. TypeScript, pnpm, Turbore
 ## Core principles
 
 - Use the simplest solution that meets current needs; keep changes focused.
-- Leave open-ended design choices to the agent. Preferences are defaults, not
-  blockers; hard constraints need a safety, correctness, compatibility, explicit
-  requirement, or demonstrated tooling basis.
+- Follow Developer-selected patterns and documented best practices. Agent discretion
+  applies to genuinely open choices; do not silently discard agreed directions.
+  Recommendations guide decisions, while hard constraints need a concrete basis.
 - Spend effort where mistakes are expensive to undo. Confirm external contracts,
   persistent formats, and irreversible effects with the Developer before implementation.
 - Never trade away correctness, security, or data integrity. Verify changed

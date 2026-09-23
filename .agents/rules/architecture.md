@@ -23,6 +23,8 @@ Dependencies flow from app/runtime packages toward shared leaves, not back:
 The app uses client/contract, not server imports. HTTP security and transport
 belong to the server, not a second implementation in the CLI. Respect package
 exports and existing ownership; internal module decomposition is a design choice.
+Keep leaf helpers private by default and expose only what callers need; internal
+extraction does not require expanding a package's public surface.
 
 ## Session invariants
 

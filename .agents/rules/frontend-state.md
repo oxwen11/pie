@@ -4,7 +4,8 @@
 
 - Server state belongs in TanStack Query. Derive values instead of synchronizing
   duplicate copies with effects. Subscribe to external stores through
-  `useSyncExternalStore`; keep local interaction state local.
+  `useSyncExternalStore`; keep local interaction state local. Store a selection's
+  id and derive the current object from its source, rather than retaining a stale copy.
 - Features live in `apps/app/src/features/`. Cross-feature imports and app-to-server
   imports are lint-restricted; combine features at routes, the app root, or shell.
   Keep Desktop's public app exports compatible.
@@ -30,14 +31,16 @@
 ## Design defaults
 
 - Colocate feature code; extract shared pieces when they have a clear owner.
-  Component/slot shape and hook extraction are choices, not fixed recipes.
+  Follow the [compound-component pattern](ui-components.md#chosen-pattern-compound-components)
+  for multi-part UI; keep hook extraction tied to actual reuse or ownership.
 - Direct query calls are fine. Extract hooks when they clarify ownership or reuse
   meaningful behavior; do not require or prohibit a hook per query/selector.
 - Prefer `select` when a consumer needs only part of a query result. Stabilize
   selectors or memoize expensive work when useful, not every derived expression.
 - Use Zustand for shared client state when needed; `useState`/`useReducer` are
-  appropriate for local state. Keep shell structure separate from domain logic
-  without prescribing one prop-versus-children composition style.
+  appropriate for local state. Keep shell structure separate from domain logic;
+  compose its parts as JSX children with shared state on the shell provider,
+  rather than expanding a list of named component/render props.
 
 ## Task guides
 

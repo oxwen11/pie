@@ -18,9 +18,11 @@ existing data, irreversible effects, and recovery — not just editing code.
 
 - Prefer existing code, platform features, and installed dependencies before
   adding machinery. Keep reversible changes simple and local.
-- Abstractions, hooks, exports, component shapes, and empty-state presentation
-  depend on their consumers. No fixed number of callers or universal pattern
-  decides whether they are worthwhile.
+- Follow Developer-selected patterns, including compound components for multi-part
+  UI. Best-practice recommendations remain the starting point; depart for a
+  concrete task-specific reason, not merely because another shape is possible.
+- Keep abstractions and public exports proportional to consumer needs. Remove
+  unused wrappers left by a refactor; do not build future flexibility for its own sake.
 - Keep optional improvements separate from blockers. A blocking design finding
   needs a concrete failure, compatibility cost, unmet requirement, or applicable
   tool constraint — not just a preference for another implementation.

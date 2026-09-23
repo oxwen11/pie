@@ -24,8 +24,9 @@ pins come from `pnpm-workspace.yaml`; do not assume stable-library examples matc
   processes so dependencies, errors, and cleanup remain controllable. Native APIs
   are appropriate at boundaries those services do not model, such as detached
   processes, Electron, or raw WebSocket upgrades.
-- Keep pure parsing and path operations synchronous unless the caller benefits
-  from an Effect result. `node:path` and `node:os.homedir` do not need an adapter.
+- Keep pure parsing and path helpers synchronous by default. Introduce Effect
+  for a concrete error, dependency, or lifecycle need, not just API uniformity.
+  `node:path` and `node:os.homedir` do not need an adapter.
 - Supply platform layers at composition roots. Existing service layers bind
   their platform dependencies so public methods do not require callers to
   rebuild the platform. Avoid accidental duplicate runtimes or resources.
@@ -43,6 +44,7 @@ pins come from `pnpm-workspace.yaml`; do not assume stable-library examples matc
 Use the existing `@effect/vitest` setup. Shared platform layers are useful;
 stateful services need per-test construction (`Layer.build` inside the test).
 A helper that rebuilds a runtime on every call can accidentally lose state.
-Use scoped resources for cleanup and `FileSystem.makeNoop` for injected failures.
+Use temporary real files to verify filesystem behavior, and `FileSystem.makeNoop`
+for injected failures. Use scoped resources for cleanup.
 Tests that poll real time need `excludeTestServices: true` rather than a frozen
 TestClock. See server tests and [toolchain.md](toolchain.md) for runner setup.

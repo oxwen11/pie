@@ -14,22 +14,37 @@
   lint configuration; do not add global tokens or shared variants solely to
   silence a feature-local styling diagnostic.
 
-## Design defaults, not universal shapes
+## Chosen pattern: compound components
 
-- Reuse suitable native elements and existing components. Compound components
-  help when consumers need composition; a small standalone component is also fine.
-  There is no one-element-per-component or mandatory taxonomy requirement.
-- Support controlled/uncontrolled modes only when consumers need them. Do not
-  add unused state modes, polymorphism, or public prop types for completeness.
-- For native wrappers, forward supported attributes; caller props normally follow
-  defaults. Compose handlers and classes explicitly when required behavior must
-  survive overrides. Export types when they are useful to callers.
-- Prefer existing semantic tokens and `cn` for class merging. Use `data-state`
-  and `data-slot` for stable styling hooks where helpful, not as a required API
-  for every component. Dynamic styles can use CSS variables.
-- Keep feature styling local by default. A shared abstraction is justified by a
-  real shared requirement, not an arbitrary minimum consumer count. Consider
-  existing consumers before changing shared UI or global tokens.
+Use compound components for multi-part UI. Give consumers composable pieces
+rather than one widget controlled by a growing collection of boolean/config props.
 
-Review usability and consumer needs, not conformity to a preferred component
-shape. Runtime proof follows [verify-evidence.md](verify-evidence.md).
+- Share state and actions through an owning provider/context, not prop drilling
+  between every piece. Keep the state implementation behind that provider.
+- Use recognizable roles such as Root, Trigger, Content, Item, Header, and Footer.
+  Each piece should have a focused responsibility and be independently composable.
+- Prefer JSX children for structural composition. Render callbacks are appropriate
+  when a parent supplies item data or state; Base UI's primitive `render` API remains valid.
+- Reuse existing primitives. A simple button does not need artificial subcomponents
+  or a context with no shared state.
+
+Examples: [composition patterns](../skills/vercel-composition-patterns/SKILL.md).
+
+## Component best practices
+
+- Extend the wrapped element's native prop types; do not repurpose native attributes
+  for unrelated meanings. Forward supported props after defaults, and preserve refs.
+  Compose handlers explicitly where required behavior must survive caller overrides.
+- Merge classes with `cn`: base → variants → state → caller `className`. Keep static
+  variant definitions outside render. Use semantic theme tokens; dynamic values
+  can use CSS variables rather than constructed Tailwind class names.
+- Expose visual state through `data-state` and part identity through `data-slot`.
+  Prefer these stable styling hooks to accumulating `openClassName`/per-state props.
+- Document non-obvious public prop behavior and export types useful to consumers.
+  Support controlled/uncontrolled modes when needed, without adding unused modes
+  or polymorphism to every component.
+- Keep feature styling local. Shared UI needs a real shared requirement, not an
+  arbitrary consumer count; consider existing consumers before changing it.
+
+Review both these practices and actual usability. Runtime proof follows
+[verify-evidence.md](verify-evidence.md).
