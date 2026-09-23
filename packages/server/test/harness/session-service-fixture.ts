@@ -6,7 +6,7 @@ import { Context, Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "
 
 import { ProjectNotFound, StoreWriteError } from "../../src/errors";
 import { EventBus, type EventBusShape, makeEventBus } from "../../src/events/event-bus";
-import type { GitFailure } from "../../src/git/service";
+import { GitService, type GitFailure } from "../../src/git/service";
 import {
   WorktreeService,
   type GitWorktreeCreateResult,
@@ -285,6 +285,12 @@ export const run = <A, E>(
           opts.worktreeRemove ??
           (() => Effect.die(new Error("unexpected worktreeRemove in unit test"))),
       });
+      const git = GitService.of({
+        status: () => Effect.die(new Error("unexpected git status in unit test")),
+        branch: () => Effect.succeed({ kind: "not-repository" }),
+        review: () => Effect.die(new Error("unexpected git review in unit test")),
+        diff: () => Effect.die(new Error("unexpected git diff in unit test")),
+      });
       const locksLayer = SessionMetadataLocksLayer;
       const graph = Layer.mergeAll(PiAgentSessionServiceCoreLayer, locksLayer).pipe(
         Layer.provide(SessionMetadataLayer),
@@ -295,6 +301,7 @@ export const run = <A, E>(
         Layer.provide(Layer.succeed(EventBus, bus)),
         Layer.provide(Layer.succeed(ProjectService, testProjectService)),
         Layer.provide(Layer.succeed(WorktreeService, worktrees)),
+        Layer.provide(Layer.succeed(GitService, git)),
         Layer.provide(Layer.succeed(FileSystem.FileSystem, fileSystem)),
         Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
       );

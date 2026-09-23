@@ -5,8 +5,14 @@ import type {
   PullRequestMergeMethod,
   PullRequestRef,
   PullRequestSnapshot,
+  PullRequestStack,
+  PullRequestStackAction,
+  PullRequestStackActionResult,
+  PullRequestStackExpected,
+  PullRequestStackPreview,
+  PullRequestSummary,
 } from "@getpie/contract/pull-request";
-import { Data, Effect, Ref, Result, Stream } from "effect";
+import { Clock, Data, Effect, Ref, Result, Stream } from "effect";
 import type { PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -22,6 +28,13 @@ import {
   PullRequestUnsupportedAction,
   PullRequestUnsupportedContext,
 } from "./errors";
+import { makeGitHubStack } from "./github-stack";
+import {
+  SUMMARY_PULL_REQUEST_FIELDS,
+  decodeDiscovery,
+  decodeSummary,
+  repositoryFromBranchConfig,
+} from "./github-summary";
 import {
   normalizeGitHubPullRequestJson,
   normalizeGitHubViewerPullRequestsJson,
@@ -153,6 +166,7 @@ const executeGh = (
   args: ReadonlyArray<string>,
   options?: {
     readonly cwd?: string;
+    readonly program?: "gh" | "git";
     readonly timeout?: typeof COMMAND_TIMEOUT | typeof DIFF_TIMEOUT;
     readonly maxOutputBytes?: number;
   },
@@ -163,7 +177,7 @@ const executeGh = (
     Effect.gen(function* () {
       const child = yield* spawner
         .spawn(
-          ChildProcess.make("gh", args, {
+          ChildProcess.make(options?.program ?? "gh", args, {
             ...(options?.cwd === undefined ? undefined : { cwd: options.cwd }),
             env: { GH_PROMPT_DISABLED: "1" },
             extendEnv: true,
@@ -272,6 +286,36 @@ export type PullRequestCliActionFailure =
   | PullRequestHostRejected;
 
 export interface GitHubCliAdapter {
+  readonly summary: (
+    cwd: string,
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestSummary | null, PullRequestReadFailure>;
+  readonly discover: (
+    cwd: string,
+    branch: string,
+  ) => Effect.Effect<PullRequestSummary | null, PullRequestReadFailure>;
+  readonly stack: (
+    cwd: string,
+    pullRequest: PullRequestRef,
+  ) => Effect.Effect<PullRequestStack | null, PullRequestReadFailure>;
+  readonly stackPreview: (
+    cwd: string,
+    pullRequest: PullRequestRef,
+    action: PullRequestStackAction,
+  ) => Effect.Effect<
+    PullRequestStackPreview,
+    PullRequestReadFailure | PullRequestUnsupportedAction
+  >;
+  readonly runStackAction: (
+    cwd: string,
+    pullRequest: PullRequestRef,
+    action: PullRequestStackAction,
+    expected: PullRequestStackExpected,
+    method?: PullRequestMergeMethod,
+  ) => Effect.Effect<
+    PullRequestStackActionResult,
+    PullRequestReadFailure | PullRequestCliActionFailure
+  >;
   readonly current: (
     cwd: string,
     pullRequest?: PullRequestRef,
@@ -322,6 +366,57 @@ export const makeGitHubCliAdapter = (
     }
     return Effect.succeed(result.stdout);
   };
+
+  const read = (
+    cwd: string,
+    args: ReadonlyArray<string>,
+    missing = false,
+    program: "gh" | "git" = "gh",
+  ) =>
+    executeGh(spawner, args, { cwd, program }).pipe(
+      Effect.mapError(mapExecutionReadError),
+      Effect.flatMap((result): Effect.Effect<string | null, PullRequestReadFailure> => {
+        if (result.exitCode === 0) return Effect.succeed(result.stdout);
+        if (isUnauthenticated(result.stderr)) return Effect.fail(new PullRequestUnauthenticated());
+        if (isRateLimited(result.stderr)) return Effect.fail(new PullRequestRateLimited());
+        if (isUnsupportedContext(result.stderr))
+          return Effect.fail(new PullRequestUnsupportedContext());
+        if (
+          missing &&
+          (isNoPullRequest(result.stderr) || /HTTP 404|Not Found \(HTTP 404\)/i.test(result.stderr))
+        )
+          return Effect.succeed(null);
+        return Effect.fail(new PullRequestHostUnavailable());
+      }),
+    );
+  const json = (raw: string | null) =>
+    Effect.try({
+      try: (): unknown => (raw === null ? null : JSON.parse(raw)),
+      catch: () => new PullRequestInvalidResponse(),
+    });
+  const stackFor = (cwd: string) =>
+    makeGitHubStack(
+      (args, missing) => read(cwd, args, missing).pipe(Effect.flatMap(json)),
+      (args) =>
+        executeGh(spawner, args, { cwd }).pipe(
+          Effect.mapError(mapExecutionActionError),
+          Effect.flatMap((result): Effect.Effect<unknown, PullRequestCliActionFailure> => {
+            if (result.exitCode !== 0 || /"errors"\s*:/.test(result.stdout)) {
+              const error = result.stderr + result.stdout;
+              if (isUnauthenticated(error)) return Effect.fail(new PullRequestUnauthenticated());
+              if (isRateLimited(error)) return Effect.fail(new PullRequestRateLimited());
+              if (isStaleHead(error)) return Effect.fail(new PullRequestStaleContext());
+              if (isConfirmedHostRejection(error))
+                return Effect.fail(new PullRequestHostRejected());
+              return Effect.fail(new PullRequestActionOutcomeUnknown());
+            }
+            return Effect.try({
+              try: (): unknown => JSON.parse(result.stdout),
+              catch: () => new PullRequestActionOutcomeUnknown(),
+            });
+          }),
+        ),
+    );
 
   const current: GitHubCliAdapter["current"] = (cwd, pullRequest) =>
     executeGh(spawner, currentPullRequestArgs(pullRequest), { cwd }).pipe(
@@ -423,5 +518,91 @@ export const makeGitHubCliAdapter = (
       }),
     );
 
-  return { current, diff, diffFor, list, detail, runAction };
+  const summary: GitHubCliAdapter["summary"] = (cwd, ref) =>
+    Effect.gen(function* () {
+      const raw = yield* read(
+        cwd,
+        ["pr", "view", pullRequestViewUrl(ref), "--json", SUMMARY_PULL_REQUEST_FIELDS.join(",")],
+        true,
+      );
+      if (raw === null) return null;
+      const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+      return yield* Effect.try({
+        try: () => decodeSummary(JSON.parse(raw), checkedAt, ref),
+        catch: () => new PullRequestInvalidResponse(),
+      });
+    });
+
+  const discover: GitHubCliAdapter["discover"] = (cwd, branch) =>
+    Effect.gen(function* () {
+      const config = yield* read(
+        cwd,
+        [
+          "config",
+          "--null",
+          "--get-regexp",
+          String.raw`^(remote\..*\.url|branch\..*\.(remote|merge))$`,
+        ],
+        false,
+        "git",
+      );
+      const repo = yield* Effect.try({
+        try: () => repositoryFromBranchConfig(config ?? "", branch),
+        catch: () => new PullRequestUnsupportedContext(),
+      });
+      const url = `https://${repo.host}/${repo.owner}/${repo.repository}`;
+      const metadata = yield* read(cwd, ["repo", "view", url, "--json", "defaultBranchRef"]);
+      const defaultBranch = yield* Effect.try({
+        try: () => {
+          const value: unknown = JSON.parse(metadata ?? "null");
+          if (typeof value !== "object" || value === null || !("defaultBranchRef" in value))
+            throw new Error("Missing default branch");
+          const branchRef = value.defaultBranchRef;
+          if (
+            typeof branchRef !== "object" ||
+            branchRef === null ||
+            !("name" in branchRef) ||
+            typeof branchRef.name !== "string"
+          )
+            throw new Error("Missing default branch");
+          return branchRef.name;
+        },
+        catch: () => new PullRequestInvalidResponse(),
+      });
+      if (branch === defaultBranch) return null;
+      const raw = yield* read(cwd, [
+        "pr",
+        "list",
+        "--repo",
+        url,
+        "--head",
+        branch,
+        "--state",
+        "all",
+        "--limit",
+        "2",
+        "--json",
+        [...SUMMARY_PULL_REQUEST_FIELDS, "headRepository", "headRepositoryOwner"].join(","),
+      ]);
+      const checkedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+      return yield* Effect.try({
+        try: () => decodeDiscovery(JSON.parse(raw ?? "null"), branch, repo, checkedAt),
+        catch: () => new PullRequestUnsupportedContext(),
+      });
+    });
+
+  return {
+    summary,
+    discover,
+    stack: (cwd, ref) => stackFor(cwd).stack(ref),
+    stackPreview: (cwd, ref, action) => stackFor(cwd).preview(ref, action),
+    runStackAction: (cwd, ref, action, expected, method) =>
+      stackFor(cwd).run(ref, action, expected, method),
+    current,
+    diff,
+    diffFor,
+    list,
+    detail,
+    runAction,
+  };
 };
