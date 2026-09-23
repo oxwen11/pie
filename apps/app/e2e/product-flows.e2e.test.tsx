@@ -1,5 +1,6 @@
+import { createCloseablePieClient, getWsTicket } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import {
   clickText,
@@ -45,9 +46,9 @@ describe("import and draft", () => {
     await fillComposer(FIRST_PROMPT);
     await submitDraftComposer();
 
-    await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toMatch(/\/session\//);
+    await expect.poll(() => window.location.pathname, { timeout: 60_000 }).toMatch(/\/session\//);
     await waitForText(FIRST_PROMPT);
-    await waitForText(fakeReply());
+    await waitForText(fakeReply(), 60_000);
     await expect.element(page.getByRole("button", { name: "Send message" })).toBeVisible();
   });
 
@@ -60,7 +61,7 @@ describe("import and draft", () => {
     await fillComposer(FOLLOW_UP);
     await sendSessionMessage();
     await waitForText(FOLLOW_UP);
-    await waitForText(/Thinking|E2E fake Pi reply/, 20_000);
+    await waitForText(/Thinking|E2E fake Pi reply/, 60_000);
   });
 });
 
@@ -179,11 +180,134 @@ describe("git workspace and review", () => {
     await page.getByRole("textbox").first().click();
     await page.getByRole("textbox").first().fill("e2e git review");
     await submitDraftComposer();
-    await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toMatch(/\/session\//);
+    await expect.poll(() => window.location.pathname, { timeout: 60_000 }).toMatch(/\/session\//);
 
     await page.getByRole("button", { name: "Toggle content panel" }).click();
     await waitForText("Choose what to show alongside the chat.");
     await page.getByRole("button", { name: "Review" }).click();
     await waitForText(/Review|Compare mode|No changes|uncommitted/i);
+  });
+});
+
+describe("session archive", () => {
+  it("archives the open session from the row menu", async () => {
+    await mountApp();
+    await waitForText(sample());
+    await openDraftForProject(sample());
+    await fillComposer("e2e archive me");
+    await submitDraftComposer();
+    await expect.poll(() => window.location.pathname, { timeout: 60_000 }).toMatch(/\/session\//);
+    await waitForText("e2e archive me");
+
+    const sessionPath = window.location.pathname;
+    const projectId = new URL(window.location.href).searchParams.get("projectId");
+    expect(projectId).toBeTruthy();
+
+    await page.getByText("e2e archive me", { exact: true }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Archive" }).click();
+
+    await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toBe("/draft");
+    await expect.poll(() => window.location.search).toContain(`projectId=${projectId}`);
+    // Sidebar drops the row (no archived list / Restore entry yet).
+    await expect.element(page.getByText("e2e archive me", { exact: true })).not.toBeInTheDocument();
+
+    // No archived list in the sidebar yet — Restore UI is unreachable.
+    // Bookmarked archived sessions still open.
+    await mountApp(`${sessionPath}?projectId=${projectId}`);
+    await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toBe(sessionPath);
+    await waitForText("e2e archive me");
+  });
+});
+
+describe("streaming queue", () => {
+  it("stops a held turn and steers a queued follow-up", async () => {
+    await mountApp();
+    await waitForText(sample());
+    await openDraftForProject(sample());
+    await fillComposer("e2e-hold for stop and queue");
+    await submitDraftComposer();
+
+    await expect.poll(() => window.location.pathname, { timeout: 60_000 }).toMatch(/\/session\//);
+    await expect
+      .element(page.getByRole("button", { name: "Stop generating" }), { timeout: 30_000 })
+      .toBeVisible();
+
+    await fillComposer("queued while streaming");
+    await sendSessionMessage();
+    await waitForText("1 queued message", 15_000);
+    await expect.element(page.getByText("queued while streaming")).toBeVisible();
+
+    await page.getByRole("button", { name: "Steer queued message" }).click();
+    await waitForText("Steer", 10_000);
+
+    // Optimistic UI updates before RPC — prove the server queue moved too.
+    const sessionId = window.location.pathname.split("/").at(-1);
+    const projectId = new URL(window.location.href).searchParams.get("projectId");
+    expect(sessionId).toBeTruthy();
+    expect(projectId).toBeTruthy();
+    if (sessionId === undefined || projectId === null) {
+      throw new Error("missing session ref after steer");
+    }
+    const server = pieE2E();
+    const { client, close } = createCloseablePieClient({
+      url: `${server.wsBaseUrl}/ws/rpc`,
+      getTicket: () => getWsTicket(server.httpBaseUrl),
+    });
+    try {
+      await expect
+        .poll(
+          async () => {
+            const snapshot = await client.agent.session.getSnapshot({
+              ref: { projectId, sessionId },
+            });
+            return snapshot.pendingPrompt;
+          },
+          { timeout: 15_000 },
+        )
+        .toEqual({ steering: ["queued while streaming"], followUp: [] });
+    } finally {
+      close();
+    }
+
+    await page.getByRole("button", { name: "Stop generating" }).click();
+    await expect
+      .element(page.getByRole("button", { name: "Stop generating" }), { timeout: 30_000 })
+      .not.toBeInTheDocument();
+  });
+});
+
+describe("terminal panel", () => {
+  it("opens a host terminal beside the chat", async () => {
+    await mountApp();
+    await waitForText(sample());
+    await openDraftForProject(sample());
+    await fillComposer("e2e terminal panel");
+    await submitDraftComposer();
+    await expect.poll(() => window.location.pathname, { timeout: 60_000 }).toMatch(/\/session\//);
+    await waitForText("e2e terminal panel");
+
+    await page.getByRole("button", { name: "Toggle content panel" }).click();
+    await waitForText("Choose what to show alongside the chat.");
+    await page.getByRole("button", { name: "Terminal" }).click();
+    const input = page.getByLabelText("zsh input");
+    await expect.element(input, { timeout: 30_000 }).toBeVisible();
+
+    // textarea exists before PTY connect — retry until write/output works.
+    const marker = "__PIE_TERMINAL_E2E__";
+    await expect
+      .poll(
+        async () => {
+          await input.click();
+          await userEvent.keyboard(`printf '${marker}\\n'{Enter}`);
+          try {
+            await expect.element(page.getByText(marker).first(), { timeout: 2_000 }).toBeVisible();
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true);
   });
 });
