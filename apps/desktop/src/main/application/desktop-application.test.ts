@@ -59,6 +59,16 @@ function makeHarness(
 }
 
 describe("DesktopApplication", () => {
+  it("starts hidden and replays current native visibility to new documents", async () => {
+    const { application } = makeHarness();
+    const read = () => Effect.runPromise(application.windowVisibility.pipe(Stream.runHead));
+    expect(Option.getOrUndefined(await read())).toBe(false);
+    await Effect.runPromise(application.setWindowVisible(true));
+    expect(Option.getOrUndefined(await read())).toBe(true);
+    await Effect.runPromise(application.setWindowVisible(false));
+    expect(Option.getOrUndefined(await read())).toBe(false);
+  });
+
   it("exposes the renderer bootstrap without transport dependencies", async () => {
     const h = makeHarness();
 

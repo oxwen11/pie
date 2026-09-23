@@ -12,7 +12,7 @@ The desktop window must leave the splash and talk to the isolated daemon. Title 
 
 `apps/desktop/e2e/tests/desktop-rpc.spec.ts` — "renders in the background without taking focus and connects to the server".
 
-This is **E2E mode**: `PIE_E2E=1`, fake-pi, window stays hidden on **all** platforms (darwin also uses accessory activation so it does not steal focus), seeded `projects.json` via fixtures. Green here proves connect + no startup dialog. It does **not** prove Import project against a real folder.
+This is **E2E mode**: `PIE_E2E=1`, window stays hidden on **all** platforms (darwin also uses accessory activation so it does not steal focus), seeded `projects.json` via fixtures. Green here proves connect + no startup dialog — not a model turn. It does **not** prove Import project against a real folder.
 
 ```bash
 pnpm turbo run e2e --filter=@getpie/desktop -- desktop-rpc.spec.ts -g "renders in the background without taking focus and connects to the server"

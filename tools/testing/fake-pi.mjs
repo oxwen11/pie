@@ -27,6 +27,19 @@ const rl = readline.createInterface({ input: process.stdin });
 const entries = [];
 const state = { leafId: null, nextEntry: 1 };
 
+const bridge = process.env.PIE_SESSION_BRIDGE_URL;
+const bridgeToken = process.env.PIE_SESSION_BRIDGE_TOKEN;
+if (bridge && bridgeToken) {
+  fetch(`${bridge}/ready`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${bridgeToken}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  }).catch(() => undefined);
+}
+
 process.stdout.write("pi startup banner (not json)\n");
 send({
   type: "extension_ui_request",

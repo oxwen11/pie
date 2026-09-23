@@ -42,6 +42,8 @@ export class DesktopApplication extends Context.Service<
     readonly bootstrap: Effect.Effect<DesktopBootstrap>;
     readonly serverConnection: Effect.Effect<ServerConnection>;
     readonly watchServerStatus: (after: number) => Stream.Stream<ServerStatusSnapshot>;
+    readonly windowVisibility: Stream.Stream<boolean>;
+    readonly setWindowVisible: (visible: boolean) => Effect.Effect<void>;
     readonly retryServer: Effect.Effect<void>;
     readonly environmentSnapshot: Effect.Effect<EnvironmentSnapshot>;
     readonly watchEnvironments: (after: number) => Stream.Stream<EnvironmentSnapshot>;
@@ -85,6 +87,7 @@ export function makeDesktopApplication({
   const environmentsRef = Effect.runSync(
     SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot()),
   );
+  const visible = Effect.runSync(SubscriptionRef.make(false));
 
   const updateEnvironments = (
     updater: (current: EnvironmentSnapshot) => Omit<EnvironmentSnapshot, "revision">,
@@ -164,6 +167,8 @@ export function makeDesktopApplication({
     watchServerStatus: (after) =>
       server.changes.pipe(Stream.filter((snapshot) => snapshot.revision > after)),
     retryServer: server.retry,
+    windowVisibility: SubscriptionRef.changes(visible),
+    setWindowVisible: (value) => SubscriptionRef.set(visible, value),
     environmentSnapshot: SubscriptionRef.get(environmentsRef),
     watchEnvironments: (after) =>
       SubscriptionRef.changes(environmentsRef).pipe(

@@ -55,6 +55,30 @@ export function resolveServerRuntimeExecutable(
 }
 
 /**
+ * E2E under Xvfb: Electron-as-Node can stall before /api/health, leaving the
+ * splash mounted forever. Prefer the Node binary Playwright already inherited.
+ */
+export function resolveDaemonCommand(
+  environment: NodeJS.ProcessEnv,
+  execPath: string = process.execPath,
+  platform: NodeJS.Platform = process.platform,
+) {
+  const nodeExec =
+    environment.PIE_E2E === "1" && typeof environment.PIE_E2E_NODE === "string"
+      ? environment.PIE_E2E_NODE
+      : environment.PIE_E2E === "1" && typeof environment.npm_node_execpath === "string"
+        ? environment.npm_node_execpath
+        : undefined;
+  if (nodeExec) {
+    return { argv: [nodeExec] as const, environment: { ...environment } };
+  }
+  return {
+    argv: [resolveServerRuntimeExecutable(platform, execPath)] as const,
+    environment: { ...environment, ELECTRON_RUN_AS_NODE: "1" },
+  };
+}
+
+/**
  * The daemon-backed `SpawnServer`: instead of forking a die-with-app child,
  * attach the daemon under `$PIE_HOME` via the shared launcher — the same
  * attach-or-spawn the CLI runs, so desktop and CLI with the same home
@@ -84,16 +108,16 @@ export function makeDaemonServerProcess(
 
     return (config, port) =>
       Effect.gen(function* () {
-        const environment = { ...config.environment, ELECTRON_RUN_AS_NODE: "1" };
+        const command = resolveDaemonCommand(config.environment);
 
         const handle = yield* resolveOrSpawnDaemon({
           home: resolvePieHome(config.environment),
           requiredCompatibilityKey,
-          serverArgv: [resolveServerRuntimeExecutable(), config.entry],
+          serverArgv: [...command.argv, config.entry],
           // 0 means "no preference" on the first attempt; afterwards the
           // supervisor pins the port it saw, which we pass as preferred.
           port: port === 0 ? undefined : port,
-          environment,
+          environment: command.environment,
           autoRespawn: port !== 0,
           replaceIncompatible: true,
         }).pipe(

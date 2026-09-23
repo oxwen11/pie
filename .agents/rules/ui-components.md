@@ -1,155 +1,50 @@
-# UI component design
+# UI components
 
-Distilled from the **Component Spec** (https://www.components.build, Hayden
-Bleasel + shadcn). Applies whenever creating or reviewing a React component,
-designing a component API, or styling with cn/CVA/data-attributes. Core
-principles: composable, accessible by default, themeable, lightweight,
-transparent, well-documented.
+## Accessibility and compatibility
 
-## Taxonomy — name the artifact before building it
+- Preserve semantic HTML, valid nesting, keyboard operation, accessible names,
+  labels, visible focus, and appropriate state announcements. Do not convey
+  information through color alone; keep touch targets at least 44px.
+- `packages/ui` uses Base UI, not Radix: use its `render` composition API rather
+  than assuming `asChild`. Preserve supported caller props, refs, and handlers.
+- `packages/ui/src/components/*` is vendored from coss and overwritten on refresh;
+  `carousel` and `splitter` are local exceptions. Fix other components through
+  wrappers or upstream. See the [vendoring ADR](../../docs/adr/0001-vendor-base-ui-components-from-coss-registry.md).
+- Preserve shared component contracts and theme behavior. Follow the active
+  lint configuration; do not add global tokens or shared variants solely to
+  silence a feature-local styling diagnostic.
 
-| Artifact      | Test                                                              |
-| ------------- | ----------------------------------------------------------------- |
-| **Primitive** | Single behavior/a11y concern, zero styling (Radix, Base UI)       |
-| **Component** | Styled, reusable, override-friendly; wraps primitives             |
-| **Pattern**   | Documented recurring solution, independent of implementation      |
-| **Block**     | Opinionated product-use-case composition; copied, never imported  |
-| **Page**      | Blocks arranged for one route                                     |
-| **Template**  | Multi-page scaffold with routing/providers; fork, don't depend on |
-| **Utility**   | Non-visual helper (hooks, class utils); side-effect free          |
+## Chosen pattern: compound components
 
-Blocks trade generality for adoption speed: strong defaults, domain logic
-stubbed via handlers, data via props — never hidden fetches.
+Use compound components for multi-part UI. Give consumers composable pieces
+rather than one widget controlled by a growing collection of boolean/config props.
 
-## Composition — compound components
+- Share state and actions through an owning provider/context, not prop drilling
+  between every piece. Keep the state implementation behind that provider.
+- Use recognizable roles such as Root, Trigger, Content, Item, Header, and Footer.
+  Each piece should have a focused responsibility and be independently composable.
+- Prefer JSX children for structural composition. Render callbacks are appropriate
+  when a parent supplies item data or state; Base UI's primitive `render` API remains valid.
+- Reuse existing primitives. A simple button does not need artificial subcomponents
+  or a context with no shared state.
 
-Never cram a widget into one component with a `data` prop and a dozen config
-props. Split into focused subcomponents sharing state through context:
+Examples: [composition patterns](../skills/vercel-composition-patterns/SKILL.md).
 
-```tsx
-<Accordion.Root open={open} setOpen={setOpen}>
-  <Accordion.Item>
-    <Accordion.Trigger>Title</Accordion.Trigger>
-    <Accordion.Content>Body</Accordion.Content>
-  </Accordion.Item>
-</Accordion.Root>
-```
+## Component best practices
 
-Standard names — don't invent synonyms: `Root` (container, owns context),
-`Trigger` (initiates action), `Content` (shown/hidden body), `Item` (one entry),
-`Header`/`Body`/`Footer` (structure), `Title`/`Description` (information).
+- Extend the wrapped element's native prop types; do not repurpose native attributes
+  for unrelated meanings. Forward supported props after defaults, and preserve refs.
+  Compose handlers explicitly where required behavior must survive caller overrides.
+- Merge classes with `cn`: base → variants → state → caller `className`. Keep static
+  variant definitions outside render. Use semantic theme tokens; dynamic values
+  can use CSS variables rather than constructed Tailwind class names.
+- Expose visual state through `data-state` and part identity through `data-slot`.
+  Prefer these stable styling hooks to accumulating `openClassName`/per-state props.
+- Document non-obvious public prop behavior and export types useful to consumers.
+  Support controlled/uncontrolled modes when needed, without adding unused modes
+  or polymorphism to every component.
+- Keep feature styling local. Shared UI needs a real shared requirement, not an
+  arbitrary consumer count; consider existing consumers before changing it.
 
-## Types — one component, one element
-
-Each exported component wraps **a single element**. A component rendering a
-header div + title h2 + footer div can't be restyled or re-structured without
-prop explosion — make each layer its own component.
-
-- Extend the native attributes of the wrapped element:
-  `type CardRootProps = React.ComponentProps<"div"> & { variant?: ... }`
-- **Spread props last** so callers can override defaults:
-  `<div className="default" {...props} />` — never the reverse. (Exception:
-  `className` goes through `cn(...)` with the caller's value last.)
-- Export every prop type, named `<ComponentName>Props`.
-- Don't shadow HTML attributes: `heading`, not `title`.
-- Document custom props with JSDoc (`/** Whether the dialog is open */`).
-
-## State — support controlled AND uncontrolled
-
-Professional components accept the triad `value` / `defaultValue` /
-`onValueChange` and merge the two modes with `useControllableState`
-(`@radix-ui/react-use-controllable-state` — the hook Radix uses internally):
-
-```tsx
-const [value, setValue] = useControllableState({
-  prop: controlledValue,
-  defaultProp: defaultValue,
-  onChange: onValueChange,
-});
-```
-
-## Styling — cn, ordering, CVA
-
-`cn` (from the `cn` package, re-exported via `@getpie/ui/lib/utils`) joins
-conditionals and resolves conflicting Tailwind utilities (last one wins). Class
-order is fixed:
-
-```tsx
-className={cn(
-  "base-styles",             // 1. base
-  buttonVariants({ variant, size }), // 2. variants (CVA, defined OUTSIDE the component)
-  isOpen && "bg-accent",     // 3. state conditionals
-  className,                 // 4. caller override — always last
-)}
-```
-
-Colors and spacing come from semantic design tokens (`--background`,
-`--primary`, `--primary-foreground`…), never hardcoded values — tokens name
-what something _is_, not how it looks, so themes swap under them. For dynamic
-values use CSS variables (`bg-[var(--color)]` + `style={{ "--color": x }}`),
-never interpolated class names.
-
-### Scope gate — feature styling stays local
-
-Keep product- and feature-specific styling in the owning app or feature.
-`packages/ui` and global theme tokens are shared contracts: change them only
-when at least two independent consumers need the same API, or the task
-explicitly requests a shared primitive.
-
-Treat `shadcn(no-restyle)` as a boundary failure, not a lint workaround. Resolve
-it through feature-local composition or a stable `data-slot`; adding a shared
-component variant or global token solely to silence the diagnostic fails this
-gate. Before committing a feature-only change, inspect the diff: unexpected
-`packages/ui` or global theme-token edits must be removed.
-
-## Data attributes — state and identity, not className props
-
-Never expose per-state className props (`openClassName`, `classes={{...}}`).
-Expose state as attributes and let consumers style with selectors:
-
-| Mechanism    | Carries                                                                                                     |
-| ------------ | ----------------------------------------------------------------------------------------------------------- |
-| `data-state` | Visual/layout state: `open`/`closed`, `active`, loading, `data-orientation`, `data-side`                    |
-| `data-slot`  | Stable identity for parent/global targeting — kebab-case, purpose-named (`submit-button`, not `blueButton`) |
-| props        | Variants (`variant`, `size`), behavior config, event handlers                                               |
-
-```tsx
-<div data-slot="dialog" data-state={isOpen ? "open" : "closed"} ... />
-// consumer: className="data-[state=open]:animate-in"
-// parent:   className="has-[>[data-slot=checkbox-group]]:gap-3"
-```
-
-## Polymorphism — asChild and as
-
-`asChild` (Radix `Slot`) merges the component's props/handlers/ref onto its
-single child instead of rendering the default element:
-`const Comp = asChild ? Slot : "button"`. Rules: exactly one child, never a
-fragment; the child must spread received props onto its element. Prefer
-`asChild` when composing with components; a typed `as` prop
-(`PolymorphicProps<E extends React.ElementType>`) suffices for
-element-switching only. Either way: default to the semantic element
-(`"button"`, `"nav"`), not `"div"`, and mind HTML nesting (no button-in-button,
-no div-in-p). In this repo, `packages/ui` sits on Base UI: the equivalent is
-`render={<Button/>}` (see stack.md).
-
-## Accessibility floor
-
-Non-negotiable on every component: semantic HTML first (ARIA only where HTML
-can't); a complete keyboard map (Arrows/Home/End/Escape per widget role);
-accessible names on icon-only buttons; `:focus-visible` indicators; state via
-`aria-expanded`/`aria-checked`/`aria-selected`; never convey information by
-color alone; 44px minimum touch targets; labels, not placeholders.
-
-## Review checklist
-
-Every item verified, or named as a deliberate exception:
-
-- [ ] One element per exported component; native attributes extended; props spread last
-- [ ] `<Name>Props` types exported; no HTML-attribute name collisions
-- [ ] Compound structure with standard subcomponent names; shared state in context
-- [ ] Stateful values accept `value`/`defaultValue`/`onValueChange`
-- [ ] `cn` ordering: base → variants → conditionals → `className`
-- [ ] State on `data-state`, identity on `data-slot`; no per-state className props
-- [ ] Colors/spacing from design tokens
-- [ ] Feature-only styling stays local; shared UI/theme edits pass the scope gate
-- [ ] Keyboard map complete; accessible names present; semantic elements used
+Review both these practices and actual usability. Runtime proof follows
+[verify-evidence.md](verify-evidence.md).
