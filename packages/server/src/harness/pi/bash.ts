@@ -9,8 +9,8 @@ import {
   type ExtensionAPI,
   type ExtensionFactory,
   getShellConfig,
-  getShellEnv,
   killProcessTree,
+  resolveSpawnContext,
   truncateTail,
   Type,
   waitForChildProcess,
@@ -50,33 +50,6 @@ export function filterPiBashEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     next[key] = value;
   }
   return next;
-}
-
-export interface BashSessionEnv {
-  sessionId?: string;
-  sessionFile?: string;
-  provider?: string;
-  modelId?: string;
-  reasoning?: string;
-}
-
-// Pi's resolveSpawnContext is private. Same five PI_* keys, then Pie's filter.
-export function bashSpawnEnv(
-  base: NodeJS.ProcessEnv,
-  session: BashSessionEnv = {},
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...base };
-  delete env.PI_SESSION_ID;
-  delete env.PI_SESSION_FILE;
-  delete env.PI_PROVIDER;
-  delete env.PI_MODEL;
-  delete env.PI_REASONING_LEVEL;
-  if (session.sessionId) env.PI_SESSION_ID = session.sessionId;
-  if (session.sessionFile) env.PI_SESSION_FILE = session.sessionFile;
-  if (session.provider) env.PI_PROVIDER = session.provider;
-  if (session.modelId) env.PI_MODEL = session.modelId;
-  if (session.reasoning) env.PI_REASONING_LEVEL = session.reasoning;
-  return filterPiBashEnv(env);
 }
 
 export function bashLogPath(sessionId: string, jobId: string): string {
@@ -347,21 +320,16 @@ export function piBashExtension(cwd: string): ExtensionFactory {
       parameters: bashSchema,
       constrainedSampling: { type: "json_schema", strict: "prefer" },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-        const session = {
-          sessionId: ctx.sessionManager.getSessionId(),
-          sessionFile: ctx.sessionManager.getSessionFile(),
-          provider: ctx.model?.provider,
-          modelId: ctx.model?.id,
-          reasoning: ctx.thinkingLevel,
-        };
+        const spawned = resolveSpawnContext(params.command, ctx.cwd || cwd, undefined, true, ctx);
         const result = await executePieBash({
-          command: params.command,
-          cwd: ctx.cwd || cwd,
-          env: bashSpawnEnv(getShellEnv(), session),
+          command: spawned.command,
+          cwd: spawned.cwd,
+          env: filterPiBashEnv(spawned.env),
           timeoutSeconds: params.timeout,
           runInBackground: params.run_in_background,
           signal,
-          logPath: (pid) => bashLogPath(session.sessionId ?? "unknown", String(pid)),
+          logPath: (pid) =>
+            bashLogPath(ctx.sessionManager.getSessionId() ?? "unknown", String(pid)),
           onBackgroundExit: (message) => {
             try {
               pi.sendUserMessage(message, { deliverAs: "followUp" });

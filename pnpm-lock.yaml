@@ -296,7 +296,7 @@ overrides:
 packageExtensionsChecksum: sha256-EtpJd2tSmwVXRtrDbtUguLAcAAK4A6gczw8a/LmaG+8=
 
 patchedDependencies:
-  '@earendil-works/pi-coding-agent@0.85.1': 8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99
+  '@earendil-works/pi-coding-agent@0.85.1': 4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980
   '@shadcn/lint@0.1.0': 273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
@@ -639,7 +639,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
@@ -711,7 +711,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -733,7 +733,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -790,13 +790,13 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@ff-labs/pi-fff':
         specifier: 0.10.6
-        version: 0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)
+        version: 0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)
       '@getpie/contract':
         specifier: workspace:*
         version: link:../contract
@@ -9655,7 +9655,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
+  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
     dependencies:
       '@earendil-works/chord': 0.85.1
       '@earendil-works/pi-agent-core': 0.85.1(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
@@ -10078,9 +10078,9 @@ snapshots:
       '@ff-labs/fff-bin-win32-arm64': 0.10.6
       '@ff-labs/fff-bin-win32-x64': 0.10.6
 
-  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)':
+  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)':
     dependencies:
-      '@earendil-works/pi-coding-agent': 0.85.1(patch_hash=8c1026887d6d3985c962d2a8306cd065853e11c82e78e2fcf7d39ae26ccfaf99)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+      '@earendil-works/pi-coding-agent': 0.85.1(patch_hash=4f4ccb51ae629c1271fe1881294cc5f408021f963ac6445d19c9ab99ca7ed980)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@earendil-works/pi-tui': 0.85.1
       '@ff-labs/fff-bun': 0.10.6
       '@ff-labs/fff-node': 0.10.6

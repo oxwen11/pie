@@ -6,12 +6,7 @@ import path from "node:path";
 import { killProcessTree } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  bashLogPath,
-  bashSpawnEnv,
-  executePieBash,
-  filterPiBashEnv,
-} from "../../../src/harness/pi/bash";
+import { bashLogPath, executePieBash, filterPiBashEnv } from "../../../src/harness/pi/bash";
 
 const HOST_ENV: NodeJS.ProcessEnv = {
   PIE_DAEMON_DIR: "daemon-beta",
@@ -44,31 +39,6 @@ describe("filterPiBashEnv", () => {
       HTTPS_PROXY: "http://proxy.example:8080",
       FOO_KEEP: "keep-me",
       PI_SESSION_ID: "sess-1",
-    });
-  });
-});
-
-describe("bashSpawnEnv", () => {
-  it("rewrites the five PI session keys and still strips Pie identity", () => {
-    expect(
-      bashSpawnEnv(HOST_ENV, {
-        sessionId: "sess-2",
-        sessionFile: "/tmp/session.jsonl",
-        provider: "anthropic",
-        modelId: "claude",
-        reasoning: "high",
-      }),
-    ).toEqual({
-      PATH: "/usr/bin:/bin",
-      HOME: "/users/test",
-      DISPLAY: ":0",
-      HTTPS_PROXY: "http://proxy.example:8080",
-      FOO_KEEP: "keep-me",
-      PI_SESSION_ID: "sess-2",
-      PI_SESSION_FILE: "/tmp/session.jsonl",
-      PI_PROVIDER: "anthropic",
-      PI_MODEL: "claude",
-      PI_REASONING_LEVEL: "high",
     });
   });
 });
