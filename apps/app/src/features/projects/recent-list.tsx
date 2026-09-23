@@ -68,14 +68,15 @@ function useHasRecentSessions(environments: ReadonlyArray<ConnectedEnvironment>)
       environmentRpc.for(environment.environmentId).project.list.queryOptions(),
     ),
   });
-  const chat = environments.flatMap((environment, index) =>
-    (projects[index]?.data ?? [])
-      .filter((project) => project.type === "chat")
-      .map((project) => ({
-        environmentId: environment.environmentId,
-        projectId: project.id,
-      })),
-  );
+  const chat: { environmentId: string; projectId: string }[] = [];
+  for (let index = 0; index < environments.length; index += 1) {
+    const environment = environments[index];
+    if (environment === undefined) continue;
+    for (const project of projects[index]?.data ?? []) {
+      if (project.type !== "chat") continue;
+      chat.push({ environmentId: environment.environmentId, projectId: project.id });
+    }
+  }
   const sessions = useQueries({
     queries: chat.map((item) =>
       environmentRpc.for(item.environmentId).agent.session.list.queryOptions({
