@@ -260,6 +260,7 @@ export function entriesToUIMessages(
         | "compaction"
         | "branch_summary"
         | "custom_message"
+        | "context_edit"
         | "usage");
       continue;
     }

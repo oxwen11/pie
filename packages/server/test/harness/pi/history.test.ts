@@ -132,7 +132,7 @@ describe("entriesToUIMessages", () => {
     expect(entriesToUIMessages(entries, "u1", "s1")).toEqual([]);
   });
 
-  it("keeps 0.86 system messages and usage records out of UI history", () => {
+  it("keeps system, usage, and context-edit records out of UI history", () => {
     const entries = [
       entry({
         type: "message",
@@ -142,7 +142,15 @@ describe("entriesToUIMessages", () => {
         message: { role: "system", content: "instructions", timestamp: 0 },
       }),
       userEntry("user", "system", "hi"),
-      entry({ type: "usage", id: "usage", parentId: "user", timestamp: "t", usage }),
+      entry({
+        type: "context_edit",
+        id: "edit",
+        parentId: "user",
+        timestamp: "t",
+        targetId: "user",
+        replacement: null,
+      }),
+      entry({ type: "usage", id: "usage", parentId: "edit", timestamp: "t", usage }),
       assistantEntry("assistant", "usage", [{ type: "text", text: "hello" }]),
     ];
 
