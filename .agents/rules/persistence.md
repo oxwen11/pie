@@ -7,7 +7,7 @@ includes application data, browser storage/cookies, Electron profiles/caches,
 logs, lifecycle files, worktrees/repository state, and delegated tool writes.
 
 Before proposing a design or implementation plan, read the
-[host persistence inventory](../../docs/architecture/host-persistence.md) and
+[host persistence inventory](../../docs/host-persistence.md) and
 confirm with the Developer:
 
 1. Owner, exact location, scope, and override rules.

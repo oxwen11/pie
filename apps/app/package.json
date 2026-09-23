@@ -41,6 +41,7 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "react-error-boundary": "catalog:",
+    "react-medium-image-zoom": "5.4.9",
     "react-resizable-panels": "^4.12.4",
     "sonner": "^2.0.8",
     "streamdown": "2.6.0",

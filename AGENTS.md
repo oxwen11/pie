@@ -35,6 +35,9 @@ whole rules or skills directory. Read additional guidance when scope expands.
 | Asked to review and merge PRs                  | [Review and merge](.agents/rules/review-and-merge-pr.md)                             |
 | Naming session-domain concepts                 | [CONTEXT.md](CONTEXT.md)                                                             |
 | Architectural decisions                        | [docs/adr/](docs/adr/)                                                               |
-| Session streaming                              | [Streaming decisions](docs/wayfinder/session-streaming-refactor/map.md)              |
+| Session streaming                              | [Runtime and recovery ADR](docs/adr/0009-pi-session-runtime-and-recovery.md)         |
 
-In-progress designs live in `docs/design/` and `docs/2026-*.md`; remediation tickets in `todos/`.
+Use [docs/README.md](docs/README.md) for documentation layout and lifecycle.
+Proposals and acceptance work live in `docs/rfc/`; remediation tickets in `todos/`.
+[Remote verification](docs/remote-access-verification.md) covers transport-specific proof.
+Capture lasting decisions before deleting completed plans; use Git history, not an archive directory.

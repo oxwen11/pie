@@ -296,7 +296,7 @@ overrides:
 packageExtensionsChecksum: sha256-EtpJd2tSmwVXRtrDbtUguLAcAAK4A6gczw8a/LmaG+8=
 
 patchedDependencies:
-  '@earendil-works/pi-coding-agent@0.85.1': f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578
+  '@earendil-works/pi-coding-agent@0.85.1': e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f
   '@shadcn/lint@0.1.0': 273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
@@ -457,6 +457,9 @@ importers:
       react-error-boundary:
         specifier: 'catalog:'
         version: 6.1.5(@types/react@19.3.0)(react@19.3.0)
+      react-medium-image-zoom:
+        specifier: 5.4.9
+        version: 5.4.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react-resizable-panels:
         specifier: ^4.12.4
         version: 4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -639,7 +642,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
@@ -711,7 +714,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -733,7 +736,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -790,13 +793,13 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@ff-labs/pi-fff':
         specifier: 0.10.6
-        version: 0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)
+        version: 0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)
       '@getpie/contract':
         specifier: workspace:*
         version: link:../contract
@@ -7710,6 +7713,12 @@ packages:
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
+  react-medium-image-zoom@5.4.9:
+    resolution: {integrity: sha512-czBdTbJI6JEbqeRIT5M8D3j7TrffBfo00U0P0lzzd19usj8PiR1yPH7PK/vQlwBE/Sv9YFdJGN6XauJPi4jRyg==}
+    peerDependencies:
+      react: ^19.3.0
+      react-dom: ^19.3.0
+
   react-resizable-panels@4.12.4:
     resolution: {integrity: sha512-SOsSj4e9U7vxL15MbgTfl35IO4vxSW4Xb0b1gtJVbRPWv7FOezcgOA00Mi0jP8XqC3y7jOQxpsGs/9zLKHPitA==}
     peerDependencies:
@@ -9655,7 +9664,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
+  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
     dependencies:
       '@earendil-works/chord': 0.85.1
       '@earendil-works/pi-agent-core': 0.85.1(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
@@ -10078,9 +10087,9 @@ snapshots:
       '@ff-labs/fff-bin-win32-arm64': 0.10.6
       '@ff-labs/fff-bin-win32-x64': 0.10.6
 
-  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)':
+  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.85.1)(@sinclair/typebox@0.34.52)':
     dependencies:
-      '@earendil-works/pi-coding-agent': 0.85.1(patch_hash=f40716774b9845c4b7167b9a632d4a47911a13132337ae2bdeec192722f6d578)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+      '@earendil-works/pi-coding-agent': 0.85.1(patch_hash=e09e00dea18cb50f5f58b68b6cb4322f905fa6b1b150b41551989761ce469d1f)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@earendil-works/pi-tui': 0.85.1
       '@ff-labs/fff-bun': 0.10.6
       '@ff-labs/fff-node': 0.10.6
@@ -16063,6 +16072,11 @@ snapshots:
 
   react-is@17.0.2:
     optional: true
+
+  react-medium-image-zoom@5.4.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   react-resizable-panels@4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:

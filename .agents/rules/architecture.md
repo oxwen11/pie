@@ -40,8 +40,8 @@ extraction does not require expanding a package's public surface.
   for multiple agents. Layer lifetime constraints are in [stack.md](stack.md).
 
 Read [CONTEXT.md](../../CONTEXT.md) for domain names and [ADRs](../../docs/adr/)
-for settled decisions. Streaming changes also require the
-[streaming map](../../docs/wayfinder/session-streaming-refactor/map.md).
+for settled decisions. Session runtime and streaming changes also require
+[ADR 0009](../../docs/adr/0009-pi-session-runtime-and-recovery.md).
 
 ## Specialized ownership
 

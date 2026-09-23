@@ -6,6 +6,7 @@ import { isReasoningUIPart, isToolUIPart, type FileUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
+import { ChatImagePreview } from "./chat-image-preview";
 import { CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown";
 import { ChatMarkdownImage } from "./chat-markdown-image";
 import { ReasoningPart } from "./reasoning-part";
@@ -96,9 +97,8 @@ function AssistantImage({ part }: { part: FileUIPart }) {
   return (
     <Message from="assistant">
       <MessageContent>
-        <img
+        <ChatImagePreview
           alt={part.filename ?? "Tool output image"}
-          className="h-auto max-h-[32rem] w-auto max-w-full rounded-md object-contain"
           decoding="async"
           height={1024}
           loading="lazy"

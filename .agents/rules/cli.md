@@ -1,15 +1,17 @@
 # Pie CLI
 
 `pie` is an agent-facing daemon client, not a second runtime or domain store.
-Read the [command design](../../docs/design/pie-cli.md) for the surface and
-[CONTEXT.md](../../CONTEXT.md) for vocabulary. Update that design when commands change.
+Implemented commands are documented by `pie --help` and per-command help in
+`packages/pie/src/node/`. Remaining proposals live in the
+[CLI RFC](../../docs/rfc/pie-cli.md); vocabulary lives in [CONTEXT.md](../../CONTEXT.md).
 
 ## Compatibility contracts
 
 - Product commands project `@getpie/contract` or daemon lifecycle. A new capability
   needs a corresponding contract change. Pi is the only agent; provider/model
-  flags select a model, not a harness. `pie-verify` remains separate proof tooling;
-  Hub commands enroll the daemon, not start a second Hub implementation.
+  flags select a model, not a harness. `pie-verify` remains separate proof tooling.
+  The proposed [Hub](../../docs/rfc/pie-hub.md) is separate; `pie hub *` would enroll
+  the daemon, not start a second Hub implementation.
 - Defaults must be scriptable: no interactive prompts, pagers, ANSI/color,
   presentation tables, spinners, or token playback. Prefer short stable text;
   `-q` emits primary ids and `--json` emits contract-shaped data without an envelope.
@@ -30,3 +32,5 @@ Read the [command design](../../docs/design/pie-cli.md) for the surface and
 
 Internal organization and additional output modes are design choices, provided
 these contracts and the agreed command requirements are preserved.
+When commands change, update their help and teaching skills; remove implemented
+proposals from the CLI RFC.

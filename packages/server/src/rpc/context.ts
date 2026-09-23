@@ -10,6 +10,7 @@ import type { PiAgent } from "../harness/pi/agent";
 import type { PackageService } from "../packages";
 import type { ProjectService } from "../project";
 import type { PullRequestService } from "../pull-request";
+import type { PullRequestCoordinator } from "../pull-request/coordinator";
 import type { ScheduleService } from "../schedule";
 import type { SettingsRepository } from "../settings";
 import type { SkillService } from "../skills";
@@ -31,5 +32,6 @@ export type RpcContext = WithEffectContext<
   | FileSystemService
   | GitService
   | PullRequestService
+  | PullRequestCoordinator
   | TerminalManager
 >;

@@ -71,10 +71,7 @@ function ChatTranscriptView({
     <Conversation key={sessionId}>
       {/* Width cap lives here, inside the scroller, so the scrollbar stays at
           the panel edge instead of hugging the centered column. */}
-      <ConversationContent
-        scrollClassName="scrollbar-thin"
-        className="mx-auto w-full max-w-4xl min-w-80"
-      >
+      <ConversationContent scrollClassName="scrollbar-thin" className="mx-auto w-full max-w-4xl">
         {snapshot.messages.length === 0 && (
           <EmptyTranscript historyStatus={snapshot.historyStatus} />
         )}
