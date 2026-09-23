@@ -497,6 +497,27 @@ describe("ScheduleService", () => {
     }),
   );
 
+  it.effect("preserves owned binding when an edit resubmits its bound Session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } }),
+      );
+      const fired = yield* h.service.runNow(created.id);
+      const sessionId = fired.ref?.sessionId;
+      if (sessionId === undefined) throw new Error("expected bound session");
+
+      const updated = yield* h.service.update({
+        id: created.id,
+        name: "Edited",
+        session: { policy: "existing", sessionId },
+      });
+
+      assert.deepStrictEqual(updated.session, { policy: "owned", sessionId });
+    }),
+  );
+
   it.effect("skips a second schedule when they share a busy session", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
