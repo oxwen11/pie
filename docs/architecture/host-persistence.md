@@ -185,29 +185,32 @@ the backfill.
 
 ### Schedules
 
-| Property      | Current contract                                                                                                                                                                                                                                   |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Path          | `$PIE_HOME/storage/schedules/<scheduleId>/schedule.json` plus `runs/<runId>.json`                                                                                                                                                                  |
-| Owner         | `ScheduleRepository`                                                                                                                                                                                                                               |
-| Data          | `schedule.json` stores Schedule state plus ordered `runIds`; each retained Run is a separate file                                                                                                                                                  |
-| Write points  | Create/update/delete, run start/settle, pause/enable, next-run advancement, failure-circuit changes, and startup recovery                                                                                                                          |
-| Compatibility | Breaking layout: the retired flat `schedules/<scheduleId>.json` files are ignored; there is no migration or adoption path                                                                                                                          |
-| Extension     | `ScheduleStateSchema`, `ScheduleRunSchema`, and the repository's stored Schedule schema are the sources of truth; incompatible changes require an explicit future migration                                                                        |
-| Atomicity     | Each JSON file is atomic, but a Schedule and its Runs are not one transaction. Changed Runs land before `schedule.json`; failures before that commit point attempt to restore the prior Runs. Unreferenced Run cleanup is best-effort after commit |
-| Retention     | Only the newest 20 Run files remain. Deleting a Schedule removes its directory; Sessions, worktrees, and Pi history created by prior runs remain                                                                                                   |
+| Property      | Current contract                                                                                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/schedules/<scheduleId>/schedule.json` plus `runs/<runId>.json`                                                                                                                                                            |
+| Owner         | `ScheduleRepository`                                                                                                                                                                                                                         |
+| Data          | `schedule.json` stores Schedule state plus ordered `runIds`; each retained Run is a separate file. Changed Runs may also appear temporarily as `pendingRuns` until their files are materialized                                              |
+| Write points  | Create/update/delete, run start/settle, pause/enable, next-run advancement, failure-circuit changes, and startup recovery                                                                                                                    |
+| Compatibility | Breaking layout: the retired flat `schedules/<scheduleId>.json` files are ignored; there is no migration or adoption path                                                                                                                    |
+| Extension     | `ScheduleStateSchema`, `ScheduleRunSchema`, and the repository's stored Schedule schema are the sources of truth; incompatible changes require an explicit future migration                                                                  |
+| Atomicity     | `schedule.json` is the atomic commit point. It temporarily embeds changed Run bodies in `pendingRuns`, so reads remain consistent across crashes while Run files are materialized. Finalization and unreferenced Run cleanup are best-effort |
+| Retention     | Only the newest 20 Run files remain. Deleting a Schedule removes its directory; Sessions, worktrees, and Pi history created by prior runs remain                                                                                             |
 
 `schedule.json` contains identity and prompt (`id`, `name`, `projectId`,
 `prompt`), cadence (`spec`, `nextRunAt`, optional `expiresAt`/`maxRuns`), session
 policy and optional worktree/model selection, enable/pause/failure counters,
-timestamps, last-run summary, and the ordered ids of retained Runs. It does not
-embed Run bodies.
+timestamps, last-run summary, and the ordered ids of retained Runs. During a
+commit it also embeds changed Run bodies in `pendingRuns`; readers prefer those
+copies until the separate Run files are materialized and `pendingRuns` is
+removed.
 
 Each Run file contains `{ id, startedAt, reason, status }` plus optional finish
 time, session id, error/skip details, missed count, and a snapshot of the
 Schedule inputs used for that Run. Only the newest 20 Run files remain;
 `firedCount` is the durable counter when older Runs fall out of that window.
-An interrupted write may leave an unreferenced Run file, which reads ignore and
-a later successful write attempts to remove.
+An interrupted commit may leave `pendingRuns` in `schedule.json`; reads use those
+copies, and the next successful write retries materialization. It may also leave
+an unreferenced Run file, which reads ignore and later cleanup attempts to remove.
 
 ## Pi package settings and installs
 
