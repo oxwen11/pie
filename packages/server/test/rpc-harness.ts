@@ -15,6 +15,7 @@ import {
   PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
+  PiAgentSessionService,
 } from "../src/harness";
 import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
@@ -25,13 +26,16 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { PiProcessTag } from "../src/rpc/runtime";
+import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
 import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE_PI = `#!/usr/bin/env node
+const bridge = process.env.PIE_SESSION_BRIDGE_URL;
+const bridgeToken = process.env.PIE_SESSION_BRIDGE_TOKEN;
+if (bridge && bridgeToken) fetch(bridge + "/ready", { method: "POST", headers: { authorization: "Bearer " + bridgeToken, "content-type": "application/json" }, body: "{}" }).catch(() => {});
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
@@ -111,6 +115,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
     Layer.provide(worktreeProvided),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
   const sessionImageAssetsLayer = SessionImageAssetsLayer.pipe(Layer.provide(harnessSessionLayer));
@@ -145,6 +150,13 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
     pullRequestLayer,
+    PullRequestCoordinatorLayer.pipe(
+      Layer.provide(harnessSessionLayer),
+      Layer.provide(pullRequestLayer),
+      Layer.provide(EventBusLayer),
+      Layer.provide(projectServiceLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,
@@ -154,5 +166,9 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
     "effect/context": await runtime.runPromise(runtime.contextEffect),
   };
   const client = createRouterClient(router, { context });
-  return { client, dispose: () => runtime.dispose() };
+  return {
+    client,
+    sessions: await runtime.runPromise(PiAgentSessionService),
+    dispose: () => runtime.dispose(),
+  };
 }

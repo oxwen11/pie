@@ -1,9 +1,5 @@
 import type { SessionRef } from "@getpie/contract";
-import type {
-  PullRequestRef,
-  PullRequestSessionStatus,
-  PullRequestSnapshot,
-} from "@getpie/contract/pull-request";
+import type { PullRequestRef, PullRequestSnapshot } from "@getpie/contract/pull-request";
 import { Effect } from "effect";
 
 import { pickSessionPullRequest } from "./pick-lifecycle";
@@ -12,6 +8,12 @@ export type PullRequestSessionWorkspace = {
   readonly ref: SessionRef;
   readonly cwd: string;
   readonly pullRequestRefs: ReadonlyArray<PullRequestRef>;
+};
+
+export type FoldedSessionStatus = {
+  readonly ref: SessionRef;
+  readonly lifecycle: PullRequestSnapshot["lifecycle"];
+  readonly url: string;
 };
 
 const pullRequestKey = (ref: PullRequestRef): string =>
@@ -23,7 +25,7 @@ export const foldSessionStatuses = <E>(
     cwd: string,
     pullRequest?: PullRequestRef,
   ) => Effect.Effect<PullRequestSnapshot | null, E>,
-): Effect.Effect<ReadonlyArray<PullRequestSessionStatus>, E> =>
+): Effect.Effect<ReadonlyArray<FoldedSessionStatus>, E> =>
   Effect.gen(function* () {
     const storedLookups: Array<{ key: string; cwd: string; pullRequest: PullRequestRef }> = [];
     const storedKeys = new Set<string>();
@@ -52,7 +54,7 @@ export const foldSessionStatuses = <E>(
     );
     const snapshotsByCwd = new Map(cwdSnapshots);
 
-    const statuses: Array<PullRequestSessionStatus> = [];
+    const statuses: Array<FoldedSessionStatus> = [];
     for (const { cwd, ref, pullRequestRefs } of workspaces) {
       if (pullRequestRefs.length === 0) {
         const snapshot = snapshotsByCwd.get(cwd);

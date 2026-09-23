@@ -6,7 +6,7 @@
  */
 
 import type { SessionSource } from "@getpie/contract";
-import type { PullRequestRef } from "@getpie/contract/pull-request";
+import type { SessionPullRequestLink } from "@getpie/contract/pull-request";
 
 /** A project is a workspace path the runtime can open sessions against. */
 export type { Project } from "@getpie/contract";
@@ -30,10 +30,12 @@ export interface Session {
    * path when that create requested `worktree`.
    */
   readonly cwd?: string;
+  /** Branch captured at creation for a session on the project path. Checkout changes never replace it. */
+  readonly gitBranch?: string;
   /** Pie-created git worktree at `cwd`. Absent for sessions on the project path. */
   readonly worktree?: { readonly branch: string };
-  /** GitHub pull requests associated with this session, newest last. Identity only. */
-  readonly pullRequestRefs?: ReadonlyArray<PullRequestRef>;
+  /** GitHub pull requests associated with this session, newest last. */
+  readonly pullRequests?: ReadonlyArray<SessionPullRequestLink>;
   /** Durable provenance for sessions created by an application-owned trigger. */
   readonly source?: SessionSource;
   /** Model selected at create; applied when Pi opens on the first prompt. */

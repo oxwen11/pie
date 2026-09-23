@@ -58,7 +58,7 @@ export function AppShellMain({ children }: AppShellMainProps) {
     <div
       className={cn(
         "flex min-h-0 flex-col md:py-1",
-        fill ? "w-0 overflow-hidden" : "min-w-0 flex-1",
+        fill ? "w-0 overflow-hidden" : "min-w-80 flex-1",
         withContent
           ? "md:[&_[data-slot=sidebar-inset]]:rounded-e-none md:[&_[data-slot=sidebar-inset]]:border-e-0"
           : "md:pe-1",
