@@ -1,64 +1,36 @@
 # Pie CLI
 
-Normative for `@getpie/cli` (`pie`) and skills that teach it.
-Implemented commands: `pie --help` and per-command help (`packages/pie/src/node/`).
-Remaining proposals: `docs/rfc/pie-cli.md`. Nouns: `CONTEXT.md`.
+`pie` is an agent-facing daemon client, not a second runtime or domain store.
+Implemented commands are documented by `pie --help` and per-command help in
+`packages/pie/src/node/`. Remaining proposals live in the
+[CLI RFC](../../docs/rfc/pie-cli.md); vocabulary lives in [CONTEXT.md](../../CONTEXT.md).
 
-## Who it is for
+## Compatibility contracts
 
-The primary caller is an **agent**. Web / Desktop are for humans.
-Do not shape defaults around interactive terminal UX: no prompts,
-pagers, color, tables, spinners, or token streaming.
+- Product commands project `@getpie/contract` or daemon lifecycle. A new capability
+  needs a corresponding contract change. Pi is the only agent; provider/model
+  flags select a model, not a harness. `pie-verify` remains separate proof tooling.
+  The proposed [Hub](../../docs/rfc/pie-hub.md) is separate; `pie hub *` would enroll
+  the daemon, not start a second Hub implementation.
+- Defaults must be scriptable: no interactive prompts, pagers, ANSI/color,
+  presentation tables, spinners, or token playback. Prefer short stable text;
+  `-q` emits primary ids and `--json` emits contract-shaped data without an envelope.
+- Exit codes: `0` success, `1` business/usage, `2` unreachable/unauthenticated.
+  Failures use non-zero exits and stable stderr, not success-shaped stdout.
+  Structured errors are available with `--json`. Additional codes need a real
+  caller benefit over structured output.
+- Default stdout changes are breaking changes. Introduce an explicit option or
+  agree a compatibility plan instead of silently changing output.
+- IDs are explicit; do not infer an active/focused session. Flags override env
+  defaults (`PIE_URL`, `PIE_AUTH_TOKEN`, `PIE_PROJECT_ID`, `PIE_SESSION_ID`, `PIE_HOME`).
+  Missing required ids fail clearly.
+- Without a URL, attach/spawn locally under `$PIE_HOME`. `--url` / `PIE_URL` is
+  connect-only: never spawn a daemon on that URL.
+- New work creates a Session unless a session id is supplied. Without a Project
+  id, resolve cwd through path-idempotent `project.create`; there is no subagent tree.
+- Destructive commands remain non-interactive and require `--yes` where guarded.
 
-## What it is
-
-`pie` is a **daemon client**: each product command projects
-`@getpie/contract` (or daemon lifecycle). It is not a second runtime,
-orchestrator, domain store, or workflow engine.
-
-Same vocabulary as the product. Same agent model as the server: **Pi
-only** (`--provider` / `--model-id` select a model, never a harness).
-
-No command for a capability the contract does not expose. New command →
-name the procedure(s); extend the contract in the same stack, or cut the
-command. `pie-verify` stays proof tooling (architecture rules). Hub is a
-separate proposed binary — `pie hub *` would enroll the daemon only
-(`docs/rfc/pie-hub.md`).
-
-## Machine interface
-
-Optimize for **decidability**: the caller must know success, failure,
-and the next id/state without scraping prose.
-
-- Exit codes drive control flow (`0` ok, `1` business/usage, `2`
-  unreachable/unauthenticated target). Extra codes only when they beat
-  parsing stdout for that command.
-- Default stdout is short, stable text. `-q` = primary id(s) only.
-  `--json` = contract-shaped payload, no `{ ok, data }` envelope.
-- Errors: non-zero exit + stable stderr. No success-shaped failure
-  output. Structured errors only with `--json`.
-- Changing a default stdout shape is a breaking change; add a flag
-  rather than silently reformatting.
-
-## Addressing
-
-IDs are explicit. No "active" / focused / selector DSL — Pie has no
-editor focus model.
-
-Flags override env (`PIE_URL`, `PIE_AUTH_TOKEN`, `PIE_PROJECT_ID`,
-`PIE_SESSION_ID`, `$PIE_HOME`). Env is a default, not authority; missing
-required id fails clearly.
-
-No `--url` → attach or spawn the local daemon under `$PIE_HOME`.
-`--url` / `PIE_URL` connects only — never starts a daemon on that URL.
-
-There is no subagent tree: new work is a new Session unless
-`--session-id` / `PIE_SESSION_ID` says otherwise. Project without an id
-resolves from cwd via path-idempotent `project.create`.
-
-Destructive ops are non-interactive (`--yes` when a guard is required).
-
-## Docs
-
-Change the command surface → update command help and skills that teach it.
-When a proposed surface lands, remove that portion from `docs/rfc/pie-cli.md`.
+Internal organization and additional output modes are design choices, provided
+these contracts and the agreed command requirements are preserved.
+When commands change, update their help and teaching skills; remove implemented
+proposals from the CLI RFC.
