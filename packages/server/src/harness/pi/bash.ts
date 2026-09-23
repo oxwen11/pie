@@ -8,6 +8,7 @@ import {
   type BashToolDetails,
   type ExtensionAPI,
   type ExtensionFactory,
+  bashSchema,
   getShellConfig,
   killProcessTree,
   resolveSpawnContext,
@@ -291,13 +292,8 @@ export async function executePieBash(input: {
   };
 }
 
-const bashSchema = Type.Object({
-  command: Type.String({ description: "Shell command to execute" }),
-  timeout: Type.Optional(
-    Type.Number({
-      description: "Timeout in seconds. Kills the command. Does not background it.",
-    }),
-  ),
+const pieBashSchema = Type.Object({
+  ...bashSchema.properties,
   run_in_background: Type.Optional(
     Type.Boolean({
       description: "Return as soon as the command is running, with a pid and log path.",
@@ -317,7 +313,7 @@ export function piBashExtension(cwd: string): ExtensionFactory {
         "You can inspect PI_* environment variables for current model and session details.",
         `Commands still running after ${BACKGROUND_AFTER_MS / 1000} seconds move to the background and return a pid and log path. Read that file for later output. Stop a background command with \`kill -- -<pid>\`.`,
       ],
-      parameters: bashSchema,
+      parameters: pieBashSchema,
       constrainedSampling: { type: "json_schema", strict: "prefer" },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         const spawned = resolveSpawnContext(params.command, ctx.cwd || cwd, undefined, true, ctx);

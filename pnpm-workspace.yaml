@@ -155,7 +155,7 @@ patchedDependencies:
   # InteractiveMode and highlight.js; inline builtin theme JSON.
   # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
   # relocatable image worker/WASM paths. Also re-export getShellEnv,
-  # killProcessTree, waitForChildProcess, Type, and resolveSpawnContext for Pie's bash tool.
+  # killProcessTree, waitForChildProcess, Type, bashSchema, and resolveSpawnContext for Pie's bash tool.
   # On bump, re-check every patched file and run the isolated server RPC
   # bundle tests after rebuilding.
   "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
