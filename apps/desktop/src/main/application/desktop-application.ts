@@ -1,6 +1,6 @@
 import os from "node:os";
 
-import { Context, Effect, Stream, SubscriptionRef } from "effect";
+import { Context, Effect, Scope, Stream, SubscriptionRef } from "effect";
 
 import type {
   ConnectingSshHost,
@@ -65,6 +65,8 @@ export type DesktopApplicationDependencies = {
   readonly ssh: DesktopSsh["Service"];
   readonly tailscale: DesktopTailscale["Service"];
   readonly quit: Effect.Effect<void>;
+  /** Layer scope. SSH close-watchers outlive the RPC handler that started them. */
+  readonly scope: Scope.Scope;
 };
 
 function emptySnapshot(): EnvironmentSnapshot {
@@ -80,6 +82,7 @@ export function makeDesktopApplication({
   ssh,
   tailscale,
   quit,
+  scope,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
   const environmentsRef = Effect.runSync(
     SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot()),
@@ -141,7 +144,7 @@ export function makeDesktopApplication({
       }));
       yield* result.closed.pipe(
         Effect.andThen(() => dropRemoteIfCurrent(remote)),
-        Effect.forkDetach,
+        Effect.forkIn(scope),
       );
     });
 

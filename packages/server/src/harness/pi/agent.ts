@@ -14,24 +14,23 @@ import { checkPiAvailability } from "./resolve-executable";
 import type { PiExecutable } from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime, type PiAgentRuntime } from "./runtime";
 import { PiSessionTools } from "./session-tools";
-import type { AvailabilityResult, SessionInfoResult } from "./types";
+import type { SessionInfoResult } from "./types";
 
 /** Injected PiAgent service — create, resume, and cold reads at the composition root. */
 export type PiAgentShape = {
-  readonly availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
   readonly create: (
     input: CreateSessionInput,
   ) => Effect.Effect<
     PiAgentRuntime,
     AgentUnavailable | ExecutableNotFound | AgentOpenError,
-    Scope.Scope | FileSystem.FileSystem
+    Scope.Scope
   >;
   readonly resume: (
     input: ResumeSessionInput,
   ) => Effect.Effect<
     PiAgentRuntime,
     SessionNotResumable | AgentUnavailable | ExecutableNotFound | AgentOpenError,
-    Scope.Scope | FileSystem.FileSystem
+    Scope.Scope
   >;
   readonly getMessages?: (
     agentSessionId: string,
@@ -43,59 +42,36 @@ export type PiAgentShape = {
   ) => Effect.Effect<SessionInfoResult, AgentOperationError>;
 };
 
-const whenAvailable = <A, E, R>(
-  availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>,
-  body: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | AgentUnavailable, R | FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const result = yield* availability;
-    if (!result.available) {
-      return yield* Effect.fail(new AgentUnavailable({ reason: result.reason ?? "Unavailable" }));
-    }
-    return yield* body;
-  });
-
-type MutableAvailability = {
-  availability: Effect.Effect<AvailabilityResult, never, FileSystem.FileSystem>;
-};
-
 export const makePiAgent = (
   piProcess: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
-): PiAgentShape => {
-  const pi: MutableAvailability & Omit<PiAgentShape, "availability"> = {
-    availability: checkPiAvailability(
+): Effect.Effect<PiAgentShape, never, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const checked = yield* checkPiAvailability(
       options.executable ?? { command: process.execPath, prefixArgs: [] },
-    ),
-    create: (input) =>
-      whenAvailable(
-        pi.availability,
-        Effect.serviceOption(PiSessionTools).pipe(
-          Effect.flatMap((tools) =>
-            createPiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
+    );
+    const blocked = checked.available
+      ? undefined
+      : new AgentUnavailable({ reason: checked.reason ?? "Unavailable" });
+    const gate = <A, E, R>(body: Effect.Effect<A, E, R>) =>
+      blocked === undefined ? body : Effect.fail(blocked);
+    const tools = Effect.serviceOption(PiSessionTools).pipe(Effect.map(Option.getOrUndefined));
+
+    return {
+      create: (input) =>
+        gate(
+          Effect.flatMap(tools, (sessionTools) =>
+            createPiAgentRuntime(piProcess, input, sessionTools),
           ),
         ),
-      ),
-    resume: (input) =>
-      whenAvailable(
-        pi.availability,
-        Effect.serviceOption(PiSessionTools).pipe(
-          Effect.flatMap((tools) =>
-            resumePiAgentRuntime(piProcess, input, Option.getOrUndefined(tools)),
+      resume: (input) =>
+        gate(
+          Effect.flatMap(tools, (sessionTools) =>
+            resumePiAgentRuntime(piProcess, input, sessionTools),
           ),
         ),
-      ),
-    getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
-  };
-  return pi;
-};
+      getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
+    };
+  });
 
 export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent") {}
-
-export const cachePiAgentAvailability = (
-  pi: PiAgentShape,
-): Effect.Effect<PiAgentShape, never, FileSystem.FileSystem> =>
-  Effect.map(Effect.cached(pi.availability), (cachedCheck) => {
-    (pi as MutableAvailability).availability = Effect.uninterruptible(cachedCheck);
-    return pi;
-  });

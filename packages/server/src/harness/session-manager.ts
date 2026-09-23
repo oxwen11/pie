@@ -4,7 +4,7 @@ import type {
   SessionScopedEventBody,
   SessionStatus,
 } from "@getpie/contract";
-import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect";
+import { Context, Deferred, Effect, Layer, Ref, Scope } from "effect";
 
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import {
@@ -128,14 +128,9 @@ type CloseStep =
 export const makePiAgentSessionManager = (
   pi: PiAgentShape,
   bus: EventBusShape,
-): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope | FileSystem.FileSystem> =>
+): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
-    // An adapter's availability check reads the filesystem; bind it once here
-    // so the manager's own methods stay R-free. `provideService` rather than
-    // `provide(Effect.context())` — the latter captures the whole layer-build
-    // context, `ownerScope` included, and wins the merge over a caller's.
-    const fileSystem = yield* FileSystem.FileSystem;
     // Complete SessionRef → the session that owns its observable state.
     const sessions = yield* Ref.make<ReadonlyMap<string, SessionEntry>>(new Map());
     const sessionKey = (ref: SessionRef) => `${ref.projectId}\0${ref.sessionId}`;
@@ -192,11 +187,6 @@ export const makePiAgentSessionManager = (
         }),
       );
 
-    const withFileSystem = <A, E, R>(
-      effect: Effect.Effect<A, E, R | FileSystem.FileSystem>,
-    ): Effect.Effect<A, E, R> =>
-      effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
-
     /**
      * The heaviest thing this server does: `create`/`resume` is where an agent
      * CLI is actually spawned or an SDK handle established. It is also the
@@ -209,13 +199,13 @@ export const makePiAgentSessionManager = (
      * PiAgent answers because it does not exist before then.
      */
     const acquireCreate = (input: CreateSessionInput): AcquireRuntime =>
-      withFileSystem(pi.create(input)).pipe(
+      pi.create(input).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.create"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
-      withFileSystem(pi.resume({ sessionId: input.sessionId, cwd: input.cwd })).pipe(
+      pi.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.resume"),
       );

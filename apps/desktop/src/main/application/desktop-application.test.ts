@@ -1,4 +1,4 @@
-import { Deferred, Effect, Option, Stream, SubscriptionRef } from "effect";
+import { Deferred, Effect, Option, Scope, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
@@ -46,6 +46,7 @@ function makeHarness(
     quit: Effect.sync(() => {
       quits += 1;
     }),
+    scope: Effect.runSync(Scope.make()),
   });
 
   return {

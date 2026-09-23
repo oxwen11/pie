@@ -12,7 +12,7 @@ than persisting a second event log.
 - `PiAgentSessionManager` owns live state and is the sole caller of
   `PiAgent.create` / `resume`. No history reader or router independently spawns
   another runtime for the same session.
-- `PiAgent` supplies availability, runtime entry, and cold reads.
+- `PiAgent` supplies runtime entry and cold reads.
   `PiAgentRuntime` owns the live Pi child; private session/fold modules own the
   session state and stream bookkeeping.
 - `prepare` is cold validation/backfill, not resume. Status/snapshot observation

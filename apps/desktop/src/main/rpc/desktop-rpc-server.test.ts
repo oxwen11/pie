@@ -4,7 +4,7 @@ import { consumeEventIterator, createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/message-port";
 import type { RouterContractClient } from "@orpc/contract";
 import { ORPCError } from "@orpc/server";
-import { Context, Effect, Logger, Stream, SubscriptionRef } from "effect";
+import { Context, Effect, Logger, Scope, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { ServerStatusSnapshot, DesktopContract } from "../../shared/desktop-rpc";
@@ -69,6 +69,7 @@ function makeHarness(
     quit: Effect.sync(() => {
       quits += 1;
     }),
+    scope: Effect.runSync(Scope.make()),
   });
   const rpcServer = makeDesktopRpcServer(override ? override(base) : base, rpcContext);
   const { port1, port2 } = new workerThreads.MessageChannel();
