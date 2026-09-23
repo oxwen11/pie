@@ -1,4 +1,4 @@
-import type { Effect, FileSystem, Scope, Stream } from "effect";
+import type { Effect, Scope, Stream } from "effect";
 import { expectTypeOf, test } from "vitest";
 
 import type {
@@ -18,7 +18,7 @@ test("PiAgent create is scoped and effect native", () => {
     Effect.Effect<
       PiAgentRuntime,
       AgentUnavailable | ExecutableNotFound | AgentOpenError,
-      Scope.Scope | FileSystem.FileSystem
+      Scope.Scope
     >
   >();
 });

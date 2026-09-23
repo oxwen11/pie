@@ -52,7 +52,7 @@ export default defineConfig({
     shadcn: {
       ui: ["@getpie/ui/components", "@getpie/ui/ai-elements"],
       ignoreImports: ["^@getpie/ui/lib(/|$)", "^@getpie/ui/hooks(/|$)"],
-      note: "See .agents/rules/ui-components.md. Colors and spacing come from theme tokens.",
+      note: "See .agents/rules/topics/ui-components.md. Colors and spacing come from theme tokens.",
     },
   },
   jsPlugins: [

@@ -5,7 +5,6 @@ import type {
   PullRequestExpected,
   PullRequestListItem,
   PullRequestRef,
-  PullRequestSessionStatus,
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 import { Context, Effect, Layer } from "effect";
@@ -13,11 +12,16 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { PullRequestStaleContext } from "./errors";
 import {
+  type GitHubCliAdapter,
   type PullRequestCliActionFailure,
   type PullRequestReadFailure,
   makeGitHubCliAdapter,
 } from "./github-cli";
-import { foldSessionStatuses, type PullRequestSessionWorkspace } from "./statuses";
+import {
+  foldSessionStatuses,
+  type FoldedSessionStatus,
+  type PullRequestSessionWorkspace,
+} from "./statuses";
 
 const samePullRequest = (left: PullRequestRef, right: PullRequestRef): boolean =>
   left.host === right.host &&
@@ -33,6 +37,11 @@ export type PullRequestActionTarget =
 export class PullRequestService extends Context.Service<
   PullRequestService,
   {
+    readonly summary: GitHubCliAdapter["summary"];
+    readonly discover: GitHubCliAdapter["discover"];
+    readonly stack: GitHubCliAdapter["stack"];
+    readonly stackPreview: GitHubCliAdapter["stackPreview"];
+    readonly runStackAction: GitHubCliAdapter["runStackAction"];
     readonly current: (
       cwd: string,
       pullRequest?: PullRequestRef,
@@ -52,7 +61,7 @@ export class PullRequestService extends Context.Service<
     ) => Effect.Effect<PullRequestActionApplied, PullRequestActionFailure>;
     readonly sessionStatuses: (
       workspaces: ReadonlyArray<PullRequestSessionWorkspace>,
-    ) => Effect.Effect<ReadonlyArray<PullRequestSessionStatus>, PullRequestReadFailure>;
+    ) => Effect.Effect<ReadonlyArray<FoldedSessionStatus>, PullRequestReadFailure>;
   }
 >()("PullRequestService") {}
 
@@ -128,6 +137,19 @@ export const PullRequestServiceLayer: Layer.Layer<
       return yield* foldSessionStatuses(workspaces, current);
     });
 
-    return { current, diff, diffFor, list, detail, runAction, sessionStatuses };
+    return {
+      current,
+      diff,
+      diffFor,
+      list,
+      detail,
+      runAction,
+      sessionStatuses,
+      summary: cli.summary,
+      discover: cli.discover,
+      stack: cli.stack,
+      stackPreview: cli.stackPreview,
+      runStackAction: cli.runStackAction,
+    };
   }),
 );

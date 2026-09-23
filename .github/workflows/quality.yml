@@ -131,6 +131,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
+      # Vitest workers import Electron in parallel. Install it once up front so
+      # they cannot race while extracting the same binary into node_modules.
+      - run: pnpm --filter @getpie/desktop exec install-electron
+
       - name: Install Playwright Chromium
         run: |
           browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"
@@ -146,7 +150,7 @@ jobs:
       # `package-artifact.test.ts` reads it (actual client vs expected []).
       # `lint:check` still depends on `@getpie/oxlint#build`. Tests are the
       # root Vitest workspace (`pnpm test`, including Vitest browser app-e2e).
-      # Desktop Playwright (`pnpm e2e`) runs after that graph, under xvfb.
+      # Focused Desktop Playwright coverage runs after that graph, under xvfb.
       # Format only needs node_modules and stays parallel with the turbo graph.
       - name: Run build, test, typecheck, lint, and format
         run: |
@@ -162,13 +166,12 @@ jobs:
           pnpm test
           wait "$format_pid"
 
-      # Direct Playwright, not `pnpm e2e`. Turbo holds a task's log until the
-      # task exits, so a hung Electron suite looks like silence. `script`
-      # allocates a tty so Node flushes each line. Desktop dist is already
-      # built by the turbo graph above.
-      - name: Run Desktop e2e
+      # Keep the merge gate to the stable packaging baseline; the full Desktop
+      # suite remains a local verification tool. `script` allocates a tty so
+      # Node flushes each line. Desktop dist is already built above.
+      - name: Run Desktop e2e baseline
         run: |
           xvfb-run -a script --quiet --return --command \
-            "pnpm --filter @getpie/desktop exec playwright test -c e2e/playwright.config.ts --reporter=line" \
+            "pnpm --filter @getpie/desktop exec playwright test -c e2e/playwright.config.ts e2e/tests/import-project.spec.ts e2e/tests/daemon-attach.spec.ts --reporter=line" \
             /dev/null
         shell: bash

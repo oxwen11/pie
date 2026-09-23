@@ -5,11 +5,12 @@ import path from "node:path";
 import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test";
 
 import {
+  closeElectron,
   linuxElectronArgs,
+  pieElectronEnv,
   seedProject,
   stopDaemonFor,
   stopProcess,
-  closeElectron,
 } from "./fixtures.js";
 
 const LEGACY_SERVER = `
@@ -45,7 +46,6 @@ async function waitForConnectedUi(
   userData: string,
   pieHome: string,
 ): Promise<ElectronApplication> {
-  const fakePiPath = path.join(import.meta.dirname, "../../../../tools/testing/fake-pi.mjs");
   const packagedExecutable = process.env.PIE_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(packagedExecutable === undefined ? undefined : { executablePath: packagedExecutable }),
@@ -54,13 +54,7 @@ async function waitForConnectedUi(
       ...(packagedExecutable === undefined ? [appPath] : []),
       `--user-data-dir=${userData}`,
     ],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      PIE_E2E: "1",
-      PIE_E2E_PI_EXECUTABLE: fakePiPath,
-      PIE_HOME: pieHome,
-    },
+    env: pieElectronEnv(pieHome),
   });
   try {
     const window = await app.firstWindow({ timeout: 30_000 });
@@ -136,8 +130,8 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
     expect(relaunched.pid).toBe(replacement.pid);
     expect(relaunched.compatibilityKey).toBe(replacement.compatibilityKey);
   } finally {
-    if (firstApp) await closeElectron(firstApp);
-    if (secondApp) await closeElectron(secondApp);
+    await closeElectron(firstApp);
+    await closeElectron(secondApp);
     await stopDaemonFor(pieHome);
     await stopProcess(legacyPid);
   }
