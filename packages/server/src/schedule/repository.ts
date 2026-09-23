@@ -233,12 +233,9 @@ export const makeScheduleRepository = (schedulesDir: string) =>
           Effect.map((items) => items.flatMap((item) => (Option.isSome(item) ? [item.value] : []))),
         ),
       read,
-      create: (schedule) =>
-        !isSafeId(schedule.id)
-          ? Effect.die(new Error(`invariant: invalid schedule id ${JSON.stringify(schedule.id)}`))
-          : withLock(schedule.id, commit(undefined, schedule)),
+      create: (schedule) => withLock(schedule.id, commit(undefined, schedule)),
       replace: (current, next) =>
-        !isSafeId(next.id) || current.id !== next.id
+        current.id !== next.id
           ? Effect.die(
               new Error(
                 `invariant: cannot replace schedule ${JSON.stringify(current.id)} with ${JSON.stringify(next.id)}`,

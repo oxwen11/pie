@@ -65,6 +65,7 @@ export function ProjectSessionRow({
             title="Created by a schedule"
           >
             <Clock aria-hidden className="size-3.5 opacity-70" />
+            <span className="sr-only">Created by a schedule</span>
           </span>
         ) : null}
       </SessionActionsMenu>
