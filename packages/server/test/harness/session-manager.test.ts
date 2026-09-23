@@ -161,6 +161,22 @@ it.effect("drains the native stream into the session and tears down on close", (
   }),
 );
 
+it.effect("isolates identical session IDs in different Projects, including teardown", () =>
+  Effect.gen(function* () {
+    const fixture = yield* makeFixture;
+    const firstRef = refFor("same");
+    const secondRef = { ...firstRef, projectId: "project-2" };
+    const first = yield* fixture.manager.open({ cwd: "/tmp" }, firstRef);
+    const second = yield* fixture.manager.open({ cwd: "/tmp" }, secondRef);
+    assert.notEqual(first, second);
+    yield* fixture.manager.close(firstRef);
+    assert.equal(yield* isActive(fixture, firstRef), false);
+    assert.equal(yield* isActive(fixture, secondRef), true);
+    yield* fixture.manager.close(secondRef);
+    assert.equal(yield* Ref.get(fixture.closeCalls), 2);
+  }),
+);
+
 it.effect("single-flights ensure in owner scope when the first waiter cancels", () =>
   Effect.gen(function* () {
     const fixture = yield* makeFixture;
