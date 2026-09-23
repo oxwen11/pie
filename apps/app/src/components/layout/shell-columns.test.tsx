@@ -79,6 +79,7 @@ describe("shell columns", () => {
       return (drawer as HTMLElement).getBoundingClientRect().width;
     };
 
+    await page.viewport(1280, 800);
     const screen = await render(<Shell contentOpen={false} />);
     await expect.element(page.getByText("Sidebar")).toBeVisible();
     const hiddenWidth = drawerWidth();
@@ -95,6 +96,32 @@ describe("shell columns", () => {
       })
       .toBeGreaterThan(100);
     expect(drawerWidth()).toBeCloseTo(hiddenWidth, 0);
+
+    const drawer = page.getByText("Sidebar").element().closest("[data-slot=sidebar-drawer]");
+    const column = page.getByText("Content").element().closest("[data-slot=content-panel-column]");
+    expect(drawer?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
+      (drawer as HTMLElement).getBoundingClientRect().right + 0.5,
+    );
+    expect(getComputedStyle(column as HTMLElement).paddingRight).toBe("4px");
+    const seams = [...document.querySelectorAll<HTMLElement>('[role="separator"]')].filter(
+      (el) => el.getBoundingClientRect().width > 0,
+    );
+    expect(seams.map((el) => el.getBoundingClientRect().width)).toEqual([4, 1]);
+    const seam = seams[0];
+    if (seam === undefined) throw new Error("missing seam");
+    const box = seam.getBoundingClientRect();
+    seam.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: box.left + 6,
+        clientY: box.top + 80,
+        pointerId: 1,
+      }),
+    );
+    expect(seam.firstElementChild?.getBoundingClientRect().width).toBeGreaterThanOrEqual(32);
+    const mark = seam.querySelector("span");
+    expect(mark?.style.left).toBe("6px");
+    expect(mark?.style.top).toBe("80px");
 
     await screen.rerender(<Shell contentOpen={false} />);
     await expect.element(page.getByText("Sidebar")).toBeVisible();
