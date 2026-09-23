@@ -16,6 +16,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
+import { PullRequestDemandProvider } from "@/components/layout/pull-request-demand-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
@@ -91,30 +92,32 @@ function RootLayout() {
     },
   });
   return (
-    <AppShell>
-      <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
-        {/*
-         * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
-         * outer local QueryClient above the router.
-         */}
-        <AppShellBody>
-          <AppShellSidebar>
-            <AppSidebar />
-          </AppShellSidebar>
-          <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
-            <AppShellMain>
-              <EnvironmentCardPanel
-                cardHeader={cardHeader}
-                cardHeading={cardHeading}
-                projectId={projectId}
-                sessionRef={sessionRef}
-              />
-            </AppShellMain>
-            <AppShellSessionPanel />
-          </EnvironmentOrpcProvider>
-        </AppShellBody>
-      </ContentPanelSessionProvider>
-    </AppShell>
+    <PullRequestDemandProvider>
+      <AppShell>
+        <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+          {/*
+           * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
+           * outer local QueryClient above the router.
+           */}
+          <AppShellBody>
+            <AppShellSidebar>
+              <AppSidebar />
+            </AppShellSidebar>
+            <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+              <AppShellMain>
+                <EnvironmentCardPanel
+                  cardHeader={cardHeader}
+                  cardHeading={cardHeading}
+                  projectId={projectId}
+                  sessionRef={sessionRef}
+                />
+              </AppShellMain>
+              <AppShellSessionPanel />
+            </EnvironmentOrpcProvider>
+          </AppShellBody>
+        </ContentPanelSessionProvider>
+      </AppShell>
+    </PullRequestDemandProvider>
   );
 }
 

@@ -1,13 +1,12 @@
 import path from "node:path";
 
 import { is } from "@electron-toolkit/utils";
-import { Context, Effect, Layer, Scope } from "effect";
+import { Context, Effect, Scope } from "effect";
 import { BrowserWindow, shell, type WebContents } from "electron";
 
 import icon from "../../../resources/icon.png?asset";
-import { DesktopConfig, startsDesktopInBackground } from "../desktop-config";
-import { APP_ORIGIN, registerAppProtocol } from "./app-protocol";
-import { RendererChannel } from "./renderer-channel";
+import { startsDesktopInBackground } from "../desktop-config";
+import { APP_ORIGIN } from "./app-protocol";
 
 export class MainWindow extends Context.Service<
   MainWindow,
@@ -20,6 +19,7 @@ export class MainWindow extends Context.Service<
 export type MainWindowOptions = {
   readonly devUrl: string | undefined;
   readonly backgroundColor: string;
+  readonly onVisibilityChanged: (visible: boolean) => void;
   readonly connectRenderer: (webContents: WebContents) => () => Promise<void>;
 };
 
@@ -71,6 +71,14 @@ export function makeMainWindow(
         },
       });
       mainWindow = window;
+      const updateVisibility = () =>
+        options.onVisibilityChanged(window.isVisible() && !window.isMinimized());
+      updateVisibility();
+      window.on("show", updateVisibility);
+      window.on("hide", updateVisibility);
+      window.on("minimize", updateVisibility);
+      window.on("maximize", updateVisibility);
+      window.on("restore", updateVisibility);
 
       window.on("ready-to-show", () => {
         if (!background) window.show();
@@ -80,6 +88,7 @@ export function makeMainWindow(
         disconnectRenderer = options.connectRenderer(window.webContents);
       });
       window.on("closed", () => {
+        options.onVisibilityChanged(false);
         disconnectCurrentRenderer();
         if (mainWindow === window) mainWindow = undefined;
       });
@@ -142,17 +151,3 @@ export function makeMainWindow(
 export function rendererRoot(): string {
   return path.join(import.meta.dirname, "../renderer");
 }
-
-export const MainWindowLive = Layer.effect(
-  MainWindow,
-  Effect.gen(function* () {
-    const config = yield* DesktopConfig;
-    const channel = yield* RendererChannel;
-    yield* registerAppProtocol(rendererRoot());
-    return yield* makeMainWindow({
-      devUrl: config.devUrl,
-      backgroundColor: config.windowBackgroundColor,
-      connectRenderer: channel.connect,
-    });
-  }),
-);
