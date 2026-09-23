@@ -27,16 +27,19 @@ export const ToolHeader = ({ className, icon: Icon, children, ...props }: ToolHe
   <CollapsibleTrigger
     className={cn("group", className)}
     render={
-      <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden text-left"
+      >
         <span className="relative flex size-4 shrink-0 items-center justify-center">
-          {Icon && <Icon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+          {Icon && <Icon className="size-4 group-hover:opacity-0 group-focus-visible:opacity-0" />}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
             <SquarePlusIcon className="size-4 group-data-[panel-open]:hidden" />
             <SquareMinusIcon className="hidden size-4 group-data-[panel-open]:block" />
           </div>
         </span>
         <span className="min-w-0 truncate text-sm leading-none">{children}</span>
-      </div>
+      </button>
     }
     {...props}
   />

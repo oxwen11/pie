@@ -84,6 +84,15 @@ describe("ToolBatch", () => {
     await expect.element(first.trigger).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("reveals +/- on hover or keyboard focus, not sticky click focus", async () => {
+    const { trigger } = await renderBatch(completedParts(), false);
+    const reveal = trigger.element().querySelector(".absolute");
+    expect(reveal?.className).toContain("group-hover:opacity-100");
+    expect(reveal?.className).toContain("group-focus-visible:opacity-100");
+    expect(reveal?.className).not.toContain("focus-within");
+    expect(trigger.element().tagName).toBe("BUTTON");
+  });
+
   it("keeps completed batches collapsed by default and toggleable", async () => {
     const { trigger } = await renderBatch(completedParts(), false);
     await expect.element(trigger).toHaveTextContent("Read 1 file");
