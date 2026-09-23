@@ -131,6 +131,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$PNPM_STORE_DIR"
 
+      # Vitest workers import Electron in parallel. Install it once up front so
+      # they cannot race while extracting the same binary into node_modules.
+      - run: pnpm --filter @getpie/desktop exec install-electron
+
       - name: Install Playwright Chromium
         run: |
           browsers="${RUNNER_WORKSPACE}/../.pie-ci-cache/ms-playwright"

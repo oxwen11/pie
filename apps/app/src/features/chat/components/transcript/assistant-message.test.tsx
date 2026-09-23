@@ -2,7 +2,9 @@
 import type { PieUIMessage } from "@getpie/contract";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import "@/index.css";
 
 import { AssistantMessage } from "./assistant-message";
 
@@ -24,19 +26,54 @@ function renderParts(parts: PieUIMessage["parts"]): HTMLDivElement {
 afterEach(() => {
   act(() => root?.unmount());
   container?.remove();
+  document.documentElement.classList.remove("dark");
   root = undefined;
   container = undefined;
 });
 
 describe("AssistantMessage", () => {
-  it("renders AI SDK raster file parts", () => {
-    const src = "data:image/png;base64,aGVsbG8=";
+  it("renders compact AI SDK raster file parts that open a themed preview", async () => {
+    document.documentElement.classList.add("dark");
+    const src =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXkAAAAASUVORK5CYII=";
     const node = renderParts([
       { type: "file", mediaType: "image/png", filename: "result.png", url: src },
     ]);
 
-    expect(node.querySelector("img")?.getAttribute("src")).toBe(src);
-    expect(node.querySelector("img")?.getAttribute("alt")).toBe("result.png");
+    const image = node.querySelector("img");
+    expect(image?.getAttribute("src")).toBe(src);
+    expect(image?.getAttribute("alt")).toBe("result.png");
+    expect(image?.className).toContain("max-h-44");
+    expect(image?.className).toContain("sm:max-w-xs");
+
+    let trigger: HTMLButtonElement | null = null;
+    await act(async () => {
+      await image?.decode();
+      await new Promise(requestAnimationFrame);
+    });
+    await act(async () => {
+      await vi.waitFor(() => {
+        trigger = node.querySelector('button[aria-label="Expand image: result.png"]');
+        expect(trigger).not.toBeNull();
+      });
+      trigger?.click();
+    });
+
+    await vi.waitFor(() => {
+      const dialog = document.body.querySelector("dialog[open]");
+      const overlay = dialog?.querySelector('[data-rmiz-modal-overlay="visible"]');
+      const unzoom = dialog?.querySelector("[data-rmiz-btn-unzoom]");
+      expect(dialog?.classList.contains("chat-image-preview-dialog")).toBe(true);
+      expect(dialog?.querySelector("img")?.getAttribute("src")).toBe(src);
+      if (!(overlay instanceof HTMLElement) || !(unzoom instanceof HTMLElement)) {
+        throw new Error("Image preview did not finish opening");
+      }
+      expect(getComputedStyle(overlay).backgroundColor).toBe(
+        getComputedStyle(document.body).backgroundColor,
+      );
+      expect(getComputedStyle(unzoom).width).toBe("44px");
+      expect(getComputedStyle(unzoom).height).toBe("44px");
+    });
   });
 
   it("does not render SVG file parts", () => {

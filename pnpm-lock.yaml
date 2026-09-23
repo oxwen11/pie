@@ -457,6 +457,9 @@ importers:
       react-error-boundary:
         specifier: 'catalog:'
         version: 6.1.5(@types/react@19.3.0)(react@19.3.0)
+      react-medium-image-zoom:
+        specifier: 5.4.9
+        version: 5.4.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react-resizable-panels:
         specifier: ^4.12.4
         version: 4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -7709,6 +7712,12 @@ packages:
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
+
+  react-medium-image-zoom@5.4.9:
+    resolution: {integrity: sha512-czBdTbJI6JEbqeRIT5M8D3j7TrffBfo00U0P0lzzd19usj8PiR1yPH7PK/vQlwBE/Sv9YFdJGN6XauJPi4jRyg==}
+    peerDependencies:
+      react: ^19.3.0
+      react-dom: ^19.3.0
 
   react-resizable-panels@4.12.4:
     resolution: {integrity: sha512-SOsSj4e9U7vxL15MbgTfl35IO4vxSW4Xb0b1gtJVbRPWv7FOezcgOA00Mi0jP8XqC3y7jOQxpsGs/9zLKHPitA==}
@@ -16063,6 +16072,11 @@ snapshots:
 
   react-is@17.0.2:
     optional: true
+
+  react-medium-image-zoom@5.4.9(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   react-resizable-panels@4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
