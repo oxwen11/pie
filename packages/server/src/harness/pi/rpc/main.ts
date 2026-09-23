@@ -1,6 +1,6 @@
 /**
  * Pie-owned Pi RPC child. Session construction uses the published SDK;
- * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v0.87.0).
+ * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v0.87.1).
  *
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
  * extension bind/UI/protocol here, and extension loading via

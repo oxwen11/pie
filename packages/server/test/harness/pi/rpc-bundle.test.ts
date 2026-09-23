@@ -116,7 +116,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               assert.equal(getModel("xai", "grok-4.6").provider, "xai");
               assert.ok(builtInExtensions.some((extension) => extension.name === "llama.cpp"));
               assert.equal(getPackageDir(), path.join(process.cwd(), "runtime"));
-              assert.equal(VERSION, "0.87.0");
+              assert.equal(VERSION, "0.87.1");
               for (const file of [getReadmePath(), path.join(getDocsPath(), "extensions.md"),
                 path.join(getExamplesPath(), "sdk/06-extensions.ts"),
                 path.join(getPackageDir(), "CHANGELOG.md")]) {
