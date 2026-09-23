@@ -71,8 +71,7 @@ the same files. Do not copy a skill into `.cursor/skills` as a second original.
 workspace path` (via `ProjectService`) and error-code mapping. Pi sees `cwd`,
   never `projectId`.
 - **`packages/server/src/rpc/runtime.ts`** is the composition root: `PiProcessLayer`
-  constructs `PiProcess`, `PiAgent` wraps it with `cachePiAgentAvailability` (one
-  `--version` probe per server lifetime), then the session manager and service
+  constructs `PiProcess`, then `PiAgent`, then the session manager and service
   layers consume `PiAgent` directly.
 - `EventBusLayer` must stay a single Layer reference across publish and
   subscribe wiring — Effect memoizes layers by reference, and a second
