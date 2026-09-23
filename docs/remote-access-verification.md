@@ -2,7 +2,7 @@
 
 Verify the actual transport from an independent client, not just daemon health
 on the host. Use isolated Pie homes and the repository's
-[verification evidence rules](../.agents/rules/verify-evidence.md).
+[acceptance and evidence rules](../.agents/rules/workflows/acceptance.md).
 Old machine addresses, ports, and one-off run results are not a reusable test setup.
 
 ## Setup

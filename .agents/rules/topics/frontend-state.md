@@ -44,7 +44,7 @@
 
 ## Task guides
 
-[React checks](../skills/react-doctor/SKILL.md) ·
-[Runtime performance](../skills/performance/SKILL.md) ·
-[Read-only audit](../skills/improve-react/SKILL.md).
-[Test pruning](../skills/prune-tests/SKILL.md) is user-invoked only.
+[React checks](../../skills/react-doctor/SKILL.md) ·
+[Runtime performance](../../skills/performance/SKILL.md) ·
+[Read-only audit](../../skills/improve-react/SKILL.md).
+[Test pruning](../../skills/prune-tests/SKILL.md) is user-invoked only.

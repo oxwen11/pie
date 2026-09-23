@@ -9,7 +9,7 @@ does not attempt to enumerate package-manager/build outputs, test fixtures, or
 remote services such as GitHub.
 
 The design approval gate for adding or changing any item in this inventory is
-in [.agents/rules/persistence.md](../.agents/rules/persistence.md) under
+in [.agents/rules/topics/persistence.md](../.agents/rules/topics/persistence.md) under
 **Host-write design gate**.
 
 ## Ownership model

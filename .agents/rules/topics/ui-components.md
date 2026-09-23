@@ -9,7 +9,7 @@
   than assuming `asChild`. Preserve supported caller props, refs, and handlers.
 - `packages/ui/src/components/*` is vendored from coss and overwritten on refresh;
   `carousel` and `splitter` are local exceptions. Fix other components through
-  wrappers or upstream. See the [vendoring ADR](../../docs/adr/0001-vendor-base-ui-components-from-coss-registry.md).
+  wrappers or upstream. See the [vendoring ADR](../../../docs/adr/0001-vendor-base-ui-components-from-coss-registry.md).
 - Preserve shared component contracts and theme behavior. Follow the active
   lint configuration; do not add global tokens or shared variants solely to
   silence a feature-local styling diagnostic.
@@ -28,7 +28,7 @@ rather than one widget controlled by a growing collection of boolean/config prop
 - Reuse existing primitives. A simple button does not need artificial subcomponents
   or a context with no shared state.
 
-Examples: [composition patterns](../skills/vercel-composition-patterns/SKILL.md).
+Examples: [composition patterns](../../skills/vercel-composition-patterns/SKILL.md).
 
 ## Component best practices
 
@@ -47,4 +47,4 @@ Examples: [composition patterns](../skills/vercel-composition-patterns/SKILL.md)
   arbitrary consumer count; consider existing consumers before changing it.
 
 Review both these practices and actual usability. Runtime proof follows
-[verify-evidence.md](verify-evidence.md).
+[acceptance.md](../workflows/acceptance.md).

@@ -5,39 +5,40 @@ Web UI and Electron app for the local Pi coding agent. TypeScript, pnpm, Turbore
 ## Core principles
 
 - Use the simplest solution that meets current needs; keep changes focused.
+- Design and review by **cost of correction**: consider users, callers, existing
+  data, and recovery, not just editing code. Keep reversible choices simple;
+  confirm costly-to-reverse decisions with the Developer before implementation.
+- **Security is a mandatory review gate**, regardless of correction cost. Never
+  trade away correctness or data integrity; unverified required behavior is not a pass.
 - Follow Developer-selected patterns and documented best practices. Agent discretion
-  applies to genuinely open choices; do not silently discard agreed directions.
-  Recommendations guide decisions, while hard constraints need a concrete basis.
-- Spend effort where mistakes are expensive to undo. Confirm external contracts,
-  persistent formats, and irreversible effects with the Developer before implementation.
-- Never trade away correctness, security, or data integrity. Verify changed
-  behavior and report gaps; unverified work is not a pass.
+  applies to genuinely open choices, not silently discarding agreed directions.
 
-## Read as needed
+## Workflow — start with the current stage
 
-Before acting, read the guidance matching the task below. This applies to both
-implementation and review. Follow relevant links for detail; do not load the
-whole rules or skills directory. Read additional guidance when scope expands.
+Read the matching stage, then the topics affected by the task. Follow relevant
+links for detail; do not preload the whole rules or skills directory. Revisit the
+applicable guidance when the scope changes.
 
-| Task                                           | Read                                                                                 |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Design, refactoring, review, or acceptance     | [Cost of correction](.agents/rules/cost-of-correction.md)                            |
-| Product boundaries or session ownership        | [Architecture](.agents/rules/architecture.md)                                        |
-| Adding or changing host writes                 | [Persistence](.agents/rules/persistence.md), before proposing a plan                 |
-| Effect, RPC, or runtime integration            | [Runtime stack](.agents/rules/stack.md)                                              |
-| Frontend state, routing, or React checks       | [Frontend state](.agents/rules/frontend-state.md)                                    |
-| UI components or styling                       | [UI components](.agents/rules/ui-components.md)                                      |
-| CLI behavior                                   | [CLI](.agents/rules/cli.md)                                                          |
-| Desktop implementation                         | [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md), before touching `apps/desktop/src` |
-| Build, lint, tests, dependencies, or dev setup | [Toolchain](.agents/rules/toolchain.md)                                              |
-| Runtime verification or UI evidence            | [Verification and evidence](.agents/rules/verify-evidence.md)                        |
-| Splitting work or preparing PRs                | [Pull requests](.agents/rules/pull-requests.md), before coding multi-slice work      |
-| Asked to review and merge PRs                  | [Review and merge](.agents/rules/review-and-merge-pr.md)                             |
-| Naming session-domain concepts                 | [CONTEXT.md](CONTEXT.md)                                                             |
-| Architectural decisions                        | [docs/adr/](docs/adr/)                                                               |
-| Session streaming                              | [Runtime and recovery ADR](docs/adr/0009-pi-session-runtime-and-recovery.md)         |
+| Stage                                                            | Entry point                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------ |
+| Design: requirements, decisions, and implementation approach     | [design.md](.agents/rules/workflows/design.md)         |
+| Review: correctness, security, compatibility, and best practices | [review.md](.agents/rules/workflows/review.md)         |
+| Acceptance: checks, failure cases, and evidence                  | [acceptance.md](.agents/rules/workflows/acceptance.md) |
+| Delivery: work slices, PRs, CI, and merging                      | [delivery.md](.agents/rules/workflows/delivery.md)     |
 
-Use [docs/README.md](docs/README.md) for documentation layout and lifecycle.
-Proposals and acceptance work live in `docs/rfc/`; remediation tickets in `todos/`.
-[Remote verification](docs/remote-access-verification.md) covers transport-specific proof.
-Capture lasting decisions before deleting completed plans; use Git history, not an archive directory.
+## Topics — read when affected
+
+| Concern                                                    | Guidance                                                                                             |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Package boundaries, contracts, or session ownership        | [Architecture](.agents/rules/topics/architecture.md)                                                 |
+| Host writes, data formats, compatibility, or migration     | [Persistence](.agents/rules/topics/persistence.md), before proposing a plan                          |
+| Trust boundaries, permissions, untrusted input, or secrets | [Security](.agents/rules/topics/security.md)                                                         |
+| UI composition, styling, accessibility, state, or routing  | [Components](.agents/rules/topics/ui-components.md), [state](.agents/rules/topics/frontend-state.md) |
+| Effect, RPC, or runtime integration                        | [Runtime stack](.agents/rules/topics/runtime.md)                                                     |
+| CLI behavior                                               | [CLI](.agents/rules/topics/cli.md)                                                                   |
+| Build, lint, tests, dependencies, or dev setup             | [Toolchain](.agents/rules/topics/toolchain.md)                                                       |
+| Desktop implementation                                     | [apps/desktop/AGENTS.md](apps/desktop/AGENTS.md), before touching `apps/desktop/src`                 |
+
+Read [CONTEXT.md](CONTEXT.md) before naming session-domain concepts.
+[docs/README.md](docs/README.md) indexes decisions, proposals, operational guides,
+and documentation lifecycle; use it to locate relevant ADRs/RFCs. Remediation tickets live in `todos/`.

@@ -93,7 +93,7 @@ Existing e2e worth knowing:
 
 ## Evidence
 
-Desktop is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+Desktop is a UI surface, so `.agents/rules/workflows/acceptance.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
 
 ```bash
 pnpm exec pie-verify desktop evidence init

@@ -1,4 +1,4 @@
-# Pull requests
+# Delivery
 
 - One concern per PR. Split large work into named, ordered slices before coding.
   A small fix stays one PR; multiple slices must form a stack, not disconnected PRs.
@@ -8,4 +8,4 @@
   and merge PRs, follow [review-and-merge-pr.md](review-and-merge-pr.md).
 - UI changes require screenshots **and** video attached to the issue or PR via
   `gh issue|pr create|edit|comment --attach <file>`. Follow
-  [verify-evidence.md](verify-evidence.md); never commit evidence files.
+  [acceptance.md](acceptance.md); never commit evidence files.

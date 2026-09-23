@@ -33,7 +33,7 @@ Keep decisions and open work, not a permanent record of the work that produced t
 - [Host persistence inventory](host-persistence.md) — owners, paths, formats, and the host-write review gate.
 - [Remote access verification](remote-access-verification.md) — transport-specific proof and isolation checks.
 - Runtime verification recipes: [web](../.agents/skills/verify-pie/SKILL.md), [CLI](../.agents/skills/verify-pie-cli/SKILL.md), and [Desktop](../.agents/skills/verify-pie-desktop/SKILL.md).
-- [Evidence requirements](../.agents/rules/verify-evidence.md) and [numbered remediation tickets](../todos/).
+- [Acceptance and evidence](../.agents/rules/workflows/acceptance.md) and [numbered remediation tickets](../todos/).
 
 ## Lifecycle
 

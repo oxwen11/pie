@@ -44,10 +44,10 @@ Other changes must fit the initial scope below, then pass steps 2 and 3.
 
 | Allowed change | Reviewer must verify | Must remain unchanged |
 | --- | --- | --- |
-| Local spacing, truncation, icons or labels in the existing Project import dialog | Follow [import-project](../skills/verify-pie/features/import-project.md): empty home → browse sample folder → import → correct sidebar row and stored path; repeat import without duplication. Check changed presentation at narrow/wide widths and with long names. | Browsing/selection/registration logic, path validation, permissions, RPC and storage. |
-| Existing Session rename dialog's input, validation, confirm or cancel UI | Follow [sidebar-sessions](../skills/verify-pie/features/sidebar-sessions.md): rename updates row, heading and stored title for the same Session; reopen/reload preserves it; cancel or empty/whitespace input leaves the stored title unchanged. | Rename RPC, server writes, event/cache synchronization, navigation, archive/delete behavior. |
-| Local presentation of the existing Files tree or read-only text preview | Follow [content-panel](../skills/verify-pie/features/content-panel.md): open Files → select README → correct filename and actual file contents → hide/show; Session URL and chat remain intact. Check changed presentation at narrow/wide widths and with long names/content. | File read/path resolution, editing, shared panel/tab lifecycle, persistence, Terminal and Git Review. |
-| Descriptive text in existing CLI help | Follow [help-and-flags](../skills/verify-pie-cli/features/help-and-flags.md): root and daemon help display the correct commands/options; exit successfully without starting a daemon. | Command/flag definitions, defaults, parsing, exit codes, non-help stdout, daemon and execution behavior. |
+| Local spacing, truncation, icons or labels in the existing Project import dialog | Follow [import-project](../../skills/verify-pie/features/import-project.md): empty home → browse sample folder → import → correct sidebar row and stored path; repeat import without duplication. Check changed presentation at narrow/wide widths and with long names. | Browsing/selection/registration logic, path validation, permissions, RPC and storage. |
+| Existing Session rename dialog's input, validation, confirm or cancel UI | Follow [sidebar-sessions](../../skills/verify-pie/features/sidebar-sessions.md): rename updates row, heading and stored title for the same Session; reopen/reload preserves it; cancel or empty/whitespace input leaves the stored title unchanged. | Rename RPC, server writes, event/cache synchronization, navigation, archive/delete behavior. |
+| Local presentation of the existing Files tree or read-only text preview | Follow [content-panel](../../skills/verify-pie/features/content-panel.md): open Files → select README → correct filename and actual file contents → hide/show; Session URL and chat remain intact. Check changed presentation at narrow/wide widths and with long names/content. | File read/path resolution, editing, shared panel/tab lifecycle, persistence, Terminal and Git Review. |
+| Descriptive text in existing CLI help | Follow [help-and-flags](../../skills/verify-pie-cli/features/help-and-flags.md): root and daemon help display the correct commands/options; exit successfully without starting a daemon. | Command/flag definitions, defaults, parsing, exit codes, non-help stdout, daemon and execution behavior. |
 
 The UI cases apply only to feature-local code in `apps/app`, not shared
 `packages/ui`, global CSS/theme or shell layout. The SPA is used by both Web
@@ -95,16 +95,16 @@ this step. The reviewer must run the relevant flow on the reviewed code:
    and build the affected artifacts through Turbo there. Confirm the running
    instance and build belong to this worktree/revision. Verify can reuse old
    runs/builds; `launch --replace` alone does not establish freshness.
-2. Follow the applicable [web](../skills/verify-pie/SKILL.md),
-   [CLI](../skills/verify-pie-cli/SKILL.md), or
-   [Desktop](../skills/verify-pie-desktop/SKILL.md) recipe:
+2. Follow the applicable [web](../../skills/verify-pie/SKILL.md),
+   [CLI](../../skills/verify-pie-cli/SKILL.md), or
+   [Desktop](../../skills/verify-pie-desktop/SKILL.md) recipe:
    **launch → doctor → drive → capture evidence → cleanup**.
    Run the relevant regression tests and affected existing user paths too.
 3. Compare actual results with the expected results from review. Cover affected
    P0 behavior: connection, chat creation, task completion, Stop/queue/Steer,
    switching/recovery/history, and safe workspace/data operations. Do not
    replay unrelated features, but do not omit affected failure paths.
-4. Follow [verify-evidence.md](verify-evidence.md): UI needs before/after
+4. Follow [acceptance.md](acceptance.md): UI needs before/after
    screenshots and video; other flows need command results, logs or side-effect
    evidence. Attach the reviewer's evidence and tested SHA to the PR.
 

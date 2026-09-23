@@ -20,8 +20,8 @@
 - `pnpm clean` includes `git clean -xdf node_modules dist .turbo`, not a repo-wide
   clean. Review the target before using destructive cleanup.
 - Cloud setup comes from `.cursor/environment.json` (mise + locked pnpm install).
-  Follow [the web dev recipe](../skills/verify/SKILL.md): Vite is 4190, API 4180,
-  daemon 4000. For isolated verification, use [verify-evidence.md](verify-evidence.md).
+  Follow [the web dev recipe](../../skills/verify/SKILL.md): Vite is 4190, API 4180,
+  daemon 4000. For isolated verification, use [acceptance.md](../workflows/acceptance.md).
 
 ## Dependencies and checks
 
@@ -52,7 +52,7 @@
   Git fixtures contend; do not enable it without isolating those fixtures.
 - Use strict assertions. If using Node assertions, import `node:assert/strict`,
   not the coercive `node:assert`. Follow nearby tests for assertion style;
-  see [stack.md](stack.md) for Effect resource lifetime and clock behavior.
+  see [runtime.md](runtime.md) for Effect resource lifetime and clock behavior.
 - Verify owns isolated runs through `tools/verify`, not the product CLI. Use the
   mise-provided `agent-browser` through the repo shim after launch; it binds the
   correct run and recording. Do not replace it with a global npm installation.

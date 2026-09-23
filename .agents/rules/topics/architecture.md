@@ -16,7 +16,7 @@ Dependencies flow from app/runtime packages toward shared leaves, not back:
 | `packages/ssh` | SSH launch and loopback tunnels; no Electron, renderer, or oRPC |
 | `packages/tailscale` | Discovery/Serve integration; no Electron, renderer, or oRPC; never log CLI stderr |
 | `apps/app` | SPA, also mounted by Desktop through its public root exports |
-| `apps/desktop` | Electron host; read its [AGENTS.md](../../apps/desktop/AGENTS.md) before editing |
+| `apps/desktop` | Electron host; read its [AGENTS.md](../../../apps/desktop/AGENTS.md) before editing |
 | `packages/pie` | Product CLI (`pie`); delegates runtime to the server |
 | `tools/` | Build, lint, and verification tooling, not product runtime |
 
@@ -37,11 +37,11 @@ extraction does not require expanding a package's public surface.
   and maps errors; avoid duplicating that domain logic there.
 - `packages/server/src/rpc/runtime.ts` composes the runtime. Session code lives
   under `packages/server/src/harness/`; the directory name is legacy, not support
-  for multiple agents. Layer lifetime constraints are in [stack.md](stack.md).
+  for multiple agents. Layer lifetime constraints are in [runtime.md](runtime.md).
 
-Read [CONTEXT.md](../../CONTEXT.md) for domain names and [ADRs](../../docs/adr/)
+Read [CONTEXT.md](../../../CONTEXT.md) for domain names and [ADRs](../../../docs/adr/)
 for settled decisions. Session runtime and streaming changes also require
-[ADR 0009](../../docs/adr/0009-pi-session-runtime-and-recovery.md).
+[ADR 0009](../../../docs/adr/0009-pi-session-runtime-and-recovery.md).
 
 ## Specialized ownership
 
