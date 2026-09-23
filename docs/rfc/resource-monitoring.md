@@ -245,7 +245,7 @@ Sidecar 的价值是 daemon 卡住时仍能观察，不是取得 OS 原本不可
 
 每个 case 报告 commit、产物版本、平台/架构/runtime、启动方式、开关、步骤时间、断言实测值和 passed/failed/blocked。保存原始 JSONL、文件清单/字节数、独立进程观察、health 和必要日志，按 `writer.instanceId + sampleSequence` 关联，不跨实例只比序号。夹具和实际采样证据分开。
 
-Desktop 按[证据规则](../../.agents/rules/verify-evidence.md)保留操作前后截图及全过程短视频，采样仍以磁盘证据为准；CLI 保存日志及 HTTP/磁盘结果。Cleanup 前保存至既有 evidence 目录，不泄露 token，不复制未脱敏 daemon.pid，截图/视频不提交 Git，随 PR 附件交付。失败也恢复暂停进程、停止受控子进程并保存证据；cleanup 后确认本轮 daemon/sidecar/Electron/测试子进程已退出，不能只删目录。
+Desktop 按[证据规则](../../.agents/rules/workflows/acceptance.md)保留操作前后截图及全过程短视频，采样仍以磁盘证据为准；CLI 保存日志及 HTTP/磁盘结果。Cleanup 前保存至既有 evidence 目录，不泄露 token，不复制未脱敏 daemon.pid，截图/视频不提交 Git，随 PR 附件交付。失败也恢复暂停进程、停止受控子进程并保存证据；cleanup 后确认本轮 daemon/sidecar/Electron/测试子进程已退出，不能只删目录。
 
 没有真实 Pi、打包态或执行证据就逐项报告缺口，不把文档检查或单测称为端到端通过。后续补齐按合同/存储/接入/分发拆小 PR，用 `gh stack`，每片同步验收，不再恢复旧的整套实施计划。
 

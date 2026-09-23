@@ -89,4 +89,4 @@ CDP-synthesized Enter does **not** submit TipTap — click the send button.
 The web app is a UI surface: every proof needs before/after screenshots
 (`pnpm exec pie-verify web evidence screenshot <name>`) **and** the automatic
 numbered 60 fps recording. Run `evidence init` before each validation to rotate clips; normal cleanup stops and flushes the current video. See
-`.agents/rules/verify-evidence.md`.
+`.agents/rules/workflows/acceptance.md`.

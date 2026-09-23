@@ -39,5 +39,5 @@ than persisting a second event log.
 
 See [metadata ownership](0002-session-info-storage-floor-harness-overlay.md),
 [history folding](0003-pi-history-role-segmentation.md), and the current
-[package rules](../../.agents/rules/architecture.md). Environment-bound client
+[package rules](../../.agents/rules/topics/architecture.md). Environment-bound client
 routing is covered separately by [ADR 0005](0005-environment-rpc-routing.md).

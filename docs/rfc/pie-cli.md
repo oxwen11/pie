@@ -1,7 +1,7 @@
 # Pie CLI: remaining command surfaces
 
 Status: proposed extensions to the existing CLI, not a command reference.
-Machine-interface and addressing rules live in [CLI rules](../../.agents/rules/cli.md);
+Machine-interface and addressing rules live in [CLI rules](../../.agents/rules/topics/cli.md);
 use `pie --help` and each command's `--help` for the implemented surface.
 
 ## Current baseline

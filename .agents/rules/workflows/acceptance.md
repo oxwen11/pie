@@ -1,10 +1,24 @@
-# Runtime verification and evidence
+# Acceptance
 
-Use the matching [Web](../skills/verify-pie/SKILL.md),
-[CLI](../skills/verify-pie-cli/SKILL.md), or
-[Desktop](../skills/verify-pie-desktop/SKILL.md) recipe:
+## Match checks to the change
+
+- Verify the agreed behavior and each identified high-cost risk. Cover existing
+  clients/data, compatibility, migration, interruption/retry, and recovery where
+  relevant, rather than only a fresh-install happy path.
+- Verify affected [security boundaries](../topics/security.md), including denial and failure
+  behavior. Unresolved security defects block acceptance regardless of correction cost.
+- Use focused checks and the appropriate test/runtime surface; do not invent a
+  speculative suite. Follow [toolchain.md](../topics/toolchain.md) for test commands.
+- Report what ran, observed results, evidence, and gaps. Unverified required
+  criteria remain incomplete; tests and live runtime proof are not interchangeable.
+
+## Runtime verification
+
+Use the matching [Web](../../skills/verify-pie/SKILL.md),
+[CLI](../../skills/verify-pie-cli/SKILL.md), or
+[Desktop](../../skills/verify-pie-desktop/SKILL.md) recipe:
 launch → doctor → drive → capture evidence → cleanup.
-The [web dev recipe](../skills/verify/SKILL.md) covers the two-process local setup.
+The [web dev recipe](../../skills/verify/SKILL.md) covers the two-process local setup.
 
 ## Required proof
 
