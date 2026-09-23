@@ -95,13 +95,15 @@ not 4000 (daemon). See `.agents/skills/verify`.
 
 ## Going deeper
 
+- `docs/README.md` — documentation index, reading order, and filing conventions
 - `CONTEXT.md` — glossary. Read it before naming anything in the session domain;
   it also lists the words to avoid.
-- `docs/adr/` — settled decisions (component vendoring; session field ownership,
-  which supersedes the older `docs/design/session-agent-design.md` on `cwd`)
-- `docs/design/`, `docs/2026-*.md` — designs in flight
-- `docs/wayfinder/session-streaming-refactor/map.md` — streaming decisions that
-  are closed for debate
+- `docs/adr/` — lasting decisions; session runtime and recovery are in ADR 0009
+- `docs/rfc/` — proposed changes, supporting work, and acceptance requirements; not an archive
+- `docs/host-persistence.md` — host-write inventory and review gate
+- `docs/remote-access-verification.md` — remote transport proof checklist
+- Completed/superseded process documents are deleted after their decisions and
+  remaining work are captured. Use Git history; do not create `docs/archive/`.
 - `.agents/skills/verify` — short build/launch notes for the two-process web dev pair
 - `.agents/skills/verify-pie` — web recipe; invoke `pnpm exec pie-verify web`
 - `.agents/skills/verify-pie-cli` — `pie` / `pie daemon` / `pie serve` recipe; invoke `pnpm exec pie-verify cli`
