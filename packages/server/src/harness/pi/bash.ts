@@ -74,9 +74,8 @@ function resolveTimeoutMs(timeout: number | undefined): number | undefined {
   return timeoutMs;
 }
 
-function exitCodeOf(child: childProcess.ChildProcess, code: number | null): number {
+function exitCodeOf(signalCode: NodeJS.Signals | null, code: number | null): number {
   if (code !== null) return code;
-  const signalCode = child.signalCode;
   return signalCode ? 128 + (os.constants.signals[signalCode] ?? 0) : 1;
 }
 
@@ -138,6 +137,179 @@ export interface PieBashResult {
   details?: BashToolDetails;
 }
 
+/** Same idle grace as Pi's waitForChildProcess. A descendant can hold the pipe after exit. */
+const PIPE_IDLE_MS = 100;
+
+declare const Bun: {
+  spawn(options: {
+    cmd: string[];
+    cwd: string;
+    env: Record<string, string>;
+    stdin: "ignore" | "pipe";
+    stdout: "pipe";
+    stderr: "pipe";
+    detached?: boolean;
+  }): {
+    pid: number;
+    signalCode: NodeJS.Signals | null;
+    exited: Promise<number>;
+    stdout: ReadableStream<Uint8Array>;
+    stderr: ReadableStream<Uint8Array>;
+    stdin: {
+      write(data: string): number | Promise<number>;
+      end(): number | Promise<number>;
+    } | null;
+  };
+};
+
+interface ShellProc {
+  pid: number;
+  signalCode: () => NodeJS.Signals | null;
+  onData: (handler: (data: Uint8Array) => void) => void;
+  done: Promise<number | null>;
+  writeStdin?: (command: string) => void;
+}
+
+function stringEnv(env: NodeJS.ProcessEnv) {
+  const next: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) next[key] = value;
+  }
+  return next;
+}
+
+function waitBun(
+  proc: ReturnType<typeof Bun.spawn>,
+  onChunk: (data: Uint8Array) => void,
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    let exitCode: number | null = null;
+    let exited = false;
+    let open = 2;
+    let idle: NodeJS.Timeout | undefined;
+    let settled = false;
+    const readers = [proc.stdout.getReader(), proc.stderr.getReader()];
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (idle) clearTimeout(idle);
+      for (const reader of readers) void reader.cancel().catch(() => undefined);
+      resolve(exitCode);
+    };
+    const arm = () => {
+      if (!exited || settled) return;
+      if (open === 0) return finish();
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(finish, PIPE_IDLE_MS);
+    };
+    const pump = async (reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> => {
+      const next = await reader.read();
+      if (settled) return;
+      if (next.done) {
+        open -= 1;
+        arm();
+        return;
+      }
+      onChunk(next.value);
+      arm();
+      return pump(reader);
+    };
+    for (const reader of readers) void pump(reader).catch(() => undefined);
+    void proc.exited.then((code) => {
+      exitCode = code;
+      exited = true;
+      arm();
+      return undefined;
+    });
+  });
+}
+
+function spawnBun(
+  shell: string,
+  args: string[],
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  fromStdin: boolean,
+): ShellProc {
+  const proc = Bun.spawn({
+    cmd: fromStdin ? [shell, ...args] : [shell, ...args, command],
+    cwd,
+    env: stringEnv(env),
+    stdin: fromStdin ? "pipe" : "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    detached: process.platform !== "win32",
+  });
+  const pending: Uint8Array[] = [];
+  let onChunk: ((data: Uint8Array) => void) | undefined;
+  const emit = (data: Uint8Array) => {
+    if (onChunk) onChunk(data);
+    else pending.push(data);
+  };
+  return {
+    pid: proc.pid,
+    signalCode: () => proc.signalCode,
+    onData: (handler) => {
+      onChunk = handler;
+      for (const chunk of pending.splice(0)) handler(chunk);
+    },
+    done: waitBun(proc, emit),
+    writeStdin: fromStdin
+      ? (text) => {
+          void proc.stdin?.write(text);
+          void proc.stdin?.end();
+        }
+      : undefined,
+  };
+}
+
+function spawnNode(
+  shell: string,
+  args: string[],
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  fromStdin: boolean,
+): ShellProc {
+  const child = childProcess.spawn(shell, fromStdin ? args : [...args, command], {
+    cwd,
+    detached: process.platform !== "win32",
+    env,
+    stdio: [fromStdin ? "pipe" : "ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  if (!child.pid) throw new Error("Failed to start command");
+  return {
+    pid: child.pid,
+    signalCode: () => child.signalCode,
+    onData: (handler) => {
+      child.stdout?.on("data", handler);
+      child.stderr?.on("data", handler);
+    },
+    done: waitForChildProcess(child),
+    writeStdin: fromStdin
+      ? (text) => {
+          child.stdin?.on("error", () => undefined);
+          child.stdin?.end(text);
+        }
+      : undefined,
+  };
+}
+
+function spawnShell(
+  shell: string,
+  args: string[],
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  fromStdin: boolean,
+): ShellProc {
+  return process.versions.bun
+    ? spawnBun(shell, args, command, cwd, env, fromStdin)
+    : spawnNode(shell, args, command, cwd, env, fromStdin);
+}
+
 export async function executePieBash(input: {
   command: string;
   cwd: string;
@@ -161,23 +333,16 @@ export async function executePieBash(input: {
 
   const shellConfig = getShellConfig();
   const fromStdin = shellConfig.commandTransport === "stdin";
-  const child = childProcess.spawn(
+  const shell = spawnShell(
     shellConfig.shell,
-    fromStdin ? shellConfig.args : [...shellConfig.args, input.command],
-    {
-      cwd: input.cwd,
-      detached: process.platform !== "win32",
-      env: input.env,
-      stdio: [fromStdin ? "pipe" : "ignore", "pipe", "pipe"],
-      windowsHide: true,
-    },
+    shellConfig.args,
+    input.command,
+    input.cwd,
+    input.env,
+    fromStdin,
   );
-  if (fromStdin) {
-    child.stdin?.on("error", () => undefined);
-    child.stdin?.end(input.command);
-  }
-  const pid = child.pid;
-  if (!pid) throw new Error("Failed to start command");
+  shell.writeStdin?.(input.command);
+  const pid = shell.pid;
   livePids.add(pid);
 
   const logPath = input.logPath(pid);
@@ -198,8 +363,7 @@ export async function executePieBash(input: {
     if (!captureTail) return;
     tail = keepTail(tail + decoder.decode(data, { stream: true }));
   };
-  child.stdout?.on("data", onData);
-  child.stderr?.on("data", onData);
+  shell.onData(onData);
 
   let killReason: "abort" | "timeout" | undefined;
   const kill = (reason: "abort" | "timeout") => {
@@ -216,7 +380,7 @@ export async function executePieBash(input: {
   }
 
   const settled = { finished: false };
-  const exited = waitForChildProcess(child).then(
+  const exited = shell.done.then(
     (code) => {
       settled.finished = true;
       return { ok: true as const, code };
@@ -256,7 +420,7 @@ export async function executePieBash(input: {
       );
     }
     if (!result.ok) throw result.error;
-    const code = exitCodeOf(child, result.code);
+    const code = exitCodeOf(shell.signalCode(), result.code);
     if (code !== 0) throw new Error(appendStatus(text, `Command exited with code ${code}`));
     return { text, details: rendered.details };
   };
@@ -277,7 +441,7 @@ export async function executePieBash(input: {
         killReason === "timeout"
           ? `timed out after ${input.timeoutSeconds} seconds`
           : result.ok
-            ? `finished with exit code ${exitCodeOf(child, result.code)}`
+            ? `finished with exit code ${exitCodeOf(shell.signalCode(), result.code)}`
             : `failed to start: ${result.error instanceof Error ? result.error.message : String(result.error)}`;
       const message = `Background command ${pid} ${status}. Output: ${logPath}`;
       input.onBackgroundExit?.(message);
