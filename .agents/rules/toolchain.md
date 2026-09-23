@@ -82,7 +82,7 @@
   via `vitest.browser.config.mts`. `apps/app/vitest.config.ts` is node-only;
   `apps/app/vitest.browser.config.ts` has `app-browser` plus `e2e/**/*.e2e.test.tsx`
   (Vitest browser mode: tests run in a Chromium iframe, `mountApp` renders
-  `AppInterface` against isolated `pie serve` + fake-pi + fake-gh). Playwright
+  `AppInterface` against isolated `pie serve` + fake-gh; conversation cases seed an e2e provider for real pie-pi-process). Playwright
   (`@playwright/test`) is Desktop Electron only — `pnpm e2e` / `turbo run e2e`.
   Vitest browser mode is not `@playwright/test` and cannot launch Electron.
   Do not add jsdom. The pie artifact test reads
@@ -97,8 +97,11 @@
   worktree fixtures contend on temp dirs — do not flip it without splitting
   those files into their own project — and uses a 30s `testTimeout` because
   those same git fixtures stall under load. `apps/desktop/e2e/` is Playwright
-  Electron and runs in Code check (`pnpm e2e` under xvfb). `tools/testing/fake-pi.mjs` is referenced by relative
-  path from server tests, CLI tests, desktop e2e, and app e2e. `@effect/vitest` still peers
+  Electron and runs in Code check (`pnpm e2e` under xvfb). Conversation/sync
+  e2e seeds `$PIE_HOME/agent` (`PI_CODING_AGENT_DIR`) with
+  `tools/testing/fake-e2e-provider.ts` and runs real pie-pi-process;
+  connect/daemon/MessagePort e2e does not. `tools/testing/fake-pi.mjs` remains
+  for unit/RPC harnesses that still swap the executable. `@effect/vitest` still peers
   `vitest <5`; `packageExtensions` widens that until the Effect catalog
   moves.
 - **Verify CLI:** `tools/verify` (`@getpie/verify`, bin `pie-verify`, root
