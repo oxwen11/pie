@@ -1,4 +1,5 @@
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@getpie/ui/ai-elements/reasoning";
+import { cn } from "@getpie/ui/lib/utils";
 import type { ReasoningUIPart } from "ai";
 
 import { shouldRenderReasoningPart } from "./should-render-reasoning";
@@ -8,17 +9,23 @@ import { shouldRenderReasoningPart } from "./should-render-reasoning";
 export function ReasoningPart({
   part,
   isMessageStreaming = false,
+  className,
 }: {
   part: ReasoningUIPart;
   /** True while the parent assistant turn is still streaming. */
   isMessageStreaming?: boolean;
+  className?: string;
 }) {
   const text = part.text ?? "";
   const isReasoningStreaming = part.state === "streaming";
   if (!shouldRenderReasoningPart(part, isMessageStreaming)) return null;
 
   return (
-    <Reasoning className="mb-0 py-1" isStreaming={isReasoningStreaming} defaultOpen={false}>
+    <Reasoning
+      className={cn("mb-0 py-1.5", className)}
+      isStreaming={isReasoningStreaming}
+      defaultOpen={false}
+    >
       <ReasoningTrigger />
       <ReasoningContent className="mt-2 [&_.font-semibold]:font-normal [&_p]:mb-2 [&_p]:leading-5 [&_p:last-child]:mb-0">
         {text}

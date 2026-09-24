@@ -28,7 +28,7 @@ export function ToolPart({ part }: { part: AnyToolPart }) {
   if (part.state === "input-streaming") return null;
   return (
     <ErrorBoundary
-      fallback={<div className="text-destructive text-xs">Failed to render tool call</div>}
+      fallback={<div className="text-destructive py-1 text-xs">Failed to render tool call</div>}
       resetKeys={[part.type, part.toolCallId, part.state]}
     >
       <ToolPartContent part={part} />

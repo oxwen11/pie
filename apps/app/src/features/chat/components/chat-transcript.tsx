@@ -90,7 +90,7 @@ function ChatTranscriptView({
         ))}
         {snapshot.status === "submitted" && <TranscriptStatusMessage label="Thinking…" />}
         {snapshot.retryNotice && (
-          <div className="text-muted-foreground text-xs">{snapshot.retryNotice}</div>
+          <div className="text-muted-foreground py-1.5 text-xs">{snapshot.retryNotice}</div>
         )}
         {snapshot.error && <ModelErrorCard error={snapshot.error} />}
         {snapshot.pendingRequests.map((request) => (
