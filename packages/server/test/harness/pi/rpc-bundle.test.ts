@@ -116,7 +116,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               assert.equal(getModel("xai", "grok-4.6").provider, "xai");
               assert.ok(builtInExtensions.some((extension) => extension.name === "llama.cpp"));
               assert.equal(getPackageDir(), path.join(process.cwd(), "runtime"));
-              assert.equal(VERSION, "0.85.1");
+              assert.equal(VERSION, "0.87.1");
               for (const file of [getReadmePath(), path.join(getDocsPath(), "extensions.md"),
                 path.join(getExamplesPath(), "sdk/06-extensions.ts"),
                 path.join(getPackageDir(), "CHANGELOG.md")]) {
@@ -124,7 +124,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               }
               const oauthProviders = builtinProviders().filter((provider) => provider.auth?.oauth);
               assert.deepEqual(oauthProviders.map((provider) => provider.id).sort(), [
-                "anthropic", "github-copilot", "kimi-coding", "openai-codex",
+                "anthropic", "github-copilot", "kimi-coding", "meta", "openai-codex",
                 "openrouter", "radius", "xai",
               ]);
               for (const provider of oauthProviders) {
@@ -243,4 +243,65 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
       }),
     );
   }
+
+  it.effect("routes queued RPC input through extension input handlers", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-rpc-input-" });
+      const runtimeDir = path.join(cwd, "runtime");
+      yield* fs.copy(path.dirname(bundle), runtimeDir);
+      yield* fs.copy(builtIsland, path.join(cwd, "fff"));
+      yield* fs.makeDirectory(path.join(cwd, "extensions"));
+      yield* fs.writeFileString(
+        path.join(cwd, "extensions/input.ts"),
+        `export default function (pi) {
+          pi.on("input", (event) => ({
+            action: "transform",
+            text: event.source + ":" + event.text,
+          }));
+        }`,
+      );
+
+      const child = yield* spawner.spawn(
+        ChildProcess.make(
+          "bun",
+          [
+            "--no-install",
+            path.join(runtimeDir, "pi-process.js"),
+            "--mode",
+            "rpc",
+            "--provider",
+            "xai",
+            "--model",
+            "grok-4.6",
+          ],
+          {
+            cwd,
+            env: {
+              PATH: process.env.PATH,
+              HOME: cwd,
+              PI_CODING_AGENT_DIR: cwd,
+              PI_OFFLINE: "1",
+            },
+            stdin: Stream.make(
+              '{"id":"s","type":"steer","message":"one"}\n',
+              '{"id":"f","type":"follow_up","message":"two"}\n',
+            ).pipe(Stream.encodeText),
+          },
+        ),
+      );
+      const output = yield* child.stdout.pipe(
+        Stream.decodeText(),
+        Stream.runFold(
+          () => "",
+          (a, b) => a + b,
+        ),
+      );
+      assert.match(
+        output,
+        /"type":"queue_update","steering":\["rpc:one"\],"followUp":\["rpc:two"\]/,
+      );
+    }),
+  );
 });

@@ -36,7 +36,7 @@
     "node-pty": "1.1.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-coding-agent": "catalog:pi",
     "@effect/platform-node": "catalog:effect",
     "@effect/vitest": "catalog:effect",
     "@getpie/client": "workspace:*",
