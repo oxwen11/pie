@@ -1,4 +1,9 @@
-import { PullRequestRefSchema } from "@getpie/contract/pull-request";
+import {
+  PullRequestRefSchema,
+  SessionPullRequestLinkSchema,
+  normalizePullRequestRef,
+  pullRequestKey,
+} from "@getpie/contract/pull-request";
 import { type JsonStoreLoadError, makeJsonCollection } from "@getpie/effect-json-store";
 import { Context, Effect, FileSystem, Layer, Option, Schema } from "effect";
 
@@ -13,7 +18,9 @@ const SessionSchema = Schema.Struct({
   createdAt: Schema.String,
   cwd: Schema.optionalKey(Schema.String),
   gitBranch: Schema.optionalKey(Schema.String),
+  ownsWorktree: Schema.optionalKey(Schema.Boolean),
   worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.String })),
+  pullRequests: Schema.optionalKey(Schema.Array(SessionPullRequestLinkSchema)),
   pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
@@ -25,15 +32,52 @@ const SessionSchema = Schema.Struct({
 
 /** Drop the create-time sentinel (`agentSessionId === sessionId`) from old records. */
 const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
-  const { agentSessionId, gitBranch, worktree, ...rest } = parsed;
+  const {
+    agentSessionId,
+    gitBranch,
+    ownsWorktree,
+    worktree,
+    pullRequests,
+    pullRequestRefs,
+    ...rest
+  } = parsed;
   const opened =
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
       : undefined;
   const resolvedWorktree =
-    worktree ?? (gitBranch !== undefined ? { branch: gitBranch } : undefined);
+    worktree ??
+    (ownsWorktree === false || gitBranch === undefined ? undefined : { branch: gitBranch });
+  const keptBranch = worktree === undefined && ownsWorktree === false ? gitBranch : undefined;
+  const links = new Map(
+    (pullRequests ?? []).map((link) => [
+      pullRequestKey(link.ref),
+      { ...link, ref: normalizePullRequestRef(link.ref) },
+    ]),
+  );
+  if (pullRequests === undefined) {
+    for (const ref of pullRequestRefs ?? []) {
+      const normalized = normalizePullRequestRef(ref);
+      const key = pullRequestKey(normalized);
+      if (!links.has(key)) {
+        links.set(key, {
+          ref: normalized,
+          source: "agent",
+          linkedAt: parsed.createdAt,
+          excluded: false,
+          snapshot: null,
+          stack: null,
+          stackCheckedAt: null,
+        });
+      }
+    }
+  }
   return {
     ...rest,
+    ...(keptBranch !== undefined ? { gitBranch: keptBranch } : undefined),
+    ...(links.size > 0 || pullRequests !== undefined
+      ? { pullRequests: [...links.values()] }
+      : undefined),
     ...(opened !== undefined ? { agentSessionId: opened } : undefined),
     ...(resolvedWorktree !== undefined ? { worktree: resolvedWorktree } : undefined),
   };
@@ -47,10 +91,12 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
     ? { agentSessionId: metadata.agentSessionId }
     : undefined),
   ...(metadata.cwd !== undefined ? { cwd: metadata.cwd } : undefined),
-  ...(metadata.worktree !== undefined ? { worktree: metadata.worktree } : undefined),
-  ...(metadata.pullRequestRefs !== undefined && metadata.pullRequestRefs.length > 0
-    ? { pullRequestRefs: metadata.pullRequestRefs }
-    : undefined),
+  ...(metadata.worktree !== undefined
+    ? { worktree: metadata.worktree }
+    : metadata.gitBranch !== undefined
+      ? { gitBranch: metadata.gitBranch, ownsWorktree: false as const }
+      : undefined),
+  ...(metadata.pullRequests !== undefined ? { pullRequests: metadata.pullRequests } : undefined),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),

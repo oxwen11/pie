@@ -64,7 +64,7 @@ Splash copy: `aria-label="Starting Pie"`. Failure dialog: **Pie could not start*
 
 ## Drive
 
-Prefer **Playwright** (`apps/desktop/e2e/`) when the change is "does the window connect / stay connected". That harness is **test mode**: `PIE_E2E=1`, fake-pi, seeded `projects.json`. Do not treat a green e2e spec as a real Import project proof.
+Prefer **Playwright** (`apps/desktop/e2e/`) when the change is "does the window connect / stay connected". That harness is **test mode**: `PIE_E2E=1`, seeded `projects.json`. Connect/daemon specs do not run pie-pi-process; only conversation specs seed the e2e provider. Do not treat a green e2e spec as a real Import project proof.
 
 ```bash
 # scripted window-connects (E2E caveat)
@@ -93,7 +93,7 @@ Existing e2e worth knowing:
 
 ## Evidence
 
-Desktop is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+Desktop is a UI surface, so `.agents/rules/workflows/acceptance.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
 
 ```bash
 pnpm exec pie-verify desktop evidence init

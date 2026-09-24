@@ -1,9 +1,4 @@
-import {
-  createRootRouteWithContext,
-  useMatch,
-  useRouteContext,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createRootRouteWithContext, useMatch, useRouteContext } from "@tanstack/react-router";
 
 import {
   AppShell,
@@ -16,16 +11,14 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
+import { PullRequestDemandProvider } from "@/components/layout/pull-request-demand-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
 import { filesPanel } from "@/features/files/files-panel";
-import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
-import { useProject } from "@/features/projects/use-projects";
 import { pullRequestPanel } from "@/features/pull-request/pull-request-panel";
 import { reviewPanel } from "@/features/review/review-panel";
 import { EnvironmentOrpcProvider } from "@/lib/environment-orpc";
 import type { EnvironmentRpc } from "@/lib/environment-rpc";
-import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export interface RouterAppContext {
   localEnvironmentId: string;
@@ -41,7 +34,8 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 // Global shell: left sidebar + floating card panel; every route renders in the card.
 function RootLayout() {
   // This is the shell's one route-identity seam for the card: the content
-  // panel and heading derive from the same authoritative session-route ref.
+  // panel derives from the authoritative session-route ref. Page headings
+  // belong to the route that renders them.
   // Sidebar modules read the route themselves and jump without callbacks.
   //
   // A named match, not `useParams({ strict: false })`: this component *is* the
@@ -66,81 +60,31 @@ function RootLayout() {
     shouldThrow: false,
     select: (match) => ({
       environmentId: match.search.environmentId,
-      projectId: match.search.projectId ?? null,
     }),
   });
   const { environmentRpc, localEnvironmentId } = useRouteContext({ from: "__root__" });
   const environmentId = sessionRef?.environmentId ?? draft?.environmentId ?? localEnvironmentId;
-  const projectId = sessionRef?.ref.projectId ?? draft?.projectId;
-  const cardHeading = useRouterState({
-    select: (state): string | false | undefined => {
-      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
-        const heading = state.matches[index]?.staticData.cardHeading;
-        if (heading !== undefined) return heading;
-      }
-      return undefined;
-    },
-  });
-  const cardHeader = useRouterState({
-    select: (state): false | undefined => {
-      for (let index = state.matches.length - 1; index >= 0; index -= 1) {
-        const header = state.matches[index]?.staticData.cardHeader;
-        if (header !== undefined) return header;
-      }
-      return undefined;
-    },
-  });
   return (
-    <AppShell>
-      <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
-        {/*
-         * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
-         * outer local QueryClient above the router.
-         */}
-        <AppShellBody>
-          <AppShellSidebar>
-            <AppSidebar />
-          </AppShellSidebar>
-          <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
-            <AppShellMain>
-              <EnvironmentCardPanel
-                cardHeader={cardHeader}
-                cardHeading={cardHeading}
-                projectId={projectId}
-                sessionRef={sessionRef}
-              />
-            </AppShellMain>
-            <AppShellSessionPanel />
-          </EnvironmentOrpcProvider>
-        </AppShellBody>
-      </ContentPanelSessionProvider>
-    </AppShell>
-  );
-}
-
-function EnvironmentCardPanel({
-  cardHeader,
-  cardHeading,
-  projectId,
-  sessionRef,
-}: {
-  cardHeader: false | undefined;
-  cardHeading: string | false | undefined;
-  projectId: string | null | undefined;
-  sessionRef: EnvironmentSessionRef | null;
-}) {
-  const project = useProject(projectId);
-  const sessionTitle = useProjectSessionTitle(sessionRef?.ref);
-
-  return (
-    <CardPanel
-      heading={
-        cardHeading === false
-          ? undefined
-          : (cardHeading ?? (sessionRef === null ? "New chat" : (sessionTitle ?? "New chat")))
-      }
-      hideHeader={cardHeader === false}
-      supportingText={cardHeading !== undefined ? undefined : project?.name}
-    />
+    <PullRequestDemandProvider>
+      <AppShell>
+        <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+          {/*
+           * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
+           * outer local QueryClient above the router.
+           */}
+          <AppShellBody>
+            <AppShellSidebar>
+              <AppSidebar />
+            </AppShellSidebar>
+            <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+              <AppShellMain>
+                <CardPanel />
+              </AppShellMain>
+              <AppShellSessionPanel />
+            </EnvironmentOrpcProvider>
+          </AppShellBody>
+        </ContentPanelSessionProvider>
+      </AppShell>
+    </PullRequestDemandProvider>
   );
 }

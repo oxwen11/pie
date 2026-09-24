@@ -2,7 +2,7 @@ import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
 // Enforces frontend-state and package boundary rules documented in
-// .agents/rules/frontend-state.md and .agents/rules/architecture.md.
+// .agents/rules/topics/frontend-state.md and .agents/rules/topics/architecture.md.
 
 const FEATURES_ROOT = "apps/app/src/features/";
 const APP_ROOT = "apps/app/";

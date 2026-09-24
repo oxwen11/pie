@@ -1,9 +1,17 @@
 import type { PrepareSessionOutput, SessionRef, WorktreeMissingErrorData } from "@getpie/contract";
+import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
+import {
+  SHELL_TITLEBAR_HEADER_CLASS,
+  SHELL_TITLEBAR_LABEL_CLASS,
+} from "@/components/layout/shell-chrome";
 import { Chat } from "@/features/chat/chat";
+import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
+import { useProject } from "@/features/projects/use-projects";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -93,12 +101,33 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function Component() {
   const prepared = Route.useLoaderData();
+  const project = useProject(prepared.ref.projectId);
+  const title = useProjectSessionTitle(prepared.ref) ?? "New chat";
+  const reserveToggle = useContentPanel() !== null;
   return (
-    <Chat
-      sessionRef={{
-        environmentId: prepared.environmentId,
-        ref: prepared.ref,
-      }}
-    />
+    <>
+      <div className={cn(SHELL_TITLEBAR_HEADER_CLASS, "border-b")}>
+        <div className={SHELL_TITLEBAR_LABEL_CLASS}>
+          <span className="min-w-0 truncate font-medium" title={title}>
+            {title}
+          </span>
+          {project?.name !== undefined && (
+            <span
+              className="text-muted-foreground max-w-[50%] min-w-0 truncate"
+              title={project.name}
+            >
+              {project.name}
+            </span>
+          )}
+        </div>
+        {reserveToggle ? <div aria-hidden="true" className="ms-auto size-7 shrink-0" /> : null}
+      </div>
+      <Chat
+        sessionRef={{
+          environmentId: prepared.environmentId,
+          ref: prepared.ref,
+        }}
+      />
+    </>
   );
 }

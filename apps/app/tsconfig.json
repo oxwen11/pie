@@ -2,6 +2,7 @@
   "extends": "@getpie/typescript/react-library.json",
   "compilerOptions": {
     "types": ["vite/client"],
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["./src/*"]
     }

@@ -114,7 +114,11 @@ function SummaryTrigger({ label }: { label: string }) {
     <CollapsibleTrigger
       className="group"
       render={
-        <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden text-left"
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <span className="relative flex size-4 shrink-0 items-center justify-center">
             <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
@@ -123,7 +127,7 @@ function SummaryTrigger({ label }: { label: string }) {
             </div>
           </span>
           <span className="min-w-0 truncate text-sm leading-none">{label}</span>
-        </div>
+        </button>
       }
     />
   );

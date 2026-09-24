@@ -23,7 +23,6 @@ type FallbackSearch = WorktreeMissingErrorData & {
 };
 
 export const Route = createFileRoute("/session/fallback")({
-  staticData: { cardHeading: CARD_HEADING },
   validateSearch: (search: Record<string, unknown>): FallbackSearch => ({
     sessionId: asText(search.sessionId) ?? "",
     projectId: asText(search.projectId) ?? "",

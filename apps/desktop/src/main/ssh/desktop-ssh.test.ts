@@ -5,7 +5,7 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { sshEnvironmentsFile } from "@getpie/server/daemon";
 import { parseSshInput, type SshConnectedEnvironment, type SshTarget } from "@getpie/ssh";
-import { Effect, FileSystem, Layer } from "effect";
+import { Effect, FileSystem, Layer, Scope } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { describe, expect, it } from "vitest";
 
@@ -33,7 +33,11 @@ const platform = Layer.mergeAll(
 const withSsh = <A>(
   f: (
     dir: string,
-  ) => Effect.Effect<A, unknown, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>,
+  ) => Effect.Effect<
+    A,
+    unknown,
+    FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
+  >,
 ): Promise<A> =>
   Effect.runPromise(
     Effect.gen(function* () {

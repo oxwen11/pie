@@ -127,7 +127,7 @@ Proof directory (survives cleanup):
 .cursor/skills/verify-pie/evidence/<run-id>/
 ```
 
-Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+Web is a UI surface, so `.agents/rules/workflows/acceptance.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
 
 ```bash
 pnpm exec pie-verify web evidence init

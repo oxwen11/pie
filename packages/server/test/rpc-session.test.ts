@@ -17,7 +17,7 @@ import {
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
 } from "../src/harness";
-import { cachePiAgentAvailability, makePiAgent, PiAgent } from "../src/harness/pi/agent";
+import { makePiAgent, PiAgent } from "../src/harness/pi/agent";
 import { makePiProcess } from "../src/harness/pi/process";
 import * as Observability from "../src/observability";
 import { makePackageService, PackageService } from "../src/packages";
@@ -25,13 +25,17 @@ import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { PiProcessTag } from "../src/rpc/runtime";
+import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/rpc/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
 import { makeSkillService, SkillService } from "../src/skills";
 import { TerminalManagerLayer } from "../src/terminal";
 
 const FAKE = `#!/usr/bin/env node
+// This protocol fixture acknowledges extension startup; the real-Pi tests exercise tool loading.
+if (process.env.PIE_SESSION_BRIDGE_URL) fetch(process.env.PIE_SESSION_BRIDGE_URL + "/ready", {
+  method: "POST", headers: { authorization: "Bearer " + process.env.PIE_SESSION_BRIDGE_TOKEN, "content-type": "application/json" }, body: "{}",
+}).catch(() => process.exit(1));
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
@@ -80,7 +84,7 @@ async function setup() {
     PiAgent,
     Effect.gen(function* () {
       const process = yield* PiProcessTag;
-      return yield* cachePiAgentAvailability(makePiAgent(process, { executable: piExecutable }));
+      return yield* makePiAgent(process, { executable: piExecutable });
     }),
   ).pipe(Layer.provide(piProcessLayer), Layer.provide(NodeServices.layer));
 
@@ -109,11 +113,12 @@ async function setup() {
     Layer.provide(projectServiceLayer),
     Layer.provide(pathsLayer),
     Layer.provide(worktreeProvided),
+    Layer.provide(gitProvided),
     Layer.provide(NodeServices.layer),
   );
 
+  const pullRequestLayer = PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer));
   const sessionImageAssetsLayer = SessionImageAssetsLayer.pipe(Layer.provide(harnessSessionLayer));
-
   const scheduleServiceLayer = ScheduleServiceLayer.pipe(
     Layer.provide(ScheduleRepositoryLayer),
     Layer.provide(projectServiceLayer),
@@ -143,7 +148,14 @@ async function setup() {
     piProcessLayer,
     FileSystemServiceLayer.pipe(Layer.provide(NodeServices.layer)),
     gitProvided,
-    PullRequestServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    pullRequestLayer,
+    PullRequestCoordinatorLayer.pipe(
+      Layer.provide(harnessSessionLayer),
+      Layer.provide(pullRequestLayer),
+      Layer.provide(EventBusLayer),
+      Layer.provide(projectServiceLayer),
+      Layer.provide(NodeServices.layer),
+    ),
     TerminalManagerLayer,
     NodeServices.layer,
     Observability.discard,

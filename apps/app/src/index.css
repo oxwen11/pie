@@ -1,4 +1,5 @@
 @import "@getpie/ui/globals.css";
+@import "react-medium-image-zoom/dist/styles.css";
 @import "tw-shimmer";
 
 /* PieLoader mark size. Relative to the surrounding text size; 0.7em ≈ 10px at
@@ -121,6 +122,20 @@
     overflow-y: hidden;
     overscroll-behavior-y: none;
   }
+}
+
+/* Theme the image-zoom library through Pie's semantic tokens. */
+.chat-image-preview-dialog [data-rmiz-modal-overlay="visible"] {
+  background-color: var(--background);
+}
+
+[data-rmiz-btn-zoom],
+[data-rmiz-btn-unzoom] {
+  width: 44px;
+  height: 44px;
+  background-color: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 0 0 1px var(--border);
 }
 
 /* TipTap Placeholder extension renders via ::before on the empty first paragraph. */

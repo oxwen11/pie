@@ -101,7 +101,6 @@ const makeFixture = Effect.gen(function* () {
     });
 
   const pi = {
-    availability: Effect.succeed({ available: true }),
     create: () => makeRuntime("created-session"),
     resume: ({ sessionId }) =>
       Ref.update(resumeCalls, (current) => current + 1).pipe(
@@ -158,6 +157,22 @@ it.effect("drains the native stream into the session and tears down on close", (
     // to the answer any untouched session gives.
     assert.deepEqual(yield* fixture.manager.status(ref), { phase: "idle" });
     assert.equal((yield* fixture.manager.snapshot(ref)).cursor, 0);
+  }),
+);
+
+it.effect("isolates identical session IDs in different Projects, including teardown", () =>
+  Effect.gen(function* () {
+    const fixture = yield* makeFixture;
+    const firstRef = refFor("same");
+    const secondRef = { ...firstRef, projectId: "project-2" };
+    const first = yield* fixture.manager.open({ cwd: "/tmp" }, firstRef);
+    const second = yield* fixture.manager.open({ cwd: "/tmp" }, secondRef);
+    assert.notEqual(first, second);
+    yield* fixture.manager.close(firstRef);
+    assert.equal(yield* isActive(fixture, firstRef), false);
+    assert.equal(yield* isActive(fixture, secondRef), true);
+    yield* fixture.manager.close(secondRef);
+    assert.equal(yield* Ref.get(fixture.closeCalls), 2);
   }),
 );
 

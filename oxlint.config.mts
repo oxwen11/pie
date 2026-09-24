@@ -52,7 +52,7 @@ export default defineConfig({
     shadcn: {
       ui: ["@getpie/ui/components", "@getpie/ui/ai-elements"],
       ignoreImports: ["^@getpie/ui/lib(/|$)", "^@getpie/ui/hooks(/|$)"],
-      note: "See .agents/rules/ui-components.md. Colors and spacing come from theme tokens.",
+      note: "See .agents/rules/topics/ui-components.md. Colors and spacing come from theme tokens.",
     },
   },
   jsPlugins: [
@@ -113,7 +113,6 @@ export default defineConfig({
           { pattern: "^CommandItem$", allow: ["layout", "spacing"] },
           { pattern: "^Empty$", allow: ["layout", "spacing"] },
           { pattern: "^Label$", allow: ["layout", "color", "spacing", "shape"] },
-          { pattern: "^LoadingBox$", allow: ["layout", "spacing"] },
           { pattern: "^MenuTrigger$", allow: ["layout", "color", "shape"] },
           { pattern: "^PromptInput$", allow: ["layout", "shape"] },
           { pattern: "^RadioGroup$", allow: ["layout", "spacing"] },
