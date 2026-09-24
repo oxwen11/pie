@@ -30,18 +30,6 @@ index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de2
  // UI components for extensions
  export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
-diff --git a/dist/modes/index.js b/dist/modes/index.js
-index 10528c34b4941a060fbf8228fcec61beeb6902d8..0102883cbc0b8f00791377c63628c4068b9c37e9 100644
---- a/dist/modes/index.js
-+++ b/dist/modes/index.js
-@@ -1,7 +1,6 @@
- /**
-  * Run modes for the coding agent.
-  */
--export { InteractiveMode } from "./interactive/interactive-mode.js";
- export { runPrintMode } from "./print-mode.js";
- export { RpcClient } from "./rpc/rpc-client.js";
- export { runRpcMode } from "./rpc/rpc-mode.js";
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
 index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..d9de2a14ed33ed6afd2c12f2ae3d959b143f4363 100644
 --- a/dist/modes/interactive/theme/theme.js

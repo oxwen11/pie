@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentSessionEvent } from "../../../src/harness/pi/protocol";
 import { createPiTransform } from "../../../src/harness/pi/transform";
@@ -32,6 +32,10 @@ const userStart = (text = "hi") =>
   e({ type: "message_start", message: { role: "user", content: text, timestamp: 0 } });
 
 describe("createPiTransform", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("opens the turn once per run, even across retries", () => {
     const t = createPiTransform("s1");
     const first = [...t(e({ type: "agent_start" }))];
@@ -89,7 +93,18 @@ describe("createPiTransform", () => {
     expect(types(user)).toEqual(["finish", "session.prompt.submitted"]);
     expect(user[1]).toMatchObject({ parts: [{ type: "text", text: "steer" }] });
     const split = run(assistantStart());
-    expect(types(split)).toEqual(["start"]);
+    expect(types(split)).toEqual(["start", "message-metadata"]);
+    expect(split[0]).toMatchObject({ type: "start", messageMetadata: { sessionId: "s1" } });
+    expect(Object.keys((split[0] as { messageMetadata: object }).messageMetadata)).toEqual([
+      "sessionId",
+    ]);
+    expect(split[1]).toEqual({
+      type: "message-metadata",
+      messageMetadata: {
+        sessionId: "s1",
+        messageStartTimestamp: "1970-01-01T00:00:00.000Z",
+      },
+    });
     expect((split[0] as { messageId: string }).messageId).not.toBe(firstMessageId);
 
     // Blocks of the continuation land under a fresh ordinal, in the new message.
@@ -140,19 +155,61 @@ describe("createPiTransform", () => {
       dynamic: false,
     });
 
-    const result = { content: [{ type: "text", text: "ok" }], details: {} };
     const done = [
       ...t(
         e({
           type: "tool_execution_end",
           toolCallId: "c1",
           toolName: "bash",
-          result,
+          result: {
+            content: [
+              { type: "text", text: "ok" },
+              { type: "image", data: "AAA", mimeType: "image/png" },
+            ],
+            details: {},
+          },
           isError: false,
         }),
       ),
     ];
-    expect(done[0]).toMatchObject({ type: "tool-output-available", output: result });
+    expect(done).toEqual([
+      {
+        type: "tool-output-available",
+        toolCallId: "c1",
+        output: { content: [{ type: "text", text: "ok" }], details: {} },
+        providerExecuted: true,
+        dynamic: false,
+      },
+      { type: "file", mediaType: "image/png", url: "data:image/png;base64,AAA" },
+    ]);
+  });
+
+  it("does not adapt SVG tool content to an AI SDK file part", () => {
+    const t = createPiTransform("s1");
+    const done = [
+      ...t(
+        e({
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "read",
+          result: {
+            content: [{ type: "image", data: "PHN2Zy8+", mimeType: "image/svg+xml" }],
+            details: {},
+          },
+          isError: false,
+        }),
+      ),
+    ];
+
+    expect(done).toEqual([
+      {
+        type: "tool-output-available",
+        toolCallId: "c1",
+        output: { content: [], details: {} },
+        providerExecuted: true,
+        dynamic: false,
+      },
+    ]);
   });
 
   it("omits successful read contents from UI chunks", () => {
@@ -233,7 +290,10 @@ describe("createPiTransform", () => {
     const t = createPiTransform("s1");
     const run = (event: AgentSessionEvent) => [...t(event)];
     run(e({ type: "agent_start" }));
-    expect([...t(e({ type: "message_end", message: assistant() }))]).toEqual([]);
+    expect(run(e({ type: "message_end", message: assistant() }))[0]).toMatchObject({
+      type: "message-metadata",
+      messageMetadata: { sessionId: "s1" },
+    });
 
     const failed = assistant({ stopReason: "error", errorMessage: "boom" });
     const ended = [...t(e({ type: "agent_end", messages: [failed], willRetry: false }))];
@@ -308,6 +368,46 @@ describe("createPiTransform", () => {
     expect([...t(e({ type: "queue_update", steering: ["steer"], followUp: ["later"] }))]).toEqual(
       [],
     );
+  });
+
+  it("stamps the segment start once and the message_end receipt as the end", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:11.000Z"));
+    const t = createPiTransform("s1");
+    const run = (event: AgentSessionEvent) => [...t(event)];
+    run(e({ type: "agent_start" }));
+    const started = run(
+      e({
+        type: "message_start",
+        message: assistant({ timestamp: Date.parse("2026-01-01T00:00:00.000Z") }),
+      }),
+    );
+    expect(started).toEqual([
+      {
+        type: "message-metadata",
+        messageMetadata: { sessionId: "s1", messageStartTimestamp: "2026-01-01T00:00:00.000Z" },
+      },
+    ]);
+    expect(
+      run(
+        e({
+          type: "message_start",
+          message: assistant({ timestamp: Date.parse("2026-01-01T00:00:09.000Z") }),
+        }),
+      ),
+    ).toEqual([]);
+    const ended = run(
+      e({
+        type: "message_end",
+        message: assistant({ timestamp: Date.parse("2026-01-01T00:00:09.000Z") }),
+      }),
+    );
+    expect(ended).toEqual([
+      {
+        type: "message-metadata",
+        messageMetadata: { sessionId: "s1", messageEndTimestamp: "2026-01-01T00:00:11.000Z" },
+      },
+    ]);
   });
 
   it("ignores bookkeeping events and user-message echoes", () => {

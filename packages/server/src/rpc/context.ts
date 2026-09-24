@@ -1,6 +1,7 @@
 import type { WithEffectContext } from "@orpc/experimental-effect";
 import type { FileSystem } from "effect/FileSystem";
 
+import type { SessionImageAssets } from "../assets";
 import type { EventBus } from "../events";
 import type { FileSystemService } from "../fs";
 import type { GitService } from "../git";
@@ -9,6 +10,7 @@ import type { PiAgent } from "../harness/pi/agent";
 import type { PackageService } from "../packages";
 import type { ProjectService } from "../project";
 import type { PullRequestService } from "../pull-request";
+import type { PullRequestCoordinator } from "../pull-request/coordinator";
 import type { ScheduleService } from "../schedule";
 import type { SettingsRepository } from "../settings";
 import type { SkillService } from "../skills";
@@ -17,6 +19,7 @@ import type { TerminalManager } from "../terminal";
 /** Services every RPC procedure may `yield*`. */
 export type RpcContext = WithEffectContext<
   | EventBus
+  | SessionImageAssets
   | FileSystem
   | PiAgent
   | PiAgentSessionService
@@ -29,5 +32,6 @@ export type RpcContext = WithEffectContext<
   | FileSystemService
   | GitService
   | PullRequestService
+  | PullRequestCoordinator
   | TerminalManager
 >;

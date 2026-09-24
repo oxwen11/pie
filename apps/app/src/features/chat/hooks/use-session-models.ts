@@ -32,8 +32,6 @@ export function useSessionModels(ref: SessionRef) {
     models: modelsQuery.data?.models ?? [],
     providerId: stateQuery.data?.provider,
     modelId: stateQuery.data?.modelId,
-    isLoading: modelsQuery.isLoading || stateQuery.isLoading,
     setModel: (provider: string, modelId: string) => setModel.mutate({ provider, modelId }),
-    isSettingModel: setModel.isPending,
   };
 }

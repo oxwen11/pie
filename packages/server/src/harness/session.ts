@@ -144,7 +144,7 @@ export const makePiAgentSession = (
     // Serializes stamp+publish across the drain fiber and `emit` callers:
     // without it two fibers could stamp seqs n/n+1 but publish n+1 first, and
     // the clients' `seq <= cursor` replay guard would drop n forever.
-    const applyLock = Semaphore.makeUnsafe(1);
+    const applyLock = yield* Semaphore.make(1);
 
     // The service binds this per call; a session has to bind it again because
     // its sources are not one fiber — the drain fiber outlives the RPC that

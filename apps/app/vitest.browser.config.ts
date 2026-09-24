@@ -6,7 +6,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser";
-import { appAlias, appDir, browserTsTests } from "./vitest.shared";
+import { appAlias, appDir, browserTsTests } from "./vitest-shared";
 
 const browserSetupFiles = [
   url.fileURLToPath(new URL("../../tools/testing/browser-locators.ts", import.meta.url)),

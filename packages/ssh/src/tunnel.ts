@@ -1,6 +1,7 @@
 import net from "node:net";
 
-import { Deferred, Duration, Effect, Exit, FileSystem, Schedule, Scope } from "effect";
+import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
+import { Deferred, Duration, Effect, Exit, Schedule, Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import {
@@ -33,8 +34,9 @@ import {
 import {
   buildSshHostSpecEffect,
   parseRemoteLaunchOutput,
+  REMOTE_DAEMON_MISMATCH_MESSAGE,
+  remoteDaemonCompatibilityMatches,
   remoteStateKey,
-  type RemoteLaunchResult,
   type SshEnvironmentBootstrap,
   type SshTarget,
 } from "./target";
@@ -81,8 +83,8 @@ export function forwardedConnection(localPort: number, token: string): SshForwar
   };
 }
 
-export const reserveLoopbackPort = (): Effect.Effect<number, SshLaunchError> =>
-  Effect.tryPromise({
+export const reserveLoopbackPort = Effect.fn("reserveLoopbackPort")(function* () {
+  return yield* Effect.tryPromise({
     try: () =>
       new Promise<number>((resolve, reject) => {
         const server = net.createServer();
@@ -114,45 +116,45 @@ export const reserveLoopbackPort = (): Effect.Effect<number, SshLaunchError> =>
         cause,
       }),
   });
+});
 
-export const waitForHttpReady = (input: {
+export const waitForHttpReady = Effect.fn("waitForHttpReady")(function* (input: {
   readonly address: string;
   readonly timeoutMs?: number;
   readonly probeTimeoutMs?: number;
-}): Effect.Effect<void, SshReadinessError> =>
-  Effect.gen(function* () {
-    const timeoutMs = input.timeoutMs ?? SSH_READY_TIMEOUT_MS;
-    const probeTimeoutMs = input.probeTimeoutMs ?? SSH_READY_PROBE_TIMEOUT_MS;
-    let lastError: unknown;
+}) {
+  const timeoutMs = input.timeoutMs ?? SSH_READY_TIMEOUT_MS;
+  const probeTimeoutMs = input.probeTimeoutMs ?? SSH_READY_PROBE_TIMEOUT_MS;
+  let lastError: unknown;
 
-    const probe = Effect.promise(async () => {
-      try {
-        const response = await fetch(new URL("/api/health", input.address), {
-          signal: AbortSignal.timeout(probeTimeoutMs),
-        });
-        return response.ok && (await response.text()) === "ok";
-      } catch (cause) {
-        lastError = cause;
-        return false;
-      }
-    });
-
-    const healthy = yield* probe.pipe(
-      Effect.repeat({
-        until: (ready) => ready,
-        schedule: Schedule.spaced(Duration.millis(READY_POLL_INTERVAL_MS)).pipe(
-          Schedule.upTo({ duration: Duration.millis(timeoutMs) }),
-        ),
-      }),
-    );
-
-    if (healthy) return;
-
-    yield* new SshReadinessError({
-      message: `Remote pie daemon did not become ready at ${input.address} within ${String(timeoutMs)}ms.`,
-      cause: lastError,
-    });
+  const probe = Effect.promise(async () => {
+    try {
+      const response = await fetch(new URL("/api/health", input.address), {
+        signal: AbortSignal.timeout(probeTimeoutMs),
+      });
+      return response.ok && (await response.text()) === "ok";
+    } catch (cause) {
+      lastError = cause;
+      return false;
+    }
   });
+
+  const healthy = yield* probe.pipe(
+    Effect.repeat({
+      until: (ready) => ready,
+      schedule: Schedule.spaced(Duration.millis(READY_POLL_INTERVAL_MS)).pipe(
+        Schedule.upTo({ duration: Duration.millis(timeoutMs) }),
+      ),
+    }),
+  );
+
+  if (healthy) return;
+
+  yield* new SshReadinessError({
+    message: `Remote pie daemon did not become ready at ${input.address} within ${String(timeoutMs)}ms.`,
+    cause: lastError,
+  });
+});
 
 function launchErrorFromDiagnostic(
   diagnostic: string,
@@ -194,168 +196,164 @@ function toLaunchError(
   });
 }
 
-export const launchOrReuseRemoteServer = (
+export const launchOrReuseRemoteServer = Effect.fn("launchOrReuseRemoteServer")(function* (
   target: SshTarget,
   options?: RemotePieRunnerOptions & SshCliEnv,
-): Effect.Effect<
-  RemoteLaunchResult,
-  SshLaunchError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug("ssh.remote.launch.start").pipe(
-      Effect.annotateLogs({
-        alias: target.alias,
-        hostname: target.hostname,
-        stateKey: remoteStateKey(target),
-      }),
-    );
-    const result = yield* runSshCommand(target, {
-      stdin: buildRemoteLaunchScript({
-        ...options,
-        packageSpec: resolveRemotePiePackageSpec(options?.packageSpec),
-      }),
-      remoteCommandArgs: ["sh", "-l", "-s", remoteStateKey(target)],
-      timeoutMs: REMOTE_LAUNCH_TIMEOUT_MS,
-      env: options?.env,
-    }).pipe(Effect.mapError(toLaunchError));
+) {
+  yield* Effect.logDebug("ssh.remote.launch.start").pipe(
+    Effect.annotateLogs({
+      alias: target.alias,
+      hostname: target.hostname,
+      stateKey: remoteStateKey(target),
+    }),
+  );
+  const result = yield* runSshCommand(target, {
+    stdin: buildRemoteLaunchScript({
+      ...options,
+      packageSpec: resolveRemotePiePackageSpec(options?.packageSpec),
+    }),
+    remoteCommandArgs: ["sh", "-l", "-s", remoteStateKey(target)],
+    timeoutMs: REMOTE_LAUNCH_TIMEOUT_MS,
+    env: options?.env,
+  }).pipe(Effect.mapError(toLaunchError));
 
-    const parsed = parseRemoteLaunchOutput(result.stdout);
-    if (parsed === undefined) {
-      return yield* new SshLaunchError({
-        message: "Remote pie daemon did not report a launch payload.",
-        stdout: redactSshErrorOutput(result.stderr || result.stdout),
-      });
-    }
-    return parsed;
-  });
+  const parsed = parseRemoteLaunchOutput(result.stdout);
+  if (parsed === undefined) {
+    return yield* new SshLaunchError({
+      message: "Remote pie daemon did not report a launch payload.",
+      stdout: redactSshErrorOutput(result.stderr || result.stdout),
+    });
+  }
+  if (
+    !remoteDaemonCompatibilityMatches(parsed.compatibilityKey, embeddedDaemonCompatibilityKey())
+  ) {
+    return yield* new SshLaunchError({
+      message: REMOTE_DAEMON_MISMATCH_MESSAGE,
+      stdout: "",
+    });
+  }
+  return parsed;
+});
 
-export const startSshTunnel = (
+export const startSshTunnel = Effect.fn("startSshTunnel")(function* (
   target: SshTarget,
   remotePort: number,
   options?: SshCliEnv,
-): Effect.Effect<
-  SshTunnel,
-  SshLaunchError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const hostSpec = yield* buildSshHostSpecEffect(target);
-    const sshCommand = yield* requireSshCommand({ env: options?.env });
-    const localPort = yield* reserveLoopbackPort();
-    const tunnelScope = yield* Scope.make();
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const environment = sshSpawnEnv(options?.env);
-    const args = [
-      ...baseSshArgs(target),
-      "-N",
-      "-L",
-      `${String(localPort)}:${REMOTE_FORWARD_HOST}:${String(remotePort)}`,
-      "-o",
-      "ExitOnForwardFailure=yes",
-      "-o",
-      "ServerAliveInterval=30",
-      "-o",
-      "ServerAliveCountMax=3",
-      hostSpec,
-    ];
+) {
+  const hostSpec = yield* buildSshHostSpecEffect(target);
+  const sshCommand = yield* requireSshCommand({ env: options?.env });
+  const localPort = yield* reserveLoopbackPort();
+  const tunnelScope = yield* Scope.make();
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const environment = sshSpawnEnv(options?.env);
+  const args = [
+    ...baseSshArgs(target),
+    "-N",
+    "-L",
+    `${String(localPort)}:${REMOTE_FORWARD_HOST}:${String(remotePort)}`,
+    "-o",
+    "ExitOnForwardFailure=yes",
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=3",
+    hostSpec,
+  ];
 
-    yield* Effect.logDebug("ssh.tunnel.start").pipe(
-      Effect.annotateLogs({
-        alias: target.alias,
-        hostname: target.hostname,
-        localPort,
-        remotePort,
-      }),
-    );
-
-    const child = yield* spawner
-      .spawn(
-        ChildProcess.make(sshCommand, args, {
-          env: environment,
-          extendEnv: false,
-          forceKillAfter: Duration.millis(TUNNEL_SHUTDOWN_TIMEOUT_MS),
-        }),
-      )
-      .pipe(
-        Effect.provideService(Scope.Scope, tunnelScope),
-        Effect.mapError((cause) =>
-          isSshSpawnNotFound(cause)
-            ? new SshClientMissingError({
-                command: sshCommand,
-                message: sshClientMissingMessage(sshCommand),
-              })
-            : new SshLaunchError({
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : `Failed to spawn SSH tunnel for ${hostSpec}.`,
-                stdout: "",
-                cause,
-              }),
-        ),
-      );
-
-    const stderrDone = yield* Deferred.make<string>();
-    yield* collectProcessOutput(child.stderr).pipe(
-      Effect.orElseSucceed(() => ""),
-      Effect.flatMap((output) => Deferred.succeed(stderrDone, output)),
-      Effect.ensuring(Deferred.succeed(stderrDone, "")),
-      Effect.forkIn(tunnelScope),
-    );
-
-    const close = Effect.ignore(Scope.close(tunnelScope, Exit.void)).pipe(Effect.asVoid);
-    const closed = child.exitCode.pipe(Effect.asVoid, Effect.ignore);
-    const alive = child.isRunning.pipe(Effect.orElseSucceed(() => false));
-    return {
+  yield* Effect.logDebug("ssh.tunnel.start").pipe(
+    Effect.annotateLogs({
+      alias: target.alias,
+      hostname: target.hostname,
       localPort,
       remotePort,
-      close,
-      closed,
-      alive,
-      stderr: Deferred.await(stderrDone),
-    };
-  });
+    }),
+  );
 
-export const waitForForwardedDaemon = (localPort: number): Effect.Effect<void, SshReadinessError> =>
-  waitForHttpReady({
-    address: `http://${LOCAL_FORWARD_HOST}:${String(localPort)}`,
-  });
-
-export const connectSshEnvironment = (
-  target: SshTarget,
-  options?: RemotePieRunnerOptions & SshCliEnv,
-): Effect.Effect<
-  SshConnectedEnvironment,
-  SshLaunchError | SshClientMissingError | SshInvalidTargetError | SshReadinessError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const launch = yield* launchOrReuseRemoteServer(target, options);
-    const tunnel = yield* startSshTunnel(target, launch.remotePort, { env: options?.env });
-    const tunnelExited = tunnel.closed.pipe(
-      Effect.andThen(tunnel.stderr),
-      Effect.flatMap((output) =>
-        Effect.fail(
-          launchErrorFromDiagnostic(
-            redactSshErrorOutput(output),
-            `SSH tunnel to ${target.hostname} exited before the local forward was ready.`,
-          ),
-        ),
+  const child = yield* spawner
+    .spawn(
+      ChildProcess.make(sshCommand, args, {
+        env: environment,
+        extendEnv: false,
+        forceKillAfter: Duration.millis(TUNNEL_SHUTDOWN_TIMEOUT_MS),
+      }),
+    )
+    .pipe(
+      Effect.provideService(Scope.Scope, tunnelScope),
+      Effect.mapError((cause) =>
+        isSshSpawnNotFound(cause)
+          ? new SshClientMissingError({
+              command: sshCommand,
+              message: sshClientMissingMessage(sshCommand),
+            })
+          : new SshLaunchError({
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : `Failed to spawn SSH tunnel for ${hostSpec}.`,
+              stdout: "",
+              cause,
+            }),
       ),
     );
-    yield* Effect.raceFirst(waitForForwardedDaemon(tunnel.localPort), tunnelExited).pipe(
-      Effect.tapError(() => tunnel.close),
-    );
-    return {
-      target,
-      httpBaseUrl: forwardedConnection(tunnel.localPort, launch.token).httpBaseUrl,
-      wsBaseUrl: forwardedConnection(tunnel.localPort, launch.token).wsBaseUrl,
-      token: launch.token,
-      remotePort: launch.remotePort,
-      reportedHostname: launch.hostname,
-      close: tunnel.close,
-      closed: tunnel.closed,
-      alive: tunnel.alive,
-    };
+
+  const stderrDone = yield* Deferred.make<string>();
+  yield* collectProcessOutput(child.stderr).pipe(
+    Effect.orElseSucceed(() => ""),
+    Effect.flatMap((output) => Deferred.succeed(stderrDone, output)),
+    Effect.ensuring(Deferred.succeed(stderrDone, "")),
+    Effect.forkIn(tunnelScope),
+  );
+
+  const close = Effect.ignore(Scope.close(tunnelScope, Exit.void)).pipe(Effect.asVoid);
+  const closed = child.exitCode.pipe(Effect.asVoid, Effect.ignore);
+  const alive = child.isRunning.pipe(Effect.orElseSucceed(() => false));
+  return {
+    localPort,
+    remotePort,
+    close,
+    closed,
+    alive,
+    stderr: Deferred.await(stderrDone),
+  };
+});
+
+export const waitForForwardedDaemon = Effect.fn("waitForForwardedDaemon")(function* (
+  localPort: number,
+) {
+  return yield* waitForHttpReady({
+    address: `http://${LOCAL_FORWARD_HOST}:${String(localPort)}`,
   });
+});
+
+export const connectSshEnvironment = Effect.fn("connectSshEnvironment")(function* (
+  target: SshTarget,
+  options?: RemotePieRunnerOptions & SshCliEnv,
+) {
+  const launch = yield* launchOrReuseRemoteServer(target, options);
+  const tunnel = yield* startSshTunnel(target, launch.remotePort, { env: options?.env });
+  const tunnelExited = tunnel.closed.pipe(
+    Effect.andThen(tunnel.stderr),
+    Effect.flatMap((output) =>
+      Effect.fail(
+        launchErrorFromDiagnostic(
+          redactSshErrorOutput(output),
+          `SSH tunnel to ${target.hostname} exited before the local forward was ready.`,
+        ),
+      ),
+    ),
+  );
+  yield* Effect.raceFirst(waitForForwardedDaemon(tunnel.localPort), tunnelExited).pipe(
+    Effect.tapError(() => tunnel.close),
+  );
+  return {
+    target,
+    httpBaseUrl: forwardedConnection(tunnel.localPort, launch.token).httpBaseUrl,
+    wsBaseUrl: forwardedConnection(tunnel.localPort, launch.token).wsBaseUrl,
+    token: launch.token,
+    remotePort: launch.remotePort,
+    reportedHostname: launch.hostname,
+    close: tunnel.close,
+    closed: tunnel.closed,
+    alive: tunnel.alive,
+  };
+});

@@ -23,7 +23,21 @@ export type RemoteLaunchResult = {
   readonly token: string;
   /** Remote `os.hostname()` after launch. Display only — not an SSH destination. */
   readonly hostname?: string;
+  /** Daemon record key. Missing means the client must not connect. */
+  readonly compatibilityKey?: string;
 };
+
+/** Substring the desktop toast already matches. Remote must upgrade; do not attach. */
+export const REMOTE_DAEMON_MISMATCH_MESSAGE =
+  "pie daemon is already running with a different version. Update Pie on that machine to match this client, then connect.";
+
+/** Exact key match only. Empty or missing remote key is a mismatch. */
+export function remoteDaemonCompatibilityMatches(
+  actual: string | undefined,
+  required: string,
+): boolean {
+  return required.length > 0 && actual === required;
+}
 
 /** Loopback URLs plus the daemon token after the local forward is up. */
 export type SshEnvironmentBootstrap = {
@@ -140,16 +154,17 @@ export function formatSshInput(target: SshTarget): string {
   return target.port !== null ? `${withUser}:${String(target.port)}` : withUser;
 }
 
-export const buildSshHostSpecEffect = (
+export const buildSshHostSpecEffect = Effect.fn("buildSshHostSpecEffect")(function* (
   target: SshTarget,
-): Effect.Effect<string, SshInvalidTargetError> =>
-  Effect.try({
+) {
+  return yield* Effect.try({
     try: () => buildSshHostSpec(target),
     catch: (cause) =>
       new SshInvalidTargetError({
         message: cause instanceof Error ? cause.message : "SSH target is invalid.",
       }),
   });
+});
 
 export function environmentLabel(target: SshTarget, reportedHostname?: string): string {
   const typed = target.alias.trim() || target.hostname.trim();
@@ -182,6 +197,7 @@ export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | un
       remotePort?: unknown;
       token?: unknown;
       hostname?: unknown;
+      compatibilityKey?: unknown;
     };
     if (
       typeof record.remotePort !== "number" ||
@@ -196,9 +212,16 @@ export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | un
       typeof record.hostname === "string" && record.hostname.trim().length > 0
         ? record.hostname.trim()
         : undefined;
-    return hostname === undefined
-      ? { remotePort: record.remotePort, token: record.token }
-      : { remotePort: record.remotePort, token: record.token, hostname };
+    const compatibilityKey =
+      typeof record.compatibilityKey === "string" && record.compatibilityKey.length > 0
+        ? record.compatibilityKey
+        : undefined;
+    return {
+      remotePort: record.remotePort,
+      token: record.token,
+      ...(hostname === undefined ? undefined : { hostname }),
+      ...(compatibilityKey === undefined ? undefined : { compatibilityKey }),
+    };
   } catch {
     return undefined;
   }

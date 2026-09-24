@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { Effect, FileSystem, Option, Semaphore } from "effect";
+import { Effect, FileSystem, Option, Semaphore, SynchronizedRef } from "effect";
 
 import { type AnySchema, makeFileCodec, type MigrationStep } from "./codec";
 import {
@@ -121,18 +121,21 @@ export const makeJsonCollection = <
 
     // One mutex per id, created on first touch. Grows with the number of
     // distinct ids used over the instance's lifetime — fine for file-backed
-    // collections, whose id sets are small.
-    const locks = new Map<string, Semaphore.Semaphore>();
+    // collections, whose id sets are small. The check-and-create is one
+    // `modifyEffect` so two fibers cannot mint two semaphores for the same id.
+    const locks = yield* SynchronizedRef.make(new Map<string, Semaphore.Semaphore>());
     const withIdLock =
       (id: string) =>
       <X, E, R>(effect: Effect.Effect<X, E, R>): Effect.Effect<X, E, R> =>
-        Effect.suspend(() => {
-          let lock = locks.get(id);
-          if (lock === undefined) {
-            lock = Semaphore.makeUnsafe(1);
-            locks.set(id, lock);
-          }
-          return lock.withPermit(effect);
+        Effect.gen(function* () {
+          const lock = yield* SynchronizedRef.modifyEffect(locks, (current) => {
+            const existing = current.get(id);
+            if (existing !== undefined) return Effect.succeed([existing, current] as const);
+            return Semaphore.make(1).pipe(
+              Effect.map((created) => [created, new Map([...current, [id, created]])] as const),
+            );
+          });
+          return yield* lock.withPermit(effect);
         });
 
     const get = (id: string): Effect.Effect<Option.Option<A>, JsonStoreLoadError> =>

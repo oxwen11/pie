@@ -2,16 +2,27 @@ import type { PieUIMessage } from "@getpie/contract";
 import { Action, Actions } from "@getpie/ui/ai-elements/actions";
 import { Message, MessageContent } from "@getpie/ui/ai-elements/message";
 import { Response } from "@getpie/ui/ai-elements/response";
-import { isReasoningUIPart, isToolUIPart } from "ai";
+import { isReasoningUIPart, isToolUIPart, type FileUIPart } from "ai";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 
+import { ChatImagePreview } from "./chat-image-preview";
+import { CHAT_MARKDOWN_REMARK_PLUGINS } from "./chat-markdown";
+import { ChatMarkdownImage } from "./chat-markdown-image";
 import { ReasoningPart } from "./reasoning-part";
 import { ToolBatch } from "./tool-batch";
 import { ToolPart } from "./tool-part";
 import { useToolBatches } from "./use-tool-batches";
 
 type Part = PieUIMessage["parts"][number];
+
+const RASTER_IMAGE_MEDIA_TYPES = new Set([
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 // Renders an assistant turn's parts: tool/reasoning runs as collapsible
 // batches and text as markdown. The copy action only appears on the last text
@@ -35,11 +46,9 @@ export function AssistantMessage({
       {items.map((item) => {
         if (item.kind === "tool-batch") {
           return (
-            <ToolBatch
-              key={`batch-${item.parts[0]?.index ?? 0}`}
-              parts={item.parts}
-              shouldShimmer={isStreaming && item.isTrailing}
-            />
+            <div key={`batch-${item.parts[0]?.index ?? 0}`} className="py-0.5">
+              <ToolBatch parts={item.parts} shouldShimmer={isStreaming && item.isTrailing} />
+            </div>
           );
         }
         const { part, index } = item;
@@ -61,7 +70,11 @@ export function AssistantMessage({
           return (
             <Message key={index} from="assistant">
               <MessageContent>
-                <Response isAnimating={isStreaming && index === lastTextIndex}>
+                <Response
+                  components={{ img: ChatMarkdownImage }}
+                  isAnimating={isStreaming && index === lastTextIndex}
+                  remarkPlugins={CHAT_MARKDOWN_REMARK_PLUGINS}
+                >
                   {part.text}
                 </Response>
                 {canShowActions && <CopyMarkdownButton text={part.text} />}
@@ -69,9 +82,29 @@ export function AssistantMessage({
             </Message>
           );
         }
+        if (part.type === "file" && RASTER_IMAGE_MEDIA_TYPES.has(part.mediaType)) {
+          return <AssistantImage key={index} part={part} />;
+        }
         return null;
       })}
     </>
+  );
+}
+
+function AssistantImage({ part }: { part: FileUIPart }) {
+  return (
+    <Message from="assistant">
+      <MessageContent>
+        <ChatImagePreview
+          alt={part.filename ?? "Tool output image"}
+          decoding="async"
+          height={1024}
+          loading="lazy"
+          src={part.url}
+          width={1024}
+        />
+      </MessageContent>
+    </Message>
   );
 }
 

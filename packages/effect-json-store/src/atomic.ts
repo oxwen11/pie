@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { Effect, type FileSystem, type PlatformError } from "effect";
+import { Effect, type FileSystem } from "effect";
 
 /**
  * Write `text` to `file` atomically: write a randomly named sibling temp file,
@@ -14,13 +14,13 @@ import { Effect, type FileSystem, type PlatformError } from "effect";
  * cleanup failure is logged and swallowed so it never masks the write's own
  * outcome.
  */
-export const writeFileAtomic = (
+export const writeFileAtomic = Effect.fn("writeFileAtomic")(function* (
   fs: FileSystem.FileSystem,
   file: string,
   text: string,
   options?: { readonly mode?: number },
-): Effect.Effect<void, PlatformError.PlatformError> =>
-  Effect.acquireUseRelease(
+) {
+  return yield* Effect.acquireUseRelease(
     Effect.sync(() => `${file}.${crypto.randomUUID()}.tmp`),
     (tmp) =>
       Effect.gen(function* () {
@@ -42,3 +42,4 @@ export const writeFileAtomic = (
           ),
         ),
   );
+});

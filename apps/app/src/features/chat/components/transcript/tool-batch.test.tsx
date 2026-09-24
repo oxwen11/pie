@@ -84,6 +84,17 @@ describe("ToolBatch", () => {
     await expect.element(first.trigger).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("does not keep click focus, so hover can leave", async () => {
+    const { trigger } = await renderBatch(completedParts(), false);
+    const reveal = trigger.element().querySelector(".absolute");
+    expect(reveal?.className).toContain("group-hover:opacity-100");
+    expect(reveal?.className).toContain("group-focus-within:opacity-100");
+
+    await trigger.click();
+    await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(document.activeElement).not.toBe(trigger.element());
+  });
+
   it("keeps completed batches collapsed by default and toggleable", async () => {
     const { trigger } = await renderBatch(completedParts(), false);
     await expect.element(trigger).toHaveTextContent("Read 1 file");

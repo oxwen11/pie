@@ -3,6 +3,7 @@ import module from "node:module";
 import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
+import { noDotFilename } from "./no-dot-filename";
 import { noLet } from "./no-let";
 import { noRestrictedDisable } from "./no-restricted-disable";
 
@@ -106,5 +107,6 @@ export default definePlugin({
     "node-import-style": nodeImportStyleRule,
     "no-restricted-disable": noRestrictedDisable,
     "no-let": noLet,
+    "no-dot-filename": noDotFilename,
   },
 });

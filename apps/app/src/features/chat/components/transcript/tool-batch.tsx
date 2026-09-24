@@ -29,8 +29,8 @@ function buildTriggerPhrase(label: BatchTriggerLabel): string {
 }
 
 // Closed by default. shouldShimmer only drives the trigger shimmer — computed
-// by the parent from `isTrailing && isStreaming`. Chrome matches ToolHeader
-// (size-4 icon, py-1, gap-2) so batch rows line up with tool rows.
+// by the parent from `isTrailing && isStreaming`. Header chrome matches ordinary
+// tool rows; the parent supplies the outer transcript rhythm.
 export function ToolBatch({
   parts,
   shouldShimmer = false,
@@ -64,6 +64,7 @@ export function ToolBatch({
                 key={part.id ?? `reasoning-${index}`}
                 part={part}
                 isMessageStreaming={shouldShimmer}
+                className="py-1"
               />
             );
           }

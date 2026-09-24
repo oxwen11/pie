@@ -178,7 +178,15 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "text-end", "finish"],
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "message-metadata",
+          "finish",
+        ],
       );
       yield* agent.session.abort(sessionId);
     }),
@@ -310,7 +318,15 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(first.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "text-end", "finish", "session.prompt.submitted"],
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "finish",
+          "session.prompt.submitted",
+        ],
       );
       yield* agent.session.abort(sessionId);
     }),
@@ -351,7 +367,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       let finishCount = 0;
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
@@ -419,7 +436,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const queued = yield* Effect.forkChild(
         Stream.runHead(
           session.events.pipe(
@@ -506,7 +524,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.deepEqual(
         Array.from(chunks, (chunk) => chunk.type),
-        ["start", "text-start", "text-delta", "error"],
+        ["start", "message-metadata", "text-start", "text-delta", "error"],
       );
 
       yield* Effect.eventually(
@@ -594,7 +612,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -620,7 +639,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -638,9 +658,11 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         [
           "session.turn.started",
           "start",
+          "message-metadata",
           "text-start",
           "text-delta",
           "text-end",
+          "message-metadata",
           "finish",
           "session.turn.ended",
         ],
@@ -660,7 +682,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

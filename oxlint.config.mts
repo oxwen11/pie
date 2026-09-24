@@ -3,7 +3,7 @@ import core from "ultracite/oxlint/core";
 import react from "ultracite/oxlint/react";
 import vitest from "ultracite/oxlint/vitest";
 
-import { deferredUltraciteRules, deferredVitestUltraciteRules } from "./oxlint.deferred.mts";
+import { deferredUltraciteRules, deferredVitestUltraciteRules } from "./oxlint-deferred.mts";
 
 const pieIgnorePatterns = [
   "**/routeTree.gen.ts",
@@ -27,7 +27,7 @@ const pieIgnorePatterns = [
 /**
  * Slice 1 of the Ultracite adoption: extend the official oxlint presets and
  * keep the current pie rule surface. New Ultracite rules stay off in
- * `oxlint.deferred.mts` until a later PR deletes that group and fixes hits.
+ * `oxlint-deferred.mts` until a later PR deletes that group and fixes hits.
  *
  * Later slices (one concern each): hooks + type-aware exhaustiveness →
  * barrels / await-in-loop / derived effects → any / unsafe / strict boolean
@@ -52,7 +52,7 @@ export default defineConfig({
     shadcn: {
       ui: ["@getpie/ui/components", "@getpie/ui/ai-elements"],
       ignoreImports: ["^@getpie/ui/lib(/|$)", "^@getpie/ui/hooks(/|$)"],
-      note: "See .agents/rules/ui-components.md. Colors and spacing come from theme tokens.",
+      note: "See .agents/rules/topics/ui-components.md. Colors and spacing come from theme tokens.",
     },
   },
   jsPlugins: [
@@ -113,7 +113,6 @@ export default defineConfig({
           { pattern: "^CommandItem$", allow: ["layout", "spacing"] },
           { pattern: "^Empty$", allow: ["layout", "spacing"] },
           { pattern: "^Label$", allow: ["layout", "color", "spacing", "shape"] },
-          { pattern: "^LoadingBox$", allow: ["layout", "spacing"] },
           { pattern: "^MenuTrigger$", allow: ["layout", "color", "shape"] },
           { pattern: "^PromptInput$", allow: ["layout", "shape"] },
           { pattern: "^RadioGroup$", allow: ["layout", "spacing"] },
@@ -216,6 +215,7 @@ export default defineConfig({
     ],
     "pie/no-restricted-disable": "error",
     "pie/no-let": ["error", { allowInFunctions: true, allowInForLoopInit: true }],
+    "pie/no-dot-filename": "error",
     "import/no-mutable-exports": "error",
     "react/globals": "error",
     "react/purity": "error",
