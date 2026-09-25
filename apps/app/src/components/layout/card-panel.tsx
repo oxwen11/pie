@@ -1,6 +1,6 @@
 import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useMatch } from "@tanstack/react-router";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
@@ -15,9 +15,12 @@ export function CardPanel() {
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
+  // Session route paints the titlebar row. On desktop that row is the drag strip —
+  // keeping the empty shell header too leaves a blank band above the title.
+  const onSessionRoute = useMatch({ from: "/session/$sessionId", shouldThrow: false }) ?? null;
   // Mobile keeps the sidebar trigger, collapsed web keeps the brand mark, and
   // desktop keeps the frameless window drag region. Web expanded needs none.
-  const showHeader = isMobile || webCollapsedChrome || desktop;
+  const showHeader = isMobile || webCollapsedChrome || (desktop && onSessionRoute === null);
 
   return (
     <SidebarInset
