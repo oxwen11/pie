@@ -13,7 +13,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@getpie/ui/components/empty";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FolderPlusIcon } from "lucide-react";
 import { useState } from "react";
@@ -22,7 +28,11 @@ import { toast } from "sonner";
 import Loader from "@/components/loader";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
-import { useProject, useProjects } from "@/features/projects/use-projects";
+import type { ProjectGroup, ProjectSelection } from "@/features/projects/project-select";
+import {
+  useConnectedEnvironments,
+  type ConnectedEnvironment,
+} from "@/features/projects/use-connected-environments";
 import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
 
 import { DraftComposer } from "./draft-composer";
@@ -67,7 +77,48 @@ function DraftRoute() {
   );
 }
 
+/** Imported projects per Environment, switcher order, oldest-first within each. */
+function buildDraftGroups(
+  environments: ReadonlyArray<ConnectedEnvironment>,
+  projectLists: ReadonlyArray<UseQueryResult<ReadonlyArray<Project>>>,
+): ProjectGroup[] {
+  const groups: ProjectGroup[] = [];
+  for (let index = 0; index < environments.length; index += 1) {
+    const environment = environments[index];
+    const list = projectLists[index]?.data;
+    if (environment === undefined || list === undefined) continue;
+    const projects = Array.from(list)
+      .filter((project) => project.type !== "chat")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (projects.length === 0) continue;
+    groups.push({
+      environmentId: environment.environmentId,
+      environmentTitle: environment.title,
+      projects,
+    });
+  }
+  return groups;
+}
+
+/** The picked project plus the Environment that owns it, or null. */
+function findSelection(
+  groups: ReadonlyArray<ProjectGroup>,
+  environmentId: string,
+  projectId: string | undefined,
+): ProjectSelection | null {
+  if (projectId === undefined) return null;
+  const own = groups.find((group) => group.environmentId === environmentId);
+  const project = own?.projects.find((candidate) => candidate.id === projectId);
+  if (own === undefined || project === undefined) return null;
+  return {
+    environmentId: own.environmentId,
+    environmentTitle: own.environmentTitle,
+    project,
+  };
+}
+
 function DraftPage({ environmentId }: { readonly environmentId: string }) {
+  const { localEnvironmentId, environmentRpc } = Route.useRouteContext();
   const orpcQueryUtils = useCatalogOrpc();
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -75,11 +126,23 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
 
-  const projects = useProjects();
-  const selected = useProject(search.projectId) ?? null;
+  // One project.list per connected Environment — same prefixed keys the
+  // sidebar and catalog worker use, so this subscribes to warm caches.
+  const environments = useConnectedEnvironments();
+  const projectLists = useQueries({
+    queries: environments.map((environment) =>
+      environmentRpc.for(environment.environmentId).project.list.queryOptions(),
+    ),
+  });
+
+  const groups = buildDraftGroups(environments, projectLists);
+  const selected = findSelection(groups, environmentId, search.projectId);
+  // Linked host: chat-folder allocation (`~/Pie`) is local-only, so the draft
+  // requires an imported Project there.
+  const requireProject = environmentId !== localEnvironmentId;
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
-      input: selected?.id ? { projectId: selected.id } : {},
+      input: selected?.project.id ? { projectId: selected.project.id } : {},
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
@@ -91,7 +154,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const startSession = useMutation({
     mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
-      let projectId = selected?.id;
+      let projectId = selected?.project.id;
       if (projectId === undefined) {
         const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
         const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
@@ -154,20 +217,19 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     },
   });
 
-  if (projects.isPending) {
+  if (projectLists.some((list) => list.isPending)) {
     return <Loader />;
   }
 
-  if (projects.isError) {
+  const ownList =
+    projectLists[environments.findIndex((entry) => entry.environmentId === environmentId)];
+  if (ownList?.isError) {
     return (
-      <DraftProjectsError
-        message={projects.error.message}
-        onRetry={() => void projects.refetch()}
-      />
+      <DraftProjectsError message={ownList.error.message} onRetry={() => void ownList.refetch()} />
     );
   }
 
-  if (projects.data.length === 0 && search.projectId === undefined) {
+  if (groups.length === 0 && search.projectId === undefined) {
     return (
       <DraftEmptyImport
         importOpen={importOpen}
@@ -189,6 +251,8 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   return (
     <DraftComposer
       draftModel={draftModel}
+      group={groups.length > 1}
+      groups={groups}
       models={modelsQuery.data?.models ?? []}
       onModelChange={(provider, modelId) => {
         navigate({
@@ -204,10 +268,15 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
           to: "/draft",
           search: (prev) => {
             if (next === null) {
-              const { projectId: _removed, ...rest } = prev;
-              return { ...rest, environmentId };
+              // Non-project chats allocate locally — drop the environment hint.
+              const { projectId: _removed, environmentId: _dropped, ...rest } = prev;
+              return rest;
             }
-            return { ...prev, projectId: next, environmentId };
+            return {
+              ...prev,
+              projectId: next.project.id,
+              environmentId: next.environmentId,
+            };
           },
           replace: true,
         }).catch((error: unknown) => {
@@ -220,7 +289,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
           ...(worktree !== undefined ? { worktree } : undefined),
         });
       }}
-      projects={projects.data ?? []}
+      requireProject={requireProject}
       selected={selected}
       startPending={startSession.isPending}
     />
