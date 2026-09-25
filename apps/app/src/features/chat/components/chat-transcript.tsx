@@ -67,8 +67,10 @@ function ChatTranscriptView({
   // that first growth — same path as opening a session that already has data.
   if (snapshot.historyStatus === "loading") {
     return (
-      <div className="relative flex-1 overflow-y-auto py-4">
-        <EmptyTranscript historyStatus="loading" />
+      <div className="relative flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-4xl p-4">
+          <EmptyTranscript historyStatus="loading" />
+        </div>
       </div>
     );
   }
@@ -77,7 +79,8 @@ function ChatTranscriptView({
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
   return (
     <Conversation key={sessionId}>
-      <ConversationContent scrollClassName="scrollbar-thin" className="px-0 py-4">
+      {/* Cap lives on the content, not the scroller, so the scrollbar stays at the panel edge. */}
+      <ConversationContent scrollClassName="scrollbar-thin" className="mx-auto w-full max-w-4xl">
         {snapshot.messages.length === 0 && (
           <EmptyTranscript historyStatus={snapshot.historyStatus} />
         )}
