@@ -45,7 +45,7 @@ const expire = (schedule: Schedule, tickedAt: number) =>
       true,
       "expired",
     );
-    yield* repo.write(skipped);
+    yield* repo.replace(schedule, skipped);
     yield* logSchedule({
       event: "schedule.expired",
       message: "schedule expired",
@@ -75,7 +75,7 @@ const applyTick = (schedule: Schedule, tickedAt: number, decision: TickDecision)
           tickedAt,
           schedule.spec.kind === "once",
         );
-        yield* repo.write(missed);
+        yield* repo.replace(schedule, missed);
         yield* logSchedule({
           event: "schedule.missed",
           message: "schedule run missed",
@@ -101,7 +101,7 @@ const applyTick = (schedule: Schedule, tickedAt: number, decision: TickDecision)
           },
           new Date(tickedAt).toISOString(),
         );
-        yield* repo.write(withMissed);
+        yield* repo.replace(schedule, withMissed);
         yield* logSchedule({
           event: "schedule.missed",
           message: "schedule run missed",

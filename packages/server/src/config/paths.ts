@@ -20,7 +20,7 @@ export class Paths extends Context.Service<
     readonly projectsFile: string;
     /** `storage/sessions/` — one `<projectId>/` subdir per project. */
     readonly sessionsDir: string;
-    /** `storage/schedules/` — one `<scheduleId>.json` per application-level Schedule. */
+    /** `storage/schedules/` — one directory per application-level Schedule. */
     readonly schedulesDir: string;
     /** `worktrees/` — git worktree checkouts, grouped per repository. */
     readonly worktreesDir: string;
