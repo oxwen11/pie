@@ -120,8 +120,9 @@ describe("shell columns", () => {
     );
     expect(seam.firstElementChild?.getBoundingClientRect().width).toBeGreaterThanOrEqual(32);
     const mark = seam.querySelector("span");
-    expect(mark?.style.left).toBe("6px");
-    expect(mark?.style.top).toBe("80px");
+    expect(mark?.style.getPropertyValue("--gutter-y")).toBe("80px");
+    expect(mark?.style.opacity).toBe("1");
+    expect(mark?.style.background).toContain("var(--gutter-y");
 
     await screen.rerender(<Shell contentOpen={false} />);
     await expect.element(page.getByText("Sidebar")).toBeVisible();
