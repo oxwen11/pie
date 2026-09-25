@@ -5,7 +5,7 @@ The new-session surface. `/` has no UI — it redirects to `/draft`. A send crea
 ## Sub-features
 
 - **Centered composer** always: project picker, optional git workspace/worktree controls, model select, TipTap input, submit. Zero projects is not an empty state — the picker stays on **Choose project**. Import remains on the sidebar.
-- **Project picker** — default **Choose project** (no `?projectId=`). The folder icon is part of the trigger. Choosing a project writes `?projectId=` (replace). Hovering the picker shows **X** in place of the folder icon; click **X** clears `?projectId=` back to Choose project without opening the list. Opening the list shows projects, then a **Don't work in a project** button (same clear).
+- **Project picker** — default **Choose project** (no `?projectId=`). The folder icon is part of the trigger. The list covers every connected Environment's imported projects; when more than one Environment has projects, each group is labeled with its Environment title (sidebar style). Picking a project writes `?projectId=` + `?environmentId=` of the owning Environment. Hovering the picker shows **X** in place of the folder icon; click **X** clears back to Choose project and drops `?environmentId=` (non-project chats are local). Opening the list shows projects, then a **Don't work in a project** button (same clear). On a linked host the picker restricts: no clear, no **Choose project** item, no **Don't work in a project**; send needs a Project.
 - **Choose project send** — `project.allocate` creates `<root>/<YYYY-MM-DD>/Chat-1/` (then `Chat-2`, …), registers it as a Project with `type: "chat"`, then `session.create`. Sidebar **Recent** lists the session (title is the prompt). **Projects** does not show the chat leaf. The picker still lists imported folders only.
 - **Workspace mode** (git repos only, after a real Project is selected): **Current directory** vs **New worktree**. Worktree requires a **base branch** (`aria-label="Base branch for worktree"`). Non-git shows **Not a Git repository**. Missing folder shows **Workspace unavailable** and blocks send.
 - **Model select** — options from Pi `get_available_models`, grouped by provider, trigger shows the model name or **Default**, including when the model list is empty. Default model is written into `?provider=&modelId=` once.
@@ -51,7 +51,7 @@ Worktree path (only if the imported folder is a git repo): switch the workspace 
 ## Gotchas
 
 - CDP Enter does **not** submit. Click the arrow button. Draft submit has **no aria-label** — identify it as the composer submit after the field is non-empty.
-- Send is disabled when: input empty, workspace unavailable, create in flight, or worktree mode with no base branch. It is **not** disabled for Choose project.
+- Send is disabled when: input empty, workspace unavailable, create in flight, or worktree mode with no base branch. It is **not** disabled for Choose project on this device. A linked host (`?environmentId=` other than local) restricts the picker: no clear (X), no **Choose project** item, no **Don't work in a project**; send needs a Project.
 - Model select missing ≠ broken draft. Pi unavailable ⇒ empty list ⇒ component returns `null`.
 - After adding/renaming routes, load `/` through Vite before typechecking (`routeTree.gen.ts` is plugin-generated).
 - Verify sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie`. `HOME` and `~/.pi/agent` stay the operator's.
