@@ -7,13 +7,15 @@ import { type EnvironmentSessionRef, sessionRefKey } from "@/lib/session-ref";
 export function Chat({ sessionRef }: { sessionRef: EnvironmentSessionRef }) {
   return (
     <ChatSessionProvider sessionRef={sessionRef}>
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
         <ChatTranscript />
-        <SessionComposer
-          key={sessionRefKey(sessionRef)}
-          sessionRef={sessionRef}
-          toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
-        />
+        <div className="mx-auto w-full max-w-4xl shrink-0 px-4">
+          <SessionComposer
+            key={sessionRefKey(sessionRef)}
+            sessionRef={sessionRef}
+            toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
+          />
+        </div>
       </div>
     </ChatSessionProvider>
   );
