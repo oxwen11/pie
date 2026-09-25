@@ -242,6 +242,9 @@ export const SessionMetadataLayer: Layer.Layer<
                         ...(metadata.updatedAt !== undefined
                           ? { updatedAt: metadata.updatedAt }
                           : undefined),
+                        ...(metadata.source !== undefined
+                          ? { source: metadata.source }
+                          : undefined),
                         ...(status !== undefined ? { status } : undefined),
                       }) satisfies SessionSummary,
                   ),

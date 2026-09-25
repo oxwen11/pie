@@ -64,6 +64,7 @@ export const trySession = (
 
 export const fireSession = (
   snapshot: ScheduleRunSnapshot,
+  scheduleId: string,
 ): Effect.Effect<
   SessionRef,
   ProjectNotFound | StoreReadError | StoreWriteError | GitWorktreeFailure,
@@ -88,6 +89,7 @@ export const fireSession = (
       ...(snapshot.provider !== undefined && snapshot.modelId !== undefined
         ? { model: { provider: snapshot.provider, modelId: snapshot.modelId } }
         : undefined),
+      source: { kind: "schedule", scheduleId },
       ...(snapshot.worktree !== undefined ? { worktree: snapshot.worktree } : undefined),
     });
     return created.ref;

@@ -1,9 +1,4 @@
-import type {
-  CreateScheduleInput,
-  ScheduleSession,
-  ScheduleSpec,
-  UpdateScheduleInput,
-} from "@getpie/contract";
+import type { CreateScheduleInput, ScheduleSpec, UpdateScheduleInput } from "@getpie/contract";
 import { MAX_SCHEDULE_MAX_RUNS } from "@getpie/contract";
 
 import { CREATE_ON_FIRST_RUN_VALUE, type ScheduleFormValues } from "./cadence";
@@ -14,7 +9,7 @@ export type ScheduleFormSubmit = {
   readonly prompt: string;
   readonly spec: ScheduleSpec;
   readonly worktree: boolean;
-  readonly session: ScheduleSession;
+  readonly session: NonNullable<CreateScheduleInput["session"]>;
   readonly expiresAt: string | null;
   readonly maxRuns: number | null;
   readonly runNow: boolean;

@@ -1,3 +1,4 @@
+import { SessionSourceSchema } from "@getpie/contract";
 import {
   PullRequestRefSchema,
   SessionPullRequestLinkSchema,
@@ -22,6 +23,7 @@ const SessionSchema = Schema.Struct({
   worktree: Schema.optionalKey(Schema.Struct({ branch: Schema.String })),
   pullRequests: Schema.optionalKey(Schema.Array(SessionPullRequestLinkSchema)),
   pullRequestRefs: Schema.optionalKey(Schema.Array(PullRequestRefSchema)),
+  source: Schema.optionalKey(SessionSourceSchema),
   provider: Schema.optionalKey(Schema.String),
   modelId: Schema.optionalKey(Schema.String),
   title: Schema.optionalKey(Schema.String),
@@ -97,6 +99,7 @@ const toStorage = (metadata: Session): typeof SessionSchema.Type => ({
       ? { gitBranch: metadata.gitBranch, ownsWorktree: false as const }
       : undefined),
   ...(metadata.pullRequests !== undefined ? { pullRequests: metadata.pullRequests } : undefined),
+  ...(metadata.source !== undefined ? { source: metadata.source } : undefined),
   ...(metadata.provider !== undefined ? { provider: metadata.provider } : undefined),
   ...(metadata.modelId !== undefined ? { modelId: metadata.modelId } : undefined),
   ...(metadata.title !== undefined ? { title: metadata.title } : undefined),

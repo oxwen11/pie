@@ -47,12 +47,22 @@ describe("SessionRepository", () => {
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* SessionRepository;
-        yield* repo.write(meta("sess-1", "proj-a", "claude-uuid-1"));
+        yield* repo.write({
+          ...meta("sess-1", "proj-a", "claude-uuid-1"),
+          source: {
+            kind: "schedule",
+            scheduleId: "11111111-1111-4111-8111-111111111111",
+          },
+        });
         return yield* repo.read("proj-a", "sess-1");
       }),
     );
     expect(read.sessionId).toBe("sess-1");
     expect(read.agentSessionId).toBe("claude-uuid-1");
+    expect(read.source).toEqual({
+      kind: "schedule",
+      scheduleId: "11111111-1111-4111-8111-111111111111",
+    });
   });
 
   it("round-trips pull request links and omits an empty list", async () => {

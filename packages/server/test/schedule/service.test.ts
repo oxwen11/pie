@@ -4,6 +4,7 @@ import type {
   Schedule,
   SessionPhase,
   SessionRef,
+  SessionSource,
   SessionSummary,
 } from "@getpie/contract";
 import { CAPABILITY_UNAVAILABLE_TAG } from "@getpie/contract";
@@ -92,7 +93,11 @@ type SessionRecord = {
 };
 
 const stubSessions = (opts: {
-  readonly created: Array<{ title?: string; projectId: string }>;
+  readonly created: Array<{
+    title?: string;
+    projectId: string;
+    source?: SessionSource;
+  }>;
   readonly prompted: Array<string>;
   readonly catalog: Array<SessionRecord>;
   readonly sessionPhase?: (ref: SessionRef) => SessionPhase;
@@ -114,6 +119,7 @@ const stubSessions = (opts: {
         opts.created.push({
           projectId: input.projectId,
           ...(input.title !== undefined ? { title: input.title } : undefined),
+          ...(input.source !== undefined ? { source: input.source } : undefined),
         });
         const sessionId = `sess-${opts.created.length}`;
         opts.catalog.push({ projectId: input.projectId, sessionId, archived: false });
@@ -184,7 +190,11 @@ const harness = (
 ) =>
   Effect.gen(function* () {
     const store = new Map<string, Schedule>();
-    const created: Array<{ title?: string; projectId: string }> = [];
+    const created: Array<{
+      title?: string;
+      projectId: string;
+      source?: SessionSource;
+    }> = [];
     const prompted: Array<string> = [];
     const catalog: Array<SessionRecord> = [];
     for (const session of opts.seed ?? []) {
@@ -278,7 +288,13 @@ describe("ScheduleService", () => {
       const h = yield* harness();
       const created = yield* h.service.create(cronInput());
       const fired = yield* h.service.runNow(created.id);
-      assert.deepStrictEqual(h.created, [{ projectId: PROJECT_ID, title: "Morning review" }]);
+      assert.deepStrictEqual(h.created, [
+        {
+          projectId: PROJECT_ID,
+          title: "Morning review",
+          source: { kind: "schedule", scheduleId: created.id },
+        },
+      ]);
       assert.deepStrictEqual(fired.ref, { projectId: PROJECT_ID, sessionId: "sess-1" });
       assert.strictEqual(fired.schedule.lastRunStatus, "running");
       assert.strictEqual(fired.schedule.lastSessionId, "sess-1");
@@ -416,27 +432,6 @@ describe("ScheduleService", () => {
     }),
   );
 
-  it.effect("skips runNow when the bound session is busy", () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(ORIGIN);
-      const h = yield* harness({
-        live: true,
-        seed: [{ sessionId: "owned-1" }],
-      });
-      const created = yield* h.service.create(
-        cronInput({
-          spec: { kind: "manual" },
-          session: { policy: "owned", sessionId: "owned-1" },
-        }),
-      );
-      const fired = yield* h.service.runNow(created.id);
-      assert.isUndefined(fired.ref);
-      assert.strictEqual(h.created.length, 0);
-      assert.strictEqual(fired.schedule.lastRunStatus, "skipped");
-      assert.strictEqual(fired.schedule.runs[0]?.skipReason, "in_progress");
-    }),
-  );
-
   it.effect("skips create runNow when the bound session is busy", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(ORIGIN);
@@ -503,6 +498,27 @@ describe("ScheduleService", () => {
         policy: "owned",
         sessionId: "sess-1",
       });
+    }),
+  );
+
+  it.effect("preserves owned binding when an edit resubmits its bound Session", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(ORIGIN);
+      const h = yield* harness();
+      const created = yield* h.service.create(
+        cronInput({ session: { policy: "owned" }, spec: { kind: "manual" } }),
+      );
+      const fired = yield* h.service.runNow(created.id);
+      const sessionId = fired.ref?.sessionId;
+      if (sessionId === undefined) throw new Error("expected bound session");
+
+      const updated = yield* h.service.update({
+        id: created.id,
+        name: "Edited",
+        session: { policy: "existing", sessionId },
+      });
+
+      assert.deepStrictEqual(updated.session, { policy: "owned", sessionId });
     }),
   );
 
@@ -858,7 +874,13 @@ describe("ScheduleService", () => {
       const created = yield* h.service.create(
         cronInput({ spec: { kind: "manual" }, runNow: true }),
       );
-      assert.deepStrictEqual(h.created, [{ projectId: PROJECT_ID, title: "Morning review" }]);
+      assert.deepStrictEqual(h.created, [
+        {
+          projectId: PROJECT_ID,
+          title: "Morning review",
+          source: { kind: "schedule", scheduleId: created.id },
+        },
+      ]);
       assert.strictEqual(created.lastRunStatus, "running");
       assert.strictEqual(created.lastSessionId, "sess-1");
       assert.strictEqual(created.runs[0]?.reason, "manual");

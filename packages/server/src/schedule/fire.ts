@@ -255,7 +255,7 @@ const decide = (
     if (!claimed) {
       return { kind: "miss", skipReason: "queue_overflow" };
     }
-    return yield* fireSession(snapshotOf(schedule)).pipe(
+    return yield* fireSession(snapshotOf(schedule), schedule.id).pipe(
       Effect.map((ref): FireDecision => ({ kind: "run", ref })),
       Effect.catchTag("ProjectNotFound", () =>
         releaseInFlight(schedule.id).pipe(

@@ -122,7 +122,12 @@ export const update = (input: UpdateScheduleInput) =>
     const provider = input.provider ?? current.provider;
     const modelId = input.modelId ?? current.modelId;
     const enabled = input.enabled ?? current.enabled;
-    const session = input.session ?? currentSession;
+    const session =
+      input.session?.policy === "existing" &&
+      currentSession?.policy === "owned" &&
+      input.session.sessionId === currentSession.sessionId
+        ? currentSession
+        : (input.session ?? currentSession);
     const updated: Schedule = {
       ...currentRest,
       name: input.name ?? current.name,
