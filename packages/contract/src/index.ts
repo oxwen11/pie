@@ -1,4 +1,5 @@
 import { agentContract } from "./agent";
+import { assetsContract } from "./assets";
 import { fsContract } from "./fs";
 import { gitContract } from "./git";
 import { packagesContract } from "./packages";
@@ -12,7 +13,17 @@ import { terminalContract } from "./terminal";
 
 export * from "./domain";
 export { toStandardSchema } from "./orpc";
-export type { PiTools, PieToolUIPart, PieUIMessage, PieUIMessageChunk } from "./pi-tools";
+export type {
+  PiTools,
+  PieAssistantMetadata,
+  PieAssistantUIMessage,
+  PieDataTypes,
+  PieToolUIPart,
+  PieUIMessage,
+  PieUIMessageChunk,
+  PieUserMetadata,
+  PieUserUIMessage,
+} from "./pi-tools";
 export * from "./packages";
 export * from "./project";
 export * from "./schedule";
@@ -22,6 +33,7 @@ export * from "./terminal";
 
 export const contract = {
   agent: agentContract,
+  assets: assetsContract,
   project: projectContract,
   fs: fsContract,
   git: gitContract,
@@ -36,6 +48,7 @@ export type Contract = typeof contract;
 
 export {
   agentContract,
+  assetsContract,
   scheduleContract,
   settingsContract,
   fsContract,

@@ -113,7 +113,7 @@ _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE
 ## Hub Domain
 
 **Hub**:
-A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives external events and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. V1 GitHub is a Schedule **trigger** (`trigger.kind: "github"`), not an ad-hoc session with no Schedule row. Design: `docs/design/pie-hub.md`.
+A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives external events and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. V1 GitHub is a Schedule **trigger** (`trigger.kind: "github"`), not an ad-hoc session with no Schedule row. Design: `docs/rfc/pie-hub.md`.
 _Avoid_: treating Hub as a second daemon; `pie hub serve`; exposing the local serve/UI process as the webhook target; a Hub-owned Schedule store; creating Hub sessions that bypass Schedule; `.pie/workflows` / YAML orchestration / multi-step Hub routing (closed — later sources are more Schedule `trigger` kinds); treating `hub.hello` as once-at-connect (Schedule create/update/delete of Hub-facing rows re-sends the full snapshot)
 
 **Relationship**:

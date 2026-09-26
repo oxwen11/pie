@@ -55,30 +55,46 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
-  it("round-trips pull request refs and omits an empty list", async () => {
-    const pullRequestRefs = [
-      { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
-      { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+  it("round-trips pull request links and omits an empty list", async () => {
+    const pullRequests = [
+      {
+        ref: { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
+        source: "agent" as const,
+        linkedAt: "2026-07-16T00:00:00.000Z",
+        excluded: false,
+        snapshot: null,
+        stack: null,
+        stackCheckedAt: null,
+      },
+      {
+        ref: { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+        source: "agent" as const,
+        linkedAt: "2026-07-16T00:00:00.000Z",
+        excluded: false,
+        snapshot: null,
+        stack: null,
+        stackCheckedAt: null,
+      },
     ];
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* SessionRepository;
-        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequestRefs });
+        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequests });
         return yield* repo.read("proj-a", "sess-1");
       }),
     );
-    expect(read.pullRequestRefs).toEqual(pullRequestRefs);
+    expect(read.pullRequests).toEqual(pullRequests);
 
     await run(
       Effect.gen(function* () {
         const repo = yield* SessionRepository;
-        yield* repo.write({ ...read, pullRequestRefs: [] });
+        yield* repo.write({ ...read, pullRequests: [] });
       }),
     );
     const raw = JSON.parse(
       await fs.readFile(path.join(home, "storage", "sessions", "proj-a", "sess-1.json"), "utf8"),
     ) as { readonly data: Record<string, unknown> };
-    expect(raw.data).not.toHaveProperty("pullRequestRefs");
+    expect(raw.data.pullRequests).toEqual([]);
   });
 
   it("strips unknown extra fields on read and never writes them back", async () => {

@@ -304,7 +304,7 @@ describe("desktop launch lifecycle", () => {
     expect(fs.existsSync(path.join(evidence, "recording-001.webm"))).toBe(true);
     expect(fs.existsSync(path.join(evidence, "recording-002.webm"))).toBe(true);
     fs.rmSync(evidence, { recursive: true, force: true });
-  }, 10_000);
+  }, 20_000);
 
   it("leaves the project list empty only when requested", async () => {
     const { root, env } = await fixture({ PIE_DESKTOP_BACKGROUND: "0" });

@@ -69,11 +69,8 @@ export const makeFileCodec = (
   const versionSchema = (version: number): AnySchema | undefined =>
     version === latestVersion ? schema : migrations[version - 1]?.schema;
 
-  const writeAtomic = (
-    file: string,
-    envelope: { readonly version: number; readonly data: unknown },
-  ): Effect.Effect<void, JsonStoreWriteError> =>
-    Effect.gen(function* () {
+  const writeAtomic = Effect.fn("FileCodec.writeAtomic")(
+    function* (file: string, envelope: { readonly version: number; readonly data: unknown }) {
       // Schema encoding cannot rule out values JSON.stringify rejects (BigInt,
       // cycles behind Schema.Unknown), so the throw must stay a typed failure.
       const text = yield* Effect.try({
@@ -81,7 +78,10 @@ export const makeFileCodec = (
         catch: (cause) => cause,
       });
       yield* writeFileAtomic(fs, file, text);
-    }).pipe(Effect.mapError((cause) => new JsonStoreWriteError({ file, cause })));
+    },
+    (effect, file) =>
+      effect.pipe(Effect.mapError((cause) => new JsonStoreWriteError({ file, cause }))),
+  );
 
   const save: FileCodec["save"] = (file, value) =>
     Schema.encodeEffect(schema)(value).pipe(
@@ -99,106 +99,102 @@ export const makeFileCodec = (
       ),
     );
 
-  const migrateStep = (
+  const migrateStep = Effect.fn("FileCodec.migrateStep")(function* (
     file: string,
     step: MigrationStep<AnySchema>,
     input: unknown,
     fromVersion: number,
-  ): Effect.Effect<unknown, JsonStoreMigrationError> =>
-    Effect.gen(function* () {
-      const toVersion = fromVersion + 1;
-      const next = versionSchema(toVersion);
-      if (next === undefined) {
-        return yield* Effect.die(
-          new Error(`invariant: missing schema for v${toVersion} while migrating ${file}`),
-        );
-      }
-      const output = yield* Effect.try({
-        try: () => step.migrate(input),
-        catch: (cause) => new JsonStoreMigrationError({ file, fromVersion, toVersion, cause }),
-      });
-      // A migration must produce a value valid under the next version's schema;
-      // encoding validates the Type side without touching disk.
-      yield* Schema.encodeEffect(next)(output).pipe(
-        Effect.mapError(
-          (cause) => new JsonStoreMigrationError({ file, fromVersion, toVersion, cause }),
-        ),
+  ) {
+    const toVersion = fromVersion + 1;
+    const next = versionSchema(toVersion);
+    if (next === undefined) {
+      return yield* Effect.die(
+        new Error(`invariant: missing schema for v${toVersion} while migrating ${file}`),
       );
-      return output;
+    }
+    const output = yield* Effect.try({
+      try: () => step.migrate(input),
+      catch: (cause) => new JsonStoreMigrationError({ file, fromVersion, toVersion, cause }),
     });
+    // A migration must produce a value valid under the next version's schema;
+    // encoding validates the Type side without touching disk.
+    yield* Schema.encodeEffect(next)(output).pipe(
+      Effect.mapError(
+        (cause) => new JsonStoreMigrationError({ file, fromVersion, toVersion, cause }),
+      ),
+    );
+    return output;
+  });
 
-  const load: FileCodec["load"] = (file) =>
-    Effect.gen(function* () {
-      const raw = yield* readRaw(file);
-      if (raw === undefined) {
-        return undefined;
+  const load: FileCodec["load"] = Effect.fn("FileCodec.load")(function* (file: string) {
+    const raw = yield* readRaw(file);
+    if (raw === undefined) {
+      return undefined;
+    }
+    const parsed = yield* Effect.try({
+      try: () => JSON.parse(raw) as unknown,
+      catch: (cause) => new JsonStoreParseError({ file, cause }),
+    });
+    // A file that fails the envelope decode is a pre-envelope (legacy) file
+    // when `legacy` is configured, and a format error otherwise.
+    const envelope = yield* Schema.decodeUnknownEffect(Envelope)(parsed).pipe(
+      Effect.map(Option.some),
+      Effect.catch((cause) =>
+        legacy === undefined
+          ? Effect.fail(new JsonStoreFormatError({ file, cause }))
+          : Effect.succeed(Option.none<typeof Envelope.Type>()),
+      ),
+    );
+
+    // The version the on-disk bytes were decoded at; 0 marks a legacy file.
+    let version: number;
+    let value: unknown;
+    if (Option.isSome(envelope)) {
+      version = envelope.value.version;
+      if (version > latestVersion) {
+        return yield* Effect.fail(
+          new JsonStoreVersionTooNewError({ file, fileVersion: version, latestVersion }),
+        );
       }
-      const parsed = yield* Effect.try({
-        try: () => JSON.parse(raw) as unknown,
-        catch: (cause) => new JsonStoreParseError({ file, cause }),
-      });
-      // A file that fails the envelope decode is a pre-envelope (legacy) file
-      // when `legacy` is configured, and a format error otherwise.
-      const envelope = yield* Schema.decodeUnknownEffect(Envelope)(parsed).pipe(
-        Effect.map(Option.some),
-        Effect.catch((cause) =>
-          legacy === undefined
-            ? Effect.fail(new JsonStoreFormatError({ file, cause }))
-            : Effect.succeed(Option.none<typeof Envelope.Type>()),
-        ),
+      const fileSchema = versionSchema(version);
+      if (fileSchema === undefined) {
+        return yield* Effect.fail(
+          new JsonStoreFormatError({
+            file,
+            cause: `version must be a positive integer, got ${version}`,
+          }),
+        );
+      }
+      value = yield* Schema.decodeUnknownEffect(fileSchema)(envelope.value.data).pipe(
+        Effect.mapError((cause) => new JsonStoreDecodeError({ file, version, cause })),
       );
+    } else if (legacy !== undefined) {
+      version = 0;
+      const legacyValue = yield* Schema.decodeUnknownEffect(legacy.schema)(parsed).pipe(
+        Effect.mapError((cause) => new JsonStoreDecodeError({ file, version: 0, cause })),
+      );
+      value = yield* migrateStep(file, legacy, legacyValue, 0);
+    } else {
+      return yield* Effect.die(
+        new Error(`invariant: ${file} missed the envelope decode with no legacy schema configured`),
+      );
+    }
 
-      // The version the on-disk bytes were decoded at; 0 marks a legacy file.
-      let version: number;
-      let value: unknown;
-      if (Option.isSome(envelope)) {
-        version = envelope.value.version;
-        if (version > latestVersion) {
-          return yield* Effect.fail(
-            new JsonStoreVersionTooNewError({ file, fileVersion: version, latestVersion }),
-          );
-        }
-        const fileSchema = versionSchema(version);
-        if (fileSchema === undefined) {
-          return yield* Effect.fail(
-            new JsonStoreFormatError({
-              file,
-              cause: `version must be a positive integer, got ${version}`,
-            }),
-          );
-        }
-        value = yield* Schema.decodeUnknownEffect(fileSchema)(envelope.value.data).pipe(
-          Effect.mapError((cause) => new JsonStoreDecodeError({ file, version, cause })),
-        );
-      } else if (legacy !== undefined) {
-        version = 0;
-        const legacyValue = yield* Schema.decodeUnknownEffect(legacy.schema)(parsed).pipe(
-          Effect.mapError((cause) => new JsonStoreDecodeError({ file, version: 0, cause })),
-        );
-        value = yield* migrateStep(file, legacy, legacyValue, 0);
-      } else {
+    for (let from = Math.max(version, 1); from < latestVersion; from++) {
+      const step = migrations[from - 1];
+      if (step === undefined) {
         return yield* Effect.die(
-          new Error(
-            `invariant: ${file} missed the envelope decode with no legacy schema configured`,
-          ),
+          new Error(`invariant: missing migration for v${from} while migrating ${file}`),
         );
       }
-
-      for (let from = Math.max(version, 1); from < latestVersion; from++) {
-        const step = migrations[from - 1];
-        if (step === undefined) {
-          return yield* Effect.die(
-            new Error(`invariant: missing migration for v${from} while migrating ${file}`),
-          );
-        }
-        value = yield* migrateStep(file, step, value, from);
-      }
-      // Legacy adoption (version 0) always writes back, even at a chain of one.
-      if (version < latestVersion) {
-        yield* save(file, value);
-      }
-      return value;
-    });
+      value = yield* migrateStep(file, step, value, from);
+    }
+    // Legacy adoption (version 0) always writes back, even at a chain of one.
+    if (version < latestVersion) {
+      yield* save(file, value);
+    }
+    return value;
+  });
 
   return { load, save };
 };

@@ -71,6 +71,11 @@ export type PlatformTailscale = {
 
 /** Browser or native capabilities supplied by the host entry point. */
 export type Platform = {
+  /** Native window visibility (including minimization), combined with Page Visibility. */
+  visibility?: {
+    getSnapshot: () => boolean;
+    subscribe: (listener: () => void) => () => void;
+  };
   /** Close the host application when that operation exists. */
   quit?: () => void;
   /**

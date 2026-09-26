@@ -1,6 +1,6 @@
 /**
  * Pie-owned Pi RPC child. Session construction uses the published SDK;
- * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v0.85.1).
+ * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v0.87.1).
  *
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
  * extension bind/UI/protocol here, and extension loading via
@@ -28,6 +28,7 @@ import {
 
 import { piBashExtension } from "../bash";
 import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../fff";
+import { sessionToolsExtensionFactory } from "../session-tools-extension";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -65,7 +66,11 @@ export const main = async (): Promise<void> => {
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
-        extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
+        extensionFactories: [
+          ...builtInExtensions,
+          piBashExtension(options.cwd),
+          sessionToolsExtensionFactory,
+        ],
         additionalExtensionPaths: [bundledFff],
       },
     });
