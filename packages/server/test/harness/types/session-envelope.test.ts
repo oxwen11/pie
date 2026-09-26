@@ -10,6 +10,7 @@ describe("isSessionEvent", () => {
       "session.request.asked",
       "project.updated",
       "session.crashed",
+      "session.runtime.stopped",
     ]) {
       expect(isSessionEvent({ type } as never)).toBe(true);
     }
