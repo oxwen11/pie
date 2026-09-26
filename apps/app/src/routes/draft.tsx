@@ -28,12 +28,16 @@ import { toast } from "sonner";
 import Loader from "@/components/loader";
 import { useChatManager } from "@/features/chat/runtime/chat-context";
 import { ImportProjectDialog } from "@/features/projects/import-project-dialog";
-import type { ProjectGroup, ProjectSelection } from "@/features/projects/project-select";
 import {
   useConnectedEnvironments,
   type ConnectedEnvironment,
 } from "@/features/projects/use-connected-environments";
 import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
+
+type DraftProjectGroup = {
+  readonly environmentId: string;
+  readonly projects: ReadonlyArray<Project>;
+};
 
 import { DraftComposer } from "./draft-composer";
 
@@ -81,8 +85,8 @@ function DraftRoute() {
 function buildDraftGroups(
   environments: ReadonlyArray<ConnectedEnvironment>,
   projectLists: ReadonlyArray<UseQueryResult<ReadonlyArray<Project>>>,
-): ProjectGroup[] {
-  const groups: ProjectGroup[] = [];
+): DraftProjectGroup[] {
+  const groups: DraftProjectGroup[] = [];
   for (let index = 0; index < environments.length; index += 1) {
     const environment = environments[index];
     const list = projectLists[index]?.data;
@@ -93,28 +97,17 @@ function buildDraftGroups(
     if (projects.length === 0) continue;
     groups.push({
       environmentId: environment.environmentId,
-      environmentTitle: environment.title,
       projects,
     });
   }
   return groups;
 }
 
-/** The picked project plus the Environment that owns it, or null. */
-function findSelection(
-  groups: ReadonlyArray<ProjectGroup>,
+function projectsFor(
+  groups: ReadonlyArray<DraftProjectGroup>,
   environmentId: string,
-  projectId: string | undefined,
-): ProjectSelection | null {
-  if (projectId === undefined) return null;
-  const own = groups.find((group) => group.environmentId === environmentId);
-  const project = own?.projects.find((candidate) => candidate.id === projectId);
-  if (own === undefined || project === undefined) return null;
-  return {
-    environmentId: own.environmentId,
-    environmentTitle: own.environmentTitle,
-    project,
-  };
+): ReadonlyArray<Project> {
+  return groups.find((group) => group.environmentId === environmentId)?.projects ?? [];
 }
 
 function DraftPage({ environmentId }: { readonly environmentId: string }) {
@@ -136,13 +129,14 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   });
 
   const groups = buildDraftGroups(environments, projectLists);
-  const selected = findSelection(groups, environmentId, search.projectId);
+  const projects = projectsFor(groups, environmentId);
+  const selected = projects.find((project) => project.id === search.projectId) ?? null;
   // Linked host: chat-folder allocation (`~/Pie`) is local-only, so the draft
   // requires an imported Project there.
   const requireProject = environmentId !== localEnvironmentId;
   const modelsQuery = useQuery(
     orpcQueryUtils.agent.listModels.queryOptions({
-      input: selected?.project.id ? { projectId: selected.project.id } : {},
+      input: selected?.id ? { projectId: selected.id } : {},
     }),
   );
   const defaultModel = modelsQuery.data?.defaultModel;
@@ -154,7 +148,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const startSession = useMutation({
     mutationKey: orpcQueryUtils.agent.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
-      let projectId = selected?.project.id;
+      let projectId = selected?.id;
       if (projectId === undefined) {
         const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
         const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
@@ -251,9 +245,21 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   return (
     <DraftComposer
       draftModel={draftModel}
-      group={groups.length > 1}
-      groups={groups}
+      environmentId={environmentId}
+      environments={environments}
       models={modelsQuery.data?.models ?? []}
+      onEnvironmentChange={(next) => {
+        navigate({
+          to: "/draft",
+          search: (prev) => {
+            const { projectId: _removed, ...rest } = prev;
+            return { ...rest, environmentId: next };
+          },
+          replace: true,
+        }).catch((error: unknown) => {
+          console.error("Failed to select draft environment", error);
+        });
+      }}
       onModelChange={(provider, modelId) => {
         navigate({
           to: "/draft",
@@ -272,17 +278,14 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
               const { projectId: _removed, environmentId: _dropped, ...rest } = prev;
               return rest;
             }
-            return {
-              ...prev,
-              projectId: next.project.id,
-              environmentId: next.environmentId,
-            };
+            return { ...prev, projectId: next, environmentId };
           },
           replace: true,
         }).catch((error: unknown) => {
           console.error("Failed to select draft project", error);
         });
       }}
+      projects={projects}
       onStart={(text, worktree) => {
         startSession.mutate({
           text,
