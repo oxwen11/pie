@@ -1,4 +1,4 @@
-import type { CreateWorktreeInput, Project } from "@getpie/contract";
+import type { CreateWorktreeInput } from "@getpie/contract";
 import { PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
 import { CardFrameHeader } from "@getpie/ui/components/card";
 import { toast } from "sonner";
@@ -7,45 +7,41 @@ import { ModelSelectorPicker } from "@/components/model-selector/model-selector-
 import { ChatComposerFrame } from "@/features/chat/components/chat-composer-frame";
 import { useChatComposerController } from "@/features/chat/components/input/use-chat-composer-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
-import { DraftEnvironmentSelect } from "@/features/projects/draft-environment-select";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
 } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
-import { ProjectSelect } from "@/features/projects/project-select";
-import type { ConnectedEnvironment } from "@/features/projects/use-connected-environments";
+import {
+  ProjectSelect,
+  type ProjectGroup,
+  type ProjectSelection,
+} from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 
 export function DraftComposer({
   draftModel,
-  environmentId,
-  environments,
+  groups,
   models,
-  onEnvironmentChange,
   onModelChange,
   onProjectChange,
   onStart,
-  projects,
   requireProject = false,
   selected,
   startPending,
 }: {
   readonly draftModel: { provider: string; modelId: string } | undefined;
-  readonly environmentId: string;
-  readonly environments: ReadonlyArray<ConnectedEnvironment>;
+  readonly groups: ReadonlyArray<ProjectGroup>;
   readonly models: Parameters<typeof ModelSelectorPicker>[0]["models"];
-  readonly onEnvironmentChange: (environmentId: string) => void;
   readonly onModelChange: (provider: string, modelId: string) => void;
-  readonly onProjectChange: (next: string | null) => void;
+  readonly onProjectChange: (next: ProjectSelection | null) => void;
   readonly onStart: (text: string, worktree?: CreateWorktreeInput) => void;
-  readonly projects: ReadonlyArray<Project>;
-  /** Linked host — the picker never offers null, so send needs a project. */
+  /** Linked host with no Project — do not allocate a chat folder there. */
   readonly requireProject?: boolean;
-  readonly selected: Project | null;
+  readonly selected: ProjectSelection | null;
   readonly startPending: boolean;
 }) {
-  const draftWorktree = useDraftWorktree(selected);
+  const draftWorktree = useDraftWorktree(selected?.project ?? null);
   const controller = useChatComposerController({
     onSubmit: (text) => {
       if (draftWorktree.gitState === "workspace-unavailable") {
@@ -64,7 +60,7 @@ export function DraftComposer({
     },
   });
   const hasContent = useChatInputHasContent(controller);
-  const selectedId = selected?.id ?? null;
+  const selectedId = selected?.project.id ?? null;
 
   return (
     <div className="flex h-full items-center justify-center p-4">
@@ -75,16 +71,14 @@ export function DraftComposer({
         header={
           <CardFrameHeader className="py-2">
             <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
-              <DraftEnvironmentSelect
-                environments={environments}
-                onChange={onEnvironmentChange}
-                value={environmentId}
-              />
               <ProjectSelect
+                groups={groups}
                 onChange={onProjectChange}
-                projects={projects}
-                requireProject={requireProject}
-                value={selectedId}
+                value={
+                  selected === null
+                    ? null
+                    : { environmentId: selected.environmentId, projectId: selected.project.id }
+                }
               />
               {draftWorktree.gitState === "not-repository" ? (
                 <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
