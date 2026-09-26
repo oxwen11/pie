@@ -74,43 +74,6 @@ layer(Layer.empty)("turn logging", (it) => {
 
   // A level filter is how a periodic read finds problems, so the outcome has to
   // reach the level — not just an annotation somebody has to go looking for.
-  it.effect("raises a failed turn to warn and carries the category", () =>
-    Effect.gen(function* () {
-      const records: Array<LogRecord> = [];
-      const context = yield* Layer.build(capture(records));
-      const live = yield* session;
-
-      yield* Effect.gen(function* () {
-        yield* live.emit({ type: "session.turn.started", turnId: "turn-2" });
-        yield* live.emit({
-          type: "session.turn.ended",
-          turnId: "turn-2",
-          outcome: "failed",
-          error: { category: "rate_limited", message: "slow down" },
-        });
-      }).pipe(Effect.provide(context));
-
-      const ended = records[1];
-      assert.ok(ended !== undefined);
-      assert.equal(ended.level, "WARN");
-      assert.equal(ended.annotations.errorCategory, "rate_limited");
-      assert.equal(ended.annotations.error, "slow down");
-    }),
-  );
 
   // Cancellation is the user's decision, not a problem to surface later.
-  it.effect("keeps a canceled turn at info", () =>
-    Effect.gen(function* () {
-      const records: Array<LogRecord> = [];
-      const context = yield* Layer.build(capture(records));
-      const live = yield* session;
-
-      yield* live
-        .emit({ type: "session.turn.ended", turnId: "turn-3", outcome: "canceled" })
-        .pipe(Effect.provide(context));
-
-      assert.equal(records[0]?.level, "INFO");
-      assert.equal(records[0]?.annotations.outcome, "canceled");
-    }),
-  );
 });

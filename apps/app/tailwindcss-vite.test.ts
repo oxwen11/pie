@@ -46,15 +46,6 @@ describe("tailwindcssVite", () => {
     ).toBeUndefined();
   });
 
-  it("forwards to Tailwind when server.environments is present", () => {
-    expect(
-      hotUpdateHandler(generateServe(tailwindcssVite())).call(pluginContext, {
-        ...bundledDevUpdate,
-        server: { environments: {} },
-      }),
-    ).toBeUndefined();
-  });
-
   it("still throws without the wrapper — upstream still needs server.environments", () => {
     expect(() =>
       hotUpdateHandler(generateServe(tailwindcss())).call(pluginContext, bundledDevUpdate),

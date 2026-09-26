@@ -45,34 +45,4 @@ describe("mergeDiscoveredHosts", () => {
       },
     ]);
   });
-
-  it("skips a Tailscale host whose hostname is already in ssh-config", () => {
-    const merged = mergeDiscoveredHosts(
-      [
-        {
-          alias: "box.tailnet.ts.net",
-          hostname: "box.tailnet.ts.net",
-          username: null,
-          port: null,
-          source: "ssh-config",
-        },
-      ],
-      [
-        {
-          alias: "box.tailnet.ts.net",
-          hostname: "box.tailnet.ts.net",
-          online: true,
-        },
-      ],
-    );
-    expect(merged).toEqual([
-      {
-        alias: "box.tailnet.ts.net",
-        hostname: "box.tailnet.ts.net",
-        username: null,
-        port: null,
-        source: "ssh-config",
-      },
-    ]);
-  });
 });

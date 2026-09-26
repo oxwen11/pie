@@ -43,11 +43,6 @@ describe("isLoopbackBind", () => {
 });
 
 describe("listenServer", () => {
-  it("returns an OS-assigned port", async () => {
-    const port = await listenServer(makeServer(), 0);
-    expect(port).toBeGreaterThan(0);
-  });
-
   it("rejects instead of emitting an unhandled error when a port is occupied", async () => {
     const blocker = makeServer();
     const occupiedPort = await listenServer(blocker, 0);

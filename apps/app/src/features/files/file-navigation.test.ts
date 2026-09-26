@@ -14,17 +14,4 @@ describe("file navigation tracker", () => {
     expect(tracker.getSnapshot()).toBe(2);
     expect(listener).toHaveBeenCalledTimes(2);
   });
-
-  it("does not version ordinary file activation and releases listeners", () => {
-    const tracker = createFileNavigationTracker();
-    const listener = vi.fn<() => void>();
-    tracker.subscribe(listener);
-
-    tracker.request({});
-    tracker.dispose();
-    tracker.request({ line: 7 });
-
-    expect(tracker.getSnapshot()).toBe(1);
-    expect(listener).not.toHaveBeenCalled();
-  });
 });

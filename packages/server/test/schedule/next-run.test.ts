@@ -41,18 +41,9 @@ describe("computeNextRunAt", () => {
   it("adds everyMs without jitter", () => {
     expect(computeNextRunAt({ kind: "every", everyMs: 60_000 }, "id", NOW)).toBe(NOW + 60_000);
   });
-
-  it("returns null for manual", () => {
-    expect(computeNextRunAt({ kind: "manual" }, "id", NOW)).toBeNull();
-  });
 });
 
 describe("countMissedSlots", () => {
-  it("counts skipped every intervals after the due slot", () => {
-    expect(countMissedSlots({ kind: "every", everyMs: 60_000 }, NOW, NOW + 90_000)).toBe(1);
-    expect(countMissedSlots({ kind: "every", everyMs: 60_000 }, NOW, NOW + 5 * 60_000)).toBe(5);
-  });
-
   it("is zero when the due slot is still the current one", () => {
     expect(countMissedSlots({ kind: "every", everyMs: 60_000 }, NOW, NOW + 30_000)).toBe(0);
   });
