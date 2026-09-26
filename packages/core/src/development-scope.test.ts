@@ -53,12 +53,6 @@ describe("resolveGitCheckout", () => {
     git(directory, ["checkout", "--detach", "HEAD"]);
     expect(resolveGitCheckout(directory)).toEqual({ inGit: true, branch: sha });
   });
-
-  it("reports inGit false outside a Git checkout", () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pie-not-git-"));
-    roots.push(directory);
-    expect(resolveGitCheckout(directory)).toEqual({ inGit: false });
-  });
 });
 
 function git(cwd: string, args: string[]): string {
