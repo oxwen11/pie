@@ -3,8 +3,6 @@ import { Button } from "@getpie/ui/components/button";
 import {
   Select,
   SelectContent,
-  SelectGroup,
-  SelectGroupLabel,
   SelectItem,
   SelectSeparator,
   SelectTrigger,
@@ -16,50 +14,23 @@ import { useState } from "react";
 /** Sentinel that is not a project UUID — `allocateChatProjectDir` on send. */
 const NEW_FOLDER_VALUE = "new-folder";
 
-/** One Environment's pickable imported projects. */
-export type ProjectGroup = {
-  readonly environmentId: string;
-  readonly environmentTitle: string;
-  readonly projects: ReadonlyArray<Project>;
-};
-
-/** What a pick emits — the project plus the Environment that owns it. */
-export type ProjectSelection = {
-  readonly environmentId: string;
-  readonly environmentTitle: string;
-  readonly project: Project;
-};
-
-/** ids are UUIDs, so ':' cannot appear in either half. */
-const selectionValue = (environmentId: string, projectId: string): string =>
-  `${environmentId}:${projectId}`;
-
-// Draft project picker across every connected Environment. `null` / Choose
-// project → allocate under `~/Pie` on send. `requireProject` (linked host):
-// no null mode — no clear, no "Don't work in a project", because chat-folder
-// allocation is local-only.
+// Draft project picker for the selected Environment. `null` / Choose project →
+// allocate under `~/Pie` on send. `requireProject` (linked host): no null mode,
+// because chat-folder allocation is local-only.
 export function ProjectSelect({
-  group,
-  groups,
   onChange,
+  projects,
   requireProject = false,
   value,
 }: {
-  /** Label each Environment's group (more than one has projects). */
-  readonly group?: boolean;
-  /** Environments in switcher order; empty ones already filtered out. */
-  readonly groups: ReadonlyArray<ProjectGroup>;
-  onChange: (next: ProjectSelection | null) => void;
-  readonly requireProject?: boolean;
-  /** Currently picked project, or null for Choose project. */
-  readonly value: { environmentId: string; projectId: string } | null;
+  onChange: (projectId: string | null) => void;
+  projects: ReadonlyArray<Project>;
+  requireProject?: boolean;
+  value: string | null;
 }) {
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
-  const selectedGroup = groups.find((entry) => entry.environmentId === value?.environmentId);
-  const selectedProject = selectedGroup?.projects.find(
-    (project) => project.id === value?.projectId,
-  );
+  const selected = projects.find((project) => project.id === value);
 
   return (
     <div
@@ -78,37 +49,15 @@ export function ProjectSelect({
       <Select
         items={[
           ...(requireProject ? [] : [{ label: "Choose project", value: NEW_FOLDER_VALUE }]),
-          ...groups.flatMap((entry) =>
-            entry.projects.map((project) => ({
-              label: project.name,
-              value: selectionValue(entry.environmentId, project.id),
-            })),
-          ),
+          ...projects.map((project) => ({ label: project.name, value: project.id })),
         ]}
         onOpenChange={setOpen}
         onValueChange={(next) => {
-          if (next === NEW_FOLDER_VALUE) {
-            onChange(null);
-            return;
-          }
-          for (const entry of groups) {
-            const project = entry.projects.find(
-              (candidate) => selectionValue(entry.environmentId, candidate.id) === next,
-            );
-            if (project !== undefined) {
-              onChange({
-                environmentId: entry.environmentId,
-                environmentTitle: entry.environmentTitle,
-                project,
-              });
-              return;
-            }
-          }
+          if (next === NEW_FOLDER_VALUE) onChange(null);
+          else if (typeof next === "string") onChange(next);
         }}
         open={open}
-        value={
-          value === null ? NEW_FOLDER_VALUE : selectionValue(value.environmentId, value.projectId)
-        }
+        value={value ?? NEW_FOLDER_VALUE}
       >
         {/* The name is only the folder's basename, so two projects can share one —
           the path is what actually tells them apart. */}
@@ -119,7 +68,7 @@ export function ProjectSelect({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           size="sm"
-          title={selectedProject?.path}
+          title={selected?.path}
         >
           {value !== null && !requireProject ? (
             <span
@@ -139,25 +88,17 @@ export function ProjectSelect({
           <SelectValue placeholder="Choose project" />
         </SelectTrigger>
         <SelectContent>
-          {groups.map((entry) => (
-            <SelectGroup key={entry.environmentId}>
-              {group ? <SelectGroupLabel>{entry.environmentTitle}</SelectGroupLabel> : null}
-              {entry.projects.map((project) => (
-                <SelectItem
-                  key={selectionValue(entry.environmentId, project.id)}
-                  value={selectionValue(entry.environmentId, project.id)}
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">{project.name}</span>
-                    <span className="text-muted-foreground truncate text-xs">{project.path}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
+          {projects.map((project) => (
+            <SelectItem key={project.id} value={project.id}>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate">{project.name}</span>
+                <span className="text-muted-foreground truncate text-xs">{project.path}</span>
+              </span>
+            </SelectItem>
           ))}
           {value !== null && !requireProject ? (
             <>
-              {groups.length > 0 ? <SelectSeparator /> : null}
+              {projects.length > 0 ? <SelectSeparator /> : null}
               <Button
                 className="w-full justify-start"
                 onClick={() => {
